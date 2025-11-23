@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Gestor | MSM</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: 'var(--primary-50)',
+                            100: 'var(--primary-100)',
+                            200: 'var(--primary-200)',
+                            300: 'var(--primary-300)',
+                            400: 'var(--primary-400)',
+                            500: 'var(--primary-500)',
+                            600: 'var(--primary-600)',
+                            700: 'var(--primary-700)',
+                            800: 'var(--primary-800)',
+                            900: 'var(--primary-900)',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Outfit', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="./index.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, var(--slate-50) 0%, var(--primary-50) 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="w-full max-w-md p-6 animate-slide-up">
+        <div class="glass rounded-2xl p-8 shadow-xl border border-white/50">
+            <div class="text-center mb-8">
+                <div
+                    class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary-100 text-primary-600 mb-4 shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                        stroke="currentColor" class="w-8 h-8">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V19.5h-6v-3.75zM13.5 19.5h2.25v-3.75a2.25 2.25 0 00-2.25-2.25h-2.25V19.5z" />
+                    </svg>
+                </div>
+                <h1 class="text-2xl font-bold text-slate-900 font-display">Create Gestor User</h1>
+                <p class="text-slate-500 mt-2 text-sm">Initializing system setup...</p>
+            </div>
+
+            <div id="status-container" class="bg-slate-50 rounded-xl p-4 border border-slate-200 mb-6">
+                <div class="flex items-center space-x-3">
+                    <div id="spinner" class="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-600"></div>
+                    <span id="result" class="text-sm font-medium text-slate-700">Processing
+                        request...</span>
+                </div>
+            </div>
+
+            <div class="flex justify-center">
+                <a href="/"
+                    class="btn-primary w-full text-center no-underline inline-block opacity-0 pointer-events-none transition-opacity duration-300"
+                    id="home-btn">
+                    Go to Dashboard
+                </a>
+            </div>
+        </div>
+        <p class="text-center text-slate-400 text-xs mt-8">
+            &copy; 2024 MSM Gestão Inteligente. All rights reserved.
+        </p>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+
+        // Use the keys from your project
+        const supabaseUrl = 'https://lumgdncfbznjgvtsriwp.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx1bWdkbmNmYnpuamd2dHNyaXdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM1OTMyNDgsImV4cCI6MjA3OTE2OTI0OH0.z66FVw-bMWlQbWBotC7_c_pjR9XMU--QMLMr4S5u9NU';
+
+        const supabase = createClient(supabaseUrl, supabaseKey);
+
+        async function create() {
+            const resultDiv = document.getElementById('result');
+            const statusContainer = document.getElementById('status-container');
+            const spinner = document.getElementById('spinner');
+            const homeBtn = document.getElementById('home-btn');
+
+            try {
+                const { data, error } = await supabase.auth.signUp({
+                    email: 'matheusmiranda357@gmail.com',
+                    password: 'password123', // User can change this later, or use the bypass with 070223
+                });
+
+                if (error) throw error;
+
+                statusContainer.className = 'bg-green-50 rounded-xl p-4 border border-green-200 mb-6 flex items-start gap-3';
+                resultDiv.innerHTML = `<div><span class="text-green-700 font-semibold">Success!</span> <span class="text-green-600 block mt-1 text-xs">User created. ID: ${data.user ? data.user.id.substring(0, 8) + '...' : 'unknown'}</span></div>`;
+                spinner.className = 'hidden';
+
+                // Show success icon
+                const iconDiv = document.createElement('div');
+                iconDiv.className = 'text-green-500 mt-0.5';
+                iconDiv.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" /></svg>`;
+                statusContainer.insertBefore(iconDiv, statusContainer.firstChild);
+
+            } catch (error) {
+                // Error State
+                statusContainer.className = 'bg-red-50 rounded-xl p-4 border border-red-200 mb-6 flex items-start gap-3';
+                resultDiv.innerHTML = `<div><span class="text-red-700 font-semibold">Error</span> <span class="text-red-600 block mt-1 text-xs">${error.message}</span></div>`;
+                spinner.className = 'hidden';
+
+                // Show error icon
+                const iconDiv = document.createElement('div');
+                iconDiv.className = 'text-red-500 mt-0.5';
+                iconDiv.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" /></svg>`;
+                statusContainer.insertBefore(iconDiv, statusContainer.firstChild);
+            } finally {
+                // Show home button
+                homeBtn.classList.remove('opacity-0', 'pointer-events-none');
+            }
+        }
+
+        create();
+    </script>
+</body>
+
+</html>

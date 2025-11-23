@@ -1,0 +1,5 @@
+{
+  "name": "MSM - Gestão Inteligente de Produção",
+  "description": "Sistema para gestão inteligente de produção, controlando estoque de matéria-prima, produção de máquinas e indicadores de desempenho.",
+  "requestFramePermissions": []
+}

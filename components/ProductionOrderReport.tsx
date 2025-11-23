@@ -1,0 +1,358 @@
+import React, { useMemo } from 'react';
+import type { ProductionOrderData, StockItem } from '../types';
+import { PrinterIcon } from './icons';
+import { LogoIcon } from './Logo';
+
+const trelicaModels = [
+    { cod: 'H6LE12S', modelo: 'H-6 LEVE (ESPAÇADOR)', tamanho: '12', superior: '5,4', inferior: '3,2', senozoide: '3,2', pesoFinal: '5,502' },
+    { cod: 'H6_12', modelo: 'H-6', tamanho: '12', superior: '5,6', inferior: '3,8', senozoide: '3,2', pesoFinal: '6,288' },
+    { cod: 'H8L6', modelo: 'H-8 LEVE', tamanho: '6', superior: '5,6', inferior: '3,2', senozoide: '3,2', pesoFinal: '2,898' },
+    { cod: 'H8L12', modelo: 'H-8 LEVE', tamanho: '12', superior: '5,6', inferior: '3,2', senozoide: '3,2', pesoFinal: '5,797' },
+    { cod: 'H8M6', modelo: 'H-8 MÉDIA', tamanho: '6', superior: '5,6', inferior: '3,8', senozoide: '3,2', pesoFinal: '3,209' },
+    { cod: 'H8M12', modelo: 'H-8 MÉDIA', tamanho: '12', superior: '5,6', inferior: '3,8', senozoide: '3,2', pesoFinal: '6,418' },
+    { cod: 'H8P6', modelo: 'H-8 PESADA', tamanho: '6', superior: '6', inferior: '3,8', senozoide: '4,2', pesoFinal: '4,087' },
+    { cod: 'H8P12', modelo: 'H-8 PESADA', tamanho: '12', superior: '6', inferior: '3,8', senozoide: '4,2', pesoFinal: '8,174' },
+    { cod: 'H10L6', modelo: 'H-10 LEVE', tamanho: '6', superior: '5,8', inferior: '3,8', senozoide: '3,8', pesoFinal: '3,843' },
+    { cod: 'H10L12', modelo: 'H-10 LEVE', tamanho: '12', superior: '5,8', inferior: '3,8', senozoide: '3,8', pesoFinal: '7,686' },
+    { cod: 'H10P12', modelo: 'H-10 PESADA', tamanho: '12', superior: '6', inferior: '4,2', senozoide: '4,2', pesoFinal: '9,057' },
+    { cod: 'H12L6', modelo: 'H-12 LEVE', tamanho: '6', superior: '5,8', inferior: '3,2', senozoide: '3,8', pesoFinal: '3,522' },
+    { cod: 'H12L12', modelo: 'H-12 LEVE', tamanho: '12', superior: '5,8', inferior: '3,2', senozoide: '3,8', pesoFinal: '7,044' },
+    { cod: 'H12P6', modelo: 'H-12 PESADA', tamanho: '6', superior: '6', inferior: '5', senozoide: '4,2', pesoFinal: '5,270' },
+    { cod: 'H12P12', modelo: 'H-12 PESADA', tamanho: '12', superior: '6', inferior: '5', senozoide: '4,2', pesoFinal: '10,540' },
+    { cod: 'H16_12', modelo: 'H-16', tamanho: '12', superior: '6', inferior: '5', senozoide: '4,2', pesoFinal: '11,263' },
+    { cod: 'H25_12', modelo: 'H-25', tamanho: '12', superior: '8', inferior: '6', senozoide: '5', pesoFinal: '20,042' },
+];
+
+interface ProductionOrderReportProps {
+  reportData: ProductionOrderData;
+  stock: StockItem[];
+  onClose: () => void;
+}
+
+const formatDuration = (ms: number) => {
+    if (isNaN(ms) || ms < 0) return '00:00:00';
+    const totalSeconds = Math.floor(ms / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+};
+
+const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportData, stock, onClose }) => {
+    const { 
+        totalDurationMs, 
+        totalDowntimeMs, 
+        effectiveTimeMs, 
+        yieldPercentage,
+    } = useMemo(() => {
+        if (!reportData.startTime || !reportData.endTime) {
+            return { totalDurationMs: 0, totalDowntimeMs: 0, effectiveTimeMs: 0, yieldPercentage: 0 };
+        }
+        const start = new Date(reportData.startTime).getTime();
+        const end = new Date(reportData.endTime).getTime();
+        const totalDurationMs = end - start;
+        
+        const totalDowntimeMs = (reportData.downtimeEvents || []).reduce((acc, event) => {
+            const stop = new Date(event.stopTime).getTime();
+            const resume = event.resumeTime ? new Date(event.resumeTime).getTime() : end;
+            const effectiveStop = Math.max(start, stop);
+            const effectiveResume = Math.min(end, resume);
+            if (effectiveResume > effectiveStop) {
+                return acc + (effectiveResume - effectiveStop);
+            }
+            return acc;
+        }, 0);
+
+        const effectiveTimeMs = totalDurationMs > totalDowntimeMs ? totalDurationMs - totalDowntimeMs : 0;
+
+        const totalPlannedWeight = reportData.machine === 'Treliça' ? reportData.plannedOutputWeight : reportData.totalWeight;
+        const totalProducedWeight = reportData.actualProducedWeight || 0;
+        
+        const yieldPercentage = totalPlannedWeight && totalPlannedWeight > 0 ? (totalProducedWeight / totalPlannedWeight) * 100 : 0;
+
+        return { totalDurationMs, totalDowntimeMs, effectiveTimeMs, yieldPercentage };
+
+    }, [reportData]);
+    
+    const totalMetersProduced = useMemo(() => {
+        const weightKg = reportData.actualProducedWeight || 0;
+        if (weightKg === 0) return 0;
+
+        const bitolaMm = parseFloat(reportData.targetBitola);
+        if (isNaN(bitolaMm) || bitolaMm <= 0) return 0;
+        
+        const steelDensityKgPerM3 = 7850;
+        const radiusM = (bitolaMm / 1000) / 2;
+        const areaM2 = Math.PI * Math.pow(radiusM, 2);
+        
+        const volumeM3 = weightKg / steelDensityKgPerM3;
+        const lengthM = volumeM3 / areaM2;
+
+        return lengthM;
+    }, [reportData.actualProducedWeight, reportData.targetBitola]);
+
+    const consumedLots = useMemo(() => {
+        const orderEndTime = reportData.endTime ? new Date(reportData.endTime).getTime() : Date.now();
+        const downtimeEvents = reportData.downtimeEvents || [];
+
+        return (reportData.processedLots || []).map(processedLot => {
+            const stockItem = stock.find(s => s.id === processedLot.lotId);
+            
+            const lotStartTime = new Date(processedLot.startTime).getTime();
+            const lotEndTime = new Date(processedLot.endTime).getTime();
+            const totalLotDurationMs = lotEndTime - lotStartTime;
+            
+            const downtimeForLotMs = downtimeEvents.reduce((acc, event) => {
+                const eventStartTime = new Date(event.stopTime).getTime();
+                const eventEndTime = event.resumeTime ? new Date(event.resumeTime).getTime() : orderEndTime;
+                
+                const overlapStart = Math.max(lotStartTime, eventStartTime);
+                const overlapEnd = Math.min(lotEndTime, eventEndTime);
+                
+                if (overlapEnd > overlapStart) {
+                    return acc + (overlapEnd - overlapStart);
+                }
+                return acc;
+            }, 0);
+            
+            const effectiveLotDurationMs = totalLotDurationMs > downtimeForLotMs ? totalLotDurationMs - downtimeForLotMs : 0;
+            
+            return {
+                ...processedLot,
+                internalLot: stockItem?.internalLot || 'N/A',
+                originalWeight: stockItem?.initialQuantity || 0,
+                effectiveDurationMs: effectiveLotDurationMs,
+            };
+        });
+    }, [reportData, stock]);
+
+    const dailyBreakdown = useMemo(() => {
+        if (!consumedLots || consumedLots.length === 0) return [];
+        
+        // FIX: Explicitly type the accumulator for the `reduce` method to help TypeScript's type inference.
+        // This resolves an issue where the `lots` variable in the subsequent `map` was being inferred as `unknown`.
+        // Fix: Explicitly typed the accumulator for the `reduce` method to help TypeScript's type inference. This resolves an issue where the `lots` variable in the subsequent `map` was being inferred as `unknown`.
+        const grouped = consumedLots.reduce<Record<string, (typeof consumedLots)[number][]>>((acc, lot) => {
+            const dateKey = new Date(lot.endTime).toISOString().split('T')[0];
+            if (!acc[dateKey]) {
+                acc[dateKey] = [];
+            }
+            acc[dateKey].push(lot);
+            return acc;
+        }, {});
+        
+        return Object.entries(grouped)
+            .map(([date, lots]) => ({
+                date: new Date(date).toLocaleDateString('pt-BR', {timeZone: 'UTC'}),
+                lots,
+                totalWeight: lots.reduce((sum, l) => sum + (l.finalWeight || 0), 0)
+            }))
+            .sort((a,b) => {
+                const dateA = a.date.split('/').reverse().join('-');
+                const dateB = b.date.split('/').reverse().join('-');
+                return new Date(dateA).getTime() - new Date(b.date).getTime();
+            });
+    }, [consumedLots]);
+
+    const operatorNames = useMemo(() => {
+        if (!reportData.operatorLogs || reportData.operatorLogs.length === 0) {
+            return 'N/A';
+        }
+        const names = new Set(reportData.operatorLogs.map(log => log.operator));
+        return Array.from(names).join(', ');
+    }, [reportData.operatorLogs]);
+
+    const inputBitola = useMemo(() => {
+        if (!reportData.selectedLotIds || !Array.isArray(reportData.selectedLotIds) || reportData.selectedLotIds.length === 0) {
+            return 'N/A';
+        }
+        const firstLotId = reportData.selectedLotIds[0];
+        const firstLot = stock.find(s => s.id === firstLotId);
+        return firstLot?.bitola || 'N/A';
+    }, [reportData.selectedLotIds, stock]);
+
+    const totalPlannedWeight = reportData.totalWeight;
+    const totalProducedWeight = reportData.actualProducedWeight || 0;
+    const totalDifference = totalPlannedWeight - totalProducedWeight;
+    const totalLossPercentage = totalPlannedWeight > 0 ? (totalDifference / totalPlannedWeight) * 100 : 0;
+
+    const trelicaModelDetails = useMemo(() => {
+        if (!reportData.trelicaModel) return null;
+        return trelicaModels.find(m => m.modelo === reportData.trelicaModel && m.tamanho === reportData.tamanho);
+    }, [reportData]);
+    
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 print-modal-container">
+      <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-5xl max-h-[95vh] flex flex-col print-modal-content">
+        <div className="flex justify-between items-center mb-4 pb-4 border-b no-print">
+          <h2 className="text-2xl font-bold text-slate-800">Relatório de Ordem de Produção</h2>
+          <div>
+            <button
+              onClick={() => window.print()}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg transition flex items-center justify-center gap-2 mr-4"
+              title="Imprimir / Salvar PDF"
+            >
+              <PrinterIcon className="h-5 w-5" />
+              <span>Imprimir</span>
+            </button>
+            <button
+              onClick={onClose}
+              className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-4 rounded-lg transition"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+        <div className="overflow-y-auto print-section bg-white p-4">
+              <div className="flex items-center justify-between mb-6">
+                  <LogoIcon className="h-16 w-16 text-slate-800" />
+                  <div className="text-right">
+                    <h1 className="text-2xl font-bold text-black">MSM - Gestão de Produção</h1>
+                    <p className="text-lg text-slate-700">Relatório de Produção Finalizada</p>
+                    <p className="text-sm text-slate-500">Gerado em: {new Date().toLocaleString('pt-BR')}</p>
+                  </div>
+              </div>
+
+              <div className="border rounded-lg p-4 mb-6">
+                <h3 className="text-lg font-semibold mb-3">Dados da Ordem</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div><strong>Nº Ordem:</strong> {reportData.orderNumber}</div>
+                    <div><strong>Máquina:</strong> {reportData.machine}</div>
+                    <div><strong>Operador(es):</strong> {operatorNames}</div>
+                    {reportData.machine === 'Treliça' ? (
+                        <>
+                            <div><strong>Modelo:</strong> {reportData.trelicaModel}</div>
+                            {reportData.quantityToProduce && (
+                                <div><strong>Qtd. Planejada:</strong> {reportData.quantityToProduce} peças</div>
+                            )}
+                            {reportData.plannedOutputWeight && (
+                                <div><strong>Peso Planejado:</strong> {reportData.plannedOutputWeight.toFixed(2)} kg</div>
+                            )}
+                             <div><strong>Peso Matéria-Prima:</strong> {reportData.totalWeight.toFixed(2)} kg</div>
+                        </>
+                    ) : (
+                        <>
+                            <div><strong>Bitola Entrada:</strong> {inputBitola}</div>
+                            <div><strong>Bitola Saída:</strong> {reportData.targetBitola}</div>
+                        </>
+                    )}
+                    <div><strong>Status:</strong> Concluída</div>
+                    <div className="md:col-span-1"><strong>Início:</strong> {reportData.startTime ? new Date(reportData.startTime).toLocaleString('pt-BR') : 'N/A'}</div>
+                    <div className="md:col-span-2"><strong>Fim:</strong> {reportData.endTime ? new Date(reportData.endTime).toLocaleString('pt-BR') : 'N/A'}</div>
+                </div>
+              </div>
+
+              <div className="border rounded-lg p-4 mb-6">
+                <h3 className="text-lg font-semibold mb-3">Indicadores de Desempenho</h3>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
+                    <div className="bg-slate-100 p-2 rounded">
+                        <div className="text-xs text-slate-500">Aproveitamento</div>
+                        <div className="text-xl font-bold text-slate-800">{yieldPercentage.toFixed(2)}%</div>
+                    </div>
+                     <div className="bg-emerald-100 p-2 rounded">
+                        <div className="text-xs text-emerald-700">Produção (kg)</div>
+                        <div className="text-xl font-bold text-emerald-800">{(reportData.actualProducedWeight || 0).toFixed(2)}</div>
+                    </div>
+                     <div className="bg-teal-100 p-2 rounded">
+                        <div className="text-xs text-teal-700">Produção (m)</div>
+                        <div className="text-xl font-bold text-teal-800">{totalMetersProduced.toFixed(2)}</div>
+                    </div>
+                    <div className="bg-green-100 p-2 rounded">
+                        <div className="text-xs text-green-700">Tempo Efetivo</div>
+                        <div className="text-xl font-bold text-green-800">{formatDuration(effectiveTimeMs)}</div>
+                    </div>
+                    <div className="bg-red-100 p-2 rounded">
+                        <div className="text-xs text-red-700">Tempo Parado</div>
+                        <div className="text-xl font-bold text-red-800">{formatDuration(totalDowntimeMs)}</div>
+                    </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                <div className="lg:col-span-3">
+                    <h3 className="text-lg font-semibold mb-3">Produção Diária</h3>
+                    {dailyBreakdown.length > 0 ? (
+                        <div className="space-y-4">
+                        {dailyBreakdown.map((day, index) => (
+                            <div key={index} className="border rounded-lg overflow-hidden">
+                                <div className="bg-slate-100 p-3 flex justify-between items-center">
+                                    <h4 className="font-bold text-slate-800">Dia: {day.date}</h4>
+                                    <div className="text-right text-sm">
+                                        <p><strong>Lotes:</strong> {day.lots.length}</p>
+                                        <p><strong>Peso Produzido:</strong> {day.totalWeight.toFixed(2)} kg</p>
+                                    </div>
+                                </div>
+                                <table className="w-full text-sm text-left text-slate-600">
+                                    <thead className="text-xs text-slate-700 uppercase bg-slate-50">
+                                        <tr>
+                                            <th className="px-4 py-2">Lote Interno</th>
+                                            <th className="px-4 py-2 text-right">Peso Saída (kg)</th>
+                                            <th className="px-4 py-2 text-right">Perda (%)</th>
+                                            <th className="px-4 py-2 text-right">Tempo Efetivo</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {day.lots.map(lot => {
+                                            const difference = lot.originalWeight - (lot.finalWeight || 0);
+                                            const lossPercentage = lot.originalWeight > 0 ? (difference / lot.originalWeight) * 100 : 0;
+                                            return (
+                                                <tr key={lot.lotId} className="bg-white border-b">
+                                                    <td className="px-4 py-2 font-medium">{lot.internalLot}</td>
+                                                    <td className="px-4 py-2 text-right font-bold">{lot.finalWeight?.toFixed(2) || 'N/A'}</td>
+                                                    <td className={`px-4 py-2 text-right font-medium ${difference >= 0 ? 'text-red-600' : 'text-green-600'}`}>{lossPercentage.toFixed(2)}%</td>
+                                                    <td className="px-4 py-2 text-right font-mono">{formatDuration(lot.effectiveDurationMs)}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ))}
+                        </div>
+                    ) : <p className="text-sm text-slate-500">Nenhum lote processado para esta ordem.</p>}
+                     <div className="font-semibold text-slate-900 bg-slate-50 border rounded-lg mt-4 p-2 flex justify-between">
+                        <span>Total Geral</span>
+                        <div className="text-right">
+                            <span>{totalProducedWeight.toFixed(2)} kg</span> / <span className="font-mono">{formatDuration(effectiveTimeMs)}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="lg:col-span-2">
+                    <h3 className="text-lg font-semibold mb-3">Registro de Paradas</h3>
+                    <table className="w-full text-sm text-left text-slate-600 border rounded-lg">
+                         <thead className="text-xs text-slate-700 uppercase bg-slate-100">
+                            <tr>
+                                <th className="px-4 py-2">Motivo</th>
+                                <th className="px-4 py-2 text-right">Duração</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {(reportData.downtimeEvents || []).map((event, index) => {
+                                if (!event.resumeTime) return null;
+                                const duration = new Date(event.resumeTime).getTime() - new Date(event.stopTime).getTime();
+                                if (duration <= 0) return null;
+                                return (
+                                <tr key={index} className="bg-white border-b">
+                                    <td className="px-4 py-2">{event.reason}</td>
+                                    <td className="px-4 py-2 text-right font-mono">{formatDuration(duration)}</td>
+                                </tr>
+                                )
+                            })}
+                        </tbody>
+                         <tfoot className="font-semibold text-slate-900 bg-slate-50 border-t-2">
+                            <tr>
+                                <th className="px-4 py-2 text-left">Total Parado</th>
+                                <th className="px-4 py-2 text-right font-mono">{formatDuration(totalDowntimeMs)}</th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+              </div>
+            </div>
+      </div>
+    </div>
+  );
+};
+
+export default ProductionOrderReport;
