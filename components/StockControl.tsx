@@ -289,7 +289,9 @@ const StockControl: React.FC<{
     deleteStockItem: (id: string) => void;
     updateStockItem: (updatedItem: StockItem) => void;
     createTransfer: (destinationSector: string, lotsToTransfer: Map<string, number>) => TransferRecord | null;
-}> = ({ stock, conferences, transfers, setPage, addConference, deleteStockItem, updateStockItem, createTransfer }) => {
+    editConference: (conferenceNumber: string, updatedData: ConferenceData) => void;
+    deleteConference: (conferenceNumber: string) => void;
+}> = ({ stock, conferences, transfers, setPage, addConference, deleteStockItem, updateStockItem, createTransfer, editConference, deleteConference }) => {
     const [isAddConferenceModalOpen, setIsAddConferenceModalOpen] = useState(false);
     const [isMultiLotTransferModalOpen, setIsMultiLotTransferModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<StockItem | null>(null);
@@ -367,7 +369,7 @@ const StockControl: React.FC<{
             {editingItem && <EditStockItemModal item={editingItem} onClose={() => setEditingItem(null)} onSubmit={updateStockItem} />}
             {isMultiLotTransferModalOpen && <MultiLotTransferModal lots={stock.filter(s => selectedLotIdsForTransfer.includes(s.id))} onClose={() => setIsMultiLotTransferModalOpen(false)} onSubmit={handleTransferSubmit} />}
             {historyLot && <LotHistoryModal lot={historyLot} onClose={() => setHistoryLot(null)} />}
-            {conferenceHistoryOpen && <FinishedConferencesModal conferences={conferences} onClose={() => setConferenceHistoryOpen(false)} onShowReport={setConferenceReportData} />}
+            {conferenceHistoryOpen && <FinishedConferencesModal conferences={conferences} stock={stock} onClose={() => setConferenceHistoryOpen(false)} onShowReport={setConferenceReportData} onEditConference={editConference} onDeleteConference={deleteConference} />}
             {conferenceReportData && <ConferenceReport reportData={conferenceReportData} onClose={() => setConferenceReportData(null)} />}
             {transferHistoryOpen && <TransfersHistoryModal transfers={transfers} onClose={() => setTransferHistoryOpen(false)} onShowReport={setTransferReportData} />}
             {transferReportData && <TransferReport reportData={transferReportData} onClose={() => setTransferReportData(null)} />}

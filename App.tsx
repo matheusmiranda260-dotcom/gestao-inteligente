@@ -294,6 +294,115 @@ const App: React.FC = () => {
             showNotification('Erro ao salvar conferência.', 'error');
         }
     };
+
+    const editConference = async (conferenceNumber: string, updatedData: ConferenceData) => {
+        try {
+            // Find the conference
+            const conference = conferences.find(c => c.conferenceNumber === conferenceNumber);
+            if (!conference) {
+                showNotification('Conferência não encontrada.', 'error');
+                return;
+            }
+
+            // Get all stock items from this conference
+            const conferenceStockItems = stock.filter(item => item.conferenceNumber === conferenceNumber);
+
+            // Check if any lot is in use (not Disponível or Disponível - Suporte Treliça)
+            const lotsInUse = conferenceStockItems.filter(item =>
+                item.status !== 'Disponível' &&
+                item.status !== 'Disponível - Suporte Treliça'
+            );
+
+            if (lotsInUse.length > 0) {
+                showNotification('Não é possível editar: alguns lotes estão em uso na produção.', 'error');
+                return;
+            }
+
+            // Delete old stock items
+            for (const item of conferenceStockItems) {
+                await deleteItem('stock_items', item.id);
+            }
+
+            // Update conference
+            await updateItem<ConferenceData>('conferences', conferenceNumber, updatedData);
+
+            // Create new stock items
+            const newStockItems: StockItem[] = updatedData.lots.map(lot => ({
+                id: generateId('STOCK'),
+                entryDate: updatedData.entryDate,
+                supplier: updatedData.supplier,
+                nfe: updatedData.nfe,
+                conferenceNumber: updatedData.conferenceNumber,
+                internalLot: lot.internalLot,
+                supplierLot: lot.supplierLot,
+                runNumber: lot.runNumber,
+                materialType: lot.materialType,
+                bitola: lot.bitola,
+                labelWeight: lot.labelWeight,
+                initialQuantity: lot.scaleWeight,
+                remainingQuantity: lot.scaleWeight,
+                status: 'Disponível',
+                history: [{
+                    type: 'Entrada (Editada)',
+                    date: new Date().toISOString(),
+                    details: {
+                        action: 'Conferência Editada',
+                        weight: lot.scaleWeight
+                    }
+                }]
+            }));
+
+            for (const item of newStockItems) {
+                await insertItem<StockItem>('stock_items', item);
+            }
+
+            // Refresh data
+            const updatedStock = await fetchTable<StockItem>('stock_items');
+            setStock(updatedStock);
+            const updatedConferences = await fetchTable<ConferenceData>('conferences');
+            setConferences(updatedConferences);
+
+            showNotification('Conferência editada com sucesso!', 'success');
+        } catch (error) {
+            showNotification('Erro ao editar conferência.', 'error');
+        }
+    };
+
+    const deleteConference = async (conferenceNumber: string) => {
+        try {
+            // Get all stock items from this conference
+            const conferenceStockItems = stock.filter(item => item.conferenceNumber === conferenceNumber);
+
+            // Check if any lot is in use
+            const lotsInUse = conferenceStockItems.filter(item =>
+                item.status !== 'Disponível' &&
+                item.status !== 'Disponível - Suporte Treliça'
+            );
+
+            if (lotsInUse.length > 0) {
+                showNotification('Não é possível excluir: alguns lotes estão em uso na produção.', 'error');
+                return;
+            }
+
+            // Delete stock items
+            for (const item of conferenceStockItems) {
+                await deleteItem('stock_items', item.id);
+            }
+
+            // Delete conference
+            await deleteItem('conferences', conferenceNumber);
+
+            // Refresh data
+            const updatedStock = await fetchTable<StockItem>('stock_items');
+            setStock(updatedStock);
+            const updatedConferences = await fetchTable<ConferenceData>('conferences');
+            setConferences(updatedConferences);
+
+            showNotification('Conferência excluída com sucesso!', 'success');
+        } catch (error) {
+            showNotification('Erro ao excluir conferência.', 'error');
+        }
+    };
     const addStockItem = async (item: StockItem) => {
         try {
             const savedItem = await insertItem<StockItem>('stock_items', item);
@@ -1282,7 +1391,7 @@ const App: React.FC = () => {
             case 'menu':
                 return <MainMenu setPage={setPage} onLogout={handleLogout} currentUser={currentUser} messages={messages} markAllMessagesAsRead={markAllMessagesAsRead} addMessage={addMessage} />;
             case 'stock':
-                return <StockControl stock={stock} conferences={conferences} transfers={transfers} setPage={setPage} addConference={addConference} deleteStockItem={deleteStockItem} updateStockItem={updateStockItem} createTransfer={createTransfer} />;
+                return <StockControl stock={stock} conferences={conferences} transfers={transfers} setPage={setPage} addConference={addConference} deleteStockItem={deleteStockItem} updateStockItem={updateStockItem} createTransfer={createTransfer} editConference={editConference} deleteConference={deleteConference} />;
             case 'trefila':
                 return <MachineControl machineType="Trefila" {...machineControlProps} />;
             case 'trelica':
