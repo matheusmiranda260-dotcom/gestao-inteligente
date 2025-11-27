@@ -14,7 +14,7 @@ import { trelicaModels } from './components/ProductionOrderTrelica';
 import FinishedGoods from './components/FinishedGoods';
 import { supabase } from './supabaseClient';
 
-import { fetchTable, insertItem, updateItem, deleteItem } from './services/supabaseService';
+import { fetchTable, insertItem, updateItem, deleteItem, deleteItemByColumn, updateItemByColumn } from './services/supabaseService';
 
 const generateId = (prefix: string) => `${prefix.toUpperCase()}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
@@ -318,13 +318,11 @@ const App: React.FC = () => {
                 return;
             }
 
-            // Delete old stock items
-            for (const item of conferenceStockItems) {
-                await deleteItem('stock_items', item.id);
-            }
+            // Delete all old stock items associated with this conference directly from DB
+            await deleteItemByColumn('stock_items', 'conference_number', conferenceNumber);
 
-            // Update conference
-            await updateItem<ConferenceData>('conferences', conferenceNumber, updatedData);
+            // Update conference using conference_number column
+            await updateItemByColumn<ConferenceData>('conferences', 'conference_number', conferenceNumber, updatedData);
 
             // Create new stock items
             const newStockItems: StockItem[] = updatedData.lots.map(lot => ({
@@ -363,8 +361,9 @@ const App: React.FC = () => {
             setConferences(updatedConferences);
 
             showNotification('Conferência editada com sucesso!', 'success');
-        } catch (error) {
-            showNotification('Erro ao editar conferência.', 'error');
+        } catch (error: any) {
+            console.error('Error editing conference:', error);
+            showNotification(`Erro ao editar conferência: ${error.message || error}`, 'error');
         }
     };
 
@@ -384,13 +383,11 @@ const App: React.FC = () => {
                 return;
             }
 
-            // Delete stock items
-            for (const item of conferenceStockItems) {
-                await deleteItem('stock_items', item.id);
-            }
+            // Delete all stock items associated with this conference directly from DB
+            await deleteItemByColumn('stock_items', 'conference_number', conferenceNumber);
 
-            // Delete conference
-            await deleteItem('conferences', conferenceNumber);
+            // Delete conference using conference_number column
+            await deleteItemByColumn('conferences', 'conference_number', conferenceNumber);
 
             // Refresh data
             const updatedStock = await fetchTable<StockItem>('stock_items');
@@ -399,8 +396,9 @@ const App: React.FC = () => {
             setConferences(updatedConferences);
 
             showNotification('Conferência excluída com sucesso!', 'success');
-        } catch (error) {
-            showNotification('Erro ao excluir conferência.', 'error');
+        } catch (error: any) {
+            console.error('Error deleting conference:', error);
+            showNotification(`Erro ao excluir conferência: ${error.message || error}`, 'error');
         }
     };
     const addStockItem = async (item: StockItem) => {
@@ -665,8 +663,10 @@ const App: React.FC = () => {
             setStock(updatedStock);
 
             showNotification('Ordem de produção criada com sucesso!', 'success');
-        } catch (error) {
-            showNotification('Erro ao criar ordem de produção.', 'error');
+        } catch (error: any) {
+            console.error('Error creating production order:', error);
+            console.error('Order data:', order);
+            showNotification(`Erro ao criar ordem de produção: ${error.message || error}`, 'error');
         }
     };
 

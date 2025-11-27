@@ -455,7 +455,7 @@ const StockControl: React.FC<{
                                 <th className="px-6 py-3">Lote Interno</th>
                                 <th className="px-6 py-3">Lote Fornecedor</th>
                                 <th className="px-6 py-3">Fornecedor</th>
-                                <th className="px-6 py-3">Material</th>
+                                <th className="px-6 py-3">Tipo de Material</th>
                                 <th className="px-6 py-3">Bitola</th>
                                 <th className="px-6 py-3 text-right">Peso Etiqueta (kg)</th>
                                 <th className="px-6 py-3 text-center">Status</th>

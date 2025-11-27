@@ -1,12 +1,12 @@
 export interface Message {
-  id: string;
-  timestamp: string; // ISO string
-  productionOrderId: string;
-  machine: MachineType;
-  senderId: string;
-  senderUsername: string;
-  message: string;
-  isRead: boolean;
+    id: string;
+    timestamp: string; // ISO string
+    productionOrderId: string;
+    machine: MachineType;
+    senderId: string;
+    senderUsername: string;
+    message: string;
+    isRead: boolean;
 }
 
 // types.ts
@@ -23,8 +23,8 @@ export type Page = 'login' | 'menu' | 'stock' | 'machineSelection' | 'trefila' |
 
 export type MachineType = 'Trefila' | 'Treliça';
 
-export const FioMaquinaBitolaOptions = ['8.00', '7.00', '6.50', '5.50'] as const;
-export const TrefilaBitolaOptions = ['3.40', '3.80', '4.20', '4.60', '5.00', '5.40', '6.00', '3.20', '5.60', '5.80', '8.00', '6.00', '5.00'] as const;
+export const FioMaquinaBitolaOptions = ['8.00', '7.00', '6.50', '6.35', '5.50'] as const;
+export const TrefilaBitolaOptions = ['3.40', '3.80', '4.20', '4.60', '5.00', '5.40', '6.00', '6.35', '3.20', '5.60', '5.80', '8.00', '6.00', '5.00'] as const;
 export type Bitola = typeof FioMaquinaBitolaOptions[number] | typeof TrefilaBitolaOptions[number];
 
 export const MaterialOptions = ['Fio Máquina', 'CA-60'] as const;

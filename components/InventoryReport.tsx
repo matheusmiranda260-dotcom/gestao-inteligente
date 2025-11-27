@@ -87,7 +87,7 @@ const InventoryReport: React.FC<InventoryReportProps> = ({ stock, filters, onClo
                             <thead className="text-xs text-slate-700 uppercase bg-slate-100">
                                 <tr>
                                     <th className="px-2 py-2 border border-slate-300">Lote Interno</th>
-                                    <th className="px-2 py-2 border border-slate-300">Material</th>
+                                    <th className="px-2 py-2 border border-slate-300">Tipo de Material</th>
                                     <th className="px-2 py-2 border border-slate-300">Bitola</th>
                                     <th className="px-2 py-2 border border-slate-300">Fornecedor</th>
                                     <th className="px-2 py-2 border border-slate-300 text-right">Peso Sistema (kg)</th>

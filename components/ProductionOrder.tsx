@@ -205,7 +205,7 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
                             <th scope="col" className="px-4 py-3 w-12"></th>
                             <th scope="col" className="px-4 py-3">Lote Interno</th>
                             <th scope="col" className="px-4 py-3">Fornecedor</th>
-                            <th scope="col" className="px-4 py-3">Material</th>
+                            <th scope="col" className="px-4 py-3">Tipo de Material</th>
                             <th scope="col" className="px-4 py-3">Bitola</th>
                             <th scope="col" className="px-4 py-3 text-right">Peso Etiqueta (kg)</th>
                             <th scope="col" className="px-4 py-3 text-right">Restante (kg)</th>

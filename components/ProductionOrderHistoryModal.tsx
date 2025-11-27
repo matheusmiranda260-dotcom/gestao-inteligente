@@ -175,7 +175,7 @@ const ProductionOrderHistoryModal: React.FC<{
                                                                 <tr>
                                                                     <th className="p-2 text-left font-semibold">Componente</th>
                                                                     <th className="p-2 text-left font-semibold">Lote Interno</th>
-                                                                    <th className="p-2 text-left font-semibold">Material</th>
+                                                                    <th className="p-2 text-left font-semibold">Tipo de Material</th>
                                                                     <th className="p-2 text-left font-semibold">Bitola</th>
                                                                     <th className="p-2 text-right font-semibold">Peso (kg)</th>
                                                                 </tr>

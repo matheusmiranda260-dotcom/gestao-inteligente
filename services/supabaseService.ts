@@ -89,9 +89,17 @@ export const fetchTable = async <T>(table: string): Promise<T[]> => {
 
 export const insertItem = async <T>(table: string, item: T): Promise<T> => {
     const snakeItem = mapToSnakeCase(item);
+    console.log(`Inserting into ${table}:`, snakeItem);
     const { data, error } = await supabase.from(table).insert(snakeItem).select().single();
     if (error) {
         console.error(`Error inserting into ${table}:`, error);
+        console.error('Error details:', {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint
+        });
+        console.error('Data attempted to insert:', snakeItem);
         throw error;
     }
     return mapToCamelCase(data) as T;
@@ -113,4 +121,22 @@ export const deleteItem = async (table: string, id: string): Promise<void> => {
         console.error(`Error deleting from ${table}:`, error);
         throw error;
     }
+};
+
+export const deleteItemByColumn = async (table: string, column: string, value: string): Promise<void> => {
+    const { error } = await supabase.from(table).delete().eq(column, value);
+    if (error) {
+        console.error(`Error deleting from ${table} by ${column}:`, error);
+        throw error;
+    }
+};
+
+export const updateItemByColumn = async <T>(table: string, column: string, value: string, updates: Partial<T>): Promise<T> => {
+    const snakeUpdates = mapToSnakeCase(updates);
+    const { data, error } = await supabase.from(table).update(snakeUpdates).eq(column, value).select().single();
+    if (error) {
+        console.error(`Error updating ${table} by ${column}:`, error);
+        throw error;
+    }
+    return mapToCamelCase(data) as T;
 };
