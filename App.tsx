@@ -623,56 +623,6 @@ const App: React.FC = () => {
             return savedTransfer;
         } catch (error) {
             showNotification('Erro ao realizar transferência.', 'error');
-            return null;
-        }
-    };
-
-    // Production Control
-    const addProductionOrder = async (order: ProductionOrderData) => {
-        try {
-            const savedOrder = await insertItem<ProductionOrderData>('production_orders', order);
-            setProductionOrders(prev => [...prev, savedOrder]);
-
-            // Update stock items status if they are selected
-            if (Array.isArray(order.selectedLotIds)) {
-                for (const lotId of order.selectedLotIds) {
-                    const stockItem = stock.find(s => s.id === lotId);
-                    if (stockItem) {
-                        await updateItem<StockItem>('stock_items', lotId, {
-                            status: 'Em Produção',
-                            productionOrderIds: [...(stockItem.productionOrderIds || []), order.id]
-                        });
-                    }
-                }
-            } else {
-                // Handle TrelicaSelectedLots object
-                const lotIds = Object.values(order.selectedLotIds).filter(id => id);
-                for (const lotId of lotIds) {
-                    const stockItem = stock.find(s => s.id === lotId);
-                    if (stockItem) {
-                        await updateItem<StockItem>('stock_items', lotId, {
-                            status: 'Em Produção - Treliça',
-                            productionOrderIds: [...(stockItem.productionOrderIds || []), order.id]
-                        });
-                    }
-                }
-            }
-
-            // Refresh stock
-            const updatedStock = await fetchTable<StockItem>('stock_items');
-            setStock(updatedStock);
-
-            showNotification('Ordem de produção criada com sucesso!', 'success');
-        } catch (error: any) {
-            console.error('Error creating production order:', error);
-            console.error('Order data:', order);
-            showNotification(`Erro ao criar ordem de produção: ${error.message || error}`, 'error');
-        }
-    };
-
-    const updateProductionOrder = async (id: string, updates: Partial<ProductionOrderData>) => {
-        try {
-            const updatedOrder = await updateItem<ProductionOrderData>('production_orders', id, updates);
             setProductionOrders(prev => prev.map(order => order.id === id ? updatedOrder : order));
         } catch (error) {
             showNotification('Erro ao atualizar ordem de produção.', 'error');
