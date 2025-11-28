@@ -1,11 +1,20 @@
 import { supabase } from '../supabaseClient';
 import {
-    StockItem, ConferenceData, ProductionOrderData, TransferRecord,
-    FinishedProductItem, PontaItem, FinishedGoodsTransferRecord,
-    PartsRequest, ShiftReport, ProductionRecord, Message, User
+    StockItem,
+    ConferenceData,
+    ProductionOrderData,
+    TransferRecord,
+    FinishedProductItem,
+    PontaItem,
+    FinishedGoodsTransferRecord,
+    PartsRequest,
+    ShiftReport,
+    ProductionRecord,
+    Message,
+    User,
 } from '../types';
 
-// Generic fetch function
+/** Generic fetch function returning raw data */
 export const fetchData = async <T>(table: string): Promise<T[]> => {
     const { data, error } = await supabase.from(table).select('*');
     if (error) {
@@ -15,7 +24,7 @@ export const fetchData = async <T>(table: string): Promise<T[]> => {
     return data as T[];
 };
 
-// Generic insert function
+/** Generic insert function returning the inserted row */
 export const insertData = async <T>(table: string, item: T): Promise<T | null> => {
     const { data, error } = await supabase.from(table).insert(item).select().single();
     if (error) {
@@ -25,7 +34,7 @@ export const insertData = async <T>(table: string, item: T): Promise<T | null> =
     return data as T;
 };
 
-// Generic update function
+/** Generic update function */
 export const updateData = async <T>(table: string, id: string, updates: Partial<T>): Promise<T | null> => {
     const { data, error } = await supabase.from(table).update(updates).eq('id', id).select().single();
     if (error) {
@@ -35,7 +44,7 @@ export const updateData = async <T>(table: string, id: string, updates: Partial<
     return data as T;
 };
 
-// Generic delete function
+/** Generic delete function */
 export const deleteData = async (table: string, id: string): Promise<boolean> => {
     const { error } = await supabase.from(table).delete().eq('id', id);
     if (error) {
@@ -45,39 +54,33 @@ export const deleteData = async (table: string, id: string): Promise<boolean> =>
     return true;
 };
 
-// Specific mapping for snake_case DB to camelCase JS if needed. 
-// For now, assuming we might need to map fields if the DB columns are snake_case and types are camelCase.
-// My migration used snake_case for columns but types are camelCase. Supabase JS client usually handles this if we configure it or we map it manually.
-// I will implement manual mapping to be safe since I defined snake_case columns in SQL.
-
+/** Helper to convert snake_case DB fields to camelCase JS */
 const mapToCamelCase = (obj: any): any => {
-    if (Array.isArray(obj)) {
-        return obj.map(v => mapToCamelCase(v));
-    } else if (obj !== null && obj.constructor === Object) {
-        return Object.keys(obj).reduce((result, key) => {
-            const camelKey = key.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
-            result[camelKey] = mapToCamelCase(obj[key]);
-            return result;
+    if (Array.isArray(obj)) return obj.map(v => mapToCamelCase(v));
+    if (obj && typeof obj === 'object' && obj.constructor === Object) {
+        return Object.keys(obj).reduce((acc, key) => {
+            const camelKey = key.replace(/_([a-z])/g, (_, g) => g.toUpperCase());
+            acc[camelKey] = mapToCamelCase(obj[key]);
+            return acc;
         }, {} as any);
     }
     return obj;
 };
 
+/** Helper to convert camelCase JS fields to snake_case DB */
 const mapToSnakeCase = (obj: any): any => {
-    if (Array.isArray(obj)) {
-        return obj.map(v => mapToSnakeCase(v));
-    } else if (obj !== null && obj.constructor === Object) {
-        return Object.keys(obj).reduce((result, key) => {
+    if (Array.isArray(obj)) return obj.map(v => mapToSnakeCase(v));
+    if (obj && typeof obj === 'object' && obj.constructor === Object) {
+        return Object.keys(obj).reduce((acc, key) => {
             const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-            result[snakeKey] = mapToSnakeCase(obj[key]);
-            return result;
+            acc[snakeKey] = mapToSnakeCase(obj[key]);
+            return acc;
         }, {} as any);
     }
     return obj;
 };
 
-// Wrapped functions with mapping
-
+/** Fetch table with camelCase conversion */
 export const fetchTable = async <T>(table: string): Promise<T[]> => {
     const { data, error } = await supabase.from(table).select('*');
     if (error) {
@@ -87,7 +90,20 @@ export const fetchTable = async <T>(table: string): Promise<T[]> => {
     return mapToCamelCase(data) as T[];
 };
 
-export const insertItem = async <T>(table: string, item: T): Promise<T> => {
+/** Insert item with automatic UUID generation for missing id */
+export const insertItem = async <T extends { id?: string }>(
+    table: string,
+    item: T
+): Promise<T> => {
+    // Ensure an id exists – the DB column is NOT NULL.
+    if (!item.id) {
+        const generatedId =
+            typeof crypto !== 'undefined' && typeof (crypto as any).randomUUID === 'function'
+                ? (crypto as any).randomUUID()
+                : Math.random().toString(36).substring(2, 15);
+        // @ts-ignore – we know T has an optional id field.
+        item.id = generatedId;
+    }
     const snakeItem = mapToSnakeCase(item);
     console.log(`Inserting into ${table}:`, snakeItem);
     const { data, error } = await supabase.from(table).insert(snakeItem).select().single();
@@ -97,7 +113,7 @@ export const insertItem = async <T>(table: string, item: T): Promise<T> => {
             message: error.message,
             code: error.code,
             details: error.details,
-            hint: error.hint
+            hint: error.hint,
         });
         console.error('Data attempted to insert:', snakeItem);
         throw error;
@@ -105,6 +121,7 @@ export const insertItem = async <T>(table: string, item: T): Promise<T> => {
     return mapToCamelCase(data) as T;
 };
 
+/** Update item with mapping */
 export const updateItem = async <T>(table: string, id: string, updates: Partial<T>): Promise<T> => {
     const snakeUpdates = mapToSnakeCase(updates);
     const { data, error } = await supabase.from(table).update(snakeUpdates).eq('id', id).select().single();
@@ -115,6 +132,7 @@ export const updateItem = async <T>(table: string, id: string, updates: Partial<
     return mapToCamelCase(data) as T;
 };
 
+/** Delete item by id */
 export const deleteItem = async (table: string, id: string): Promise<void> => {
     const { error } = await supabase.from(table).delete().eq('id', id);
     if (error) {
@@ -123,6 +141,7 @@ export const deleteItem = async (table: string, id: string): Promise<void> => {
     }
 };
 
+/** Delete by arbitrary column */
 export const deleteItemByColumn = async (table: string, column: string, value: string): Promise<void> => {
     const { error } = await supabase.from(table).delete().eq(column, value);
     if (error) {
@@ -131,9 +150,19 @@ export const deleteItemByColumn = async (table: string, column: string, value: s
     }
 };
 
-export const updateItemByColumn = async <T>(table: string, column: string, value: string, updates: Partial<T>): Promise<T> => {
+/** Update by arbitrary column */
+export const updateItemByColumn = async <T>(
+    table: string,
+    column: string,
+    value: string,
+    updates: Partial<T>
+): Promise<T> => {
     const snakeUpdates = mapToSnakeCase(updates);
-    const { data, error } = await supabase.from(table).update(snakeUpdates).eq(column, value).select().single();
+    const { data, error } = await supabase.from(table)
+        .update(snakeUpdates)
+        .eq(column, value)
+        .select()
+        .single();
     if (error) {
         console.error(`Error updating ${table} by ${column}:`, error);
         throw error;
