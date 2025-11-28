@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplicar Schema - Gestão Inteligente</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .step {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 30px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            transition: transform 0.2s;
+        }
+
+        .step:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .step-number {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 40px;
+            font-weight: bold;
+            margin-right: 15px;
+            font-size: 1.2rem;
+        }
+
+        .step h2 {
+            color: #333;
+            margin-bottom: 15px;
+            display: inline-block;
+        }
+
+        .step p, .step li {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+
+        .step ul {
+            list-style-position: inside;
+            margin-left: 55px;
+        }
+
+        .code-block {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            position: relative;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background 0.3s;
+        }
+
+        .copy-btn:hover {
+            background: #5568d3;
+        }
+
+        .copy-btn:active {
+            background: #4c5fd9;
+        }
+
+        .success {
+            background: #d4edda;
+            border-color: #28a745;
+            color: #155724;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #28a745;
+        }
+
+        .warning {
+            background: #fff3cd;
+            border-color: #ffc107;
+            color: #856404;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #ffc107;
+        }
+
+        .error {
+            background: #f8d7da;
+            border-color: #dc3545;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #dc3545;
+        }
+
+        .btn-primary {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 15px 30px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: background 0.3s;
+            margin: 10px 5px;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+
+        .btn-secondary {
+            display: inline-block;
+            background: #6c757d;
+            color: white;
+            padding: 15px 30px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: background 0.3s;
+            margin: 10px 5px;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .footer {
+            background: #f8f9fa;
+            padding: 30px;
+            text-align: center;
+            color: #666;
+            border-top: 1px solid #dee2e6;
+        }
+
+        #sqlContent {
+            display: none;
+        }
+
+        .icon {
+            font-size: 1.5rem;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Aplicar Schema do Supabase</h1>
+            <p>Corrija o erro de Ordem de Produção em 3 passos simples</p>
+        </div>
+
+        <div class="content">
+            <div class="warning">
+                <strong>⚠️ IMPORTANTE:</strong> Este processo irá criar ou atualizar a tabela <code>production_orders</code> no seu banco de dados Supabase. Certifique-se de ter backup se necessário.
+            </div>
+
+            <div class="step">
+                <span class="step-number">1</span>
+                <h2>Acessar o Supabase Dashboard</h2>
+                <ul>
+                    <li>Acesse: <a href="https://app.supabase.com" target="_blank">https://app.supabase.com</a></li>
+                    <li>Faça login na sua conta</li>
+                    <li>Selecione o projeto <strong>gestao-inteligente</strong></li>
+                </ul>
+                <a href="https://app.supabase.com" target="_blank" class="btn-primary">🔗 Abrir Supabase</a>
+            </div>
+
+            <div class="step">
+                <span class="step-number">2</span>
+                <h2>Abrir o SQL Editor</h2>
+                <ul>
+                    <li>No menu lateral esquerdo, clique em <strong>"SQL Editor"</strong></li>
+                    <li>Clique no botão <strong>"New Query"</strong></li>
+                    <li>Um editor de SQL em branco será aberto</li>
+                </ul>
+            </div>
+
+            <div class="step">
+                <span class="step-number">3</span>
+                <h2>Copiar e Executar o Script SQL</h2>
+                <p>Clique no botão abaixo para copiar o script SQL:</p>
+                
+                <button class="btn-primary" onclick="copiarSQL()">📋 Copiar Script SQL</button>
+                <button class="btn-secondary" onclick="mostrarSQL()">👁️ Ver Script</button>
+                
+                <div id="sqlContent" style="display: none;">
+                    <div class="code-block">
+                        <button class="copy-btn" onclick="copiarSQL()">Copiar</button>
+                        <pre id="sqlScript"></pre>
+                    </div>
+                </div>
+
+                <div class="success" id="copiadoMsg" style="display: none;">
+                    ✅ Script copiado! Agora cole no SQL Editor do Supabase e clique em "Run".
+                </div>
+
+                <p style="margin-top: 20px;"><strong>Depois de copiar:</strong></p>
+                <ul>
+                    <li>Cole o script no SQL Editor do Supabase (Ctrl+V)</li>
+                    <li>Clique no botão <strong>"Run"</strong> ou pressione <strong>Ctrl+Enter</strong></li>
+                    <li>Aguarde a execução (deve levar menos de 10 segundos)</li>
+                    <li>✅ Você deve ver uma mensagem de sucesso</li>
+                </ul>
+            </div>
+
+            <div class="step">
+                <span class="step-number">4</span>
+                <h2>Verificar a Criação da Tabela</h2>
+                <ul>
+                    <li>No menu lateral, clique em <strong>"Table Editor"</strong></li>
+                    <li>Procure pela tabela <strong>"production_orders"</strong></li>
+                    <li>✅ Se visualizar a tabela, está tudo pronto!</li>
+                </ul>
+            </div>
+
+            <div class="step">
+                <span class="step-number">5</span>
+                <h2>Testar a Aplicação</h2>
+                <ul>
+                    <li>Volte para a aplicação Gestão Inteligente</li>
+                    <li>Acesse <strong>Menu → Ordem de Produção - Trefila</strong></li>
+                    <li>Preencha o formulário e tente criar uma ordem</li>
+                    <li>✅ <strong>Deve funcionar sem erros!</strong></li>
+                </ul>
+            </div>
+
+            <div class="success">
+                <h3>🎉 Pronto!</h3>
+                <p>Após seguir estes passos, o problema de criação de ordens de produção estará resolvido!</p>
+            </div>
+
+            <div class="error" style="display: none;" id="errorMsg">
+                <h3>❌ Se ainda houver erro:</h3>
+                <ul>
+                    <li>Abra o console do navegador (F12)</li>
+                    <li>Vá na aba "Console"</li>
+                    <li>Tente criar a ordem novamente</li>
+                    <li>Copie a mensagem de erro completa</li>
+                    <li>Entre em contato para suporte</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>Gestão Inteligente</strong> - Sistema de Gestão Industrial</p>
+            <p>Desenvolvido com ❤️ by Antigravity AI | 2025</p>
+        </div>
+    </div>
+
+    <script>
+        // Carrega o script SQL
+        async function carregarSQL() {
+            try {
+                const response = await fetch('supabase_production_orders_schema.sql');
+                const sql = await response.text();
+                document.getElementById('sqlScript').textContent = sql;
+            } catch (error) {
+                console.error('Erro ao carregar SQL:', error);
+                document.getElementById('sqlScript').textContent = 
+                    'Erro ao carregar o arquivo SQL. Por favor, abra o arquivo supabase_production_orders_schema.sql manualmente.';
+            }
+        }
+
+        function mostrarSQL() {
+            const sqlContent = document.getElementById('sqlContent');
+            if (sqlContent.style.display === 'none') {
+                sqlContent.style.display = 'block';
+            } else {
+                sqlContent.style.display = 'none';
+            }
+        }
+
+        async function copiarSQL() {
+            const sqlScript = document.getElementById('sqlScript').textContent;
+            
+            if (!sqlScript || sqlScript.includes('Erro ao carregar')) {
+                // Fallback: copiar o conteúdo do arquivo diretamente
+                const response = await fetch('supabase_production_orders_schema.sql');
+                const sql = await response.text();
+                navigator.clipboard.writeText(sql);
+            } else {
+                navigator.clipboard.writeText(sqlScript);
+            }
+            
+            const msg = document.getElementById('copiadoMsg');
+            msg.style.display = 'block';
+            
+            setTimeout(() => {
+                msg.style.display = 'none';
+            }, 5000);
+        }
+
+        // Carrega o SQL ao carregar a página
+        carregarSQL();
+    </script>
+</body>
+</html>
