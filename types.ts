@@ -50,7 +50,7 @@ export interface StockItem {
     labelWeight: number;
     initialQuantity: number;
     remainingQuantity: number;
-    status: 'Disponível' | 'Em Produção' | 'Em Produção - Treliça' | 'Transferido' | 'Disponível - Suporte Treliça';
+    status: 'Disponível' | 'Em Produção' | 'Em Produção - Treliça' | 'Em Produção - Trefila' | 'Transferido' | 'Disponível - Suporte Treliça' | 'CA-60';
     history?: HistoryEvent[];
     productionOrderIds?: string[];
 }

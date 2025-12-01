@@ -626,20 +626,64 @@ const App: React.FC = () => {
         }
     };
 
-    const addProductionOrder = async (order: ProductionOrderData) => {
+    const addProductionOrder = async (orderData: Omit<ProductionOrderData, 'id' | 'status' | 'creationDate'>) => {
+        const newOrder: ProductionOrderData = {
+            ...orderData,
+            id: generateId('op'),
+            status: 'pending',
+            creationDate: new Date().toISOString(),
+            downtimeEvents: [],
+            processedLots: [],
+            operatorLogs: [],
+            weighedPackages: [],
+            pontas: []
+        };
+
         try {
-            const savedOrder = await insertItem<ProductionOrderData>('production_orders', order);
+            const savedOrder = await insertItem<ProductionOrderData>('production_orders', newOrder);
             setProductionOrders(prev => [...prev, savedOrder]);
+
+            // Update stock items status
+            if (newOrder.machine === 'Trefila') {
+                const lotIds = newOrder.selectedLotIds as string[];
+                for (const lotId of lotIds) {
+                    const stockItem = stock.find(s => s.id === lotId);
+                    if (stockItem) {
+                        await updateItem<StockItem>('stock_items', lotId, {
+                            status: 'Em Produção - Trefila',
+                            productionOrderIds: [...(stockItem.productionOrderIds || []), savedOrder.id]
+                        });
+                    }
+                }
+                const updatedStock = await fetchTable<StockItem>('stock_items');
+                setStock(updatedStock);
+            } else if (newOrder.machine === 'Treliça') {
+                const lots = newOrder.selectedLotIds as TrelicaSelectedLots;
+                const lotIds = [lots.superior, lots.inferior1, lots.inferior2, lots.senozoide1, lots.senozoide2];
+                const uniqueLotIds = [...new Set(lotIds)];
+                for (const lotId of uniqueLotIds) {
+                    const stockItem = stock.find(s => s.id === lotId);
+                    if (stockItem) {
+                        await updateItem<StockItem>('stock_items', lotId, {
+                            status: 'Em Produção - Treliça',
+                            productionOrderIds: [...(stockItem.productionOrderIds || []), savedOrder.id]
+                        });
+                    }
+                }
+                const updatedStock = await fetchTable<StockItem>('stock_items');
+                setStock(updatedStock);
+            }
+
             showNotification('Ordem de produção criada com sucesso!', 'success');
         } catch (error) {
             showNotification('Erro ao criar ordem de produção.', 'error');
         }
     };
 
-    const updateProductionOrder = async (id: string, updates: Partial<ProductionOrderData>) => {
+    const updateProductionOrder = async (orderId: string, updates: Partial<ProductionOrderData>) => {
         try {
-            await updateItem('production_orders', id, updates);
-            setProductionOrders(prev => prev.map(o => o.id === id ? { ...o, ...updates } : o));
+            await updateItem('production_orders', orderId, updates);
+            setProductionOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updates } : o));
             showNotification('Ordem de produção atualizada com sucesso!', 'success');
         } catch (error) {
             showNotification('Erro ao atualizar ordem de produção.', 'error');
