@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Page, StockItem, ProductionOrderData, Bitola, TrelicaSelectedLots } from '../types';
-import { ArrowLeftIcon, WarningIcon, ClipboardListIcon } from './icons';
+import type { Page, StockItem, ProductionOrderData, Bitola } from '../types';
+import { ArrowLeftIcon, WarningIcon, ClipboardListIcon, TrashIcon } from './icons';
 import ProductionOrderHistoryModal from './ProductionOrderHistoryModal';
 import ProductionOrderReport from './ProductionOrderReport';
 
@@ -29,43 +29,36 @@ type AvailableStockItem = StockItem & { availableQuantity: number };
 const normalizeBitola = (bitolaString: string) => parseFloat(bitolaString.replace(',', '.')).toFixed(2);
 
 interface ProductionOrderTrelicaProps {
-  setPage: (page: Page) => void;
-  stock: StockItem[];
-  productionOrders: ProductionOrderData[];
-  addProductionOrder: (order: Omit<ProductionOrderData, 'id' | 'status' | 'creationDate'>) => void;
-  showNotification: (message: string, type: 'success' | 'error') => void;
-  updateProductionOrder: (orderId: string, data: { orderNumber?: string; targetBitola?: Bitola }) => void;
-  deleteProductionOrder: (orderId: string) => void;
+    setPage: (page: Page) => void;
+    stock: StockItem[];
+    productionOrders: ProductionOrderData[];
+    addProductionOrder: (order: Omit<ProductionOrderData, 'id' | 'status' | 'creationDate'>) => void;
+    showNotification: (message: string, type: 'success' | 'error') => void;
+    updateProductionOrder: (orderId: string, data: { orderNumber?: string; targetBitola?: Bitola }) => void;
+    deleteProductionOrder: (orderId: string) => void;
 }
 
 const WeightIndicator: React.FC<{ required: number; selected: number; }> = ({ required, selected }) => {
     const sufficient = selected >= required;
+    const percentage = required > 0 ? Math.min((selected / required) * 100, 100) : 0;
+
     return (
         <div className="text-right text-sm">
             <p>Necessário: <span className="font-bold">{required.toFixed(2)} kg</span></p>
-            <p>Disponível: 
+            <p>Selecionado:
                 <span className={`font-bold ${sufficient ? 'text-green-600' : 'text-red-600'}`}>
                     {selected.toFixed(2)} kg
                 </span>
             </p>
+            <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                <div
+                    className={`h-2 rounded-full transition-all ${sufficient ? 'bg-green-600' : 'bg-red-600'}`}
+                    style={{ width: `${percentage}%` }}
+                ></div>
+            </div>
         </div>
     );
 };
-
-const LotSelector: React.FC<{label: string, lots: AvailableStockItem[], selectedLot: string, onSelect: (id: string) => void, requiredBitola: string}> = ({label, lots, selectedLot, onSelect, requiredBitola}) => (
-    <div>
-        <label className="block text-sm font-medium text-gray-700">{label} <span className="text-xs text-gray-500">(Bitola: {requiredBitola}mm)</span></label>
-        <select value={selectedLot} onChange={e => onSelect(e.target.value)} className="mt-1 p-2 w-full border rounded-md bg-white">
-            <option value="">Selecione um lote...</option>
-            {lots.map(lot => (
-                <option key={lot.id} value={lot.id}>
-                    {lot.internalLot} ({lot.availableQuantity.toFixed(2)} kg)
-                </option>
-            ))}
-        </select>
-    </div>
-);
-
 
 const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage, stock, productionOrders, addProductionOrder, showNotification, updateProductionOrder, deleteProductionOrder }) => {
     const [orderNumber, setOrderNumber] = useState('');
@@ -76,12 +69,11 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
         return savedSpeed ? parseFloat(savedSpeed) : 10;
     });
 
-    const [superiorLot, setSuperiorLot] = useState('');
-    const [inferiorLot1, setInferiorLot1] = useState('');
-    const [inferiorLot2, setInferiorLot2] = useState('');
-    const [senozoideLot1, setSenozoideLot1] = useState('');
-    const [senozoideLot2, setSenozoideLot2] = useState('');
-    
+    // Arrays de lotes selecionados para cada posição
+    const [superiorLots, setSuperiorLots] = useState<string[]>([]);
+    const [inferiorLots, setInferiorLots] = useState<string[]>([]);
+    const [senozoideLots, setSenozoideLots] = useState<string[]>([]);
+
     const [showHistoryModal, setShowHistoryModal] = useState(false);
     const [productionReportData, setProductionReportData] = useState<ProductionOrderData | null>(null);
 
@@ -90,63 +82,31 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
     }, [machineSpeed]);
 
     const trelicaProductionOrders = useMemo(() => productionOrders.filter(o => o.machine === 'Treliça'), [productionOrders]);
-    
+
     const availableCa60Stock = useMemo(() => {
-        const reservedWeight = new Map<string, number>();
-
-        productionOrders
-            .filter(o => o.machine === 'Treliça' && (o.status === 'pending' || o.status === 'in_progress'))
-            .forEach(order => {
-                const model = trelicaModels.find(m => m.modelo === order.trelicaModel && m.tamanho === order.tamanho);
-                if (!model || !order.quantityToProduce) return;
-                
-                const qty = order.quantityToProduce;
-                const parse = (s: string) => parseFloat(s.replace(',', '.'));
-                
-                const requiredSuperior = parse(model.pesoSuperior) * qty;
-                const requiredInferior = parse(model.pesoInferior) * qty;
-                const requiredSenozoide = parse(model.pesoSenozoide) * qty;
-
-                const lots = order.selectedLotIds as TrelicaSelectedLots;
-                
-                if(lots.superior) reservedWeight.set(lots.superior, (reservedWeight.get(lots.superior) || 0) + requiredSuperior);
-                if(lots.inferior1) reservedWeight.set(lots.inferior1, (reservedWeight.get(lots.inferior1) || 0) + requiredInferior / 2);
-                if(lots.inferior2) reservedWeight.set(lots.inferior2, (reservedWeight.get(lots.inferior2) || 0) + requiredInferior / 2);
-                if(lots.senozoide1) reservedWeight.set(lots.senozoide1, (reservedWeight.get(lots.senozoide1) || 0) + requiredSenozoide / 2);
-                if(lots.senozoide2) reservedWeight.set(lots.senozoide2, (reservedWeight.get(lots.senozoide2) || 0) + requiredSenozoide / 2);
-            });
-
         return stock
             .filter(item => item.materialType === 'CA-60' && item.status !== 'Transferido')
-            .map(item => {
-                const reserved = reservedWeight.get(item.id) || 0;
-                const availableQuantity = item.remainingQuantity - reserved;
-                return {
-                    ...item,
-                    availableQuantity: availableQuantity > 0 ? availableQuantity : 0
-                };
-            })
+            .map(item => ({
+                ...item,
+                availableQuantity: item.remainingQuantity
+            }))
             .filter(item => item.availableQuantity > 0);
-
-    }, [stock, productionOrders]);
-
+    }, [stock]);
 
     const handleModelChange = (cod: string) => {
         const model = trelicaModels.find(m => m.cod === cod) || null;
         setSelectedModel(model);
-        setSuperiorLot('');
-        setInferiorLot1('');
-        setInferiorLot2('');
-        setSenozoideLot1('');
-        setSenozoideLot2('');
+        setSuperiorLots([]);
+        setInferiorLots([]);
+        setSenozoideLots([]);
     };
-    
+
     const { baseSuperiorLots, baseInferiorLots, baseSenozoideLots } = useMemo(() => {
         if (!selectedModel) return { baseSuperiorLots: [], baseInferiorLots: [], baseSenozoideLots: [] };
         const superiorBitola = normalizeBitola(selectedModel.superior);
         const inferiorBitola = normalizeBitola(selectedModel.inferior);
         const senozoideBitola = normalizeBitola(selectedModel.senozoide);
-        
+
         return {
             baseSuperiorLots: availableCa60Stock.filter(s => s.bitola === superiorBitola),
             baseInferiorLots: availableCa60Stock.filter(s => s.bitola === inferiorBitola),
@@ -167,28 +127,25 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
     const { selectedSuperiorWeight, selectedInferiorWeight, selectedSenozoideWeight } = useMemo(() => {
         const getLotWeight = (id: string) => availableCa60Stock.find(s => s.id === id)?.availableQuantity || 0;
         return {
-            selectedSuperiorWeight: getLotWeight(superiorLot),
-            selectedInferiorWeight: getLotWeight(inferiorLot1) + getLotWeight(inferiorLot2),
-            selectedSenozoideWeight: getLotWeight(senozoideLot1) + getLotWeight(senozoideLot2),
+            selectedSuperiorWeight: superiorLots.reduce((sum, id) => sum + getLotWeight(id), 0),
+            selectedInferiorWeight: inferiorLots.reduce((sum, id) => sum + getLotWeight(id), 0),
+            selectedSenozoideWeight: senozoideLots.reduce((sum, id) => sum + getLotWeight(id), 0),
         };
-    }, [superiorLot, inferiorLot1, inferiorLot2, senozoideLot1, senozoideLot2, availableCa60Stock]);
-    
-    const { superiorLots, inferiorLots1, inferiorLots2, senozoideLots1, senozoideLots2 } = useMemo(() => {
-        const allSelectedIds = new Set([superiorLot, inferiorLot1, inferiorLot2, senozoideLot1, senozoideLot2].filter(Boolean));
-        
-        const superior = baseSuperiorLots.filter(l => !allSelectedIds.has(l.id) || l.id === superiorLot);
-        const inferior1 = baseInferiorLots.filter(l => !allSelectedIds.has(l.id) || l.id === inferiorLot1);
-        const inferior2 = baseInferiorLots.filter(l => !allSelectedIds.has(l.id) || l.id === inferiorLot2);
-        const senozoide1 = baseSenozoideLots.filter(l => !allSelectedIds.has(l.id) || l.id === senozoideLot1);
-        const senozoide2 = baseSenozoideLots.filter(l => !allSelectedIds.has(l.id) || l.id === senozoideLot2);
+    }, [superiorLots, inferiorLots, senozoideLots, availableCa60Stock]);
 
-        return { superiorLots: superior, inferiorLots1: inferior1, inferiorLots2: inferior2, senozoideLots1: senozoide1, senozoideLots2: senozoide2 };
-    }, [baseSuperiorLots, baseInferiorLots, baseSenozoideLots, superiorLot, inferiorLot1, inferiorLot2, senozoideLot1, senozoideLot2]);
-
+    // Filtrar lotes disponíveis (excluir os já selecionados)
+    const { availableSuperiorLots, availableInferiorLots, availableSenozoideLots } = useMemo(() => {
+        const allSelected = new Set([...superiorLots, ...inferiorLots, ...senozoideLots]);
+        return {
+            availableSuperiorLots: baseSuperiorLots.filter(l => !allSelected.has(l.id)),
+            availableInferiorLots: baseInferiorLots.filter(l => !allSelected.has(l.id)),
+            availableSenozoideLots: baseSenozoideLots.filter(l => !allSelected.has(l.id)),
+        };
+    }, [baseSuperiorLots, baseInferiorLots, baseSenozoideLots, superiorLots, inferiorLots, senozoideLots]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         if (!orderNumber.trim()) {
             showNotification('O número da ordem é obrigatório.', 'error');
             return;
@@ -205,37 +162,45 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
             showNotification('A quantidade a produzir deve ser maior que zero.', 'error');
             return;
         }
-        if (!superiorLot || !inferiorLot1 || !inferiorLot2 || !senozoideLot1 || !senozoideLot2) {
-             showNotification('Todos os 5 lotes devem ser selecionados.', 'error');
+        if (superiorLots.length === 0) {
+            showNotification('Selecione pelo menos um lote para Superior.', 'error');
             return;
         }
-        if (inferiorLot1 === inferiorLot2 || senozoideLot1 === senozoideLot2) {
-            showNotification('Lotes duplicados para a mesma função (Inferior ou Senozoide). Por favor, selecione lotes diferentes.', 'error');
+        if (inferiorLots.length === 0) {
+            showNotification('Selecione pelo menos um lote para Inferior.', 'error');
+            return;
+        }
+        if (senozoideLots.length === 0) {
+            showNotification('Selecione pelo menos um lote para Senozoide.', 'error');
             return;
         }
         if (selectedSuperiorWeight < requiredSuperiorWeight) {
-            showNotification(`Peso para a barra Superior é insuficiente. Necessário: ${requiredSuperiorWeight.toFixed(2)} kg.`, 'error');
+            showNotification(`Peso para Superior é insuficiente. Necessário: ${requiredSuperiorWeight.toFixed(2)} kg.`, 'error');
             return;
         }
         if (selectedInferiorWeight < requiredInferiorWeight) {
-            showNotification(`Peso para as barras Inferiores é insuficiente. Necessário: ${requiredInferiorWeight.toFixed(2)} kg.`, 'error');
+            showNotification(`Peso para Inferior é insuficiente. Necessário: ${requiredInferiorWeight.toFixed(2)} kg.`, 'error');
             return;
         }
         if (selectedSenozoideWeight < requiredSenozoideWeight) {
-            showNotification(`Peso para as barras Senozoides é insuficiente. Necessário: ${requiredSenozoideWeight.toFixed(2)} kg.`, 'error');
+            showNotification(`Peso para Senozoide é insuficiente. Necessário: ${requiredSenozoideWeight.toFixed(2)} kg.`, 'error');
             return;
         }
-        
-        const trelicaLots: TrelicaSelectedLots = {
-            superior: superiorLot,
-            inferior1: inferiorLot1,
-            inferior2: inferiorLot2,
-            senozoide1: senozoideLot1,
-            senozoide2: senozoideLot2,
+
+        // Criar estrutura compatível com o formato antigo (inferior1, inferior2, etc)
+        const trelicaLots = {
+            superior: superiorLots[0] || '',
+            inferior1: inferiorLots[0] || '',
+            inferior2: inferiorLots[1] || inferiorLots[0] || '',
+            senozoide1: senozoideLots[0] || '',
+            senozoide2: senozoideLots[1] || senozoideLots[0] || '',
+            // Guardar todos os lotes em um array adicional
+            allSuperior: superiorLots,
+            allInferior: inferiorLots,
+            allSenozoide: senozoideLots,
         };
 
         const totalPlannedConsumption = requiredSuperiorWeight + requiredInferiorWeight + requiredSenozoideWeight;
-
         const plannedOutputWeight = parseFloat(selectedModel.pesoFinal.replace(',', '.')) * quantity;
 
         addProductionOrder({
@@ -245,21 +210,21 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
             trelicaModel: selectedModel.modelo,
             tamanho: selectedModel.tamanho,
             quantityToProduce: quantity,
-            selectedLotIds: trelicaLots,
+            selectedLotIds: trelicaLots as any,
             totalWeight: totalPlannedConsumption,
             plannedOutputWeight: plannedOutputWeight,
         });
-        
+
         setOrderNumber('');
         setQuantity(1);
         handleModelChange('');
     };
-    
+
     const plannedWeight = useMemo(() => {
         if (!selectedModel || !quantity) return 0;
         return parseFloat(selectedModel.pesoFinal.replace(',', '.')) * quantity;
     }, [selectedModel, quantity]);
-    
+
     const totalMetersToProduce = useMemo(() => {
         if (!selectedModel || !quantity) return 0;
         return parseFloat(selectedModel.tamanho) * quantity;
@@ -280,125 +245,226 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
         return formatMinutesToHHMM(timeInMinutes);
     }, [totalMetersToProduce, machineSpeed]);
 
-
     return (
-    <div className="p-4 sm:p-6 md:p-8">
-        {showHistoryModal && <ProductionOrderHistoryModal orders={trelicaProductionOrders} stock={stock} onClose={() => setShowHistoryModal(false)} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} onShowReport={order => { setProductionReportData(order); setShowHistoryModal(false); }} />}
-        {productionReportData && <ProductionOrderReport reportData={productionReportData} stock={stock} onClose={() => setProductionReportData(null)} />}
-      
-        <header className="flex items-center justify-between mb-6">
-            <div className="flex items-center">
-                <button onClick={() => setPage('menu')} className="mr-4 p-2 rounded-full hover:bg-slate-200 transition">
-                    <ArrowLeftIcon className="h-6 w-6 text-slate-700" />
+        <div className="p-4 sm:p-6 md:p-8">
+            {showHistoryModal && <ProductionOrderHistoryModal orders={trelicaProductionOrders} stock={stock} onClose={() => setShowHistoryModal(false)} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} onShowReport={order => { setProductionReportData(order); setShowHistoryModal(false); }} />}
+            {productionReportData && <ProductionOrderReport reportData={productionReportData} stock={stock} onClose={() => setProductionReportData(null)} />}
+
+            <header className="flex items-center justify-between mb-6">
+                <div className="flex items-center">
+                    <button onClick={() => setPage('menu')} className="mr-4 p-2 rounded-full hover:bg-slate-200 transition">
+                        <ArrowLeftIcon className="h-6 w-6 text-slate-700" />
+                    </button>
+                    <h1 className="text-3xl font-bold text-slate-800">Ordem de Produção - Treliça</h1>
+                </div>
+                <button onClick={() => setShowHistoryModal(true)} className="bg-white hover:bg-slate-50 text-slate-700 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
+                    <ClipboardListIcon className="h-5 w-5" />
+                    <span>Ver Ordens Criadas</span>
                 </button>
-                <h1 className="text-3xl font-bold text-slate-800">Ordem de Produção - Treliça</h1>
-            </div>
-            <button onClick={() => setShowHistoryModal(true)} className="bg-white hover:bg-slate-50 text-slate-700 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
-                <ClipboardListIcon className="h-5 w-5" />
-                <span>Ver Ordens Criadas</span>
-            </button>
-        </header>
-      
-        <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-sm space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div>
-                    <label htmlFor="orderNumber" className="block text-sm font-medium text-gray-700">Número da Ordem</label>
-                    <input type="text" id="orderNumber" value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} className="mt-1 p-2 w-full border rounded-md" required />
-                </div>
-                <div>
-                    <label htmlFor="model" className="block text-sm font-medium text-gray-700">Modelo da Treliça</label>
-                    <select id="model" value={selectedModel?.cod || ''} onChange={e => handleModelChange(e.target.value)} className="mt-1 p-2 w-full border rounded-md bg-white">
-                        <option value="">Selecione um modelo...</option>
-                        {trelicaModels.map(m => <option key={m.cod} value={m.cod}>{`${m.modelo} (${m.tamanho} mts)`}</option>)}
-                    </select>
-                </div>
-                <div>
-                    <label htmlFor="quantity" className="block text-sm font-medium text-gray-700">Quantidade de Peças</label>
-                    <input type="number" id="quantity" value={quantity} onChange={(e) => setQuantity(parseInt(e.target.value, 10) || 1)} min="1" className="mt-1 p-2 w-full border rounded-md" required />
-                </div>
-                <div>
-                    <label htmlFor="machineSpeed" className="block text-sm font-medium text-gray-700">Velocidade (m/min)</label>
-                    <input type="number" id="machineSpeed" value={machineSpeed} onChange={(e) => setMachineSpeed(parseFloat(e.target.value) || 1)} min="1" className="mt-1 p-2 w-full border rounded-md" required />
-                </div>
-            </div>
+            </header>
 
-            {selectedModel && (
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-slate-50 border rounded-lg">
+            <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-sm space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                     <div>
-                        <h3 className="font-semibold text-gray-800">Especificações do Modelo</h3>
-                        <div className="text-sm mt-2 space-y-1">
-                            <p><strong>Superior:</strong> {selectedModel.superior} mm</p>
-                            <p><strong>Inferior:</strong> {selectedModel.inferior} mm</p>
-                            <p><strong>Senozoide:</strong> {selectedModel.senozoide} mm</p>
-                        </div>
+                        <label htmlFor="orderNumber" className="block text-sm font-medium text-gray-700">Número da Ordem</label>
+                        <input type="text" id="orderNumber" value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} className="mt-1 p-2 w-full border rounded-md" required />
                     </div>
-                     <div className="text-right">
-                        <h3 className="font-semibold text-gray-800">Resumo do Planejamento</h3>
-                        <div className="text-sm mt-2 space-y-1">
-                            <p><strong>Peso (un):</strong> {selectedModel.pesoFinal} kg</p>
-                            <p><strong>Qtd.:</strong> {quantity} pçs</p>
-                            <p><strong>Total Metros:</strong> {totalMetersToProduce.toFixed(2)} m</p>
-                            <p className="text-lg font-bold text-indigo-700 border-t pt-2 mt-2">Peso Total: {plannedWeight.toFixed(2)} kg</p>
-                            <p className="text-lg font-bold text-emerald-700 border-t pt-2 mt-2">Tempo Estimado: {estimatedTime} <span className="text-xs font-normal">(HH:MM)</span></p>
-                        </div>
+                    <div>
+                        <label htmlFor="model" className="block text-sm font-medium text-gray-700">Modelo da Treliça</label>
+                        <select id="model" value={selectedModel?.cod || ''} onChange={e => handleModelChange(e.target.value)} className="mt-1 p-2 w-full border rounded-md bg-white">
+                            <option value="">Selecione um modelo...</option>
+                            {trelicaModels.map(m => <option key={m.cod} value={m.cod}>{`${m.modelo} (${m.tamanho} mts)`}</option>)}
+                        </select>
                     </div>
-                </div>
-            )}
-
-            {selectedModel && (
-                <div className="border-t pt-6 space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-4 p-4 border rounded-lg bg-slate-50">
-                        <h3 className="text-lg font-semibold text-gray-800 md:col-span-3">Seleção de Lotes (Material: CA-60)</h3>
-                        
-                        {/* Superior */}
-                        <div className="md:col-span-3">
-                             <div className="flex justify-between items-end border-b pb-1 mb-2">
-                                <h4 className="font-medium text-gray-600">Barra Superior (1 Lote)</h4>
-                                <WeightIndicator required={requiredSuperiorWeight} selected={selectedSuperiorWeight} />
-                            </div>
-                            <LotSelector label="Lote Superior" lots={superiorLots} selectedLot={superiorLot} onSelect={setSuperiorLot} requiredBitola={selectedModel.superior} />
-                        </div>
-
-                        {/* Inferior */}
-                        <div className="md:col-span-3 mt-4">
-                             <div className="flex justify-between items-end border-b pb-1 mb-2">
-                                <h4 className="font-medium text-gray-600">Barras Inferiores (2 Lotes)</h4>
-                                <WeightIndicator required={requiredInferiorWeight} selected={selectedInferiorWeight} />
-                            </div>
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <LotSelector label="Lote Inferior 1" lots={inferiorLots1} selectedLot={inferiorLot1} onSelect={setInferiorLot1} requiredBitola={selectedModel.inferior} />
-                                <LotSelector label="Lote Inferior 2" lots={inferiorLots2} selectedLot={inferiorLot2} onSelect={setInferiorLot2} requiredBitola={selectedModel.inferior} />
-                            </div>
-                        </div>
-
-                        {/* Senozoide */}
-                         <div className="md:col-span-3 mt-4">
-                             <div className="flex justify-between items-end border-b pb-1 mb-2">
-                                <h4 className="font-medium text-gray-600">Barras Senozoides (2 Lotes)</h4>
-                                <WeightIndicator required={requiredSenozoideWeight} selected={selectedSenozoideWeight} />
-                            </div>
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <LotSelector label="Lote Senozoide 1" lots={senozoideLots1} selectedLot={senozoideLot1} onSelect={setSenozoideLot1} requiredBitola={selectedModel.senozoide} />
-                                <LotSelector label="Lote Senozoide 2" lots={senozoideLots2} selectedLot={senozoideLot2} onSelect={setSenozoideLot2} requiredBitola={selectedModel.senozoide} />
-                            </div>
-                        </div>
+                    <div>
+                        <label htmlFor="quantity" className="block text-sm font-medium text-gray-700">Quantidade de Peças</label>
+                        <input type="number" id="quantity" value={quantity} onChange={(e) => setQuantity(parseInt(e.target.value, 10) || 1)} min="1" className="mt-1 p-2 w-full border rounded-md" required />
                     </div>
-                    <div className="flex justify-end">
-                         <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg transition text-lg">
-                            Criar Ordem de Produção
-                        </button>
+                    <div>
+                        <label htmlFor="machineSpeed" className="block text-sm font-medium text-gray-700">Velocidade (m/min)</label>
+                        <input type="number" id="machineSpeed" value={machineSpeed} onChange={(e) => setMachineSpeed(parseFloat(e.target.value) || 1)} min="1" className="mt-1 p-2 w-full border rounded-md" required />
                     </div>
                 </div>
-            )}
-            {!selectedModel && (
-                <div className="text-center text-gray-500 py-10 border-t mt-4">
-                    <WarningIcon className="h-12 w-12 mx-auto text-yellow-400 mb-2" />
-                    <p>Por favor, selecione um modelo de treliça para continuar.</p>
-                </div>
-            )}
-        </form>
-    </div>
-  );
+
+                {selectedModel && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-slate-50 border rounded-lg">
+                        <div>
+                            <h3 className="font-semibold text-gray-800">Especificações do Modelo</h3>
+                            <div className="text-sm mt-2 space-y-1">
+                                <p><strong>Superior:</strong> {selectedModel.superior} mm</p>
+                                <p><strong>Inferior:</strong> {selectedModel.inferior} mm</p>
+                                <p><strong>Senozoide:</strong> {selectedModel.senozoide} mm</p>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <h3 className="font-semibold text-gray-800">Resumo do Planejamento</h3>
+                            <div className="text-sm mt-2 space-y-1">
+                                <p><strong>Peso (un):</strong> {selectedModel.pesoFinal} kg</p>
+                                <p><strong>Qtd.:</strong> {quantity} pçs</p>
+                                <p><strong>Total Metros:</strong> {totalMetersToProduce.toFixed(2)} m</p>
+                                <p className="text-lg font-bold text-indigo-700 border-t pt-2 mt-2">Peso Total: {plannedWeight.toFixed(2)} kg</p>
+                                <p className="text-lg font-bold text-emerald-700 border-t pt-2 mt-2">Tempo Estimado: {estimatedTime} <span className="text-xs font-normal">(HH:MM)</span></p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {selectedModel && (
+                    <div className="border-t pt-6 space-y-6">
+                        <div className="space-y-6">
+                            <h3 className="text-lg font-semibold text-gray-800">Seleção de Lotes (Material: CA-60)</h3>
+
+                            {/* Superior */}
+                            <div className="p-4 border rounded-lg bg-slate-50">
+                                <div className="flex justify-between items-end border-b pb-2 mb-4">
+                                    <h4 className="font-medium text-gray-600">Barra Superior (Bitola: {selectedModel.superior}mm)</h4>
+                                    <WeightIndicator required={requiredSuperiorWeight} selected={selectedSuperiorWeight} />
+                                </div>
+                                <div className="space-y-2">
+                                    {superiorLots.map((lotId, index) => {
+                                        const lot = availableCa60Stock.find(l => l.id === lotId);
+                                        return (
+                                            <div key={index} className="flex items-center gap-2 bg-white p-2 rounded border">
+                                                <span className="flex-1 text-sm">
+                                                    <strong>{lot?.internalLot}</strong> - {lot?.availableQuantity.toFixed(2)} kg
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSuperiorLots(prev => prev.filter((_, i) => i !== index))}
+                                                    className="text-red-600 hover:text-red-800 p-1"
+                                                >
+                                                    <TrashIcon className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                    {availableSuperiorLots.length > 0 && (
+                                        <select
+                                            value=""
+                                            onChange={(e) => {
+                                                if (e.target.value) {
+                                                    setSuperiorLots(prev => [...prev, e.target.value]);
+                                                }
+                                            }}
+                                            className="w-full p-2 border rounded-md bg-white"
+                                        >
+                                            <option value="">+ Adicionar Lote Superior</option>
+                                            {availableSuperiorLots.map(lot => (
+                                                <option key={lot.id} value={lot.id}>
+                                                    {lot.internalLot} ({lot.availableQuantity.toFixed(2)} kg)
+                                                </option>
+                                            ))}
+                                        </select>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Inferior */}
+                            <div className="p-4 border rounded-lg bg-slate-50">
+                                <div className="flex justify-between items-end border-b pb-2 mb-4">
+                                    <h4 className="font-medium text-gray-600">Barras Inferiores (Bitola: {selectedModel.inferior}mm)</h4>
+                                    <WeightIndicator required={requiredInferiorWeight} selected={selectedInferiorWeight} />
+                                </div>
+                                <div className="space-y-2">
+                                    {inferiorLots.map((lotId, index) => {
+                                        const lot = availableCa60Stock.find(l => l.id === lotId);
+                                        return (
+                                            <div key={index} className="flex items-center gap-2 bg-white p-2 rounded border">
+                                                <span className="flex-1 text-sm">
+                                                    <strong>{lot?.internalLot}</strong> - {lot?.availableQuantity.toFixed(2)} kg
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setInferiorLots(prev => prev.filter((_, i) => i !== index))}
+                                                    className="text-red-600 hover:text-red-800 p-1"
+                                                >
+                                                    <TrashIcon className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                    {availableInferiorLots.length > 0 && (
+                                        <select
+                                            value=""
+                                            onChange={(e) => {
+                                                if (e.target.value) {
+                                                    setInferiorLots(prev => [...prev, e.target.value]);
+                                                }
+                                            }}
+                                            className="w-full p-2 border rounded-md bg-white"
+                                        >
+                                            <option value="">+ Adicionar Lote Inferior</option>
+                                            {availableInferiorLots.map(lot => (
+                                                <option key={lot.id} value={lot.id}>
+                                                    {lot.internalLot} ({lot.availableQuantity.toFixed(2)} kg)
+                                                </option>
+                                            ))}
+                                        </select>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Senozoide */}
+                            <div className="p-4 border rounded-lg bg-slate-50">
+                                <div className="flex justify-between items-end border-b pb-2 mb-4">
+                                    <h4 className="font-medium text-gray-600">Barras Senozoides (Bitola: {selectedModel.senozoide}mm)</h4>
+                                    <WeightIndicator required={requiredSenozoideWeight} selected={selectedSenozoideWeight} />
+                                </div>
+                                <div className="space-y-2">
+                                    {senozoideLots.map((lotId, index) => {
+                                        const lot = availableCa60Stock.find(l => l.id === lotId);
+                                        return (
+                                            <div key={index} className="flex items-center gap-2 bg-white p-2 rounded border">
+                                                <span className="flex-1 text-sm">
+                                                    <strong>{lot?.internalLot}</strong> - {lot?.availableQuantity.toFixed(2)} kg
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSenozoideLots(prev => prev.filter((_, i) => i !== index))}
+                                                    className="text-red-600 hover:text-red-800 p-1"
+                                                >
+                                                    <TrashIcon className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                    {availableSenozoideLots.length > 0 && (
+                                        <select
+                                            value=""
+                                            onChange={(e) => {
+                                                if (e.target.value) {
+                                                    setSenozoideLots(prev => [...prev, e.target.value]);
+                                                }
+                                            }}
+                                            className="w-full p-2 border rounded-md bg-white"
+                                        >
+                                            <option value="">+ Adicionar Lote Senozoide</option>
+                                            {availableSenozoideLots.map(lot => (
+                                                <option key={lot.id} value={lot.id}>
+                                                    {lot.internalLot} ({lot.availableQuantity.toFixed(2)} kg)
+                                                </option>
+                                            ))}
+                                        </select>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex justify-end">
+                            <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg transition text-lg">
+                                Criar Ordem de Produção
+                            </button>
+                        </div>
+                    </div>
+                )}
+                {!selectedModel && (
+                    <div className="text-center text-gray-500 py-10 border-t mt-4">
+                        <WarningIcon className="h-12 w-12 mx-auto text-yellow-400 mb-2" />
+                        <p>Por favor, selecione um modelo de treliça para continuar.</p>
+                    </div>
+                )}
+            </form>
+        </div>
+    );
 };
 
 export default ProductionOrderTrelica;
