@@ -752,25 +752,26 @@ const App: React.FC = () => {
             }
 
             // Start the new order
-            const orderToStart = { ...orderToStartData };
-            orderToStart.status = 'in_progress';
-            orderToStart.startTime = now;
-            orderToStart.downtimeEvents = [...(orderToStart.downtimeEvents || []), {
-                stopTime: now,
-                resumeTime: null,
-                reason: 'Aguardando Início da Produção'
-            }];
+            const updates: Partial<ProductionOrderData> = {
+                status: 'in_progress',
+                startTime: now,
+                downtimeEvents: [...(orderToStartData.downtimeEvents || []), {
+                    stopTime: now,
+                    resumeTime: null,
+                    reason: 'Aguardando Início da Produção'
+                }]
+            };
 
             if (openShiftOrderIndex !== -1) {
-                orderToStart.operatorLogs = [...(orderToStart.operatorLogs || []), {
+                updates.operatorLogs = [...(orderToStartData.operatorLogs || []), {
                     operator: currentUser.username,
                     startTime: now,
                     endTime: null
                 }];
             }
 
-            await updateItem('production_orders', orderToStart.id, orderToStart);
-            newOrders[newOrderIndex] = orderToStart;
+            const updatedOrder = await updateItem('production_orders', orderToStartData.id, updates);
+            newOrders[newOrderIndex] = updatedOrder;
 
             setProductionOrders(newOrders);
             showNotification('Ordem de produção iniciada.', 'success');
@@ -786,14 +787,13 @@ const App: React.FC = () => {
         const order = productionOrders.find(o => o.id === orderId);
         if (!order) return;
 
-        const updatedOrder: ProductionOrderData = {
-            ...order,
+        const updates: Partial<ProductionOrderData> = {
             operatorLogs: [...(order.operatorLogs || []), { operator: currentUser.username, startTime: now, endTime: null }],
         };
 
         // For Treliça, automatically resume production when shift starts
-        if (updatedOrder.machine === 'Treliça') {
-            const newEvents = [...(updatedOrder.downtimeEvents || [])];
+        if (order.machine === 'Treliça') {
+            const newEvents = [...(order.downtimeEvents || [])];
             let lastEventIndex = -1;
             for (let i = newEvents.length - 1; i >= 0; i--) {
                 if (!newEvents[i].resumeTime) {
@@ -804,11 +804,11 @@ const App: React.FC = () => {
             if (lastEventIndex !== -1) {
                 newEvents[lastEventIndex].resumeTime = now;
             }
-            updatedOrder.downtimeEvents = newEvents;
+            updates.downtimeEvents = newEvents;
         }
 
         try {
-            await updateItem('production_orders', orderId, updatedOrder);
+            const updatedOrder = await updateItem('production_orders', orderId, updates);
             setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
             showNotification('Turno iniciado.', 'success');
         } catch (error) {
@@ -894,10 +894,10 @@ const App: React.FC = () => {
             operatorLog = newLogs[lastLogIndex];
         }
 
-        const updatedOrder = { ...order, operatorLogs: newLogs };
+        const updates: Partial<ProductionOrderData> = { operatorLogs: newLogs };
 
         try {
-            await updateItem('production_orders', orderId, { operatorLogs: newLogs });
+            const updatedOrder = await updateItem('production_orders', orderId, updates);
             setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
 
             if (operatorLog) {
@@ -927,10 +927,10 @@ const App: React.FC = () => {
         }
         newEvents.push({ stopTime: now, resumeTime: null, reason });
 
-        const updatedOrder = { ...order, downtimeEvents: newEvents };
+        const updates: Partial<ProductionOrderData> = { downtimeEvents: newEvents };
 
         try {
-            await updateItem('production_orders', orderId, { downtimeEvents: newEvents });
+            const updatedOrder = await updateItem('production_orders', orderId, updates);
             setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
             showNotification('Parada registrada.', 'success');
         } catch (error) {
@@ -958,10 +958,10 @@ const App: React.FC = () => {
             newEvents.push({ stopTime: now, resumeTime: null, reason: 'Troca de Rolo / Preparação' });
         }
 
-        const updatedOrder = { ...order, downtimeEvents: newEvents };
+        const updates: Partial<ProductionOrderData> = { downtimeEvents: newEvents };
 
         try {
-            await updateItem('production_orders', orderId, { downtimeEvents: newEvents });
+            const updatedOrder = await updateItem('production_orders', orderId, updates);
             setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
             showNotification('Produção retomada.', 'success');
         } catch (error) {
@@ -986,14 +986,13 @@ const App: React.FC = () => {
             newEvents[lastEventIndex].resumeTime = now;
         }
 
-        const updatedOrder = {
-            ...order,
+        const updates: Partial<ProductionOrderData> = {
             activeLotProcessing: { lotId, startTime: now },
             downtimeEvents: newEvents
         };
 
         try {
-            await updateItem('production_orders', orderId, updatedOrder);
+            const updatedOrder = await updateItem('production_orders', orderId, updates);
             setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
             showNotification('Processamento de lote iniciado.', 'success');
         } catch (error) {
@@ -1018,15 +1017,14 @@ const App: React.FC = () => {
             reason: 'Troca de Rolo / Preparação'
         };
 
-        const updatedOrder = {
-            ...order,
+        const updates: Partial<ProductionOrderData> = {
             activeLotProcessing: undefined,
             processedLots: [...(order.processedLots || []), processedLot],
             downtimeEvents: [...(order.downtimeEvents || []), newDowntime]
         };
 
         try {
-            await updateItem('production_orders', orderId, updatedOrder);
+            const updatedOrder = await updateItem('production_orders', orderId, updates);
             setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
             showNotification('Processamento de lote finalizado.', 'success');
         } catch (error) {
@@ -1042,7 +1040,7 @@ const App: React.FC = () => {
             return;
         }
 
-        let completedOrder: ProductionOrderData;
+        let updates: Partial<ProductionOrderData>;
 
         // Common completion logic
         const newEvents = [...(orderToComplete.downtimeEvents || [])];
@@ -1065,8 +1063,7 @@ const App: React.FC = () => {
             }, 0);
             const calculatedScrapWeight = totalInputWeight - actualProducedWeight;
 
-            completedOrder = {
-                ...orderToComplete,
+            updates = {
                 status: 'completed',
                 endTime: now,
                 downtimeEvents: newEvents,
@@ -1075,8 +1072,7 @@ const App: React.FC = () => {
             };
         } else { // Treliça
             const actualProducedWeight = (orderToComplete.weighedPackages || []).reduce((sum, pkg) => sum + pkg.weight, 0);
-            completedOrder = {
-                ...orderToComplete,
+            updates = {
                 status: 'completed',
                 endTime: now,
                 downtimeEvents: newEvents,
@@ -1086,10 +1082,12 @@ const App: React.FC = () => {
             };
         }
 
+        const completedOrder = { ...orderToComplete, ...updates } as ProductionOrderData;
+
         try {
             // 1. Update Production Order in Supabase
-            await updateItem<ProductionOrderData>('production_orders', completedOrder.id, completedOrder);
-            setProductionOrders(prev => prev.map(o => o.id === orderId ? completedOrder : o));
+            const updatedOrder = await updateItem<ProductionOrderData>('production_orders', completedOrder.id, updates);
+            setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
 
             // 2. Update Stock in Supabase and Local State
             const stockUpdates: { id: string, changes: Partial<StockItem> }[] = [];
@@ -1246,10 +1244,10 @@ const App: React.FC = () => {
         const newProcessedLots = (order.processedLots || []).map(p =>
             p.lotId === lotId ? { ...p, finalWeight } : p
         );
-        const updatedOrder = { ...order, processedLots: newProcessedLots };
+        const updates: Partial<ProductionOrderData> = { processedLots: newProcessedLots };
 
         try {
-            await updateItem('production_orders', orderId, { processedLots: newProcessedLots });
+            const updatedOrder = await updateItem('production_orders', orderId, updates);
             setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
             showNotification('Peso do lote registrado com sucesso.', 'success');
         } catch (error) {
@@ -1267,10 +1265,10 @@ const App: React.FC = () => {
         const otherPackages = existingPackages.filter(p => p.packageNumber !== packageData.packageNumber);
         const newWeighedPackages = [...otherPackages, newPackage].sort((a, b) => a.packageNumber - b.packageNumber);
 
-        const updatedOrder = { ...order, weighedPackages: newWeighedPackages };
+        const updates: Partial<ProductionOrderData> = { weighedPackages: newWeighedPackages };
 
         try {
-            await updateItem('production_orders', orderId, { weighedPackages: newWeighedPackages });
+            const updatedOrder = await updateItem('production_orders', orderId, updates);
             setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
             showNotification(`Peso do pacote #${packageData.packageNumber} registrado com sucesso.`, 'success');
         } catch (error) {
@@ -1348,13 +1346,12 @@ const App: React.FC = () => {
                     description: activity
                 });
                 logsCopy[logIndex] = updatedLog;
-                targetOrder.operatorLogs = logsCopy;
 
                 try {
-                    await updateItem('production_orders', targetOrder.id, { operatorLogs: logsCopy });
+                    const updatedOrder = await updateItem('production_orders', targetOrder.id, { operatorLogs: logsCopy });
                     setProductionOrders(prev => {
                         const newOrders = [...prev];
-                        newOrders[targetOrderIndex] = targetOrder;
+                        newOrders[targetOrderIndex] = updatedOrder;
                         return newOrders;
                     });
                     showNotification('Atividade registrada com sucesso.', 'success');
