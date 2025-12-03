@@ -58,14 +58,14 @@ const ShiftDetails: React.FC<{ report: ShiftReport, stock: StockItem[] }> = ({ r
                         <p className="text-xl font-mono font-bold text-red-800">{formatDuration(totalDowntime)} ({downtimePercentage.toFixed(1)}%)</p>
                     </div>
                     {report.machine === 'Trefila' ? (
-                        <div className="bg-blue-100 p-3 rounded-md">
-                            <p className="text-sm text-blue-700">Bitola Produzida</p>
-                            <p className="text-xl font-mono font-bold text-blue-800">{report.targetBitola}</p>
+                        <div className="bg-[#e6f0f5] p-3 rounded-md">
+                            <p className="text-sm text-[#0F3F5C]">Bitola Produzida</p>
+                            <p className="text-xl font-mono font-bold text-[#0F3F5C]">{report.targetBitola}</p>
                         </div>
                     ) : (
-                        <div className="bg-blue-100 p-3 rounded-md">
-                            <p className="text-sm text-blue-700">Produto</p>
-                            <p className="text-lg font-bold text-blue-800">{report.trelicaModel} ({report.tamanho} mts)</p>
+                        <div className="bg-[#e6f0f5] p-3 rounded-md">
+                            <p className="text-sm text-[#0F3F5C]">Produto</p>
+                            <p className="text-lg font-bold text-[#0F3F5C]">{report.trelicaModel} ({report.tamanho} mts)</p>
                         </div>
                     )}
                     <div className="bg-orange-100 p-3 rounded-md">

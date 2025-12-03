@@ -102,7 +102,7 @@ const TransferFinishedGoodsModal: React.FC<{
                 </div>
                 <div className="flex justify-end gap-4 mt-4 pt-4 border-t">
                     <button type="button" onClick={onClose} className="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg">Cancelar</button>
-                    <button type="submit" className="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700">Confirmar Transferência</button>
+                    <button type="submit" className="bg-[#0F3F5C] text-white font-bold py-2 px-4 rounded-lg hover:bg-[#0A2A3D]">Confirmar Transferência</button>
                 </div>
             </form>
         </div>

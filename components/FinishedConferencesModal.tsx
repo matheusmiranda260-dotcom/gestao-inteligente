@@ -168,7 +168,7 @@ const EditConferenceModal: React.FC<{
                 <button type="button" onClick={handleAddLot} className="text-slate-600 hover:text-slate-800 font-semibold py-2 mt-2 self-start">+ Adicionar outro lote</button>
                 <div className="flex justify-end gap-4 mt-4 pt-4 border-t">
                     <button type="button" onClick={onClose} className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-4 rounded-lg transition">Cancelar</button>
-                    <button type="submit" className="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 transition">Salvar Alterações</button>
+                    <button type="submit" className="bg-[#0F3F5C] text-white font-bold py-2 px-4 rounded-lg hover:bg-[#0A2A3D] transition">Salvar Alterações</button>
                 </div>
             </form>
         </div>
@@ -248,7 +248,7 @@ const FinishedConferencesModal: React.FC<FinishedConferencesModalProps> = ({ con
                                                             <PrinterIcon className="h-4 w-4" />
                                                             <span>Reimprimir</span>
                                                         </button>
-                                                        <button onClick={() => handleEdit(conf)} className="text-indigo-600 hover:underline text-xs font-semibold flex items-center gap-1" title="Editar Conferência">
+                                                        <button onClick={() => handleEdit(conf)} className="text-[#0F3F5C] hover:underline text-xs font-semibold flex items-center gap-1" title="Editar Conferência">
                                                             <PencilIcon className="h-4 w-4" />
                                                             <span>Editar</span>
                                                         </button>

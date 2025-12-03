@@ -92,7 +92,7 @@ const UserModal: React.FC<{
                                         type="checkbox"
                                         checked={!!permissions[page]}
                                         onChange={(e) => handlePermissionChange(page, e.target.checked)}
-                                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                        className="h-4 w-4 rounded border-slate-300 text-[#0F3F5C] focus:ring-indigo-500"
                                     />
                                     <span className="text-slate-700">{label}</span>
                                 </label>
@@ -102,7 +102,7 @@ const UserModal: React.FC<{
                 </div>
                 <div className="flex justify-end gap-4 pt-4 mt-auto border-t">
                     <button type="button" onClick={onClose} className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-4 rounded-lg transition">Cancelar</button>
-                    <button type="submit" className="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 transition">Salvar</button>
+                    <button type="submit" className="bg-[#0F3F5C] text-white font-bold py-2 px-4 rounded-lg hover:bg-[#0A2A3D] transition">Salvar</button>
                 </div>
             </form>
         </div>
@@ -163,7 +163,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, addUser, updateU
             <div className="mb-6 flex justify-end">
                 <button
                     onClick={() => setIsModalOpen(true)}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition"
+                    className="bg-[#0F3F5C] hover:bg-[#0A2A3D] text-white font-bold py-2 px-4 rounded-lg transition"
                 >
                     Adicionar Usuário
                 </button>

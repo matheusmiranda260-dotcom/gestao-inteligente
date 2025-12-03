@@ -10,7 +10,7 @@ interface ProductionOrderStatusBadgeProps {
 const ProductionOrderStatusBadge: React.FC<ProductionOrderStatusBadgeProps> = ({ status }) => {
     const statusMap = {
         pending: { text: 'Pendente', className: 'bg-amber-100 text-amber-800' },
-        in_progress: { text: 'Em Produção', className: 'bg-blue-100 text-blue-800' },
+        in_progress: { text: 'Em Produção', className: 'bg-[#e6f0f5] text-[#0F3F5C]' },
         completed: { text: 'Concluída', className: 'bg-emerald-100 text-emerald-800' },
     };
     const { text, className } = statusMap[status] || { text: 'Desconhecido', className: 'bg-slate-100 text-slate-800' };

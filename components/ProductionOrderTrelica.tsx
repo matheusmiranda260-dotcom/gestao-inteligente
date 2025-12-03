@@ -319,7 +319,7 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
                                 <p><strong>Peso (un):</strong> {selectedModel.pesoFinal} kg</p>
                                 <p><strong>Qtd.:</strong> {quantity} pçs</p>
                                 <p><strong>Total Metros:</strong> {totalMetersToProduce.toFixed(2)} m</p>
-                                <p className="text-lg font-bold text-indigo-700 border-t pt-2 mt-2">Peso Total: {plannedWeight.toFixed(2)} kg</p>
+                                <p className="text-lg font-bold text-[#0A2A3D] border-t pt-2 mt-2">Peso Total: {plannedWeight.toFixed(2)} kg</p>
                                 <p className="text-lg font-bold text-emerald-700 border-t pt-2 mt-2">Tempo Estimado: {estimatedTime} <span className="text-xs font-normal">(HH:MM)</span></p>
                             </div>
                         </div>
@@ -331,16 +331,16 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
                         <h3 className="text-lg font-semibold text-gray-800">Seleção de Lotes (Material: CA-60)</h3>
 
                         {/* Superior - 1 lote único */}
-                        <div className="p-4 border rounded-lg bg-blue-50">
-                            <div className="flex justify-between items-end border-b border-blue-200 pb-2 mb-4">
+                        <div className="p-4 border rounded-lg bg-[#e6f0f5]">
+                            <div className="flex justify-between items-end border-b border-[#0F3F5C]/20 pb-2 mb-4">
                                 <h4 className="font-medium text-gray-700">
-                                    <span className="text-blue-700">●</span> Barra Superior (Bitola: {selectedModel.superior}mm)
+                                    <span className="text-[#0F3F5C]">●</span> Barra Superior (Bitola: {selectedModel.superior}mm)
                                 </h4>
                                 <WeightIndicator required={requiredSuperiorWeight} selected={selectedSuperiorWeight} label="1 Lote Único" />
                             </div>
                             <div className="space-y-2">
                                 {superiorLot && (
-                                    <div className="bg-white p-3 rounded border border-blue-200">
+                                    <div className="bg-white p-3 rounded border border-[#0F3F5C]/20">
                                         <p className="text-sm">
                                             <strong>{getLotInfo(superiorLot)?.internalLot}</strong> - {getLotInfo(superiorLot)?.availableQuantity.toFixed(2)} kg
                                         </p>
@@ -430,10 +430,10 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
                         </div>
 
                         {/* Senozoide - 2 lotes (Direito e Esquerdo) */}
-                        <div className="p-4 border rounded-lg bg-purple-50">
-                            <div className="flex justify-between items-end border-b border-purple-200 pb-2 mb-4">
+                        <div className="p-4 border rounded-lg bg-[#fff3e6]">
+                            <div className="flex justify-between items-end border-b border-[#FF8C00]/20 pb-2 mb-4">
                                 <h4 className="font-medium text-gray-700">
-                                    <span className="text-purple-700">●</span> Barras Senozoides (Bitola: {selectedModel.senozoide}mm)
+                                    <span className="text-[#FF8C00]">●</span> Barras Senozoides (Bitola: {selectedModel.senozoide}mm)
                                 </h4>
                                 <WeightIndicator required={requiredSenozoideWeight} selected={selectedSenozoideWeight} label="2 Lotes (D + E)" />
                             </div>
@@ -444,7 +444,7 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
                                         → Lado Direito
                                     </label>
                                     {senozoideDireito && (
-                                        <div className="bg-white p-2 mb-2 rounded border border-purple-200">
+                                        <div className="bg-white p-2 mb-2 rounded border border-[#FF8C00]/20">
                                             <p className="text-sm">
                                                 <strong>{getLotInfo(senozoideDireito)?.internalLot}</strong><br />
                                                 {getLotInfo(senozoideDireito)?.availableQuantity.toFixed(2)} kg
@@ -472,7 +472,7 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
                                         ← Lado Esquerdo
                                     </label>
                                     {senozoideEsquerdo && (
-                                        <div className="bg-white p-2 mb-2 rounded border border-purple-200">
+                                        <div className="bg-white p-2 mb-2 rounded border border-[#FF8C00]/20">
                                             <p className="text-sm">
                                                 <strong>{getLotInfo(senozoideEsquerdo)?.internalLot}</strong><br />
                                                 {getLotInfo(senozoideEsquerdo)?.availableQuantity.toFixed(2)} kg
@@ -497,7 +497,7 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
                         </div>
 
                         <div className="flex justify-end">
-                            <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg transition text-lg">
+                            <button type="submit" className="bg-[#0F3F5C] hover:bg-[#0A2A3D] text-white font-bold py-3 px-6 rounded-lg transition text-lg">
                                 Criar Ordem de Produção
                             </button>
                         </div>

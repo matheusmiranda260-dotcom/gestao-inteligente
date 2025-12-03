@@ -43,7 +43,7 @@ const MessagingModal: React.FC<{
                 <div className="flex-grow overflow-y-auto pr-2 space-y-3">
                     {messages.map(msg => (
                         <div key={msg.id} className={`flex ${msg.senderId === currentUser?.id ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-xs lg:max-w-md p-3 rounded-lg ${msg.senderId === currentUser?.id ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-800'}`}>
+                            <div className={`max-w-xs lg:max-w-md p-3 rounded-lg ${msg.senderId === currentUser?.id ? 'bg-[#e6f0f5]0 text-white' : 'bg-slate-200 text-slate-800'}`}>
                                 <p className="text-xs font-bold mb-1">{msg.senderUsername}</p>
                                 <p className="text-sm">{msg.message}</p>
                                 <p className="text-xs text-right mt-1 opacity-70">{new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
@@ -953,7 +953,7 @@ const MachineControl: React.FC<MachineControlProps> = ({ machineType, setPage, c
                             </div>
                             <button 
                                 onClick={() => setIsMessagingModalOpen(true)}
-                                className="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2"
+                                className="w-full bg-[#0F3F5C] text-white font-bold py-3 px-4 rounded-lg hover:bg-[#0A2A3D] flex items-center justify-center gap-2"
                             >
                                 <ChatBubbleLeftRightIcon className="h-5 w-5"/> Mensagens Gestor
                             </button>

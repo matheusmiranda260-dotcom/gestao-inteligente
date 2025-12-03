@@ -185,7 +185,7 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
                     </div>
                 </div>
                  <div className="mt-6 flex flex-col gap-3">
-                    <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition">
+                    <button type="submit" className="w-full bg-[#0F3F5C] hover:bg-[#0A2A3D] text-white font-bold py-3 px-4 rounded-lg transition">
                         Criar Ordem
                     </button>
                     <button type="button" onClick={clearSelection} className="w-full bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-4 rounded-lg transition">

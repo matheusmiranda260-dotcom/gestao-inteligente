@@ -148,7 +148,7 @@ const AddConferenceModal: React.FC<{
 
                 <div className="flex justify-end gap-4 mt-4 pt-4 border-t">
                     <button type="button" onClick={onClose} className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-4 rounded-lg transition">Cancelar</button>
-                    <button type="submit" className="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 transition">Finalizar e Adicionar ao Estoque</button>
+                    <button type="submit" className="bg-[#0F3F5C] text-white font-bold py-2 px-4 rounded-lg hover:bg-[#0A2A3D] transition">Finalizar e Adicionar ao Estoque</button>
                 </div>
             </form>
         </div>
@@ -273,7 +273,7 @@ const MultiLotTransferModal: React.FC<{
                 </div>
                 <div className="flex justify-end gap-4 mt-4 pt-4 border-t">
                     <button type="button" onClick={onClose} className="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg">Cancelar</button>
-                    <button type="submit" className="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700">Confirmar Transferência</button>
+                    <button type="submit" className="bg-[#0F3F5C] text-white font-bold py-2 px-4 rounded-lg hover:bg-[#0A2A3D]">Confirmar Transferência</button>
                 </div>
             </form>
         </div>
@@ -396,7 +396,7 @@ const StockControl: React.FC<{
 
             <div className="bg-white p-6 rounded-xl shadow-sm flex flex-wrap gap-4 items-center justify-between">
                 <div>
-                    <button onClick={() => setIsAddConferenceModalOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition text-base">
+                    <button onClick={() => setIsAddConferenceModalOpen(true)} className="bg-[#0F3F5C] hover:bg-[#0A2A3D] text-white font-bold py-2 px-4 rounded-lg transition text-base">
                         + Adicionar Conferência
                     </button>
                 </div>
