@@ -1,25 +1,37 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap');
 
 :root {
-  /* Premium Color Palette */
-  --primary-50: #eef2ff;
-  --primary-100: #e0e7ff;
-  --primary-200: #c7d2fe;
-  --primary-300: #a5b4fc;
-  --primary-400: #818cf8;
-  --primary-500: #6366f1;
-  /* Indigo 500 */
-  --primary-600: #4f46e5;
-  --primary-700: #4338ca;
-  --primary-800: #3730a3;
-  --primary-900: #312e81;
+  /* MSM Brand Colors */
+  --msm-blue: #0F3F5C;
+  --msm-blue-dark: #0A2A3D;
+  --msm-blue-light: #1A5A7D;
+  --msm-orange: #FF8C00;
+  --msm-orange-dark: #E67E00;
+  --msm-orange-light: #FFA333;
+  
+  /* Primary Palette (MSM Blue) */
+  --primary-50: #e6f0f5;
+  --primary-100: #cce1ec;
+  --primary-200: #99c3d9;
+  --primary-300: #66a5c6;
+  --primary-400: #3387b3;
+  --primary-500: #0F3F5C;
+  --primary-600: #0D3850;
+  --primary-700: #0A2A3D;
+  --primary-800: #071C2A;
+  --primary-900: #040E16;
 
-  --secondary-50: #f0fdfa;
-  --secondary-100: #ccfbf1;
-  --secondary-200: #99f6e4;
-  --secondary-500: #14b8a6;
-  /* Teal 500 */
-  --secondary-600: #0d9488;
+  /* Secondary Palette (MSM Orange) */
+  --secondary-50: #fff3e6;
+  --secondary-100: #ffe7cc;
+  --secondary-200: #ffcf99;
+  --secondary-300: #ffb766;
+  --secondary-400: #ff9f33;
+  --secondary-500: #FF8C00;
+  --secondary-600: #E67E00;
+  --secondary-700: #CC6F00;
+  --secondary-800: #B36000;
+  --secondary-900: #995200;
 
   --slate-50: #f8fafc;
   --slate-100: #f1f5f9;
@@ -35,20 +47,21 @@
   --surface-light: #ffffff;
   --surface-dark: #0f172a;
 
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-sm: 0 1px 2px 0 rgb(15 63 92 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(15 63 92 / 0.1), 0 2px 4px -2px rgb(15 63 92 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(15 63 92 / 0.1), 0 4px 6px -4px rgb(15 63 92 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(15 63 92 / 0.1), 0 8px 10px -6px rgb(15 63 92 / 0.1);
 }
 
 body {
   font-family: 'Inter', sans-serif;
-  background-color: var(--slate-50);
+  background: linear-gradient(135deg, #f8fafc 0%, #e6f0f5 100%);
   color: var(--slate-800);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   margin: 0;
   padding: 0;
+  min-height: 100vh;
 }
 
 h1,
@@ -58,7 +71,7 @@ h4,
 h5,
 h6 {
   font-family: 'Outfit', sans-serif;
-  color: var(--slate-900);
+  color: var(--msm-blue);
 }
 
 /* Custom Scrollbar */
@@ -72,28 +85,28 @@ h6 {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--slate-300);
+  background: var(--msm-blue-light);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--slate-400);
+  background: var(--msm-blue);
 }
 
 /* Glassmorphism utilities */
 .glass {
-  background: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(15, 63, 92, 0.1);
   box-shadow: var(--shadow-lg);
 }
 
 .glass-dark {
-  background: rgba(15, 23, 42, 0.6);
+  background: rgba(15, 63, 92, 0.7);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 140, 0, 0.2);
 }
 
 /* Animations */
@@ -119,6 +132,17 @@ h6 {
   }
 }
 
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.7;
+  }
+}
+
 .animate-fade-in {
   animation: fadeIn 0.5s ease-out forwards;
 }
@@ -127,23 +151,28 @@ h6 {
   animation: slideUp 0.6s ease-out forwards;
 }
 
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
 /* Card Styles */
 .card {
   background: var(--surface-light);
   border-radius: 1rem;
   box-shadow: var(--shadow-md);
-  border: 1px solid var(--slate-100);
+  border: 1px solid rgba(15, 63, 92, 0.1);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .card:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-lg);
+  border-color: rgba(255, 140, 0, 0.2);
 }
 
 /* Button Styles */
 .btn-primary {
-  background: linear-gradient(135deg, var(--primary-600), var(--primary-500));
+  background: linear-gradient(135deg, var(--msm-blue), var(--msm-blue-light));
   color: white;
   padding: 0.75rem 1.5rem;
   border-radius: 0.5rem;
@@ -151,13 +180,40 @@ h6 {
   border: none;
   cursor: pointer;
   transition: all 0.2s;
-  box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);
+  box-shadow: 0 4px 6px -1px rgba(15, 63, 92, 0.3);
 }
 
 .btn-primary:hover {
-  background: linear-gradient(135deg, var(--primary-700), var(--primary-600));
-  box-shadow: 0 6px 8px -1px rgba(79, 70, 229, 0.3);
+  background: linear-gradient(135deg, var(--msm-blue-dark), var(--msm-blue));
+  box-shadow: 0 6px 8px -1px rgba(15, 63, 92, 0.4);
   transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: linear-gradient(135deg, var(--msm-orange), var(--msm-orange-light));
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 6px -1px rgba(255, 140, 0, 0.3);
+}
+
+.btn-secondary:hover {
+  background: linear-gradient(135deg, var(--msm-orange-dark), var(--msm-orange));
+  box-shadow: 0 6px 8px -1px rgba(255, 140, 0, 0.4);
+  transform: translateY(-1px);
+}
+
+/* MSM Gradient Background */
+.msm-gradient {
+  background: linear-gradient(135deg, var(--msm-blue) 0%, var(--msm-blue-light) 100%);
+}
+
+.msm-gradient-reverse {
+  background: linear-gradient(135deg, var(--msm-blue-light) 0%, var(--msm-blue) 100%);
 }
 
 /* Print Styles */
@@ -254,7 +310,7 @@ h6 {
     padding: 8px;
   }
 
-  /* Ensure graphs/charts are visible if possible, though interactives might be tricky */
+  /* Ensure graphs/charts are visible if possible */
   .recharts-wrapper {
     visibility: visible !important;
   }
