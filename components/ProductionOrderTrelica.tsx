@@ -85,7 +85,9 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
 
     const availableCa60Stock = useMemo(() => {
         return stock
-            .filter(item => item.materialType === 'CA-60' && item.status !== 'Transferido')
+            .filter(item => item.materialType === 'CA-60' &&
+                item.status !== 'Transferido' &&
+                !item.status.startsWith('Em Produção'))
             .map(item => ({
                 ...item,
                 availableQuantity: item.remainingQuantity
@@ -150,8 +152,8 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
             showNotification('O número da ordem é obrigatório.', 'error');
             return;
         }
-        if (productionOrders.some(o => o.orderNumber.trim().toLowerCase().startsWith(orderNumber.trim().toLowerCase()))) {
-            showNotification(`O número de ordem base "${orderNumber}" já existe ou está em uso.`, 'error');
+        if (productionOrders.some(o => o.orderNumber.trim().toLowerCase() === orderNumber.trim().toLowerCase())) {
+            showNotification(`O número de ordem "${orderNumber}" já existe.`, 'error');
             return;
         }
         if (!selectedModel) {
