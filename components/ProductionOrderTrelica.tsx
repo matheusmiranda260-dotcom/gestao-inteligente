@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Page, StockItem, ProductionOrderData, Bitola } from '../types';
-import { ArrowLeftIcon, WarningIcon, ClipboardListIcon, TrashIcon } from './icons';
+import { ArrowLeftIcon, WarningIcon, ClipboardListIcon } from './icons';
 import ProductionOrderHistoryModal from './ProductionOrderHistoryModal';
 import ProductionOrderReport from './ProductionOrderReport';
 
@@ -38,12 +38,13 @@ interface ProductionOrderTrelicaProps {
     deleteProductionOrder: (orderId: string) => void;
 }
 
-const WeightIndicator: React.FC<{ required: number; selected: number; }> = ({ required, selected }) => {
+const WeightIndicator: React.FC<{ required: number; selected: number; label?: string }> = ({ required, selected, label }) => {
     const sufficient = selected >= required;
     const percentage = required > 0 ? Math.min((selected / required) * 100, 100) : 0;
 
     return (
         <div className="text-right text-sm">
+            {label && <p className="text-xs text-gray-500 mb-1">{label}</p>}
             <p>Necessário: <span className="font-bold">{required.toFixed(2)} kg</span></p>
             <p>Selecionado:
                 <span className={`font-bold ${sufficient ? 'text-green-600' : 'text-red-600'}`}>
@@ -69,10 +70,12 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
         return savedSpeed ? parseFloat(savedSpeed) : 10;
     });
 
-    // Arrays de lotes selecionados para cada posição
-    const [superiorLots, setSuperiorLots] = useState<string[]>([]);
-    const [inferiorLots, setInferiorLots] = useState<string[]>([]);
-    const [senozoideLots, setSenozoideLots] = useState<string[]>([]);
+    // Lotes selecionados - estrutura física da máquina
+    const [superiorLot, setSuperiorLot] = useState<string>(''); // 1 lote único
+    const [inferiorDireito, setInferiorDireito] = useState<string>(''); // Lado direito
+    const [inferiorEsquerdo, setInferiorEsquerdo] = useState<string>(''); // Lado esquerdo
+    const [senozoideDireito, setSenozoideDireito] = useState<string>(''); // Lado direito
+    const [senozoideEsquerdo, setSenozoideEsquerdo] = useState<string>(''); // Lado esquerdo
 
     const [showHistoryModal, setShowHistoryModal] = useState(false);
     const [productionReportData, setProductionReportData] = useState<ProductionOrderData | null>(null);
@@ -98,9 +101,12 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
     const handleModelChange = (cod: string) => {
         const model = trelicaModels.find(m => m.cod === cod) || null;
         setSelectedModel(model);
-        setSuperiorLots([]);
-        setInferiorLots([]);
-        setSenozoideLots([]);
+        // Limpar seleções
+        setSuperiorLot('');
+        setInferiorDireito('');
+        setInferiorEsquerdo('');
+        setSenozoideDireito('');
+        setSenozoideEsquerdo('');
     };
 
     const { baseSuperiorLots, baseInferiorLots, baseSenozoideLots } = useMemo(() => {
@@ -129,21 +135,21 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
     const { selectedSuperiorWeight, selectedInferiorWeight, selectedSenozoideWeight } = useMemo(() => {
         const getLotWeight = (id: string) => availableCa60Stock.find(s => s.id === id)?.availableQuantity || 0;
         return {
-            selectedSuperiorWeight: superiorLots.reduce((sum, id) => sum + getLotWeight(id), 0),
-            selectedInferiorWeight: inferiorLots.reduce((sum, id) => sum + getLotWeight(id), 0),
-            selectedSenozoideWeight: senozoideLots.reduce((sum, id) => sum + getLotWeight(id), 0),
+            selectedSuperiorWeight: getLotWeight(superiorLot),
+            selectedInferiorWeight: getLotWeight(inferiorDireito) + getLotWeight(inferiorEsquerdo),
+            selectedSenozoideWeight: getLotWeight(senozoideDireito) + getLotWeight(senozoideEsquerdo),
         };
-    }, [superiorLots, inferiorLots, senozoideLots, availableCa60Stock]);
+    }, [superiorLot, inferiorDireito, inferiorEsquerdo, senozoideDireito, senozoideEsquerdo, availableCa60Stock]);
 
     // Filtrar lotes disponíveis (excluir os já selecionados)
     const { availableSuperiorLots, availableInferiorLots, availableSenozoideLots } = useMemo(() => {
-        const allSelected = new Set([...superiorLots, ...inferiorLots, ...senozoideLots]);
+        const allSelected = new Set([superiorLot, inferiorDireito, inferiorEsquerdo, senozoideDireito, senozoideEsquerdo].filter(Boolean));
         return {
             availableSuperiorLots: baseSuperiorLots.filter(l => !allSelected.has(l.id)),
             availableInferiorLots: baseInferiorLots.filter(l => !allSelected.has(l.id)),
             availableSenozoideLots: baseSenozoideLots.filter(l => !allSelected.has(l.id)),
         };
-    }, [baseSuperiorLots, baseInferiorLots, baseSenozoideLots, superiorLots, inferiorLots, senozoideLots]);
+    }, [baseSuperiorLots, baseInferiorLots, baseSenozoideLots, superiorLot, inferiorDireito, inferiorEsquerdo, senozoideDireito, senozoideEsquerdo]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -164,18 +170,21 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
             showNotification('A quantidade a produzir deve ser maior que zero.', 'error');
             return;
         }
-        if (superiorLots.length === 0) {
-            showNotification('Selecione pelo menos um lote para Superior.', 'error');
+
+        // Validações específicas da nova estrutura
+        if (!superiorLot) {
+            showNotification('Selecione o lote Superior.', 'error');
             return;
         }
-        if (inferiorLots.length === 0) {
-            showNotification('Selecione pelo menos um lote para Inferior.', 'error');
+        if (!inferiorDireito || !inferiorEsquerdo) {
+            showNotification('Selecione os lotes Inferior (Direito e Esquerdo).', 'error');
             return;
         }
-        if (senozoideLots.length === 0) {
-            showNotification('Selecione pelo menos um lote para Senozoide.', 'error');
+        if (!senozoideDireito || !senozoideEsquerdo) {
+            showNotification('Selecione os lotes Senozoide (Direito e Esquerdo).', 'error');
             return;
         }
+
         if (selectedSuperiorWeight < requiredSuperiorWeight) {
             showNotification(`Peso para Superior é insuficiente. Necessário: ${requiredSuperiorWeight.toFixed(2)} kg.`, 'error');
             return;
@@ -189,17 +198,17 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
             return;
         }
 
-        // Criar estrutura compatível com o formato antigo (inferior1, inferior2, etc)
+        // Criar estrutura compatível mantendo retrocompatibilidade
         const trelicaLots = {
-            superior: superiorLots[0] || '',
-            inferior1: inferiorLots[0] || '',
-            inferior2: inferiorLots[1] || inferiorLots[0] || '',
-            senozoide1: senozoideLots[0] || '',
-            senozoide2: senozoideLots[1] || senozoideLots[0] || '',
-            // Guardar todos os lotes em um array adicional
-            allSuperior: superiorLots,
-            allInferior: inferiorLots,
-            allSenozoide: senozoideLots,
+            superior: superiorLot,
+            inferior1: inferiorDireito,
+            inferior2: inferiorEsquerdo,
+            senozoide1: senozoideDireito,
+            senozoide2: senozoideEsquerdo,
+            // Arrays para a lógica de consumo
+            allSuperior: [superiorLot],
+            allInferior: [inferiorDireito, inferiorEsquerdo],
+            allSenozoide: [senozoideDireito, senozoideEsquerdo],
         };
 
         const totalPlannedConsumption = requiredSuperiorWeight + requiredInferiorWeight + requiredSenozoideWeight;
@@ -246,6 +255,12 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
         const timeInMinutes = totalMetersToProduce / machineSpeed;
         return formatMinutesToHHMM(timeInMinutes);
     }, [totalMetersToProduce, machineSpeed]);
+
+    const getLotInfo = (lotId: string) => {
+        if (!lotId) return null;
+        const lot = availableCa60Stock.find(l => l.id === lotId);
+        return lot;
+    };
 
     return (
         <div className="p-4 sm:p-6 md:p-8">
@@ -313,144 +328,174 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
 
                 {selectedModel && (
                     <div className="border-t pt-6 space-y-6">
-                        <div className="space-y-6">
-                            <h3 className="text-lg font-semibold text-gray-800">Seleção de Lotes (Material: CA-60)</h3>
+                        <h3 className="text-lg font-semibold text-gray-800">Seleção de Lotes (Material: CA-60)</h3>
 
-                            {/* Superior */}
-                            <div className="p-4 border rounded-lg bg-slate-50">
-                                <div className="flex justify-between items-end border-b pb-2 mb-4">
-                                    <h4 className="font-medium text-gray-600">Barra Superior (Bitola: {selectedModel.superior}mm)</h4>
-                                    <WeightIndicator required={requiredSuperiorWeight} selected={selectedSuperiorWeight} />
-                                </div>
-                                <div className="space-y-2">
-                                    {superiorLots.map((lotId, index) => {
-                                        const lot = availableCa60Stock.find(l => l.id === lotId);
-                                        return (
-                                            <div key={index} className="flex items-center gap-2 bg-white p-2 rounded border">
-                                                <span className="flex-1 text-sm">
-                                                    <strong>{lot?.internalLot}</strong> - {lot?.availableQuantity.toFixed(2)} kg
-                                                </span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setSuperiorLots(prev => prev.filter((_, i) => i !== index))}
-                                                    className="text-red-600 hover:text-red-800 p-1"
-                                                >
-                                                    <TrashIcon className="h-4 w-4" />
-                                                </button>
-                                            </div>
-                                        );
-                                    })}
-                                    {availableSuperiorLots.length > 0 && (
-                                        <select
-                                            value=""
-                                            onChange={(e) => {
-                                                if (e.target.value) {
-                                                    setSuperiorLots(prev => [...prev, e.target.value]);
-                                                }
-                                            }}
-                                            className="w-full p-2 border rounded-md bg-white"
-                                        >
-                                            <option value="">+ Adicionar Lote Superior</option>
-                                            {availableSuperiorLots.map(lot => (
-                                                <option key={lot.id} value={lot.id}>
-                                                    {lot.internalLot} ({lot.availableQuantity.toFixed(2)} kg)
-                                                </option>
-                                            ))}
-                                        </select>
-                                    )}
-                                </div>
+                        {/* Superior - 1 lote único */}
+                        <div className="p-4 border rounded-lg bg-blue-50">
+                            <div className="flex justify-between items-end border-b border-blue-200 pb-2 mb-4">
+                                <h4 className="font-medium text-gray-700">
+                                    <span className="text-blue-700">●</span> Barra Superior (Bitola: {selectedModel.superior}mm)
+                                </h4>
+                                <WeightIndicator required={requiredSuperiorWeight} selected={selectedSuperiorWeight} label="1 Lote Único" />
                             </div>
-
-                            {/* Inferior */}
-                            <div className="p-4 border rounded-lg bg-slate-50">
-                                <div className="flex justify-between items-end border-b pb-2 mb-4">
-                                    <h4 className="font-medium text-gray-600">Barras Inferiores (Bitola: {selectedModel.inferior}mm)</h4>
-                                    <WeightIndicator required={requiredInferiorWeight} selected={selectedInferiorWeight} />
-                                </div>
-                                <div className="space-y-2">
-                                    {inferiorLots.map((lotId, index) => {
-                                        const lot = availableCa60Stock.find(l => l.id === lotId);
-                                        return (
-                                            <div key={index} className="flex items-center gap-2 bg-white p-2 rounded border">
-                                                <span className="flex-1 text-sm">
-                                                    <strong>{lot?.internalLot}</strong> - {lot?.availableQuantity.toFixed(2)} kg
-                                                </span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setInferiorLots(prev => prev.filter((_, i) => i !== index))}
-                                                    className="text-red-600 hover:text-red-800 p-1"
-                                                >
-                                                    <TrashIcon className="h-4 w-4" />
-                                                </button>
-                                            </div>
-                                        );
-                                    })}
-                                    {availableInferiorLots.length > 0 && (
-                                        <select
-                                            value=""
-                                            onChange={(e) => {
-                                                if (e.target.value) {
-                                                    setInferiorLots(prev => [...prev, e.target.value]);
-                                                }
-                                            }}
-                                            className="w-full p-2 border rounded-md bg-white"
-                                        >
-                                            <option value="">+ Adicionar Lote Inferior</option>
-                                            {availableInferiorLots.map(lot => (
-                                                <option key={lot.id} value={lot.id}>
-                                                    {lot.internalLot} ({lot.availableQuantity.toFixed(2)} kg)
-                                                </option>
-                                            ))}
-                                        </select>
-                                    )}
-                                </div>
+                            <div className="space-y-2">
+                                {superiorLot && (
+                                    <div className="bg-white p-3 rounded border border-blue-200">
+                                        <p className="text-sm">
+                                            <strong>{getLotInfo(superiorLot)?.internalLot}</strong> - {getLotInfo(superiorLot)?.availableQuantity.toFixed(2)} kg
+                                        </p>
+                                    </div>
+                                )}
+                                <select
+                                    value={superiorLot}
+                                    onChange={(e) => setSuperiorLot(e.target.value)}
+                                    className="w-full p-2 border rounded-md bg-white"
+                                    required
+                                >
+                                    <option value="">Selecione o lote Superior...</option>
+                                    {availableSuperiorLots.map(lot => (
+                                        <option key={lot.id} value={lot.id}>
+                                            {lot.internalLot} ({lot.availableQuantity.toFixed(2)} kg)
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
+                        </div>
 
-                            {/* Senozoide */}
-                            <div className="p-4 border rounded-lg bg-slate-50">
-                                <div className="flex justify-between items-end border-b pb-2 mb-4">
-                                    <h4 className="font-medium text-gray-600">Barras Senozoides (Bitola: {selectedModel.senozoide}mm)</h4>
-                                    <WeightIndicator required={requiredSenozoideWeight} selected={selectedSenozoideWeight} />
-                                </div>
-                                <div className="space-y-2">
-                                    {senozoideLots.map((lotId, index) => {
-                                        const lot = availableCa60Stock.find(l => l.id === lotId);
-                                        return (
-                                            <div key={index} className="flex items-center gap-2 bg-white p-2 rounded border">
-                                                <span className="flex-1 text-sm">
-                                                    <strong>{lot?.internalLot}</strong> - {lot?.availableQuantity.toFixed(2)} kg
-                                                </span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setSenozoideLots(prev => prev.filter((_, i) => i !== index))}
-                                                    className="text-red-600 hover:text-red-800 p-1"
-                                                >
-                                                    <TrashIcon className="h-4 w-4" />
-                                                </button>
-                                            </div>
-                                        );
-                                    })}
-                                    {availableSenozoideLots.length > 0 && (
-                                        <select
-                                            value=""
-                                            onChange={(e) => {
-                                                if (e.target.value) {
-                                                    setSenozoideLots(prev => [...prev, e.target.value]);
-                                                }
-                                            }}
-                                            className="w-full p-2 border rounded-md bg-white"
-                                        >
-                                            <option value="">+ Adicionar Lote Senozoide</option>
-                                            {availableSenozoideLots.map(lot => (
-                                                <option key={lot.id} value={lot.id}>
-                                                    {lot.internalLot} ({lot.availableQuantity.toFixed(2)} kg)
-                                                </option>
-                                            ))}
-                                        </select>
+                        {/* Inferior - 2 lotes (Direito e Esquerdo) */}
+                        <div className="p-4 border rounded-lg bg-green-50">
+                            <div className="flex justify-between items-end border-b border-green-200 pb-2 mb-4">
+                                <h4 className="font-medium text-gray-700">
+                                    <span className="text-green-700">●</span> Barras Inferiores (Bitola: {selectedModel.inferior}mm)
+                                </h4>
+                                <WeightIndicator required={requiredInferiorWeight} selected={selectedInferiorWeight} label="2 Lotes (D + E)" />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Direito */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-600 mb-2">
+                                        → Lado Direito
+                                    </label>
+                                    {inferiorDireito && (
+                                        <div className="bg-white p-2 mb-2 rounded border border-green-200">
+                                            <p className="text-sm">
+                                                <strong>{getLotInfo(inferiorDireito)?.internalLot}</strong><br />
+                                                {getLotInfo(inferiorDireito)?.availableQuantity.toFixed(2)} kg
+                                            </p>
+                                        </div>
                                     )}
+                                    <select
+                                        value={inferiorDireito}
+                                        onChange={(e) => setInferiorDireito(e.target.value)}
+                                        className="w-full p-2 border rounded-md bg-white"
+                                        required
+                                    >
+                                        <option value="">Selecione...</option>
+                                        {availableInferiorLots.map(lot => (
+                                            <option key={lot.id} value={lot.id}>
+                                                {lot.internalLot} ({lot.availableQuantity.toFixed(2)} kg)
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Esquerdo */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-600 mb-2">
+                                        ← Lado Esquerdo
+                                    </label>
+                                    {inferiorEsquerdo && (
+                                        <div className="bg-white p-2 mb-2 rounded border border-green-200">
+                                            <p className="text-sm">
+                                                <strong>{getLotInfo(inferiorEsquerdo)?.internalLot}</strong><br />
+                                                {getLotInfo(inferiorEsquerdo)?.availableQuantity.toFixed(2)} kg
+                                            </p>
+                                        </div>
+                                    )}
+                                    <select
+                                        value={inferiorEsquerdo}
+                                        onChange={(e) => setInferiorEsquerdo(e.target.value)}
+                                        className="w-full p-2 border rounded-md bg-white"
+                                        required
+                                    >
+                                        <option value="">Selecione...</option>
+                                        {availableInferiorLots.map(lot => (
+                                            <option key={lot.id} value={lot.id}>
+                                                {lot.internalLot} ({lot.availableQuantity.toFixed(2)} kg)
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
                             </div>
                         </div>
+
+                        {/* Senozoide - 2 lotes (Direito e Esquerdo) */}
+                        <div className="p-4 border rounded-lg bg-purple-50">
+                            <div className="flex justify-between items-end border-b border-purple-200 pb-2 mb-4">
+                                <h4 className="font-medium text-gray-700">
+                                    <span className="text-purple-700">●</span> Barras Senozoides (Bitola: {selectedModel.senozoide}mm)
+                                </h4>
+                                <WeightIndicator required={requiredSenozoideWeight} selected={selectedSenozoideWeight} label="2 Lotes (D + E)" />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Direito */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-600 mb-2">
+                                        → Lado Direito
+                                    </label>
+                                    {senozoideDireito && (
+                                        <div className="bg-white p-2 mb-2 rounded border border-purple-200">
+                                            <p className="text-sm">
+                                                <strong>{getLotInfo(senozoideDireito)?.internalLot}</strong><br />
+                                                {getLotInfo(senozoideDireito)?.availableQuantity.toFixed(2)} kg
+                                            </p>
+                                        </div>
+                                    )}
+                                    <select
+                                        value={senozoideDireito}
+                                        onChange={(e) => setSenozoideDireito(e.target.value)}
+                                        className="w-full p-2 border rounded-md bg-white"
+                                        required
+                                    >
+                                        <option value="">Selecione...</option>
+                                        {availableSenozoideLots.map(lot => (
+                                            <option key={lot.id} value={lot.id}>
+                                                {lot.internalLot} ({lot.availableQuantity.toFixed(2)} kg)
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Esquerdo */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-600 mb-2">
+                                        ← Lado Esquerdo
+                                    </label>
+                                    {senozoideEsquerdo && (
+                                        <div className="bg-white p-2 mb-2 rounded border border-purple-200">
+                                            <p className="text-sm">
+                                                <strong>{getLotInfo(senozoideEsquerdo)?.internalLot}</strong><br />
+                                                {getLotInfo(senozoideEsquerdo)?.availableQuantity.toFixed(2)} kg
+                                            </p>
+                                        </div>
+                                    )}
+                                    <select
+                                        value={senozoideEsquerdo}
+                                        onChange={(e) => setSenozoideEsquerdo(e.target.value)}
+                                        className="w-full p-2 border rounded-md bg-white"
+                                        required
+                                    >
+                                        <option value="">Selecione...</option>
+                                        {availableSenozoideLots.map(lot => (
+                                            <option key={lot.id} value={lot.id}>
+                                                {lot.internalLot} ({lot.availableQuantity.toFixed(2)} kg)
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="flex justify-end">
                             <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg transition text-lg">
                                 Criar Ordem de Produção
