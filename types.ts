@@ -17,6 +17,9 @@ export interface TrelicaSelectedLots {
     inferior2: string;
     senozoide1: string;
     senozoide2: string;
+    allSuperior?: string[];
+    allInferior?: string[];
+    allSenozoide?: string[];
 }
 
 export type Page = 'login' | 'menu' | 'stock' | 'machineSelection' | 'trefila' | 'trelica' | 'productionOrder' | 'productionOrderTrelica' | 'reports' | 'userManagement' | 'productionDashboard' | 'finishedGoods';
@@ -66,6 +69,7 @@ export interface ConferenceLotData {
 }
 
 export interface ConferenceData {
+    id?: string;
     entryDate: string; // ISO string
     supplier: string;
     nfe: string;

@@ -659,7 +659,13 @@ const App: React.FC = () => {
                 setStock(updatedStock);
             } else if (newOrder.machine === 'Treliça') {
                 const lots = newOrder.selectedLotIds as TrelicaSelectedLots;
-                const lotIds = [lots.superior, lots.inferior1, lots.inferior2, lots.senozoide1, lots.senozoide2];
+
+                let lotIds: string[] = [];
+                if (lots.allSuperior && lots.allInferior && lots.allSenozoide) {
+                    lotIds = [...lots.allSuperior, ...lots.allInferior, ...lots.allSenozoide];
+                } else {
+                    lotIds = [lots.superior, lots.inferior1, lots.inferior2, lots.senozoide1, lots.senozoide2];
+                }
                 const uniqueLotIds = [...new Set(lotIds)];
                 for (const lotId of uniqueLotIds) {
                     const stockItem = stock.find(s => s.id === lotId);
@@ -695,7 +701,17 @@ const App: React.FC = () => {
             const orderToDelete = productionOrders.find(o => o.id === orderId);
             if (!orderToDelete) return;
 
-            const lotIds = Array.isArray(orderToDelete.selectedLotIds) ? orderToDelete.selectedLotIds : Object.values(orderToDelete.selectedLotIds);
+            let lotIds: string[] = [];
+            if (orderToDelete.machine === 'Treliça' && !Array.isArray(orderToDelete.selectedLotIds)) {
+                const lots = orderToDelete.selectedLotIds as TrelicaSelectedLots;
+                if (lots.allSuperior && lots.allInferior && lots.allSenozoide) {
+                    lotIds = [...lots.allSuperior, ...lots.allInferior, ...lots.allSenozoide];
+                } else {
+                    lotIds = [lots.superior, lots.inferior1, lots.inferior2, lots.senozoide1, lots.senozoide2];
+                }
+            } else {
+                lotIds = Array.isArray(orderToDelete.selectedLotIds) ? orderToDelete.selectedLotIds : Object.values(orderToDelete.selectedLotIds) as string[];
+            }
 
             // Update related stock items first
             for (const lotId of lotIds) {
@@ -1142,11 +1158,34 @@ const App: React.FC = () => {
 
                     const lots = completedOrder.selectedLotIds as TrelicaSelectedLots;
                     const consumedMap = new Map<string, number>();
-                    consumedMap.set(lots.superior, (consumedMap.get(lots.superior) || 0) + totalConsumed.superior);
-                    consumedMap.set(lots.inferior1, (consumedMap.get(lots.inferior1) || 0) + totalConsumed.inferior / 2);
-                    consumedMap.set(lots.inferior2, (consumedMap.get(lots.inferior2) || 0) + totalConsumed.inferior / 2);
-                    consumedMap.set(lots.senozoide1, (consumedMap.get(lots.senozoide1) || 0) + totalConsumed.senozoide / 2);
-                    consumedMap.set(lots.senozoide2, (consumedMap.get(lots.senozoide2) || 0) + totalConsumed.senozoide / 2);
+
+                    const distributeConsumption = (lotIds: string[], totalWeight: number) => {
+                        let remainingWeight = totalWeight;
+                        for (const lotId of lotIds) {
+                            if (remainingWeight <= 0) break;
+                            const stockItem = stock.find(s => s.id === lotId);
+                            if (!stockItem) continue;
+
+                            const available = stockItem.remainingQuantity;
+                            const toConsume = Math.min(remainingWeight, available);
+
+                            consumedMap.set(lotId, (consumedMap.get(lotId) || 0) + toConsume);
+                            remainingWeight -= toConsume;
+                        }
+                        // If there is still remaining weight, force it on the last lot (or first if no lots)
+                        if (remainingWeight > 0 && lotIds.length > 0) {
+                            const lastLotId = lotIds[lotIds.length - 1];
+                            consumedMap.set(lastLotId, (consumedMap.get(lastLotId) || 0) + remainingWeight);
+                        }
+                    };
+
+                    const superiorLots = lots.allSuperior || [lots.superior];
+                    const inferiorLots = lots.allInferior || [lots.inferior1, lots.inferior2].filter(Boolean);
+                    const senozoideLots = lots.allSenozoide || [lots.senozoide1, lots.senozoide2].filter(Boolean);
+
+                    distributeConsumption(superiorLots, totalConsumed.superior);
+                    distributeConsumption(inferiorLots, totalConsumed.inferior);
+                    distributeConsumption(senozoideLots, totalConsumed.senozoide);
 
                     for (const stockItem of stock) {
                         if (consumedMap.has(stockItem.id)) {
