@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import type { StockItem } from '../types';
 import { PrinterIcon } from './icons';
-import { LogoIcon } from './Logo';
+import MSMLogo from './MSMLogo';
 
 interface InventoryReportProps {
     stock: StockItem[];
@@ -41,13 +41,13 @@ const InventoryReport: React.FC<InventoryReportProps> = ({ stock, filters, onClo
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 print-modal-container">
-            <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-5xl max-h-[95vh] flex flex-col print-modal-content">
-                <div className="flex justify-between items-center mb-4 pb-4 border-b no-print">
-                    <h2 className="text-2xl font-bold text-slate-800">Relatório de Inventário de Estoque</h2>
-                    <div>
+            <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-7xl max-h-[95vh] flex flex-col print-modal-content">
+                <div className="flex justify-between items-center mb-4 pb-4 border-b border-[#0F3F5C]/20 no-print">
+                    <h2 className="text-2xl font-bold text-[#0F3F5C]">Relatório de Inventário de Estoque</h2>
+                    <div className="flex gap-3">
                         <button
                             onClick={() => window.print()}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg transition flex items-center justify-center gap-2 mr-4"
+                            className="bg-gradient-to-r from-[#FF8C00] to-[#FFA333] hover:from-[#E67E00] hover:to-[#FF8C00] text-white font-bold py-2 px-4 rounded-lg transition-all shadow-md flex items-center justify-center gap-2"
                             title="Imprimir / Salvar PDF"
                         >
                             <PrinterIcon className="h-5 w-5" />
@@ -63,72 +63,130 @@ const InventoryReport: React.FC<InventoryReportProps> = ({ stock, filters, onClo
                 </div>
 
                 <div className="overflow-y-auto print-section bg-white p-4">
-                    <div className="flex items-center justify-between mb-6">
-                        <LogoIcon className="h-16 w-16 text-slate-800" />
+                    {/* Professional Header */}
+                    <div className="flex items-start justify-between mb-8 pb-6 border-b-2 border-[#0F3F5C]">
+                        <div className="flex items-center gap-4">
+                            <MSMLogo size="lg" showText={false} />
+                            <div>
+                                <h1 className="text-3xl font-bold text-[#0F3F5C]">MSM INDÚSTRIA</h1>
+                                <p className="text-sm text-[#FF8C00] font-semibold">Sistema de Gestão de Produção</p>
+                            </div>
+                        </div>
                         <div className="text-right">
-                            <h1 className="text-2xl font-bold text-black">MSM - Gestão de Produção</h1>
-                            <p className="text-lg text-slate-700">Ficha de Conferência de Estoque</p>
-                            <p className="text-sm text-slate-500">Gerado em: {new Date().toLocaleString('pt-BR')}</p>
+                            <p className="text-2xl font-bold text-[#0F3F5C] mb-1">FICHA DE CONFERÊNCIA</p>
+                            <p className="text-lg font-semibold text-[#FF8C00]">Inventário de Estoque</p>
+                            <p className="text-sm text-slate-600 mt-2">
+                                <span className="font-semibold">Data:</span><br />
+                                {new Date().toLocaleString('pt-BR', {
+                                    day: '2-digit',
+                                    month: '2-digit',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                })}
+                            </p>
                         </div>
                     </div>
 
-                    <div className="border rounded-lg p-4 mb-6">
-                        <h3 className="text-lg font-semibold mb-3">Filtros Aplicados</h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                            <div><strong>Status:</strong> {filters.statusFilter || 'Todos'}</div>
-                            <div><strong>Material:</strong> {filters.materialFilter || 'Todos'}</div>
-                            <div><strong>Bitola:</strong> {filters.bitolaFilter || 'Todas'}</div>
-                            <div><strong>Busca:</strong> {filters.searchTerm || '-'}</div>
+                    {/* Applied Filters */}
+                    <div className="bg-gradient-to-r from-[#e6f0f5] to-[#fff3e6] border-l-4 border-[#FF8C00] rounded-lg p-5 mb-6 shadow-sm">
+                        <h3 className="text-lg font-bold text-[#0F3F5C] mb-4 flex items-center gap-2">
+                            <svg className="w-5 h-5 text-[#FF8C00]" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />
+                            </svg>
+                            Filtros Aplicados
+                        </h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="bg-white p-3 rounded-lg shadow-sm">
+                                <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Status</p>
+                                <p className="text-sm font-bold text-[#0F3F5C]">{filters.statusFilter || 'Todos'}</p>
+                            </div>
+                            <div className="bg-white p-3 rounded-lg shadow-sm">
+                                <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Material</p>
+                                <p className="text-sm font-bold text-[#0F3F5C]">{filters.materialFilter || 'Todos'}</p>
+                            </div>
+                            <div className="bg-white p-3 rounded-lg shadow-sm">
+                                <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Bitola</p>
+                                <p className="text-sm font-bold text-[#0F3F5C]">{filters.bitolaFilter || 'Todas'}</p>
+                            </div>
+                            <div className="bg-white p-3 rounded-lg shadow-sm">
+                                <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Busca</p>
+                                <p className="text-sm font-bold text-[#0F3F5C]">{filters.searchTerm || '-'}</p>
+                            </div>
                         </div>
                     </div>
 
-                    <div>
-                        <table className="w-full text-sm text-left text-slate-600 border-collapse border border-slate-300">
-                            <thead className="text-xs text-slate-700 uppercase bg-slate-100">
-                                <tr>
-                                    <th className="px-2 py-2 border border-slate-300">Lote Interno</th>
-                                    <th className="px-2 py-2 border border-slate-300">Tipo de Material</th>
-                                    <th className="px-2 py-2 border border-slate-300">Bitola</th>
-                                    <th className="px-2 py-2 border border-slate-300">Fornecedor</th>
-                                    <th className="px-2 py-2 border border-slate-300 text-right">Peso Sistema (kg)</th>
-                                    <th className="px-2 py-2 border border-slate-300 w-32 text-center">Peso Físico</th>
-                                    <th className="px-2 py-2 border border-slate-300 w-24 text-center">Diferença</th>
-                                    <th className="px-2 py-2 border border-slate-300 w-40">Observações</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredStock.map((item) => (
-                                    <tr key={item.id} className="bg-white border-b border-slate-300">
-                                        <td className="px-2 py-2 border border-slate-300 font-medium text-slate-900">{item.internalLot}</td>
-                                        <td className="px-2 py-2 border border-slate-300">{item.materialType}</td>
-                                        <td className="px-2 py-2 border border-slate-300">{item.bitola}</td>
-                                        <td className="px-2 py-2 border border-slate-300">{item.supplier}</td>
-                                        <td className="px-2 py-2 border border-slate-300 text-right font-bold">{item.remainingQuantity.toFixed(2)}</td>
-                                        <td className="px-2 py-2 border border-slate-300"></td>
-                                        <td className="px-2 py-2 border border-slate-300"></td>
-                                        <td className="px-2 py-2 border border-slate-300"></td>
+                    {/* Inventory Table */}
+                    <div className="mb-6">
+                        <h3 className="text-lg font-bold text-[#0F3F5C] mb-4 flex items-center gap-2">
+                            <svg className="w-5 h-5 text-[#FF8C00]" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                            </svg>
+                            Itens em Estoque ({filteredStock.length} itens)
+                        </h3>
+                        <div className="border border-[#0F3F5C]/20 rounded-lg overflow-hidden shadow-sm">
+                            <table className="w-full text-sm text-left border-collapse">
+                                <thead className="text-xs text-white uppercase bg-gradient-to-r from-[#0F3F5C] to-[#1A5A7D]">
+                                    <tr>
+                                        <th className="px-2 py-2 border-r border-white/20">Lote Interno</th>
+                                        <th className="px-2 py-2 border-r border-white/20">Material</th>
+                                        <th className="px-2 py-2 border-r border-white/20">Bitola</th>
+                                        <th className="px-2 py-2 border-r border-white/20">Fornecedor</th>
+                                        <th className="px-2 py-2 border-r border-white/20 text-right">Peso Sistema (kg)</th>
+                                        <th className="px-2 py-2 border-r border-white/20 w-32 text-center bg-[#FF8C00]/30">Peso Físico</th>
+                                        <th className="px-2 py-2 border-r border-white/20 w-24 text-center bg-[#FF8C00]/30">Diferença</th>
+                                        <th className="px-2 py-2 w-40 bg-[#FF8C00]/30">Observações</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                            <tfoot>
-                                <tr className="font-semibold text-slate-900 bg-slate-50 border-t-2 border-slate-300">
-                                    <th colSpan={4} className="px-4 py-2 text-base text-right border border-slate-300">Total Sistema:</th>
-                                    <td className="px-2 py-2 text-base text-right font-bold border border-slate-300">{totalSystemWeight.toFixed(2)} kg</td>
-                                    <td colSpan={3} className="border border-slate-300"></td>
-                                </tr>
-                            </tfoot>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    {filteredStock.map((item, index) => (
+                                        <tr key={item.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50'} border-b border-slate-200`}>
+                                            <td className="px-2 py-2 border-r border-slate-200 font-bold text-[#0F3F5C]">{item.internalLot}</td>
+                                            <td className="px-2 py-2 border-r border-slate-200 text-slate-700">{item.materialType}</td>
+                                            <td className="px-2 py-2 border-r border-slate-200 font-semibold text-slate-900">{item.bitola}</td>
+                                            <td className="px-2 py-2 border-r border-slate-200 text-slate-700">{item.supplier}</td>
+                                            <td className="px-2 py-2 border-r border-slate-200 text-right font-bold text-[#FF8C00]">{item.remainingQuantity.toFixed(2)}</td>
+                                            <td className="px-2 py-2 border-r border-slate-200 bg-[#fff3e6]/30"></td>
+                                            <td className="px-2 py-2 border-r border-slate-200 bg-[#fff3e6]/30"></td>
+                                            <td className="px-2 py-2 bg-[#fff3e6]/30"></td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                                <tfoot className="bg-[#e6f0f5]">
+                                    <tr className="border-t-2 border-[#0F3F5C]">
+                                        <th colSpan={4} className="px-4 py-3 text-lg text-right font-bold text-[#0F3F5C] border-r border-[#0F3F5C]/20">Total Sistema:</th>
+                                        <td className="px-2 py-3 text-right border-r border-[#0F3F5C]/20">
+                                            <div className="inline-block px-3 py-1 rounded-lg font-bold text-lg bg-[#FF8C00] text-white shadow-md">
+                                                {totalSystemWeight.toFixed(2)} kg
+                                            </div>
+                                        </td>
+                                        <td colSpan={3} className="bg-[#fff3e6]/50"></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
                     </div>
 
-                    <div className="mt-12 pt-8 text-center flex justify-around">
-                        <div className="inline-block">
-                            <div className="border-t border-slate-500 w-64"></div>
-                            <p className="text-sm mt-1">Conferente</p>
+                    {/* Signature Section */}
+                    <div className="mt-16 pt-10 grid grid-cols-2 gap-32 text-center">
+                        <div>
+                            <div className="border-t-2 border-[#0F3F5C] pt-2">
+                                <p className="text-sm font-semibold text-slate-700">Conferente</p>
+                                <p className="text-xs text-slate-500 mt-1">Assinatura e Matrícula</p>
+                            </div>
                         </div>
-                        <div className="inline-block">
-                            <div className="border-t border-slate-500 w-64"></div>
-                            <p className="text-sm mt-1">Gestor Responsável</p>
+                        <div>
+                            <div className="border-t-2 border-[#0F3F5C] pt-2">
+                                <p className="text-sm font-semibold text-slate-700">Gestor Responsável</p>
+                                <p className="text-xs text-slate-500 mt-1">Assinatura e Carimbo</p>
+                            </div>
                         </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="mt-8 pt-4 border-t-2 border-slate-200 text-center text-sm text-slate-500">
+                        <p className="font-semibold">MSM Indústria - Sistema de Gestão de Produção</p>
+                        <p className="text-xs mt-1">Documento gerado automaticamente para conferência física de estoque</p>
                     </div>
                 </div>
             </div>

@@ -149,7 +149,7 @@ export interface ProductionOrderData {
     processedLots?: ProcessedLot[];
     actualProducedWeight?: number;
     operatorLogs?: OperatorLog[];
-    activeLotProcessing?: { lotId: string; startTime: string; };
+    activeLotProcessing?: { lotId?: string; startTime?: string; } | null;
     actualProducedQuantity?: number;
     scrapWeight?: number;
     weighedPackages?: WeighedPackage[];

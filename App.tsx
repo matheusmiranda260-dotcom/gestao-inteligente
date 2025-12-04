@@ -15,7 +15,7 @@ import FinishedGoods from './components/FinishedGoods';
 import { supabase } from './supabaseClient';
 
 import { fetchTable, insertItem, updateItem, deleteItem, deleteItemByColumn, updateItemByColumn } from './services/supabaseService';
-
+import { useAllRealtimeSubscriptions } from './hooks/useSupabaseRealtime';
 const generateId = (prefix: string) => `${prefix.toUpperCase()}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
 const App: React.FC = () => {
@@ -970,7 +970,7 @@ const App: React.FC = () => {
         if (lastEventIndex !== -1) {
             newEvents[lastEventIndex].resumeTime = now;
         }
-        if (!order.activeLotProcessing && order.machine === 'Trefila') {
+        if ((!order.activeLotProcessing || !order.activeLotProcessing.lotId) && order.machine === 'Trefila') {
             newEvents.push({ stopTime: now, resumeTime: null, reason: 'Troca de Rolo / Preparação' });
         }
 
@@ -1034,7 +1034,7 @@ const App: React.FC = () => {
         };
 
         const updates: Partial<ProductionOrderData> = {
-            activeLotProcessing: undefined,
+            activeLotProcessing: { lotId: '', startTime: '' },
             processedLots: [...(order.processedLots || []), processedLot],
             downtimeEvents: [...(order.downtimeEvents || []), newDowntime]
         };
