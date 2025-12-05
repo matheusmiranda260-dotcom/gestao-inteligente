@@ -103,6 +103,7 @@ export interface DowntimeEvent {
 export interface ProcessedLot {
     lotId: string;
     finalWeight: number | null;
+    measuredGauge?: number; // Bitola aferida em mm
     startTime: string; // ISO string
     endTime: string; // ISO string
 }

@@ -103,8 +103,17 @@ export function useAllRealtimeSubscriptions(setters: RealtimeSetters, enabled: b
                         }
                     }
                 )
-                .subscribe((status) => {
+                .subscribe((status, err) => {
                     console.log(`[Realtime] ${tableName} status:`, status);
+                    if (status === 'SUBSCRIBED') {
+                        console.log(`[Realtime] ✅ Conectado com sucesso a ${tableName}`);
+                    }
+                    if (status === 'CHANNEL_ERROR') {
+                        console.error(`[Realtime] ❌ Erro ao conectar em ${tableName}:`, err);
+                    }
+                    if (status === 'TIMED_OUT') {
+                        console.warn(`[Realtime] ⚠️ Tempo limite esgotado para ${tableName}`);
+                    }
                 });
 
             channels.push(channel);

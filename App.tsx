@@ -16,6 +16,7 @@ import { supabase } from './supabaseClient';
 
 import { fetchTable, insertItem, updateItem, deleteItem, deleteItemByColumn, updateItemByColumn } from './services/supabaseService';
 import { useAllRealtimeSubscriptions } from './hooks/useSupabaseRealtime';
+import RealtimeStatus from './components/RealtimeStatus';
 const generateId = (prefix: string) => `${prefix.toUpperCase()}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
 const App: React.FC = () => {
@@ -90,6 +91,22 @@ const App: React.FC = () => {
     const showNotification = (message: string, type: 'success' | 'error') => {
         setNotification({ message, type });
     };
+
+    // Supabase Realtime - Atualiza dados automaticamente quando há mudanças no banco
+    useAllRealtimeSubscriptions({
+        setStock,
+        setConferences,
+        setProductionOrders,
+        setTransfers,
+        setFinishedGoods,
+        setPontasStock,
+        setFinishedGoodsTransfers,
+        setPartsRequests,
+        setShiftReports,
+        setTrefilaProduction,
+        setTrelicaProduction,
+        setMessages,
+    }, !!currentUser);
 
     useEffect(() => {
         // Check active session
@@ -1276,12 +1293,12 @@ const App: React.FC = () => {
     };
 
 
-    const recordLotWeight = async (orderId: string, lotId: string, finalWeight: number) => {
+    const recordLotWeight = async (orderId: string, lotId: string, finalWeight: number, measuredGauge?: number) => {
         const order = productionOrders.find(o => o.id === orderId);
         if (!order) return;
 
         const newProcessedLots = (order.processedLots || []).map(p =>
-            p.lotId === lotId ? { ...p, finalWeight } : p
+            p.lotId === lotId ? { ...p, finalWeight, measuredGauge } : p
         );
         const updates: Partial<ProductionOrderData> = { processedLots: newProcessedLots };
 
@@ -1466,6 +1483,7 @@ const App: React.FC = () => {
         <div className="bg-slate-100 min-h-screen">
             {notification && <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />}
             {renderPage()}
+            <RealtimeStatus />
         </div>
     );
 };
