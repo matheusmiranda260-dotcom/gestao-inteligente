@@ -334,6 +334,7 @@ const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportDat
                                                 <thead className="text-xs text-slate-700 uppercase bg-slate-50">
                                                     <tr>
                                                         <th className="px-4 py-2">Lote Interno</th>
+                                                        {reportData.machine === 'Trefila' && <th className="px-4 py-2 text-right">Bit. Aferida</th>}
                                                         <th className="px-4 py-2 text-right">Peso Saída (kg)</th>
                                                         <th className="px-4 py-2 text-right">Perda (%)</th>
                                                         <th className="px-4 py-2 text-right">T. Efetivo</th>
@@ -346,6 +347,7 @@ const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportDat
                                                         return (
                                                             <tr key={lot.lotId} className="bg-white hover:bg-slate-50">
                                                                 <td className="px-4 py-2 font-medium text-[#0F3F5C]">{lot.internalLot}</td>
+                                                                {reportData.machine === 'Trefila' && <td className="px-4 py-2 text-right text-slate-600">{(lot as any).measuredGauge ? `${(lot as any).measuredGauge.toFixed(2)} mm` : '-'}</td>}
                                                                 <td className="px-4 py-2 text-right font-bold">{lot.finalWeight?.toFixed(2) || 'N/A'}</td>
                                                                 <td className={`px-4 py-2 text-right font-medium ${difference >= 0 ? 'text-red-600' : 'text-green-600'}`}>{lossPercentage.toFixed(2)}%</td>
                                                                 <td className="px-4 py-2 text-right font-mono text-slate-500">{formatDuration(lot.effectiveDurationMs)}</td>
