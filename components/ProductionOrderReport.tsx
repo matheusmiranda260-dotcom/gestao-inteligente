@@ -126,6 +126,17 @@ const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportDat
         });
     }, [reportData, stock]);
 
+    const averageMeasuredGauge = useMemo(() => {
+        if (!consumedLots || consumedLots.length === 0) return null;
+        const validGauges = (consumedLots as any[])
+            .map(l => l.measuredGauge)
+            .filter((g: any) => typeof g === 'number' && g > 0);
+
+        if (validGauges.length === 0) return null;
+        const sum = validGauges.reduce((a: number, b: number) => a + b, 0);
+        return sum / validGauges.length;
+    }, [consumedLots]);
+
     const dailyBreakdown = useMemo(() => {
         if (!consumedLots || consumedLots.length === 0) return [];
 
@@ -264,6 +275,12 @@ const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportDat
                                         <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Bitola Saída</p>
                                         <p className="text-sm font-bold text-[#0F3F5C]">{reportData.targetBitola}</p>
                                     </div>
+                                    {averageMeasuredGauge && (
+                                        <div className="bg-white p-3 rounded-lg shadow-sm">
+                                            <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Média Aferida</p>
+                                            <p className="text-sm font-bold text-[#0F3F5C]">{averageMeasuredGauge.toFixed(2)} mm</p>
+                                        </div>
+                                    )}
                                 </>
                             )}
                             <div className="bg-white p-3 rounded-lg shadow-sm">
@@ -334,7 +351,7 @@ const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportDat
                                                 <thead className="text-xs text-slate-700 uppercase bg-slate-50">
                                                     <tr>
                                                         <th className="px-4 py-2">Lote Interno</th>
-                                                        {reportData.machine === 'Trefila' && <th className="px-4 py-2 text-right">Bit. Aferida</th>}
+                                                        {reportData.machine?.toLowerCase() === 'trefila' && <th className="px-4 py-2 text-right">Bit. Aferida</th>}
                                                         <th className="px-4 py-2 text-right">Peso Saída (kg)</th>
                                                         <th className="px-4 py-2 text-right">Perda (%)</th>
                                                         <th className="px-4 py-2 text-right">T. Efetivo</th>
@@ -347,7 +364,7 @@ const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportDat
                                                         return (
                                                             <tr key={lot.lotId} className="bg-white hover:bg-slate-50">
                                                                 <td className="px-4 py-2 font-medium text-[#0F3F5C]">{lot.internalLot}</td>
-                                                                {reportData.machine === 'Trefila' && <td className="px-4 py-2 text-right text-slate-600">{(lot as any).measuredGauge ? `${(lot as any).measuredGauge.toFixed(2)} mm` : '-'}</td>}
+                                                                {reportData.machine?.toLowerCase() === 'trefila' && <td className="px-4 py-2 text-right text-slate-600">{(lot as any).measuredGauge ? `${(lot as any).measuredGauge.toFixed(2)} mm` : '-'}</td>}
                                                                 <td className="px-4 py-2 text-right font-bold">{lot.finalWeight?.toFixed(2) || 'N/A'}</td>
                                                                 <td className={`px-4 py-2 text-right font-medium ${difference >= 0 ? 'text-red-600' : 'text-green-600'}`}>{lossPercentage.toFixed(2)}%</td>
                                                                 <td className="px-4 py-2 text-right font-mono text-slate-500">{formatDuration(lot.effectiveDurationMs)}</td>
