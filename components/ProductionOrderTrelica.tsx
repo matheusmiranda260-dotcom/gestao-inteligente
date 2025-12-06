@@ -141,13 +141,18 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
         };
     }, [superiorLot, inferiorDireito, inferiorEsquerdo, senozoideDireito, senozoideEsquerdo, availableCa60Stock]);
 
-    // Filtrar lotes disponíveis (excluir os já selecionados)
-    const { availableSuperiorLots, availableInferiorLots, availableSenozoideLots } = useMemo(() => {
+    // Filtrar lotes disponíveis (mantendo o selecionado no próprio campo)
+    const { optsSuperior, optsInferiorDir, optsInferiorEsq, optsSenozoideDir, optsSenozoideEsq } = useMemo(() => {
         const allSelected = new Set([superiorLot, inferiorDireito, inferiorEsquerdo, senozoideDireito, senozoideEsquerdo].filter(Boolean));
+
+        const getOpts = (base: StockItem[], current: string) => base.filter(l => !allSelected.has(l.id) || l.id === current);
+
         return {
-            availableSuperiorLots: baseSuperiorLots.filter(l => !allSelected.has(l.id)),
-            availableInferiorLots: baseInferiorLots.filter(l => !allSelected.has(l.id)),
-            availableSenozoideLots: baseSenozoideLots.filter(l => !allSelected.has(l.id)),
+            optsSuperior: getOpts(baseSuperiorLots, superiorLot),
+            optsInferiorDir: getOpts(baseInferiorLots, inferiorDireito),
+            optsInferiorEsq: getOpts(baseInferiorLots, inferiorEsquerdo),
+            optsSenozoideDir: getOpts(baseSenozoideLots, senozoideDireito),
+            optsSenozoideEsq: getOpts(baseSenozoideLots, senozoideEsquerdo),
         };
     }, [baseSuperiorLots, baseInferiorLots, baseSenozoideLots, superiorLot, inferiorDireito, inferiorEsquerdo, senozoideDireito, senozoideEsquerdo]);
 
@@ -353,7 +358,7 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
                                     required
                                 >
                                     <option value="">Selecione o lote Superior...</option>
-                                    {availableSuperiorLots.map(lot => (
+                                    {optsSuperior.map(lot => (
                                         <option key={lot.id} value={lot.id}>
                                             {lot.internalLot} ({lot.availableQuantity.toFixed(2)} kg)
                                         </option>
@@ -391,7 +396,7 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
                                         required
                                     >
                                         <option value="">Selecione...</option>
-                                        {availableInferiorLots.map(lot => (
+                                        {optsInferiorDir.map(lot => (
                                             <option key={lot.id} value={lot.id}>
                                                 {lot.internalLot} ({lot.availableQuantity.toFixed(2)} kg)
                                             </option>
@@ -419,7 +424,7 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
                                         required
                                     >
                                         <option value="">Selecione...</option>
-                                        {availableInferiorLots.map(lot => (
+                                        {optsInferiorEsq.map(lot => (
                                             <option key={lot.id} value={lot.id}>
                                                 {lot.internalLot} ({lot.availableQuantity.toFixed(2)} kg)
                                             </option>
@@ -458,7 +463,7 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
                                         required
                                     >
                                         <option value="">Selecione...</option>
-                                        {availableSenozoideLots.map(lot => (
+                                        {optsSenozoideDir.map(lot => (
                                             <option key={lot.id} value={lot.id}>
                                                 {lot.internalLot} ({lot.availableQuantity.toFixed(2)} kg)
                                             </option>
@@ -486,7 +491,7 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
                                         required
                                     >
                                         <option value="">Selecione...</option>
-                                        {availableSenozoideLots.map(lot => (
+                                        {optsSenozoideEsq.map(lot => (
                                             <option key={lot.id} value={lot.id}>
                                                 {lot.internalLot} ({lot.availableQuantity.toFixed(2)} kg)
                                             </option>
