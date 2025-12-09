@@ -1177,21 +1177,32 @@ const App: React.FC = () => {
                     const consumedMap = new Map<string, number>();
 
                     const distributeConsumption = (lotIds: string[], totalWeight: number) => {
+                        console.log('Distributing consumption:', { lotIds, totalWeight });
                         let remainingWeight = totalWeight;
                         for (const lotId of lotIds) {
                             if (remainingWeight <= 0) break;
                             const stockItem = stock.find(s => s.id === lotId);
-                            if (!stockItem) continue;
+                            if (!stockItem) {
+                                console.warn('Stock item not found for lotId:', lotId);
+                                continue;
+                            }
 
-                            const available = stockItem.remainingQuantity;
+                            const alreadyConsumed = consumedMap.get(lotId) || 0;
+                            const available = Math.max(0, stockItem.remainingQuantity - alreadyConsumed);
+
+                            console.log('Lot:', stockItem.internalLot, 'Available:', available, 'Remaining Needed:', remainingWeight);
+
                             const toConsume = Math.min(remainingWeight, available);
 
-                            consumedMap.set(lotId, (consumedMap.get(lotId) || 0) + toConsume);
-                            remainingWeight -= toConsume;
+                            if (toConsume > 0) {
+                                consumedMap.set(lotId, alreadyConsumed + toConsume);
+                                remainingWeight -= toConsume;
+                            }
                         }
                         // If there is still remaining weight, force it on the last lot (or first if no lots)
                         if (remainingWeight > 0 && lotIds.length > 0) {
                             const lastLotId = lotIds[lotIds.length - 1];
+                            console.warn('Forcing remaining weight on last lot:', lastLotId, remainingWeight);
                             consumedMap.set(lastLotId, (consumedMap.get(lastLotId) || 0) + remainingWeight);
                         }
                     };
@@ -1200,9 +1211,14 @@ const App: React.FC = () => {
                     const inferiorLots = lots.allInferior || [lots.inferior1, lots.inferior2].filter(Boolean);
                     const senozoideLots = lots.allSenozoide || [lots.senozoide1, lots.senozoide2].filter(Boolean);
 
+                    console.log('Lots for consumption:', { superiorLots, inferiorLots, senozoideLots });
+                    console.log('Total Consumed to distribute:', totalConsumed);
+
                     distributeConsumption(superiorLots, totalConsumed.superior);
                     distributeConsumption(inferiorLots, totalConsumed.inferior);
                     distributeConsumption(senozoideLots, totalConsumed.senozoide);
+
+                    console.log('Consumed Map Result:', Object.fromEntries(consumedMap));
 
                     for (const stockItem of stock) {
                         if (consumedMap.has(stockItem.id)) {
@@ -1216,6 +1232,14 @@ const App: React.FC = () => {
                             const hasOtherActiveOrders = remainingOrderIds.some(otherId => {
                                 const otherOrder = productionOrders.find(o => o.id === otherId);
                                 return otherOrder && (otherOrder.status === 'pending' || otherOrder.status === 'in_progress');
+                            });
+
+                            console.log('Updating Stock Item:', stockItem.internalLot, {
+                                consumedQty,
+                                newRemainingQty,
+                                remainingOrderIds,
+                                hasOtherActiveOrders,
+                                currentStatus: stockItem.status
                             });
 
                             stockUpdates.push({
