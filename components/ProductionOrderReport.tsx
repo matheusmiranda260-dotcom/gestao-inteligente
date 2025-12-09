@@ -191,6 +191,189 @@ const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportDat
         return trelicaModels.find(m => m.modelo === reportData.trelicaModel && m.tamanho === reportData.tamanho);
     }, [reportData]);
 
+    // Trefila Specific Layout
+    if (reportData.machine === 'Trefila') {
+        const inputWeight = consumedLots?.reduce((sum, lot) => sum + lot.originalWeight, 0) || 0;
+        const outputWeight = consumedLots?.reduce((sum, lot) => sum + (lot.finalWeight || 0), 0) || 0;
+        const scrapWeight = inputWeight - outputWeight;
+        const scrapPercentage = inputWeight > 0 ? (scrapWeight / inputWeight) * 100 : 0;
+        const velocity = effectiveTimeMs > 0 ? totalMetersProduced / (effectiveTimeMs / 1000) : 0;
+
+        return (
+            <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 print-modal-container">
+                <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-5xl max-h-[95vh] flex flex-col print-modal-content">
+                    <div className="flex justify-between items-center mb-4 pb-4 border-b border-[#0F3F5C]/20 no-print">
+                        <h2 className="text-2xl font-bold text-[#0F3F5C]">Relatório de Produção - Trefila</h2>
+                        <div className="flex gap-3">
+                            <button onClick={() => window.print()} className="bg-gradient-to-r from-[#FF8C00] to-[#FFA333] hover:from-[#E67E00] hover:to-[#FF8C00] text-white font-bold py-2 px-4 rounded-lg transition-all shadow-md flex items-center justify-center gap-2">
+                                <PrinterIcon className="h-5 w-5" /> Imprimir
+                            </button>
+                            <button onClick={onClose} className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-4 rounded-lg transition">Fechar</button>
+                        </div>
+                    </div>
+
+                    <div className="overflow-y-auto print-section bg-white p-2 font-sans text-sm text-black">
+                        {/* Header */}
+                        <div className="border-2 border-black mb-1 p-2 text-center">
+                            {/* Optional Logo Placeholder if needed, but user asked to remove specific branding previously. Keeping layout generic as per structure request. */}
+                            {/* If strictly following image structure, top part is title */}
+                            <h1 className="text-xl font-bold uppercase">Controle de Produção Diaria - Setor Laminação</h1>
+                            <h2 className="text-lg font-bold uppercase">Trefila</h2>
+                        </div>
+
+                        {/* Order Info Table */}
+                        <table className="w-full border-collapse border-2 border-black mb-1 text-center font-bold">
+                            <tbody>
+                                <tr className="border-b border-black">
+                                    <td className="p-1">Ordem de produção : {reportData.orderNumber}</td>
+                                </tr>
+                                <tr className="border-b border-black">
+                                    <td className="p-1">
+                                        Data da produção: {reportData.startTime ? new Date(reportData.startTime).toLocaleDateString('pt-BR', { weekday: 'short', year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A'}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td className="p-1">Operador/auxiliar: {operatorNames}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        {/* Product Desc Table */}
+                        <div className="border-2 border-black mb-4 font-bold">
+                            <div className="border-b border-black p-1 pl-2">
+                                Descrição do produto (entrada): <span className="text-red-600">{inputBitola}mm -- FIO MAQUINA--</span>
+                            </div>
+                            <div className="p-1 pl-2">
+                                Descrição do produto (Saída): <span className="text-green-600">{reportData.targetBitola}mm ---CA60--</span>
+                            </div>
+                        </div>
+
+                        {/* Paradas */}
+                        <div className="mb-4">
+                            <h3 className="text-center font-bold italic underline mb-1">PARADAS E SEUS MOTIVOS:</h3>
+                            <table className="w-full border-collapse border border-black text-xs text-center font-bold">
+                                <thead>
+                                    <tr className="bg-gray-200">
+                                        <th className="border border-black p-1 w-20">INÍCIO</th>
+                                        <th className="border border-black p-1 w-20">FIM</th>
+                                        <th className="border border-black p-1">MOTIVO</th>
+                                        <th className="border border-black p-1 w-20">DURAÇÃO</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {(reportData.downtimeEvents || []).map((event, idx) => {
+                                        if (!event.resumeTime) return null;
+                                        const duration = new Date(event.resumeTime).getTime() - new Date(event.stopTime).getTime();
+                                        return (
+                                            <tr key={idx}>
+                                                <td className="border border-black p-1 text-red-600">
+                                                    {new Date(event.stopTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                                </td>
+                                                <td className="border border-black p-1 text-green-600">
+                                                    {new Date(event.resumeTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                                </td>
+                                                <td className="border border-black p-1 uppercase italic">{event.reason}</td>
+                                                <td className="border border-black p-1 text-red-600 font-mono">{formatDuration(duration)}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                    {(!reportData.downtimeEvents || reportData.downtimeEvents.length === 0) && (
+                                        <tr><td colSpan={4} className="border border-black p-1 text-center italic">Nenhuma parada registrada.</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Estatística do Dia */}
+                        <div className="mb-4 border border-black p-2">
+                            <h3 className="text-center font-bold italic underline mb-2">ESTATÍSTICA DO DIA:</h3>
+                            <div className="grid grid-cols-[2fr_1fr_1fr] gap-x-2 gap-y-1 w-full max-w-lg mx-auto font-bold text-sm">
+                                <div className="text-right">Horas (Turno trabalhados):</div>
+                                <div className="text-center font-mono">{formatDuration(totalDurationMs)}</div>
+                                <div></div>
+
+                                <div className="text-right">Tempo de maquina (parada) :</div>
+                                <div className="text-center text-red-600 font-mono">{formatDuration(totalDowntimeMs)}</div>
+                                <div className="text-red-600">{totalDurationMs > 0 ? ((totalDowntimeMs / totalDurationMs) * 100).toFixed(1) : 0}%</div>
+
+                                <div className="text-right">Tempo de maquina (Efetivo) :</div>
+                                <div className="text-center text-green-600 font-mono">{formatDuration(effectiveTimeMs)}</div>
+                                <div className="text-green-600">{totalDurationMs > 0 ? ((effectiveTimeMs / totalDurationMs) * 100).toFixed(1) : 0}%</div>
+
+                                <div className="text-right">Peso entrada:</div>
+                                <div className="text-center">{inputWeight.toFixed(0)} kg</div>
+                                <div></div>
+
+                                <div className="text-right">Peso saida:</div>
+                                <div className="text-center">{outputWeight.toFixed(0)} kg</div>
+                                <div></div>
+
+                                <div className="text-right">sucata:</div>
+                                <div className="text-center text-red-600">{scrapWeight.toFixed(2)} kg</div>
+                                <div className="text-red-600">{scrapPercentage.toFixed(2)}%</div>
+
+                                <div className="text-right">Quant. metros produzidos:</div>
+                                <div className="text-center">{totalMetersProduced.toFixed(0)} metros</div>
+                                <div></div>
+
+                                <div className="text-right">Velocidade:</div>
+                                <div className="text-center">{velocity.toFixed(2)} m/s</div>
+                                <div></div>
+                            </div>
+                        </div>
+
+                        {/* Atualização da Produção */}
+                        <div>
+                            <h3 className="text-center font-bold italic underline mb-1">ATUALIZAÇÃO DA PRODUÇÃO:</h3>
+                            <table className="w-full border-collapse border border-black text-sm text-center font-bold mx-auto max-w-2xl">
+                                <thead>
+                                    <tr className="bg-white border-b-2 border-black">
+                                        <th className="border border-black p-1">Data</th>
+                                        <th className="border border-black p-1">kg (entrada)</th>
+                                        <th className="border border-black p-1">kg (saída)</th>
+                                        <th className="border border-black p-1">bitola</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {dailyBreakdown.map((day, dIdx) => (
+                                        <React.Fragment key={dIdx}>
+                                            {day.lots.map((lot, lIdx) => (
+                                                <tr key={lot.lotId}>
+                                                    {lIdx === 0 && (
+                                                        <td className="border border-black p-1 align-middle" rowSpan={day.lots.length}>
+                                                            {new Date(day.date.split('/').reverse().join('-')).toLocaleDateString('pt-BR')}
+                                                        </td>
+                                                    )}
+                                                    <td className="border border-black p-1">{(lot as any).originalWeight?.toFixed(0) || '-'}</td>
+                                                    <td className="border border-black p-1">{lot.finalWeight?.toFixed(0) || '-'}</td>
+                                                    <td className="border border-black p-1">{(lot as any).measuredGauge ? (lot as any).measuredGauge.toFixed(2) + 'mm' : '-'}</td>
+                                                </tr>
+                                            ))}
+                                            <tr className="bg-gray-50 text-red-600">
+                                                <td className="border border-black p-1 text-right italic" colSpan={4}>
+                                                    Subtotal Dia: {day.lots.reduce((acc, l) => acc + (l.finalWeight || 0), 0).toFixed(0)} kg
+                                                </td>
+                                            </tr>
+                                        </React.Fragment>
+                                    ))}
+                                </tbody>
+                                <tfoot>
+                                    <tr className="border-t-2 border-black bg-white">
+                                        <td className="border border-black p-1 font-bold text-red-600 text-lg">Total</td>
+                                        <td className="border border-black p-1 font-bold text-red-600 text-lg">{inputWeight.toFixed(0)}</td>
+                                        <td className="border border-black p-1 font-bold text-red-600 text-lg">{outputWeight.toFixed(0)}</td>
+                                        <td className="border border-black p-1"></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Default Layout (Treliça and others)
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 print-modal-container">
             <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-5xl max-h-[95vh] flex flex-col print-modal-content">
