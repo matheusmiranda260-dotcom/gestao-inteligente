@@ -235,46 +235,58 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
         };
     }, [selectedModel, quantity]);
 
-    // Auto-select lots logic
+    // State for Auto-Selection Toggle
+    const [isAutoSelect, setIsAutoSelect] = useState(true);
+
+    // Auto-select lots logic - Sequential Allocation to prevent conflicts
     useEffect(() => {
-        if (!selectedModel) return;
+        if (!selectedModel || !isAutoSelect) return;
 
-        const selectByWeight = (available: AvailableStockItem[], targetWeight: number) => {
+        const superiorBitola = normalizeBitola(selectedModel.superior);
+        const inferiorBitola = normalizeBitola(selectedModel.inferior);
+        const senozoideBitola = normalizeBitola(selectedModel.senozoide);
+
+        const usedIds = new Set<string>();
+
+        const allocate = (bitola: string, targetWeight: number) => {
+            // Filter raw stock by bitola and exclude already used IDs
+            // availableCa60Stock is already sorted by date (FIFO)
+            const candidates = availableCa60Stock.filter(l =>
+                l.bitola === bitola &&
+                !usedIds.has(l.id)
+            );
+
             let currentWeight = 0;
-            const selectedIds: string[] = [];
+            const selected: string[] = [];
 
-            for (const lot of available) {
+            for (const lot of candidates) {
                 if (currentWeight >= targetWeight) break;
-                selectedIds.push(lot.id);
+                selected.push(lot.id);
+                usedIds.add(lot.id);
                 currentWeight += lot.availableQuantity;
             }
-            return selectedIds;
+            return selected;
         };
 
-        // Auto-select based on calculated requirements
-        // We only overwrite selection if the requirements change drastically or model changes
-        // But the user request implies they want it AUTOMATIC so they don't have to select.
-        // So we will enforce this auto-selection when requirements are calculated.
+        const newSuperiorLots = allocate(superiorBitola, requiredSuperiorWeight);
+        const newInferiorLots = allocate(inferiorBitola, requiredInferiorWeight);
+        const newSenozoideLots = allocate(senozoideBitola, requiredSenozoideWeight);
 
-        setSuperiorLots(selectByWeight(baseSuperiorLots, requiredSuperiorWeight));
-        setInferiorLots(selectByWeight(baseInferiorLots, requiredInferiorWeight));
-        setSenozoideLots(selectByWeight(baseSenozoideLots, requiredSenozoideWeight));
+        setSuperiorLots(newSuperiorLots);
+        setInferiorLots(newInferiorLots);
+        setSenozoideLots(newSenozoideLots);
 
     }, [
         selectedModel,
-        quantity, // Re-run if quantity (and thus required weight) changes
-        // Dependencies for base lots and weights are implicitly covered by selectedModel + quantity or are stable
-        // We include the base arrays to ensure if stock updates we re-eval? 
-        // Ideally yes, but might cause loops if not careful. The base arrays are derived from Memo so they change when Stock changes.
-        baseSuperiorLots,
-        baseInferiorLots,
-        baseSenozoideLots,
+        quantity,
+        availableCa60Stock, // We depend on the raw stock now for fresh calculation
         requiredSuperiorWeight,
         requiredInferiorWeight,
-        requiredSenozoideWeight
+        requiredSenozoideWeight,
+        isAutoSelect // Re-run if user switches back to auto
     ]);
 
-    // Calculate total selected weights - re-added for validation
+    // Calculate total selected weights
     const getWeight = (ids: string[]) => ids.reduce((acc, id) => acc + (availableCa60Stock.find(s => s.id === id)?.availableQuantity || 0), 0);
     const selectedSuperiorWeight = getWeight(superiorLots);
     const selectedInferiorWeight = getWeight(inferiorLots);
@@ -315,8 +327,8 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
 
         if (selectedSuperiorWeight < requiredSuperiorWeight) {
             showNotification(`Peso para Superior pode ser insuficiente. (Selecionado: ${selectedSuperiorWeight.toFixed(2)} / Necessário: ${requiredSuperiorWeight.toFixed(2)})`, 'error');
-            // We allow proceeding but maybe a confirmation? For now just error as requested by standard logic
-            return; // Enforcing requirement
+            // We allow proceeding but maybe a confirmation? 
+            return;
         }
         if (selectedInferiorWeight < requiredInferiorWeight) {
             showNotification(`Peso para Inferior insuficiente. (Selecionado: ${selectedInferiorWeight.toFixed(2)} / Necessário: ${requiredInferiorWeight.toFixed(2)})`, 'error');
@@ -329,15 +341,12 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
 
         // Criar estrutura compatível
         const trelicaLots = {
-            // For backward compatibility or if backend expects single fields:
-            // We'll put the first lot as "primary"
             superior: superiorLots[0],
             inferior1: inferiorLots[0],
-            inferior2: inferiorLots[1] || inferiorLots[0], // Fallback
+            inferior2: inferiorLots[1] || inferiorLots[0],
             senozoide1: senozoideLots[0],
-            senozoide2: senozoideLots[1] || senozoideLots[0], // Fallback
+            senozoide2: senozoideLots[1] || senozoideLots[0],
 
-            // New arrays
             allSuperior: superiorLots,
             allInferior: inferiorLots,
             allSenozoide: senozoideLots,
@@ -455,7 +464,23 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
 
                 {selectedModel && (
                     <div className="border-t pt-6 space-y-6">
-                        <h3 className="text-lg font-semibold text-gray-800">Seleção de Lotes (Material: CA-60)</h3>
+                        <div className="flex justify-between items-center">
+                            <h3 className="text-lg font-semibold text-gray-800">Seleção de Lotes (Material: CA-60)</h3>
+                            {/* Toggle Switch */}
+                            <div className="flex items-center gap-3 bg-gray-100 p-2 rounded-lg">
+                                <span className={`text-sm font-medium ${isAutoSelect ? 'text-gray-500' : 'text-blue-700'}`}>Manual</span>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsAutoSelect(!isAutoSelect)}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#0F3F5C] focus:ring-offset-2 ${isAutoSelect ? 'bg-[#0F3F5C]' : 'bg-gray-300'}`}
+                                >
+                                    <span
+                                        className={`${isAutoSelect ? 'translate-x-6' : 'translate-x-1'} inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}
+                                    />
+                                </button>
+                                <span className={`text-sm font-medium ${isAutoSelect ? 'text-[#0F3F5C]' : 'text-gray-500'}`}>Automático (FIFO)</span>
+                            </div>
+                        </div>
 
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             <MultiLotSelector
