@@ -396,7 +396,7 @@ const StockControl: React.FC<{
             const updatedItem: StockItem = {
                 ...releasingItem,
                 status: 'Disponível',
-                productionOrderIds: undefined
+                productionOrderIds: []
             };
             updatedItem.history = [...(releasingItem.history || []), {
                 type: 'Liberação Manual',

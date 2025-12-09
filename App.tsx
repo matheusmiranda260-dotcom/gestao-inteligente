@@ -1455,7 +1455,7 @@ const App: React.FC = () => {
             case 'menu':
                 return <MainMenu setPage={setPage} onLogout={handleLogout} currentUser={currentUser} messages={messages} markAllMessagesAsRead={markAllMessagesAsRead} addMessage={addMessage} />;
             case 'stock':
-                return <StockControl stock={stock} conferences={conferences} transfers={transfers} setPage={setPage} addConference={addConference} deleteStockItem={deleteStockItem} updateStockItem={updateStockItem} createTransfer={createTransfer} editConference={editConference} deleteConference={deleteConference} />;
+                return <StockControl stock={stock} conferences={conferences} transfers={transfers} setPage={setPage} addConference={addConference} deleteStockItem={deleteStockItem} updateStockItem={(item) => updateStockItem(item.id, item)} createTransfer={createTransfer} editConference={editConference} deleteConference={deleteConference} />;
             case 'trefila':
                 return <MachineControl machineType="Trefila" {...machineControlProps} />;
             case 'trelica':
