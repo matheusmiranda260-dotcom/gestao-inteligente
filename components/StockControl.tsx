@@ -9,6 +9,7 @@ import ConferenceReport from './ConferenceReport';
 import TransfersHistoryModal from './TransfersHistoryModal';
 import TransferReport from './TransferReport';
 import InventoryReport from './InventoryReport';
+import StockDashboard from './StockDashboard';
 
 const getStatusBadge = (status: StockItem['status']) => {
     const styles = {
@@ -481,6 +482,8 @@ const StockControl: React.FC<{
                     </button>
                 </div>
             </div>
+
+            <StockDashboard stock={stock} />
 
             <div className="bg-white p-6 rounded-xl shadow-sm">
                 <h2 className="text-xl font-semibold text-slate-700 mb-4">Filtros de Busca</h2>
