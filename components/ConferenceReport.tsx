@@ -44,11 +44,7 @@ const ConferenceReport: React.FC<ConferenceReportProps> = ({ reportData, onClose
             {/* Professional Header with MSM Logo */}
             <div className="flex items-start justify-between mb-8 pb-6 border-b-2 border-[#0F3F5C]">
               <div className="flex items-center gap-4">
-                <MSMLogo size="lg" showText={false} />
-                <div>
-                  <h1 className="text-3xl font-bold text-[#0F3F5C]">MSM INDÚSTRIA</h1>
-                  <p className="text-sm text-[#FF8C00] font-semibold">Sistema de Gestão de Produção</p>
-                </div>
+                {/* Logo removed as requested */}
               </div>
               <div className="text-right">
                 <p className="text-2xl font-bold text-[#0F3F5C] mb-1">ENTRADA DE MATERIAL</p>
