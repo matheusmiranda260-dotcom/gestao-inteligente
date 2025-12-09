@@ -41,6 +41,7 @@ interface ProductionOrderTrelicaProps {
 const WeightIndicator: React.FC<{ required: number; selected: number; label?: string }> = ({ required, selected, label }) => {
     const sufficient = selected >= required;
     const percentage = required > 0 ? Math.min((selected / required) * 100, 100) : 0;
+    const remaining = selected > required ? selected - required : 0;
 
     return (
         <div className="text-right text-sm">
@@ -51,11 +52,107 @@ const WeightIndicator: React.FC<{ required: number; selected: number; label?: st
                     {selected.toFixed(2)} kg
                 </span>
             </p>
+            {remaining > 0 && (
+                <p className="text-xs text-blue-600 font-semibold mt-1">
+                    Sobra estimada: {remaining.toFixed(2)} kg
+                </p>
+            )}
             <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
                 <div
                     className={`h-2 rounded-full transition-all ${sufficient ? 'bg-green-600' : 'bg-red-600'}`}
                     style={{ width: `${percentage}%` }}
                 ></div>
+            </div>
+        </div>
+    );
+};
+
+interface MultiLotSelectorProps {
+    label: string;
+    subLabel?: string;
+    availableLots: AvailableStockItem[];
+    selectedLots: string[];
+    onSelectionChange: (selectedIds: string[]) => void;
+    requiredWeight: number;
+    colorClass: string;
+}
+
+const MultiLotSelector: React.FC<MultiLotSelectorProps> = ({ label, subLabel, availableLots, selectedLots, onSelectionChange, requiredWeight, colorClass }) => {
+    const selectedWeight = useMemo(() => {
+        return selectedLots.reduce((sum, id) => {
+            const lot = availableLots.find(l => l.id === id);
+            return sum + (lot ? lot.availableQuantity : 0);
+        }, 0);
+    }, [selectedLots, availableLots]);
+
+    const handleSelectLot = (lotId: string, isChecked: boolean) => {
+        const lotIndex = availableLots.findIndex(l => l.id === lotId);
+        if (lotIndex === -1) return;
+
+        let newSelectedIds: string[] = [];
+
+        if (isChecked) {
+            // FIFO: Select this lot and all previous (older) lots
+            const lotsToSelect = availableLots.slice(0, lotIndex + 1).map(l => l.id);
+            // Merge with existing selection to be safe, though FIFO usually replaces
+            newSelectedIds = [...new Set([...selectedLots, ...lotsToSelect])];
+        } else {
+            // FIFO: Deselect this lot and all subsequent (newer) lots
+            const lotsToKeep = availableLots.slice(0, lotIndex).map(l => l.id);
+            newSelectedIds = lotsToKeep;
+        }
+
+        // Filter to ensure we only have valid IDs from this available list (mostly a sanity check)
+        const validIds = newSelectedIds.filter(id => availableLots.some(l => l.id === id));
+        onSelectionChange(validIds);
+    };
+
+    return (
+        <div className={`p-4 border rounded-lg ${colorClass}`}>
+            <div className="flex justify-between items-end border-b border-opacity-20 border-black pb-2 mb-4">
+                <div>
+                    <h4 className="font-medium text-gray-700">{label}</h4>
+                    {subLabel && <p className="text-xs text-gray-500">{subLabel}</p>}
+                </div>
+                <WeightIndicator required={requiredWeight} selected={selectedWeight} label={`${selectedLots.length} lotes`} />
+            </div>
+
+            <div className="max-h-60 overflow-y-auto bg-white rounded border border-gray-200">
+                <table className="w-full text-sm text-left">
+                    <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                            <th className="p-2 w-10"></th>
+                            <th className="p-2">Lote Interno</th>
+                            <th className="p-2 text-right">Peso (kg)</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                        {availableLots.map(lot => (
+                            <tr key={lot.id} className="hover:bg-gray-50 cursor-pointer" onClick={(e) => {
+                                // Prevent double toggle if clicking checkbox directly
+                                if ((e.target as HTMLElement).tagName !== 'INPUT') {
+                                    handleSelectLot(lot.id, !selectedLots.includes(lot.id));
+                                }
+                            }}>
+                                <td className="p-2 text-center">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedLots.includes(lot.id)}
+                                        onChange={(e) => handleSelectLot(lot.id, e.target.checked)}
+                                        className="rounded border-gray-300 pointer-events-none" // pointer-events-none because row click handles it
+                                    />
+                                </td>
+                                <td className="p-2 font-medium text-gray-700">{lot.internalLot}</td>
+                                <td className="p-2 text-right">{lot.availableQuantity.toFixed(2)}</td>
+                            </tr>
+                        ))}
+                        {availableLots.length === 0 && (
+                            <tr>
+                                <td colSpan={3} className="p-4 text-center text-gray-400 text-xs">Nenhum lote disponível</td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
             </div>
         </div>
     );
@@ -70,12 +167,10 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
         return savedSpeed ? parseFloat(savedSpeed) : 10;
     });
 
-    // Lotes selecionados - estrutura física da máquina
-    const [superiorLot, setSuperiorLot] = useState<string>(''); // 1 lote único
-    const [inferiorDireito, setInferiorDireito] = useState<string>(''); // Lado direito
-    const [inferiorEsquerdo, setInferiorEsquerdo] = useState<string>(''); // Lado esquerdo
-    const [senozoideDireito, setSenozoideDireito] = useState<string>(''); // Lado direito
-    const [senozoideEsquerdo, setSenozoideEsquerdo] = useState<string>(''); // Lado esquerdo
+    // Multi-lot states
+    const [superiorLots, setSuperiorLots] = useState<string[]>([]);
+    const [inferiorLots, setInferiorLots] = useState<string[]>([]);
+    const [senozoideLots, setSenozoideLots] = useState<string[]>([]);
 
     const [showHistoryModal, setShowHistoryModal] = useState(false);
     const [productionReportData, setProductionReportData] = useState<ProductionOrderData | null>(null);
@@ -95,18 +190,17 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
                 ...item,
                 availableQuantity: item.remainingQuantity
             }))
-            .filter(item => item.availableQuantity > 0);
+            // We map to AvailableStockItem but it effectively matches StockItem structure for id, internalLot etc
+            .sort((a, b) => new Date(a.entryDate).getTime() - new Date(b.entryDate).getTime());
     }, [stock]);
 
     const handleModelChange = (cod: string) => {
         const model = trelicaModels.find(m => m.cod === cod) || null;
         setSelectedModel(model);
         // Limpar seleções
-        setSuperiorLot('');
-        setInferiorDireito('');
-        setInferiorEsquerdo('');
-        setSenozoideDireito('');
-        setSenozoideEsquerdo('');
+        setSuperiorLots([]);
+        setInferiorLots([]);
+        setSenozoideLots([]);
     };
 
     const { baseSuperiorLots, baseInferiorLots, baseSenozoideLots } = useMemo(() => {
@@ -115,12 +209,21 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
         const inferiorBitola = normalizeBitola(selectedModel.inferior);
         const senozoideBitola = normalizeBitola(selectedModel.senozoide);
 
+        // Need to filter out lots already selected in OTHER categories if dynamic changes happen?
+        // Actually, physically a lot can't be Superior AND Inferior at same time.
+        // But here we rely on the component state.
+        // For simplicity, we just filter by Bitola. If Bitolas overlap, user must be careful or we implement cross-exclusion.
+        // Implementing cross-exclusion:
+
+        const getAvailableFor = (bitola: string, excludeIds: string[]) =>
+            availableCa60Stock.filter(s => s.bitola === bitola && !excludeIds.includes(s.id));
+
         return {
-            baseSuperiorLots: availableCa60Stock.filter(s => s.bitola === superiorBitola),
-            baseInferiorLots: availableCa60Stock.filter(s => s.bitola === inferiorBitola),
-            baseSenozoideLots: availableCa60Stock.filter(s => s.bitola === senozoideBitola),
+            baseSuperiorLots: getAvailableFor(superiorBitola, [...inferiorLots, ...senozoideLots]),
+            baseInferiorLots: getAvailableFor(inferiorBitola, [...superiorLots, ...senozoideLots]),
+            baseSenozoideLots: getAvailableFor(senozoideBitola, [...superiorLots, ...inferiorLots]),
         };
-    }, [selectedModel, availableCa60Stock]);
+    }, [selectedModel, availableCa60Stock, superiorLots, inferiorLots, senozoideLots]);
 
     const { requiredSuperiorWeight, requiredInferiorWeight, requiredSenozoideWeight } = useMemo(() => {
         if (!selectedModel || !quantity) return { requiredSuperiorWeight: 0, requiredInferiorWeight: 0, requiredSenozoideWeight: 0 };
@@ -132,29 +235,50 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
         };
     }, [selectedModel, quantity]);
 
-    const { selectedSuperiorWeight, selectedInferiorWeight, selectedSenozoideWeight } = useMemo(() => {
-        const getLotWeight = (id: string) => availableCa60Stock.find(s => s.id === id)?.availableQuantity || 0;
-        return {
-            selectedSuperiorWeight: getLotWeight(superiorLot),
-            selectedInferiorWeight: getLotWeight(inferiorDireito) + getLotWeight(inferiorEsquerdo),
-            selectedSenozoideWeight: getLotWeight(senozoideDireito) + getLotWeight(senozoideEsquerdo),
+    // Auto-select lots logic
+    useEffect(() => {
+        if (!selectedModel) return;
+
+        const selectByWeight = (available: AvailableStockItem[], targetWeight: number) => {
+            let currentWeight = 0;
+            const selectedIds: string[] = [];
+
+            for (const lot of available) {
+                if (currentWeight >= targetWeight) break;
+                selectedIds.push(lot.id);
+                currentWeight += lot.availableQuantity;
+            }
+            return selectedIds;
         };
-    }, [superiorLot, inferiorDireito, inferiorEsquerdo, senozoideDireito, senozoideEsquerdo, availableCa60Stock]);
 
-    // Filtrar lotes disponíveis (mantendo o selecionado no próprio campo)
-    const { optsSuperior, optsInferiorDir, optsInferiorEsq, optsSenozoideDir, optsSenozoideEsq } = useMemo(() => {
-        const allSelected = new Set([superiorLot, inferiorDireito, inferiorEsquerdo, senozoideDireito, senozoideEsquerdo].filter(Boolean));
+        // Auto-select based on calculated requirements
+        // We only overwrite selection if the requirements change drastically or model changes
+        // But the user request implies they want it AUTOMATIC so they don't have to select.
+        // So we will enforce this auto-selection when requirements are calculated.
 
-        const getOpts = (base: StockItem[], current: string) => base.filter(l => !allSelected.has(l.id) || l.id === current);
+        setSuperiorLots(selectByWeight(baseSuperiorLots, requiredSuperiorWeight));
+        setInferiorLots(selectByWeight(baseInferiorLots, requiredInferiorWeight));
+        setSenozoideLots(selectByWeight(baseSenozoideLots, requiredSenozoideWeight));
 
-        return {
-            optsSuperior: getOpts(baseSuperiorLots, superiorLot),
-            optsInferiorDir: getOpts(baseInferiorLots, inferiorDireito),
-            optsInferiorEsq: getOpts(baseInferiorLots, inferiorEsquerdo),
-            optsSenozoideDir: getOpts(baseSenozoideLots, senozoideDireito),
-            optsSenozoideEsq: getOpts(baseSenozoideLots, senozoideEsquerdo),
-        };
-    }, [baseSuperiorLots, baseInferiorLots, baseSenozoideLots, superiorLot, inferiorDireito, inferiorEsquerdo, senozoideDireito, senozoideEsquerdo]);
+    }, [
+        selectedModel,
+        quantity, // Re-run if quantity (and thus required weight) changes
+        // Dependencies for base lots and weights are implicitly covered by selectedModel + quantity or are stable
+        // We include the base arrays to ensure if stock updates we re-eval? 
+        // Ideally yes, but might cause loops if not careful. The base arrays are derived from Memo so they change when Stock changes.
+        baseSuperiorLots,
+        baseInferiorLots,
+        baseSenozoideLots,
+        requiredSuperiorWeight,
+        requiredInferiorWeight,
+        requiredSenozoideWeight
+    ]);
+
+    // Calculate total selected weights - re-added for validation
+    const getWeight = (ids: string[]) => ids.reduce((acc, id) => acc + (availableCa60Stock.find(s => s.id === id)?.availableQuantity || 0), 0);
+    const selectedSuperiorWeight = getWeight(superiorLots);
+    const selectedInferiorWeight = getWeight(inferiorLots);
+    const selectedSenozoideWeight = getWeight(senozoideLots);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -176,44 +300,47 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
             return;
         }
 
-        // Validações específicas da nova estrutura
-        if (!superiorLot) {
-            showNotification('Selecione o lote Superior.', 'error');
+        if (superiorLots.length === 0) {
+            showNotification('Selecione pelo menos um lote Superior.', 'error');
             return;
         }
-        if (!inferiorDireito || !inferiorEsquerdo) {
-            showNotification('Selecione os lotes Inferior (Direito e Esquerdo).', 'error');
+        if (inferiorLots.length === 0) {
+            showNotification('Selecione pelo menos um lote Inferior.', 'error');
             return;
         }
-        if (!senozoideDireito || !senozoideEsquerdo) {
-            showNotification('Selecione os lotes Senozoide (Direito e Esquerdo).', 'error');
+        if (senozoideLots.length === 0) {
+            showNotification('Selecione pelo menos um lote Senozoide.', 'error');
             return;
         }
 
         if (selectedSuperiorWeight < requiredSuperiorWeight) {
-            showNotification(`Peso para Superior é insuficiente. Necessário: ${requiredSuperiorWeight.toFixed(2)} kg.`, 'error');
-            return;
+            showNotification(`Peso para Superior pode ser insuficiente. (Selecionado: ${selectedSuperiorWeight.toFixed(2)} / Necessário: ${requiredSuperiorWeight.toFixed(2)})`, 'error');
+            // We allow proceeding but maybe a confirmation? For now just error as requested by standard logic
+            return; // Enforcing requirement
         }
         if (selectedInferiorWeight < requiredInferiorWeight) {
-            showNotification(`Peso para Inferior é insuficiente. Necessário: ${requiredInferiorWeight.toFixed(2)} kg.`, 'error');
+            showNotification(`Peso para Inferior insuficiente. (Selecionado: ${selectedInferiorWeight.toFixed(2)} / Necessário: ${requiredInferiorWeight.toFixed(2)})`, 'error');
             return;
         }
         if (selectedSenozoideWeight < requiredSenozoideWeight) {
-            showNotification(`Peso para Senozoide é insuficiente. Necessário: ${requiredSenozoideWeight.toFixed(2)} kg.`, 'error');
+            showNotification(`Peso para Senozoide insuficiente. (Selecionado: ${selectedSenozoideWeight.toFixed(2)} / Necessário: ${requiredSenozoideWeight.toFixed(2)})`, 'error');
             return;
         }
 
-        // Criar estrutura compatível mantendo retrocompatibilidade
+        // Criar estrutura compatível
         const trelicaLots = {
-            superior: superiorLot,
-            inferior1: inferiorDireito,
-            inferior2: inferiorEsquerdo,
-            senozoide1: senozoideDireito,
-            senozoide2: senozoideEsquerdo,
-            // Arrays para a lógica de consumo
-            allSuperior: [superiorLot],
-            allInferior: [inferiorDireito, inferiorEsquerdo],
-            allSenozoide: [senozoideDireito, senozoideEsquerdo],
+            // For backward compatibility or if backend expects single fields:
+            // We'll put the first lot as "primary"
+            superior: superiorLots[0],
+            inferior1: inferiorLots[0],
+            inferior2: inferiorLots[1] || inferiorLots[0], // Fallback
+            senozoide1: senozoideLots[0],
+            senozoide2: senozoideLots[1] || senozoideLots[0], // Fallback
+
+            // New arrays
+            allSuperior: superiorLots,
+            allInferior: inferiorLots,
+            allSenozoide: senozoideLots,
         };
 
         const totalPlannedConsumption = requiredSuperiorWeight + requiredInferiorWeight + requiredSenozoideWeight;
@@ -261,11 +388,6 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
         return formatMinutesToHHMM(timeInMinutes);
     }, [totalMetersToProduce, machineSpeed]);
 
-    const getLotInfo = (lotId: string) => {
-        if (!lotId) return null;
-        const lot = availableCa60Stock.find(l => l.id === lotId);
-        return lot;
-    };
 
     return (
         <div className="p-4 sm:p-6 md:p-8">
@@ -335,174 +457,37 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
                     <div className="border-t pt-6 space-y-6">
                         <h3 className="text-lg font-semibold text-gray-800">Seleção de Lotes (Material: CA-60)</h3>
 
-                        {/* Superior - 1 lote único */}
-                        <div className="p-4 border rounded-lg bg-[#e6f0f5]">
-                            <div className="flex justify-between items-end border-b border-[#0F3F5C]/20 pb-2 mb-4">
-                                <h4 className="font-medium text-gray-700">
-                                    <span className="text-[#0F3F5C]">●</span> Barra Superior (Bitola: {selectedModel.superior}mm)
-                                </h4>
-                                <WeightIndicator required={requiredSuperiorWeight} selected={selectedSuperiorWeight} label="1 Lote Único" />
-                            </div>
-                            <div className="space-y-2">
-                                {superiorLot && (
-                                    <div className="bg-white p-3 rounded border border-[#0F3F5C]/20">
-                                        <p className="text-sm">
-                                            <strong>{getLotInfo(superiorLot)?.internalLot}</strong> - {getLotInfo(superiorLot)?.availableQuantity.toFixed(2)} kg
-                                        </p>
-                                    </div>
-                                )}
-                                <select
-                                    value={superiorLot}
-                                    onChange={(e) => setSuperiorLot(e.target.value)}
-                                    className="w-full p-2 border rounded-md bg-white"
-                                    required
-                                >
-                                    <option value="">Selecione o lote Superior...</option>
-                                    {optsSuperior.map(lot => (
-                                        <option key={lot.id} value={lot.id}>
-                                            {lot.internalLot} ({lot.availableQuantity.toFixed(2)} kg)
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <MultiLotSelector
+                                label={`Superior (${selectedModel.superior}mm)`}
+                                availableLots={baseSuperiorLots}
+                                selectedLots={superiorLots}
+                                onSelectionChange={setSuperiorLots}
+                                requiredWeight={requiredSuperiorWeight}
+                                colorClass="bg-[#e6f0f5] border-[#0F3F5C]/20"
+                            />
+                            <MultiLotSelector
+                                label={`Inferior (${selectedModel.inferior}mm)`}
+                                subLabel="Soma dos lotes para Direita + Esquerda"
+                                availableLots={baseInferiorLots}
+                                selectedLots={inferiorLots}
+                                onSelectionChange={setInferiorLots}
+                                requiredWeight={requiredInferiorWeight}
+                                colorClass="bg-green-50 border-green-200"
+                            />
+                            <MultiLotSelector
+                                label={`Senozoide (${selectedModel.senozoide}mm)`}
+                                subLabel="Soma dos lotes para Direita + Esquerda"
+                                availableLots={baseSenozoideLots}
+                                selectedLots={senozoideLots}
+                                onSelectionChange={setSenozoideLots}
+                                requiredWeight={requiredSenozoideWeight}
+                                colorClass="bg-[#fff3e6] border-[#FF8C00]/20"
+                            />
                         </div>
 
-                        {/* Inferior - 2 lotes (Direito e Esquerdo) */}
-                        <div className="p-4 border rounded-lg bg-green-50">
-                            <div className="flex justify-between items-end border-b border-green-200 pb-2 mb-4">
-                                <h4 className="font-medium text-gray-700">
-                                    <span className="text-green-700">●</span> Barras Inferiores (Bitola: {selectedModel.inferior}mm)
-                                </h4>
-                                <WeightIndicator required={requiredInferiorWeight} selected={selectedInferiorWeight} label="2 Lotes (D + E)" />
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {/* Direito */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-600 mb-2">
-                                        → Lado Direito
-                                    </label>
-                                    {inferiorDireito && (
-                                        <div className="bg-white p-2 mb-2 rounded border border-green-200">
-                                            <p className="text-sm">
-                                                <strong>{getLotInfo(inferiorDireito)?.internalLot}</strong><br />
-                                                {getLotInfo(inferiorDireito)?.availableQuantity.toFixed(2)} kg
-                                            </p>
-                                        </div>
-                                    )}
-                                    <select
-                                        value={inferiorDireito}
-                                        onChange={(e) => setInferiorDireito(e.target.value)}
-                                        className="w-full p-2 border rounded-md bg-white"
-                                        required
-                                    >
-                                        <option value="">Selecione...</option>
-                                        {optsInferiorDir.map(lot => (
-                                            <option key={lot.id} value={lot.id}>
-                                                {lot.internalLot} ({lot.availableQuantity.toFixed(2)} kg)
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                {/* Esquerdo */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-600 mb-2">
-                                        ← Lado Esquerdo
-                                    </label>
-                                    {inferiorEsquerdo && (
-                                        <div className="bg-white p-2 mb-2 rounded border border-green-200">
-                                            <p className="text-sm">
-                                                <strong>{getLotInfo(inferiorEsquerdo)?.internalLot}</strong><br />
-                                                {getLotInfo(inferiorEsquerdo)?.availableQuantity.toFixed(2)} kg
-                                            </p>
-                                        </div>
-                                    )}
-                                    <select
-                                        value={inferiorEsquerdo}
-                                        onChange={(e) => setInferiorEsquerdo(e.target.value)}
-                                        className="w-full p-2 border rounded-md bg-white"
-                                        required
-                                    >
-                                        <option value="">Selecione...</option>
-                                        {optsInferiorEsq.map(lot => (
-                                            <option key={lot.id} value={lot.id}>
-                                                {lot.internalLot} ({lot.availableQuantity.toFixed(2)} kg)
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Senozoide - 2 lotes (Direito e Esquerdo) */}
-                        <div className="p-4 border rounded-lg bg-[#fff3e6]">
-                            <div className="flex justify-between items-end border-b border-[#FF8C00]/20 pb-2 mb-4">
-                                <h4 className="font-medium text-gray-700">
-                                    <span className="text-[#FF8C00]">●</span> Barras Senozoides (Bitola: {selectedModel.senozoide}mm)
-                                </h4>
-                                <WeightIndicator required={requiredSenozoideWeight} selected={selectedSenozoideWeight} label="2 Lotes (D + E)" />
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {/* Direito */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-600 mb-2">
-                                        → Lado Direito
-                                    </label>
-                                    {senozoideDireito && (
-                                        <div className="bg-white p-2 mb-2 rounded border border-[#FF8C00]/20">
-                                            <p className="text-sm">
-                                                <strong>{getLotInfo(senozoideDireito)?.internalLot}</strong><br />
-                                                {getLotInfo(senozoideDireito)?.availableQuantity.toFixed(2)} kg
-                                            </p>
-                                        </div>
-                                    )}
-                                    <select
-                                        value={senozoideDireito}
-                                        onChange={(e) => setSenozoideDireito(e.target.value)}
-                                        className="w-full p-2 border rounded-md bg-white"
-                                        required
-                                    >
-                                        <option value="">Selecione...</option>
-                                        {optsSenozoideDir.map(lot => (
-                                            <option key={lot.id} value={lot.id}>
-                                                {lot.internalLot} ({lot.availableQuantity.toFixed(2)} kg)
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                {/* Esquerdo */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-600 mb-2">
-                                        ← Lado Esquerdo
-                                    </label>
-                                    {senozoideEsquerdo && (
-                                        <div className="bg-white p-2 mb-2 rounded border border-[#FF8C00]/20">
-                                            <p className="text-sm">
-                                                <strong>{getLotInfo(senozoideEsquerdo)?.internalLot}</strong><br />
-                                                {getLotInfo(senozoideEsquerdo)?.availableQuantity.toFixed(2)} kg
-                                            </p>
-                                        </div>
-                                    )}
-                                    <select
-                                        value={senozoideEsquerdo}
-                                        onChange={(e) => setSenozoideEsquerdo(e.target.value)}
-                                        className="w-full p-2 border rounded-md bg-white"
-                                        required
-                                    >
-                                        <option value="">Selecione...</option>
-                                        {optsSenozoideEsq.map(lot => (
-                                            <option key={lot.id} value={lot.id}>
-                                                {lot.internalLot} ({lot.availableQuantity.toFixed(2)} kg)
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="flex justify-end">
-                            <button type="submit" className="bg-[#0F3F5C] hover:bg-[#0A2A3D] text-white font-bold py-3 px-6 rounded-lg transition text-lg">
+                        <div className="flex justify-end p-4">
+                            <button type="submit" className="bg-[#0F3F5C] hover:bg-[#0A2A3D] text-white font-bold py-3 px-8 rounded-lg transition text-lg shadow-lg">
                                 Criar Ordem de Produção
                             </button>
                         </div>
