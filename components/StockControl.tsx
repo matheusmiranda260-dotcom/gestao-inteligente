@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Page, StockItem, ConferenceData, ConferenceLotData, Bitola, MaterialType, TransferRecord } from '../types';
 import { MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions } from '../types';
-import { ArrowLeftIcon, PencilIcon, TrashIcon, WarningIcon, BookOpenIcon, TruckIcon, DocumentReportIcon, PrinterIcon } from './icons';
+import { ArrowLeftIcon, PencilIcon, TrashIcon, WarningIcon, BookOpenIcon, TruckIcon, DocumentReportIcon, PrinterIcon, LockOpenIcon } from './icons';
 import LotHistoryModal from './LotHistoryModal';
 import FinishedConferencesModal from './FinishedConferencesModal';
 import ConferenceReport from './ConferenceReport';
@@ -296,6 +296,7 @@ const StockControl: React.FC<{
     const [isMultiLotTransferModalOpen, setIsMultiLotTransferModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<StockItem | null>(null);
     const [deletingItem, setDeletingItem] = useState<StockItem | null>(null);
+    const [releasingItem, setReleasingItem] = useState<StockItem | null>(null);
     const [historyLot, setHistoryLot] = useState<StockItem | null>(null);
     const [conferenceHistoryOpen, setConferenceHistoryOpen] = useState(false);
     const [conferenceReportData, setConferenceReportData] = useState<ConferenceData | null>(null);
@@ -351,7 +352,6 @@ const StockControl: React.FC<{
     };
 
     const handleSelectLotForTransfer = (lotId: string) => {
-        // Find the index of the clicked lot in the currently filtered list
         const lotIndex = filteredStock.findIndex(item => item.id === lotId);
         if (lotIndex === -1) return;
 
@@ -359,33 +359,21 @@ const StockControl: React.FC<{
         let newSelectedIds: string[] = [];
 
         if (!isCurrentlySelected) {
-            // Select this lot AND all previous (older) available lots
-            // We only consider lots that are actually transferable
             const transferableLots = filteredStock.filter(item => item.status === 'Disponível' || item.status === 'Disponível - Suporte Treliça');
-
-            // Find finding the target lot index within the transferable lots list to correctly slice
             const targetLotInTransferableIndex = transferableLots.findIndex(item => item.id === lotId);
 
             if (targetLotInTransferableIndex !== -1) {
-                // Get all transferable lots up to and including the target lot
                 const lotsToSelect = transferableLots.slice(0, targetLotInTransferableIndex + 1).map(item => item.id);
-
-                // Merge with existing selection (though typically existing selection should be a subset of this if user followed order, but for safety)
                 newSelectedIds = [...new Set([...selectedLotIdsForTransfer, ...lotsToSelect])];
             } else {
-                // Fallback if something weird happens
                 newSelectedIds = [...selectedLotIdsForTransfer, lotId];
             }
 
         } else {
-            // Deselect this lot AND all subsequent (newer) lots
-            // This means we keep only the lots that are OLDER (appear before) this lot in the transferable list
-
             const transferableLots = filteredStock.filter(item => item.status === 'Disponível' || item.status === 'Disponível - Suporte Treliça');
             const targetLotInTransferableIndex = transferableLots.findIndex(item => item.id === lotId);
 
             if (targetLotInTransferableIndex !== -1) {
-                // Keep only the lots appearing BEFORE the target lot
                 const lotsToKeep = transferableLots.slice(0, targetLotInTransferableIndex).map(item => item.id);
                 newSelectedIds = lotsToKeep;
             } else {
@@ -400,6 +388,27 @@ const StockControl: React.FC<{
         if (deletingItem) {
             deleteStockItem(deletingItem.id);
             setDeletingItem(null);
+        }
+    };
+
+    const handleRelease = () => {
+        if (releasingItem) {
+            const updatedItem: StockItem = {
+                ...releasingItem,
+                status: 'Disponível',
+                productionOrderIds: undefined
+            };
+            updatedItem.history = [...(releasingItem.history || []), {
+                type: 'Liberação Manual',
+                date: new Date().toISOString(),
+                details: {
+                    action: 'Status alterado manualmente para Disponível',
+                    reason: 'Solicitação do usuário (Correção)'
+                }
+            }];
+
+            updateStockItem(updatedItem);
+            setReleasingItem(null);
         }
     };
 
@@ -422,6 +431,24 @@ const StockControl: React.FC<{
                         <div className="flex justify-center gap-4">
                             <button onClick={() => setDeletingItem(null)} className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-6 rounded-lg transition">Cancelar</button>
                             <button onClick={handleDelete} className="bg-red-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-red-700 transition">Confirmar Exclusão</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {releasingItem && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white p-8 rounded-xl shadow-xl w-full max-w-md text-center">
+                        <WarningIcon className="h-16 w-16 mx-auto text-amber-500 mb-4" />
+                        <p className="text-lg text-slate-700 mb-2">Liberar Lote Manualmente?</p>
+                        <p className="text-sm text-slate-500 mb-6">
+                            O lote <strong>{releasingItem.internalLot}</strong> está com status <strong>{releasingItem.status}</strong>.
+                            Deseja forçar o status para <strong>Disponível</strong>?
+                            <br /><br />
+                            <span className="text-xs text-red-500">Cuidado: Use isso apenas se o lote estiver travado incorretamente.</span>
+                        </p>
+                        <div className="flex justify-center gap-4">
+                            <button onClick={() => setReleasingItem(null)} className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-6 rounded-lg transition">Cancelar</button>
+                            <button onClick={handleRelease} className="bg-amber-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-amber-700 transition">Confirmar Liberação</button>
                         </div>
                     </div>
                 </div>
@@ -523,6 +550,11 @@ const StockControl: React.FC<{
                                             <button onClick={() => setHistoryLot(item)} className="p-1 text-slate-500 hover:text-slate-700" title="Ver Histórico"><BookOpenIcon className="h-5 w-5" /></button>
                                             <button onClick={() => setEditingItem(item)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="p-1 text-slate-500 hover:text-emerald-700 disabled:opacity-30 disabled:cursor-not-allowed" title="Editar Lote"><PencilIcon className="h-5 w-5" /></button>
                                             <button onClick={() => setDeletingItem(item)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="p-1 text-slate-500 hover:text-red-700 disabled:opacity-30 disabled:cursor-not-allowed" title="Excluir Lote"><TrashIcon className="h-5 w-5" /></button>
+                                            {(item.status.includes('Em Produção')) && (
+                                                <button onClick={() => setReleasingItem(item)} className="p-1 text-amber-500 hover:text-amber-700" title="Liberar Lote Manualmente (Correção)">
+                                                    <LockOpenIcon className="h-5 w-5" />
+                                                </button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
