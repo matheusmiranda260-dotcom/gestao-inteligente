@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Page, StockItem, ConferenceData, ConferenceLotData, Bitola, MaterialType, TransferRecord } from '../types';
 import { MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions } from '../types';
-import { ArrowLeftIcon, PencilIcon, TrashIcon, WarningIcon, BookOpenIcon, TruckIcon, DocumentReportIcon, PrinterIcon } from './icons';
+import { ArrowLeftIcon, PencilIcon, TrashIcon, WarningIcon, BookOpenIcon, TruckIcon, DocumentReportIcon, PrinterIcon, LockOpenIcon } from './icons';
 import LotHistoryModal from './LotHistoryModal';
 import FinishedConferencesModal from './FinishedConferencesModal';
 import ConferenceReport from './ConferenceReport';
@@ -296,6 +296,7 @@ const StockControl: React.FC<{
     const [isMultiLotTransferModalOpen, setIsMultiLotTransferModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<StockItem | null>(null);
     const [deletingItem, setDeletingItem] = useState<StockItem | null>(null);
+    const [releasingItem, setReleasingItem] = useState<StockItem | null>(null);
     const [historyLot, setHistoryLot] = useState<StockItem | null>(null);
     const [conferenceHistoryOpen, setConferenceHistoryOpen] = useState(false);
     const [conferenceReportData, setConferenceReportData] = useState<ConferenceData | null>(null);
@@ -363,6 +364,16 @@ const StockControl: React.FC<{
         }
     };
 
+    const handleRelease = () => {
+        if (releasingItem) {
+            updateStockItem(releasingItem.id, {
+                status: 'Disponível',
+                productionOrderIds: []
+            });
+            setReleasingItem(null);
+        }
+    };
+
     return (
         <div className="p-4 sm:p-6 md:p-8 space-y-6">
             {isAddConferenceModalOpen && <AddConferenceModal onClose={() => setIsAddConferenceModalOpen(false)} onSubmit={handleAddConferenceSubmit} stock={stock} onShowReport={setConferenceReportData} />}
@@ -382,6 +393,25 @@ const StockControl: React.FC<{
                         <div className="flex justify-center gap-4">
                             <button onClick={() => setDeletingItem(null)} className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-6 rounded-lg transition">Cancelar</button>
                             <button onClick={handleDelete} className="bg-red-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-red-700 transition">Confirmar Exclusão</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {releasingItem && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white p-8 rounded-xl shadow-xl w-full max-w-md text-center">
+                        <WarningIcon className="h-16 w-16 mx-auto text-amber-500 mb-4" />
+                        <p className="text-lg text-slate-700 mb-6">
+                            Este lote está marcado como <strong>{releasingItem.status}</strong>.
+                            <br />
+                            Deseja forçar a liberação para <strong>Disponível</strong>?
+                            <br />
+                            <span className="text-sm text-red-500 mt-2 block">Use isso apenas se o lote estiver travado incorretamente.</span>
+                        </p>
+                        <div className="flex justify-center gap-4">
+                            <button onClick={() => setReleasingItem(null)} className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-6 rounded-lg transition">Cancelar</button>
+                            <button onClick={handleRelease} className="bg-amber-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-amber-700 transition">Confirmar Liberação</button>
                         </div>
                     </div>
                 </div>
@@ -480,6 +510,7 @@ const StockControl: React.FC<{
                                     <td className="px-6 py-4 text-center">{getStatusBadge(item.status)}</td>
                                     <td className="px-6 py-4">
                                         <div className="flex items-center justify-center space-x-2">
+                                            <button onClick={() => setReleasingItem(item)} disabled={!item.status.includes('Em Produção')} className="p-1 text-slate-500 hover:text-amber-700 disabled:hidden" title="Liberar Lote Travado"><LockOpenIcon className="h-5 w-5" /></button>
                                             <button onClick={() => setHistoryLot(item)} className="p-1 text-slate-500 hover:text-slate-700" title="Ver Histórico"><BookOpenIcon className="h-5 w-5" /></button>
                                             <button onClick={() => setEditingItem(item)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="p-1 text-slate-500 hover:text-emerald-700 disabled:opacity-30 disabled:cursor-not-allowed" title="Editar Lote"><PencilIcon className="h-5 w-5" /></button>
                                             <button onClick={() => setDeletingItem(item)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="p-1 text-slate-500 hover:text-red-700 disabled:opacity-30 disabled:cursor-not-allowed" title="Excluir Lote"><TrashIcon className="h-5 w-5" /></button>
