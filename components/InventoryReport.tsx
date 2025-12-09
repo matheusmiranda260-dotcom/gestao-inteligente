@@ -118,12 +118,55 @@ const InventoryReport: React.FC<InventoryReportProps> = ({ stock, filters, onClo
 
                     {/* Inventory Table */}
                     <div className="mb-6">
-                        <h3 className="text-lg font-bold text-[#0F3F5C] mb-4 flex items-center gap-2">
-                            <svg className="w-5 h-5 text-[#FF8C00]" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                            </svg>
-                            Itens em Estoque ({filteredStock.length} itens)
-                        </h3>
+                        <style>
+                            {`
+                                @media print {
+                                    @page {
+                                        size: A4;
+                                        margin: 10mm;
+                                    }
+                                    .print-modal-container {
+                                        position: absolute;
+                                        top: 0;
+                                        left: 0;
+                                        width: 100%;
+                                        height: 100%;
+                                        background: white;
+                                        z-index: 9999;
+                                    }
+                                    .print-modal-content {
+                                        box-shadow: none;
+                                        max-width: none;
+                                        width: 100%;
+                                        height: auto;
+                                        overflow: visible;
+                                    }
+                                    .no-print {
+                                        display: none !important;
+                                    }
+                                    .print-section {
+                                        overflow: visible !important;
+                                    }
+                                    body {
+                                        background-color: white;
+                                    }
+                                }
+                            `}
+                        </style>
+
+                        <div className="flex justify-between items-end mb-4">
+                            <h3 className="text-lg font-bold text-[#0F3F5C] flex items-center gap-2">
+                                <svg className="w-5 h-5 text-[#FF8C00]" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                                </svg>
+                                Itens em Estoque
+                            </h3>
+                            <div className="bg-[#e6f0f5] px-4 py-2 rounded-lg border border-[#0F3F5C]/20">
+                                <span className="text-sm font-semibold text-slate-600 mr-2">Total de Lotes:</span>
+                                <span className="text-xl font-bold text-[#0F3F5C]">{filteredStock.length}</span>
+                            </div>
+                        </div>
+
                         <div className="border border-[#0F3F5C]/20 rounded-lg overflow-hidden shadow-sm">
                             <table className="w-full text-sm text-left border-collapse">
                                 <thead className="text-xs text-white uppercase bg-gradient-to-r from-[#0F3F5C] to-[#1A5A7D]">
@@ -139,22 +182,38 @@ const InventoryReport: React.FC<InventoryReportProps> = ({ stock, filters, onClo
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {filteredStock.map((item, index) => (
-                                        <tr key={item.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50'} border-b border-slate-200`}>
-                                            <td className="px-2 py-2 border-r border-slate-200 font-bold text-[#0F3F5C]">{item.internalLot}</td>
-                                            <td className="px-2 py-2 border-r border-slate-200 text-slate-700">{item.materialType}</td>
-                                            <td className="px-2 py-2 border-r border-slate-200 font-semibold text-slate-900">{item.bitola}</td>
-                                            <td className="px-2 py-2 border-r border-slate-200 text-slate-700">{item.supplier}</td>
-                                            <td className="px-2 py-2 border-r border-slate-200 text-right font-bold text-[#FF8C00]">{item.remainingQuantity.toFixed(2)}</td>
-                                            <td className="px-2 py-2 border-r border-slate-200 bg-[#fff3e6]/30"></td>
-                                            <td className="px-2 py-2 border-r border-slate-200 bg-[#fff3e6]/30"></td>
-                                            <td className="px-2 py-2 bg-[#fff3e6]/30"></td>
-                                        </tr>
+                                    {Object.entries(filteredStock.reduce<Record<string, StockItem[]>>((acc, item) => {
+                                        const type = item.materialType;
+                                        if (!acc[type]) acc[type] = [];
+                                        acc[type].push(item);
+                                        return acc;
+                                    }, {})).map(([type, items]) => (
+                                        <React.Fragment key={type}>
+                                            <tr className="bg-[#e6f0f5] font-bold text-[#0F3F5C]">
+                                                <td colSpan={8} className="px-3 py-2 border-b border-[#0F3F5C]/20">
+                                                    {type} <span className="text-xs font-normal text-slate-500 ml-2">({items.length} lotes)</span>
+                                                </td>
+                                            </tr>
+                                            {items.map((item, index) => (
+                                                <tr key={item.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50'} border-b border-slate-200`}>
+                                                    <td className="px-2 py-2 border-r border-slate-200 font-bold text-[#0F3F5C]">{item.internalLot}</td>
+                                                    <td className="px-2 py-2 border-r border-slate-200 text-slate-700">{item.materialType}</td>
+                                                    <td className="px-2 py-2 border-r border-slate-200 font-semibold text-slate-900">{item.bitola}</td>
+                                                    <td className="px-2 py-2 border-r border-slate-200 text-slate-700">{item.supplier}</td>
+                                                    <td className="px-2 py-2 border-r border-slate-200 text-right font-bold text-[#FF8C00]">{item.remainingQuantity.toFixed(2)}</td>
+                                                    <td className="px-2 py-2 border-r border-slate-200 bg-[#fff3e6]/30"></td>
+                                                    <td className="px-2 py-2 border-r border-slate-200 bg-[#fff3e6]/30"></td>
+                                                    <td className="px-2 py-2 bg-[#fff3e6]/30"></td>
+                                                </tr>
+                                            ))}
+                                        </React.Fragment>
                                     ))}
                                 </tbody>
                                 <tfoot className="bg-[#e6f0f5]">
                                     <tr className="border-t-2 border-[#0F3F5C]">
-                                        <th colSpan={4} className="px-4 py-3 text-lg text-right font-bold text-[#0F3F5C] border-r border-[#0F3F5C]/20">Total Sistema:</th>
+                                        <th colSpan={4} className="px-4 py-3 text-lg text-right font-bold text-[#0F3F5C] border-r border-[#0F3F5C]/20">
+                                            Total ({filteredStock.length} lotes):
+                                        </th>
                                         <td className="px-2 py-3 text-right border-r border-[#0F3F5C]/20">
                                             <div className="inline-block px-3 py-1 rounded-lg font-bold text-lg bg-[#FF8C00] text-white shadow-md">
                                                 {totalSystemWeight.toFixed(2)} kg

@@ -121,10 +121,12 @@ const AddConferenceModal: React.FC<{
                             {lots.map((lot, index) => (
                                 <tr key={index} className="border-b">
                                     <td className="p-2">
-                                        <input type="text" value={lot.internalLot || ''} onChange={e => handleLotChange(index, 'internalLot', e.target.value)} className="w-full p-2 border border-slate-300 rounded" required />
+                                        <input type="text" value={lot.internalLot || ''} onChange={e => handleLotChange(index, 'internalLot', e.target.value)} className={`w-full p-2 border rounded ${!lot.internalLot && 'border-red-300 bg-red-50'}`} placeholder="Obrigatório" required />
                                         {duplicateErrors[index] && <p className="text-red-500 text-xs mt-1">{duplicateErrors[index]}</p>}
                                     </td>
-                                    <td className="p-2"><input type="text" value={lot.supplierLot || ''} onChange={e => handleLotChange(index, 'supplierLot', e.target.value)} className="w-full p-2 border border-slate-300 rounded" required /></td>
+                                    <td className="p-2">
+                                        <input type="text" value={lot.supplierLot || ''} onChange={e => handleLotChange(index, 'supplierLot', e.target.value)} className={`w-full p-2 border rounded ${!lot.supplierLot && 'border-red-300 bg-red-50'}`} placeholder="Obrigatório" required />
+                                    </td>
                                     <td className="p-2"><input type="text" value={lot.runNumber || ''} onChange={e => handleLotChange(index, 'runNumber', e.target.value)} className="w-full p-2 border border-slate-300 rounded" required /></td>
                                     <td className="p-2">
                                         <select value={lot.materialType} onChange={e => handleLotChange(index, 'materialType', e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white">
