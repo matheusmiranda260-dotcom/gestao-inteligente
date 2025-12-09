@@ -67,6 +67,12 @@ const AddConferenceModal: React.FC<{
 
     const handleLotChange = (index: number, field: keyof ConferenceLotData, value: string | number) => {
         const newLots = [...lots];
+
+        // Ensure numeric input for lot numbers
+        if ((field === 'internalLot' || field === 'supplierLot') && typeof value === 'string') {
+            value = value.replace(/[^0-9]/g, '');
+        }
+
         (newLots[index] as any)[field] = value;
         setLots(newLots);
     };
