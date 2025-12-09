@@ -215,411 +215,220 @@ const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportDat
                     </div>
                 </div>
                 <div className="overflow-y-auto print-section bg-white p-6">
-                    {/* Conditional Rendering for Trefila Report Style */}
-                    {(reportData.machine?.toLowerCase() === 'trefila' || reportData.machine?.toLowerCase() === 'trefila') ? (
-                        <div className="font-sans text-black">
-                            {/* Header Table */}
-                            <table className="w-full border-collapse border border-black mb-1">
-                                <thead>
-                                    <tr>
-                                        <th colSpan={2} className="border border-black p-2 text-center text-xl font-bold uppercase">
-                                            CONTROLE DE PRODUÇÃO DIARIA - SETOR LAMINAÇÃO<br />TREFILA
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr className="border border-black">
-                                        <td className="border border-black p-1 px-4 font-bold text-sm w-1/3">Ordem de produção :</td>
-                                        <td className="border border-black p-1 px-4 font-bold text-lg">{reportData.orderNumber}</td>
-                                    </tr>
-                                    <tr className="border border-black">
-                                        <td className="border border-black p-1 px-4 font-bold text-sm">Data da produção:</td>
-                                        <td className="border border-black p-1 px-4 font-bold">{new Date(reportData.startTime!).toLocaleDateString('pt-BR', { weekday: 'short', year: 'numeric', month: 'long', day: 'numeric' })}</td>
-                                    </tr>
-                                    <tr className="border border-black">
-                                        <td className="border border-black p-1 px-4 font-bold text-sm">Operador/auxiliar:</td>
-                                        <td className="border border-black p-1 px-4 font-bold uppercase">{operatorNames}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                    <div className="flex items-start justify-between mb-8 pb-6 border-b-2 border-[#0F3F5C]">
+                        <div className="flex items-center gap-4">
+                            <MSMLogo size="lg" showText={false} />
+                            <div>
+                                <h1 className="text-3xl font-bold text-[#0F3F5C]">MSM INDÚSTRIA</h1>
+                                <p className="text-sm text-[#FF8C00] font-semibold">Sistema de Gestão de Produção</p>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-2xl font-bold text-[#0F3F5C] mb-1">RELATÓRIO DE PRODUÇÃO</p>
+                            <p className="text-sm text-slate-600">
+                                <span className="font-semibold">Gerado em:</span><br />
+                                {new Date().toLocaleString('pt-BR')}
+                            </p>
+                        </div>
+                    </div>
 
-                            {/* Product Description Table */}
-                            <table className="w-full border-collapse border border-black mb-6">
-                                <tbody>
-                                    <tr className="border border-black">
-                                        <td className="border border-black p-1 px-4 text-sm font-bold w-1/3">Descrição do produto (entrada):</td>
-                                        <td className="border border-black p-1 px-4 font-bold text-red-700 uppercase text-lg">{inputBitola}mm -- FIO MAQUINA --</td>
-                                    </tr>
-                                    <tr className="border border-black">
-                                        <td className="border border-black p-1 px-4 text-sm font-bold w-1/3">Descrição do produto (Saida):</td>
-                                        <td className="border border-black p-1 px-4 font-bold text-green-700 uppercase text-lg">{reportData.targetBitola}mm ---CA60---</td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                    <div className="bg-gradient-to-r from-[#e6f0f5] to-[#fff3e6] border-l-4 border-[#FF8C00] rounded-lg p-5 mb-6 shadow-sm">
+                        <h3 className="text-lg font-bold text-[#0F3F5C] mb-4 flex items-center gap-2">
+                            <svg className="w-5 h-5 text-[#FF8C00]" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                            </svg>
+                            Dados da Ordem
+                        </h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            <div className="bg-white p-3 rounded-lg shadow-sm">
+                                <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Nº Ordem</p>
+                                <p className="text-sm font-bold text-[#0F3F5C]">{reportData.orderNumber}</p>
+                            </div>
+                            <div className="bg-white p-3 rounded-lg shadow-sm">
+                                <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Máquina</p>
+                                <p className="text-sm font-bold text-[#0F3F5C]">{reportData.machine}</p>
+                            </div>
+                            <div className="bg-white p-3 rounded-lg shadow-sm col-span-2">
+                                <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Operador(es)</p>
+                                <p className="text-sm font-bold text-[#0F3F5C]">{operatorNames}</p>
+                            </div>
+                            {reportData.machine === 'Treliça' ? (
+                                <>
+                                    <div className="bg-white p-3 rounded-lg shadow-sm">
+                                        <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Modelo</p>
+                                        <p className="text-sm font-bold text-[#0F3F5C]">{reportData.trelicaModel}</p>
+                                    </div>
+                                    {reportData.quantityToProduce && (
+                                        <div className="bg-white p-3 rounded-lg shadow-sm">
+                                            <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Qtd. Planejada</p>
+                                            <p className="text-sm font-bold text-[#0F3F5C]">{reportData.quantityToProduce} pcs</p>
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <>
+                                    <div className="bg-white p-3 rounded-lg shadow-sm">
+                                        <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Bitola Entrada</p>
+                                        <p className="text-sm font-bold text-[#0F3F5C]">{inputBitola}</p>
+                                    </div>
+                                    <div className="bg-white p-3 rounded-lg shadow-sm">
+                                        <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Bitola Saída</p>
+                                        <p className="text-sm font-bold text-[#0F3F5C]">{reportData.targetBitola}</p>
+                                    </div>
+                                    {averageMeasuredGauge && (
+                                        <div className="bg-white p-3 rounded-lg shadow-sm">
+                                            <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Média Aferida</p>
+                                            <p className="text-sm font-bold text-[#0F3F5C]">{averageMeasuredGauge.toFixed(2)} mm</p>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                            <div className="bg-white p-3 rounded-lg shadow-sm">
+                                <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Status</p>
+                                <span className="inline-block px-2 py-1 text-xs font-bold rounded-full bg-emerald-100 text-emerald-800">Concluída</span>
+                            </div>
+                            <div className="bg-white p-3 rounded-lg shadow-sm col-span-2 md:col-span-1">
+                                <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Início</p>
+                                <p className="text-sm font-bold text-[#0F3F5C]">{reportData.startTime ? new Date(reportData.startTime).toLocaleString('pt-BR') : 'N/A'}</p>
+                            </div>
+                            <div className="bg-white p-3 rounded-lg shadow-sm col-span-2">
+                                <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Fim</p>
+                                <p className="text-sm font-bold text-[#0F3F5C]">{reportData.endTime ? new Date(reportData.endTime).toLocaleString('pt-BR') : 'N/A'}</p>
+                            </div>
+                        </div>
+                    </div>
 
-                            {/* Stops Section */}
-                            <div className="mb-6">
-                                <h3 className="text-center italic text-slate-700 font-semibold mb-1">PARADAS E SEUS MOTIVOS:</h3>
-                                <table className="w-full border-collapse border border-black text-sm">
-                                    <thead className="bg-slate-200">
+                    <div className="mb-6">
+                        <h3 className="text-lg font-bold text-[#0F3F5C] mb-4 flex items-center gap-2">
+                            <svg className="w-5 h-5 text-[#FF8C00]" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
+                            </svg>
+                            Indicadores de Desempenho
+                        </h3>
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
+                            <div className="bg-slate-100 p-4 rounded-lg shadow-sm border border-slate-200">
+                                <div className="text-xs text-slate-500 font-bold uppercase mb-1">Aproveitamento</div>
+                                <div className="text-2xl font-bold text-[#0F3F5C]">{yieldPercentage.toFixed(2)}%</div>
+                            </div>
+                            <div className="bg-emerald-50 p-4 rounded-lg shadow-sm border border-emerald-100">
+                                <div className="text-xs text-emerald-700 font-bold uppercase mb-1">Produção (kg)</div>
+                                <div className="text-2xl font-bold text-emerald-800">{(reportData.actualProducedWeight || 0).toFixed(2)}</div>
+                            </div>
+                            <div className="bg-sky-50 p-4 rounded-lg shadow-sm border border-sky-100">
+                                <div className="text-xs text-sky-700 font-bold uppercase mb-1">Produção (m)</div>
+                                <div className="text-2xl font-bold text-sky-800">{totalMetersProduced.toFixed(2)}</div>
+                            </div>
+                            <div className="bg-green-50 p-4 rounded-lg shadow-sm border border-green-100">
+                                <div className="text-xs text-green-700 font-bold uppercase mb-1">Tempo Efetivo</div>
+                                <div className="text-2xl font-bold text-green-800">{formatDuration(effectiveTimeMs)}</div>
+                            </div>
+                            <div className="bg-red-50 p-4 rounded-lg shadow-sm border border-red-100">
+                                <div className="text-xs text-red-700 font-bold uppercase mb-1">Tempo Parado</div>
+                                <div className="text-2xl font-bold text-red-800">{formatDuration(totalDowntimeMs)}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                        <div className="lg:col-span-3">
+                            <h3 className="text-lg font-bold text-[#0F3F5C] mb-4 flex items-center gap-2">
+                                <svg className="w-5 h-5 text-[#FF8C00]" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
+                                </svg>
+                                Detalhamento da Produção
+                            </h3>
+                            {dailyBreakdown.length > 0 ? (
+                                <div className="space-y-4">
+                                    {dailyBreakdown.map((day, index) => (
+                                        <div key={index} className="border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+                                            <div className="bg-gradient-to-r from-[#0F3F5C] to-[#1A5A7D] p-3 flex justify-between items-center text-white">
+                                                <h4 className="font-bold">Dia: {day.date}</h4>
+                                                <div className="text-right text-sm">
+                                                    <p><strong>Lotes:</strong> {day.lots.length} | <strong>Peso:</strong> {day.totalWeight.toFixed(2)} kg</p>
+                                                </div>
+                                            </div>
+                                            <table className="w-full text-sm text-left text-slate-600">
+                                                <thead className="text-xs text-slate-700 uppercase bg-slate-50">
+                                                    <tr>
+                                                        <th className="px-4 py-2">Lote Interno</th>
+                                                        {reportData.machine?.toLowerCase() === 'trefila' && <th className="px-4 py-2 text-right">Bit. Aferida</th>}
+                                                        <th className="px-4 py-2 text-right">Peso Saída (kg)</th>
+                                                        <th className="px-4 py-2 text-right">Perda (%)</th>
+                                                        <th className="px-4 py-2 text-right">T. Efetivo</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100">
+                                                    {day.lots.map(lot => {
+                                                        const difference = lot.originalWeight - (lot.finalWeight || 0);
+                                                        const lossPercentage = lot.originalWeight > 0 ? (difference / lot.originalWeight) * 100 : 0;
+                                                        return (
+                                                            <tr key={lot.lotId} className="bg-white hover:bg-slate-50">
+                                                                <td className="px-4 py-2 font-medium text-[#0F3F5C]">{lot.internalLot}</td>
+                                                                {reportData.machine?.toLowerCase() === 'trefila' && <td className="px-4 py-2 text-right text-slate-600">{(lot as any).measuredGauge ? `${(lot as any).measuredGauge.toFixed(2)} mm` : '-'}</td>}
+                                                                <td className="px-4 py-2 text-right font-bold">{lot.finalWeight?.toFixed(2) || 'N/A'}</td>
+                                                                <td className={`px-4 py-2 text-right font-medium ${difference >= 0 ? 'text-red-600' : 'text-green-600'}`}>{lossPercentage.toFixed(2)}%</td>
+                                                                <td className="px-4 py-2 text-right font-mono text-slate-500">{formatDuration(lot.effectiveDurationMs)}</td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : <p className="text-sm text-slate-500 italic p-4 bg-slate-50 rounded text-center">Nenhum lote processado para esta ordem.</p>}
+                            <div className="font-semibold text-white bg-[#0F3F5C] rounded-lg mt-4 p-3 flex justify-between shadow-sm">
+                                <span>Total Geral</span>
+                                <div className="text-right">
+                                    <span>{totalProducedWeight.toFixed(2)} kg</span> / <span className="font-mono">{formatDuration(effectiveTimeMs)}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="lg:col-span-2">
+                            <h3 className="text-lg font-bold text-[#0F3F5C] mb-4 flex items-center gap-2">
+                                <svg className="w-5 h-5 text-[#FF8C00]" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                                </svg>
+                                Paradas
+                            </h3>
+                            <div className="border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+                                <table className="w-full text-sm text-left text-slate-600">
+                                    <thead className="text-xs text-white uppercase bg-slate-500">
                                         <tr>
-                                            <th className="border border-black p-1 text-center text-red-700">Início</th>
-                                            <th className="border border-black p-1 text-center text-green-700">Fim</th>
-                                            <th className="border border-black p-1 text-center italic w-1/2">MOTIVO</th>
-                                            <th className="border border-black p-1 text-center text-red-700">Duração</th>
+                                            <th className="px-4 py-2">Motivo</th>
+                                            <th className="px-4 py-2 text-right">Duração</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
+                                    <tbody className="divide-y divide-slate-100">
                                         {(reportData.downtimeEvents || []).map((event, index) => {
                                             if (!event.resumeTime) return null;
                                             const duration = new Date(event.resumeTime).getTime() - new Date(event.stopTime).getTime();
-                                            // format HH:MM:ss for start and end
-                                            const start = new Date(event.stopTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                                            const end = new Date(event.resumeTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
+                                            if (duration <= 0) return null;
                                             return (
-                                                <tr key={index} className="border border-black bg-slate-100">
-                                                    <td className="border border-black p-1 text-center font-bold text-red-600">{start}</td>
-                                                    <td className="border border-black p-1 text-center font-bold text-green-600">{end}</td>
-                                                    <td className="border border-black p-1 text-center italic font-bold uppercase">{event.reason}</td>
-                                                    <td className="border border-black p-1 text-center font-bold text-red-600">{formatDuration(duration)}</td>
+                                                <tr key={index} className="bg-white hover:bg-slate-50">
+                                                    <td className="px-4 py-2">{event.reason}</td>
+                                                    <td className="px-4 py-2 text-right font-mono text-slate-700">{formatDuration(duration)}</td>
                                                 </tr>
-                                            );
+                                            )
                                         })}
-                                        {(!reportData.downtimeEvents || reportData.downtimeEvents.length === 0) && (
-                                            <tr className="border border-black">
-                                                <td colSpan={4} className="p-2 text-center text-gray-500 italic">Nenhuma parada registrada.</td>
-                                            </tr>
-                                        )}
                                     </tbody>
-                                </table>
-                            </div>
-
-                            {/* Statistics Section */}
-                            <div className="mb-6 border border-black p-4">
-                                <h3 className="text-center italic text-slate-700 font-semibold border-b border-black w-1/2 mx-auto mb-4 pb-1">ESTATÍSTICA DO DIA:</h3>
-                                <div className="max-w-xl mx-auto text-sm font-bold space-y-1">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-right w-1/2 pr-4">Horas (Turno trabalhados):</span>
-                                        <span className="w-1/2 pl-4 text-left">{formatDuration(totalDurationMs)}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-right w-1/2 pr-4 text-red-700">Tempo de maquina (parada) :</span>
-                                        <span className="w-1/2 pl-4 text-left flex gap-8">
-                                            <span className="text-red-700">{formatDuration(totalDowntimeMs)}</span>
-                                            <span className="text-red-700">{totalDurationMs > 0 ? ((totalDowntimeMs / totalDurationMs) * 100).toFixed(1) : 0}%</span>
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-right w-1/2 pr-4 text-green-600">Tempo de maquina (Efetivo) :</span>
-                                        <span className="w-1/2 pl-4 text-left flex gap-8">
-                                            <span className="text-green-600">{formatDuration(effectiveTimeMs)}</span>
-                                            <span className="text-green-600">{totalDurationMs > 0 ? ((effectiveTimeMs / totalDurationMs) * 100).toFixed(1) : 0}%</span>
-                                        </span>
-                                    </div>
-
-                                    {(() => {
-                                        // Calculate input weight sum
-                                        const inputWeightSum = consumedLots.reduce((acc, lot) => acc + lot.originalWeight, 0);
-                                        const outputWeightSum = consumedLots.reduce((acc, lot) => acc + (lot.finalWeight || 0), 0); // Or use reportData.actualProducedWeight
-                                        const scrap = inputWeightSum - outputWeightSum;
-                                        const scrapPercent = inputWeightSum > 0 ? (scrap / inputWeightSum) * 100 : 0;
-
-                                        // Velocity Calculation m/s
-                                        const velocity = effectiveTimeMs > 0 ? (totalMetersProduced / (effectiveTimeMs / 1000)) : 0;
-
-                                        return (
-                                            <>
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-right w-1/2 pr-4">Peso entrada:</span>
-                                                    <span className="w-1/2 pl-4 text-left">{inputWeightSum.toFixed(0)} kg</span>
-                                                </div>
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-right w-1/2 pr-4">Peso saida:</span>
-                                                    <span className="w-1/2 pl-4 text-left">{outputWeightSum.toFixed(0)} kg</span>
-                                                </div>
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-right w-1/2 pr-4 text-red-800">sucata:</span>
-                                                    <span className="w-1/2 pl-4 text-left flex gap-8">
-                                                        <span className="text-red-800">{scrap.toFixed(0)} kg</span>
-                                                        <span className="text-red-800">{scrapPercent.toFixed(2)}%</span>
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-right w-1/2 pr-4">Quant. metros produzidos:</span>
-                                                    <span className="w-1/2 pl-4 text-left">{totalMetersProduced.toFixed(0)} metros</span>
-                                                </div>
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-right w-1/2 pr-4">Velocidade:</span>
-                                                    <span className="w-1/2 pl-4 text-left">{velocity.toFixed(2)}</span>
-                                                </div>
-                                            </>
-                                        );
-                                    })()}
-                                </div>
-                            </div>
-
-                            {/* Production Breakdown Table */}
-                            <div className="border border-black p-1">
-                                <h3 className="text-center italic text-slate-700 font-semibold border-b border-black w-1/2 mx-auto mb-2">ATUALIZAÇÃO DA PRODUÇÃO:</h3>
-                                <table className="w-full border-collapse border border-black text-sm text-center font-bold">
-                                    <thead>
+                                    <tfoot className="font-semibold text-[#0F3F5C] bg-slate-100 border-t-2 border-slate-300">
                                         <tr>
-                                            <th className="border border-black p-1 w-1/4">Data</th>
-                                            <th className="border border-black p-1 w-1/4">kg (entrada)</th>
-                                            <th className="border border-black p-1 w-1/4">kg (saida)</th>
-                                            <th className="border border-black p-1 w-1/4">bitola</th>
+                                            <th className="px-4 py-2 text-left">Total Parado</th>
+                                            <th className="px-4 py-2 text-right font-mono">{formatDuration(totalDowntimeMs)}</th>
                                         </tr>
-                                    </thead>
-                                    <tbody>
-                                        {dailyBreakdown.map((day, dayIndex) => (
-                                            <React.Fragment key={dayIndex}>
-                                                {day.lots.map((lot, lotIndex) => (
-                                                    <tr key={lot.lotId}>
-                                                        {/* Show date only on first row of the day group */}
-                                                        {lotIndex === 0 && (
-                                                            <td rowSpan={day.lots.length} className="border border-black p-1 align-middle bg-white">
-                                                                {day.date.split('/').slice(0, 2).join('/') + '/' + day.date.split('/')[2].slice(2)}
-                                                            </td>
-                                                        )}
-                                                        <td className="border border-black p-1">{lot.originalWeight.toFixed(0)}</td>
-                                                        <td className="border border-black p-1">{lot.finalWeight?.toFixed(0) || '-'}</td>
-                                                        <td className="border border-black p-1">{(lot as any).measuredGauge ? `${(lot as any).measuredGauge.toFixed(2)}mm` : '-'}</td>
-                                                    </tr>
-                                                ))}
-                                                {/* Daily Subtotal if needed, or simply let the next day start. 
-                                                    The image shows totals at the very bottom in red. */}
-                                            </React.Fragment>
-                                        ))}
-                                        {/* Grand Totals Row matching image style */}
-                                        <tr className="text-red-400 text-lg">
-                                            <td className="p-2 border-t border-black"></td>
-                                            <td className="p-2 border-t border-black font-bold">
-                                                {consumedLots.reduce((acc, lot) => acc + lot.originalWeight, 0).toFixed(0)}
-                                            </td>
-                                            <td className="p-2 border-t border-black font-bold">
-                                                {consumedLots.reduce((acc, lot) => acc + (lot.finalWeight || 0), 0).toFixed(0)}
-                                            </td>
-                                            <td className="p-2 border-t border-black"></td>
-                                        </tr>
-                                    </tbody>
+                                    </tfoot>
                                 </table>
                             </div>
                         </div>
-                    ) : (
-                        // STANDARD REPORT LAYOUT (Existing Code)
-                        <>
-                            <div className="flex items-start justify-between mb-8 pb-6 border-b-2 border-[#0F3F5C]">
-                                <div className="flex items-center gap-4">
-                                    {/* Logo removed as requested */}
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-2xl font-bold text-[#0F3F5C] mb-1">RELATÓRIO DE PRODUÇÃO</p>
-                                    <p className="text-sm text-slate-600">
-                                        <span className="font-semibold">Gerado em:</span><br />
-                                        {new Date().toLocaleString('pt-BR')}
-                                    </p>
-                                </div>
-                            </div>
+                    </div>
 
-                            <div className="bg-gradient-to-r from-[#e6f0f5] to-[#fff3e6] border-l-4 border-[#FF8C00] rounded-lg p-5 mb-6 shadow-sm">
-                                <h3 className="text-lg font-bold text-[#0F3F5C] mb-4 flex items-center gap-2">
-                                    <svg className="w-5 h-5 text-[#FF8C00]" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
-                                    </svg>
-                                    Dados da Ordem
-                                </h3>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                    <div className="bg-white p-3 rounded-lg shadow-sm">
-                                        <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Nº Ordem</p>
-                                        <p className="text-sm font-bold text-[#0F3F5C]">{reportData.orderNumber}</p>
-                                    </div>
-                                    <div className="bg-white p-3 rounded-lg shadow-sm">
-                                        <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Máquina</p>
-                                        <p className="text-sm font-bold text-[#0F3F5C]">{reportData.machine}</p>
-                                    </div>
-                                    <div className="bg-white p-3 rounded-lg shadow-sm col-span-2">
-                                        <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Operador(es)</p>
-                                        <p className="text-sm font-bold text-[#0F3F5C]">{operatorNames}</p>
-                                    </div>
-                                    {reportData.machine === 'Treliça' ? (
-                                        <>
-                                            <div className="bg-white p-3 rounded-lg shadow-sm">
-                                                <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Modelo</p>
-                                                <p className="text-sm font-bold text-[#0F3F5C]">{reportData.trelicaModel}</p>
-                                            </div>
-                                            {reportData.quantityToProduce && (
-                                                <div className="bg-white p-3 rounded-lg shadow-sm">
-                                                    <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Qtd. Planejada</p>
-                                                    <p className="text-sm font-bold text-[#0F3F5C]">{reportData.quantityToProduce} pcs</p>
-                                                </div>
-                                            )}
-                                        </>
-                                    ) : (
-                                        <>
-                                            <div className="bg-white p-3 rounded-lg shadow-sm">
-                                                <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Bitola Entrada</p>
-                                                <p className="text-sm font-bold text-[#0F3F5C]">{inputBitola}</p>
-                                            </div>
-                                            <div className="bg-white p-3 rounded-lg shadow-sm">
-                                                <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Bitola Saída</p>
-                                                <p className="text-sm font-bold text-[#0F3F5C]">{reportData.targetBitola}</p>
-                                            </div>
-                                            {averageMeasuredGauge && (
-                                                <div className="bg-white p-3 rounded-lg shadow-sm">
-                                                    <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Média Aferida</p>
-                                                    <p className="text-sm font-bold text-[#0F3F5C]">{averageMeasuredGauge.toFixed(2)} mm</p>
-                                                </div>
-                                            )}
-                                        </>
-                                    )}
-                                    <div className="bg-white p-3 rounded-lg shadow-sm">
-                                        <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Status</p>
-                                        <span className="inline-block px-2 py-1 text-xs font-bold rounded-full bg-emerald-100 text-emerald-800">Concluída</span>
-                                    </div>
-                                    <div className="bg-white p-3 rounded-lg shadow-sm col-span-2 md:col-span-1">
-                                        <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Início</p>
-                                        <p className="text-sm font-bold text-[#0F3F5C]">{reportData.startTime ? new Date(reportData.startTime).toLocaleString('pt-BR') : 'N/A'}</p>
-                                    </div>
-                                    <div className="bg-white p-3 rounded-lg shadow-sm col-span-2">
-                                        <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Fim</p>
-                                        <p className="text-sm font-bold text-[#0F3F5C]">{reportData.endTime ? new Date(reportData.endTime).toLocaleString('pt-BR') : 'N/A'}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="mb-6">
-                                <h3 className="text-lg font-bold text-[#0F3F5C] mb-4 flex items-center gap-2">
-                                    <svg className="w-5 h-5 text-[#FF8C00]" fill="currentColor" viewBox="0 0 20 20">
-                                        <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
-                                    </svg>
-                                    Indicadores de Desempenho
-                                </h3>
-                                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
-                                    <div className="bg-slate-100 p-4 rounded-lg shadow-sm border border-slate-200">
-                                        <div className="text-xs text-slate-500 font-bold uppercase mb-1">Aproveitamento</div>
-                                        <div className="text-2xl font-bold text-[#0F3F5C]">{yieldPercentage.toFixed(2)}%</div>
-                                    </div>
-                                    <div className="bg-emerald-50 p-4 rounded-lg shadow-sm border border-emerald-100">
-                                        <div className="text-xs text-emerald-700 font-bold uppercase mb-1">Produção (kg)</div>
-                                        <div className="text-2xl font-bold text-emerald-800">{(reportData.actualProducedWeight || 0).toFixed(2)}</div>
-                                    </div>
-                                    <div className="bg-sky-50 p-4 rounded-lg shadow-sm border border-sky-100">
-                                        <div className="text-xs text-sky-700 font-bold uppercase mb-1">Produção (m)</div>
-                                        <div className="text-2xl font-bold text-sky-800">{totalMetersProduced.toFixed(2)}</div>
-                                    </div>
-                                    <div className="bg-green-50 p-4 rounded-lg shadow-sm border border-green-100">
-                                        <div className="text-xs text-green-700 font-bold uppercase mb-1">Tempo Efetivo</div>
-                                        <div className="text-2xl font-bold text-green-800">{formatDuration(effectiveTimeMs)}</div>
-                                    </div>
-                                    <div className="bg-red-50 p-4 rounded-lg shadow-sm border border-red-100">
-                                        <div className="text-xs text-red-700 font-bold uppercase mb-1">Tempo Parado</div>
-                                        <div className="text-2xl font-bold text-red-800">{formatDuration(totalDowntimeMs)}</div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                                <div className="lg:col-span-3">
-                                    <h3 className="text-lg font-bold text-[#0F3F5C] mb-4 flex items-center gap-2">
-                                        <svg className="w-5 h-5 text-[#FF8C00]" fill="currentColor" viewBox="0 0 20 20">
-                                            <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
-                                        </svg>
-                                        Detalhamento da Produção
-                                    </h3>
-                                    {dailyBreakdown.length > 0 ? (
-                                        <div className="space-y-4">
-                                            {dailyBreakdown.map((day, index) => (
-                                                <div key={index} className="border border-slate-200 rounded-lg overflow-hidden shadow-sm">
-                                                    <div className="bg-gradient-to-r from-[#0F3F5C] to-[#1A5A7D] p-3 flex justify-between items-center text-white">
-                                                        <h4 className="font-bold">Dia: {day.date}</h4>
-                                                        <div className="text-right text-sm">
-                                                            <p><strong>Lotes:</strong> {day.lots.length} | <strong>Peso:</strong> {day.totalWeight.toFixed(2)} kg</p>
-                                                        </div>
-                                                    </div>
-                                                    <table className="w-full text-sm text-left text-slate-600">
-                                                        <thead className="text-xs text-slate-700 uppercase bg-slate-50">
-                                                            <tr>
-                                                                <th className="px-4 py-2">Lote Interno</th>
-                                                                {reportData.machine?.toLowerCase() === 'trefila' && <th className="px-4 py-2 text-right">Bit. Aferida</th>}
-                                                                <th className="px-4 py-2 text-right">Peso Saída (kg)</th>
-                                                                <th className="px-4 py-2 text-right">Perda (%)</th>
-                                                                <th className="px-4 py-2 text-right">T. Efetivo</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody className="divide-y divide-slate-100">
-                                                            {day.lots.map(lot => {
-                                                                const difference = lot.originalWeight - (lot.finalWeight || 0);
-                                                                const lossPercentage = lot.originalWeight > 0 ? (difference / lot.originalWeight) * 100 : 0;
-                                                                return (
-                                                                    <tr key={lot.lotId} className="bg-white hover:bg-slate-50">
-                                                                        <td className="px-4 py-2 font-medium text-[#0F3F5C]">{lot.internalLot}</td>
-                                                                        {reportData.machine?.toLowerCase() === 'trefila' && <td className="px-4 py-2 text-right text-slate-600">{(lot as any).measuredGauge ? `${(lot as any).measuredGauge.toFixed(2)} mm` : '-'}</td>}
-                                                                        <td className="px-4 py-2 text-right font-bold">{lot.finalWeight?.toFixed(2) || 'N/A'}</td>
-                                                                        <td className={`px-4 py-2 text-right font-medium ${difference >= 0 ? 'text-red-600' : 'text-green-600'}`}>{lossPercentage.toFixed(2)}%</td>
-                                                                        <td className="px-4 py-2 text-right font-mono text-slate-500">{formatDuration(lot.effectiveDurationMs)}</td>
-                                                                    </tr>
-                                                                );
-                                                            })}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ) : <p className="text-sm text-slate-500 italic p-4 bg-slate-50 rounded text-center">Nenhum lote processado para esta ordem.</p>}
-                                    <div className="font-semibold text-white bg-[#0F3F5C] rounded-lg mt-4 p-3 flex justify-between shadow-sm">
-                                        <span>Total Geral</span>
-                                        <div className="text-right">
-                                            <span>{totalProducedWeight.toFixed(2)} kg</span> / <span className="font-mono">{formatDuration(effectiveTimeMs)}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="lg:col-span-2">
-                                    <h3 className="text-lg font-bold text-[#0F3F5C] mb-4 flex items-center gap-2">
-                                        <svg className="w-5 h-5 text-[#FF8C00]" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                                        </svg>
-                                        Paradas
-                                    </h3>
-                                    <div className="border border-slate-200 rounded-lg overflow-hidden shadow-sm">
-                                        <table className="w-full text-sm text-left text-slate-600">
-                                            <thead className="text-xs text-white uppercase bg-slate-500">
-                                                <tr>
-                                                    <th className="px-4 py-2">Motivo</th>
-                                                    <th className="px-4 py-2 text-right">Duração</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-100">
-                                                {(reportData.downtimeEvents || []).map((event, index) => {
-                                                    if (!event.resumeTime) return null;
-                                                    const duration = new Date(event.resumeTime).getTime() - new Date(event.stopTime).getTime();
-                                                    if (duration <= 0) return null;
-                                                    return (
-                                                        <tr key={index} className="bg-white hover:bg-slate-50">
-                                                            <td className="px-4 py-2">{event.reason}</td>
-                                                            <td className="px-4 py-2 text-right font-mono text-slate-700">{formatDuration(duration)}</td>
-                                                        </tr>
-                                                    )
-                                                })}
-                                            </tbody>
-                                            <tfoot className="font-semibold text-[#0F3F5C] bg-slate-100 border-t-2 border-slate-300">
-                                                <tr>
-                                                    <th className="px-4 py-2 text-left">Total Parado</th>
-                                                    <th className="px-4 py-2 text-right font-mono">{formatDuration(totalDowntimeMs)}</th>
-                                                </tr>
-                                            </tfoot>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="mt-8 pt-4 border-t-2 border-slate-200 text-center text-sm text-slate-500 no-print">
-                                <p className="font-semibold">MSM Indústria - Sistema de Gestão de Produção</p>
-                                <p className="text-xs mt-1">Confiabilidade e Qualidade em Aço</p>
-                            </div>
-                        </>
-                    )}
+                    {/* Footer */}
+                    <div className="mt-8 pt-4 border-t-2 border-slate-200 text-center text-sm text-slate-500 no-print">
+                        <p className="font-semibold">MSM Indústria - Sistema de Gestão de Produção</p>
+                        <p className="text-xs mt-1">Confiabilidade e Qualidade em Aço</p>
+                    </div>
                 </div>
             </div>
         </div>
