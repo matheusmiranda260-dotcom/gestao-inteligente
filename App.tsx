@@ -1224,7 +1224,7 @@ const App: React.FC = () => {
                                     remainingQuantity: newRemainingQty,
                                     labelWeight: newRemainingQty,
                                     productionOrderIds: remainingOrderIds.length > 0 ? remainingOrderIds : undefined,
-                                    status: hasOtherActiveOrders ? stockItem.status : (newRemainingQty > 0.01 ? 'Disponível - Suporte Treliça' : 'Transferido'),
+                                    status: hasOtherActiveOrders ? stockItem.status : (newRemainingQty > 0.01 ? 'Disponível' : 'Consumido para fazer trelica'),
                                     history: [...(stockItem.history || []), {
                                         type: 'Consumido na Produção de Treliça', date: now,
                                         details: { 'Ordem': completedOrder.orderNumber, 'Qtd Consumida': consumedQty.toFixed(2) }
