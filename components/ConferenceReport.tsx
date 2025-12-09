@@ -1,7 +1,6 @@
 import React from 'react';
 import type { ConferenceData } from '../types';
 import { PrinterIcon } from './icons';
-import MSMLogo from './MSMLogo';
 
 interface ConferenceReportProps {
   reportData: ConferenceData;
@@ -42,14 +41,7 @@ const ConferenceReport: React.FC<ConferenceReportProps> = ({ reportData, onClose
         <div className="overflow-y-auto print-section bg-white">
           <div className="p-6">
             {/* Professional Header with MSM Logo */}
-            <div className="flex items-start justify-between mb-8 pb-6 border-b-2 border-[#0F3F5C]">
-              <div className="flex items-center gap-4">
-                <MSMLogo size="lg" showText={false} />
-                <div>
-                  <h1 className="text-3xl font-bold text-[#0F3F5C]">MSM INDÚSTRIA</h1>
-                  <p className="text-sm text-[#FF8C00] font-semibold">Sistema de Gestão de Produção</p>
-                </div>
-              </div>
+            <div className="flex items-start justify-end mb-8 pb-6 border-b-2 border-[#0F3F5C]">
               <div className="text-right">
                 <p className="text-2xl font-bold text-[#0F3F5C] mb-1">ENTRADA DE MATERIAL</p>
                 <p className="text-sm text-slate-600">
@@ -155,7 +147,6 @@ const ConferenceReport: React.FC<ConferenceReportProps> = ({ reportData, onClose
 
             {/* Footer */}
             <div className="mt-8 pt-4 border-t-2 border-slate-200 text-center text-sm text-slate-500">
-              <p className="font-semibold">MSM Indústria - Sistema de Gestão de Produção</p>
               <p className="text-xs mt-1">Documento gerado automaticamente • Conferência #{reportData.conferenceNumber}</p>
             </div>
           </div>

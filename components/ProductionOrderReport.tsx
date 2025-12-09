@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
 import type { ProductionOrderData, StockItem } from '../types';
 import { PrinterIcon } from './icons';
-import MSMLogo from './MSMLogo';
 
 const trelicaModels = [
     { cod: 'H6LE12S', modelo: 'H-6 LEVE (ESPAÇADOR)', tamanho: '12', superior: '5,4', inferior: '3,2', senozoide: '3,2', pesoFinal: '5,502' },
@@ -215,14 +214,7 @@ const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportDat
                     </div>
                 </div>
                 <div className="overflow-y-auto print-section bg-white p-6">
-                    <div className="flex items-start justify-between mb-8 pb-6 border-b-2 border-[#0F3F5C]">
-                        <div className="flex items-center gap-4">
-                            <MSMLogo size="lg" showText={false} />
-                            <div>
-                                <h1 className="text-3xl font-bold text-[#0F3F5C]">MSM INDÚSTRIA</h1>
-                                <p className="text-sm text-[#FF8C00] font-semibold">Sistema de Gestão de Produção</p>
-                            </div>
-                        </div>
+                    <div className="flex items-start justify-end mb-8 pb-6 border-b-2 border-[#0F3F5C]">
                         <div className="text-right">
                             <p className="text-2xl font-bold text-[#0F3F5C] mb-1">RELATÓRIO DE PRODUÇÃO</p>
                             <p className="text-sm text-slate-600">
@@ -426,7 +418,6 @@ const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportDat
 
                     {/* Footer */}
                     <div className="mt-8 pt-4 border-t-2 border-slate-200 text-center text-sm text-slate-500 no-print">
-                        <p className="font-semibold">MSM Indústria - Sistema de Gestão de Produção</p>
                         <p className="text-xs mt-1">Confiabilidade e Qualidade em Aço</p>
                     </div>
                 </div>
