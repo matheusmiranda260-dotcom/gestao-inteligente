@@ -351,9 +351,49 @@ const StockControl: React.FC<{
     };
 
     const handleSelectLotForTransfer = (lotId: string) => {
-        setSelectedLotIdsForTransfer(prev =>
-            prev.includes(lotId) ? prev.filter(id => id !== lotId) : [...prev, lotId]
-        );
+        // Find the index of the clicked lot in the currently filtered list
+        const lotIndex = filteredStock.findIndex(item => item.id === lotId);
+        if (lotIndex === -1) return;
+
+        const isCurrentlySelected = selectedLotIdsForTransfer.includes(lotId);
+        let newSelectedIds: string[] = [];
+
+        if (!isCurrentlySelected) {
+            // Select this lot AND all previous (older) available lots
+            // We only consider lots that are actually transferable
+            const transferableLots = filteredStock.filter(item => item.status === 'Disponível' || item.status === 'Disponível - Suporte Treliça');
+
+            // Find finding the target lot index within the transferable lots list to correctly slice
+            const targetLotInTransferableIndex = transferableLots.findIndex(item => item.id === lotId);
+
+            if (targetLotInTransferableIndex !== -1) {
+                // Get all transferable lots up to and including the target lot
+                const lotsToSelect = transferableLots.slice(0, targetLotInTransferableIndex + 1).map(item => item.id);
+
+                // Merge with existing selection (though typically existing selection should be a subset of this if user followed order, but for safety)
+                newSelectedIds = [...new Set([...selectedLotIdsForTransfer, ...lotsToSelect])];
+            } else {
+                // Fallback if something weird happens
+                newSelectedIds = [...selectedLotIdsForTransfer, lotId];
+            }
+
+        } else {
+            // Deselect this lot AND all subsequent (newer) lots
+            // This means we keep only the lots that are OLDER (appear before) this lot in the transferable list
+
+            const transferableLots = filteredStock.filter(item => item.status === 'Disponível' || item.status === 'Disponível - Suporte Treliça');
+            const targetLotInTransferableIndex = transferableLots.findIndex(item => item.id === lotId);
+
+            if (targetLotInTransferableIndex !== -1) {
+                // Keep only the lots appearing BEFORE the target lot
+                const lotsToKeep = transferableLots.slice(0, targetLotInTransferableIndex).map(item => item.id);
+                newSelectedIds = lotsToKeep;
+            } else {
+                newSelectedIds = selectedLotIdsForTransfer.filter(id => id !== lotId);
+            }
+        }
+
+        setSelectedLotIdsForTransfer(newSelectedIds);
     };
 
     const handleDelete = () => {
