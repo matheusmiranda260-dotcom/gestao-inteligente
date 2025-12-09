@@ -329,36 +329,7 @@ const StockControl: React.FC<{
             .sort((a, b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime());
     }, [stock, searchTerm, statusFilter, materialFilter, bitolaFilter]);
 
-    const formattedStockSummary = useMemo(() => {
-        if (!stock || stock.length === 0) return [];
 
-        const summaryMap = stock
-            .filter(item => item && (item.status === 'Disponível' || item.status === 'Disponível - Suporte Treliça'))
-            .reduce((acc, item) => {
-                // Safety check for item validation
-                if (!item || !item.internalLot) return acc;
-
-                const key = item.internalLot;
-                if (!acc.has(key)) {
-                    acc.set(key, {
-                        internalLot: item.internalLot,
-                        bitola: item.bitola || 'N/A',
-                        materialType: item.materialType || 'N/A',
-                        count: 0,
-                        totalWeight: 0,
-                        supplier: item.supplier || 'N/A'
-                    });
-                }
-                const entry = acc.get(key);
-                if (entry) {
-                    entry.count++;
-                    entry.totalWeight += (item.remainingQuantity || 0);
-                }
-                return acc;
-            }, new Map<string, { internalLot: string; bitola: string; materialType: string; count: number; totalWeight: number; supplier: string }>());
-
-        return Array.from(summaryMap.values()).sort((a, b) => b.totalWeight - a.totalWeight);
-    }, [stock]);
 
     const handleAddConferenceSubmit = (data: ConferenceData) => {
         addConference(data);
@@ -530,46 +501,7 @@ const StockControl: React.FC<{
                 </div>
             </div>
 
-            {/* Stock Summary Section */}
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
-                    <h2 className="text-lg font-semibold text-slate-700 flex items-center gap-2">
-                        <ClipboardListIcon className="h-5 w-5 text-[#0F3F5C]" />
-                        Resumo de Disponibilidade por Lote
-                    </h2>
-                    <div className="text-sm text-slate-500">
-                        Total Disponível: {formattedStockSummary.reduce((acc, i) => acc + i.totalWeight, 0).toFixed(2)} kg
-                    </div>
-                </div>
-                <div className="p-4 overflow-x-auto">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        {formattedStockSummary.map((summary) => (
-                            <div key={summary.internalLot} className="bg-slate-50 border border-slate-200 rounded-lg p-3 hover:shadow-md transition-shadow">
-                                <div className="flex justify-between items-start mb-2">
-                                    <h3 className="font-bold text-[#0F3F5C] truncate" title={summary.internalLot}>{summary.internalLot}</h3>
-                                    <span className="text-xs font-semibold bg-white border border-slate-300 px-1.5 py-0.5 rounded text-slate-600">{summary.bitola}</span>
-                                </div>
-                                <div className="text-xs text-slate-500 mb-2 truncate" title={summary.supplier}>{summary.supplier}</div>
-                                <div className="flex justify-between items-end border-t border-slate-200 pt-2 mt-2">
-                                    <div className="text-center">
-                                        <div className="text-xs text-slate-500">Rolos</div>
-                                        <div className="font-bold text-slate-800 text-lg leading-none">{summary.count}</div>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="text-xs text-slate-500">Peso Total</div>
-                                        <div className="font-bold text-emerald-700 text-lg leading-none">{summary.totalWeight.toFixed(1)} <span className="text-xs font-normal text-slate-500">kg</span></div>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                        {formattedStockSummary.length === 0 && (
-                            <div className="col-span-full text-center text-slate-400 py-4 text-sm">
-                                Nenhum lote disponível encontrado.
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
+
 
             <div className="bg-white rounded-xl shadow-sm">
                 <div className="p-6 border-b flex justify-between items-center">
