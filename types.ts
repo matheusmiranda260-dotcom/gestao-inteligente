@@ -26,7 +26,19 @@ export interface TrelicaSelectedLots {
     allSenozoideRight?: string[];
 }
 
-export type Page = 'login' | 'menu' | 'stock' | 'machineSelection' | 'trefila' | 'trelica' | 'productionOrder' | 'productionOrderTrelica' | 'reports' | 'userManagement' | 'productionDashboard' | 'finishedGoods';
+export type Page = 'login' | 'menu' | 'stock' | 'machineSelection' | 'trefila' | 'trelica' | 'productionOrder' | 'productionOrderTrelica' | 'reports' | 'userManagement' | 'productionDashboard' | 'finishedGoods' | 'partsManager';
+
+export interface SparePart {
+    id: string;
+    name: string;
+    description?: string;
+    model: string;
+    machine: string;
+    currentStock: number;
+    minStock: number;
+    location?: string;
+    lastUpdated?: string;
+}
 
 export type MachineType = 'Trefila' | 'Treliça';
 

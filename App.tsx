@@ -12,6 +12,7 @@ import Notification from './components/Notification';
 import ProductionDashboard from './components/ProductionDashboard';
 import { trelicaModels } from './components/ProductionOrderTrelica';
 import FinishedGoods from './components/FinishedGoods';
+import SparePartsManager from './components/SparePartsManager';
 import { supabase } from './supabaseClient';
 
 import { fetchTable, insertItem, updateItem, deleteItem, deleteItemByColumn, updateItemByColumn } from './services/supabaseService';
@@ -1648,6 +1649,8 @@ const App: React.FC = () => {
                 return <UserManagement users={users} addUser={addUser} updateUser={updateUser} deleteUser={deleteUser} setPage={setPage} />;
             case 'finishedGoods':
                 return <FinishedGoods finishedGoods={finishedGoods} pontasStock={pontasStock} setPage={setPage} finishedGoodsTransfers={finishedGoodsTransfers} createFinishedGoodsTransfer={createFinishedGoodsTransfer} />;
+            case 'partsManager':
+                return <SparePartsManager onBack={() => setPage('menu')} />;
             default:
                 return <Login onLogin={handleLogin} error={null} />;
         }

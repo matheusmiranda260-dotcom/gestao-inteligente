@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { Page, User, Message, MachineType } from '../types';
-import { UserGroupIcon, ArchiveIcon, CogIcon, ClipboardListIcon, ChartBarIcon, ChatBubbleLeftRightIcon } from './icons';
+import { UserGroupIcon, ArchiveIcon, CogIcon, ClipboardListIcon, ChartBarIcon, ChatBubbleLeftRightIcon, WrenchScrewdriverIcon } from './icons';
 import MSMLogo from './MSMLogo';
 
 const ManagerMessagesModal: React.FC<{
@@ -239,6 +239,12 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser, mes
                         icon={<UserGroupIcon />}
                     />
                 )}
+                <MenuButton
+                    onClick={() => setPage('partsManager')}
+                    label="Gerenciador de Peças"
+                    description="Controle de estoque de peças de reposição."
+                    icon={<WrenchScrewdriverIcon />}
+                />
             </div>
         </div>
     );
