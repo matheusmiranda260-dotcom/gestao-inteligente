@@ -1381,18 +1381,24 @@ const App: React.FC = () => {
             }
 
             // 4. Create Finished Goods (Treliça)
-            if (completedOrder.machine === 'Treliça' && completedOrder.actualProducedQuantity && completedOrder.actualProducedQuantity > 0) {
-                console.log('Tentando criar Produto Acabado para ordem:', completedOrder.orderNumber);
+            // Use actualProducedWeight as the main indicator of a successful production
+            // 4. Create Finished Goods (Treliça)
 
-                // Ensure weight is present (fallback again just in case)
-                let finalWeight = completedOrder.actualProducedWeight;
-                if (!finalWeight || finalWeight <= 0) {
-                    const modelInfo = trelicaModels.find(m => m.modelo === completedOrder.trelicaModel && m.tamanho === completedOrder.tamanho);
-                    if (modelInfo) {
-                        finalWeight = parseFloat(modelInfo.pesoFinal.replace(',', '.')) * completedOrder.actualProducedQuantity;
-                        console.log('Recalculated weight for finished goods:', finalWeight);
-                    }
+            // Calculate final weight with fallback BEFORE checking if we should create the item
+            let finalFinishedWeight = completedOrder.actualProducedWeight || 0;
+
+            if (completedOrder.machine === 'Treliça' && finalFinishedWeight <= 0 && completedOrder.actualProducedQuantity && completedOrder.actualProducedQuantity > 0) {
+                const modelInfo = trelicaModels.find(m => m.modelo === completedOrder.trelicaModel && m.tamanho === completedOrder.tamanho);
+                if (modelInfo) {
+                    finalFinishedWeight = parseFloat(modelInfo.pesoFinal.replace(',', '.')) * completedOrder.actualProducedQuantity;
+                    console.log('Recalculated weight for finished goods (Fallback):', finalFinishedWeight);
                 }
+            }
+
+            // Now check if we have a valid weight to proceed
+            if (completedOrder.machine === 'Treliça' && finalFinishedWeight > 0) {
+                console.log('Tentando criar Produto Acabado para ordem:', completedOrder.orderNumber, 'Peso Final:', finalFinishedWeight);
+
 
                 const newFinishedProduct: FinishedProductItem = {
                     id: generateId('fg'),
@@ -1403,7 +1409,7 @@ const App: React.FC = () => {
                     model: completedOrder.trelicaModel || 'Desconhecido',
                     size: completedOrder.tamanho || '0',
                     quantity: completedOrder.actualProducedQuantity,
-                    totalWeight: finalWeight || 0,
+                    totalWeight: finalFinishedWeight || 0,
                     status: 'Disponível',
                 };
 
@@ -1418,14 +1424,27 @@ const App: React.FC = () => {
                 }
             } else {
                 if (completedOrder.machine === 'Treliça') {
-                    console.warn('Ignorando criação de Produto Acabado: Quantidade produzida é 0 ou inválida.', completedOrder);
+                    console.warn('Ignorando criação de Produto Acabado: Peso produzido é 0 ou inválido.', completedOrder);
                 }
             }
 
-            showNotification(`Ordem ${completedOrder.orderNumber} finalizada.`, 'success');
+            console.log('Stock updates to be applied:', stockUpdates);
+            for (const update of stockUpdates) {
+                // Se ainda houver quantidade restante, marca como suporte; caso contrário, marca como usado para fazer treliça
+                const changes = {
+                    ...update.changes,
+                    status: ((update.changes.remainingQuantity && update.changes.remainingQuantity > 0)
+                        ? 'Disponível - Suporte Treliça'
+                        : 'Consumido para fazer treliça') as any,
+                };
+                await updateItem<StockItem>('stock_items', update.id, changes);
+            }
 
-        } catch (error) {
-            showNotification('Erro ao finalizar ordem de produção.', 'error');
+            showNotification(`Ordem ${completedOrder.orderNumber} finalizada com sucesso.`, 'success');
+
+        } catch (error: any) {
+            console.error('Erro fatal ao finalizar ordem:', error);
+            showNotification('Erro ao finalizar ordem de produção: ' + (error.message || 'Erro desconhecido'), 'error');
         }
     };
 
