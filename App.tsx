@@ -1355,20 +1355,44 @@ const App: React.FC = () => {
 
             // 4. Create Finished Goods (Treliça)
             if (completedOrder.machine === 'Treliça' && completedOrder.actualProducedQuantity && completedOrder.actualProducedQuantity > 0) {
+                console.log('Tentando criar Produto Acabado para ordem:', completedOrder.orderNumber);
+
+                // Ensure weight is present (fallback again just in case)
+                let finalWeight = completedOrder.actualProducedWeight;
+                if (!finalWeight || finalWeight <= 0) {
+                    const modelInfo = trelicaModels.find(m => m.modelo === completedOrder.trelicaModel && m.tamanho === completedOrder.tamanho);
+                    if (modelInfo) {
+                        finalWeight = parseFloat(modelInfo.pesoFinal.replace(',', '.')) * completedOrder.actualProducedQuantity;
+                        console.log('Recalculated weight for finished goods:', finalWeight);
+                    }
+                }
+
                 const newFinishedProduct: FinishedProductItem = {
                     id: generateId('fg'),
                     productionDate: now,
                     productionOrderId: completedOrder.id,
                     orderNumber: completedOrder.orderNumber,
                     productType: 'Treliça',
-                    model: completedOrder.trelicaModel!,
-                    size: completedOrder.tamanho!,
-                    quantity: completedOrder.actualProducedQuantity!,
-                    totalWeight: completedOrder.actualProducedWeight!,
+                    model: completedOrder.trelicaModel || 'Desconhecido',
+                    size: completedOrder.tamanho || '0',
+                    quantity: completedOrder.actualProducedQuantity,
+                    totalWeight: finalWeight || 0,
                     status: 'Disponível',
                 };
-                await insertItem<FinishedProductItem>('finished_goods', newFinishedProduct);
-                setFinishedGoods(prev => [...prev, newFinishedProduct].sort((a, b) => new Date(b.productionDate).getTime() - new Date(a.productionDate).getTime()));
+
+                try {
+                    console.log('Inserindo Finished Good:', newFinishedProduct);
+                    await insertItem<FinishedProductItem>('finished_goods', newFinishedProduct);
+                    setFinishedGoods(prev => [...prev, newFinishedProduct].sort((a, b) => new Date(b.productionDate).getTime() - new Date(a.productionDate).getTime()));
+                    console.log('Produto Acabado inserido com sucesso.');
+                } catch (fgError: any) {
+                    console.error('Erro ao salvar Produto Acabado:', fgError);
+                    showNotification('Aviso: Ordem finalizada, mas houve erro ao salvar no Estoque de Produto Acabado: ' + (fgError.message || 'Erro desconhecido'), 'error');
+                }
+            } else {
+                if (completedOrder.machine === 'Treliça') {
+                    console.warn('Ignorando criação de Produto Acabado: Quantidade produzida é 0 ou inválida.', completedOrder);
+                }
             }
 
             showNotification(`Ordem ${completedOrder.orderNumber} finalizada.`, 'success');
