@@ -1,18 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeftIcon, PlusIcon, SearchIcon, TrashIcon, PencilIcon, SaveIcon, XIcon, AdjustmentsIcon, MinusIcon, ClockIcon } from './icons';
 import { SparePart, PartUsage } from '../types';
+import { fetchTable, insertItem, updateItem, deleteItem, fetchByColumn } from '../services/supabaseService';
 
 interface SparePartsManagerProps {
     onBack: () => void;
 }
 
 const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
-    // Mock initial data with history array
-    const [parts, setParts] = useState<SparePart[]>([
-        { id: '1', name: 'Rolamento 6205', model: 'SKF', machine: 'Trefila', currentStock: 10, minStock: 5, history: [] },
-        { id: '2', name: 'Correia A-40', model: 'V-Belt', machine: 'Treliça', currentStock: 2, minStock: 3, history: [] }, // Low stock
-    ]);
-
+    const [parts, setParts] = useState<SparePart[]>([]);
+    const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
 
     // Modals State
@@ -22,6 +19,8 @@ const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
 
     // Active Item for Modals
     const [selectedPart, setSelectedPart] = useState<SparePart | null>(null);
+    const [partHistory, setPartHistory] = useState<PartUsage[]>([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
 
     // Forms State
     const [formData, setFormData] = useState<Partial<SparePart>>({
@@ -32,13 +31,30 @@ const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
         quantity: 1, reason: '', user: ''
     });
 
+    // --- Fetch Data ---
+    const loadParts = async () => {
+        setLoading(true);
+        try {
+            const data = await fetchTable<SparePart>('spare_parts');
+            setParts(data.sort((a, b) => a.name.localeCompare(b.name)));
+        } catch (error) {
+            console.error('Error loading parts:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        loadParts();
+    }, []);
+
     // --- Handlers ---
 
     // 1. Edit / Add
     const handleOpenEditModal = (part?: SparePart) => {
         if (part) {
             setSelectedPart(part);
-            setFormData(part);
+            setFormData({ ...part });
         } else {
             setSelectedPart(null);
             setFormData({ name: '', model: '', machine: 'Geral', currentStock: 0, minStock: 0 });
@@ -46,22 +62,24 @@ const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
         setIsEditModalOpen(true);
     };
 
-    const handleSavePart = () => {
+    const handleSavePart = async () => {
         if (!formData.name || !formData.model) return alert('Preencha os campos obrigatórios.');
 
-        if (selectedPart) {
-            // Edit
-            setParts(prev => prev.map(p => p.id === selectedPart.id ? { ...p, ...formData, history: p.history || [] } as SparePart : p));
-        } else {
-            // Add
-            const newPart: SparePart = {
-                id: Math.random().toString(36).substr(2, 9),
-                history: [],
-                ...formData as SparePart
-            };
-            setParts(prev => [...prev, newPart]);
+        try {
+            if (selectedPart) {
+                // Edit
+                const updated = await updateItem<SparePart>('spare_parts', selectedPart.id, formData);
+                setParts(prev => prev.map(p => p.id === selectedPart.id ? updated : p));
+            } else {
+                // Add
+                // @ts-ignore
+                const newPart = await insertItem<SparePart>('spare_parts', formData);
+                setParts(prev => [...prev, newPart]);
+            }
+            setIsEditModalOpen(false);
+        } catch (error) {
+            alert('Erro ao salvar peça. Verifique o console.');
         }
-        setIsEditModalOpen(false);
     };
 
     // 2. Consume (Baixar Estoque)
@@ -71,45 +89,73 @@ const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
         setIsConsumeModalOpen(true);
     };
 
-    const handleConfirmConsume = () => {
+    const handleConfirmConsume = async () => {
         if (!selectedPart || consumeData.quantity <= 0) return;
         if (consumeData.quantity > selectedPart.currentStock) {
             return alert('Quantidade a baixar é maior que o estoque atual.');
         }
 
-        const usageRecord: PartUsage = {
-            id: Math.random().toString(36).substr(2, 9),
-            date: new Date().toISOString(),
-            quantity: consumeData.quantity,
-            machine: selectedPart.machine,
-            reason: consumeData.reason || 'Consumo Geral',
-            user: consumeData.user || 'Desconhecido'
-        };
+        try {
+            // 1. Create history record in DB
+            // We map 'user' to 'user_name' for DB match if needed, or just insert.
+            // My SQL used 'user_name'. 
+            const historyItem = {
+                part_id: selectedPart.id, // Ensure this matches your DB column name for foreign key
+                date: new Date().toISOString(),
+                quantity: consumeData.quantity,
+                machine: selectedPart.machine,
+                reason: consumeData.reason || 'Consumo Geral',
+                user_name: consumeData.user || 'Desconhecido' // Use user_name for Supabase
+            };
 
-        setParts(prev => prev.map(p => {
-            if (p.id === selectedPart.id) {
-                return {
-                    ...p,
-                    currentStock: p.currentStock - consumeData.quantity,
-                    history: [usageRecord, ...(p.history || [])]
-                };
-            }
-            return p;
-        }));
+            await insertItem('part_usage_history', historyItem);
 
-        setIsConsumeModalOpen(false);
+            // 2. Update stock
+            const newStock = selectedPart.currentStock - consumeData.quantity;
+            const updatedPart = await updateItem<SparePart>('spare_parts', selectedPart.id, { currentStock: newStock });
+
+            setParts(prev => prev.map(p => p.id === selectedPart.id ? updatedPart : p));
+            setIsConsumeModalOpen(false);
+        } catch (error) {
+            console.error(error);
+            alert('Erro ao registrar baixa.');
+        }
     };
 
     // 3. History
-    const handleOpenHistoryModal = (part: SparePart) => {
+    const handleOpenHistoryModal = async (part: SparePart) => {
         setSelectedPart(part);
         setIsHistoryModalOpen(true);
+        setHistoryLoading(true);
+        try {
+            const history = await fetchByColumn<any>('part_usage_history', 'part_id', part.id);
+            // Map back to PartUsage type if keys differ (userName -> user)
+            const mappedHistory: PartUsage[] = history.map(h => ({
+                id: h.id,
+                date: h.date,
+                quantity: h.quantity,
+                machine: h.machine,
+                reason: h.reason,
+                user: h.user_name || h.user // handle both checks
+            }));
+
+            setPartHistory(mappedHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+        } catch (error) {
+            console.error('Error loading history:', error);
+        } finally {
+            setHistoryLoading(false);
+        }
     };
 
     // 4. Delete
-    const handleDelete = (id: string) => {
+    const handleDelete = async (id: string) => {
         if (window.confirm('Tem certeza que deseja excluir esta peça?')) {
-            setParts(prev => prev.filter(p => p.id !== id));
+            try {
+                await deleteItem('spare_parts', id);
+                setParts(prev => prev.filter(p => p.id !== id));
+            } catch (error) {
+                alert('Erro ao excluir peça.');
+            }
         }
     };
 
@@ -180,82 +226,86 @@ const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
 
                 {/* Table */}
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500 font-semibold tracking-wider">
-                                    <th className="p-4">Peça / Descrição</th>
-                                    <th className="p-4">Modelo</th>
-                                    <th className="p-4">Máquina</th>
-                                    <th className="p-4 text-center">Estoque</th>
-                                    <th className="p-4 text-center">Mínimo</th>
-                                    <th className="p-4 text-center">Status</th>
-                                    <th className="p-4 text-right">Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {filteredParts.length > 0 ? filteredParts.map(part => {
-                                    const status = getStockStatus(part.currentStock, part.minStock);
-                                    return (
-                                        <tr key={part.id} className="hover:bg-slate-50 transition-colors">
-                                            <td className="p-4 font-medium text-slate-800">{part.name}</td>
-                                            <td className="p-4 text-slate-600">{part.model}</td>
-                                            <td className="p-4 text-slate-600">
-                                                <span className="px-2 py-1 rounded-md bg-slate-100 text-xs font-bold text-slate-600 border border-slate-200">
-                                                    {part.machine}
-                                                </span>
-                                            </td>
-                                            <td className="p-4 text-center font-bold text-slate-800 text-lg">{part.currentStock}</td>
-                                            <td className="p-4 text-center text-slate-500">{part.minStock}</td>
-                                            <td className="p-4 text-center">
-                                                <span className={`px-2 py-1 rounded-full text-xs font-bold ${status.color}`}>
-                                                    {status.label}
-                                                </span>
-                                            </td>
-                                            <td className="p-4 text-right space-x-1">
-                                                <button
-                                                    onClick={() => handleOpenConsumeModal(part)}
-                                                    className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition"
-                                                    title="Baixar Estoque (Usar)"
-                                                >
-                                                    <div className="flex items-center gap-1 font-semibold text-xs border border-amber-200 px-2 py-1 rounded bg-amber-50">
-                                                        <MinusIcon className="h-4 w-4" /> Baixar
-                                                    </div>
-                                                </button>
-                                                <button
-                                                    onClick={() => handleOpenHistoryModal(part)}
-                                                    className="p-1.5 text-slate-600 hover:bg-slate-100 rounded-lg transition"
-                                                    title="Ver Histórico"
-                                                >
-                                                    <ClockIcon className="h-5 w-5" />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleOpenEditModal(part)}
-                                                    className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                                                    title="Editar"
-                                                >
-                                                    <PencilIcon className="h-5 w-5" />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(part.id)}
-                                                    className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition"
-                                                    title="Excluir"
-                                                >
-                                                    <TrashIcon className="h-5 w-5" />
-                                                </button>
+                    {loading ? (
+                        <div className="p-8 text-center text-slate-500">Carregando peças...</div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500 font-semibold tracking-wider">
+                                        <th className="p-4">Peça / Descrição</th>
+                                        <th className="p-4">Modelo</th>
+                                        <th className="p-4">Máquina</th>
+                                        <th className="p-4 text-center">Estoque</th>
+                                        <th className="p-4 text-center">Mínimo</th>
+                                        <th className="p-4 text-center">Status</th>
+                                        <th className="p-4 text-right">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {filteredParts.length > 0 ? filteredParts.map(part => {
+                                        const status = getStockStatus(part.currentStock, part.minStock);
+                                        return (
+                                            <tr key={part.id} className="hover:bg-slate-50 transition-colors">
+                                                <td className="p-4 font-medium text-slate-800">{part.name}</td>
+                                                <td className="p-4 text-slate-600">{part.model}</td>
+                                                <td className="p-4 text-slate-600">
+                                                    <span className="px-2 py-1 rounded-md bg-slate-100 text-xs font-bold text-slate-600 border border-slate-200">
+                                                        {part.machine}
+                                                    </span>
+                                                </td>
+                                                <td className="p-4 text-center font-bold text-slate-800 text-lg">{part.currentStock}</td>
+                                                <td className="p-4 text-center text-slate-500">{part.minStock}</td>
+                                                <td className="p-4 text-center">
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${status.color}`}>
+                                                        {status.label}
+                                                    </span>
+                                                </td>
+                                                <td className="p-4 text-right space-x-1">
+                                                    <button
+                                                        onClick={() => handleOpenConsumeModal(part)}
+                                                        className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition"
+                                                        title="Baixar Estoque (Usar)"
+                                                    >
+                                                        <div className="flex items-center gap-1 font-semibold text-xs border border-amber-200 px-2 py-1 rounded bg-amber-50">
+                                                            <MinusIcon className="h-4 w-4" /> Baixar
+                                                        </div>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleOpenHistoryModal(part)}
+                                                        className="p-1.5 text-slate-600 hover:bg-slate-100 rounded-lg transition"
+                                                        title="Ver Histórico"
+                                                    >
+                                                        <ClockIcon className="h-5 w-5" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleOpenEditModal(part)}
+                                                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                                                        title="Editar"
+                                                    >
+                                                        <PencilIcon className="h-5 w-5" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDelete(part.id)}
+                                                        className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition"
+                                                        title="Excluir"
+                                                    >
+                                                        <TrashIcon className="h-5 w-5" />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    }) : (
+                                        <tr>
+                                            <td colSpan={7} className="p-8 text-center text-slate-400">
+                                                Nenhuma peça encontrada.
                                             </td>
                                         </tr>
-                                    );
-                                }) : (
-                                    <tr>
-                                        <td colSpan={7} className="p-8 text-center text-slate-400">
-                                            Nenhuma peça encontrada.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -376,7 +426,9 @@ const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
                             <button onClick={() => setIsHistoryModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition"><XIcon /></button>
                         </div>
                         <div className="flex-grow overflow-auto p-0">
-                            {selectedPart.history && selectedPart.history.length > 0 ? (
+                            {historyLoading ? (
+                                <div className="flex justify-center items-center h-full text-slate-400">Carregando histórico...</div>
+                            ) : partHistory.length > 0 ? (
                                 <table className="w-full text-left border-collapse">
                                     <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
                                         <tr>
@@ -387,13 +439,13 @@ const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {selectedPart.history.map((record) => (
+                                        {partHistory.map((record) => (
                                             <tr key={record.id} className="hover:bg-slate-50">
                                                 <td className="p-4 text-sm text-slate-600 whitespace-nowrap">
                                                     {new Date(record.date).toLocaleDateString()} <span className="text-slate-400 text-xs">{new Date(record.date).toLocaleTimeString()}</span>
                                                 </td>
                                                 <td className="p-4 text-sm font-bold text-red-600">-{record.quantity}</td>
-                                                <td className="p-4 text-sm text-slate-800">{record.user}</td>
+                                                <td className="p-4 text-sm text-slate-800">{record.user || 'Desconhecido'}</td>
                                                 <td className="p-4 text-sm text-slate-600">{record.reason}</td>
                                             </tr>
                                         ))}

@@ -90,6 +90,16 @@ export const fetchTable = async <T>(table: string): Promise<T[]> => {
     return mapToCamelCase(data) as T[];
 };
 
+/** Fetch items by column value */
+export const fetchByColumn = async <T>(table: string, column: string, value: string): Promise<T[]> => {
+    const { data, error } = await supabase.from(table).select('*').eq(column, value);
+    if (error) {
+        console.error(`Error fetching ${table} by ${column}:`, error);
+        throw error;
+    }
+    return mapToCamelCase(data) as T[];
+};
+
 /** Insert item with automatic UUID generation for missing id */
 export const insertItem = async <T extends { id?: string }>(
     table: string,
