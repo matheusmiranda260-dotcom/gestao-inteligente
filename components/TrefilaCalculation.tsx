@@ -13,6 +13,128 @@ interface PassResult {
     status: 'Alta' | 'Ok' | 'Baixa';
 }
 
+// Standard Recipes extracted from image
+const STANDARD_RECIPES = [
+    {
+        in: 8.0, out: 6.00, passes: [
+            { entry: 'RO 3', output: 'RT 3', d: 7.20 },
+            { entry: 'RO 2', output: 'RT 2', d: 6.52 },
+            { entry: 'ROA 2', output: 'PR 6,00', d: 6.00 }
+        ]
+    },
+    {
+        in: 8.0, out: 5.80, passes: [
+            { entry: 'RO 3', output: 'RT 3', d: 7.16 },
+            { entry: 'RO 2', output: 'RT 2', d: 6.44 },
+            { entry: 'ROA 2', output: 'PR 5,80', d: 5.80 }
+        ]
+    },
+    {
+        in: 8.0, out: 5.60, passes: [
+            { entry: 'RO 3', output: 'RT 3', d: 7.02 },
+            { entry: 'RO 2', output: 'RT 2', d: 6.24 },
+            { entry: 'ROA 2', output: 'PR 5,60', d: 5.60 }
+        ]
+    },
+    {
+        in: 7.0, out: 5.50, passes: [
+            { entry: 'RO 2', output: 'RT 2', d: 6.14 },
+            { entry: 'ROA 1', output: 'PR 5,50', d: 5.50 }
+        ]
+    },
+    {
+        in: 7.0, out: 5.00, passes: [
+            { entry: 'RO 2', output: 'RT 2', d: 6.22 },
+            { entry: 'RO 2', output: 'CA 5.50', d: 5.56 },
+            { entry: 'ROA 1', output: 'PR 5,00', d: 5.00 }
+        ]
+    },
+    {
+        in: 6.5, out: 5.00, passes: [
+            { entry: 'RO 2', output: 'CA 5,50', d: 5.55 },
+            { entry: 'ROA 1', output: 'PR 5,00', d: 5.00 }
+        ]
+    },
+    {
+        in: 6.5, out: 4.20, passes: [
+            { entry: 'RO 2', output: 'CA 5,50', d: 5.52 },
+            { entry: 'RO 1', output: 'CA 4,60', d: 4.74 },
+            { entry: 'ROA 1', output: 'PR 4,20', d: 4.20 }
+        ]
+    },
+    {
+        in: 6.5, out: 4.10, passes: [
+            { entry: 'RO 2', output: 'CA 5,50', d: 5.44 },
+            { entry: 'RO 1', output: 'CA 4,60', d: 4.65 },
+            { entry: 'ROA 1', output: 'PR 4,10', d: 4.10 }
+        ]
+    },
+    {
+        in: 5.5, out: 4.40, passes: [
+            { entry: 'RO 1', output: 'CA 4,60', d: 4.89 },
+            { entry: 'ROA 1', output: 'PR 4,40', d: 4.40 }
+        ]
+    },
+    {
+        in: 5.5, out: 4.20, passes: [
+            { entry: 'RO 1', output: 'CA 4,60', d: 4.70 },
+            { entry: 'ROA 1', output: 'PR 4,20', d: 4.20 }
+        ]
+    },
+    {
+        in: 5.5, out: 4.10, passes: [
+            { entry: 'RO 1', output: 'CA 4,60', d: 4.60 },
+            { entry: 'ROA 1', output: 'PR 4,10', d: 4.10 }
+        ]
+    },
+    {
+        in: 5.5, out: 3.80, passes: [
+            { entry: 'RO 1', output: 'CA 4,60', d: 4.79 },
+            { entry: 'RO 0', output: 'RT 0', d: 4.23 },
+            { entry: 'ROA 0', output: 'PR 3,80', d: 3.80 }
+        ]
+    },
+    {
+        in: 5.5, out: 3.70, passes: [
+            { entry: 'RO 1', output: 'CA 4,60', d: 4.73 },
+            { entry: 'RO 0', output: 'RT 0', d: 4.15 },
+            { entry: 'ROA 0', output: 'PR 3,70', d: 3.70 }
+        ]
+    },
+    {
+        in: 5.5, out: 3.40, passes: [
+            { entry: 'RO 1', output: 'CA 4,60', d: 4.76 },
+            { entry: 'RO 0', output: 'RT 0', d: 4.15 },
+            { entry: 'RO 0', output: 'CA 3,55', d: 3.67 },
+            { entry: 'ROA 0', output: 'PR 3,40', d: 3.40 }
+        ]
+    },
+    {
+        in: 5.5, out: 3.20, passes: [
+            { entry: 'RO 1', output: 'CA 4,60', d: 4.70 },
+            { entry: 'RO 0', output: 'RT 0', d: 4.07 },
+            { entry: 'RO 0', output: 'CA 3,55', d: 3.57 },
+            { entry: 'ROA 0', output: 'PR 3,20', d: 3.20 }
+        ]
+    },
+    {
+        in: 5.5, out: 3.10, passes: [
+            { entry: 'RO 1', output: 'CA 4,60', d: 4.68 },
+            { entry: 'RO 0', output: 'RT 0', d: 4.01 },
+            { entry: 'RO 0', output: 'CA 3,55', d: 3.49 },
+            { entry: 'ROA 0', output: 'PR 3,10', d: 3.10 }
+        ]
+    },
+    {
+        in: 6.35, out: 3.80, passes: [
+            { entry: 'RO 2', output: 'CA 5,50', d: 5.44 },
+            { entry: 'RO 1', output: 'CA 4,60', d: 4.79 },
+            { entry: 'RO 0', output: 'RT 0', d: 4.23 },
+            { entry: 'ROA 0', output: 'PR 3,80', d: 3.80 }
+        ]
+    }
+];
+
 const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
     const [params, setParams] = useState({
         type: 'K-7 CA 60' as 'K-7 CA 60',
@@ -132,15 +254,36 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
     const calculateDistribution = () => {
         const dIn = parseFloat(params.entryDiameter.replace(',', '.'));
         const dOut = parseFloat(params.finalDiameter.replace(',', '.'));
-        let n = parseInt(params.passes);
 
+        if (isNaN(dIn) || isNaN(dOut)) { alert('Verifique os parâmetros.'); return; }
         setSuggestion(null);
 
-        // Validation limits
-        if (n > 4) { setParams(prev => ({ ...prev, passes: '4' })); n = 4; }
-        if (isNaN(dIn) || isNaN(dOut) || isNaN(n) || n <= 0) { alert('Verifique os parâmetros.'); return; }
+        // 1. Check Standard Recipes First
+        const recipe = STANDARD_RECIPES.find(r =>
+            Math.abs(r.in - dIn) < 0.01 &&
+            Math.abs(r.out - dOut) < 0.01
+        );
 
-        // 1. Run for current Selection
+        if (recipe) {
+            // Found a standard recipe!
+            const n = recipe.passes.length;
+            setParams(prev => ({ ...prev, passes: n.toString() })); // Update passes count
+
+            const diameters = recipe.passes.map(p => p.d);
+            const rings = recipe.passes.map(p => ({ entry: p.entry, output: p.output }));
+
+            setPassDiameters(diameters);
+            setPassRings(rings);
+            updateResults(diameters);
+            setSuggestion('Receita Padrão K7 encontrada e aplicada com sucesso!');
+            return;
+        }
+
+        // 2. Fallback to Simulation if no standard recipe found
+        let n = parseInt(params.passes);
+        if (n <= 0) n = 4;
+        if (n > 4) { setParams(prev => ({ ...prev, passes: '4' })); n = 4; }
+
         const currentResult = runSimulation(n, dIn, dOut);
         if (!currentResult) return;
 
