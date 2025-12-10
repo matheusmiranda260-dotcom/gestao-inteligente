@@ -1239,6 +1239,10 @@ const App: React.FC = () => {
 
                     if (fullPiecesQty > 0 && (totalConsumed.superior + totalConsumed.inferior + totalConsumed.senozoide) <= 0.001) {
                         showNotification('Aviso: Quantidade produzida > 0 mas consumo calculado é 0.', 'error');
+                    } else {
+                        // Debug visually
+                        console.log(`Consumo Calculado: Sup=${totalConsumed.superior.toFixed(2)}, Inf=${totalConsumed.inferior.toFixed(2)}, Sen=${totalConsumed.senozoide.toFixed(2)}`);
+                        // showNotification(`Consumo Calc: Sup=${totalConsumed.superior.toFixed(2)}, Inf=${totalConsumed.inferior.toFixed(2)}`, 'success');
                     }
 
                     const distributeConsumption = (lotIds: string[] | undefined, totalWeight: number) => {
@@ -1320,10 +1324,16 @@ const App: React.FC = () => {
                     }
 
                     for (const lotId of uniqueInvolvedLotIds) {
-                        const stockItem = currentStock.find(s => s.id === lotId) || stock.find(s => s.id === lotId);
+                        // Ensure we clean the ID in case of whitespace
+                        const cleanId = lotId.trim();
+                        const stockItem = currentStock.find(s => s.id === cleanId) || stock.find(s => s.id === cleanId);
+
                         if (stockItem) {
-                            const consumedQty = consumedMap.get(stockItem.id) || 0;
-                            const newRemainingQty = Math.max(0, stockItem.remainingQuantity - consumedQty);
+                            const consumedQty = consumedMap.get(cleanId) || 0;
+                            // Force numeric conversion just in case
+                            const currentQty = typeof stockItem.remainingQuantity === 'string' ? parseFloat(stockItem.remainingQuantity) : stockItem.remainingQuantity;
+                            const newRemainingQty = Math.max(0, currentQty - consumedQty);
+
                             const remainingOrderIds = (stockItem.productionOrderIds || []).filter(id => id !== orderId);
 
                             const hasOtherActiveOrders = remainingOrderIds.some(otherId => {
@@ -1331,34 +1341,36 @@ const App: React.FC = () => {
                                 return otherOrder && (otherOrder.status === 'pending' || otherOrder.status === 'in_progress');
                             });
 
-                            console.log(`Atualizando lote ${stockItem.internalLot} (ID: ${stockItem.id}): Consumido=${consumedQty}, Restante=${newRemainingQty}`);
+                            console.log(`Atualizando lote ${stockItem.internalLot} (ID: ${stockItem.id}): Atual=${currentQty} Consumido=${consumedQty}, Restante=${newRemainingQty}`);
 
-                            // Determine status explicitly
-                            let newStatus: any = 'Disponível - Suporte Treliça';
-                            if (newRemainingQty <= 0.01) {
-                                newStatus = 'Consumido para fazer treliça';
-                            } else if (hasOtherActiveOrders) {
-                                newStatus = stockItem.status; // Keep current status if active elsewhere
-                            }
-
-                            const historyEntry = consumedQty > 0 ? {
-                                type: 'Consumido na Produção de Treliça',
-                                date: now,
-                                details: { 'Ordem': completedOrder.orderNumber, 'Qtd Consumida': consumedQty.toFixed(2) }
-                            } : null;
-
-                            const newHistory = historyEntry ? [...(stockItem.history || []), historyEntry] : stockItem.history;
-
-                            stockUpdates.push({
-                                id: stockItem.id,
-                                changes: {
-                                    remainingQuantity: newRemainingQty,
-                                    labelWeight: newRemainingQty,
-                                    productionOrderIds: remainingOrderIds.length > 0 ? remainingOrderIds : undefined,
-                                    status: newStatus,
-                                    history: newHistory
+                            if (consumedQty > 0 || Math.abs(currentQty - newRemainingQty) > 0.001) {
+                                // Determine status explicitly
+                                let newStatus: any = 'Disponível - Suporte Treliça';
+                                if (newRemainingQty <= 0.01) {
+                                    newStatus = 'Consumido para fazer treliça';
+                                } else if (hasOtherActiveOrders) {
+                                    newStatus = stockItem.status; // Keep current status if active elsewhere
                                 }
-                            });
+
+                                const historyEntry = consumedQty > 0 ? {
+                                    type: 'Consumido na Produção de Treliça',
+                                    date: now,
+                                    details: { 'Ordem': completedOrder.orderNumber, 'Qtd Consumida': consumedQty.toFixed(2) }
+                                } : null;
+
+                                const newHistory = historyEntry ? [...(stockItem.history || []), historyEntry] : stockItem.history;
+
+                                stockUpdates.push({
+                                    id: stockItem.id,
+                                    changes: {
+                                        remainingQuantity: newRemainingQty,
+                                        labelWeight: newRemainingQty,
+                                        productionOrderIds: remainingOrderIds.length > 0 ? remainingOrderIds : undefined,
+                                        status: newStatus,
+                                        history: newHistory
+                                    }
+                                });
+                            }
                         } else {
                             console.warn('Lote envolvido não encontrado no cadastro de estoque:', lotId);
                             showNotification(`Aviso: Lote ID ${lotId} não encontrado no estoque para atualização.`, 'error');
