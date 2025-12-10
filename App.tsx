@@ -1318,7 +1318,7 @@ const App: React.FC = () => {
                                     remainingQuantity: newRemainingQty,
                                     labelWeight: newRemainingQty,
                                     productionOrderIds: remainingOrderIds.length > 0 ? remainingOrderIds : undefined,
-                                    status: hasOtherActiveOrders ? stockItem.status : (newRemainingQty > 0.01 ? 'Disponível' : 'Consumido para fazer trelica'),
+                                    status: hasOtherActiveOrders ? stockItem.status : (newRemainingQty > 0.01 ? 'Disponível - Suporte Treliça' : 'Consumido para fazer trelica'),
                                     history: newHistory
                                 }
                             });
