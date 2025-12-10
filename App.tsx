@@ -1444,16 +1444,20 @@ const App: React.FC = () => {
             }
 
             console.log('Stock updates to be applied:', stockUpdates);
+
             for (const update of stockUpdates) {
-                // Se ainda houver quantidade restante, marca como suporte; caso contrário, marca como usado para fazer treliça
-                const changes = {
-                    ...update.changes,
-                    status: ((update.changes.remainingQuantity && update.changes.remainingQuantity > 0)
-                        ? 'Disponível - Suporte Treliça'
-                        : 'Consumido para fazer treliça') as any,
-                };
-                await updateItem<StockItem>('stock_items', update.id, changes);
+                try {
+                    console.log(`Applying update for lot ${update.id}:`, update.changes);
+                    await updateItem<StockItem>('stock_items', update.id, update.changes);
+                } catch (err: any) {
+                    console.error(`Failed to update lot ${update.id}:`, err);
+                    showNotification(`Erro ao atualizar lote ${update.id}: ${err.message}`, 'error');
+                }
             }
+
+            // Refresh stock again to reflect changes in UI immediately
+            const finalStock = await fetchTable<StockItem>('stock_items');
+            setStock(finalStock);
 
             showNotification(`Ordem ${completedOrder.orderNumber} finalizada com sucesso.`, 'success');
 
