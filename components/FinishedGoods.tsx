@@ -37,7 +37,7 @@ const TransferFinishedGoodsModal: React.FC<{
             alert('O setor de destino é obrigatório.');
             return;
         }
-        
+
         const itemsWithQuantity = new Map<string, number>();
         quantities.forEach((qty, id) => {
             if (qty > 0) {
@@ -119,7 +119,7 @@ const FinishedGoodsTransferReport: React.FC<{ reportData: FinishedGoodsTransferR
                 <div className="flex justify-between items-center mb-4 pb-4 border-b no-print">
                     <h2 className="text-2xl font-bold text-slate-800">Relatório de Transferência</h2>
                     <div>
-                        <button onClick={() => window.print()} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg mr-4"><PrinterIcon className="h-5 w-5 inline mr-2"/>Imprimir</button>
+                        <button onClick={() => window.print()} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg mr-4"><PrinterIcon className="h-5 w-5 inline mr-2" />Imprimir</button>
                         <button onClick={onClose} className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-4 rounded-lg">Fechar</button>
                     </div>
                 </div>
@@ -217,11 +217,11 @@ const FinishedGoodsTransfersHistoryModal: React.FC<{
 
 
 interface FinishedGoodsProps {
-  finishedGoods: FinishedProductItem[];
-  pontasStock: PontaItem[];
-  finishedGoodsTransfers: FinishedGoodsTransferRecord[];
-  setPage: (page: Page) => void;
-  createFinishedGoodsTransfer: (data: { destinationSector: string; otherDestination?: string; items: Map<string, number> }) => FinishedGoodsTransferRecord | null;
+    finishedGoods: FinishedProductItem[];
+    pontasStock: PontaItem[];
+    finishedGoodsTransfers: FinishedGoodsTransferRecord[];
+    setPage: (page: Page) => void;
+    createFinishedGoodsTransfer: (data: { destinationSector: string; otherDestination?: string; items: Map<string, number> }) => FinishedGoodsTransferRecord | null;
 }
 
 const FinishedGoods: React.FC<FinishedGoodsProps> = ({ finishedGoods, pontasStock, setPage, finishedGoodsTransfers, createFinishedGoodsTransfer }) => {
@@ -229,7 +229,7 @@ const FinishedGoods: React.FC<FinishedGoodsProps> = ({ finishedGoods, pontasStoc
     const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [reportData, setReportData] = useState<FinishedGoodsTransferRecord | null>(null);
-    
+
     const allItems = [...finishedGoods, ...pontasStock];
 
     const handleSelectItem = (itemId: string) => {
@@ -243,11 +243,11 @@ const FinishedGoods: React.FC<FinishedGoodsProps> = ({ finishedGoods, pontasStoc
             return newSet;
         });
     };
-    
+
     const handleSelectAll = (items: (FinishedProductItem | PontaItem)[], tableType: 'trelica' | 'ponta') => {
         const itemIds = items.map(i => i.id);
         const allSelectedForTable = itemIds.every(id => selectedItems.has(id));
-        
+
         setSelectedItems(prev => {
             const newSet = new Set(prev);
             if (allSelectedForTable) {
@@ -267,11 +267,11 @@ const FinishedGoods: React.FC<FinishedGoodsProps> = ({ finishedGoods, pontasStoc
             setReportData(result);
         }
     };
-    
+
     return (
         <div className="p-4 sm:p-6 md:p-8 space-y-6">
             {isTransferModalOpen && (
-                <TransferFinishedGoodsModal 
+                <TransferFinishedGoodsModal
                     itemsToTransfer={allItems.filter(item => selectedItems.has(item.id))}
                     onClose={() => setIsTransferModalOpen(false)}
                     onSubmit={handleTransferSubmit}
@@ -279,7 +279,7 @@ const FinishedGoods: React.FC<FinishedGoodsProps> = ({ finishedGoods, pontasStoc
             )}
             {reportData && <FinishedGoodsTransferReport reportData={reportData} onClose={() => setReportData(null)} />}
             {isHistoryOpen && <FinishedGoodsTransfersHistoryModal transfers={finishedGoodsTransfers} onClose={() => setIsHistoryOpen(false)} onShowReport={setReportData} />}
-            
+
             <header className="flex items-center justify-between">
                 <div className="flex items-center">
                     <button onClick={() => setPage('menu')} className="mr-4 p-2 rounded-full hover:bg-slate-200 transition">
@@ -287,8 +287,8 @@ const FinishedGoods: React.FC<FinishedGoodsProps> = ({ finishedGoods, pontasStoc
                     </button>
                     <h1 className="text-3xl font-bold text-slate-800">Estoque de Produto Acabado (Treliças)</h1>
                 </div>
-                 <div className="flex gap-4">
-                     <button onClick={() => setIsHistoryOpen(true)} className="bg-white hover:bg-slate-50 text-slate-700 font-semibold py-2 px-4 rounded-lg border border-slate-300">
+                <div className="flex gap-4">
+                    <button onClick={() => setIsHistoryOpen(true)} className="bg-white hover:bg-slate-50 text-slate-700 font-semibold py-2 px-4 rounded-lg border border-slate-300">
                         Histórico de Transferências
                     </button>
                     <button onClick={() => setIsTransferModalOpen(true)} disabled={selectedItems.size === 0} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-slate-400 flex items-center gap-2">
@@ -317,7 +317,7 @@ const FinishedGoods: React.FC<FinishedGoodsProps> = ({ finishedGoods, pontasStoc
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200">
-                            {finishedGoods.filter(i => i.quantity > 0).map(item => (
+                            {finishedGoods.map(item => (
                                 <tr key={item.id} className="bg-white hover:bg-slate-50">
                                     <td className="p-4"><input type="checkbox" checked={selectedItems.has(item.id)} onChange={() => handleSelectItem(item.id)} className="h-4 w-4 rounded" /></td>
                                     <td className="px-6 py-4 whitespace-nowrap">{new Date(item.productionDate).toLocaleDateString('pt-BR')}</td>
@@ -331,7 +331,7 @@ const FinishedGoods: React.FC<FinishedGoodsProps> = ({ finishedGoods, pontasStoc
                             ))}
                         </tbody>
                     </table>
-                    {finishedGoods.filter(i => i.quantity > 0).length === 0 && (
+                    {finishedGoods.length === 0 && (
                         <div className="text-center text-slate-500 py-16">
                             <ArchiveIcon className="h-12 w-12 mx-auto text-slate-400 mb-2" />
                             <p className="font-semibold">Estoque de treliças padrão vazio.</p>
