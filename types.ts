@@ -28,6 +28,15 @@ export interface TrelicaSelectedLots {
 
 export type Page = 'login' | 'menu' | 'stock' | 'machineSelection' | 'trefila' | 'trelica' | 'productionOrder' | 'productionOrderTrelica' | 'reports' | 'userManagement' | 'productionDashboard' | 'finishedGoods' | 'partsManager';
 
+export interface PartUsage {
+    id: string;
+    date: string; // ISO string
+    quantity: number;
+    machine: string;
+    reason?: string;
+    user?: string;
+}
+
 export interface SparePart {
     id: string;
     name: string;
@@ -38,6 +47,7 @@ export interface SparePart {
     minStock: number;
     location?: string;
     lastUpdated?: string;
+    history?: PartUsage[];
 }
 
 export type MachineType = 'Trefila' | 'Treliça';
