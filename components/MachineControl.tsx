@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Page, MachineType, StockItem, ProductionOrderData, User, PartsRequest, ShiftReport, TrelicaSelectedLots, Ponta, Message } from '../types';
-import { ArrowLeftIcon, PlayIcon, PauseIcon, ClockIcon, WarningIcon, StopIcon, CheckCircleIcon, WrenchScrewdriverIcon, ArchiveIcon, ClipboardListIcon, CogIcon, DocumentReportIcon, ScaleIcon, TrashIcon, ChatBubbleLeftRightIcon } from './icons';
+import { ArrowLeftIcon, PlayIcon, PauseIcon, ClockIcon, WarningIcon, StopIcon, CheckCircleIcon, WrenchScrewdriverIcon, ArchiveIcon, ClipboardListIcon, CogIcon, DocumentReportIcon, ScaleIcon, TrashIcon, ChatBubbleLeftRightIcon, CalculatorIcon } from './icons';
 import PartsRequestModal from './PartsRequestModal';
 import ShiftReportsModal from './ShiftReportsModal';
 import ProductionOrderReport from './ProductionOrderReport';
 import { trelicaModels } from './ProductionOrderTrelica';
+import TrefilaCalculation from './TrefilaCalculation';
 
 const MessagingModal: React.FC<{
     isOpen: boolean;
@@ -538,6 +539,7 @@ const MachineControl: React.FC<MachineControlProps> = ({ machineType, setPage, c
     const [showShiftReportsModal, setShowShiftReportsModal] = useState(false);
     const [isMessagingModalOpen, setIsMessagingModalOpen] = useState(false);
     const [productionReportData, setProductionReportData] = useState<ProductionOrderData | null>(null);
+    const [showTrefilaCalculation, setShowTrefilaCalculation] = useState(false);
 
     const activeOrder = useMemo(() => productionOrders.find(o => o.machine === machineType && o.status === 'in_progress'), [productionOrders, machineType]);
     const pendingOrders = useMemo(() => productionOrders.filter(o => o.machine === machineType && o.status === 'pending').sort((a, b) => new Date(a.creationDate).getTime() - new Date(b.creationDate).getTime()), [productionOrders, machineType]);
@@ -797,6 +799,7 @@ const MachineControl: React.FC<MachineControlProps> = ({ machineType, setPage, c
 
     return (
         <div className="p-4 sm:p-6 md:p-8">
+            {showTrefilaCalculation && <TrefilaCalculation onClose={() => setShowTrefilaCalculation(false)} />}
             {showDowntimeModal && <DowntimeModal onClose={() => setShowDowntimeModal(false)} onSubmit={handleStopMachine} />}
             {showCompletionModal && activeOrder && <CompletionModal order={activeOrder} onClose={() => setShowCompletionModal(false)} onSubmit={handleCompleteProduction} />}
             {showQuantityPrompt && activeOrder && (
@@ -898,6 +901,15 @@ const MachineControl: React.FC<MachineControlProps> = ({ machineType, setPage, c
                             icon={<WrenchScrewdriverIcon className="h-6 w-6" />}
                             disabled={!activeOrder}
                         />
+                        {machineType === 'Trefila' && (
+                            <MachineMenuButton
+                                onClick={() => setShowTrefilaCalculation(true)}
+                                label="Cálculo de Trefilação"
+                                description="Simulação e otimização de passes de redução."
+                                icon={<CalculatorIcon className="h-6 w-6" />}
+                            />
+                        )}
+
                         <MachineMenuButton
                             onClick={() => setIsMessagingModalOpen(true)}
                             label="Mensagens Gestor"
