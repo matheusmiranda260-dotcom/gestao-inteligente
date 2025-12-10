@@ -1077,7 +1077,10 @@ const App: React.FC = () => {
         const now = new Date().toISOString();
 
         const orderToComplete = productionOrders.find(o => o.id === orderId);
+        window.alert(`DEBUG: completeProduction INICIADO. ID: ${orderId}\nEncontrado: ${!!orderToComplete}\nMáquina: ${orderToComplete?.machine}`);
+
         if (!orderToComplete || orderToComplete.status === 'completed') {
+            window.alert('DEBUG: Ordem não encontrada ou já completa.');
             return;
         }
 
@@ -1399,6 +1402,8 @@ const App: React.FC = () => {
 
             // Calculate final weight with fallback BEFORE checking if we should create the item
             let finalFinishedWeight = completedOrder.actualProducedWeight || 0;
+
+            window.alert(`DEBUG: Iniciando bloco Finished Goods.\nMáquina: ${completedOrder.machine}\nPeso: ${finalFinishedWeight}`);
 
             if (completedOrder.machine === 'Treliça' && finalFinishedWeight <= 0 && completedOrder.actualProducedQuantity && completedOrder.actualProducedQuantity > 0) {
                 const modelInfo = trelicaModels.find(m => m.modelo === completedOrder.trelicaModel && m.tamanho === completedOrder.tamanho);
