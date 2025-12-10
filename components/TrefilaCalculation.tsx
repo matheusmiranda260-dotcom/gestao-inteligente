@@ -27,6 +27,8 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
 
     // State to hold the current diameters for manual editing
     const [passDiameters, setPassDiameters] = useState<number[]>([]);
+    // State to hold the rings/rollers for each pass (K7)
+    const [passRings, setPassRings] = useState<{ entry: string; output: string }[]>([]);
 
     // Extracted Simulation Logic
     const runSimulation = (n: number, dIn: number, dOut: number) => {
@@ -143,6 +145,7 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
         if (!currentResult) return;
 
         setPassDiameters(currentResult.diameters);
+        setPassRings(Array(n).fill({ entry: '', output: '' }));
         updateResults(currentResult.diameters);
 
         // 2. Find Optimal 'n'
@@ -249,9 +252,27 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
         }
     };
 
+    const handleRingChange = (index: number, type: 'entry' | 'output', value: string) => {
+        const newRings = [...passRings];
+        // Ensure index exists
+        if (!newRings[index]) newRings[index] = { entry: '', output: '' };
+
+        newRings[index] = {
+            ...newRings[index],
+            [type]: value
+        };
+        setPassRings(newRings);
+    };
+
     const handleSave = () => {
         if (!recipeName) return alert('Digite um nome para a receita.');
         // TODO: Implement save logic
+        console.log({
+            name: recipeName,
+            params,
+            results,
+            rings: passRings
+        });
         alert(`Receita "${recipeName}" salva com sucesso! (Simulação)`);
     };
 
@@ -451,14 +472,16 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                         {/* Table */}
                         <div className="bg-white p-6 rounded-xl shadow-sm">
                             <div className="flex justify-between items-center mb-4">
-                                <h2 className="text-lg font-bold text-slate-800">Tabela Detalhada (Editável)</h2>
-                                <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded">Edite os diâmetros abaixo para ajuste fino</span>
+                                <h2 className="text-lg font-bold text-slate-800">Tabela Detalhada (Configuração K7)</h2>
+                                <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded">Preencha os anéis e ajuste diâmetros</span>
                             </div>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm text-left">
                                     <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b">
                                         <tr>
-                                            <th className="px-6 py-3 font-semibold">Passe</th>
+                                            <th className="px-6 py-3 font-semibold">Passe K7</th>
+                                            <th className="px-6 py-3 font-semibold">Anel Entrada (Oval)</th>
+                                            <th className="px-6 py-3 font-semibold">Anel Saída (CA)</th>
                                             <th className="px-6 py-3 font-semibold">Diâmetro (mm)</th>
                                             <th className="px-6 py-3 font-semibold">Redução (%)</th>
                                             <th className="px-6 py-3 font-semibold">Status</th>
@@ -468,6 +491,24 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                         {results.map((res, index) => (
                                             <tr key={res.pass} className="hover:bg-slate-50">
                                                 <td className="px-6 py-4 font-bold text-slate-700">#{res.pass}</td>
+                                                <td className="px-6 py-4">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Ex: 5.5 Oval"
+                                                        value={passRings[index]?.entry || ''}
+                                                        onChange={(e) => handleRingChange(index, 'entry', e.target.value)}
+                                                        className="w-32 p-1 border border-slate-300 rounded text-center text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    />
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Ex: 5.0 CA"
+                                                        value={passRings[index]?.output || ''}
+                                                        onChange={(e) => handleRingChange(index, 'output', e.target.value)}
+                                                        className="w-32 p-1 border border-slate-300 rounded text-center text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    />
+                                                </td>
                                                 <td className="px-6 py-4">
                                                     <input
                                                         type="number"
@@ -491,7 +532,7 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                         ))}
                                         {results.length === 0 && (
                                             <tr>
-                                                <td colSpan={4} className="px-6 py-8 text-center text-slate-400">
+                                                <td colSpan={6} className="px-6 py-8 text-center text-slate-400">
                                                     Nenhum cálculo realizado.
                                                 </td>
                                             </tr>
