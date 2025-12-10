@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Page, StockItem, ConferenceData, ConferenceLotData, Bitola, MaterialType, TransferRecord } from '../types';
 import { MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions } from '../types';
-import { ArrowLeftIcon, PencilIcon, TrashIcon, WarningIcon, BookOpenIcon, TruckIcon, DocumentReportIcon, PrinterIcon, LockOpenIcon, ClipboardListIcon } from './icons';
+import { ArrowLeftIcon, PencilIcon, TrashIcon, WarningIcon, BookOpenIcon, TruckIcon, DocumentReportIcon, PrinterIcon, LockOpenIcon, ClipboardListIcon, ChartBarIcon, XCircleIcon } from './icons';
 import LotHistoryModal from './LotHistoryModal';
 import FinishedConferencesModal from './FinishedConferencesModal';
 import ConferenceReport from './ConferenceReport';
@@ -304,6 +304,7 @@ const StockControl: React.FC<{
     const [transferHistoryOpen, setTransferHistoryOpen] = useState(false);
     const [transferReportData, setTransferReportData] = useState<TransferRecord | null>(null);
     const [showInventoryReport, setShowInventoryReport] = useState(false);
+    const [stockDashboardOpen, setStockDashboardOpen] = useState(false);
 
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
@@ -471,6 +472,9 @@ const StockControl: React.FC<{
                     </button>
                 </div>
                 <div className="flex gap-4">
+                    <button onClick={() => setStockDashboardOpen(true)} className="bg-white hover:bg-slate-50 text-slate-700 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
+                        <ChartBarIcon className="h-5 w-5" />Estatística
+                    </button>
                     <button onClick={() => setShowInventoryReport(true)} className="bg-white hover:bg-slate-50 text-slate-700 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
                         <PrinterIcon className="h-5 w-5" />Imprimir Inventário
                     </button>
@@ -483,7 +487,17 @@ const StockControl: React.FC<{
                 </div>
             </div>
 
-            <StockDashboard stock={stock} />
+            {stockDashboardOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-7xl max-h-[95vh] overflow-y-auto flex flex-col relative">
+                        <button onClick={() => setStockDashboardOpen(false)} className="absolute top-4 right-4 text-slate-500 hover:text-slate-700">
+                            <XCircleIcon className="h-8 w-8" />
+                        </button>
+                        <h2 className="text-2xl font-bold text-slate-800 mb-6">Estatísticas do Estoque</h2>
+                        <StockDashboard stock={stock} />
+                    </div>
+                </div>
+            )}
 
             <div className="bg-white p-6 rounded-xl shadow-sm">
                 <h2 className="text-xl font-semibold text-slate-700 mb-4">Filtros de Busca</h2>
