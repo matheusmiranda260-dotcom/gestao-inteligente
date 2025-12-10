@@ -1152,27 +1152,43 @@ const App: React.FC = () => {
                     }
                 }
             } else if (completedOrder.machine === 'Treliça') {
+                const lots = completedOrder.selectedLotIds as TrelicaSelectedLots;
+                const fullPiecesQty = completedOrder.actualProducedQuantity || 0;
+                const consumedMap = new Map<string, number>();
+
+                // Find model info to calculate weights
                 const modelInfo = trelicaModels.find(m => m.modelo === completedOrder.trelicaModel && m.tamanho === completedOrder.tamanho);
+
+                if (!modelInfo && fullPiecesQty > 0) {
+                    showNotification(`Erro: Modelo de treliça não encontrado para cálculo de peso. (${completedOrder.trelicaModel})`, 'error');
+                }
+
                 if (modelInfo) {
                     const parse = (s: string) => parseFloat(s.replace(',', '.'));
-                    const fullPiecesQty = completedOrder.actualProducedQuantity || 0;
-
                     const consumedFull = {
                         superior: parse(modelInfo.pesoSuperior) * fullPiecesQty,
                         inferior: parse(modelInfo.pesoInferior) * fullPiecesQty,
                         senozoide: parse(modelInfo.pesoSenozoide) * fullPiecesQty,
                     };
 
+                    // Calculate Pontas Consumption
                     const consumedPontas = { superior: 0, inferior: 0, senozoide: 0 };
-                    const modelTamanho = parse(modelInfo.tamanho);
-
-                    if (modelTamanho > 0) {
-                        (completedOrder.pontas || []).forEach(ponta => {
-                            const ratio = ponta.size / modelTamanho;
-                            consumedPontas.superior += parse(modelInfo.pesoSuperior) * ponta.quantity * ratio;
-                            consumedPontas.inferior += parse(modelInfo.pesoInferior) * ponta.quantity * ratio;
-                            consumedPontas.senozoide += parse(modelInfo.pesoSenozoide) * ponta.quantity * ratio;
-                        });
+                    if (completedOrder.pontas) {
+                        for (const ponta of completedOrder.pontas) {
+                            // Estimate distribution based on model ratio or just sum total weight?
+                            // Since ponta is a slice of the truss, it consumes all components proportionally.
+                            // Total weight of ponta is known.
+                            // Ratio:
+                            const totalModelWeight = parse(modelInfo.pesoFinal);
+                            if (totalModelWeight > 0) {
+                                const ratio = ponta.totalWeight / totalModelWeight;
+                                // But ponta.totalWeight is for ALL pontas of that size? No, ponta object has quantity.
+                                // ponta.totalWeight is already calculated as total weight of this batch of pontas.
+                                consumedPontas.superior += (parse(modelInfo.pesoSuperior) / totalModelWeight) * ponta.totalWeight;
+                                consumedPontas.inferior += (parse(modelInfo.pesoInferior) / totalModelWeight) * ponta.totalWeight;
+                                consumedPontas.senozoide += (parse(modelInfo.pesoSenozoide) / totalModelWeight) * ponta.totalWeight;
+                            }
+                        }
                     }
 
                     const totalConsumed = {
@@ -1181,25 +1197,19 @@ const App: React.FC = () => {
                         senozoide: consumedFull.senozoide + consumedPontas.senozoide,
                     };
 
-                    const lots = completedOrder.selectedLotIds as TrelicaSelectedLots;
-                    const consumedMap = new Map<string, number>();
+                    if (fullPiecesQty > 0 && (totalConsumed.superior + totalConsumed.inferior + totalConsumed.senozoide) <= 0.001) {
+                        showNotification('Aviso: Quantidade produzida > 0 mas consumo calculado é 0. Verifique o cadastro do modelo.', 'error');
+                    }
 
                     const distributeConsumption = (lotIds: string[], totalWeight: number) => {
-                        console.log('Distributing consumption:', { lotIds, totalWeight });
                         let remainingWeight = totalWeight;
                         for (const lotId of lotIds) {
-                            if (remainingWeight <= 0) break;
+                            if (remainingWeight <= 0.0001) break;
                             const stockItem = stock.find(s => s.id === lotId);
-                            if (!stockItem) {
-                                console.warn('Stock item not found for lotId:', lotId);
-                                continue;
-                            }
+                            if (!stockItem) continue;
 
                             const alreadyConsumed = consumedMap.get(lotId) || 0;
                             const available = Math.max(0, stockItem.remainingQuantity - alreadyConsumed);
-
-                            console.log('Lot:', stockItem.internalLot, 'Available:', available, 'Remaining Needed:', remainingWeight);
-
                             const toConsume = Math.min(remainingWeight, available);
 
                             if (toConsume > 0) {
@@ -1207,39 +1217,15 @@ const App: React.FC = () => {
                                 remainingWeight -= toConsume;
                             }
                         }
-                        // If there is still remaining weight, force it on the last lot (or first if no lots)
-                        if (remainingWeight > 0 && lotIds.length > 0) {
+                        // Force remaining on last lot if needed (unlikely with valid stock but good for safety)
+                        if (remainingWeight > 0.0001 && lotIds.length > 0) {
                             const lastLotId = lotIds[lotIds.length - 1];
-                            console.warn('Forcing remaining weight on last lot:', lastLotId, remainingWeight);
                             consumedMap.set(lastLotId, (consumedMap.get(lastLotId) || 0) + remainingWeight);
                         }
                     };
 
-
+                    // Distribute
                     const superiorLots = lots.allSuperior || [lots.superior];
-                    const inferiorLeftLots = lots.allInferiorLeft || lots.allInferior || [lots.inferior1].filter(Boolean); // Fallback to allInferior or single if new data not present (though new orders will have it)
-                    // Note: If using old order structure, we might treat split as single list. But let's support new structure primarily.
-                    // If allInferiorLeft is present, we assume the split logic.
-                    // If not, we might be completing an old order.
-                    // Let's robustly gather Left/Right lists.
-                    // If old order (no Left/Right), we might need to default to split total consumption across 'allInferior' list.
-                    // But user specifically asked for "2 lots logic".
-                    // Let's assume new structure is populated or we map old structure to it if possible? Use generic `allInferior` if split missing.
-
-                    const inferiorRightLots = lots.allInferiorRight || (lots.allInferior ? [] : [lots.inferior2].filter(Boolean));
-                    // If old structure `allInferior` exists but no `allInferiorRight`, it means we have one big list. We should distribute 100% of weight to it?
-                    // Or split it? "Logic didn't work" might be referring to this completion step if they tested it.
-                    // If I used previous code, it distributed `totalConsumed.inferior` to `lots.allInferior`.
-                    // Now `totalConsumed.inferior` is TOTAL weight.
-                    // I need to split it: 50% Left, 50% Right.
-
-                    const senozoideLeftLots = lots.allSenozoideLeft || lots.allSenozoide || [lots.senozoide1].filter(Boolean);
-                    const senozoideRightLots = lots.allSenozoideRight || (lots.allSenozoide ? [] : [lots.senozoide2].filter(Boolean));
-
-                    console.log('Lots for consumption:', { superiorLots, inferiorLeftLots, inferiorRightLots, senozoideLeftLots, senozoideRightLots });
-                    console.log('Total Consumed to distribute (Total Component Weights):', totalConsumed);
-
-                    distributeConsumption(superiorLots, totalConsumed.superior);
 
                     // Split weight for 2 sides
                     const halfInferiorWeight = totalConsumed.inferior / 2;
