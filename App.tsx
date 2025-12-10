@@ -1163,12 +1163,10 @@ const App: React.FC = () => {
             } else if (completedOrder.machine === 'Treliça' || completedOrder.machine === 'Trelica') {
                 console.log('Finalizando Ordem Treliça:', completedOrder);
 
-
                 const fullPiecesQty = completedOrder.actualProducedQuantity || 0;
                 let lots: TrelicaSelectedLots;
 
                 if (Array.isArray(completedOrder.selectedLotIds)) {
-                    console.log('Detectado formato de array para lotes (Legacy)');
                     const arr = completedOrder.selectedLotIds as string[];
                     lots = {
                         superior: arr[0] || '',
@@ -1200,7 +1198,7 @@ const App: React.FC = () => {
                 console.log('Modelo encontrado:', modelInfo ? 'Sim' : 'Não', modelInfo);
 
                 if (!modelInfo && fullPiecesQty > 0) {
-                    showNotification(`Erro: Modelo de treliça não encontrado. (${completedOrder.trelicaModel} - ${completedOrder.tamanho})`, 'error');
+                    showNotification(`Erro CRÍTICO: Modelo de treliça não encontrado. (${completedOrder.trelicaModel} - ${completedOrder.tamanho})`, 'error');
                 }
 
                 if (modelInfo) {
@@ -1230,9 +1228,6 @@ const App: React.FC = () => {
                         senozoide: consumedFull.senozoide + consumedPontas.senozoide,
                     };
 
-                    // DEBUG: Alert Consumption
-                    // window.alert(`Consumo Calculado:\nSup: ${totalConsumed.superior.toFixed(2)}\nInf: ${totalConsumed.inferior.toFixed(2)}\nSen: ${totalConsumed.senozoide.toFixed(2)}`);
-
                     console.log('Total Consumido Calculado:', totalConsumed);
 
                     if (fullPiecesQty > 0 && (totalConsumed.superior + totalConsumed.inferior + totalConsumed.senozoide) <= 0.001) {
@@ -1242,14 +1237,12 @@ const App: React.FC = () => {
                     const distributeConsumption = (lotIds: string[] | undefined, totalWeight: number) => {
                         if (!lotIds || lotIds.length === 0) return;
                         let remainingWeight = totalWeight;
-
-                        console.log('Distribuindo consumo para lotes:', lotIds, 'Peso total:', totalWeight);
-
                         for (const lotId of lotIds) {
                             if (remainingWeight <= 0.0001) break;
                             const stockItem = stock.find(s => s.id === lotId);
                             if (!stockItem) {
                                 console.warn('Lote não encontrado no estoque:', lotId);
+                                showNotification(`Aviso: Lote ID ${lotId} não encontrado no estoque carregado.`, 'error');
                                 continue;
                             }
 
@@ -1315,6 +1308,10 @@ const App: React.FC = () => {
                     ];
                     const uniqueInvolvedLotIds = [...new Set(allInvolvedLotIds)].filter(Boolean);
 
+                    if (uniqueInvolvedLotIds.length === 0) {
+                        showNotification('Aviso: Nenhum lote foi identificado para consumo.', 'error');
+                    }
+
                     for (const lotId of uniqueInvolvedLotIds) {
                         const stockItem = stock.find(s => s.id === lotId);
                         if (stockItem) {
@@ -1322,7 +1319,6 @@ const App: React.FC = () => {
                             const newRemainingQty = Math.max(0, stockItem.remainingQuantity - consumedQty);
                             const remainingOrderIds = (stockItem.productionOrderIds || []).filter(id => id !== orderId);
 
-                            // Check if there are other active orders for this item
                             const hasOtherActiveOrders = remainingOrderIds.some(otherId => {
                                 const otherOrder = productionOrders.find(o => o.id === otherId);
                                 return otherOrder && (otherOrder.status === 'pending' || otherOrder.status === 'in_progress');
@@ -1337,9 +1333,6 @@ const App: React.FC = () => {
                             } else if (hasOtherActiveOrders) {
                                 newStatus = stockItem.status; // Keep current status if active elsewhere
                             }
-
-                            // DEBUG: Alert each item update
-                            // window.alert(`Lote: ${stockItem.internalLot}\nConsumido: ${consumedQty}\nRestante: ${newRemainingQty}\nNovo Status: ${newStatus}`);
 
                             const historyEntry = consumedQty > 0 ? {
                                 type: 'Consumido na Produção de Treliça',
@@ -1361,6 +1354,7 @@ const App: React.FC = () => {
                             });
                         } else {
                             console.warn('Lote envolvido não encontrado no cadastro de estoque:', lotId);
+                            showNotification(`Aviso: Lote ID ${lotId} não encontrado no estoque para atualização.`, 'error');
                         }
                     }
                 }
