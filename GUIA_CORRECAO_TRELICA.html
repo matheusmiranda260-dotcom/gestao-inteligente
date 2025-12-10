@@ -1,154 +1,168 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Guia: Aplicar Correções no Supabase</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            color: black !important;
+            font-weight: bold !important;
+        }
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #e0e0e0 0%, #f5f5f5 100%);
             min-height: 100vh;
             padding: 40px 20px;
         }
+
         .container {
             max-width: 900px;
             margin: 0 auto;
             background: white;
             border-radius: 16px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
             overflow: hidden;
+            border: 2px solid black;
         }
+
         .header {
-            background: linear-gradient(135deg, #0F3F5C 0%, #1a5f7a 100%);
-            color: white;
+            background: #d0d0d0;
             padding: 40px;
             text-align: center;
+            border-bottom: 2px solid black;
         }
+
         .header h1 {
             font-size: 32px;
             margin-bottom: 10px;
         }
+
         .header p {
             font-size: 16px;
-            opacity: 0.9;
         }
+
         .content {
             padding: 40px;
         }
+
         .step {
             background: #f8f9fa;
-            border-left: 4px solid #FF8C00;
+            border: 2px solid black;
             padding: 24px;
             margin-bottom: 24px;
             border-radius: 8px;
         }
+
         .step-number {
             display: inline-block;
             background: #FF8C00;
-            color: white;
             width: 32px;
             height: 32px;
             border-radius: 50%;
             text-align: center;
             line-height: 32px;
-            font-weight: bold;
             margin-right: 12px;
+            border: 2px solid black;
         }
+
         .step h2 {
             display: inline-block;
-            color: #0F3F5C;
             font-size: 20px;
             margin-bottom: 12px;
         }
+
         .step p {
-            color: #555;
             line-height: 1.6;
             margin-top: 12px;
         }
+
         .code-box {
-            background: #1e1e1e;
-            color: #d4d4d4;
+            background: #e0e0e0;
             padding: 20px;
             border-radius: 8px;
             font-family: 'Courier New', monospace;
-            font-size: 13px;
+            font-size: 14px;
             margin: 16px 0;
             overflow-x: auto;
             position: relative;
+            border: 2px solid black;
         }
+
         .copy-btn {
             position: absolute;
             top: 10px;
             right: 10px;
             background: #FF8C00;
-            color: white;
-            border: none;
+            border: 2px solid black;
             padding: 8px 16px;
             border-radius: 6px;
             cursor: pointer;
             font-size: 12px;
-            font-weight: bold;
             transition: all 0.2s;
         }
+
         .copy-btn:hover {
             background: #e67e00;
             transform: scale(1.05);
         }
+
         .copy-btn:active {
             transform: scale(0.95);
         }
+
         .warning {
             background: #fff3cd;
-            border-left: 4px solid #ffc107;
+            border: 2px solid black;
             padding: 16px;
             margin: 16px 0;
             border-radius: 6px;
         }
-        .warning strong {
-            color: #856404;
-        }
+
         .success {
             background: #d4edda;
-            border-left: 4px solid #28a745;
+            border: 2px solid black;
             padding: 16px;
             margin: 16px 0;
             border-radius: 6px;
         }
-        .success strong {
-            color: #155724;
-        }
+
         .btn-primary {
-            background: #0F3F5C;
-            color: white;
+            background: #d0d0d0;
             padding: 14px 28px;
-            border: none;
+            border: 2px solid black;
             border-radius: 8px;
             font-size: 16px;
-            font-weight: bold;
             cursor: pointer;
             transition: all 0.2s;
             display: inline-block;
             text-decoration: none;
         }
+
         .btn-primary:hover {
-            background: #0a2a3d;
+            background: #c0c0c0;
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(15, 63, 92, 0.3);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="header">
             <h1>🔧 Guia: Corrigir Treliça no Supabase</h1>
             <p>Siga os passos abaixo para garantir que tudo funcione corretamente</p>
         </div>
-        
+
         <div class="content">
             <div class="warning">
-                <strong>⚠️ Importante:</strong> Você precisa aplicar este script no Supabase SQL Editor uma única vez. Isso vai criar as tabelas e permissões necessárias.
+                <strong>⚠️ Importante:</strong> Você precisa aplicar este script no Supabase SQL Editor uma única vez.
+                Isso vai criar as tabelas e permissões necessárias.
             </div>
 
             <div class="step">
@@ -161,7 +175,7 @@
                 <span class="step-number">2</span>
                 <h2>Copie o script SQL abaixo</h2>
                 <p>Clique no botão "Copiar" para copiar todo o código SQL:</p>
-                
+
                 <div class="code-box">
                     <button class="copy-btn" onclick="copyCode()">📋 Copiar</button>
                     <pre id="sqlCode">-- ====================================
@@ -247,7 +261,8 @@ WHERE EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'finished
                 <h2>Verifique se deu certo</h2>
                 <p>Se tudo der certo, você verá uma mensagem verde dizendo "Success".</p>
                 <div class="success">
-                    <strong>✅ Sucesso!</strong> Se você vir esta mensagem: <code>"Tabela finished_goods criada com sucesso!"</code>, significa que está tudo pronto.
+                    <strong>✅ Sucesso!</strong> Se você vir esta mensagem:
+                    <code>"Tabela finished_goods criada com sucesso!"</code>, significa que está tudo pronto.
                 </div>
             </div>
 
@@ -255,11 +270,13 @@ WHERE EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'finished
                 <span class="step-number">5</span>
                 <h2>Teste no Sistema</h2>
                 <p>Volte para o sistema e tente finalizar uma ordem de Treliça novamente. Agora deve funcionar!</p>
-                <p><strong>Abra o Console do Navegador (F12)</strong> para ver os logs detalhados e me diga se aparecer algum erro.</p>
+                <p><strong>Abra o Console do Navegador (F12)</strong> para ver os logs detalhados e me diga se aparecer
+                    algum erro.</p>
             </div>
 
             <div class="warning">
-                <strong>🔍 Se ainda não funcionar:</strong> Tire um print da tela do Console (F12 > Aba Console) e me envie. Vou ver exatamente o que está acontecendo.
+                <strong>🔍 Se ainda não funcionar:</strong> Tire um print da tela do Console (F12 > Aba Console) e me
+                envie. Vou ver exatamente o que está acontecendo.
             </div>
         </div>
     </div>
@@ -280,4 +297,5 @@ WHERE EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'finished
         }
     </script>
 </body>
+
 </html>
