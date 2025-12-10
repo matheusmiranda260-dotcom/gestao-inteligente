@@ -133,8 +133,9 @@ const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
                     <div className="flex items-center gap-4">
-                        <button onClick={onBack} className="p-2 hover:bg-slate-200 rounded-full transition text-slate-600">
-                            <ArrowLeftIcon />
+                        <button onClick={onBack} className="group flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all text-slate-600">
+                            <ArrowLeftIcon className="h-5 w-5 group-hover:-translate-x-1 transition-transform" />
+                            <span className="font-semibold">Voltar</span>
                         </button>
                         <div>
                             <h1 className="text-3xl font-bold text-slate-800">Gerenciador de Peças</h1>
