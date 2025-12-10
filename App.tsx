@@ -1162,8 +1162,7 @@ const App: React.FC = () => {
                 }
             } else if (completedOrder.machine === 'Treliça' || completedOrder.machine === 'Trelica') {
                 console.log('Finalizando Ordem Treliça:', completedOrder);
-                // DEBUG: Alert start
-                window.alert(`Iniciando finalização Treliça via DEBUG.\nID: ${completedOrder.id}\nModelo: ${completedOrder.trelicaModel}\nTamanho: ${completedOrder.tamanho}`);
+
 
                 const fullPiecesQty = completedOrder.actualProducedQuantity || 0;
                 let lots: TrelicaSelectedLots;
@@ -1199,12 +1198,6 @@ const App: React.FC = () => {
                 );
 
                 console.log('Modelo encontrado:', modelInfo ? 'Sim' : 'Não', modelInfo);
-                // DEBUG: Alert Model
-                if (!modelInfo) {
-                    window.alert(`MODELO NÃO ENCONTRADO!\nBanco busca: '${completedOrder.trelicaModel}' e '${completedOrder.tamanho}'\nVerifique cadastro.`);
-                } else {
-                    // window.alert(`Modelo encontrado: ${modelInfo.modelo}`);
-                }
 
                 if (!modelInfo && fullPiecesQty > 0) {
                     showNotification(`Erro: Modelo de treliça não encontrado. (${completedOrder.trelicaModel} - ${completedOrder.tamanho})`, 'error');
@@ -1374,8 +1367,7 @@ const App: React.FC = () => {
             }
 
             console.log('Stock updates to be applied:', stockUpdates);
-            // DEBUG: Alert total updates
-            window.alert(`Total de lotes a atualizar no estoque: ${stockUpdates.length}`);
+
             for (const update of stockUpdates) {
                 await updateItem<StockItem>('stock_items', update.id, update.changes);
             }
