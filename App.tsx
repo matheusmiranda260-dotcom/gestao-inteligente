@@ -1420,7 +1420,7 @@ const App: React.FC = () => {
                     productType: 'Treliça',
                     model: completedOrder.trelicaModel || 'Desconhecido',
                     size: completedOrder.tamanho || '0',
-                    quantity: completedOrder.actualProducedQuantity,
+                    quantity: completedOrder.actualProducedQuantity || 0,
                     totalWeight: finalFinishedWeight || 0,
                     status: 'Disponível',
                 };
