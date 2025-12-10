@@ -502,12 +502,12 @@ const StockControl: React.FC<{
             <div className="bg-white p-6 rounded-xl shadow-sm">
                 <h2 className="text-xl font-semibold text-slate-700 mb-4">Filtros de Busca</h2>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <input type="text" placeholder="Buscar por lote, fornecedor, NFe..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="p-2 border border-slate-300 rounded-md md:col-span-2" />
-                    <select value={bitolaFilter} onChange={e => setBitolaFilter(e.target.value)} className="p-2 border border-slate-300 rounded-md bg-white">
+                    <input type="text" placeholder="Buscar por lote, fornecedor, NFe..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="p-2 border border-slate-300 rounded-md md:col-span-2 text-slate-900" />
+                    <select value={bitolaFilter} onChange={e => setBitolaFilter(e.target.value)} className="p-2 border border-slate-300 rounded-md bg-white text-slate-900">
                         <option value="">Todas as Bitolas</option>
                         {allBitolaOptions.map(b => <option key={b} value={b}>{b}</option>)}
                     </select>
-                    <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="p-2 border border-slate-300 rounded-md bg-white">
+                    <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="p-2 border border-slate-300 rounded-md bg-white text-slate-900">
                         <option value="">Todos os Status</option>
                         <option value="Disponível">Disponível</option>
                         <option value="Disponível - Suporte Treliça">Disponível - Suporte Treliça</option>

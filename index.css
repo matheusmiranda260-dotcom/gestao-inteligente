@@ -2,17 +2,23 @@
 
 :root {
   /* MSM Brand Colors - Premium Dark Tech Theme */
-  --msm-blue: #0A2A3D; /* Deep Navy Base */
-  --msm-blue-dark: #020F18; /* Near Black */
-  --msm-blue-light: #1A5A7D; /* Accent Blue */
-  
-  --msm-orange: #FF8C00; /* Primary Brand Orange */
-  --msm-orange-glow: #FFA500; /* Glow Orange */
+  --msm-blue: #0A2A3D;
+  /* Deep Navy Base */
+  --msm-blue-dark: #020F18;
+  /* Near Black */
+  --msm-blue-light: #1A5A7D;
+  /* Accent Blue */
+
+  --msm-orange: #FF8C00;
+  /* Primary Brand Orange */
+  --msm-orange-glow: #FFA500;
+  /* Glow Orange */
   --msm-orange-dark: #E67E00;
 
-  --msm-cyan: #00E5FF; /* Neon Cyan Accent */
+  --msm-cyan: #00E5FF;
+  /* Neon Cyan Accent */
   --msm-cyan-dim: #008C9E;
-  
+
   /* Text Colors */
   --text-primary: #F0F9FF;
   --text-secondary: #94A3B8;
@@ -24,7 +30,7 @@
   --surface-glass-border: rgba(255, 255, 255, 0.08);
   --surface-glass-highlight: rgba(255, 255, 255, 0.1);
   --card-bg: rgba(10, 20, 30, 0.6);
-  
+
   /* Shadows */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
@@ -44,6 +50,7 @@ body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
+  font-weight: bold;
 }
 
 h1,
@@ -95,23 +102,50 @@ h6 {
 
 /* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes slideUp {
-  from { transform: translateY(20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 15px rgba(255, 140, 0, 0.2); }
-  50% { box-shadow: 0 0 25px rgba(255, 140, 0, 0.5); }
+
+  0%,
+  100% {
+    box-shadow: 0 0 15px rgba(255, 140, 0, 0.2);
+  }
+
+  50% {
+    box-shadow: 0 0 25px rgba(255, 140, 0, 0.5);
+  }
 }
 
-.animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
-.animate-slide-up { animation: slideUp 0.6s ease-out forwards; }
-.animate-pulse { animation: pulse-glow 3s infinite; }
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.6s ease-out forwards;
+}
+
+.animate-pulse {
+  animation: pulse-glow 3s infinite;
+}
 
 /* Card Styles */
 .card {
