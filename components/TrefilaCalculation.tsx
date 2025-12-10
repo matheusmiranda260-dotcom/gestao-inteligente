@@ -125,13 +125,6 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                 // Clamp Start = 29%. Solve for End.
                 bestRStart = 0.29;
                 bestREnd = solveForEnd(targetRatio, 0.29);
-
-                // If even with start=29% and end=28.9% we can't meet target, it might be impossible.
-                // But solveForEnd will do its best.
-                // Suggest increasing passes if start is maxed out.
-                if (n < 4) {
-                    setSuggestion(`A redução exigida é alta (Início > 29%). O ideal seria fazer este modelo com 4 passes.`);
-                }
             } else if (Math.abs(startAttempt - 0.19) < 0.002 || startAttempt < 0.19) {
                 // Ascending or Flat case (Start <= End)
                 // Force descending. Lower End until Start > End.
@@ -157,6 +150,14 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                 bestRStart = startAttempt;
                 bestREnd = 0.19;
             }
+        }
+
+        // Suggestion Logic: Check if heavy reduction and passes < 4
+        // If the start reduction is high (> 25%), suggest 4 passes.
+        if (n < 4 && bestRStart > 0.25) {
+            setSuggestion('O ideal para fazer esse modelo seria com 4 passes.');
+        } else if (n < 4 && bestRStart > 0.29) { // Redundant but safe logic
+            setSuggestion('Redução crítica! O ideal para fazer esse modelo seria com 4 passes.');
         }
 
         // Generate Diameters
@@ -459,8 +460,8 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                                 <td className="px-6 py-4 font-bold">{res.reduction.toFixed(2)}%</td>
                                                 <td className="px-6 py-4">
                                                     <span className={`flex items-center gap-1 font-medium ${res.status === 'Alta' ? 'text-red-500' :
-                                                            res.status === 'Baixa' ? 'text-amber-500' :
-                                                                'text-emerald-500'
+                                                        res.status === 'Baixa' ? 'text-amber-500' :
+                                                            'text-emerald-500'
                                                         }`}>
                                                         {res.status === 'Ok' ? <CheckCircleIconSmall className="h-4 w-4" /> : <WarningIconSmall className="h-4 w-4" />}
                                                         {res.status}
