@@ -1167,6 +1167,9 @@ const App: React.FC = () => {
             } else if (completedOrder.machine === 'Treliça' || completedOrder.machine === 'Trelica') {
                 console.log('Finalizando Ordem Treliça:', completedOrder);
 
+                // Refresh stock to ensure we have the latest quantities before deducting
+                const currentStock = await fetchTable<StockItem>('stock_items');
+
                 const fullPiecesQty = completedOrder.actualProducedQuantity || 0;
                 let lots: TrelicaSelectedLots;
 
@@ -1243,7 +1246,7 @@ const App: React.FC = () => {
                         let remainingWeight = totalWeight;
                         for (const lotId of lotIds) {
                             if (remainingWeight <= 0.0001) break;
-                            const stockItem = stock.find(s => s.id === lotId);
+                            const stockItem = currentStock.find(s => s.id === lotId) || stock.find(s => s.id === lotId);
                             if (!stockItem) {
                                 console.warn('Lote não encontrado no estoque:', lotId);
                                 showNotification(`Aviso: Lote ID ${lotId} não encontrado no estoque carregado.`, 'error');
@@ -1317,7 +1320,7 @@ const App: React.FC = () => {
                     }
 
                     for (const lotId of uniqueInvolvedLotIds) {
-                        const stockItem = stock.find(s => s.id === lotId);
+                        const stockItem = currentStock.find(s => s.id === lotId) || stock.find(s => s.id === lotId);
                         if (stockItem) {
                             const consumedQty = consumedMap.get(stockItem.id) || 0;
                             const newRemainingQty = Math.max(0, stockItem.remainingQuantity - consumedQty);
