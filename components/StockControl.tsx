@@ -571,7 +571,7 @@ const StockControl: React.FC<{
                                             <button onClick={() => setHistoryLot(item)} className="p-1 text-slate-500 hover:text-slate-700" title="Ver Histórico"><BookOpenIcon className="h-5 w-5" /></button>
                                             <button onClick={() => setEditingItem(item)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="p-1 text-slate-500 hover:text-emerald-700 disabled:opacity-30 disabled:cursor-not-allowed" title="Editar Lote"><PencilIcon className="h-5 w-5" /></button>
                                             <button onClick={() => setDeletingItem(item)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="p-1 text-slate-500 hover:text-red-700 disabled:opacity-30 disabled:cursor-not-allowed" title="Excluir Lote"><TrashIcon className="h-5 w-5" /></button>
-                                            {(item.status.includes('Em Produção')) && (
+                                            {(item.status.includes('Em Produção') || item.status === 'Disponível - Suporte Treliça') && (
                                                 <button onClick={() => setReleasingItem(item)} className="p-1 text-amber-500 hover:text-amber-700" title="Liberar Lote Manualmente (Correção)">
                                                     <LockOpenIcon className="h-5 w-5" />
                                                 </button>
