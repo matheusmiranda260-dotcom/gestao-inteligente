@@ -15,7 +15,7 @@ interface PassResult {
 
 const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
     const [params, setParams] = useState({
-        type: 'K-7 CA 60' as 'K-7 CA 60' | 'FIEIRAS BTC',
+        type: 'K-7 CA 60' as 'K-7 CA 60',
         entryDiameter: '5.5',
         finalDiameter: '3.2',
         passes: '4'
@@ -44,36 +44,104 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
             return;
         }
 
-        // Auto-Calculation Logic (Initial Suggestion)
-        // Strategy: Force Last Pass ~19%. Distribute rest evenly.
+        // Logic for Descending Graph (Higher reduction at start, Lower at end)
+        // Target Total Ratio (Area_out / Area_in) = (dOut / dIn)^2
+        const targetRatio = Math.pow(dOut / dIn, 2);
 
-        const dFinal = dOut;
-        // Last pass reduction 19% target
-        // A_out = A_beforeLast * (1 - 0.19) => A_beforeLast = A_out / 0.81
-        // D_beforeLast = D_out / sqrt(0.81) = D_out / 0.9
-        const dBeforeLast = dFinal / 0.9;
+        // Helper to calc ratio from reductions
+        const getRatioFromReductions = (rStart: number, rEnd: number, steps: number) => {
+            let currentRatio = 1;
+            for (let i = 0; i < steps; i++) {
+                // Linear interpolation of reduction
+                // i=0 -> rStart
+                // i=n-1 -> rEnd
+                const r = steps === 1 ? rStart : rStart - ((rStart - rEnd) / (steps - 1)) * i;
+                currentRatio *= (1 - r);
+            }
+            return currentRatio;
+        };
+
+        // Solve for optimal R_start and R_end (Target Descending)
+
+        let bestRStart = 0.29; // Try starting max
+        let bestREnd = 0.19; // Try ending with 19%
+
+        // Strategy 1: Fix R_end = 19%, find R_start
+        let low = 0.19;
+        let high = 0.50;
+        let solvedRStart = 0.29;
+
+        for (let iter = 0; iter < 20; iter++) {
+            const mid = (low + high) / 2;
+            const ratio = getRatioFromReductions(mid, 0.19, n);
+            // If resulting ratio (mid) < targetRatio: we reduced too much (area too small). Need smaller R.
+            if (ratio < targetRatio) high = mid;
+            else low = mid;
+        }
+        solvedRStart = (low + high) / 2;
+
+        if (solvedRStart > 0.29) {
+            // Strategy 2: If required R_start > 29%, clamp R_start = 29% and solve for R_end.
+            bestRStart = 0.29;
+            low = 0.01;
+            high = 0.29;
+
+            for (let iter = 0; iter < 20; iter++) {
+                const mid = (low + high) / 2;
+                const ratio = getRatioFromReductions(0.29, mid, n);
+                // If ratio < targetRatio (Reduced too much), need smaller factors -> larger products -> Decrease R?
+                // Wait. Smaller factor (0.7) reduces more than Larger factor (0.9).
+                // If ratio < target, we reduced too much. We need less reduction. Decrease R. 
+                if (ratio < targetRatio) high = mid; // Decrease R_end
+                else low = mid; // Increase R_end
+            }
+            bestREnd = (low + high) / 2;
+
+        } else if (solvedRStart < 0.1901) {
+            // Strategy 3: Graph is ascending. Force Descending.
+            // Fix R_end = 15% to try to steepen slope while keeping same area?
+            // Actually, if we need very little reduction, maybe R_start is low.
+
+            low = 0.15; high = 0.40;
+            // Try to target 15% end
+            for (let iter = 0; iter < 20; iter++) {
+                const mid = (low + high) / 2;
+                const ratio = getRatioFromReductions(mid, 0.15, n);
+                if (ratio < targetRatio) high = mid; else low = mid;
+            }
+            const startFor15 = (low + high) / 2;
+
+            if (startFor15 > 0.15) {
+                bestRStart = startFor15;
+                bestREnd = 0.15;
+            } else {
+                // Even with 15% end, start is lower? (Ascending). 
+                // Just use the R_end=19% solution (it was ascending slightly or flat).
+                bestRStart = solvedRStart;
+                bestREnd = 0.19;
+            }
+        } else {
+            // Valid descending solution with R_end = 19%
+            bestRStart = solvedRStart;
+            bestREnd = 0.19;
+        }
 
         const calculatedDiameters: number[] = [];
+        let currentD = dIn;
+        let prevArea = Math.PI * Math.pow(currentD / 2, 2);
 
-        if (n === 1) {
-            calculatedDiameters.push(dOut);
-        } else {
-            // We need to go from dIn to dBeforeLast in (n-1) passes
-            // Constant reduction for first n-1 passes for simplicity as a starting point
-            // r_rest = 1 - (dBeforeLast / dIn)^(2/(n-1))
-            const r_rest = 1 - Math.pow(dBeforeLast / dIn, 2 / (n - 1));
+        for (let i = 0; i < n; i++) {
+            const r = n === 1 ? bestRStart : bestRStart - ((bestRStart - bestREnd) / (n - 1)) * i;
 
-            let currentD = dIn;
-            // Generate n-1 intermediate diameters
-            for (let i = 1; i < n; i++) {
-                const prevD = currentD;
-                const prevArea = Math.PI * Math.pow(prevD / 2, 2);
-                const nextArea = prevArea * (1 - r_rest);
-                currentD = 2 * Math.sqrt(nextArea / Math.PI);
-                calculatedDiameters.push(parseFloat(currentD.toFixed(2)));
+            if (i === n - 1) {
+                calculatedDiameters.push(dOut);
+            } else {
+                const nextArea = prevArea * (1 - r);
+                const nextD = 2 * Math.sqrt(nextArea / Math.PI);
+                calculatedDiameters.push(parseFloat(nextD.toFixed(2)));
+                currentD = nextD;
+                prevArea = nextArea;
             }
-            // Add final diameter
-            calculatedDiameters.push(dOut);
         }
 
         setPassDiameters(calculatedDiameters);
@@ -283,13 +351,6 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                             </div>
                                         </div>
                                     ))}
-
-                                    {/* Final Target Visual (Duplicate of last if matches?) 
-                                        Actually, the last block in results IS the final block.
-                                        But typically Trefila flow shows Entry -> Die 1 -> Die 2 -> ... -> Final Wire
-                                        Our results array has the output of each die.
-                                        So results[results.length-1] IS the final wire.
-                                    */}
                                 </div>
                             ) : (
                                 <div className="text-center py-10 text-slate-400">
