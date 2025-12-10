@@ -1398,27 +1398,18 @@ const App: React.FC = () => {
             }
 
             // 4. Create Finished Goods (Treliça)
-            // Use actualProducedWeight as the main indicator of a successful production
-            // 4. Create Finished Goods (Treliça)
-
             // Calculate final weight with fallback BEFORE checking if we should create the item
             let finalFinishedWeight = completedOrder.actualProducedWeight || 0;
-
-            window.alert(`DEBUG: Iniciando bloco Finished Goods.\nMáquina: ${completedOrder.machine}\nPeso: ${finalFinishedWeight}`);
 
             if (completedOrder.machine === 'Treliça' && finalFinishedWeight <= 0 && completedOrder.actualProducedQuantity && completedOrder.actualProducedQuantity > 0) {
                 const modelInfo = trelicaModels.find(m => m.modelo === completedOrder.trelicaModel && m.tamanho === completedOrder.tamanho);
                 if (modelInfo) {
                     finalFinishedWeight = parseFloat(modelInfo.pesoFinal.replace(',', '.')) * completedOrder.actualProducedQuantity;
-                    console.log('Recalculated weight for finished goods (Fallback):', finalFinishedWeight);
                 }
             }
 
             // Now check if we have a valid weight to proceed
             if (completedOrder.machine === 'Treliça' && finalFinishedWeight > 0) {
-                console.log('Tentando criar Produto Acabado para ordem:', completedOrder.orderNumber, 'Peso Final:', finalFinishedWeight);
-
-
                 const newFinishedProduct: FinishedProductItem = {
                     id: generateId('fg'),
                     productionDate: now,
@@ -1433,10 +1424,9 @@ const App: React.FC = () => {
                 };
 
                 try {
-                    console.log('Inserindo Finished Good:', newFinishedProduct);
                     await insertItem<FinishedProductItem>('finished_goods', newFinishedProduct);
                     setFinishedGoods(prev => [...prev, newFinishedProduct].sort((a, b) => new Date(b.productionDate).getTime() - new Date(a.productionDate).getTime()));
-                    console.log('Produto Acabado inserido com sucesso.');
+                    // Ensure we are redirecting or notifying correctly if needed
                 } catch (fgError: any) {
                     console.error('Erro ao salvar Produto Acabado:', fgError);
                     showNotification('Aviso: Ordem finalizada, mas houve erro ao salvar no Estoque de Produto Acabado: ' + (fgError.message || 'Erro desconhecido'), 'error');
