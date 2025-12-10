@@ -1402,7 +1402,7 @@ const App: React.FC = () => {
             let finalFinishedWeight = completedOrder.actualProducedWeight || 0;
 
             if (completedOrder.machine === 'Treliça' && finalFinishedWeight <= 0 && completedOrder.actualProducedQuantity && completedOrder.actualProducedQuantity > 0) {
-                const modelInfo = trelicaModels.find(m => m.modelo === completedOrder.trelicaModel && m.tamanho === completedOrder.tamanho);
+                const modelInfo = trelicaModels.find(m => m.modelo === completedOrder.trelicaModel && String(m.tamanho) === String(completedOrder.tamanho));
                 if (modelInfo) {
                     finalFinishedWeight = parseFloat(modelInfo.pesoFinal.replace(',', '.')) * completedOrder.actualProducedQuantity;
                 }
