@@ -1215,16 +1215,59 @@ const App: React.FC = () => {
                         }
                     };
 
-                    const superiorLots = lots.allSuperior || [lots.superior];
-                    const inferiorLots = lots.allInferior || [lots.inferior1, lots.inferior2].filter(Boolean);
-                    const senozoideLots = lots.allSenozoide || [lots.senozoide1, lots.senozoide2].filter(Boolean);
 
-                    console.log('Lots for consumption:', { superiorLots, inferiorLots, senozoideLots });
-                    console.log('Total Consumed to distribute:', totalConsumed);
+                    const superiorLots = lots.allSuperior || [lots.superior];
+                    const inferiorLeftLots = lots.allInferiorLeft || lots.allInferior || [lots.inferior1].filter(Boolean); // Fallback to allInferior or single if new data not present (though new orders will have it)
+                    // Note: If using old order structure, we might treat split as single list. But let's support new structure primarily.
+                    // If allInferiorLeft is present, we assume the split logic.
+                    // If not, we might be completing an old order.
+                    // Let's robustly gather Left/Right lists.
+                    // If old order (no Left/Right), we might need to default to split total consumption across 'allInferior' list.
+                    // But user specifically asked for "2 lots logic".
+                    // Let's assume new structure is populated or we map old structure to it if possible? Use generic `allInferior` if split missing.
+
+                    const inferiorRightLots = lots.allInferiorRight || (lots.allInferior ? [] : [lots.inferior2].filter(Boolean));
+                    // If old structure `allInferior` exists but no `allInferiorRight`, it means we have one big list. We should distribute 100% of weight to it?
+                    // Or split it? "Logic didn't work" might be referring to this completion step if they tested it.
+                    // If I used previous code, it distributed `totalConsumed.inferior` to `lots.allInferior`.
+                    // Now `totalConsumed.inferior` is TOTAL weight.
+                    // I need to split it: 50% Left, 50% Right.
+
+                    const senozoideLeftLots = lots.allSenozoideLeft || lots.allSenozoide || [lots.senozoide1].filter(Boolean);
+                    const senozoideRightLots = lots.allSenozoideRight || (lots.allSenozoide ? [] : [lots.senozoide2].filter(Boolean));
+
+                    console.log('Lots for consumption:', { superiorLots, inferiorLeftLots, inferiorRightLots, senozoideLeftLots, senozoideRightLots });
+                    console.log('Total Consumed to distribute (Total Component Weights):', totalConsumed);
 
                     distributeConsumption(superiorLots, totalConsumed.superior);
-                    distributeConsumption(inferiorLots, totalConsumed.inferior);
-                    distributeConsumption(senozoideLots, totalConsumed.senozoide);
+
+                    // Split weight for 2 sides
+                    const halfInferiorWeight = totalConsumed.inferior / 2;
+                    const halfSenozoideWeight = totalConsumed.senozoide / 2;
+
+                    // If we have distinct left/right lists, distribute half to each.
+                    // If we only have a legacy `allInferior` list (and no right list), we distribute Full weight to it.
+                    if (lots.allInferiorLeft && lots.allInferiorRight) {
+                        distributeConsumption(lots.allInferiorLeft, halfInferiorWeight);
+                        distributeConsumption(lots.allInferiorRight, halfInferiorWeight);
+                    } else if (lots.allInferior) {
+                        // Legacy fallback
+                        distributeConsumption(lots.allInferior, totalConsumed.inferior);
+                    } else {
+                        // Very old fallback
+                        distributeConsumption([lots.inferior1].filter(Boolean), halfInferiorWeight);
+                        distributeConsumption([lots.inferior2].filter(Boolean), halfInferiorWeight);
+                    }
+
+                    if (lots.allSenozoideLeft && lots.allSenozoideRight) {
+                        distributeConsumption(lots.allSenozoideLeft, halfSenozoideWeight);
+                        distributeConsumption(lots.allSenozoideRight, halfSenozoideWeight);
+                    } else if (lots.allSenozoide) {
+                        distributeConsumption(lots.allSenozoide, totalConsumed.senozoide);
+                    } else {
+                        distributeConsumption([lots.senozoide1].filter(Boolean), halfSenozoideWeight);
+                        distributeConsumption([lots.senozoide2].filter(Boolean), halfSenozoideWeight);
+                    }
 
                     console.log('Consumed Map Result:', Object.fromEntries(consumedMap));
 
