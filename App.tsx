@@ -1401,7 +1401,9 @@ const App: React.FC = () => {
             // Calculate final weight with fallback BEFORE checking if we should create the item
             let finalFinishedWeight = completedOrder.actualProducedWeight || 0;
 
-            if (completedOrder.machine === 'Treliça' && finalFinishedWeight <= 0 && completedOrder.actualProducedQuantity && completedOrder.actualProducedQuantity > 0) {
+            const isTrelica = completedOrder.machine === 'Treliça' || completedOrder.machine === 'Trelica';
+
+            if (isTrelica && finalFinishedWeight <= 0 && completedOrder.actualProducedQuantity && completedOrder.actualProducedQuantity > 0) {
                 const modelInfo = trelicaModels.find(m => m.modelo === completedOrder.trelicaModel && String(m.tamanho) === String(completedOrder.tamanho));
                 if (modelInfo) {
                     finalFinishedWeight = parseFloat(modelInfo.pesoFinal.replace(',', '.')) * completedOrder.actualProducedQuantity;
@@ -1409,7 +1411,7 @@ const App: React.FC = () => {
             }
 
             // Now check if we have a valid weight to proceed
-            if (completedOrder.machine === 'Treliça' && finalFinishedWeight > 0) {
+            if (isTrelica && finalFinishedWeight > 0) {
                 const newFinishedProduct: FinishedProductItem = {
                     id: generateId('fg'),
                     productionDate: now,
@@ -1432,8 +1434,9 @@ const App: React.FC = () => {
                     showNotification('Aviso: Ordem finalizada, mas houve erro ao salvar no Estoque de Produto Acabado: ' + (fgError.message || 'Erro desconhecido'), 'error');
                 }
             } else {
-                if (completedOrder.machine === 'Treliça') {
+                if (isTrelica) {
                     console.warn('Ignorando criação de Produto Acabado: Peso produzido é 0 ou inválido.', completedOrder);
+                    showNotification('Aviso: Produto Acabado não criado. Peso calculado é 0 ou inválido.', 'error');
                 }
             }
 
