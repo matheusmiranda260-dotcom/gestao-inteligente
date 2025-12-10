@@ -125,10 +125,10 @@ export const MachineSelection: React.FC<MachineSelectionProps> = ({ setPage }) =
         </header>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <button onClick={() => setPage('trefila')} className="bg-white p-6 rounded-xl shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
-                <h3 className="text-2xl font-semibold text-center text-slate-700">Máquina Trefila</h3>
+                <h3 className="text-2xl font-semibold text-center text-slate-700">Trefila 01</h3>
             </button>
             <button onClick={() => setPage('trelica')} className="bg-white p-6 rounded-xl shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
-                <h3 className="text-2xl font-semibold text-center text-slate-700">Máquina Treliça</h3>
+                <h3 className="text-2xl font-semibold text-center text-slate-700">Treliça 01</h3>
             </button>
         </div>
     </div>
