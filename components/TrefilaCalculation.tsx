@@ -147,57 +147,55 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
 
         // 2. Find Optimal 'n'
         let optimalN = -1;
-        let optimalStats = { max: 100, min: 0, rangeOk: false };
 
         // We check 2, 3, 4 passes (1 is rarely optimal for multi-pass machine unless trivial)
-        const candidates: { n: number, max: number, min: number, allOk: boolean }[] = [];
+        const candidates: { n: number, start: number, end: number, valid: boolean }[] = [];
 
         for (let verifyN = 1; verifyN <= 4; verifyN++) {
             const sim = runSimulation(verifyN, dIn, dOut);
             if (sim) {
-                const maxR = Math.max(...sim.reductions);
-                const minR = Math.min(...sim.reductions);
-                // Check Range 19% - 29%
-                const allOk = maxR <= 29.5 && minR >= 18.5; // Tolerance 0.5%
-                candidates.push({ n: verifyN, max: maxR, min: minR, allOk });
+                const rStart = sim.reductions.length > 0 ? sim.reductions[0] : 0;
+                const rEnd = sim.reductions.length > 0 ? sim.reductions[sim.reductions.length - 1] : 0;
+
+                // Criteria:
+                // 1st Pass: Max 29% (+2% margin = 31%)
+                // Last Pass: Max 19% (+2% margin = 21%)
+                // Also Last Pass should ideally not be too low (< 15%) if we want efficiency, but safety is primary.
+                const valid = rStart <= 31.0 && rEnd <= 21.0;
+                candidates.push({ n: verifyN, start: rStart, end: rEnd, valid });
             }
         }
 
-        // Selection Logic
-        // Prefer 'allOk' (19-29). If multiple, pick lowest N (efficiency) or N closest to avg?
-        // User said: "8 to 5.6 -> 3 passes (21%) vs 4 passes (16%) -> 3 is ideal".
-        // 3 passes is within 19-29. 4 passes is < 19.
-        // So strict 19% lower bound is important.
+        // Optimization Logic:
+        // We want the 'n' that is VALID and has reductions CLOSEST to the ideals (Start=29, End=19) to match user preference for efficiency.
+        // Usually, fewer passes = higher reductions.
+        // So we prefer the smallest 'n' that is valid.
+        // Example: 8 -> 5.6
+        // n=3: Start~24%, End~18%. Valid. (Closer to limits) -> Efficient.
+        // n=4: Start~16%, End~15%. Valid. (Far from limits) -> Less efficient.
+        // User prefers n=3.
 
-        const validCandidates = candidates.filter(c => c.allOk);
+        const validCandidates = candidates.filter(c => c.valid);
 
         if (validCandidates.length > 0) {
-            // Pick lowest N that is valid? Or highest?
-            // Usually fewer passes = cheaper.
-            // Let's pick lowest N.
-            optimalN = validCandidates[0].n; // Since loop 1..4, first is lowest.
+            // Sort by 'n' ascending. 
+            // Smallest n = Highest Reductions = Closest to limits (Efficiency).
+            validCandidates.sort((a, b) => a.n - b.n);
+            optimalN = validCandidates[0].n;
         } else {
-            // No perfect match. 
-            // Look for Safe (Max <= 29).
-            const safeCandidates = candidates.filter(c => c.max <= 29.5);
-            if (safeCandidates.length > 0) {
-                // Pick candidate with minR closest to 19?
-                // Or maxR closest to 29?
-                // Just pick the one with Highest MinR (closest to 19 from below).
-                safeCandidates.sort((a, b) => b.min - a.min);
-                optimalN = safeCandidates[0].n;
-            } else {
-                // Nothing safe. Suggest 4 (Max Possible).
-                optimalN = 4;
-            }
+            // No valid configuration found (all exceed max limits).
+            // Suggest the one with the lowest Start Reduction (safest) -> Largest N.
+            optimalN = 4;
         }
 
         if (optimalN !== n) {
             const cand = candidates.find(c => c.n === optimalN);
-            if (cand && cand.allOk) {
-                setSuggestion(`Sugestão: ${optimalN} passes seria o ideal (Reduções entre ${cand.min.toFixed(1)}% e ${cand.max.toFixed(1)}%).`);
-            } else if (cand) {
-                setSuggestion(`Sugestão: ${optimalN} passes seria o mais indicado para este diâmetro.`);
+            if (cand) {
+                if (cand.valid) {
+                    setSuggestion(`Sugestão: ${optimalN} passes seria o ideal (Mais eficiente, próximo dos limites).`);
+                } else {
+                    setSuggestion(`Sugestão: ${optimalN} passes (Redução crítica, mas é a opção mais segura disponível).`);
+                }
             }
         }
     };
