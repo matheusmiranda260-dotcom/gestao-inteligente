@@ -24,97 +24,109 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
     const [results, setResults] = useState<PassResult[]>([]);
     const [recipeName, setRecipeName] = useState('');
 
+    // State to hold the current diameters for manual editing
+    const [passDiameters, setPassDiameters] = useState<number[]>([]);
+
     const calculateDistribution = () => {
         const dIn = parseFloat(params.entryDiameter.replace(',', '.'));
         const dOut = parseFloat(params.finalDiameter.replace(',', '.'));
-        const n = parseInt(params.passes);
+        let n = parseInt(params.passes);
+
+        // Validation for Max 4 Passes
+        if (n > 4) {
+            alert('O número máximo de passes é 4.');
+            n = 4;
+            setParams(prev => ({ ...prev, passes: '4' }));
+        }
 
         if (isNaN(dIn) || isNaN(dOut) || isNaN(n) || n <= 0) {
             alert('Por favor, verifique os parâmetros.');
             return;
         }
 
-        // Calculation:
-        // 1. Last pass is fixed roughly at 19% Area Reduction.
-        // A_{n} = A_{n-1} * (1 - 0.19)
-        // A_{n-1} = A_{n} / 0.81
-        // D_{n-1} = D_out / sqrt(0.81) = D_out / 0.9
+        // Auto-Calculation Logic (Initial Suggestion)
+        // Strategy: Force Last Pass ~19%. Distribute rest evenly.
 
         const dFinal = dOut;
-        const dBeforeLast = dFinal / Math.sqrt(0.81);
+        // Last pass reduction 19% target
+        // A_out = A_beforeLast * (1 - 0.19) => A_beforeLast = A_out / 0.81
+        // D_beforeLast = D_out / sqrt(0.81) = D_out / 0.9
+        const dBeforeLast = dFinal / 0.9;
 
-        // 2. Distribute remaining passes (from Entry to n-1)
-        // Passes to solve: n - 1.
-        // If n=1, we just check reduction dIn -> dOut directly against 19% or 29% constraints?
-        // Let's handle n >= 2 properly.
-
-        const newResults: PassResult[] = [];
-        let currentD = dIn;
+        const calculatedDiameters: number[] = [];
 
         if (n === 1) {
-            const prevArea = Math.PI * Math.pow(dIn / 2, 2);
-            const nextArea = Math.PI * Math.pow(dOut / 2, 2);
-            const reduction = ((prevArea - nextArea) / prevArea) * 100;
-            let status: 'Alta' | 'Ok' | 'Baixa' = 'Ok';
-            // For single pass, maybe apply 29% rule or 19% rule? Let's use 29% as absolute limit.
-            if (reduction > 29) status = 'Alta';
-
-            newResults.push({
-                pass: 1,
-                diameter: parseFloat(dOut.toFixed(2)),
-                reduction: parseFloat(reduction.toFixed(2)),
-                status
-            });
-
+            calculatedDiameters.push(dOut);
         } else {
-            // For n >= 2
-            // We need to go from dIn to dBeforeLast in n-1 passes steps.
-            // (1 - r_rest)^(n-1) = (A_beforeLast / A_in) = (dBeforeLast / dIn)^2
+            // We need to go from dIn to dBeforeLast in (n-1) passes
+            // Constant reduction for first n-1 passes for simplicity as a starting point
             // r_rest = 1 - (dBeforeLast / dIn)^(2/(n-1))
-
             const r_rest = 1 - Math.pow(dBeforeLast / dIn, 2 / (n - 1));
 
-            // Pass 1 to n-1
+            let currentD = dIn;
+            // Generate n-1 intermediate diameters
             for (let i = 1; i < n; i++) {
                 const prevD = currentD;
                 const prevArea = Math.PI * Math.pow(prevD / 2, 2);
                 const nextArea = prevArea * (1 - r_rest);
                 currentD = 2 * Math.sqrt(nextArea / Math.PI);
-                const currentReduction = ((prevArea - nextArea) / prevArea) * 100;
-
-                let status: 'Alta' | 'Ok' | 'Baixa' = 'Ok';
-                // First pass check
-                if (i === 1 && currentReduction > 29.0) status = 'Alta';
-                else if (currentReduction > 35) status = 'Alta'; // General safety
-
-                newResults.push({
-                    pass: i,
-                    diameter: parseFloat(currentD.toFixed(2)),
-                    reduction: parseFloat(currentReduction.toFixed(2)),
-                    status
-                });
+                calculatedDiameters.push(parseFloat(currentD.toFixed(2)));
             }
-
-            // Final Pass (n)
-            const finalPrevD = currentD; // Should be dBeforeLast
-            const finalPrevArea = Math.PI * Math.pow(finalPrevD / 2, 2);
-            const finalNextArea = Math.PI * Math.pow(dOut / 2, 2);
-            const finalReduction = ((finalPrevArea - finalNextArea) / finalPrevArea) * 100;
-
-            // Check if final reduction is indeed around 19%
-            let finalStatus: 'Alta' | 'Ok' | 'Baixa' = 'Ok';
-            if (Math.abs(finalReduction - 19) > 1.5) finalStatus = 'Baixa'; // Should be close to 19 by design, but checking tolerances
-            // Actually, if we constructed it to be 19%, it should be ok unless inputs are crazy
-
-            newResults.push({
-                pass: n,
-                diameter: parseFloat(dOut.toFixed(2)),
-                reduction: parseFloat(finalReduction.toFixed(2)),
-                status: finalStatus // Expected to be 19%
-            });
+            // Add final diameter
+            calculatedDiameters.push(dOut);
         }
 
+        setPassDiameters(calculatedDiameters);
+        updateResults(calculatedDiameters);
+    };
+
+    const updateResults = (diameters: number[]) => {
+        const dIn = parseFloat(params.entryDiameter.replace(',', '.'));
+        const newResults: PassResult[] = [];
+
+        diameters.forEach((d, index) => {
+            const prevD = index === 0 ? dIn : diameters[index - 1];
+            const currentD = d;
+
+            const prevArea = Math.PI * Math.pow(prevD / 2, 2);
+            const currentArea = Math.PI * Math.pow(currentD / 2, 2);
+
+            // Avoid division by zero
+            const reduction = prevArea > 0 ? ((prevArea - currentArea) / prevArea) * 100 : 0;
+
+            const passNumber = index + 1;
+            const isLastPass = passNumber === diameters.length;
+            const isFirstPass = passNumber === 1;
+
+            let status: 'Alta' | 'Ok' | 'Baixa' = 'Ok';
+
+            // Validation Logic:
+            // 1. First Pass Max 29%
+            if (isFirstPass && reduction > 29.0) status = 'Alta';
+            // 2. Last Pass Max 19%
+            else if (isLastPass && reduction > 19.0) status = 'Alta';
+            // General safety for intermediate passes (using 29% as a safe upper bound guideline for now)
+            else if (reduction > 29.0) status = 'Alta';
+
+            newResults.push({
+                pass: passNumber,
+                diameter: parseFloat(currentD.toFixed(2)),
+                reduction: parseFloat(reduction.toFixed(2)),
+                status
+            });
+        });
+
         setResults(newResults);
+    };
+
+    const handleDiameterChange = (index: number, value: string) => {
+        const newDiameters = [...passDiameters];
+        const val = parseFloat(value);
+        if (!isNaN(val)) {
+            newDiameters[index] = val;
+            setPassDiameters(newDiameters);
+            updateResults(newDiameters);
+        }
     };
 
     const handleSave = () => {
@@ -186,13 +198,17 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Número de Passes</label>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Número de Passes (Max 4)</label>
                                     <input
                                         type="number"
                                         min="1"
-                                        max="10"
+                                        max="4"
                                         value={params.passes}
-                                        onChange={e => setParams({ ...params, passes: e.target.value })}
+                                        onChange={e => {
+                                            const val = parseInt(e.target.value);
+                                            if (val > 4) return;
+                                            setParams({ ...params, passes: e.target.value })
+                                        }}
                                         className="w-full p-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                                     />
                                 </div>
@@ -202,7 +218,7 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                     className="w-full bg-[#1e293b] text-white font-bold py-3 px-4 rounded-lg hover:bg-slate-800 transition shadow-lg mt-2 flex items-center justify-center gap-2"
                                 >
                                     <CalculatorIcon className="h-5 w-5" />
-                                    Calcular Distribuição
+                                    Calcular / Resetar
                                 </button>
                             </div>
                         </div>
@@ -259,7 +275,8 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                                     {/* Trapezoid shape indicative visual could be CSS, but kept simple box for now */}
                                                 </div>
                                                 <div className="absolute -bottom-8 left-0 right-0 text-center">
-                                                    <span className="inline-block px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-bold rounded-full border border-blue-200">
+                                                    <span className={`inline-block px-2 py-0.5 text-xs font-bold rounded-full border ${res.status === 'Alta' ? 'bg-red-100 text-red-700 border-red-200' : 'bg-blue-100 text-blue-700 border-blue-200'
+                                                        }`}>
                                                         {res.reduction.toFixed(1)}%
                                                     </span>
                                                 </div>
@@ -267,15 +284,12 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                         </div>
                                     ))}
 
-                                    {/* Final */}
-                                    <div className="flex items-center">
-                                        <div className="h-1 w-8 bg-slate-300 mx-2" />
-                                        <div className="bg-emerald-500 text-white p-4 rounded-lg w-24 h-24 flex flex-col items-center justify-center shadow-md relative z-10">
-                                            <span className="text-xs opacity-70 mb-1">Final</span>
-                                            <span className="text-xl font-bold">{results[results.length - 1].diameter.toFixed(2)}</span>
-                                            <span className="text-[10px] opacity-70">mm</span>
-                                        </div>
-                                    </div>
+                                    {/* Final Target Visual (Duplicate of last if matches?) 
+                                        Actually, the last block in results IS the final block.
+                                        But typically Trefila flow shows Entry -> Die 1 -> Die 2 -> ... -> Final Wire
+                                        Our results array has the output of each die.
+                                        So results[results.length-1] IS the final wire.
+                                    */}
                                 </div>
                             ) : (
                                 <div className="text-center py-10 text-slate-400">
@@ -293,10 +307,11 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                         <LineChart data={results} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                                             <XAxis dataKey="pass" tickLine={false} axisLine={false} tick={{ fill: '#64748B' }} label={{ value: 'Passes', position: 'insideBottom', offset: -5 }} />
-                                            <YAxis tickLine={false} axisLine={false} tick={{ fill: '#64748B' }} label={{ value: '% Redução', angle: -90, position: 'insideLeft' }} domain={[0, 'auto']} />
+                                            <YAxis tickLine={false} axisLine={false} tick={{ fill: '#64748B' }} label={{ value: '% Redução', angle: -90, position: 'insideLeft' }} domain={[0, 40]} />
                                             <Tooltip
                                                 contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
                                             />
+                                            <ReferenceLine y={29} label="Max 1º (29%)" stroke="#EF4444" strokeDasharray="3 3" />
                                             <ReferenceLine y={19} label="Max Final (19%)" stroke="#F59E0B" strokeDasharray="3 3" />
                                             <Line type="monotone" dataKey="reduction" stroke="#3B82F6" strokeWidth={3} dot={{ r: 4, fill: '#3B82F6', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} />
                                         </LineChart>
@@ -311,7 +326,10 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
 
                         {/* Table */}
                         <div className="bg-white p-6 rounded-xl shadow-sm">
-                            <h2 className="text-lg font-bold text-slate-800 mb-4">Tabela Detalhada</h2>
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-lg font-bold text-slate-800">Tabela Detalhada (Editável)</h2>
+                                <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded">Edite os diâmetros abaixo para ajuste fino</span>
+                            </div>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm text-left">
                                     <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b">
@@ -323,15 +341,23 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {results.map((res) => (
+                                        {results.map((res, index) => (
                                             <tr key={res.pass} className="hover:bg-slate-50">
                                                 <td className="px-6 py-4 font-bold text-slate-700">#{res.pass}</td>
-                                                <td className="px-6 py-4 border border-slate-200 m-1 rounded bg-white inline-block mt-2 min-w-[80px] text-center">{res.diameter.toFixed(2)}</td>
-                                                <td className="px-6 py-4 font-bold">{res.reduction.toFixed(3)}%</td>
+                                                <td className="px-6 py-4">
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={passDiameters[index] || ''}
+                                                        onChange={(e) => handleDiameterChange(index, e.target.value)}
+                                                        className="w-24 p-1 border border-slate-300 rounded text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    />
+                                                </td>
+                                                <td className="px-6 py-4 font-bold">{res.reduction.toFixed(2)}%</td>
                                                 <td className="px-6 py-4">
                                                     <span className={`flex items-center gap-1 font-medium ${res.status === 'Alta' ? 'text-red-500' :
-                                                        res.status === 'Baixa' ? 'text-amber-500' :
-                                                            'text-emerald-500'
+                                                            res.status === 'Baixa' ? 'text-amber-500' :
+                                                                'text-emerald-500'
                                                         }`}>
                                                         {res.status === 'Ok' ? <CheckCircleIconSmall className="h-4 w-4" /> : <WarningIconSmall className="h-4 w-4" />}
                                                         {res.status}
