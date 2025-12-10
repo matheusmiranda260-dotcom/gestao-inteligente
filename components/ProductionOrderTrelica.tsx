@@ -45,21 +45,21 @@ const WeightIndicator: React.FC<{ required: number; selected: number; label?: st
 
     return (
         <div className="text-right text-sm">
-            {label && <p className="text-xs text-gray-500 mb-1">{label}</p>}
-            <p>Necessário: <span className="font-bold">{required.toFixed(2)} kg</span></p>
-            <p>Selecionado:
-                <span className={`font-bold ${sufficient ? 'text-green-600' : 'text-red-600'}`}>
+            {label && <p className="text-xs text-slate-400 mb-1">{label}</p>}
+            <p className="text-slate-300">Necessário: <span className="font-bold text-white">{required.toFixed(2)} kg</span></p>
+            <p className="text-slate-300">Selecionado:
+                <span className={`font-bold ml-1 ${sufficient ? 'text-green-400' : 'text-red-400'}`}>
                     {selected.toFixed(2)} kg
                 </span>
             </p>
             {remaining > 0 && (
-                <p className="text-xs text-blue-600 font-semibold mt-1">
+                <p className="text-xs text-[#00E5FF] font-semibold mt-1">
                     Sobra estimada: {remaining.toFixed(2)} kg
                 </p>
             )}
-            <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+            <div className="w-full bg-black/40 rounded-full h-2 mt-1 border border-white/10">
                 <div
-                    className={`h-2 rounded-full transition-all ${sufficient ? 'bg-green-600' : 'bg-red-600'}`}
+                    className={`h-2 rounded-full transition-all shadow-[0_0_8px_rgba(0,0,0,0.5)] ${sufficient ? 'bg-green-500 shadow-green-500/50' : 'bg-red-500 shadow-red-500/50'}`}
                     style={{ width: `${percentage}%` }}
                 ></div>
             </div>
@@ -92,44 +92,39 @@ const MultiLotSelector: React.FC<MultiLotSelectorProps> = ({ label, subLabel, av
         let newSelectedIds: string[] = [];
 
         if (isChecked) {
-            // FIFO: Select this lot and all previous (older) lots
             const lotsToSelect = availableLots.slice(0, lotIndex + 1).map(l => l.id);
-            // Merge with existing selection to be safe, though FIFO usually replaces
             newSelectedIds = [...new Set([...selectedLots, ...lotsToSelect])];
         } else {
-            // FIFO: Deselect this lot and all subsequent (newer) lots
             const lotsToKeep = availableLots.slice(0, lotIndex).map(l => l.id);
             newSelectedIds = lotsToKeep;
         }
 
-        // Filter to ensure we only have valid IDs from this available list (mostly a sanity check)
         const validIds = newSelectedIds.filter(id => availableLots.some(l => l.id === id));
         onSelectionChange(validIds);
     };
 
     return (
-        <div className={`p-4 border rounded-lg ${colorClass}`}>
-            <div className="flex justify-between items-end border-b border-opacity-20 border-black pb-2 mb-4">
+        <div className={`p-4 border rounded-lg ${colorClass} backdrop-blur-sm transition-all`}>
+            <div className="flex justify-between items-end border-b border-white/10 pb-2 mb-4">
                 <div>
-                    <h4 className="font-medium text-gray-700">{label}</h4>
-                    {subLabel && <p className="text-xs text-gray-500">{subLabel}</p>}
+                    <h4 className="font-bold text-white tracking-wide">{label}</h4>
+                    {subLabel && <p className="text-xs text-slate-400">{subLabel}</p>}
                 </div>
                 <WeightIndicator required={requiredWeight} selected={selectedWeight} label={`${selectedLots.length} lotes`} />
             </div>
 
-            <div className="max-h-60 overflow-y-auto bg-white rounded border border-gray-200">
+            <div className="max-h-60 overflow-y-auto bg-black/20 rounded border border-white/10 custom-scrollbar">
                 <table className="w-full text-sm text-left">
-                    <thead className="bg-gray-50 sticky top-0">
+                    <thead className="bg-white/5 sticky top-0 text-slate-300">
                         <tr>
                             <th className="p-2 w-10"></th>
                             <th className="p-2">Lote Interno</th>
                             <th className="p-2 text-right">Peso (kg)</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-white/5">
                         {availableLots.map(lot => (
-                            <tr key={lot.id} className="hover:bg-gray-50 cursor-pointer" onClick={(e) => {
-                                // Prevent double toggle if clicking checkbox directly
+                            <tr key={lot.id} className="hover:bg-white/5 cursor-pointer transition-colors" onClick={(e) => {
                                 if ((e.target as HTMLElement).tagName !== 'INPUT') {
                                     handleSelectLot(lot.id, !selectedLots.includes(lot.id));
                                 }
@@ -139,16 +134,16 @@ const MultiLotSelector: React.FC<MultiLotSelectorProps> = ({ label, subLabel, av
                                         type="checkbox"
                                         checked={selectedLots.includes(lot.id)}
                                         onChange={(e) => handleSelectLot(lot.id, e.target.checked)}
-                                        className="rounded border-gray-300 pointer-events-none" // pointer-events-none because row click handles it
+                                        className="rounded border-white/30 bg-black/40 text-[#00E5FF] focus:ring-[#00E5FF] pointer-events-none"
                                     />
                                 </td>
-                                <td className="p-2 font-medium text-gray-700">{lot.internalLot}</td>
-                                <td className="p-2 text-right">{lot.availableQuantity.toFixed(2)}</td>
+                                <td className="p-2 font-medium text-slate-200">{lot.internalLot}</td>
+                                <td className="p-2 text-right text-slate-300">{lot.availableQuantity.toFixed(2)}</td>
                             </tr>
                         ))}
                         {availableLots.length === 0 && (
                             <tr>
-                                <td colSpan={3} className="p-4 text-center text-gray-400 text-xs">Nenhum lote disponível</td>
+                                <td colSpan={3} className="p-4 text-center text-slate-500 text-xs">Nenhum lote disponível</td>
                             </tr>
                         )}
                     </tbody>
@@ -440,80 +435,80 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
 
             <header className="flex items-center justify-between mb-6">
                 <div className="flex items-center">
-                    <button onClick={() => setPage('menu')} className="mr-4 p-2 rounded-full hover:bg-slate-200 transition">
-                        <ArrowLeftIcon className="h-6 w-6 text-slate-700" />
+                    <button onClick={() => setPage('menu')} className="mr-4 p-2 rounded-full hover:bg-white/10 transition">
+                        <ArrowLeftIcon className="h-6 w-6 text-white" />
                     </button>
-                    <h1 className="text-3xl font-bold text-slate-800">Ordem de Produção - Treliça</h1>
+                    <h1 className="text-3xl font-bold text-white drop-shadow-md">Ordem de Produção - Treliça</h1>
                 </div>
-                <button onClick={() => setShowHistoryModal(true)} className="bg-white hover:bg-slate-50 text-slate-700 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
+                <button onClick={() => setShowHistoryModal(true)} className="bg-white/5 hover:bg-white/10 text-white font-semibold py-2 px-4 rounded-lg border border-white/10 transition flex items-center gap-2">
                     <ClipboardListIcon className="h-5 w-5" />
                     <span>Ver Ordens Criadas</span>
                 </button>
             </header>
 
-            <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-sm space-y-6">
+            <form onSubmit={handleSubmit} className="card p-6 shadow-2xl space-y-6 border border-white/10">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                     <div>
-                        <label htmlFor="orderNumber" className="block text-sm font-medium text-gray-700">Número da Ordem</label>
-                        <input type="text" id="orderNumber" value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} className="mt-1 p-2 w-full border rounded-md" required />
+                        <label htmlFor="orderNumber" className="block text-sm font-medium text-slate-300 mb-1">Número da Ordem</label>
+                        <input type="text" id="orderNumber" value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} className="w-full pl-3 pr-4 py-2 rounded-lg border border-white/10 bg-black/20 focus:bg-black/40 focus:border-[#00E5FF] focus:ring-1 focus:ring-[#00E5FF] outline-none transition-all text-white placeholder-slate-500" required />
                     </div>
                     <div>
-                        <label htmlFor="model" className="block text-sm font-medium text-gray-700">Modelo da Treliça</label>
-                        <select id="model" value={selectedModel?.cod || ''} onChange={e => handleModelChange(e.target.value)} className="mt-1 p-2 w-full border rounded-md bg-white">
-                            <option value="">Selecione um modelo...</option>
-                            {trelicaModels.map(m => <option key={m.cod} value={m.cod}>{`${m.modelo} (${m.tamanho} mts)`}</option>)}
+                        <label htmlFor="model" className="block text-sm font-medium text-slate-300 mb-1">Modelo da Treliça</label>
+                        <select id="model" value={selectedModel?.cod || ''} onChange={e => handleModelChange(e.target.value)} className="w-full pl-3 pr-4 py-2 rounded-lg border border-white/10 bg-black/20 focus:bg-black/40 focus:border-[#00E5FF] focus:ring-1 focus:ring-[#00E5FF] outline-none transition-all text-white">
+                            <option value="" className="bg-slate-800 text-white">Selecione um modelo...</option>
+                            {trelicaModels.map(m => <option key={m.cod} value={m.cod} className="bg-slate-800 text-white">{`${m.modelo} (${m.tamanho} mts)`}</option>)}
                         </select>
                     </div>
                     <div>
-                        <label htmlFor="quantity" className="block text-sm font-medium text-gray-700">Quantidade de Peças</label>
-                        <input type="number" id="quantity" value={quantity} onChange={(e) => setQuantity(parseInt(e.target.value, 10) || 1)} min="1" className="mt-1 p-2 w-full border rounded-md" required />
+                        <label htmlFor="quantity" className="block text-sm font-medium text-slate-300 mb-1">Quantidade de Peças</label>
+                        <input type="number" id="quantity" value={quantity} onChange={(e) => setQuantity(parseInt(e.target.value, 10) || 1)} min="1" className="w-full pl-3 pr-4 py-2 rounded-lg border border-white/10 bg-black/20 focus:bg-black/40 focus:border-[#00E5FF] focus:ring-1 focus:ring-[#00E5FF] outline-none transition-all text-white placeholder-slate-500" required />
                     </div>
                     <div>
-                        <label htmlFor="machineSpeed" className="block text-sm font-medium text-gray-700">Velocidade (m/min)</label>
-                        <input type="number" id="machineSpeed" value={machineSpeed} onChange={(e) => setMachineSpeed(parseFloat(e.target.value) || 1)} min="1" className="mt-1 p-2 w-full border rounded-md" required />
+                        <label htmlFor="machineSpeed" className="block text-sm font-medium text-slate-300 mb-1">Velocidade (m/min)</label>
+                        <input type="number" id="machineSpeed" value={machineSpeed} onChange={(e) => setMachineSpeed(parseFloat(e.target.value) || 1)} min="1" className="w-full pl-3 pr-4 py-2 rounded-lg border border-white/10 bg-black/20 focus:bg-black/40 focus:border-[#00E5FF] focus:ring-1 focus:ring-[#00E5FF] outline-none transition-all text-white placeholder-slate-500" required />
                     </div>
                 </div>
 
                 {selectedModel && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-slate-50 border rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-white/5 border border-white/10 rounded-lg">
                         <div>
-                            <h3 className="font-semibold text-gray-800">Especificações do Modelo</h3>
-                            <div className="text-sm mt-2 space-y-1">
+                            <h3 className="font-semibold text-white">Especificações do Modelo</h3>
+                            <div className="text-sm mt-2 space-y-1 text-slate-300">
                                 <p><strong>Superior:</strong> {selectedModel.superior} mm</p>
                                 <p><strong>Inferior:</strong> {selectedModel.inferior} mm (2x)</p>
                                 <p><strong>Senozoide:</strong> {selectedModel.senozoide} mm (2x)</p>
                             </div>
                         </div>
                         <div className="text-right">
-                            <h3 className="font-semibold text-gray-800">Resumo do Planejamento</h3>
-                            <div className="text-sm mt-2 space-y-1">
+                            <h3 className="font-semibold text-white">Resumo do Planejamento</h3>
+                            <div className="text-sm mt-2 space-y-1 text-slate-300">
                                 <p><strong>Peso (un):</strong> {selectedModel.pesoFinal} kg</p>
                                 <p><strong>Qtd.:</strong> {quantity} pçs</p>
                                 <p><strong>Total Metros:</strong> {totalMetersToProduce.toFixed(2)} m</p>
-                                <p className="text-lg font-bold text-[#0A2A3D] border-t pt-2 mt-2">Peso Total: {plannedWeight.toFixed(2)} kg</p>
-                                <p className="text-lg font-bold text-emerald-700 border-t pt-2 mt-2">Tempo Estimado: {estimatedTime} <span className="text-xs font-normal">(HH:MM)</span></p>
+                                <p className="text-lg font-bold text-[#00E5FF] border-t border-white/10 pt-2 mt-2">Peso Total: {plannedWeight.toFixed(2)} kg</p>
+                                <p className="text-lg font-bold text-emerald-400 border-t border-white/10 pt-2 mt-2">Tempo Estimado: {estimatedTime} <span className="text-xs font-normal text-slate-400">(HH:MM)</span></p>
                             </div>
                         </div>
                     </div>
                 )}
 
                 {selectedModel && (
-                    <div className="border-t pt-6 space-y-6">
+                    <div className="border-t border-white/10 pt-6 space-y-6">
                         <div className="flex justify-between items-center">
-                            <h3 className="text-lg font-semibold text-gray-800">Seleção de Lotes (Material: CA-60)</h3>
+                            <h3 className="text-lg font-semibold text-white">Seleção de Lotes (Material: CA-60)</h3>
                             {/* Toggle Switch */}
-                            <div className="flex items-center gap-3 bg-gray-100 p-2 rounded-lg">
-                                <span className={`text-sm font-medium ${isAutoSelect ? 'text-gray-500' : 'text-blue-700'}`}>Manual</span>
+                            <div className="flex items-center gap-3 bg-white/5 p-2 rounded-lg border border-white/10">
+                                <span className={`text-sm font-medium ${isAutoSelect ? 'text-slate-500' : 'text-[#00E5FF]'}`}>Manual</span>
                                 <button
                                     type="button"
                                     onClick={() => setIsAutoSelect(!isAutoSelect)}
-                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#0F3F5C] focus:ring-offset-2 ${isAutoSelect ? 'bg-[#0F3F5C]' : 'bg-gray-300'}`}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#00E5FF] focus:ring-offset-2 ${isAutoSelect ? 'bg-[#00E5FF]' : 'bg-slate-600'}`}
                                 >
                                     <span
                                         className={`${isAutoSelect ? 'translate-x-6' : 'translate-x-1'} inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}
                                     />
                                 </button>
-                                <span className={`text-sm font-medium ${isAutoSelect ? 'text-[#0F3F5C]' : 'text-gray-500'}`}>Automático (FIFO)</span>
+                                <span className={`text-sm font-medium ${isAutoSelect ? 'text-[#00E5FF]' : 'text-slate-500'}`}>Automático (FIFO)</span>
                             </div>
                         </div>
 
@@ -525,20 +520,20 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
                                 selectedLots={superiorLots}
                                 onSelectionChange={setSuperiorLots}
                                 requiredWeight={requiredSuperiorWeight}
-                                colorClass="bg-[#e6f0f5] border-[#0F3F5C]/20"
+                                colorClass="bg-[#00E5FF]/5 border-[#00E5FF]/20"
                             />
                         </div>
 
                         {/* Middle Group: Inferior (Left + Right) */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-green-50/50 p-4 rounded-lg border border-green-100">
-                            <div className="lg:col-span-2 text-sm font-bold text-green-800 uppercase tracking-wide">Banzos Inferiores</div>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-green-500/5 p-4 rounded-lg border border-green-500/10">
+                            <div className="lg:col-span-2 text-sm font-bold text-green-400 uppercase tracking-wide">Banzos Inferiores</div>
                             <MultiLotSelector
                                 label={`Inferior - Lado 1 (${selectedModel.inferior}mm)`}
                                 availableLots={baseInferiorLeftLots}
                                 selectedLots={inferiorLeftLots}
                                 onSelectionChange={setInferiorLeftLots}
                                 requiredWeight={requiredInferiorSideWeight}
-                                colorClass="bg-white border-green-200 shadow-sm"
+                                colorClass="bg-black/20 border-green-500/30 shadow-none"
                             />
                             <MultiLotSelector
                                 label={`Inferior - Lado 2 (${selectedModel.inferior}mm)`}
@@ -546,20 +541,20 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
                                 selectedLots={inferiorRightLots}
                                 onSelectionChange={setInferiorRightLots}
                                 requiredWeight={requiredInferiorSideWeight}
-                                colorClass="bg-white border-green-200 shadow-sm"
+                                colorClass="bg-black/20 border-green-500/30 shadow-none"
                             />
                         </div>
 
                         {/* Bottom Group: Senozoide (Left + Right) */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-orange-50/50 p-4 rounded-lg border border-orange-100">
-                            <div className="lg:col-span-2 text-sm font-bold text-orange-800 uppercase tracking-wide">Estribos / Senozoides</div>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-orange-500/5 p-4 rounded-lg border border-orange-500/10">
+                            <div className="lg:col-span-2 text-sm font-bold text-orange-400 uppercase tracking-wide">Estribos / Senozoides</div>
                             <MultiLotSelector
                                 label={`Senozoide - Lado 1 (${selectedModel.senozoide}mm)`}
                                 availableLots={baseSenozoideLeftLots}
                                 selectedLots={senozoideLeftLots}
                                 onSelectionChange={setSenozoideLeftLots}
                                 requiredWeight={requiredSenozoideSideWeight}
-                                colorClass="bg-white border-orange-200 shadow-sm"
+                                colorClass="bg-black/20 border-orange-500/30 shadow-none"
                             />
                             <MultiLotSelector
                                 label={`Senozoide - Lado 2 (${selectedModel.senozoide}mm)`}
@@ -567,12 +562,12 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
                                 selectedLots={senozoideRightLots}
                                 onSelectionChange={setSenozoideRightLots}
                                 requiredWeight={requiredSenozoideSideWeight}
-                                colorClass="bg-white border-orange-200 shadow-sm"
+                                colorClass="bg-black/20 border-orange-500/30 shadow-none"
                             />
                         </div>
 
                         <div className="flex justify-end p-4">
-                            <button type="submit" className="bg-[#0F3F5C] hover:bg-[#0A2A3D] text-white font-bold py-3 px-8 rounded-lg transition text-lg shadow-lg">
+                            <button type="submit" className="btn-primary py-3 px-8 text-lg shadow-lg">
                                 Criar Ordem de Produção
                             </button>
                         </div>
