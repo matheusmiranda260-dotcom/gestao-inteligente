@@ -1271,15 +1271,26 @@ const App: React.FC = () => {
 
                     console.log('Consumed Map Result:', Object.fromEntries(consumedMap));
 
-                    for (const stockItem of stock) {
-                        if (consumedMap.has(stockItem.id)) {
-                            const consumedQty = consumedMap.get(stockItem.id)!;
+                    // Collect all involved lot IDs
+                    const allInvolvedLotIds = [
+                        ...(lots.allSuperior || [lots.superior]),
+                        ...(lots.allInferiorLeft || lots.allInferior || [lots.inferior1].filter(Boolean)),
+                        ...(lots.allInferiorRight || (lots.allInferior ? [] : [lots.inferior2].filter(Boolean))),
+                        ...(lots.allSenozoideLeft || lots.allSenozoide || [lots.senozoide1].filter(Boolean)),
+                        ...(lots.allSenozoideRight || (lots.allSenozoide ? [] : [lots.senozoide2].filter(Boolean)))
+                    ];
+                    const uniqueInvolvedLotIds = [...new Set(allInvolvedLotIds)];
+
+                    console.log('Consumed Map Result:', Object.fromEntries(consumedMap));
+
+                    for (const lotId of uniqueInvolvedLotIds) {
+                        const stockItem = stock.find(s => s.id === lotId);
+                        if (stockItem) {
+                            const consumedQty = consumedMap.get(stockItem.id) || 0;
                             const newRemainingQty = Math.max(0, stockItem.remainingQuantity - consumedQty);
                             const remainingOrderIds = (stockItem.productionOrderIds || []).filter(id => id !== orderId);
 
                             // Check if there are other active orders for this item
-                            // We need to check against the updated productionOrders list (which we just updated locally via setProductionOrders, but here we can use the logic)
-                            // Actually, since we just completed *this* order, we only care if *other* orders are active.
                             const hasOtherActiveOrders = remainingOrderIds.some(otherId => {
                                 const otherOrder = productionOrders.find(o => o.id === otherId);
                                 return otherOrder && (otherOrder.status === 'pending' || otherOrder.status === 'in_progress');
@@ -1293,6 +1304,14 @@ const App: React.FC = () => {
                                 currentStatus: stockItem.status
                             });
 
+                            const historyEntry = consumedQty > 0 ? {
+                                type: 'Consumido na Produção de Treliça',
+                                date: now,
+                                details: { 'Ordem': completedOrder.orderNumber, 'Qtd Consumida': consumedQty.toFixed(2) }
+                            } : null;
+
+                            const newHistory = historyEntry ? [...(stockItem.history || []), historyEntry] : stockItem.history;
+
                             stockUpdates.push({
                                 id: stockItem.id,
                                 changes: {
@@ -1300,10 +1319,7 @@ const App: React.FC = () => {
                                     labelWeight: newRemainingQty,
                                     productionOrderIds: remainingOrderIds.length > 0 ? remainingOrderIds : undefined,
                                     status: hasOtherActiveOrders ? stockItem.status : (newRemainingQty > 0.01 ? 'Disponível' : 'Consumido para fazer trelica'),
-                                    history: [...(stockItem.history || []), {
-                                        type: 'Consumido na Produção de Treliça', date: now,
-                                        details: { 'Ordem': completedOrder.orderNumber, 'Qtd Consumida': consumedQty.toFixed(2) }
-                                    }]
+                                    history: newHistory
                                 }
                             });
                         }
