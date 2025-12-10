@@ -23,6 +23,7 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
 
     const [results, setResults] = useState<PassResult[]>([]);
     const [recipeName, setRecipeName] = useState('');
+    const [suggestion, setSuggestion] = useState<string | null>(null);
 
     // State to hold the current diameters for manual editing
     const [passDiameters, setPassDiameters] = useState<number[]>([]);
@@ -32,11 +33,13 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
         const dOut = parseFloat(params.finalDiameter.replace(',', '.'));
         let n = parseInt(params.passes);
 
+        // Reset suggestion
+        setSuggestion(null);
+
         // Validation for Max 4 Passes
         if (n > 4) {
-            alert('O número máximo de passes é 4.');
-            n = 4;
             setParams(prev => ({ ...prev, passes: '4' }));
+            n = 4;
         }
 
         if (isNaN(dIn) || isNaN(dOut) || isNaN(n) || n <= 0) {
@@ -44,93 +47,125 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
             return;
         }
 
-        // Logic for Descending Graph (Higher reduction at start, Lower at end)
-        // Target Total Ratio (Area_out / Area_in) = (dOut / dIn)^2
-        const targetRatio = Math.pow(dOut / dIn, 2);
+        // Logic for STRICTLY DESCENDING Graph
+        // Reductions r_0, r_1, ..., r_{n-1} must satisfy: r_0 > r_1 > ... > r_{n-1}
+        // We model this as a linear progression: r_i = r_start - i * delta
+        // where delta > 0.
+        // r_end = r_{n-1} = r_start - (n-1)*delta
+        // We relate r_start and r_end.
+        // Target: Product(1-r_i) = (dOut/dIn)^2
 
-        // Helper to calc ratio from reductions
-        const getRatioFromReductions = (rStart: number, rEnd: number, steps: number) => {
-            let currentRatio = 1;
-            for (let i = 0; i < steps; i++) {
-                // Linear interpolation of reduction
-                // i=0 -> rStart
-                // i=n-1 -> rEnd
-                const r = steps === 1 ? rStart : rStart - ((rStart - rEnd) / (steps - 1)) * i;
-                currentRatio *= (1 - r);
+        // Solver Helper: Given r_end, find r_start
+        const solveForStart = (targetVal: number, rEndFixed: number) => {
+            let low = rEndFixed + 0.001; // Must be strictly greater for descending
+            let high = 0.90;
+            let sol = low;
+
+            // Binary search for r_start
+            for (let k = 0; k < 30; k++) {
+                const mid = (low + high) / 2;
+                const rStartTest = mid;
+
+                // Calculate resulting ratio
+                let currentRatio = 1;
+                for (let i = 0; i < n; i++) {
+                    // Linear interp
+                    const r = n === 1 ? rStartTest : rStartTest - ((rStartTest - rEndFixed) / (n - 1)) * i;
+                    currentRatio *= (1 - r); // (1-0.3)
+                }
+
+                // If currentRatio < targetVal: We reduced too much. Reductions are too large.
+                // Need smaller r_start.
+                if (currentRatio < targetVal) high = mid;
+                else low = mid;
             }
-            return currentRatio;
+            return (low + high) / 2;
         };
 
-        // Solve for optimal R_start and R_end (Target Descending)
+        // Solver Helper 2: Given r_start, find r_end
+        const solveForEnd = (targetVal: number, rStartFixed: number) => {
+            let low = 0.001;
+            let high = rStartFixed - 0.001;
+            if (high < low) high = low; // degenerate case
 
-        let bestRStart = 0.29; // Try starting max
-        let bestREnd = 0.19; // Try ending with 19%
-
-        // Strategy 1: Fix R_end = 19%, find R_start
-        let low = 0.19;
-        let high = 0.50;
-        let solvedRStart = 0.29;
-
-        for (let iter = 0; iter < 20; iter++) {
-            const mid = (low + high) / 2;
-            const ratio = getRatioFromReductions(mid, 0.19, n);
-            // If resulting ratio (mid) < targetRatio: we reduced too much (area too small). Need smaller R.
-            if (ratio < targetRatio) high = mid;
-            else low = mid;
-        }
-        solvedRStart = (low + high) / 2;
-
-        if (solvedRStart > 0.29) {
-            // Strategy 2: If required R_start > 29%, clamp R_start = 29% and solve for R_end.
-            bestRStart = 0.29;
-            low = 0.01;
-            high = 0.29;
-
-            for (let iter = 0; iter < 20; iter++) {
+            for (let k = 0; k < 30; k++) {
                 const mid = (low + high) / 2;
-                const ratio = getRatioFromReductions(0.29, mid, n);
-                // If ratio < targetRatio (Reduced too much), need smaller factors -> larger products -> Decrease R?
-                // Wait. Smaller factor (0.7) reduces more than Larger factor (0.9).
-                // If ratio < target, we reduced too much. We need less reduction. Decrease R. 
-                if (ratio < targetRatio) high = mid; // Decrease R_end
-                else low = mid; // Increase R_end
+                const rEndTest = mid;
+
+                let currentRatio = 1;
+                for (let i = 0; i < n; i++) {
+                    const r = n === 1 ? rStartFixed : rStartFixed - ((rStartFixed - rEndTest) / (n - 1)) * i;
+                    currentRatio *= (1 - r);
+                }
+
+                // currentRatio < targetVal => need smaller reductions.
+                // reducing r_end decreases average -> increases ratio.
+                if (currentRatio < targetVal) high = mid;
+                else low = mid;
             }
-            bestREnd = (low + high) / 2;
+            return (low + high) / 2;
+        };
 
-        } else if (solvedRStart < 0.1901) {
-            // Strategy 3: Graph is ascending. Force Descending.
-            // Fix R_end = 15% to try to steepen slope while keeping same area?
-            // Actually, if we need very little reduction, maybe R_start is low.
+        const targetRatio = Math.pow(dOut / dIn, 2);
 
-            low = 0.15; high = 0.40;
-            // Try to target 15% end
-            for (let iter = 0; iter < 20; iter++) {
-                const mid = (low + high) / 2;
-                const ratio = getRatioFromReductions(mid, 0.15, n);
-                if (ratio < targetRatio) high = mid; else low = mid;
-            }
-            const startFor15 = (low + high) / 2;
+        // Step 1: Default Ideal case. Try Anchor End = 19%.
+        // Solver for Start.
+        let bestRStart = 0;
+        let bestREnd = 0.19;
 
-            if (startFor15 > 0.15) {
-                bestRStart = startFor15;
-                bestREnd = 0.15;
+        if (n === 1) {
+            // Single pass
+            bestREnd = 1 - targetRatio;
+            bestRStart = 1 - targetRatio;
+        } else {
+            const startAttempt = solveForStart(targetRatio, 0.19);
+
+            if (startAttempt > 0.29) {
+                // Requirement exceeded safe Start limit with fixed End=19%.
+                // Clamp Start = 29%. Solve for End.
+                bestRStart = 0.29;
+                bestREnd = solveForEnd(targetRatio, 0.29);
+
+                // If even with start=29% and end=28.9% we can't meet target, it might be impossible.
+                // But solveForEnd will do its best.
+                // Suggest increasing passes if start is maxed out.
+                if (n < 4) {
+                    setSuggestion(`A redução exigida é alta (Início > 29%). O ideal seria fazer este modelo com 4 passes.`);
+                }
+            } else if (Math.abs(startAttempt - 0.19) < 0.002 || startAttempt < 0.19) {
+                // Ascending or Flat case (Start <= End)
+                // Force descending. Lower End until Start > End.
+
+                let found = false;
+                let searchEnd = 0.18;
+                for (; searchEnd > 0.01; searchEnd -= 0.01) {
+                    const s = solveForStart(targetRatio, searchEnd);
+                    if (s > searchEnd + 0.01) { // Ensure at least 1% slope
+                        bestRStart = s;
+                        bestREnd = searchEnd;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    // Fallback: strictly flat if we really can't descend
+                    bestRStart = 1 - Math.pow(targetRatio, 1 / n);
+                    bestREnd = bestRStart;
+                }
             } else {
-                // Even with 15% end, start is lower? (Ascending). 
-                // Just use the R_end=19% solution (it was ascending slightly or flat).
-                bestRStart = solvedRStart;
+                // Valid descending < 29% and > 19%
+                bestRStart = startAttempt;
                 bestREnd = 0.19;
             }
-        } else {
-            // Valid descending solution with R_end = 19%
-            bestRStart = solvedRStart;
-            bestREnd = 0.19;
         }
 
+        // Generate Diameters
         const calculatedDiameters: number[] = [];
         let currentD = dIn;
         let prevArea = Math.PI * Math.pow(currentD / 2, 2);
 
         for (let i = 0; i < n; i++) {
+            // Linear r logic
             const r = n === 1 ? bestRStart : bestRStart - ((bestRStart - bestREnd) / (n - 1)) * i;
 
             if (i === n - 1) {
@@ -288,6 +323,13 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                     <CalculatorIcon className="h-5 w-5" />
                                     Calcular / Resetar
                                 </button>
+
+                                {suggestion && (
+                                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-md flex items-start gap-2 text-sm text-amber-800">
+                                        <AdjustmentsIcon className="h-5 w-5 mt-0.5 flex-shrink-0" />
+                                        <span>{suggestion}</span>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
