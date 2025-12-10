@@ -28,112 +28,66 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
     // State to hold the current diameters for manual editing
     const [passDiameters, setPassDiameters] = useState<number[]>([]);
 
-    const calculateDistribution = () => {
-        const dIn = parseFloat(params.entryDiameter.replace(',', '.'));
-        const dOut = parseFloat(params.finalDiameter.replace(',', '.'));
-        let n = parseInt(params.passes);
-
-        // Reset suggestion
-        setSuggestion(null);
-
-        // Validation for Max 4 Passes
-        if (n > 4) {
-            setParams(prev => ({ ...prev, passes: '4' }));
-            n = 4;
-        }
-
-        if (isNaN(dIn) || isNaN(dOut) || isNaN(n) || n <= 0) {
-            alert('Por favor, verifique os parâmetros.');
-            return;
-        }
-
-        // Logic for STRICTLY DESCENDING Graph
-        // Reductions r_0, r_1, ..., r_{n-1} must satisfy: r_0 > r_1 > ... > r_{n-1}
-        // We model this as a linear progression: r_i = r_start - i * delta
-        // where delta > 0.
-        // r_end = r_{n-1} = r_start - (n-1)*delta
-        // We relate r_start and r_end.
-        // Target: Product(1-r_i) = (dOut/dIn)^2
-
-        // Solver Helper: Given r_end, find r_start
-        const solveForStart = (targetVal: number, rEndFixed: number) => {
-            let low = rEndFixed + 0.001; // Must be strictly greater for descending
-            let high = 0.90;
-            let sol = low;
-
-            // Binary search for r_start
-            for (let k = 0; k < 30; k++) {
-                const mid = (low + high) / 2;
-                const rStartTest = mid;
-
-                // Calculate resulting ratio
-                let currentRatio = 1;
-                for (let i = 0; i < n; i++) {
-                    // Linear interp
-                    const r = n === 1 ? rStartTest : rStartTest - ((rStartTest - rEndFixed) / (n - 1)) * i;
-                    currentRatio *= (1 - r); // (1-0.3)
-                }
-
-                // If currentRatio < targetVal: We reduced too much. Reductions are too large.
-                // Need smaller r_start.
-                if (currentRatio < targetVal) high = mid;
-                else low = mid;
-            }
-            return (low + high) / 2;
-        };
-
-        // Solver Helper 2: Given r_start, find r_end
-        const solveForEnd = (targetVal: number, rStartFixed: number) => {
-            let low = 0.001;
-            let high = rStartFixed - 0.001;
-            if (high < low) high = low; // degenerate case
-
-            for (let k = 0; k < 30; k++) {
-                const mid = (low + high) / 2;
-                const rEndTest = mid;
-
-                let currentRatio = 1;
-                for (let i = 0; i < n; i++) {
-                    const r = n === 1 ? rStartFixed : rStartFixed - ((rStartFixed - rEndTest) / (n - 1)) * i;
-                    currentRatio *= (1 - r);
-                }
-
-                // currentRatio < targetVal => need smaller reductions.
-                // reducing r_end decreases average -> increases ratio.
-                if (currentRatio < targetVal) high = mid;
-                else low = mid;
-            }
-            return (low + high) / 2;
-        };
+    // Extracted Simulation Logic
+    const runSimulation = (n: number, dIn: number, dOut: number) => {
+        if (n <= 0) return null;
 
         const targetRatio = Math.pow(dOut / dIn, 2);
 
-        // Step 1: Default Ideal case. Try Anchor End = 19%.
-        // Solver for Start.
+        // Solver Helpers
+        const getRatioFromReductions = (rStart: number, rEnd: number, steps: number) => {
+            let currentRatio = 1;
+            for (let i = 0; i < steps; i++) {
+                const r = steps === 1 ? rStart : rStart - ((rStart - rEnd) / (steps - 1)) * i;
+                currentRatio *= (1 - r);
+            }
+            return currentRatio;
+        };
+
+        const solveForStart = (targetVal: number, rEndFixed: number) => {
+            let low = rEndFixed + 0.001;
+            let high = 0.90;
+            for (let k = 0; k < 30; k++) {
+                const mid = (low + high) / 2;
+                const ratio = getRatioFromReductions(mid, rEndFixed, n);
+                if (ratio < targetVal) high = mid; else low = mid;
+            }
+            return (low + high) / 2;
+        };
+
+        const solveForEnd = (targetVal: number, rStartFixed: number) => {
+            let low = 0.001;
+            let high = rStartFixed - 0.001;
+            if (high < low) high = low;
+            for (let k = 0; k < 30; k++) {
+                const mid = (low + high) / 2;
+                const ratio = getRatioFromReductions(rStartFixed, mid, n);
+                if (ratio < targetVal) high = mid; else low = mid;
+            }
+            return (low + high) / 2;
+        };
+
+        // 1. Try Anchor End = 19%
         let bestRStart = 0;
         let bestREnd = 0.19;
 
         if (n === 1) {
-            // Single pass
             bestREnd = 1 - targetRatio;
             bestRStart = 1 - targetRatio;
         } else {
             const startAttempt = solveForStart(targetRatio, 0.19);
 
             if (startAttempt > 0.29) {
-                // Requirement exceeded safe Start limit with fixed End=19%.
-                // Clamp Start = 29%. Solve for End.
+                // Too high start, clamp start=29, solve end
                 bestRStart = 0.29;
                 bestREnd = solveForEnd(targetRatio, 0.29);
             } else if (Math.abs(startAttempt - 0.19) < 0.002 || startAttempt < 0.19) {
-                // Ascending or Flat case (Start <= End)
-                // Force descending. Lower End until Start > End.
-
+                // Ascending/Flat -> Force Descending
                 let found = false;
                 let searchEnd = 0.18;
                 for (; searchEnd > 0.01; searchEnd -= 0.01) {
                     const s = solveForStart(targetRatio, searchEnd);
-                    if (s > searchEnd + 0.01) { // Ensure at least 1% slope
+                    if (s > searchEnd + 0.01) {
                         bestRStart = s;
                         bestREnd = searchEnd;
                         found = true;
@@ -141,32 +95,21 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                     }
                 }
                 if (!found) {
-                    // Fallback: strictly flat if we really can't descend
                     bestRStart = 1 - Math.pow(targetRatio, 1 / n);
                     bestREnd = bestRStart;
                 }
             } else {
-                // Valid descending < 29% and > 19%
                 bestRStart = startAttempt;
                 bestREnd = 0.19;
             }
         }
 
-        // Suggestion Logic: Check if heavy reduction and passes < 4
-        // If the start reduction is high (> 25%), suggest 4 passes.
-        if (n < 4 && bestRStart > 0.25) {
-            setSuggestion('O ideal para fazer esse modelo seria com 4 passes.');
-        } else if (n < 4 && bestRStart > 0.29) { // Redundant but safe logic
-            setSuggestion('Redução crítica! O ideal para fazer esse modelo seria com 4 passes.');
-        }
-
-        // Generate Diameters
         const calculatedDiameters: number[] = [];
+        const calculatedReductions: number[] = [];
         let currentD = dIn;
         let prevArea = Math.PI * Math.pow(currentD / 2, 2);
 
         for (let i = 0; i < n; i++) {
-            // Linear r logic
             const r = n === 1 ? bestRStart : bestRStart - ((bestRStart - bestREnd) / (n - 1)) * i;
 
             if (i === n - 1) {
@@ -178,10 +121,85 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                 currentD = nextD;
                 prevArea = nextArea;
             }
+            calculatedReductions.push(r * 100);
         }
 
-        setPassDiameters(calculatedDiameters);
-        updateResults(calculatedDiameters);
+        return { diameters: calculatedDiameters, reductions: calculatedReductions };
+    };
+
+    const calculateDistribution = () => {
+        const dIn = parseFloat(params.entryDiameter.replace(',', '.'));
+        const dOut = parseFloat(params.finalDiameter.replace(',', '.'));
+        let n = parseInt(params.passes);
+
+        setSuggestion(null);
+
+        // Validation limits
+        if (n > 4) { setParams(prev => ({ ...prev, passes: '4' })); n = 4; }
+        if (isNaN(dIn) || isNaN(dOut) || isNaN(n) || n <= 0) { alert('Verifique os parâmetros.'); return; }
+
+        // 1. Run for current Selection
+        const currentResult = runSimulation(n, dIn, dOut);
+        if (!currentResult) return;
+
+        setPassDiameters(currentResult.diameters);
+        updateResults(currentResult.diameters);
+
+        // 2. Find Optimal 'n'
+        let optimalN = -1;
+        let optimalStats = { max: 100, min: 0, rangeOk: false };
+
+        // We check 2, 3, 4 passes (1 is rarely optimal for multi-pass machine unless trivial)
+        const candidates: { n: number, max: number, min: number, allOk: boolean }[] = [];
+
+        for (let verifyN = 1; verifyN <= 4; verifyN++) {
+            const sim = runSimulation(verifyN, dIn, dOut);
+            if (sim) {
+                const maxR = Math.max(...sim.reductions);
+                const minR = Math.min(...sim.reductions);
+                // Check Range 19% - 29%
+                const allOk = maxR <= 29.5 && minR >= 18.5; // Tolerance 0.5%
+                candidates.push({ n: verifyN, max: maxR, min: minR, allOk });
+            }
+        }
+
+        // Selection Logic
+        // Prefer 'allOk' (19-29). If multiple, pick lowest N (efficiency) or N closest to avg?
+        // User said: "8 to 5.6 -> 3 passes (21%) vs 4 passes (16%) -> 3 is ideal".
+        // 3 passes is within 19-29. 4 passes is < 19.
+        // So strict 19% lower bound is important.
+
+        const validCandidates = candidates.filter(c => c.allOk);
+
+        if (validCandidates.length > 0) {
+            // Pick lowest N that is valid? Or highest?
+            // Usually fewer passes = cheaper.
+            // Let's pick lowest N.
+            optimalN = validCandidates[0].n; // Since loop 1..4, first is lowest.
+        } else {
+            // No perfect match. 
+            // Look for Safe (Max <= 29).
+            const safeCandidates = candidates.filter(c => c.max <= 29.5);
+            if (safeCandidates.length > 0) {
+                // Pick candidate with minR closest to 19?
+                // Or maxR closest to 29?
+                // Just pick the one with Highest MinR (closest to 19 from below).
+                safeCandidates.sort((a, b) => b.min - a.min);
+                optimalN = safeCandidates[0].n;
+            } else {
+                // Nothing safe. Suggest 4 (Max Possible).
+                optimalN = 4;
+            }
+        }
+
+        if (optimalN !== n) {
+            const cand = candidates.find(c => c.n === optimalN);
+            if (cand && cand.allOk) {
+                setSuggestion(`Sugestão: ${optimalN} passes seria o ideal (Reduções entre ${cand.min.toFixed(1)}% e ${cand.max.toFixed(1)}%).`);
+            } else if (cand) {
+                setSuggestion(`Sugestão: ${optimalN} passes seria o mais indicado para este diâmetro.`);
+            }
+        }
     };
 
     const updateResults = (diameters: number[]) => {
