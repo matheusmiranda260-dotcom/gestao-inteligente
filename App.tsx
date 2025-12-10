@@ -1112,7 +1112,16 @@ const App: React.FC = () => {
                 scrapWeight: calculatedScrapWeight >= 0 ? calculatedScrapWeight : 0,
             };
         } else { // Treliça
-            const actualProducedWeight = (orderToComplete.weighedPackages || []).reduce((sum, pkg) => sum + pkg.weight, 0);
+            let actualProducedWeight = (orderToComplete.weighedPackages || []).reduce((sum, pkg) => sum + pkg.weight, 0);
+
+            // Fallback: Use theoretical weight if no packages were weighed
+            if ((actualProducedWeight === 0 || isNaN(actualProducedWeight)) && finalData.actualProducedQuantity && finalData.actualProducedQuantity > 0) {
+                const modelInfo = trelicaModels.find(m => m.modelo === orderToComplete.trelicaModel && m.tamanho === orderToComplete.tamanho);
+                if (modelInfo) {
+                    actualProducedWeight = parseFloat(modelInfo.pesoFinal.replace(',', '.')) * finalData.actualProducedQuantity;
+                }
+            }
+
             updates = {
                 status: 'completed',
                 endTime: now,
