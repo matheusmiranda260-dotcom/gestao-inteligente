@@ -1161,8 +1161,27 @@ const App: React.FC = () => {
                     }
                 }
             } else if (completedOrder.machine === 'Treliça') {
-                const lots = completedOrder.selectedLotIds as TrelicaSelectedLots;
                 const fullPiecesQty = completedOrder.actualProducedQuantity || 0;
+                let lots: TrelicaSelectedLots;
+
+                if (Array.isArray(completedOrder.selectedLotIds)) {
+                    const arr = completedOrder.selectedLotIds as string[];
+                    lots = {
+                        superior: arr[0] || '',
+                        inferior1: arr[1] || '',
+                        inferior2: arr[2] || '',
+                        senozoide1: arr[3] || '',
+                        senozoide2: arr[4] || '',
+                        allSuperior: arr[0] ? [arr[0]] : [],
+                        allInferiorLeft: arr[1] ? [arr[1]] : [],
+                        allInferiorRight: arr[2] ? [arr[2]] : [],
+                        allSenozoideLeft: arr[3] ? [arr[3]] : [],
+                        allSenozoideRight: arr[4] ? [arr[4]] : [],
+                    };
+                } else {
+                    lots = completedOrder.selectedLotIds as TrelicaSelectedLots;
+                }
+
                 const consumedMap = new Map<string, number>();
 
                 // Find model info to calculate weights
