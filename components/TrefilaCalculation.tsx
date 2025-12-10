@@ -297,13 +297,17 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
 
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Diâmetro de Entrada (mm)</label>
-                                    <input
-                                        type="number"
-                                        step="0.01"
+                                    <select
                                         value={params.entryDiameter}
                                         onChange={e => setParams({ ...params, entryDiameter: e.target.value })}
-                                        className="w-full p-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                    />
+                                        className="w-full p-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                                    >
+                                        <option value="8.00">8,00 mm</option>
+                                        <option value="7.00">7,00 mm</option>
+                                        <option value="6.50">6,50 mm</option>
+                                        <option value="6.35">6,35 mm</option>
+                                        <option value="5.50">5,50 mm</option>
+                                    </select>
                                 </div>
 
                                 <div>
