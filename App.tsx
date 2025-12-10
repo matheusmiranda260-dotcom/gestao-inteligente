@@ -1608,6 +1608,30 @@ const App: React.FC = () => {
         }
     };
 
+    const deleteFinishedGoods = async (ids: string[]) => {
+        if (!confirm('Tem certeza que deseja excluir os itens selecionados?')) return;
+
+        try {
+            for (const id of ids) {
+                await deleteItem('finished_goods', id);
+            }
+            setFinishedGoods(prev => prev.filter(item => !ids.includes(item.id)));
+
+            // Check if any ID is in pontasStock and delete if necessary
+            const pontasToDelete = pontasStock.filter(p => ids.includes(p.id));
+            if (pontasToDelete.length > 0) {
+                for (const p of pontasToDelete) {
+                    await deleteItem('pontas_stock', p.id);
+                }
+                setPontasStock(prev => prev.filter(p => !ids.includes(p.id)));
+            }
+            showNotification('Itens excluídos com sucesso.', 'success');
+        } catch (error: any) {
+            console.error('Error deleting finished goods:', error);
+            showNotification('Erro ao excluir itens: ' + error.message, 'error');
+        }
+    };
+
     const renderPage = () => {
         const machineControlProps = {
             setPage, stock, currentUser, registerProduction, productionOrders, shiftReports,
@@ -1641,7 +1665,7 @@ const App: React.FC = () => {
             case 'userManagement':
                 return <UserManagement users={users} addUser={addUser} updateUser={updateUser} deleteUser={deleteUser} setPage={setPage} />;
             case 'finishedGoods':
-                return <FinishedGoods finishedGoods={finishedGoods} pontasStock={pontasStock} setPage={setPage} finishedGoodsTransfers={finishedGoodsTransfers} createFinishedGoodsTransfer={createFinishedGoodsTransfer} />;
+                return <FinishedGoods finishedGoods={finishedGoods} pontasStock={pontasStock} setPage={setPage} finishedGoodsTransfers={finishedGoodsTransfers} createFinishedGoodsTransfer={createFinishedGoodsTransfer} onDelete={deleteFinishedGoods} />;
             case 'partsManager':
                 return <SparePartsManager onBack={() => setPage('menu')} />;
             default:

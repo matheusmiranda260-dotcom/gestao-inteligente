@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { Page, FinishedProductItem, PontaItem, FinishedGoodsTransferRecord } from '../types';
-import { ArrowLeftIcon, ArchiveIcon, TruckIcon, PrinterIcon } from './icons';
+import { ArrowLeftIcon, ArchiveIcon, TruckIcon, PrinterIcon, TrashIcon } from './icons';
 import { LogoIcon } from './Logo';
 
 const getStatusBadge = (status: FinishedProductItem['status'] | PontaItem['status']) => {
@@ -222,9 +222,10 @@ interface FinishedGoodsProps {
     finishedGoodsTransfers: FinishedGoodsTransferRecord[];
     setPage: (page: Page) => void;
     createFinishedGoodsTransfer: (data: { destinationSector: string; otherDestination?: string; items: Map<string, number> }) => FinishedGoodsTransferRecord | null;
+    onDelete?: (ids: string[]) => void;
 }
 
-const FinishedGoods: React.FC<FinishedGoodsProps> = ({ finishedGoods, pontasStock, setPage, finishedGoodsTransfers, createFinishedGoodsTransfer }) => {
+const FinishedGoods: React.FC<FinishedGoodsProps> = ({ finishedGoods, pontasStock, setPage, finishedGoodsTransfers, createFinishedGoodsTransfer, onDelete }) => {
     const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
     const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -292,8 +293,20 @@ const FinishedGoods: React.FC<FinishedGoodsProps> = ({ finishedGoods, pontasStoc
                         Histórico de Transferências
                     </button>
                     <button onClick={() => setIsTransferModalOpen(true)} disabled={selectedItems.size === 0} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-slate-400 flex items-center gap-2">
-                        <TruckIcon className="h-5 w-5" /> Transferir Selecionados ({selectedItems.size})
+                        <TruckIcon className="h-5 w-5" /> Transferir ({selectedItems.size})
                     </button>
+                    {onDelete && (
+                        <button
+                            onClick={() => {
+                                onDelete(Array.from(selectedItems));
+                                setSelectedItems(new Set());
+                            }}
+                            disabled={selectedItems.size === 0}
+                            className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-slate-400 flex items-center gap-2"
+                        >
+                            <TrashIcon className="h-5 w-5" /> Excluir ({selectedItems.size})
+                        </button>
+                    )}
                 </div>
             </header>
 
