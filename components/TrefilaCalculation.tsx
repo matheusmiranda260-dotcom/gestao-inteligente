@@ -34,42 +34,83 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
             return;
         }
 
-        // Calculation Logic (Placeholder for standard constant reduction area)
-        // Area In = pi * (dIn/2)^2
-        // Area Out = pi * (dOut/2)^2
-        // Total Area Red = 1 - (AreaOut / AreaIn)
-        // Per pass reduction r: Area_i = Area_{i-1} * (1 - r)
-        // Area_n = Area_0 * (1 - r)^n => (1-r)^n = Area_n / Area_0 = (dOut/dIn)^2
-        // 1-r = (dOut/dIn)^(2/n)
-        // r = 1 - (dOut/dIn)^(2/n)
+        // Calculation:
+        // 1. Last pass is fixed roughly at 19% Area Reduction.
+        // A_{n} = A_{n-1} * (1 - 0.19)
+        // A_{n-1} = A_{n} / 0.81
+        // D_{n-1} = D_out / sqrt(0.81) = D_out / 0.9
 
-        const r = 1 - Math.pow(dOut / dIn, 2 / n);
+        const dFinal = dOut;
+        const dBeforeLast = dFinal / Math.sqrt(0.81);
+
+        // 2. Distribute remaining passes (from Entry to n-1)
+        // Passes to solve: n - 1.
+        // If n=1, we just check reduction dIn -> dOut directly against 19% or 29% constraints?
+        // Let's handle n >= 2 properly.
 
         const newResults: PassResult[] = [];
         let currentD = dIn;
 
-        for (let i = 1; i <= n; i++) {
-            const prevD = currentD;
-            const prevArea = Math.PI * Math.pow(prevD / 2, 2);
-
-            // Apply constant reduction to get next diameter
-            // nextArea = prevArea * (1 - r)
-            const nextArea = prevArea * (1 - r);
-            currentD = 2 * Math.sqrt(nextArea / Math.PI);
-
-            // Calculate actual reduction for this step (should be r)
-            const currentReduction = ((prevArea - nextArea) / prevArea) * 100;
-
-            // Determine status (mock thresholds)
+        if (n === 1) {
+            const prevArea = Math.PI * Math.pow(dIn / 2, 2);
+            const nextArea = Math.PI * Math.pow(dOut / 2, 2);
+            const reduction = ((prevArea - nextArea) / prevArea) * 100;
             let status: 'Alta' | 'Ok' | 'Baixa' = 'Ok';
-            if (currentReduction > 30) status = 'Alta';
-            if (currentReduction < 10) status = 'Baixa';
+            // For single pass, maybe apply 29% rule or 19% rule? Let's use 29% as absolute limit.
+            if (reduction > 29) status = 'Alta';
 
             newResults.push({
-                pass: i,
-                diameter: parseFloat(currentD.toFixed(2)),
-                reduction: parseFloat(currentReduction.toFixed(2)),
+                pass: 1,
+                diameter: parseFloat(dOut.toFixed(2)),
+                reduction: parseFloat(reduction.toFixed(2)),
                 status
+            });
+
+        } else {
+            // For n >= 2
+            // We need to go from dIn to dBeforeLast in n-1 passes steps.
+            // (1 - r_rest)^(n-1) = (A_beforeLast / A_in) = (dBeforeLast / dIn)^2
+            // r_rest = 1 - (dBeforeLast / dIn)^(2/(n-1))
+
+            const r_rest = 1 - Math.pow(dBeforeLast / dIn, 2 / (n - 1));
+
+            // Pass 1 to n-1
+            for (let i = 1; i < n; i++) {
+                const prevD = currentD;
+                const prevArea = Math.PI * Math.pow(prevD / 2, 2);
+                const nextArea = prevArea * (1 - r_rest);
+                currentD = 2 * Math.sqrt(nextArea / Math.PI);
+                const currentReduction = ((prevArea - nextArea) / prevArea) * 100;
+
+                let status: 'Alta' | 'Ok' | 'Baixa' = 'Ok';
+                // First pass check
+                if (i === 1 && currentReduction > 29.0) status = 'Alta';
+                else if (currentReduction > 35) status = 'Alta'; // General safety
+
+                newResults.push({
+                    pass: i,
+                    diameter: parseFloat(currentD.toFixed(2)),
+                    reduction: parseFloat(currentReduction.toFixed(2)),
+                    status
+                });
+            }
+
+            // Final Pass (n)
+            const finalPrevD = currentD; // Should be dBeforeLast
+            const finalPrevArea = Math.PI * Math.pow(finalPrevD / 2, 2);
+            const finalNextArea = Math.PI * Math.pow(dOut / 2, 2);
+            const finalReduction = ((finalPrevArea - finalNextArea) / finalPrevArea) * 100;
+
+            // Check if final reduction is indeed around 19%
+            let finalStatus: 'Alta' | 'Ok' | 'Baixa' = 'Ok';
+            if (Math.abs(finalReduction - 19) > 1.5) finalStatus = 'Baixa'; // Should be close to 19 by design, but checking tolerances
+            // Actually, if we constructed it to be 19%, it should be ok unless inputs are crazy
+
+            newResults.push({
+                pass: n,
+                diameter: parseFloat(dOut.toFixed(2)),
+                reduction: parseFloat(finalReduction.toFixed(2)),
+                status: finalStatus // Expected to be 19%
             });
         }
 
@@ -118,12 +159,6 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                             className={`flex-1 py-1 px-3 rounded-md text-sm font-medium transition ${params.type === 'K-7 CA 60' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                                         >
                                             K-7 CA 60
-                                        </button>
-                                        <button
-                                            onClick={() => setParams({ ...params, type: 'FIEIRAS BTC' })}
-                                            className={`flex-1 py-1 px-3 rounded-md text-sm font-medium transition ${params.type === 'FIEIRAS BTC' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                                        >
-                                            FIEIRAS BTC
                                         </button>
                                     </div>
                                 </div>
@@ -295,8 +330,8 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                                 <td className="px-6 py-4 font-bold">{res.reduction.toFixed(3)}%</td>
                                                 <td className="px-6 py-4">
                                                     <span className={`flex items-center gap-1 font-medium ${res.status === 'Alta' ? 'text-red-500' :
-                                                            res.status === 'Baixa' ? 'text-amber-500' :
-                                                                'text-emerald-500'
+                                                        res.status === 'Baixa' ? 'text-amber-500' :
+                                                            'text-emerald-500'
                                                         }`}>
                                                         {res.status === 'Ok' ? <CheckCircleIconSmall className="h-4 w-4" /> : <WarningIconSmall className="h-4 w-4" />}
                                                         {res.status}
