@@ -20,6 +20,10 @@ export interface TrelicaSelectedLots {
     allSuperior?: string[];
     allInferior?: string[];
     allSenozoide?: string[];
+    allInferiorLeft?: string[];
+    allInferiorRight?: string[];
+    allSenozoideLeft?: string[];
+    allSenozoideRight?: string[];
 }
 
 export type Page = 'login' | 'menu' | 'stock' | 'machineSelection' | 'trefila' | 'trelica' | 'productionOrder' | 'productionOrderTrelica' | 'reports' | 'userManagement' | 'productionDashboard' | 'finishedGoods';

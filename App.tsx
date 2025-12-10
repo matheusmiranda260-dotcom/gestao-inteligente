@@ -678,7 +678,15 @@ const App: React.FC = () => {
                 const lots = newOrder.selectedLotIds as TrelicaSelectedLots;
 
                 let lotIds: string[] = [];
-                if (lots.allSuperior && lots.allInferior && lots.allSenozoide) {
+                if (lots.allSuperior && lots.allInferiorLeft && lots.allInferiorRight && lots.allSenozoideLeft && lots.allSenozoideRight) {
+                    lotIds = [
+                        ...lots.allSuperior,
+                        ...lots.allInferiorLeft,
+                        ...lots.allInferiorRight,
+                        ...lots.allSenozoideLeft,
+                        ...lots.allSenozoideRight
+                    ];
+                } else if (lots.allSuperior && lots.allInferior && lots.allSenozoide) {
                     lotIds = [...lots.allSuperior, ...lots.allInferior, ...lots.allSenozoide];
                 } else {
                     lotIds = [lots.superior, lots.inferior1, lots.inferior2, lots.senozoide1, lots.senozoide2];
