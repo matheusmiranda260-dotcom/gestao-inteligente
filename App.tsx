@@ -1162,6 +1162,9 @@ const App: React.FC = () => {
                 }
             } else if (completedOrder.machine === 'Treliça' || completedOrder.machine === 'Trelica') {
                 console.log('Finalizando Ordem Treliça:', completedOrder);
+                // DEBUG: Alert start
+                window.alert(`Iniciando finalização Treliça via DEBUG.\nID: ${completedOrder.id}\nModelo: ${completedOrder.trelicaModel}\nTamanho: ${completedOrder.tamanho}`);
+
                 const fullPiecesQty = completedOrder.actualProducedQuantity || 0;
                 let lots: TrelicaSelectedLots;
 
@@ -1196,6 +1199,12 @@ const App: React.FC = () => {
                 );
 
                 console.log('Modelo encontrado:', modelInfo ? 'Sim' : 'Não', modelInfo);
+                // DEBUG: Alert Model
+                if (!modelInfo) {
+                    window.alert(`MODELO NÃO ENCONTRADO!\nBanco busca: '${completedOrder.trelicaModel}' e '${completedOrder.tamanho}'\nVerifique cadastro.`);
+                } else {
+                    // window.alert(`Modelo encontrado: ${modelInfo.modelo}`);
+                }
 
                 if (!modelInfo && fullPiecesQty > 0) {
                     showNotification(`Erro: Modelo de treliça não encontrado. (${completedOrder.trelicaModel} - ${completedOrder.tamanho})`, 'error');
@@ -1227,6 +1236,9 @@ const App: React.FC = () => {
                         inferior: consumedFull.inferior + consumedPontas.inferior,
                         senozoide: consumedFull.senozoide + consumedPontas.senozoide,
                     };
+
+                    // DEBUG: Alert Consumption
+                    // window.alert(`Consumo Calculado:\nSup: ${totalConsumed.superior.toFixed(2)}\nInf: ${totalConsumed.inferior.toFixed(2)}\nSen: ${totalConsumed.senozoide.toFixed(2)}`);
 
                     console.log('Total Consumido Calculado:', totalConsumed);
 
@@ -1317,12 +1329,24 @@ const App: React.FC = () => {
                             const newRemainingQty = Math.max(0, stockItem.remainingQuantity - consumedQty);
                             const remainingOrderIds = (stockItem.productionOrderIds || []).filter(id => id !== orderId);
 
+                            // Check if there are other active orders for this item
                             const hasOtherActiveOrders = remainingOrderIds.some(otherId => {
                                 const otherOrder = productionOrders.find(o => o.id === otherId);
                                 return otherOrder && (otherOrder.status === 'pending' || otherOrder.status === 'in_progress');
                             });
 
                             console.log(`Atualizando lote ${stockItem.internalLot} (ID: ${stockItem.id}): Consumido=${consumedQty}, Restante=${newRemainingQty}`);
+
+                            // Determine status explicitly
+                            let newStatus: any = 'Disponível - Suporte Treliça';
+                            if (newRemainingQty <= 0.01) {
+                                newStatus = 'Consumido para fazer treliça';
+                            } else if (hasOtherActiveOrders) {
+                                newStatus = stockItem.status; // Keep current status if active elsewhere
+                            }
+
+                            // DEBUG: Alert each item update
+                            // window.alert(`Lote: ${stockItem.internalLot}\nConsumido: ${consumedQty}\nRestante: ${newRemainingQty}\nNovo Status: ${newStatus}`);
 
                             const historyEntry = consumedQty > 0 ? {
                                 type: 'Consumido na Produção de Treliça',
@@ -1338,7 +1362,7 @@ const App: React.FC = () => {
                                     remainingQuantity: newRemainingQty,
                                     labelWeight: newRemainingQty,
                                     productionOrderIds: remainingOrderIds.length > 0 ? remainingOrderIds : undefined,
-                                    status: hasOtherActiveOrders ? stockItem.status : (newRemainingQty > 0.01 ? 'Disponível - Suporte Treliça' : 'Consumido para fazer trelica'),
+                                    status: newStatus,
                                     history: newHistory
                                 }
                             });
@@ -1349,6 +1373,9 @@ const App: React.FC = () => {
                 }
             }
 
+            console.log('Stock updates to be applied:', stockUpdates);
+            // DEBUG: Alert total updates
+            window.alert(`Total de lotes a atualizar no estoque: ${stockUpdates.length}`);
             for (const update of stockUpdates) {
                 await updateItem<StockItem>('stock_items', update.id, update.changes);
             }
