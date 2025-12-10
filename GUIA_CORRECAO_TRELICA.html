@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guia: Aplicar Correções no Supabase</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #0F3F5C 0%, #1a5f7a 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        .content {
+            padding: 40px;
+        }
+        .step {
+            background: #f8f9fa;
+            border-left: 4px solid #FF8C00;
+            padding: 24px;
+            margin-bottom: 24px;
+            border-radius: 8px;
+        }
+        .step-number {
+            display: inline-block;
+            background: #FF8C00;
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 32px;
+            font-weight: bold;
+            margin-right: 12px;
+        }
+        .step h2 {
+            display: inline-block;
+            color: #0F3F5C;
+            font-size: 20px;
+            margin-bottom: 12px;
+        }
+        .step p {
+            color: #555;
+            line-height: 1.6;
+            margin-top: 12px;
+        }
+        .code-box {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            margin: 16px 0;
+            overflow-x: auto;
+            position: relative;
+        }
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #FF8C00;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        .copy-btn:hover {
+            background: #e67e00;
+            transform: scale(1.05);
+        }
+        .copy-btn:active {
+            transform: scale(0.95);
+        }
+        .warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 16px;
+            margin: 16px 0;
+            border-radius: 6px;
+        }
+        .warning strong {
+            color: #856404;
+        }
+        .success {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 16px;
+            margin: 16px 0;
+            border-radius: 6px;
+        }
+        .success strong {
+            color: #155724;
+        }
+        .btn-primary {
+            background: #0F3F5C;
+            color: white;
+            padding: 14px 28px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-block;
+            text-decoration: none;
+        }
+        .btn-primary:hover {
+            background: #0a2a3d;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(15, 63, 92, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔧 Guia: Corrigir Treliça no Supabase</h1>
+            <p>Siga os passos abaixo para garantir que tudo funcione corretamente</p>
+        </div>
+        
+        <div class="content">
+            <div class="warning">
+                <strong>⚠️ Importante:</strong> Você precisa aplicar este script no Supabase SQL Editor uma única vez. Isso vai criar as tabelas e permissões necessárias.
+            </div>
+
+            <div class="step">
+                <span class="step-number">1</span>
+                <h2>Acesse o Supabase SQL Editor</h2>
+                <p>Abra o seu projeto no Supabase e clique em <strong>SQL Editor</strong> no menu lateral esquerdo.</p>
+            </div>
+
+            <div class="step">
+                <span class="step-number">2</span>
+                <h2>Copie o script SQL abaixo</h2>
+                <p>Clique no botão "Copiar" para copiar todo o código SQL:</p>
+                
+                <div class="code-box">
+                    <button class="copy-btn" onclick="copyCode()">📋 Copiar</button>
+                    <pre id="sqlCode">-- ====================================
+-- Script de Correção - Treliça
+-- ====================================
+
+-- 1. Criar extensão UUID (se não existir)
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- 2. Garantir que a tabela finished_goods existe
+CREATE TABLE IF NOT EXISTS public.finished_goods (
+    id TEXT PRIMARY KEY,
+    production_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    production_order_id TEXT,
+    order_number TEXT,
+    product_type TEXT,
+    model TEXT,
+    size TEXT,
+    quantity NUMERIC,
+    total_weight NUMERIC,
+    status TEXT DEFAULT 'Disponível'
+);
+
+-- 3. Garantir que a tabela pontas_stock existe
+CREATE TABLE IF NOT EXISTS public.pontas_stock (
+    id TEXT PRIMARY KEY,
+    production_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    production_order_id TEXT,
+    order_number TEXT,
+    product_type TEXT,
+    model TEXT,
+    size TEXT,
+    quantity NUMERIC,
+    total_weight NUMERIC,
+    status TEXT DEFAULT 'Disponível'
+);
+
+-- 4. Garantir colunas em production_orders
+ALTER TABLE public.production_orders 
+    ADD COLUMN IF NOT EXISTS actual_produced_weight NUMERIC,
+    ADD COLUMN IF NOT EXISTS actual_produced_quantity NUMERIC;
+
+-- 5. Habilitar RLS (Row Level Security)
+ALTER TABLE public.finished_goods ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pontas_stock ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.stock_items ENABLE ROW LEVEL SECURITY;
+
+-- 6. Remover políticas antigas (se existirem)
+DROP POLICY IF EXISTS "Enable all for finished_goods" ON public.finished_goods;
+DROP POLICY IF EXISTS "Enable all for pontas_stock" ON public.pontas_stock;
+DROP POLICY IF EXISTS "Enable all for stock_items" ON public.stock_items;
+
+-- 7. Criar políticas permissivas (permitir TUDO para usuários autenticados)
+CREATE POLICY "Enable all for finished_goods" 
+    ON public.finished_goods FOR ALL 
+    USING (true) 
+    WITH CHECK (true);
+
+CREATE POLICY "Enable all for pontas_stock" 
+    ON public.pontas_stock FOR ALL 
+    USING (true) 
+    WITH CHECK (true);
+
+CREATE POLICY "Enable all for stock_items" 
+    ON public.stock_items FOR ALL 
+    USING (true) 
+    WITH CHECK (true);
+
+-- 8. Verificar se tudo está OK
+SELECT 'Tabela finished_goods criada com sucesso!' as status
+WHERE EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'finished_goods');</pre>
+                </div>
+            </div>
+
+            <div class="step">
+                <span class="step-number">3</span>
+                <h2>Cole e Execute no SQL Editor</h2>
+                <p>Cole o código SQL no editor e clique em <strong>RUN</strong> (ou pressione Ctrl+Enter).</p>
+            </div>
+
+            <div class="step">
+                <span class="step-number">4</span>
+                <h2>Verifique se deu certo</h2>
+                <p>Se tudo der certo, você verá uma mensagem verde dizendo "Success".</p>
+                <div class="success">
+                    <strong>✅ Sucesso!</strong> Se você vir esta mensagem: <code>"Tabela finished_goods criada com sucesso!"</code>, significa que está tudo pronto.
+                </div>
+            </div>
+
+            <div class="step">
+                <span class="step-number">5</span>
+                <h2>Teste no Sistema</h2>
+                <p>Volte para o sistema e tente finalizar uma ordem de Treliça novamente. Agora deve funcionar!</p>
+                <p><strong>Abra o Console do Navegador (F12)</strong> para ver os logs detalhados e me diga se aparecer algum erro.</p>
+            </div>
+
+            <div class="warning">
+                <strong>🔍 Se ainda não funcionar:</strong> Tire um print da tela do Console (F12 > Aba Console) e me envie. Vou ver exatamente o que está acontecendo.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function copyCode() {
+            const code = document.getElementById('sqlCode').textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                const btn = document.querySelector('.copy-btn');
+                const originalText = btn.textContent;
+                btn.textContent = '✅ Copiado!';
+                btn.style.background = '#28a745';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.style.background = '#FF8C00';
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>
