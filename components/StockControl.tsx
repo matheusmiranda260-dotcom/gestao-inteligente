@@ -13,14 +13,14 @@ import StockDashboard from './StockDashboard';
 
 const getStatusBadge = (status: StockItem['status']) => {
     const styles = {
-        'Disponível': 'bg-emerald-100 text-emerald-800',
-        'Em Produção': 'bg-amber-100 text-amber-800',
-        'Em Produção - Treliça': 'bg-violet-100 text-violet-800',
-        'Transferido': 'bg-slate-200 text-slate-800',
-        'Disponível - Suporte Treliça': 'bg-cyan-100 text-cyan-800',
+        'Disponível': 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20',
+        'Em Produção': 'bg-amber-500/10 text-amber-400 border border-amber-500/20',
+        'Em Produção - Treliça': 'bg-violet-500/10 text-violet-400 border border-violet-500/20',
+        'Transferido': 'bg-slate-700/30 text-slate-400 border border-slate-600/30',
+        'Disponível - Suporte Treliça': 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20',
     };
     return (
-        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${styles[status] || styles['Transferido']}`}>
+        <span className={`px-3 py-1 text-xs font-bold rounded-full border shadow-sm backdrop-blur-sm ${styles[status] || styles['Transferido']}`}>
             {status}
         </span>
     );
@@ -103,53 +103,53 @@ const AddConferenceModal: React.FC<{
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-            <form onSubmit={handleFinalSubmit} className="bg-white p-6 rounded-xl shadow-xl w-full max-w-6xl max-h-[95vh] flex flex-col">
-                <h2 className="text-2xl font-bold text-slate-800 mb-4 border-b pb-4">Adicionar Nova Conferência</h2>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 p-4 bg-slate-50 rounded-lg border">
-                    <div><label className="text-sm font-medium">Data Entrada</label><input type="date" value={conferenceData.entryDate} onChange={e => setConferenceData({ ...conferenceData, entryDate: e.target.value })} className="w-full p-2 border border-slate-300 rounded" required /></div>
-                    <div><label className="text-sm font-medium">Fornecedor</label><input type="text" value={conferenceData.supplier} onChange={e => setConferenceData({ ...conferenceData, supplier: e.target.value })} className="w-full p-2 border border-slate-300 rounded" required /></div>
-                    <div><label className="text-sm font-medium">Nota Fiscal (NFe)</label><input type="text" value={conferenceData.nfe} onChange={e => setConferenceData({ ...conferenceData, nfe: e.target.value })} className="w-full p-2 border border-slate-300 rounded" required /></div>
-                    <div><label className="text-sm font-medium">Nº Conferência</label><input type="text" value={conferenceData.conferenceNumber} onChange={e => setConferenceData({ ...conferenceData, conferenceNumber: e.target.value })} className="w-full p-2 border border-slate-300 rounded" required /></div>
+            <form onSubmit={handleFinalSubmit} className="bg-[#0F172A] p-6 rounded-xl shadow-xl w-full max-w-6xl max-h-[95vh] flex flex-col">
+                <h2 className="text-2xl font-bold text-white mb-4 border-b pb-4">Adicionar Nova Conferência</h2>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 p-4 bg-slate-800/50 rounded-lg border">
+                    <div><label className="text-sm font-medium">Data Entrada</label><input type="date" value={conferenceData.entryDate} onChange={e => setConferenceData({ ...conferenceData, entryDate: e.target.value })} className="w-full p-2 border border-slate-700 rounded" required /></div>
+                    <div><label className="text-sm font-medium">Fornecedor</label><input type="text" value={conferenceData.supplier} onChange={e => setConferenceData({ ...conferenceData, supplier: e.target.value })} className="w-full p-2 border border-slate-700 rounded" required /></div>
+                    <div><label className="text-sm font-medium">Nota Fiscal (NFe)</label><input type="text" value={conferenceData.nfe} onChange={e => setConferenceData({ ...conferenceData, nfe: e.target.value })} className="w-full p-2 border border-slate-700 rounded" required /></div>
+                    <div><label className="text-sm font-medium">Nº Conferência</label><input type="text" value={conferenceData.conferenceNumber} onChange={e => setConferenceData({ ...conferenceData, conferenceNumber: e.target.value })} className="w-full p-2 border border-slate-700 rounded" required /></div>
                 </div>
                 <div className="flex-grow overflow-y-auto border rounded-lg">
                     <table className="w-full text-sm">
-                        <thead className="sticky top-0 bg-slate-100 z-10">
+                        <thead className="sticky top-0 bg-slate-800 z-10">
                             <tr>
-                                {['Lote Interno', 'Lote Fornecedor', 'Corrida', 'Tipo Material', 'Bitola', 'Peso Etiqueta (kg)', 'Peso Balança (kg)', ''].map(h => <th key={h} className="p-2 text-left font-semibold text-slate-600">{h}</th>)}
+                                {['Lote Interno', 'Lote Fornecedor', 'Corrida', 'Tipo Material', 'Bitola', 'Peso Etiqueta (kg)', 'Peso Balança (kg)', ''].map(h => <th key={h} className="p-2 text-left font-semibold text-slate-400">{h}</th>)}
                             </tr>
                         </thead>
                         <tbody>
                             {lots.map((lot, index) => (
                                 <tr key={index} className="border-b">
                                     <td className="p-2">
-                                        <input type="text" value={lot.internalLot || ''} onChange={e => handleLotChange(index, 'internalLot', e.target.value)} className="w-full p-2 border border-slate-300 rounded" required />
+                                        <input type="text" value={lot.internalLot || ''} onChange={e => handleLotChange(index, 'internalLot', e.target.value)} className="w-full p-2 border border-slate-700 rounded" required />
                                         {duplicateErrors[index] && <p className="text-red-500 text-xs mt-1">{duplicateErrors[index]}</p>}
                                     </td>
-                                    <td className="p-2"><input type="text" value={lot.supplierLot || ''} onChange={e => handleLotChange(index, 'supplierLot', e.target.value)} className="w-full p-2 border border-slate-300 rounded" required /></td>
-                                    <td className="p-2"><input type="text" value={lot.runNumber || ''} onChange={e => handleLotChange(index, 'runNumber', e.target.value)} className="w-full p-2 border border-slate-300 rounded" required /></td>
+                                    <td className="p-2"><input type="text" value={lot.supplierLot || ''} onChange={e => handleLotChange(index, 'supplierLot', e.target.value)} className="w-full p-2 border border-slate-700 rounded" required /></td>
+                                    <td className="p-2"><input type="text" value={lot.runNumber || ''} onChange={e => handleLotChange(index, 'runNumber', e.target.value)} className="w-full p-2 border border-slate-700 rounded" required /></td>
                                     <td className="p-2">
-                                        <select value={lot.materialType} onChange={e => handleLotChange(index, 'materialType', e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white">
+                                        <select value={lot.materialType} onChange={e => handleLotChange(index, 'materialType', e.target.value)} className="w-full p-2 border border-slate-700 rounded bg-[#0F172A]">
                                             {MaterialOptions.map(m => <option key={m} value={m}>{m}</option>)}
                                         </select>
                                     </td>
                                     <td className="p-2">
-                                        <select value={lot.bitola} onChange={e => handleLotChange(index, 'bitola', e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white">
+                                        <select value={lot.bitola} onChange={e => handleLotChange(index, 'bitola', e.target.value)} className="w-full p-2 border border-slate-700 rounded bg-[#0F172A]">
                                             {allBitolaOptions.map(b => <option key={b} value={b}>{b}</option>)}
                                         </select>
                                     </td>
-                                    <td className="p-2"><input type="number" step="0.01" value={lot.labelWeight || ''} onChange={e => handleLotChange(index, 'labelWeight', parseFloat(e.target.value))} className="w-full p-2 border border-slate-300 rounded" required /></td>
-                                    <td className="p-2"><input type="number" step="0.01" value={lot.scaleWeight || ''} onChange={e => handleLotChange(index, 'scaleWeight', parseFloat(e.target.value))} className="w-full p-2 border border-slate-300 rounded" required /></td>
+                                    <td className="p-2"><input type="number" step="0.01" value={lot.labelWeight || ''} onChange={e => handleLotChange(index, 'labelWeight', parseFloat(e.target.value))} className="w-full p-2 border border-slate-700 rounded" required /></td>
+                                    <td className="p-2"><input type="number" step="0.01" value={lot.scaleWeight || ''} onChange={e => handleLotChange(index, 'scaleWeight', parseFloat(e.target.value))} className="w-full p-2 border border-slate-700 rounded" required /></td>
                                     <td className="p-2 text-center"><button type="button" onClick={() => handleRemoveLot(index)} className="p-1 text-red-500 hover:text-red-700"><TrashIcon className="h-5 w-5" /></button></td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
-                <button type="button" onClick={handleAddLot} className="text-slate-600 hover:text-slate-800 font-semibold py-2 mt-2 self-start">+ Adicionar outro lote</button>
+                <button type="button" onClick={handleAddLot} className="text-slate-400 hover:text-white font-semibold py-2 mt-2 self-start">+ Adicionar outro lote</button>
 
                 <div className="flex justify-end gap-4 mt-4 pt-4 border-t">
-                    <button type="button" onClick={onClose} className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-4 rounded-lg transition">Cancelar</button>
-                    <button type="submit" className="bg-[#0F3F5C] text-white font-bold py-2 px-4 rounded-lg hover:bg-[#0A2A3D] transition">Finalizar e Adicionar ao Estoque</button>
+                    <button type="button" onClick={onClose} className="bg-slate-200 hover:bg-slate-300 text-white font-bold py-2 px-4 rounded-lg transition">Cancelar</button>
+                    <button type="submit" className="bg-[#0F3F5C] hover:bg-[#0A2A3D] text-white font-bold py-2 px-4 rounded-lg hover:bg-[#0A2A3D] transition">Finalizar e Adicionar ao Estoque</button>
                 </div>
             </form>
         </div>
@@ -175,13 +175,13 @@ const EditStockItemModal: React.FC<{
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-xl w-full max-w-lg">
-                <h2 className="text-2xl font-bold text-slate-800 mb-6">Editar Lote: {item.internalLot}</h2>
+            <form onSubmit={handleSubmit} className="bg-[#0F172A] p-6 rounded-xl shadow-xl w-full max-w-lg">
+                <h2 className="text-2xl font-bold text-white mb-6">Editar Lote: {item.internalLot}</h2>
                 <div className="grid grid-cols-2 gap-4">
-                    <input type="text" value={formData.supplier} onChange={e => handleChange('supplier', e.target.value)} placeholder="Fornecedor" className="p-2 border border-slate-300 rounded" />
-                    <input type="text" value={formData.nfe} onChange={e => handleChange('nfe', e.target.value)} placeholder="NFe" className="p-2 border border-slate-300 rounded" />
-                    <input type="number" step="0.01" value={formData.labelWeight} onChange={e => handleChange('labelWeight', parseFloat(e.target.value))} placeholder="Peso Etiqueta" className="p-2 border border-slate-300 rounded" />
-                    <input type="number" step="0.01" value={formData.remainingQuantity} onChange={e => handleChange('remainingQuantity', parseFloat(e.target.value))} placeholder="Peso Restante" className="p-2 border border-slate-300 rounded" />
+                    <input type="text" value={formData.supplier} onChange={e => handleChange('supplier', e.target.value)} placeholder="Fornecedor" className="p-2 border border-slate-700 rounded" />
+                    <input type="text" value={formData.nfe} onChange={e => handleChange('nfe', e.target.value)} placeholder="NFe" className="p-2 border border-slate-700 rounded" />
+                    <input type="number" step="0.01" value={formData.labelWeight} onChange={e => handleChange('labelWeight', parseFloat(e.target.value))} placeholder="Peso Etiqueta" className="p-2 border border-slate-700 rounded" />
+                    <input type="number" step="0.01" value={formData.remainingQuantity} onChange={e => handleChange('remainingQuantity', parseFloat(e.target.value))} placeholder="Peso Restante" className="p-2 border border-slate-700 rounded" />
                 </div>
                 <div className="flex justify-end gap-4 mt-8 pt-4 border-t">
                     <button type="button" onClick={onClose}>Cancelar</button>
@@ -232,11 +232,11 @@ const MultiLotTransferModal: React.FC<{
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col">
-                <h2 className="text-2xl font-bold text-slate-800 mb-4">Realizar Transferência de Material</h2>
+            <form onSubmit={handleSubmit} className="bg-[#0F172A] p-6 rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+                <h2 className="text-2xl font-bold text-white mb-4">Realizar Transferência de Material</h2>
                 <div className="mb-4">
-                    <label className="block text-sm font-medium text-slate-700">Setor de Destino</label>
-                    <select value={destinationSector} onChange={e => setDestinationSector(e.target.value)} className="mt-1 p-2 w-full border border-slate-300 rounded bg-white">
+                    <label className="block text-sm font-medium text-slate-200">Setor de Destino</label>
+                    <select value={destinationSector} onChange={e => setDestinationSector(e.target.value)} className="mt-1 p-2 w-full border border-slate-700 rounded bg-[#0F172A]">
                         <option value="Coluna">Coluna</option>
                         <option value="CA50">CA50</option>
                         <option value="Mediterranea">Mediterranea</option>
@@ -245,11 +245,11 @@ const MultiLotTransferModal: React.FC<{
                 </div>
                 <div className="flex-grow overflow-y-auto border rounded-md">
                     <table className="w-full text-sm">
-                        <thead className="bg-slate-50 sticky top-0">
+                        <thead className="bg-slate-800/50 sticky top-0">
                             <tr >
-                                <th className="p-2 text-left font-semibold text-slate-600">Lote Interno</th>
-                                <th className="p-2 text-left font-semibold text-slate-600">Restante (kg)</th>
-                                <th className="p-2 text-left font-semibold text-slate-600">Qtd. a Transferir (kg)</th>
+                                <th className="p-2 text-left font-semibold text-slate-400">Lote Interno</th>
+                                <th className="p-2 text-left font-semibold text-slate-400">Restante (kg)</th>
+                                <th className="p-2 text-left font-semibold text-slate-400">Qtd. a Transferir (kg)</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -264,7 +264,7 @@ const MultiLotTransferModal: React.FC<{
                                             value={quantities.get(lot.id) || ''}
                                             onChange={e => handleQuantityChange(lot.id, parseFloat(e.target.value) || 0)}
                                             max={lot.remainingQuantity}
-                                            className="w-full p-1 border border-slate-300 rounded"
+                                            className="w-full p-1 border border-slate-700 rounded"
                                         />
                                     </td>
                                 </tr>
@@ -273,8 +273,8 @@ const MultiLotTransferModal: React.FC<{
                     </table>
                 </div>
                 <div className="flex justify-end gap-4 mt-4 pt-4 border-t">
-                    <button type="button" onClick={onClose} className="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg">Cancelar</button>
-                    <button type="submit" className="bg-[#0F3F5C] text-white font-bold py-2 px-4 rounded-lg hover:bg-[#0A2A3D]">Confirmar Transferência</button>
+                    <button type="button" onClick={onClose} className="bg-slate-200 text-white font-bold py-2 px-4 rounded-lg">Cancelar</button>
+                    <button type="submit" className="bg-[#0F3F5C] hover:bg-[#0A2A3D] text-white font-bold py-2 px-4 rounded-lg hover:bg-[#0A2A3D]">Confirmar Transferência</button>
                 </div>
             </form>
         </div>
@@ -429,11 +429,11 @@ const StockControl: React.FC<{
             {showInventoryReport && <InventoryReport stock={stock} filters={{ searchTerm, statusFilter, materialFilter, bitolaFilter }} onClose={() => setShowInventoryReport(false)} />}
             {deletingItem && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white p-8 rounded-xl shadow-xl w-full max-w-md text-center">
+                    <div className="bg-[#0F172A] p-8 rounded-xl shadow-xl w-full max-w-md text-center">
                         <WarningIcon className="h-16 w-16 mx-auto text-red-500 mb-4" />
-                        <p className="text-lg text-slate-700 mb-6">Tem certeza que deseja excluir o lote <strong>{deletingItem.internalLot}</strong>? Esta ação não pode ser desfeita.</p>
+                        <p className="text-lg text-slate-200 mb-6">Tem certeza que deseja excluir o lote <strong>{deletingItem.internalLot}</strong>? Esta ação não pode ser desfeita.</p>
                         <div className="flex justify-center gap-4">
-                            <button onClick={() => setDeletingItem(null)} className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-6 rounded-lg transition">Cancelar</button>
+                            <button onClick={() => setDeletingItem(null)} className="bg-slate-200 hover:bg-slate-300 text-white font-bold py-2 px-6 rounded-lg transition">Cancelar</button>
                             <button onClick={handleDelete} className="bg-red-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-red-700 transition">Confirmar Exclusão</button>
                         </div>
                     </div>
@@ -441,9 +441,9 @@ const StockControl: React.FC<{
             )}
             {releasingItem && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white p-8 rounded-xl shadow-xl w-full max-w-md text-center">
+                    <div className="bg-[#0F172A] p-8 rounded-xl shadow-xl w-full max-w-md text-center">
                         <WarningIcon className="h-16 w-16 mx-auto text-amber-500 mb-4" />
-                        <p className="text-lg text-slate-700 mb-2">Liberar Lote Manualmente?</p>
+                        <p className="text-lg text-slate-200 mb-2">Liberar Lote Manualmente?</p>
                         <p className="text-sm text-slate-500 mb-6">
                             O lote <strong>{releasingItem.internalLot}</strong> está com status <strong>{releasingItem.status}</strong>.
                             Deseja forçar o status para <strong>Disponível</strong>?
@@ -451,7 +451,7 @@ const StockControl: React.FC<{
                             <span className="text-xs text-red-500">Cuidado: Use isso apenas se o lote estiver travado incorretamente.</span>
                         </p>
                         <div className="flex justify-center gap-4">
-                            <button onClick={() => setReleasingItem(null)} className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-6 rounded-lg transition">Cancelar</button>
+                            <button onClick={() => setReleasingItem(null)} className="bg-slate-200 hover:bg-slate-300 text-white font-bold py-2 px-6 rounded-lg transition">Cancelar</button>
                             <button onClick={handleRelease} className="bg-amber-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-amber-700 transition">Confirmar Liberação</button>
                         </div>
                     </div>
@@ -460,28 +460,28 @@ const StockControl: React.FC<{
 
             <header className="flex items-center">
                 <button onClick={() => setPage('menu')} className="mr-4 p-2 rounded-full hover:bg-slate-200 transition">
-                    <ArrowLeftIcon className="h-6 w-6 text-slate-700" />
+                    <ArrowLeftIcon className="h-6 w-6 text-slate-200" />
                 </button>
-                <h1 className="text-3xl font-bold text-slate-800">Controle de Estoque</h1>
+                <h1 className="text-3xl font-bold text-white">Controle de Estoque</h1>
             </header>
 
-            <div className="bg-white p-6 rounded-xl shadow-sm flex flex-wrap gap-4 items-center justify-between">
+            <div className="bg-[#0F172A] p-6 rounded-xl shadow-sm flex flex-wrap gap-4 items-center justify-between">
                 <div>
                     <button onClick={() => setIsAddConferenceModalOpen(true)} className="bg-[#0F3F5C] hover:bg-[#0A2A3D] text-white font-bold py-2 px-4 rounded-lg transition text-base">
                         + Adicionar Conferência
                     </button>
                 </div>
                 <div className="flex gap-4">
-                    <button onClick={() => setStockDashboardOpen(true)} className="bg-white hover:bg-slate-50 text-slate-700 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
+                    <button onClick={() => setStockDashboardOpen(true)} className="bg-[#0F172A] hover:bg-slate-800/50 text-slate-200 font-semibold py-2 px-4 rounded-lg border border-slate-700 transition flex items-center gap-2">
                         <ChartBarIcon className="h-5 w-5" />Estatística
                     </button>
-                    <button onClick={() => setShowInventoryReport(true)} className="bg-white hover:bg-slate-50 text-slate-700 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
+                    <button onClick={() => setShowInventoryReport(true)} className="bg-[#0F172A] hover:bg-slate-800/50 text-slate-200 font-semibold py-2 px-4 rounded-lg border border-slate-700 transition flex items-center gap-2">
                         <PrinterIcon className="h-5 w-5" />Imprimir Inventário
                     </button>
-                    <button onClick={() => setConferenceHistoryOpen(true)} className="bg-white hover:bg-slate-50 text-slate-700 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
+                    <button onClick={() => setConferenceHistoryOpen(true)} className="bg-[#0F172A] hover:bg-slate-800/50 text-slate-200 font-semibold py-2 px-4 rounded-lg border border-slate-700 transition flex items-center gap-2">
                         <DocumentReportIcon className="h-5 w-5" />Conferências Finalizadas
                     </button>
-                    <button onClick={() => setTransferHistoryOpen(true)} className="bg-white hover:bg-slate-50 text-slate-700 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
+                    <button onClick={() => setTransferHistoryOpen(true)} className="bg-[#0F172A] hover:bg-slate-800/50 text-slate-200 font-semibold py-2 px-4 rounded-lg border border-slate-700 transition flex items-center gap-2">
                         <TruckIcon className="h-5 w-5" />Transferências Feitas
                     </button>
                 </div>
@@ -489,25 +489,25 @@ const StockControl: React.FC<{
 
             {stockDashboardOpen && (
                 <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-7xl max-h-[95vh] overflow-y-auto flex flex-col relative">
-                        <button onClick={() => setStockDashboardOpen(false)} className="absolute top-4 right-4 text-slate-500 hover:text-slate-700">
+                    <div className="bg-[#0F172A] p-6 rounded-xl shadow-xl w-full max-w-7xl max-h-[95vh] overflow-y-auto flex flex-col relative">
+                        <button onClick={() => setStockDashboardOpen(false)} className="absolute top-4 right-4 text-slate-500 hover:text-slate-200">
                             <XCircleIcon className="h-8 w-8" />
                         </button>
-                        <h2 className="text-2xl font-bold text-slate-800 mb-6">Estatísticas do Estoque</h2>
+                        <h2 className="text-2xl font-bold text-white mb-6">Estatísticas do Estoque</h2>
                         <StockDashboard stock={stock} />
                     </div>
                 </div>
             )}
 
-            <div className="bg-white p-6 rounded-xl shadow-sm">
-                <h2 className="text-xl font-semibold text-slate-700 mb-4">Filtros de Busca</h2>
+            <div className="bg-[#0F172A] p-6 rounded-xl shadow-sm">
+                <h2 className="text-xl font-semibold text-slate-200 mb-4">Filtros de Busca</h2>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <input type="text" placeholder="Buscar por lote, fornecedor, NFe..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="p-2 border border-slate-300 rounded-md md:col-span-2 text-slate-900" />
-                    <select value={bitolaFilter} onChange={e => setBitolaFilter(e.target.value)} className="p-2 border border-slate-300 rounded-md bg-white text-slate-900">
+                    <input type="text" placeholder="Buscar por lote, fornecedor, NFe..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="p-2 border border-slate-700 rounded-md md:col-span-2 text-white" />
+                    <select value={bitolaFilter} onChange={e => setBitolaFilter(e.target.value)} className="p-2 border border-slate-700 rounded-md bg-[#0F172A] text-white">
                         <option value="">Todas as Bitolas</option>
                         {allBitolaOptions.map(b => <option key={b} value={b}>{b}</option>)}
                     </select>
-                    <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="p-2 border border-slate-300 rounded-md bg-white text-slate-900">
+                    <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="p-2 border border-slate-700 rounded-md bg-[#0F172A] text-white">
                         <option value="">Todos os Status</option>
                         <option value="Disponível">Disponível</option>
                         <option value="Disponível - Suporte Treliça">Disponível - Suporte Treliça</option>
@@ -520,10 +520,10 @@ const StockControl: React.FC<{
 
 
 
-            <div className="bg-white rounded-xl shadow-sm">
+            <div className="bg-[#0F172A] rounded-xl shadow-sm">
                 <div className="p-6 border-b flex justify-between items-center">
                     <div>
-                        <h2 className="text-xl font-semibold text-slate-700">Lotes em Estoque</h2>
+                        <h2 className="text-xl font-semibold text-slate-200">Lotes em Estoque</h2>
                         <p className="text-sm text-slate-500">Exibindo {filteredStock.length} de {stock.length} lotes.</p>
                     </div>
                     <button
@@ -536,9 +536,9 @@ const StockControl: React.FC<{
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
-                        <thead className="text-xs text-slate-600 uppercase bg-slate-50">
+                        <thead className="text-xs text-slate-400 uppercase bg-slate-800/50">
                             <tr>
-                                <th className="p-4 w-12"><input type="checkbox" onChange={handleSelectAllForTransfer} checked={filteredStock.length > 0 && selectedLotIdsForTransfer.length === filteredStock.filter(i => i.status === 'Disponível' || i.status === 'Disponível - Suporte Treliça').length} className="h-4 w-4 rounded border-slate-300 text-slate-600 focus:ring-slate-500" /></th>
+                                <th className="p-4 w-12"><input type="checkbox" onChange={handleSelectAllForTransfer} checked={filteredStock.length > 0 && selectedLotIdsForTransfer.length === filteredStock.filter(i => i.status === 'Disponível' || i.status === 'Disponível - Suporte Treliça').length} className="h-4 w-4 rounded border-slate-700 text-slate-400 focus:ring-slate-500" /></th>
                                 <th className="px-6 py-3">Data Entrada</th>
                                 <th className="px-6 py-3">Lote Interno</th>
                                 <th className="px-6 py-3">Lote Fornecedor</th>
@@ -552,23 +552,23 @@ const StockControl: React.FC<{
                         </thead>
                         <tbody className="divide-y divide-slate-200">
                             {filteredStock.map(item => (
-                                <tr key={item.id} className="bg-white hover:bg-slate-50">
+                                <tr key={item.id} className="bg-[#0F172A] hover:bg-slate-800/50">
                                     <td className="p-4">
-                                        <input type="checkbox" checked={selectedLotIdsForTransfer.includes(item.id)} onChange={() => handleSelectLotForTransfer(item.id)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="h-4 w-4 rounded border-slate-300 text-slate-600 focus:ring-slate-500" />
+                                        <input type="checkbox" checked={selectedLotIdsForTransfer.includes(item.id)} onChange={() => handleSelectLotForTransfer(item.id)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="h-4 w-4 rounded border-slate-700 text-slate-400 focus:ring-slate-500" />
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">{new Date(item.entryDate).toLocaleDateString('pt-BR')}</td>
-                                    <td className="px-6 py-4 font-medium text-slate-900 whitespace-nowrap">{item.internalLot}</td>
+                                    <td className="px-6 py-4 font-medium text-white whitespace-nowrap">{item.internalLot}</td>
                                     <td className="px-6 py-4 whitespace-nowrap">{item.supplierLot}</td>
                                     <td className="px-6 py-4 whitespace-nowrap">{item.supplier}</td>
                                     <td className="px-6 py-4 whitespace-nowrap">{item.materialType}</td>
                                     <td className="px-6 py-4 whitespace-nowrap font-semibold">{item.bitola}</td>
-                                    <td className="px-6 py-4 text-right font-medium text-slate-900 whitespace-nowrap">
+                                    <td className="px-6 py-4 text-right font-medium text-white whitespace-nowrap">
                                         {item.labelWeight.toFixed(2)}
                                     </td>
                                     <td className="px-6 py-4 text-center">{getStatusBadge(item.status)}</td>
                                     <td className="px-6 py-4">
                                         <div className="flex items-center justify-center space-x-2">
-                                            <button onClick={() => setHistoryLot(item)} className="p-1 text-slate-500 hover:text-slate-700" title="Ver Histórico"><BookOpenIcon className="h-5 w-5" /></button>
+                                            <button onClick={() => setHistoryLot(item)} className="p-1 text-slate-500 hover:text-slate-200" title="Ver Histórico"><BookOpenIcon className="h-5 w-5" /></button>
                                             <button onClick={() => setEditingItem(item)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="p-1 text-slate-500 hover:text-emerald-700 disabled:opacity-30 disabled:cursor-not-allowed" title="Editar Lote"><PencilIcon className="h-5 w-5" /></button>
                                             <button onClick={() => setDeletingItem(item)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="p-1 text-slate-500 hover:text-red-700 disabled:opacity-30 disabled:cursor-not-allowed" title="Excluir Lote"><TrashIcon className="h-5 w-5" /></button>
                                             {(item.status.includes('Em Produção') || item.status === 'Disponível - Suporte Treliça') && (

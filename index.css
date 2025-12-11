@@ -318,3 +318,85 @@ h6 {
     visibility: visible !important;
   }
 }
+
+/* Global Form Elements - Dark Theme Default */
+input,
+select,
+textarea {
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  border-radius: 0.5rem;
+  padding: 0.625rem;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: var(--msm-orange);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 140, 0, 0.2);
+}
+
+/* Fix for Select Options in Dark Mode */
+option {
+  background-color: var(--msm-blue-dark);
+  color: var(--text-primary);
+  padding: 10px;
+}
+
+/* Disabled styling */
+input:disabled,
+select:disabled,
+textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+/* Placeholder color */
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-muted);
+}
+
+/* Global Table Styles */
+table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+th {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  padding: 1rem;
+  text-align: left;
+}
+
+td {
+  padding: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+tr:hover td {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* Utility to force text visibility if needed */
+.text-visible {
+  color: var(--text-primary) !important;
+}
+
+/* Scrollbar refinement */
+::-webkit-scrollbar-track {
+  background: transparent;
+}
