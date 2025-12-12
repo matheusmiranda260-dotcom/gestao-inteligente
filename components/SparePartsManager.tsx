@@ -32,6 +32,7 @@ const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
     });
 
     const [imageFile, setImageFile] = useState<File | null>(null);
+    const [previewImage, setPreviewImage] = useState<string | null>(null);
 
     // --- Fetch Data ---
     const loadParts = async () => {
@@ -278,7 +279,12 @@ const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
                                                 <tr key={part.id} className="hover:bg-slate-50 transition-colors">
                                                     <td className="p-4">
                                                         {part.imageUrl ? (
-                                                            <img src={part.imageUrl} alt={part.name} className="w-10 h-10 object-cover rounded-lg border border-slate-200" />
+                                                            <img
+                                                                src={part.imageUrl}
+                                                                alt={part.name}
+                                                                className="w-10 h-10 object-cover rounded-lg border border-slate-200 cursor-pointer hover:opacity-80 transition"
+                                                                onClick={() => setPreviewImage(part.imageUrl!)}
+                                                            />
                                                         ) : (
                                                             <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-slate-300">
                                                                 <AdjustmentsIcon className="h-5 w-5" />
@@ -361,7 +367,12 @@ const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
                                         <div key={part.id} className="p-4 flex gap-4 bg-white">
                                             <div className="flex-shrink-0">
                                                 {part.imageUrl ? (
-                                                    <img src={part.imageUrl} alt={part.name} className="w-20 h-20 object-cover rounded-lg border border-slate-200" />
+                                                    <img
+                                                        src={part.imageUrl}
+                                                        alt={part.name}
+                                                        className="w-20 h-20 object-cover rounded-lg border border-slate-200 cursor-pointer hover:opacity-80 transition"
+                                                        onClick={() => setPreviewImage(part.imageUrl!)}
+                                                    />
                                                 ) : (
                                                     <div className="w-20 h-20 bg-slate-100 rounded-lg flex items-center justify-center text-slate-300">
                                                         <AdjustmentsIcon className="h-8 w-8" />
@@ -597,6 +608,24 @@ const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
                             <button onClick={() => setIsHistoryModalOpen(false)} className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold rounded-lg transition">Fechar</button>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* Image Preview Modal */}
+            {previewImage && (
+                <div
+                    className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center p-4 backdrop-blur-sm animate-fadeIn"
+                    onClick={() => setPreviewImage(null)}
+                >
+                    <button className="absolute top-4 right-4 text-white p-2 bg-white/10 rounded-full hover:bg-white/20 transition">
+                        <XIcon className="h-6 w-6" />
+                    </button>
+                    <img
+                        src={previewImage}
+                        alt="Preview"
+                        className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
+                        onClick={(e) => e.stopPropagation()}
+                    />
                 </div>
             )}
         </div>
