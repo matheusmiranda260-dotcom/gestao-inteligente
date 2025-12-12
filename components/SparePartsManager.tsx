@@ -93,7 +93,8 @@ const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
             setIsEditModalOpen(false);
         } catch (error) {
             console.error(error);
-            alert('Erro ao salvar peça. Verifique o console.');
+            const msg = error instanceof Error ? error.message : 'Desconhecido';
+            alert(`Erro ao salvar: ${msg}`);
         }
     };
 
