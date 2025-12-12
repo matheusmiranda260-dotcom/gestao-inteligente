@@ -758,12 +758,12 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
 
                                                                 if (balance < 0) return (
                                                                     <div className="text-[10px] text-red-600 font-bold text-center mt-1">
-                                                                        Falta {Math.abs(balance)} (Disp: {s.available})
+                                                                        Falta {Math.abs(balance)} (Disp: {s.available} / Req: {s.required})
                                                                     </div>
                                                                 );
                                                                 if (balance === 0) return (
                                                                     <div className="text-[10px] text-emerald-600 font-bold text-center mt-1">
-                                                                        Saldo Suficiente (Conta Exata)
+                                                                        Conta Exata (Disp: {s.available})
                                                                     </div>
                                                                 );
                                                                 return (
@@ -791,12 +791,12 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
 
                                                                 if (balance < 0) return (
                                                                     <div className="text-[10px] text-red-600 font-bold text-center mt-1">
-                                                                        Falta {Math.abs(balance)} (Disp: {s.available})
+                                                                        Falta {Math.abs(balance)} (Disp: {s.available} / Req: {s.required})
                                                                     </div>
                                                                 );
                                                                 if (balance === 0) return (
                                                                     <div className="text-[10px] text-emerald-600 font-bold text-center mt-1">
-                                                                        Saldo Suficiente (Conta Exata)
+                                                                        Conta Exata (Disp: {s.available})
                                                                     </div>
                                                                 );
                                                                 return (
