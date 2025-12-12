@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { ArrowLeftIcon, SaveIcon, CalculatorIcon, AdjustmentsIcon, TrashIcon, BookOpenIcon, CheckCircleIcon, ExclamationIcon, PrinterIcon } from './icons';
-import { TrefilaRecipe } from '../types';
+import { TrefilaRecipe, TrefilaRingStock } from '../types';
 import { insertItem, fetchTable, deleteItem } from '../services/supabaseService';
 import RingStockManager from './RingStockManager';
 
@@ -33,25 +33,57 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
     const [passRings, setPassRings] = useState<{ entry: string; output: string }[]>([]);
     const [suggestion, setSuggestion] = useState<string | null>(null);
 
-    // Recipe State
+    // Recipe & Stock State
     const [recipeName, setRecipeName] = useState('');
     const [savedRecipes, setSavedRecipes] = useState<TrefilaRecipe[]>([]);
+    const [ringStock, setRingStock] = useState<TrefilaRingStock[]>([]);
 
-    // Fetch Recipes on Mount
+    // Fetch Recipes & Stock on Mount
     useEffect(() => {
-        loadRecipes();
+        loadData();
     }, []);
 
-    const loadRecipes = async () => {
+    // Refresh stock when manager closes
+    useEffect(() => {
+        if (!showStockManager) loadData();
+    }, [showStockManager]);
+
+    const loadData = async () => {
         setIsLoading(true);
         try {
-            const data = await fetchTable<TrefilaRecipe>('trefila_recipes');
-            setSavedRecipes(data || []);
+            const [recipes, rings] = await Promise.all([
+                fetchTable<TrefilaRecipe>('trefila_recipes'),
+                fetchTable<TrefilaRingStock>('trefila_rings_stock')
+            ]);
+            setSavedRecipes(recipes || []);
+            setRingStock(rings || []);
         } catch (error) {
-            console.error("Erro ao carregar receitas:", error);
+            console.error("Erro ao carregar dados:", error);
         } finally {
             setIsLoading(false);
         }
+    };
+
+    // Helper to check stock
+    const checkStock = (ringName: string) => {
+        if (!ringName || ringName === '-') return { available: 0, required: 0, status: 'ok' as const };
+
+        // Count total usage of this specific ring name in the current setup
+        let totalUsageCount = 0;
+        passRings.forEach(p => {
+            if (p.entry === ringName) totalUsageCount++;
+            if (p.output === ringName) totalUsageCount++;
+        });
+
+        const required = totalUsageCount * 3; // "Usamos 3 anéis para cada entrada ou saída"
+        const stockItem = ringStock.find(r => r.name.trim().toLowerCase() === ringName.trim().toLowerCase());
+        const available = stockItem?.quantity || 0;
+
+        return {
+            available,
+            required,
+            status: available >= required ? 'ok' as const : 'missing' as const
+        };
     };
 
     // Simulation Logic (Unchanged core logic)
@@ -582,9 +614,28 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                                     </div>
 
                                                     {/* Ring Input Display */}
-                                                    <div className="absolute -bottom-10 bg-slate-100 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 flex items-center gap-2 border border-slate-200">
-                                                        <span className="opacity-50">Anel:</span>
-                                                        <span className="text-blue-700 font-bold">{passRings[i]?.output || '-'}</span>
+                                                    <div className="absolute -bottom-16 w-32 bg-slate-100 p-2 rounded-lg text-xs font-medium text-slate-600 border border-slate-200 shadow-sm flex flex-col gap-1">
+                                                        {(() => {
+                                                            const entryRing = passRings[i]?.entry;
+                                                            const outputRing = passRings[i]?.output;
+                                                            const entryStatus = checkStock(entryRing);
+                                                            const outputStatus = checkStock(outputRing);
+
+                                                            return (
+                                                                <>
+                                                                    <div className={`flex justify-between items-center ${entryStatus.status === 'missing' ? 'text-red-600' : ''}`}>
+                                                                        <span className="opacity-75">Ent:</span>
+                                                                        <span className="font-bold">{entryRing || '-'}</span>
+                                                                        {entryStatus.status === 'missing' && <ExclamationIcon className="h-3 w-3" />}
+                                                                    </div>
+                                                                    <div className={`flex justify-between items-center ${outputStatus.status === 'missing' ? 'text-red-600' : ''}`}>
+                                                                        <span className="opacity-75">Sai:</span>
+                                                                        <span className="font-bold">{outputRing || '-'}</span>
+                                                                        {outputStatus.status === 'missing' && <ExclamationIcon className="h-3 w-3" />}
+                                                                    </div>
+                                                                </>
+                                                            );
+                                                        })()}
                                                     </div>
                                                 </div>
                                             </React.Fragment>
@@ -658,19 +709,35 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                                         <td className="px-6 py-4 font-bold text-slate-800">#{res.pass}</td>
                                                         <td className="px-6 py-4 bg-blue-50/10 border-l border-slate-100">
                                                             <input type="text"
-                                                                className="w-full bg-transparent border-b border-dashed border-slate-300 focus:border-blue-600 outline-none text-center transition-colors"
+                                                                className={`w-full bg-transparent border-b border-dashed outline-none text-center transition-colors ${checkStock(passRings[i]?.entry).status === 'missing' ? 'border-red-400 text-red-600 font-bold' : 'border-slate-300 focus:border-blue-600'}`}
                                                                 placeholder="-"
                                                                 value={passRings[i]?.entry}
                                                                 onChange={e => handleRingChange(i, 'entry', e.target.value)}
                                                             />
+                                                            {(() => {
+                                                                const s = checkStock(passRings[i]?.entry);
+                                                                if (s.status === 'missing') return (
+                                                                    <div className="text-[10px] text-red-500 font-bold text-center mt-1">
+                                                                        Falta (Disp: {s.available})
+                                                                    </div>
+                                                                );
+                                                            })()}
                                                         </td>
                                                         <td className="px-6 py-4 bg-blue-50/10 border-r border-slate-100">
                                                             <input type="text"
-                                                                className="w-full bg-transparent border-b border-dashed border-slate-300 focus:border-blue-600 outline-none text-center text-blue-700 font-bold transition-colors"
+                                                                className={`w-full bg-transparent border-b border-dashed outline-none text-center font-bold transition-colors ${checkStock(passRings[i]?.output).status === 'missing' ? 'border-red-400 text-red-600' : 'border-slate-300 focus:border-blue-600 text-blue-700'}`}
                                                                 placeholder="-"
                                                                 value={passRings[i]?.output}
                                                                 onChange={e => handleRingChange(i, 'output', e.target.value)}
                                                             />
+                                                            {(() => {
+                                                                const s = checkStock(passRings[i]?.output);
+                                                                if (s.status === 'missing') return (
+                                                                    <div className="text-[10px] text-red-500 font-bold text-center mt-1">
+                                                                        Falta (Disp: {s.available})
+                                                                    </div>
+                                                                );
+                                                            })()}
                                                         </td>
                                                         <td className="px-6 py-4">
                                                             <div className="flex items-center gap-2">
