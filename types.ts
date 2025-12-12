@@ -275,3 +275,15 @@ export interface FinishedGoodsTransferRecord {
     otherDestination?: string;
     transferredItems: TransferredFinishedGoodInfo[];
 }
+
+export interface TrefilaRecipe {
+    id: string;
+    name: string;
+    type: 'K-7 CA 60' | string;
+    entryDiameter: number;
+    finalDiameter: number;
+    passes: number;
+    passDiameters: number[];
+    passRings: { entry: string; output: string }[];
+    createdAt?: string;
+}
