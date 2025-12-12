@@ -750,14 +750,23 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                                             />
                                                             {(() => {
                                                                 const s = checkStock(passRings[i]?.entry);
-                                                                if (s.status === 'missing') return (
-                                                                    <div className="text-[10px] text-red-500 font-bold text-center mt-1">
-                                                                        Falta (Disp: {s.available})
+                                                                const balance = s.available - s.required;
+
+                                                                if (!passRings[i]?.entry || passRings[i]?.entry === '-') return null;
+
+                                                                if (balance < 0) return (
+                                                                    <div className="text-[10px] text-red-600 font-bold text-center mt-1">
+                                                                        Falta {Math.abs(balance)} (Disp: {s.available})
                                                                     </div>
                                                                 );
-                                                                if (passRings[i]?.entry && passRings[i]?.entry !== '-') return (
-                                                                    <div className="text-[10px] text-emerald-600 font-medium text-center mt-1">
-                                                                        Estoque: {s.available}
+                                                                if (balance === 0) return (
+                                                                    <div className="text-[10px] text-emerald-600 font-bold text-center mt-1">
+                                                                        Saldo Suficiente (Conta Exata)
+                                                                    </div>
+                                                                );
+                                                                return (
+                                                                    <div className="text-[10px] text-blue-600 font-bold text-center mt-1">
+                                                                        Sobram {balance} (Disp: {s.available})
                                                                     </div>
                                                                 );
                                                             })()}
@@ -774,14 +783,23 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                                             />
                                                             {(() => {
                                                                 const s = checkStock(passRings[i]?.output);
-                                                                if (s.status === 'missing') return (
-                                                                    <div className="text-[10px] text-red-500 font-bold text-center mt-1">
-                                                                        Falta (Disp: {s.available})
+                                                                const balance = s.available - s.required;
+
+                                                                if (!passRings[i]?.output || passRings[i]?.output === '-') return null;
+
+                                                                if (balance < 0) return (
+                                                                    <div className="text-[10px] text-red-600 font-bold text-center mt-1">
+                                                                        Falta {Math.abs(balance)} (Disp: {s.available})
                                                                     </div>
                                                                 );
-                                                                if (passRings[i]?.output && passRings[i]?.output !== '-') return (
-                                                                    <div className="text-[10px] text-emerald-600 font-medium text-center mt-1">
-                                                                        Estoque: {s.available}
+                                                                if (balance === 0) return (
+                                                                    <div className="text-[10px] text-emerald-600 font-bold text-center mt-1">
+                                                                        Saldo Suficiente (Conta Exata)
+                                                                    </div>
+                                                                );
+                                                                return (
+                                                                    <div className="text-[10px] text-blue-600 font-bold text-center mt-1">
+                                                                        Sobram {balance} (Disp: {s.available})
                                                                     </div>
                                                                 );
                                                             })()}
