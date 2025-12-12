@@ -103,16 +103,17 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
     const checkStock = (ringName: string) => {
         if (!ringName || ringName === '-') return { available: 0, required: 0, status: 'ok' as const };
 
-        // Safety check for inputs
-        const safeName = typeof ringName === 'string' ? ringName.trim().toLowerCase() : '';
-        if (!safeName) return { available: 0, required: 0, status: 'ok' as const };
+        // Safety check and Normalization (remove spaces, lowercase)
+        const normalize = (s: string) => s ? s.toString().toLowerCase().replace(/\s+/g, '').trim() : '';
+        const targetName = normalize(ringName);
+        if (!targetName) return { available: 0, required: 0, status: 'ok' as const };
 
         // Count total usage of this specific ring name in the current setup
         let totalUsageCount = 0;
         if (Array.isArray(passRings)) {
             passRings.forEach(p => {
-                if (p?.entry && p.entry.trim().toLowerCase() === safeName) totalUsageCount++;
-                if (p?.output && p.output.trim().toLowerCase() === safeName) totalUsageCount++;
+                if (p?.entry && normalize(p.entry) === targetName) totalUsageCount++;
+                if (p?.output && normalize(p.output) === targetName) totalUsageCount++;
             });
         }
 
@@ -120,7 +121,7 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
 
         if (!Array.isArray(ringStock)) return { available: 0, required, status: 'ok' as const };
 
-        const stockItem = ringStock.find(r => r?.name && r.name.trim().toLowerCase() === safeName);
+        const stockItem = ringStock.find(r => r?.name && normalize(r.name) === targetName);
         const available = stockItem?.quantity || 0;
 
         return {
