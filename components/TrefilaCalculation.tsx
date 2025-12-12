@@ -740,8 +740,8 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                                         <td className="px-6 py-4 bg-blue-50/10 border-l border-slate-100">
                                                             <input type="text"
                                                                 className={`w-full bg-transparent border-b border-dashed outline-none text-center transition-colors ${checkStock(passRings[i]?.entry).status === 'missing'
-                                                                        ? 'border-red-400 text-red-600 font-bold bg-red-50'
-                                                                        : (passRings[i]?.entry && passRings[i]?.entry !== '-' ? 'border-emerald-400 text-emerald-600 font-bold bg-emerald-50' : 'border-slate-300 focus:border-blue-600')
+                                                                    ? 'border-red-400 text-red-600 font-bold bg-red-50'
+                                                                    : (passRings[i]?.entry && passRings[i]?.entry !== '-' ? 'border-emerald-400 text-emerald-600 font-bold bg-emerald-50' : 'border-slate-300 focus:border-blue-600')
                                                                     }`}
                                                                 placeholder="-"
                                                                 value={passRings[i]?.entry}
@@ -754,13 +754,18 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                                                         Falta (Disp: {s.available})
                                                                     </div>
                                                                 );
+                                                                if (passRings[i]?.entry && passRings[i]?.entry !== '-') return (
+                                                                    <div className="text-[10px] text-emerald-600 font-medium text-center mt-1">
+                                                                        Estoque: {s.available}
+                                                                    </div>
+                                                                );
                                                             })()}
                                                         </td>
                                                         <td className="px-6 py-4 bg-blue-50/10 border-r border-slate-100">
                                                             <input type="text"
                                                                 className={`w-full bg-transparent border-b border-dashed outline-none text-center font-bold transition-colors ${checkStock(passRings[i]?.output).status === 'missing'
-                                                                        ? 'border-red-400 text-red-600 bg-red-50'
-                                                                        : (passRings[i]?.output && passRings[i]?.output !== '-' ? 'border-emerald-400 text-emerald-600 bg-emerald-50' : 'border-slate-300 focus:border-blue-600 text-blue-700')
+                                                                    ? 'border-red-400 text-red-600 bg-red-50'
+                                                                    : (passRings[i]?.output && passRings[i]?.output !== '-' ? 'border-emerald-400 text-emerald-600 bg-emerald-50' : 'border-slate-300 focus:border-blue-600 text-blue-700')
                                                                     }`}
                                                                 placeholder="-"
                                                                 value={passRings[i]?.output}
@@ -771,6 +776,11 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                                                 if (s.status === 'missing') return (
                                                                     <div className="text-[10px] text-red-500 font-bold text-center mt-1">
                                                                         Falta (Disp: {s.available})
+                                                                    </div>
+                                                                );
+                                                                if (passRings[i]?.output && passRings[i]?.output !== '-') return (
+                                                                    <div className="text-[10px] text-emerald-600 font-medium text-center mt-1">
+                                                                        Estoque: {s.available}
                                                                     </div>
                                                                 );
                                                             })()}
