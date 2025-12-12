@@ -17,7 +17,6 @@ interface PassResult {
 
 const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
     // UI State
-    const [activeTab, setActiveTab] = useState<'fluxo' | 'tabela' | 'grafico'>('fluxo');
     const [isLoading, setIsLoading] = useState(false);
 
     // Calculation State
@@ -244,7 +243,6 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
         setPassRings(recipe.passRings || []);
         updateResults(recipe.passDiameters);
         setRecipeName(recipe.name); // Optional: preload name
-        setActiveTab('tabela'); // Switch to table view to see details
     };
 
     const handleDeleteRecipe = async (id: string, e: React.MouseEvent) => {
@@ -271,7 +269,7 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                         <div>
                             <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                                 <CalculatorIcon className="h-6 w-6 text-blue-600" />
-                                Cálculo de Trefilação
+                                Análise Inteligente de Trefilação
                             </h1>
                         </div>
                     </div>
@@ -280,16 +278,16 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                     </div>
                 </div>
 
-                <div className="flex-1 max-w-[1600px] w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                <div className="flex-1 max-w-[1920px] w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
                     {/* Left Panel: Controls & Recipes */}
-                    <div className="lg:col-span-4 space-y-6">
+                    <div className="lg:col-span-3 space-y-6">
 
                         {/* Parameters Card */}
                         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                             <h2 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
                                 <AdjustmentsIcon className="h-5 w-5 text-blue-500" />
-                                Parâmetros de Processo
+                                Parâmetros
                             </h2>
 
                             <div className="space-y-5">
@@ -297,7 +295,7 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                     <label className="text-xs font-bold text-slate-500 bg-slate-50 px-2 py-1 rounded inline-block mb-2">TIPO DE MATERIAL</label>
                                     <div className="flex bg-slate-100 p-1 rounded-xl">
                                         <button className="flex-1 py-2 rounded-lg bg-white text-blue-700 shadow-sm font-semibold text-sm">K-7 CA 60</button>
-                                        <button className="flex-1 py-2 rounded-lg text-slate-500 font-medium text-sm hover:bg-white/50" disabled>Outros (Em breve)</button>
+                                        <button className="flex-1 py-2 rounded-lg text-slate-500 font-medium text-sm hover:bg-white/50" disabled>Outros</button>
                                     </div>
                                 </div>
 
@@ -345,7 +343,7 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                     className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-blue-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
                                 >
                                     <CalculatorIcon className="h-5 w-5" />
-                                    Calcular Distribuição
+                                    Calcular
                                 </button>
 
                                 {suggestion && (
@@ -367,25 +365,25 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                             <div className="flex gap-2 mb-4">
                                 <input
                                     type="text"
-                                    placeholder="Nome da nova receita..."
+                                    placeholder="Nome..."
                                     value={recipeName}
                                     onChange={e => setRecipeName(e.target.value)}
                                     className="flex-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-emerald-500 outline-none"
                                 />
                                 <button
                                     onClick={handleSaveRecipe}
-                                    className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg font-semibold text-sm transition"
+                                    className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-2 rounded-lg font-semibold text-sm transition"
                                 >
                                     Salvar
                                 </button>
                             </div>
 
-                            <div className="space-y-2 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
+                            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
                                 {isLoading ? (
                                     <p className="text-center text-slate-400 text-sm py-2">Carregando...</p>
                                 ) : savedRecipes.length === 0 ? (
                                     <p className="text-center text-slate-400 text-sm py-4 border-2 border-dashed border-slate-100 rounded-xl">
-                                        Nenhuma receita salva.
+                                        Nenhuma receita.
                                     </p>
                                 ) : (
                                     savedRecipes.map(recipe => (
@@ -393,10 +391,10 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                             onClick={() => handleLoadRecipe(recipe)}
                                             className="group flex items-center justify-between p-3 rounded-xl bg-slate-50 hover:bg-blue-50 border border-transparent hover:border-blue-100 transition cursor-pointer"
                                         >
-                                            <div>
-                                                <p className="font-bold text-slate-700 text-sm group-hover:text-blue-700">{recipe.name}</p>
-                                                <p className="text-xs text-slate-500 group-hover:text-blue-500">
-                                                    {recipe.entryDiameter}mm → {recipe.finalDiameter}mm ({recipe.passes} passes)
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-bold text-slate-700 text-sm group-hover:text-blue-700 truncate">{recipe.name}</p>
+                                                <p className="text-xs text-slate-500 group-hover:text-blue-500 truncate">
+                                                    {recipe.entryDiameter}mm → {recipe.finalDiameter}mm
                                                 </p>
                                             </div>
                                             <button
@@ -413,90 +411,141 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
 
                     </div>
 
-                    {/* Right Panel: Results Visualization */}
-                    <div className="lg:col-span-8 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 min-h-[600px] flex flex-col">
-
-                        {/* Tab Switcher */}
-                        <div className="flex gap-2 p-1 bg-slate-100 rounded-xl w-fit mb-6">
-                            {[
-                                { id: 'fluxo', label: 'Fluxo Visual', icon: AdjustmentsIcon },
-                                { id: 'tabela', label: 'Tabela Técnica', icon: BookOpenIcon },
-                                { id: 'grafico', label: 'Gráfico de Redução', icon: CalculatorIcon }
-                            ].map(tab => (
-                                <button
-                                    key={tab.id}
-                                    onClick={() => setActiveTab(tab.id as any)}
-                                    className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${activeTab === tab.id
-                                            ? 'bg-white text-blue-600 shadow-sm'
-                                            : 'text-slate-500 hover:text-slate-700'
-                                        }`}
-                                >
-                                    {/* @ts-ignore */}
-                                    <tab.icon className="h-4 w-4" />
-                                    {tab.label}
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* Content Area */}
-
+                    {/* Right Panel: Results Visualization - Single View */}
+                    <div className="lg:col-span-9 space-y-6">
                         {results.length === 0 ? (
-                            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-100 rounded-2xl m-4">
-                                <CalculatorIcon className="h-12 w-12 mb-2 opacity-20" />
-                                <p>Execute o cálculo para visualizar os resultados.</p>
+                            <div className="bg-white p-12 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-slate-400 min-h-[400px]">
+                                <CalculatorIcon className="h-20 w-20 mb-4 opacity-10" />
+                                <h3 className="text-xl font-bold text-slate-500 mb-2">Pronto para calcular</h3>
+                                <p className="text-slate-400">Insira os parâmetros à esquerda e clique em "Calcular" para ver a análise completa.</p>
                             </div>
                         ) : (
-                            <div className="flex-1">
-                                {activeTab === 'fluxo' && (
-                                    <div className="h-full flex flex-col justify-center overflow-x-auto p-4">
-                                        <div className="flex items-center min-w-max gap-4 mx-auto">
-                                            {/* Entry Node */}
-                                            <div className="flex flex-col items-center">
-                                                <div className="w-24 h-24 rounded-full bg-slate-800 text-white flex flex-col items-center justify-center shadow-lg border-4 border-slate-100 z-10">
-                                                    <span className="text-xs opacity-70">Entrada</span>
-                                                    <span className="text-xl font-bold">{params.entryDiameter}</span>
-                                                    <span className="text-[10px] opacity-70">mm</span>
+                            <>
+                                {/* Section 1: Visual Process Flow */}
+                                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+                                        <AdjustmentsIcon className="h-32 w-32 text-blue-500" />
+                                    </div>
+                                    <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2 relative z-10">
+                                        <AdjustmentsIcon className="h-5 w-5 text-blue-600" />
+                                        Fluxo de Redução
+                                    </h3>
+
+                                    <div className="flex flex-col xl:flex-row items-center justify-center py-8 gap-4 xl:gap-0 relative z-10 overflow-x-auto">
+                                        {/* Entry Node */}
+                                        <div className="flex flex-col items-center group relative cursor-default">
+                                            <div className="w-28 h-28 rounded-full bg-slate-800 text-white flex flex-col items-center justify-center shadow-xl border-4 border-slate-50 ring-4 ring-slate-100 z-20 relative overflow-hidden">
+                                                <div className="absolute inset-0 bg-gradient-to-br from-slate-700 to-slate-900"></div>
+                                                <div className="relative z-10 flex flex-col items-center">
+                                                    <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Entrada</span>
+                                                    <span className="text-3xl font-black">{params.entryDiameter}</span>
+                                                    <span className="text-[10px] text-slate-400">mm</span>
                                                 </div>
                                             </div>
+                                        </div>
 
-                                            {/* Process Nodes */}
-                                            {results.map((res, i) => (
-                                                <div key={i} className="flex items-center">
-                                                    {/* Connector */}
-                                                    <div className="w-16 h-1 bg-slate-200 relative">
-                                                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-2 py-0.5 rounded-full border border-slate-200">
-                                                            <span className={`text-[10px] font-bold ${res.reduction > 29 ? 'text-red-500' : 'text-blue-500'}`}>
-                                                                -{res.reduction.toFixed(1)}%
-                                                            </span>
-                                                        </div>
+                                        {/* Process Nodes */}
+                                        {results.map((res, i) => (
+                                            <React.Fragment key={i}>
+                                                {/* Connector */}
+                                                <div className="flex flex-col items-center justify-center w-24 xl:w-32 relative h-16 xl:h-auto">
+                                                    <div className="absolute top-1/2 left-0 right-0 h-1 bg-slate-200 overflow-hidden rounded-full">
+                                                        <div className="h-full bg-blue-500/20 w-full animate-pulse"></div>
                                                     </div>
-
-                                                    {/* Node */}
-                                                    <div className="flex flex-col items-center gap-2 relative group">
-                                                        <div className={`w-24 h-24 rounded-2xl flex flex-col items-center justify-center shadow-md border-2 transition-transform hover:scale-105 z-10 ${res.status === 'Alta' ? 'bg-red-50 border-red-200' : 'bg-white border-blue-100'
-                                                            }`}>
-                                                            <span className="text-xs text-slate-400 mb-1">Passe {res.pass}</span>
-                                                            <span className="text-2xl font-bold text-slate-700">{res.diameter.toFixed(2)}</span>
-                                                            <span className="text-[10px] text-slate-400">mm</span>
-                                                        </div>
-                                                        <div className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded">
-                                                            {passRings[i]?.output || '-'}
-                                                        </div>
+                                                    <div className="relative z-10 bg-white px-3 py-1.5 rounded-xl border border-blue-100 shadow-sm flex flex-col items-center min-w-[80px]">
+                                                        <span className={`text-sm font-bold ${res.reduction > 29 ? 'text-red-500' : 'text-blue-600'}`}>
+                                                            -{res.reduction.toFixed(1)}%
+                                                        </span>
+                                                        <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Redução</span>
                                                     </div>
                                                 </div>
-                                            ))}
+
+                                                {/* Machine Node */}
+                                                <div className="flex flex-col items-center relative group">
+                                                    <div className={`w-28 h-28 rounded-3xl flex flex-col items-center justify-center shadow-lg border-4 transition-all duration-300 z-20 relative bg-white
+                                                        ${res.status === 'Alta'
+                                                            ? 'border-red-100 ring-4 ring-red-50 shadow-red-100'
+                                                            : 'border-blue-100 ring-4 ring-blue-50 shadow-blue-100'}`
+                                                    }>
+                                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Passe {res.pass}</span>
+                                                        <span className={`text-3xl font-black ${res.status === 'Alta' ? 'text-red-600' : 'text-slate-700'}`}>
+                                                            {res.diameter.toFixed(2)}
+                                                        </span>
+                                                        <span className="text-[10px] text-slate-400">mm</span>
+
+                                                        {res.status === 'Alta' && (
+                                                            <div className="absolute -top-3 -right-3 bg-red-500 text-white rounded-full p-1.5 shadow-lg animate-bounce">
+                                                                <ExclamationIcon className="h-4 w-4" />
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Ring Input Display */}
+                                                    <div className="absolute -bottom-10 bg-slate-100 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 flex items-center gap-2 border border-slate-200">
+                                                        <span className="opacity-50">Anel:</span>
+                                                        <span className="text-blue-700 font-bold">{passRings[i]?.output || '-'}</span>
+                                                    </div>
+                                                </div>
+                                            </React.Fragment>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Section 2: Reduction Chart */}
+                                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                                    <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                        <CalculatorIcon className="h-5 w-5 text-purple-600" />
+                                        Performance de Redução (% de Área)
+                                    </h3>
+                                    <div className="h-[350px] w-full">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <LineChart data={results} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                                                <defs>
+                                                    <linearGradient id="colorReduction" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.1} />
+                                                        <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
+                                                    </linearGradient>
+                                                </defs>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                                <XAxis dataKey="pass" tickLine={false} axisLine={false} tick={{ fill: '#64748B' }} label={{ value: 'Passe (Máquina)', position: 'insideBottom', offset: -5, fill: '#94a3b8' }} />
+                                                <YAxis tickLine={false} axisLine={false} tick={{ fill: '#64748B' }} domain={[0, 45]} />
+                                                <Tooltip
+                                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)', padding: '12px' }}
+                                                    cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }}
+                                                />
+                                                <ReferenceLine y={29} stroke="#EF4444" strokeDasharray="3 3" label={{ position: 'right', value: 'Limite Segurança (29%)', fill: '#EF4444', fontSize: 12 }} />
+                                                <Line
+                                                    type="monotone"
+                                                    dataKey="reduction"
+                                                    stroke="#3B82F6"
+                                                    strokeWidth={3}
+                                                    dot={{ r: 6, fill: '#3B82F6', strokeWidth: 3, stroke: '#fff' }}
+                                                    activeDot={{ r: 8, stroke: '#3B82F6', strokeWidth: 4, fill: '#fff' }}
+                                                />
+                                            </LineChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </div>
+
+                                {/* Section 3: Detailed Table */}
+                                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                                    <div className="flex items-center justify-between mb-6">
+                                        <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                            <BookOpenIcon className="h-5 w-5 text-emerald-600" />
+                                            Dados Técnicos
+                                        </h3>
+                                        <div className="text-xs text-slate-500 bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
+                                            Edite os diâmetros abaixo para simular
                                         </div>
                                     </div>
-                                )}
 
-                                {activeTab === 'tabela' && (
-                                    <div className="overflow-x-auto">
+                                    <div className="overflow-x-auto rounded-xl border border-slate-200">
                                         <table className="w-full text-sm text-left border-collapse">
                                             <thead>
-                                                <tr className="bg-slate-50 border-b border-slate-200">
+                                                <tr className="bg-slate-50/80 border-b border-slate-200">
                                                     <th className="px-6 py-4 font-bold text-slate-600">PASSE</th>
-                                                    <th className="px-6 py-4 font-bold text-slate-600 bg-blue-50/50">ANEL ENTRADA</th>
-                                                    <th className="px-6 py-4 font-bold text-slate-600 bg-blue-50/50">ANEL SAÍDA</th>
+                                                    <th className="px-6 py-4 font-bold text-slate-600 bg-blue-50/30 border-l border-blue-100">ANEL ENTRADA</th>
+                                                    <th className="px-6 py-4 font-bold text-slate-600 bg-blue-50/30 border-r border-blue-100">ANEL SAÍDA</th>
                                                     <th className="px-6 py-4 font-bold text-slate-600">DIÂMETRO (mm)</th>
                                                     <th className="px-6 py-4 font-bold text-slate-600">REDUÇÃO (%)</th>
                                                     <th className="px-6 py-4 font-bold text-slate-600">STATUS</th>
@@ -504,75 +553,57 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                             </thead>
                                             <tbody className="divide-y divide-slate-100">
                                                 {results.map((res, i) => (
-                                                    <tr key={i} className="hover:bg-slate-50">
+                                                    <tr key={i} className="hover:bg-slate-50 transition-colors">
                                                         <td className="px-6 py-4 font-bold text-slate-800">#{res.pass}</td>
-                                                        <td className="px-6 py-4 bg-blue-50/20">
+                                                        <td className="px-6 py-4 bg-blue-50/10 border-l border-slate-100">
                                                             <input type="text"
-                                                                className="w-full bg-transparent border-b border-dashed border-blue-300 focus:border-blue-600 outline-none text-center"
+                                                                className="w-full bg-transparent border-b border-dashed border-slate-300 focus:border-blue-600 outline-none text-center transition-colors"
                                                                 placeholder="-"
                                                                 value={passRings[i]?.entry}
                                                                 onChange={e => handleRingChange(i, 'entry', e.target.value)}
                                                             />
                                                         </td>
-                                                        <td className="px-6 py-4 bg-blue-50/20">
+                                                        <td className="px-6 py-4 bg-blue-50/10 border-r border-slate-100">
                                                             <input type="text"
-                                                                className="w-full bg-transparent border-b border-dashed border-blue-300 focus:border-blue-600 outline-none text-center text-blue-700 font-medium"
+                                                                className="w-full bg-transparent border-b border-dashed border-slate-300 focus:border-blue-600 outline-none text-center text-blue-700 font-bold transition-colors"
                                                                 placeholder="-"
                                                                 value={passRings[i]?.output}
                                                                 onChange={e => handleRingChange(i, 'output', e.target.value)}
                                                             />
                                                         </td>
                                                         <td className="px-6 py-4">
-                                                            <input type="number" step="0.01"
-                                                                className="w-20 bg-slate-100 rounded px-2 py-1 text-center font-bold text-slate-700 focus:bg-white focus:ring-2 ring-blue-200 outline-none"
-                                                                value={passDiameters[i]}
-                                                                onChange={e => handleDiameterChange(i, e.target.value)}
-                                                            />
+                                                            <div className="flex items-center gap-2">
+                                                                <input type="number" step="0.01"
+                                                                    className="w-24 bg-slate-100 hover:bg-white focus:bg-white border border-transparent focus:border-blue-300 rounded px-3 py-1.5 text-center font-bold text-slate-700 focus:ring-2 ring-blue-100 outline-none transition-all"
+                                                                    value={passDiameters[i]}
+                                                                    onChange={e => handleDiameterChange(i, e.target.value)}
+                                                                />
+                                                                <span className="text-xs text-slate-400">mm</span>
+                                                            </div>
                                                         </td>
-                                                        <td className="px-6 py-4 font-mono text-slate-600">
-                                                            {res.reduction.toFixed(2)}%
+                                                        <td className="px-6 py-4">
+                                                            <span className={`font-mono font-bold ${res.reduction > 29 ? 'text-red-600' : 'text-slate-600'}`}>
+                                                                {res.reduction.toFixed(2)}%
+                                                            </span>
                                                         </td>
                                                         <td className="px-6 py-4">
                                                             {res.status === 'Ok'
-                                                                ? <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold"><CheckCircleIcon className="h-3 w-3" /> OK</span>
-                                                                : <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-100 text-red-700 text-xs font-bold"><ExclamationIcon className="h-3 w-3" /> Alta</span>
+                                                                ? <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold border border-emerald-200"><CheckCircleIcon className="h-3.5 w-3.5" /> Ideal</span>
+                                                                : <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-bold border border-red-200 animate-pulse"><ExclamationIcon className="h-3.5 w-3.5" /> Crítico</span>
                                                             }
                                                         </td>
                                                     </tr>
                                                 ))}
                                             </tbody>
                                         </table>
-                                        <div className="mt-4 p-4 bg-blue-50 rounded-xl text-blue-800 text-xs flex items-center gap-2">
-                                            <ExclamationIcon className="h-4 w-4" />
-                                            Dica: Edite os diâmetros diretamente na tabela para simular ajustes finos.
-                                        </div>
                                     </div>
-                                )}
-
-                                {activeTab === 'grafico' && (
-                                    <div className="h-[400px] w-full p-4">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <LineChart data={results}>
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                                                <XAxis dataKey="pass" tickLine={false} axisLine={false} tick={{ fill: '#64748B' }} />
-                                                <YAxis tickLine={false} axisLine={false} tick={{ fill: '#64748B' }} domain={[0, 40]} />
-                                                <Tooltip
-                                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 15px rgba(0,0,0,0.1)' }}
-                                                    cursor={{ stroke: '#cbd5e1', strokeWidth: 1 }}
-                                                />
-                                                <ReferenceLine y={29} stroke="#EF4444" strokeDasharray="3 3" label={{ position: 'right', value: 'Max (29%)', fill: '#EF4444', fontSize: 12 }} />
-                                                <Line type="monotone" dataKey="reduction" stroke="#3B82F6" strokeWidth={3} dot={{ r: 4, fill: '#3B82F6', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} />
-                                            </LineChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                )}
-                            </div>
+                                </div>
+                            </>
                         )}
                     </div>
                 </div>
             </div>
 
-            {/* Custom Styles for hidden scrollbar but functional */}
             <style>{`
                 .custom-scrollbar::-webkit-scrollbar {
                     width: 4px;
