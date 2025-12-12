@@ -179,3 +179,16 @@ export const updateItemByColumn = async <T>(
     }
     return mapToCamelCase(data) as T;
 };
+
+/** Upload file to storage */
+export const uploadFile = async (bucket: string, path: string, file: File): Promise<string | null> => {
+    // Generate unique path if needed, or overwrite?
+    // User might upload "image.jpg" twice. Better to prepend timestamp/uuid.
+    const { data, error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true });
+    if (error) {
+        console.error('Error uploading file:', error);
+        throw error;
+    }
+    const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(path);
+    return publicUrl;
+};

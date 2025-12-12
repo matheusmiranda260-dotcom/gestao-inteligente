@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeftIcon, PlusIcon, SearchIcon, TrashIcon, PencilIcon, SaveIcon, XIcon, AdjustmentsIcon, MinusIcon, ClockIcon } from './icons';
 import { SparePart, PartUsage } from '../types';
-import { fetchTable, insertItem, updateItem, deleteItem, fetchByColumn } from '../services/supabaseService';
+import { fetchTable, insertItem, updateItem, deleteItem, fetchByColumn, uploadFile } from '../services/supabaseService';
 
 interface SparePartsManagerProps {
     onBack: () => void;
@@ -31,6 +31,8 @@ const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
         type: 'OUT', quantity: 1, reason: '', user: '', date: ''
     });
 
+    const [imageFile, setImageFile] = useState<File | null>(null);
+
     // --- Fetch Data ---
     const loadParts = async () => {
         setLoading(true);
@@ -59,6 +61,7 @@ const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
             setSelectedPart(null);
             setFormData({ name: '', model: '', machine: 'Geral', currentStock: 0, minStock: 0, imageUrl: '' });
         }
+        setImageFile(null);
         setIsEditModalOpen(true);
     };
 
@@ -66,18 +69,30 @@ const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
         if (!formData.name || !formData.model) return alert('Preencha os campos obrigatórios.');
 
         try {
+            let finalImageUrl = formData.imageUrl;
+
+            if (imageFile) {
+                const fileExt = imageFile.name.split('.').pop();
+                const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+                const url = await uploadFile('spare-parts', fileName, imageFile);
+                if (url) finalImageUrl = url;
+            }
+
+            const payload = { ...formData, imageUrl: finalImageUrl };
+
             if (selectedPart) {
                 // Edit
-                const updated = await updateItem<SparePart>('spare_parts', selectedPart.id, formData);
+                const updated = await updateItem<SparePart>('spare_parts', selectedPart.id, payload);
                 setParts(prev => prev.map(p => p.id === selectedPart.id ? updated : p));
             } else {
                 // Add
                 // @ts-ignore
-                const newPart = await insertItem<SparePart>('spare_parts', formData);
+                const newPart = await insertItem<SparePart>('spare_parts', payload);
                 setParts(prev => [...prev, newPart]);
             }
             setIsEditModalOpen(false);
         } catch (error) {
+            console.error(error);
             alert('Erro ao salvar peça. Verifique o console.');
         }
     };
@@ -358,8 +373,29 @@ const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
                                 <input type="text" value={formData.model} onChange={e => setFormData({ ...formData, model: e.target.value })} className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ex: SKF 6205-2Z" />
                             </div>
                             <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1">URL da Imagem (Foto)</label>
-                                <input type="text" value={formData.imageUrl || ''} onChange={e => setFormData({ ...formData, imageUrl: e.target.value })} className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="http://..." />
+                                <label className="block text-sm font-bold text-slate-700 mb-1">Foto da Peça</label>
+                                <div className="flex items-center gap-4">
+                                    {(imageFile || formData.imageUrl) && (
+                                        <img
+                                            src={imageFile ? URL.createObjectURL(imageFile) : formData.imageUrl}
+                                            alt="Preview"
+                                            className="w-16 h-16 object-cover rounded-lg border border-slate-300"
+                                        />
+                                    )}
+                                    <label className="cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2 rounded-lg font-semibold transition flex items-center gap-2">
+                                        <PlusIcon className="h-4 w-4" /> Escolher Foto
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            className="hidden"
+                                            onChange={e => {
+                                                if (e.target.files && e.target.files[0]) {
+                                                    setImageFile(e.target.files[0]);
+                                                }
+                                            }}
+                                        />
+                                    </label>
+                                </div>
                             </div>
                             <div>
                                 <label className="block text-sm font-bold text-slate-700 mb-1">Máquina</label>
