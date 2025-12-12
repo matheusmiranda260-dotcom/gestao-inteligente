@@ -159,10 +159,56 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
         if (!currentResult) return;
 
         setPassDiameters(currentResult.diameters);
-        // Preserve existing ring values if pass count is same, else reset
-        if (passRings.length !== n) {
-            setPassRings(Array(n).fill({ entry: '', output: '' }));
-        }
+
+        // Auto-suggest Rings based on Diameter Rules
+        const newRings = currentResult.diameters.map((dOutput, index) => {
+            const isLast = index === n - 1;
+            const dEntry = index === 0 ? dIn : currentResult.diameters[index - 1];
+
+            let entryRing = '';
+            let outputRing = '';
+
+            // Entry Ring Logic
+            if (!isLast) {
+                if (dEntry >= 4.00 && dEntry <= 4.99) entryRing = 'RO 0';
+                else if (dEntry >= 5.00 && dEntry <= 5.99) entryRing = 'RO 1';
+                else if (dEntry >= 6.00 && dEntry <= 6.99) entryRing = 'RO 2';
+                else if (dEntry >= 7.00 && dEntry <= 7.99) entryRing = 'RO 3';
+            } else {
+                if (dEntry >= 3.49 && dEntry <= 4.23) entryRing = 'ROA 0';
+                else if (dEntry >= 4.60 && dEntry <= 5.56) entryRing = 'ROA 1';
+                else if (dEntry >= 5.60 && dEntry <= 6.00) entryRing = 'ROA 2';
+            }
+
+            // Output Ring Logic
+            if (!isLast) {
+                // Priority to specific CA ranges
+                if (dOutput >= 3.50 && dOutput <= 3.65) outputRing = 'CA 3,55';
+                else if (dOutput >= 4.55 && dOutput <= 4.70) outputRing = 'CA 4,60';
+                else if (dOutput >= 5.45 && dOutput <= 5.60) outputRing = 'CA 5,50';
+                // Fallback to RT generic ranges
+                else if (dOutput >= 4.00 && dOutput <= 4.99) outputRing = 'RT 0';
+                else if (dOutput >= 6.00 && dOutput <= 6.99) outputRing = 'RT 2';
+                else if (dOutput >= 7.00 && dOutput <= 7.99) outputRing = 'RT 3';
+            } else {
+                // PR Series for Last Pass
+                if (dOutput >= 3.15 && dOutput <= 3.30) outputRing = 'PR 3,20';
+                else if (dOutput >= 3.35 && dOutput <= 3.50) outputRing = 'PR 3,40';
+                else if (dOutput >= 3.65 && dOutput <= 3.80) outputRing = 'PR 3,70';
+                else if (dOutput >= 3.75 && dOutput <= 3.90) outputRing = 'PR 3,80';
+                else if (dOutput >= 4.05 && dOutput <= 4.20) outputRing = 'PR 4,10';
+                else if (dOutput >= 4.15 && dOutput <= 4.30) outputRing = 'PR 4,20';
+                else if (dOutput >= 4.35 && dOutput <= 4.50) outputRing = 'PR 4,40';
+                else if (dOutput >= 4.95 && dOutput <= 5.10) outputRing = 'PR 5,00';
+                else if (dOutput >= 5.45 && dOutput <= 5.60) outputRing = 'PR 5,50';
+                else if (dOutput >= 5.55 && dOutput <= 5.70) outputRing = 'PR 5,60';
+                else if (dOutput >= 5.75 && dOutput <= 5.90) outputRing = 'PR 5,80';
+                else if (dOutput >= 5.95 && dOutput <= 6.10) outputRing = 'PR 6,00';
+            }
+            return { entry: entryRing, output: outputRing };
+        });
+
+        setPassRings(newRings);
         updateResults(currentResult.diameters);
     };
 
