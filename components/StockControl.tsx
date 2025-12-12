@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Page, StockItem, ConferenceData, ConferenceLotData, Bitola, MaterialType, TransferRecord } from '../types';
 import { MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions } from '../types';
-import { ArrowLeftIcon, PencilIcon, TrashIcon, WarningIcon, BookOpenIcon, TruckIcon, DocumentReportIcon, PrinterIcon, LockOpenIcon, ClipboardListIcon, ChartBarIcon, XCircleIcon } from './icons';
+import { ArrowLeftIcon, PencilIcon, TrashIcon, WarningIcon, BookOpenIcon, TruckIcon, DocumentReportIcon, PrinterIcon, LockOpenIcon, ClipboardListIcon, ChartBarIcon, XCircleIcon, ArchiveIcon } from './icons';
 import LotHistoryModal from './LotHistoryModal';
 import FinishedConferencesModal from './FinishedConferencesModal';
 import ConferenceReport from './ConferenceReport';
@@ -10,6 +10,7 @@ import TransfersHistoryModal from './TransfersHistoryModal';
 import TransferReport from './TransferReport';
 import InventoryReport from './InventoryReport';
 import StockDashboard from './StockDashboard';
+import StockPyramidMapModal from './StockPyramidMapModal';
 
 const getStatusBadge = (status: StockItem['status']) => {
     const styles = {
@@ -305,6 +306,7 @@ const StockControl: React.FC<{
     const [transferReportData, setTransferReportData] = useState<TransferRecord | null>(null);
     const [showInventoryReport, setShowInventoryReport] = useState(false);
     const [stockDashboardOpen, setStockDashboardOpen] = useState(false);
+    const [isStockMapOpen, setIsStockMapOpen] = useState(false);
 
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
@@ -426,7 +428,9 @@ const StockControl: React.FC<{
             {conferenceReportData && <ConferenceReport reportData={conferenceReportData} onClose={() => setConferenceReportData(null)} />}
             {transferHistoryOpen && <TransfersHistoryModal transfers={transfers} onClose={() => setTransferHistoryOpen(false)} onShowReport={setTransferReportData} />}
             {transferReportData && <TransferReport reportData={transferReportData} onClose={() => setTransferReportData(null)} />}
+
             {showInventoryReport && <InventoryReport stock={stock} filters={{ searchTerm, statusFilter, materialFilter, bitolaFilter }} onClose={() => setShowInventoryReport(false)} />}
+            {isStockMapOpen && <StockPyramidMapModal stock={stock} onClose={() => setIsStockMapOpen(false)} onUpdateStockItem={updateStockItem} />}
             {deletingItem && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white p-8 rounded-xl shadow-xl w-full max-w-md text-center">
@@ -474,6 +478,9 @@ const StockControl: React.FC<{
                 <div className="flex gap-4">
                     <button onClick={() => setStockDashboardOpen(true)} className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
                         <ChartBarIcon className="h-5 w-5" />Estatística
+                    </button>
+                    <button onClick={() => setIsStockMapOpen(true)} className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
+                        <ArchiveIcon className="h-5 w-5 text-emerald-600" />Mapa de Estoque
                     </button>
                     <button onClick={() => setShowInventoryReport(true)} className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
                         <PrinterIcon className="h-5 w-5" />Imprimir Inventário

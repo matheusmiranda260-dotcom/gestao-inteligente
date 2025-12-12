@@ -82,6 +82,7 @@ export interface StockItem {
     status: 'Disponível' | 'Em Produção' | 'Em Produção - Treliça' | 'Em Produção - Trefila' | 'Transferido' | 'Disponível - Suporte Treliça' | 'CA-60' | 'Consumido para fazer treliça';
     history?: HistoryEvent[];
     productionOrderIds?: string[];
+    location?: string;
 }
 
 export interface ConferenceLotData {
