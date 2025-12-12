@@ -103,54 +103,117 @@ const AddConferenceModal: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-            <form onSubmit={handleFinalSubmit} className="bg-white p-6 rounded-xl shadow-xl w-full max-w-6xl max-h-[95vh] flex flex-col">
-                <h2 className="text-2xl font-bold text-slate-800 mb-4 border-b pb-4">Adicionar Nova Conferência</h2>
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-2 md:p-4">
+            <form onSubmit={handleFinalSubmit} className="bg-white p-3 md:p-6 rounded-xl shadow-xl w-full max-w-6xl max-h-[95vh] flex flex-col h-full md:h-auto">
+                <h2 className="text-xl md:text-2xl font-bold text-slate-800 mb-4 border-b pb-4">Adicionar Nova Conferência</h2>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 p-4 bg-slate-50 rounded-lg border">
                     <div><label className="text-sm font-medium">Data Entrada</label><input type="date" value={conferenceData.entryDate} onChange={e => setConferenceData({ ...conferenceData, entryDate: e.target.value })} className="w-full p-2 border border-slate-300 rounded" required /></div>
                     <div><label className="text-sm font-medium">Fornecedor</label><input type="text" value={conferenceData.supplier} onChange={e => setConferenceData({ ...conferenceData, supplier: e.target.value })} className="w-full p-2 border border-slate-300 rounded" required /></div>
                     <div><label className="text-sm font-medium">Nota Fiscal (NFe)</label><input type="text" value={conferenceData.nfe} onChange={e => setConferenceData({ ...conferenceData, nfe: e.target.value })} className="w-full p-2 border border-slate-300 rounded" required /></div>
                     <div><label className="text-sm font-medium">Nº Conferência</label><input type="text" value={conferenceData.conferenceNumber} onChange={e => setConferenceData({ ...conferenceData, conferenceNumber: e.target.value })} className="w-full p-2 border border-slate-300 rounded" required /></div>
                 </div>
-                <div className="flex-grow overflow-y-auto border rounded-lg">
-                    <table className="w-full text-sm">
-                        <thead className="sticky top-0 bg-slate-800 z-10">
-                            <tr>
-                                {['Lote Interno', 'Lote Fornecedor', 'Corrida', 'Tipo Material', 'Bitola', 'Peso Etiqueta (kg)', 'Peso Balança (kg)', ''].map(h => <th key={h} className="p-2 text-left font-semibold text-slate-600">{h}</th>)}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {lots.map((lot, index) => (
-                                <tr key={index} className="border-b">
-                                    <td className="p-2">
-                                        <input type="text" value={lot.internalLot || ''} onChange={e => handleLotChange(index, 'internalLot', e.target.value)} className="w-full p-2 border border-slate-300 rounded" required />
-                                        {duplicateErrors[index] && <p className="text-red-500 text-xs mt-1">{duplicateErrors[index]}</p>}
-                                    </td>
-                                    <td className="p-2"><input type="text" value={lot.supplierLot || ''} onChange={e => handleLotChange(index, 'supplierLot', e.target.value)} className="w-full p-2 border border-slate-300 rounded" required /></td>
-                                    <td className="p-2"><input type="text" value={lot.runNumber || ''} onChange={e => handleLotChange(index, 'runNumber', e.target.value)} className="w-full p-2 border border-slate-300 rounded" required /></td>
-                                    <td className="p-2">
-                                        <select value={lot.materialType} onChange={e => handleLotChange(index, 'materialType', e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white">
-                                            {MaterialOptions.map(m => <option key={m} value={m}>{m}</option>)}
-                                        </select>
-                                    </td>
-                                    <td className="p-2">
-                                        <select value={lot.bitola} onChange={e => handleLotChange(index, 'bitola', e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white">
-                                            {allBitolaOptions.map(b => <option key={b} value={b}>{b}</option>)}
-                                        </select>
-                                    </td>
-                                    <td className="p-2"><input type="number" step="0.01" value={lot.labelWeight || ''} onChange={e => handleLotChange(index, 'labelWeight', parseFloat(e.target.value))} className="w-full p-2 border border-slate-300 rounded" required /></td>
-                                    <td className="p-2"><input type="number" step="0.01" value={lot.scaleWeight || ''} onChange={e => handleLotChange(index, 'scaleWeight', parseFloat(e.target.value))} className="w-full p-2 border border-slate-300 rounded" required /></td>
-                                    <td className="p-2 text-center"><button type="button" onClick={() => handleRemoveLot(index)} className="p-1 text-red-500 hover:text-red-700"><TrashIcon className="h-5 w-5" /></button></td>
+                <div className="flex-grow overflow-y-auto border rounded-lg bg-slate-50 md:bg-white p-2 md:p-0">
+
+                    {/* Desktop Table View */}
+                    <div className="hidden md:block">
+                        <table className="w-full text-sm">
+                            <thead className="sticky top-0 bg-slate-800 z-10">
+                                <tr>
+                                    {['Lote Interno', 'Lote Fornecedor', 'Corrida', 'Tipo Material', 'Bitola', 'Peso Etiqueta (kg)', 'Peso Balança (kg)', ''].map(h => <th key={h} className="p-2 text-left font-semibold text-slate-600 md:text-white">{h}</th>)}
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {lots.map((lot, index) => (
+                                    <tr key={index} className="border-b">
+                                        <td className="p-2">
+                                            <input type="text" value={lot.internalLot || ''} onChange={e => handleLotChange(index, 'internalLot', e.target.value)} className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500" required placeholder="Lote Interno" />
+                                            {duplicateErrors[index] && <p className="text-red-500 text-xs mt-1">{duplicateErrors[index]}</p>}
+                                        </td>
+                                        <td className="p-2"><input type="text" value={lot.supplierLot || ''} onChange={e => handleLotChange(index, 'supplierLot', e.target.value)} className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500" required placeholder="Lote Fornec." /></td>
+                                        <td className="p-2"><input type="text" value={lot.runNumber || ''} onChange={e => handleLotChange(index, 'runNumber', e.target.value)} className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500" required placeholder="Corrida" /></td>
+                                        <td className="p-2">
+                                            <select value={lot.materialType} onChange={e => handleLotChange(index, 'materialType', e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white">
+                                                {MaterialOptions.map(m => <option key={m} value={m}>{m}</option>)}
+                                            </select>
+                                        </td>
+                                        <td className="p-2">
+                                            <select value={lot.bitola} onChange={e => handleLotChange(index, 'bitola', e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white">
+                                                {allBitolaOptions.map(b => <option key={b} value={b}>{b}</option>)}
+                                            </select>
+                                        </td>
+                                        <td className="p-2"><input type="number" step="0.01" value={lot.labelWeight || ''} onChange={e => handleLotChange(index, 'labelWeight', parseFloat(e.target.value))} className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500" required placeholder="0.00" /></td>
+                                        <td className="p-2"><input type="number" step="0.01" value={lot.scaleWeight || ''} onChange={e => handleLotChange(index, 'scaleWeight', parseFloat(e.target.value))} className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500" required placeholder="0.00" /></td>
+                                        <td className="p-2 text-center"><button type="button" onClick={() => handleRemoveLot(index)} className="p-1 text-red-500 hover:text-red-700 transition"><TrashIcon className="h-5 w-5" /></button></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Mobile Card View */}
+                    <div className="md:hidden space-y-4 pb-4">
+                        {lots.map((lot, index) => (
+                            <div key={index} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 relative animate-fadeIn">
+                                <div className="absolute top-3 right-3">
+                                    <button type="button" onClick={() => handleRemoveLot(index)} className="text-red-500 bg-red-50 p-2 rounded-lg hover:bg-red-100">
+                                        <TrashIcon className="h-5 w-5" />
+                                    </button>
+                                </div>
+                                <h3 className="font-bold text-slate-800 mb-3 border-b pb-2">Item #{index + 1}</h3>
+
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-600 mb-1">Lote Interno</label>
+                                        <input type="text" value={lot.internalLot || ''} onChange={e => handleLotChange(index, 'internalLot', e.target.value)} className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ex: INT-001" />
+                                        {duplicateErrors[index] && <p className="text-red-500 text-xs mt-1 font-bold">{duplicateErrors[index]}</p>}
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-600 mb-1">Lote Fornecedor</label>
+                                            <input type="text" value={lot.supplierLot || ''} onChange={e => handleLotChange(index, 'supplierLot', e.target.value)} className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-600 mb-1">Nº Corrida</label>
+                                            <input type="text" value={lot.runNumber || ''} onChange={e => handleLotChange(index, 'runNumber', e.target.value)} className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-600 mb-1">Material</label>
+                                            <select value={lot.materialType} onChange={e => handleLotChange(index, 'materialType', e.target.value)} className="w-full p-3 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                                                {MaterialOptions.map(m => <option key={m} value={m}>{m}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-600 mb-1">Bitola</label>
+                                            <select value={lot.bitola} onChange={e => handleLotChange(index, 'bitola', e.target.value)} className="w-full p-3 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                                                {allBitolaOptions.map(b => <option key={b} value={b}>{b}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3 pt-2">
+                                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                            <label className="block text-xs font-bold text-slate-500 mb-1">Peso Etiqueta</label>
+                                            <input type="number" step="0.01" value={lot.labelWeight || ''} onChange={e => handleLotChange(index, 'labelWeight', parseFloat(e.target.value))} className="w-full p-2 border border-slate-300 rounded bg-white text-center font-bold" placeholder="0.00" />
+                                        </div>
+                                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                            <label className="block text-xs font-bold text-slate-500 mb-1">Peso Balança</label>
+                                            <input type="number" step="0.01" value={lot.scaleWeight || ''} onChange={e => handleLotChange(index, 'scaleWeight', parseFloat(e.target.value))} className="w-full p-2 border border-slate-300 rounded bg-white text-center font-bold text-emerald-700" placeholder="0.00" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
                 <button type="button" onClick={handleAddLot} className="text-slate-600 hover:text-slate-800 font-semibold py-2 mt-2 self-start">+ Adicionar outro lote</button>
 
-                <div className="flex justify-end gap-4 mt-4 pt-4 border-t">
-                    <button type="button" onClick={onClose} className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-4 rounded-lg transition">Cancelar</button>
-                    <button type="submit" className="bg-[#0F3F5C] hover:bg-[#0A2A3D] text-white font-bold py-2 px-4 rounded-lg hover:bg-[#0A2A3D] transition">Finalizar e Adicionar ao Estoque</button>
+                <div className="flex flex-col-reverse md:flex-row justify-end gap-3 md:gap-4 mt-4 pt-4 border-t">
+                    <button type="button" onClick={onClose} className="w-full md:w-auto bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-3 md:py-2 px-4 rounded-lg transition">Cancelar</button>
+                    <button type="submit" className="w-full md:w-auto bg-[#0F3F5C] hover:bg-[#0A2A3D] text-white font-bold py-3 md:py-2 px-4 rounded-lg hover:bg-[#0A2A3D] transition">Finalizar e Adicionar ao Estoque</button>
                 </div>
             </form>
         </div>
