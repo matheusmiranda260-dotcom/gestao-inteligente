@@ -262,8 +262,13 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
     const handlePrintRecipe = (recipe: TrefilaRecipe, e: React.MouseEvent) => {
         e.stopPropagation();
         handleLoadRecipe(recipe);
+
+        const originalTitle = document.title;
+        document.title = ' '; // Clear title to prevent browser print header
+
         setTimeout(() => {
             window.print();
+            document.title = originalTitle;
         }, 600);
     };
 
@@ -293,28 +298,6 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                             <span className="hidden md:inline">Gerenciar Anéis/Fieiras</span>
                             <span className="md:hidden">Anéis</span>
                         </button>
-                    </div>
-                </div>
-
-                {/* PRINT ONLY HEADER */}
-                <div className="hidden print:block p-8 mb-6 bg-white border-b-2 border-slate-800">
-                    <div className="flex items-center justify-between mb-4">
-                        <h1 className="text-2xl font-bold text-slate-900">Relatório de Trefilação</h1>
-                        <div className="text-sm text-slate-500">
-                            Gerado em: {new Date().toLocaleDateString()}
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 text-sm border-t border-slate-200 pt-4">
-                        <div>
-                            <span className="block text-slate-500 text-xs uppercase font-bold">Receita</span>
-                            <span className="font-bold text-slate-800 text-lg">{recipeName || 'Simulação Personalizada'}</span>
-                        </div>
-                        <div className="text-right">
-                            <span className="block text-slate-500 text-xs uppercase font-bold">Parâmetros</span>
-                            <span className="text-slate-700">
-                                {params.type} • {params.entryDiameter}mm → {params.finalDiameter}mm ({params.passes} passes)
-                            </span>
-                        </div>
                     </div>
                 </div>
 
