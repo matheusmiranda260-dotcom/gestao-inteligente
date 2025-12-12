@@ -90,6 +90,7 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                 fetchTable<TrefilaRecipe>('trefila_recipes'),
                 fetchTable<TrefilaRingStock>('trefila_rings_stock')
             ]);
+            console.log('Dados carregados:', { recipes: recipes?.length, rings: rings?.length });
             setSavedRecipes(recipes || []);
             setRingStock(rings || []);
         } catch (error) {
@@ -121,8 +122,9 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
 
         if (!Array.isArray(ringStock)) return { available: 0, required, status: 'ok' as const };
 
-        const stockItem = ringStock.find(r => r?.name && normalize(r.name) === targetName);
-        const available = stockItem?.quantity || 0;
+        // Sum quantity of ALL matching stock items (handling duplicates)
+        const matchingItems = ringStock.filter(r => r?.name && normalize(r.name) === targetName);
+        const available = matchingItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
 
         return {
             available,
