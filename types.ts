@@ -296,3 +296,22 @@ export interface TrefilaRingStock {
     model: string;
     quantity: number;
 }
+
+export interface KaizenAction {
+    id: string;
+    date: string;
+    description: string;
+    photoUrl?: string;
+    type: 'action' | 'resolution';
+}
+
+export interface KaizenProblem {
+    id: string;
+    description: string;
+    sector: string;
+    responsible: string;
+    status: 'Aberto' | 'Em melhoria' | 'Resolvido';
+    date: string;
+    photoUrl?: string;
+    history: KaizenAction[];
+}
