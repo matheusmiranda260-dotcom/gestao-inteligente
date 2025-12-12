@@ -124,7 +124,7 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
 
         // Sum quantity of ALL matching stock items (handling duplicates)
         const matchingItems = ringStock.filter(r => r?.name && normalize(r.name) === targetName);
-        const available = matchingItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
+        const available = matchingItems.reduce((sum, item) => sum + (parseInt(String(item.quantity || 0), 10)), 0);
 
         return {
             available,
@@ -496,6 +496,10 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                     <CalculatorIcon className="h-5 w-5" />
                                     Calcular
                                 </button>
+                                <div className="text-center mt-2 text-xs text-slate-400">
+                                    Status do Estoque: {ringStock.length} itens carregados.
+                                    {ringStock.length === 0 && <span className="text-red-500 font-bold ml-1"> (Verifique conexão)</span>}
+                                </div>
 
                                 {suggestion && (
                                     <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 flex items-start gap-2">
