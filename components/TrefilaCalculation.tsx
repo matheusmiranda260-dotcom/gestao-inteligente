@@ -16,6 +16,41 @@ interface PassResult {
     status: 'Alta' | 'Ok' | 'Baixa';
 }
 
+const RING_DEFS = [
+    // Output (Not Last) - CA & RT
+    { name: 'CA 3,55', min: 3.5, max: 3.65, dest: 'output', cond: 'not_last' },
+    { name: 'CA 4,60', min: 4.55, max: 4.70, dest: 'output', cond: 'not_last' },
+    { name: 'CA 5,50', min: 5.45, max: 5.60, dest: 'output', cond: 'not_last' },
+    { name: 'RT 0', min: 4.00, max: 4.99, dest: 'output', cond: 'not_last' },
+    { name: 'RT 2', min: 6.00, max: 6.99, dest: 'output', cond: 'not_last' },
+    { name: 'RT 3', min: 7.00, max: 7.99, dest: 'output', cond: 'not_last' },
+
+    // Output (Last) - PR
+    { name: 'PR 3,20', min: 3.15, max: 3.30, dest: 'output', cond: 'last' },
+    { name: 'PR 3,40', min: 3.35, max: 3.50, dest: 'output', cond: 'last' },
+    { name: 'PR 3,70', min: 3.65, max: 3.80, dest: 'output', cond: 'last' },
+    { name: 'PR 3,80', min: 3.75, max: 3.90, dest: 'output', cond: 'last' },
+    { name: 'PR 4,10', min: 4.05, max: 4.20, dest: 'output', cond: 'last' },
+    { name: 'PR 4,20', min: 4.15, max: 4.30, dest: 'output', cond: 'last' },
+    { name: 'PR 4,40', min: 4.35, max: 4.50, dest: 'output', cond: 'last' },
+    { name: 'PR 5,00', min: 4.95, max: 5.10, dest: 'output', cond: 'last' },
+    { name: 'PR 5,50', min: 5.45, max: 5.60, dest: 'output', cond: 'last' },
+    { name: 'PR 5,60', min: 5.55, max: 5.70, dest: 'output', cond: 'last' },
+    { name: 'PR 5,80', min: 5.75, max: 5.90, dest: 'output', cond: 'last' },
+    { name: 'PR 6,00', min: 5.95, max: 6.10, dest: 'output', cond: 'last' },
+
+    // Entry (Not Last) - RO
+    { name: 'RO 0', min: 4.00, max: 4.99, dest: 'entry', cond: 'not_last' },
+    { name: 'RO 1', min: 5.00, max: 5.99, dest: 'entry', cond: 'not_last' },
+    { name: 'RO 2', min: 6.00, max: 6.99, dest: 'entry', cond: 'not_last' },
+    { name: 'RO 3', min: 7.00, max: 7.99, dest: 'entry', cond: 'not_last' },
+
+    // Entry (Last) - ROA
+    { name: 'ROA 0', min: 3.49, max: 4.23, dest: 'entry', cond: 'last' },
+    { name: 'ROA 1', min: 4.60, max: 5.56, dest: 'entry', cond: 'last' },
+    { name: 'ROA 2', min: 5.60, max: 6.00, dest: 'entry', cond: 'last' },
+];
+
 const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
     // UI State
     const [isLoading, setIsLoading] = useState(false);
@@ -201,51 +236,32 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
 
         setPassDiameters(currentResult.diameters);
 
-        // Auto-suggest Rings based on Diameter Rules
+        // Auto-suggest Rings using Best Fit Logic
         const newRings = currentResult.diameters.map((dOutput, index) => {
             const isLast = index === n - 1;
             const dEntry = index === 0 ? dIn : currentResult.diameters[index - 1];
 
-            let entryRing = '';
-            let outputRing = '';
+            const getBestRing = (diameter: number, dest: string, cond: string) => {
+                const candidates = RING_DEFS.filter(r => r.dest === dest && r.cond === cond);
 
-            // Entry Ring Logic
-            if (!isLast) {
-                if (dEntry >= 4.00 && dEntry <= 4.99) entryRing = 'RO 0';
-                else if (dEntry >= 5.00 && dEntry <= 5.99) entryRing = 'RO 1';
-                else if (dEntry >= 6.00 && dEntry <= 6.99) entryRing = 'RO 2';
-                else if (dEntry >= 7.00 && dEntry <= 7.99) entryRing = 'RO 3';
-            } else {
-                if (dEntry >= 3.49 && dEntry <= 4.23) entryRing = 'ROA 0';
-                else if (dEntry >= 4.60 && dEntry <= 5.56) entryRing = 'ROA 1';
-                else if (dEntry >= 5.60 && dEntry <= 6.00) entryRing = 'ROA 2';
-            }
+                // 1. Try Exact Range (Sort by narrower range first)
+                const exact = candidates.filter(r => diameter >= r.min && diameter <= r.max);
+                if (exact.length > 0) {
+                    return exact.sort((a, b) => (a.max - a.min) - (b.max - b.min))[0].name;
+                }
 
-            // Output Ring Logic
-            if (!isLast) {
-                // Priority to specific CA ranges
-                if (dOutput >= 3.50 && dOutput <= 3.65) outputRing = 'CA 3,55';
-                else if (dOutput >= 4.55 && dOutput <= 4.70) outputRing = 'CA 4,60';
-                else if (dOutput >= 5.45 && dOutput <= 5.60) outputRing = 'CA 5,50';
-                // Fallback to RT generic ranges
-                else if (dOutput >= 4.00 && dOutput <= 4.99) outputRing = 'RT 0';
-                else if (dOutput >= 6.00 && dOutput <= 6.99) outputRing = 'RT 2';
-                else if (dOutput >= 7.00 && dOutput <= 7.99) outputRing = 'RT 3';
-            } else {
-                // PR Series for Last Pass
-                if (dOutput >= 3.15 && dOutput <= 3.30) outputRing = 'PR 3,20';
-                else if (dOutput >= 3.35 && dOutput <= 3.50) outputRing = 'PR 3,40';
-                else if (dOutput >= 3.65 && dOutput <= 3.80) outputRing = 'PR 3,70';
-                else if (dOutput >= 3.75 && dOutput <= 3.90) outputRing = 'PR 3,80';
-                else if (dOutput >= 4.05 && dOutput <= 4.20) outputRing = 'PR 4,10';
-                else if (dOutput >= 4.15 && dOutput <= 4.30) outputRing = 'PR 4,20';
-                else if (dOutput >= 4.35 && dOutput <= 4.50) outputRing = 'PR 4,40';
-                else if (dOutput >= 4.95 && dOutput <= 5.10) outputRing = 'PR 5,00';
-                else if (dOutput >= 5.45 && dOutput <= 5.60) outputRing = 'PR 5,50';
-                else if (dOutput >= 5.55 && dOutput <= 5.70) outputRing = 'PR 5,60';
-                else if (dOutput >= 5.75 && dOutput <= 5.90) outputRing = 'PR 5,80';
-                else if (dOutput >= 5.95 && dOutput <= 6.10) outputRing = 'PR 6,00';
-            }
+                // 2. Closest Center
+                if (candidates.length === 0) return '-';
+                return candidates.sort((a, b) => {
+                    const centerA = (a.min + a.max) / 2;
+                    const centerB = (b.min + b.max) / 2;
+                    return Math.abs(centerA - diameter) - Math.abs(centerB - diameter);
+                })[0].name;
+            };
+
+            const entryRing = getBestRing(dEntry, 'entry', isLast ? 'last' : 'not_last');
+            const outputRing = getBestRing(dOutput, 'output', isLast ? 'last' : 'not_last');
+
             return { entry: entryRing, output: outputRing };
         });
 
