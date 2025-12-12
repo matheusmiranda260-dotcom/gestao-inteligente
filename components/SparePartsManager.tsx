@@ -255,101 +255,149 @@ const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
                     {loading ? (
                         <div className="p-8 text-center text-slate-500">Carregando peças...</div>
                     ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500 font-semibold tracking-wider">
-                                        <th className="p-4 w-16">Img</th>
-                                        <th className="p-4">Peça / Descrição</th>
-                                        <th className="p-4">Modelo</th>
-                                        <th className="p-4">Máquina</th>
-                                        <th className="p-4 text-center">Estoque</th>
-                                        <th className="p-4 text-center">Mínimo</th>
-                                        <th className="p-4 text-center">Status</th>
-                                        <th className="p-4 text-right">Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {filteredParts.length > 0 ? filteredParts.map(part => {
-                                        const status = getStockStatus(part.currentStock, part.minStock);
-                                        return (
-                                            <tr key={part.id} className="hover:bg-slate-50 transition-colors">
-                                                <td className="p-4">
-                                                    {part.imageUrl ? (
-                                                        <img src={part.imageUrl} alt={part.name} className="w-10 h-10 object-cover rounded-lg border border-slate-200" />
-                                                    ) : (
-                                                        <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-slate-300">
-                                                            <AdjustmentsIcon className="h-5 w-5" />
-                                                        </div>
-                                                    )}
-                                                </td>
-                                                <td className="p-4 font-medium text-slate-800">{part.name}</td>
-                                                <td className="p-4 text-slate-600">{part.model}</td>
-                                                <td className="p-4 text-slate-600">
-                                                    <span className="px-2 py-1 rounded-md bg-slate-100 text-xs font-bold text-slate-600 border border-slate-200">
-                                                        {part.machine}
-                                                    </span>
-                                                </td>
-                                                <td className="p-4 text-center font-bold text-slate-800 text-lg">{part.currentStock}</td>
-                                                <td className="p-4 text-center text-slate-500">{part.minStock}</td>
-                                                <td className="p-4 text-center">
-                                                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${status.color}`}>
-                                                        {status.label}
-                                                    </span>
-                                                </td>
-                                                <td className="p-4 text-right space-x-1">
-                                                    <button
-                                                        onClick={() => handleOpenMovement(part, 'IN')}
-                                                        className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
-                                                        title="Adicionar Estoque"
-                                                    >
-                                                        <div className="flex items-center gap-1 font-semibold text-xs border border-emerald-200 px-2 py-1 rounded bg-emerald-50">
-                                                            <PlusIcon className="h-4 w-4" /> Add
-                                                        </div>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleOpenMovement(part, 'OUT')}
-                                                        className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition"
-                                                        title="Baixar Estoque (Usar)"
-                                                    >
-                                                        <div className="flex items-center gap-1 font-semibold text-xs border border-amber-200 px-2 py-1 rounded bg-amber-50">
-                                                            <MinusIcon className="h-4 w-4" /> Baixar
-                                                        </div>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleOpenHistoryModal(part)}
-                                                        className="p-1.5 text-slate-600 hover:bg-slate-100 rounded-lg transition"
-                                                        title="Ver Histórico"
-                                                    >
-                                                        <ClockIcon className="h-5 w-5" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleOpenEditModal(part)}
-                                                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                                                        title="Editar"
-                                                    >
-                                                        <PencilIcon className="h-5 w-5" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDelete(part.id)}
-                                                        className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition"
-                                                        title="Excluir"
-                                                    >
-                                                        <TrashIcon className="h-5 w-5" />
-                                                    </button>
+                        <>
+                            {/* Desktop View */}
+                            <div className="hidden md:block overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500 font-semibold tracking-wider">
+                                            <th className="p-4 w-16">Img</th>
+                                            <th className="p-4">Peça / Descrição</th>
+                                            <th className="p-4">Modelo</th>
+                                            <th className="p-4">Máquina</th>
+                                            <th className="p-4 text-center">Estoque</th>
+                                            <th className="p-4 text-center">Mínimo</th>
+                                            <th className="p-4 text-center">Status</th>
+                                            <th className="p-4 text-right">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {filteredParts.length > 0 ? filteredParts.map(part => {
+                                            const status = getStockStatus(part.currentStock, part.minStock);
+                                            return (
+                                                <tr key={part.id} className="hover:bg-slate-50 transition-colors">
+                                                    <td className="p-4">
+                                                        {part.imageUrl ? (
+                                                            <img src={part.imageUrl} alt={part.name} className="w-10 h-10 object-cover rounded-lg border border-slate-200" />
+                                                        ) : (
+                                                            <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-slate-300">
+                                                                <AdjustmentsIcon className="h-5 w-5" />
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td className="p-4 font-medium text-slate-800">{part.name}</td>
+                                                    <td className="p-4 text-slate-600">{part.model}</td>
+                                                    <td className="p-4 text-slate-600">
+                                                        <span className="px-2 py-1 rounded-md bg-slate-100 text-xs font-bold text-slate-600 border border-slate-200">
+                                                            {part.machine}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-4 text-center font-bold text-slate-800 text-lg">{part.currentStock}</td>
+                                                    <td className="p-4 text-center text-slate-500">{part.minStock}</td>
+                                                    <td className="p-4 text-center">
+                                                        <span className={`px-2 py-1 rounded-full text-xs font-bold ${status.color}`}>
+                                                            {status.label}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-4 text-right space-x-1">
+                                                        <button
+                                                            onClick={() => handleOpenMovement(part, 'IN')}
+                                                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
+                                                            title="Adicionar Estoque"
+                                                        >
+                                                            <div className="flex items-center gap-1 font-semibold text-xs border border-emerald-200 px-2 py-1 rounded bg-emerald-50">
+                                                                <PlusIcon className="h-4 w-4" /> Add
+                                                            </div>
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleOpenMovement(part, 'OUT')}
+                                                            className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition"
+                                                            title="Baixar Estoque (Usar)"
+                                                        >
+                                                            <div className="flex items-center gap-1 font-semibold text-xs border border-amber-200 px-2 py-1 rounded bg-amber-50">
+                                                                <MinusIcon className="h-4 w-4" /> Baixar
+                                                            </div>
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleOpenHistoryModal(part)}
+                                                            className="p-1.5 text-slate-600 hover:bg-slate-100 rounded-lg transition"
+                                                            title="Ver Histórico"
+                                                        >
+                                                            <ClockIcon className="h-5 w-5" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleOpenEditModal(part)}
+                                                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                                                            title="Editar"
+                                                        >
+                                                            <PencilIcon className="h-5 w-5" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDelete(part.id)}
+                                                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition"
+                                                            title="Excluir"
+                                                        >
+                                                            <TrashIcon className="h-5 w-5" />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        }) : (
+                                            <tr>
+                                                <td colSpan={8} className="p-8 text-center text-slate-400">
+                                                    Nenhuma peça encontrada.
                                                 </td>
                                             </tr>
-                                        );
-                                    }) : (
-                                        <tr>
-                                            <td colSpan={7} className="p-8 text-center text-slate-400">
-                                                Nenhuma peça encontrada.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* Mobile View (Cards) */}
+                            <div className="md:hidden divide-y divide-slate-100">
+                                {filteredParts.length > 0 ? filteredParts.map(part => {
+                                    const status = getStockStatus(part.currentStock, part.minStock);
+                                    return (
+                                        <div key={part.id} className="p-4 flex gap-4 bg-white">
+                                            <div className="flex-shrink-0">
+                                                {part.imageUrl ? (
+                                                    <img src={part.imageUrl} alt={part.name} className="w-20 h-20 object-cover rounded-lg border border-slate-200" />
+                                                ) : (
+                                                    <div className="w-20 h-20 bg-slate-100 rounded-lg flex items-center justify-center text-slate-300">
+                                                        <AdjustmentsIcon className="h-8 w-8" />
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="flex-grow min-w-0">
+                                                <div className="flex justify-between items-start mb-1">
+                                                    <h3 className="font-bold text-slate-800 truncate pr-2">{part.name}</h3>
+                                                    <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${status.color}`}>
+                                                        {status.label}
+                                                    </span>
+                                                </div>
+                                                <p className="text-sm text-slate-500 truncate">{part.model}</p>
+
+                                                <div className="flex items-center justify-between mt-3">
+                                                    <span className="text-xs font-bold text-slate-500 px-2 py-1 bg-slate-100 rounded border border-slate-200">{part.machine}</span>
+                                                    <div className="text-sm font-bold text-slate-700">Estoque: <span className="text-xl">{part.currentStock}</span></div>
+                                                </div>
+
+                                                <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-slate-50">
+                                                    <button onClick={() => handleOpenMovement(part, 'IN')} className="flex-1 p-2 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-100 flex justify-center items-center gap-1 font-bold text-xs"><PlusIcon className="h-4 w-4" /> Add</button>
+                                                    <button onClick={() => handleOpenMovement(part, 'OUT')} className="flex-1 p-2 bg-amber-50 text-amber-700 rounded-lg border border-amber-100 flex justify-center items-center gap-1 font-bold text-xs"><MinusIcon className="h-4 w-4" /> Usar</button>
+                                                    <button onClick={() => handleOpenHistoryModal(part)} className="p-2 bg-slate-50 text-slate-600 rounded-lg border border-slate-200"><ClockIcon className="h-4 w-4" /></button>
+                                                    <button onClick={() => handleOpenEditModal(part)} className="p-2 bg-blue-50 text-blue-600 rounded-lg border border-blue-100"><PencilIcon className="h-4 w-4" /></button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                }) : (
+                                    <div className="p-8 text-center text-slate-400">
+                                        Nenhuma peça encontrada.
+                                    </div>
+                                )}
+                            </div>
+                        </>
                     )}
                 </div>
             </div>
