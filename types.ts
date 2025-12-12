@@ -35,6 +35,7 @@ export interface PartUsage {
     machine: string;
     reason?: string;
     user?: string;
+    type?: 'IN' | 'OUT';
 }
 
 export interface SparePart {
@@ -47,6 +48,7 @@ export interface SparePart {
     minStock: number;
     location?: string;
     lastUpdated?: string;
+    imageUrl?: string;
     history?: PartUsage[];
 }
 

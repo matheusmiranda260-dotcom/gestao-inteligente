@@ -14,7 +14,7 @@ const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
 
     // Modals State
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [isConsumeModalOpen, setIsConsumeModalOpen] = useState(false);
+    const [isMovementModalOpen, setIsMovementModalOpen] = useState(false);
     const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
 
     // Active Item for Modals
@@ -24,11 +24,11 @@ const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
 
     // Forms State
     const [formData, setFormData] = useState<Partial<SparePart>>({
-        name: '', model: '', machine: 'Geral', currentStock: 0, minStock: 0
+        name: '', model: '', machine: 'Geral', currentStock: 0, minStock: 0, imageUrl: ''
     });
 
-    const [consumeData, setConsumeData] = useState<{ quantity: number, reason: string, user: string }>({
-        quantity: 1, reason: '', user: ''
+    const [movementData, setMovementData] = useState<{ type: 'IN' | 'OUT', quantity: number, reason: string, user: string, date: string }>({
+        type: 'OUT', quantity: 1, reason: '', user: '', date: ''
     });
 
     // --- Fetch Data ---
@@ -57,7 +57,7 @@ const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
             setFormData({ ...part });
         } else {
             setSelectedPart(null);
-            setFormData({ name: '', model: '', machine: 'Geral', currentStock: 0, minStock: 0 });
+            setFormData({ name: '', model: '', machine: 'Geral', currentStock: 0, minStock: 0, imageUrl: '' });
         }
         setIsEditModalOpen(true);
     };
@@ -82,43 +82,52 @@ const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
         }
     };
 
-    // 2. Consume (Baixar Estoque)
-    const handleOpenConsumeModal = (part: SparePart) => {
+    // 2. Movement (Entrada / Baixa)
+    const handleOpenMovement = (part: SparePart, type: 'IN' | 'OUT') => {
         setSelectedPart(part);
-        setConsumeData({ quantity: 1, reason: '', user: '' });
-        setIsConsumeModalOpen(true);
+        // Default date to now (local ISO-like string for datetime-local input)
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        const dateStr = now.toISOString().slice(0, 16);
+
+        setMovementData({ type, quantity: 1, reason: '', user: '', date: dateStr });
+        setIsMovementModalOpen(true);
     };
 
-    const handleConfirmConsume = async () => {
-        if (!selectedPart || consumeData.quantity <= 0) return;
-        if (consumeData.quantity > selectedPart.currentStock) {
+    const handleConfirmMovement = async () => {
+        if (!selectedPart || movementData.quantity <= 0) return;
+
+        if (movementData.type === 'OUT' && movementData.quantity > selectedPart.currentStock) {
             return alert('Quantidade a baixar é maior que o estoque atual.');
         }
 
         try {
             // 1. Create history record in DB
-            // We map 'user' to 'user_name' for DB match if needed, or just insert.
-            // My SQL used 'user_name'. 
             const historyItem = {
-                part_id: selectedPart.id, // Ensure this matches your DB column name for foreign key
-                date: new Date().toISOString(),
-                quantity: consumeData.quantity,
+                part_id: selectedPart.id,
+                date: new Date(movementData.date).toISOString(),
+                quantity: movementData.quantity,
                 machine: selectedPart.machine,
-                reason: consumeData.reason || 'Consumo Geral',
-                user_name: consumeData.user || 'Desconhecido' // Use user_name for Supabase
+                reason: movementData.reason || (movementData.type === 'IN' ? 'Entrada Estoque' : 'Consumo Geral'),
+                user_name: movementData.user || 'Desconhecido',
+                type: movementData.type
             };
 
+            // @ts-ignore
             await insertItem('part_usage_history', historyItem);
 
             // 2. Update stock
-            const newStock = selectedPart.currentStock - consumeData.quantity;
+            const newStock = movementData.type === 'IN'
+                ? selectedPart.currentStock + movementData.quantity
+                : selectedPart.currentStock - movementData.quantity;
+
             const updatedPart = await updateItem<SparePart>('spare_parts', selectedPart.id, { currentStock: newStock });
 
             setParts(prev => prev.map(p => p.id === selectedPart.id ? updatedPart : p));
-            setIsConsumeModalOpen(false);
+            setIsMovementModalOpen(false);
         } catch (error) {
             console.error(error);
-            alert('Erro ao registrar baixa.');
+            alert('Erro ao registrar movimentação.');
         }
     };
 
@@ -136,7 +145,8 @@ const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
                 quantity: h.quantity,
                 machine: h.machine,
                 reason: h.reason,
-                user: h.user_name || h.user // handle both checks
+                user: h.user_name || h.user, // handle both checks
+                type: h.type || 'OUT' // Default to OUT for old records
             }));
 
             setPartHistory(mappedHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
@@ -233,6 +243,7 @@ const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500 font-semibold tracking-wider">
+                                        <th className="p-4 w-16">Img</th>
                                         <th className="p-4">Peça / Descrição</th>
                                         <th className="p-4">Modelo</th>
                                         <th className="p-4">Máquina</th>
@@ -247,6 +258,15 @@ const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
                                         const status = getStockStatus(part.currentStock, part.minStock);
                                         return (
                                             <tr key={part.id} className="hover:bg-slate-50 transition-colors">
+                                                <td className="p-4">
+                                                    {part.imageUrl ? (
+                                                        <img src={part.imageUrl} alt={part.name} className="w-10 h-10 object-cover rounded-lg border border-slate-200" />
+                                                    ) : (
+                                                        <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-slate-300">
+                                                            <AdjustmentsIcon className="h-5 w-5" />
+                                                        </div>
+                                                    )}
+                                                </td>
                                                 <td className="p-4 font-medium text-slate-800">{part.name}</td>
                                                 <td className="p-4 text-slate-600">{part.model}</td>
                                                 <td className="p-4 text-slate-600">
@@ -263,7 +283,16 @@ const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
                                                 </td>
                                                 <td className="p-4 text-right space-x-1">
                                                     <button
-                                                        onClick={() => handleOpenConsumeModal(part)}
+                                                        onClick={() => handleOpenMovement(part, 'IN')}
+                                                        className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
+                                                        title="Adicionar Estoque"
+                                                    >
+                                                        <div className="flex items-center gap-1 font-semibold text-xs border border-emerald-200 px-2 py-1 rounded bg-emerald-50">
+                                                            <PlusIcon className="h-4 w-4" /> Add
+                                                        </div>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleOpenMovement(part, 'OUT')}
                                                         className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition"
                                                         title="Baixar Estoque (Usar)"
                                                     >
@@ -329,6 +358,10 @@ const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
                                 <input type="text" value={formData.model} onChange={e => setFormData({ ...formData, model: e.target.value })} className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ex: SKF 6205-2Z" />
                             </div>
                             <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-1">URL da Imagem (Foto)</label>
+                                <input type="text" value={formData.imageUrl || ''} onChange={e => setFormData({ ...formData, imageUrl: e.target.value })} className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="http://..." />
+                            </div>
+                            <div>
                                 <label className="block text-sm font-bold text-slate-700 mb-1">Máquina</label>
                                 <select value={formData.machine} onChange={e => setFormData({ ...formData, machine: e.target.value })} className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white">
                                     <option value="Geral">Geral</option>
@@ -356,59 +389,74 @@ const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
                 </div>
             )}
 
-            {/* Modal: Consume (Baixar) */}
-            {isConsumeModalOpen && selectedPart && (
+            {/* Modal: Movement (Add/Remove) */}
+            {isMovementModalOpen && selectedPart && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-fadeIn">
-                        <div className="bg-amber-50 px-6 py-4 border-b border-amber-100 flex justify-between items-center">
-                            <h2 className="text-xl font-bold text-amber-800 flex items-center gap-2">
-                                <MinusIcon className="h-6 w-6" /> Baixar Estoque
+                        <div className={`px-6 py-4 border-b flex justify-between items-center ${movementData.type === 'IN' ? 'bg-emerald-50 border-emerald-100' : 'bg-amber-50 border-amber-100'}`}>
+                            <h2 className={`text-xl font-bold flex items-center gap-2 ${movementData.type === 'IN' ? 'text-emerald-800' : 'text-amber-800'}`}>
+                                {movementData.type === 'IN' ? <PlusIcon className="h-6 w-6" /> : <MinusIcon className="h-6 w-6" />}
+                                {movementData.type === 'IN' ? 'Adicionar Estoque' : 'Baixar Estoque'}
                             </h2>
-                            <button onClick={() => setIsConsumeModalOpen(false)} className="text-amber-800/50 hover:text-amber-800 transition"><XIcon /></button>
+                            <button onClick={() => setIsMovementModalOpen(false)} className="opacity-50 hover:opacity-100 transition"><XIcon /></button>
                         </div>
                         <div className="p-6 space-y-4">
                             <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
                                 <p className="text-sm text-slate-500 mb-1">Peça selecionada:</p>
                                 <p className="font-bold text-slate-800">{selectedPart.name}</p>
-                                <p className="text-xs text-slate-600">{selectedPart.model} ({selectedPart.machine})</p>
                                 <p className="text-sm font-bold text-slate-700 mt-2">Estoque Atual: {selectedPart.currentStock}</p>
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1">Quantidade utilizada</label>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    max={selectedPart.currentStock}
-                                    value={consumeData.quantity}
-                                    onChange={e => setConsumeData({ ...consumeData, quantity: Number(e.target.value) })}
-                                    className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none text-lg font-bold text-center"
-                                />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-1">Data / Hora</label>
+                                    <input
+                                        type="datetime-local"
+                                        value={movementData.date}
+                                        onChange={e => setMovementData({ ...movementData, date: e.target.value })}
+                                        className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-1">Quantidade</label>
+                                    <input
+                                        type="number" min="1"
+                                        value={movementData.quantity}
+                                        onChange={e => setMovementData({ ...movementData, quantity: Number(e.target.value) })}
+                                        className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-center font-bold"
+                                    />
+                                </div>
                             </div>
+
                             <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1">Quem retirou?</label>
+                                <label className="block text-sm font-bold text-slate-700 mb-1">{movementData.type === 'IN' ? 'Responsável' : 'Quem retirou?'}</label>
                                 <input
                                     type="text"
-                                    value={consumeData.user}
-                                    onChange={e => setConsumeData({ ...consumeData, user: e.target.value })}
-                                    className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none"
-                                    placeholder="Nome do operador"
+                                    value={movementData.user}
+                                    onChange={e => setMovementData({ ...movementData, user: e.target.value })}
+                                    className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                    placeholder="Nome do responsável"
                                 />
                             </div>
                             <div>
                                 <label className="block text-sm font-bold text-slate-700 mb-1">Motivo / Observação</label>
                                 <input
                                     type="text"
-                                    value={consumeData.reason}
-                                    onChange={e => setConsumeData({ ...consumeData, reason: e.target.value })}
-                                    className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none"
-                                    placeholder="Ex: Manutenção corretiva Trefila"
+                                    value={movementData.reason}
+                                    onChange={e => setMovementData({ ...movementData, reason: e.target.value })}
+                                    className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                    placeholder={movementData.type === 'IN' ? "Ex: Compra NF 123" : "Ex: Manutenção Trefila"}
                                 />
                             </div>
                         </div>
                         <div className="bg-slate-50 px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
-                            <button onClick={() => setIsConsumeModalOpen(false)} className="px-4 py-2 text-slate-600 font-semibold hover:bg-slate-200 rounded-lg transition">Cancelar</button>
-                            <button onClick={handleConfirmConsume} className="px-6 py-2 bg-amber-600 text-white font-bold rounded-lg hover:bg-amber-700 transition shadow-lg shadow-amber-900/20">Confirmar Baixa</button>
+                            <button onClick={() => setIsMovementModalOpen(false)} className="px-4 py-2 text-slate-600 font-semibold hover:bg-slate-200 rounded-lg transition">Cancelar</button>
+                            <button
+                                onClick={handleConfirmMovement}
+                                className={`px-6 py-2 text-white font-bold rounded-lg transition shadow-lg ${movementData.type === 'IN' ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-900/20' : 'bg-amber-600 hover:bg-amber-700 shadow-amber-900/20'}`}
+                            >
+                                Confirmar {movementData.type === 'IN' ? 'Entrada' : 'Baixa'}
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -444,7 +492,9 @@ const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
                                                 <td className="p-4 text-sm text-slate-600 whitespace-nowrap">
                                                     {new Date(record.date).toLocaleDateString()} <span className="text-slate-400 text-xs">{new Date(record.date).toLocaleTimeString()}</span>
                                                 </td>
-                                                <td className="p-4 text-sm font-bold text-red-600">-{record.quantity}</td>
+                                                <td className={`p-4 text-sm font-bold ${record.type === 'IN' ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                    {record.type === 'IN' ? '+' : '-'}{record.quantity}
+                                                </td>
                                                 <td className="p-4 text-sm text-slate-800">{record.user || 'Desconhecido'}</td>
                                                 <td className="p-4 text-sm text-slate-600">{record.reason}</td>
                                             </tr>
