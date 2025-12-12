@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { ArrowLeftIcon, SaveIcon, CalculatorIcon, AdjustmentsIcon, TrashIcon, BookOpenIcon, CheckCircleIcon, ExclamationIcon } from './icons';
+import { ArrowLeftIcon, SaveIcon, CalculatorIcon, AdjustmentsIcon, TrashIcon, BookOpenIcon, CheckCircleIcon, ExclamationIcon, PrinterIcon } from './icons';
 import { TrefilaRecipe } from '../types';
 import { insertItem, fetchTable, deleteItem } from '../services/supabaseService';
 import RingStockManager from './RingStockManager';
@@ -244,7 +244,7 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
         setPassDiameters(recipe.passDiameters);
         setPassRings(recipe.passRings || []);
         updateResults(recipe.passDiameters);
-        setRecipeName(recipe.name); // Optional: preload name
+        setRecipeName(recipe.name);
     };
 
     const handleDeleteRecipe = async (id: string, e: React.MouseEvent) => {
@@ -259,11 +259,19 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
         }
     };
 
+    const handlePrintRecipe = (recipe: TrefilaRecipe, e: React.MouseEvent) => {
+        e.stopPropagation();
+        handleLoadRecipe(recipe);
+        setTimeout(() => {
+            window.print();
+        }, 600);
+    };
+
     return (
-        <div className="fixed inset-0 bg-slate-50 z-[100] overflow-y-auto">
-            <div className="min-h-screen flex flex-col">
-                {/* Header */}
-                <div className="bg-white border-b border-slate-200 px-4 md:px-6 py-4 flex items-center justify-between sticky top-0 z-20 shadow-sm">
+        <div className="fixed inset-0 bg-slate-50 z-[100] overflow-y-auto print:static print:bg-white print:overflow-visible">
+            <div className="min-h-screen flex flex-col print:min-h-0 print:block">
+                {/* Header - HIDDEN ON PRINT */}
+                <div className="bg-white border-b border-slate-200 px-4 md:px-6 py-4 flex items-center justify-between sticky top-0 z-20 shadow-sm print:hidden">
                     <div className="flex items-center gap-3 md:gap-4">
                         <button onClick={onClose} className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition">
                             <ArrowLeftIcon className="h-5 w-5" />
@@ -288,10 +296,32 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                     </div>
                 </div>
 
-                <div className="flex-1 max-w-[1920px] w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                {/* PRINT ONLY HEADER */}
+                <div className="hidden print:block p-8 mb-6 bg-white border-b-2 border-slate-800">
+                    <div className="flex items-center justify-between mb-4">
+                        <h1 className="text-2xl font-bold text-slate-900">Relatório de Trefilação</h1>
+                        <div className="text-sm text-slate-500">
+                            Gerado em: {new Date().toLocaleDateString()}
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 text-sm border-t border-slate-200 pt-4">
+                        <div>
+                            <span className="block text-slate-500 text-xs uppercase font-bold">Receita</span>
+                            <span className="font-bold text-slate-800 text-lg">{recipeName || 'Simulação Personalizada'}</span>
+                        </div>
+                        <div className="text-right">
+                            <span className="block text-slate-500 text-xs uppercase font-bold">Parâmetros</span>
+                            <span className="text-slate-700">
+                                {params.type} • {params.entryDiameter}mm → {params.finalDiameter}mm ({params.passes} passes)
+                            </span>
+                        </div>
+                    </div>
+                </div>
 
-                    {/* Left Panel: Controls & Recipes */}
-                    <div className="lg:col-span-3 space-y-6">
+                <div className="flex-1 max-w-[1920px] w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start print:block print:p-0">
+
+                    {/* Left Panel: Controls & Recipes - HIDDEN ON PRINT */}
+                    <div className="lg:col-span-3 space-y-6 print:hidden">
 
                         {/* Parameters Card */}
                         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
@@ -407,12 +437,22 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                                     {recipe.entryDiameter}mm → {recipe.finalDiameter}mm
                                                 </p>
                                             </div>
-                                            <button
-                                                onClick={(e) => handleDeleteRecipe(recipe.id, e)}
-                                                className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-100 text-slate-400 hover:text-red-500 rounded-lg transition"
-                                            >
-                                                <TrashIcon className="h-4 w-4" />
-                                            </button>
+                                            <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                                                <button
+                                                    onClick={(e) => handlePrintRecipe(recipe, e)}
+                                                    className="p-1.5 hover:bg-blue-100 text-slate-400 hover:text-blue-600 rounded-lg transition"
+                                                    title="Imprimir Relatório"
+                                                >
+                                                    <PrinterIcon className="h-4 w-4" />
+                                                </button>
+                                                <button
+                                                    onClick={(e) => handleDeleteRecipe(recipe.id, e)}
+                                                    className="p-1.5 hover:bg-red-100 text-slate-400 hover:text-red-500 rounded-lg transition"
+                                                    title="Excluir Receita"
+                                                >
+                                                    <TrashIcon className="h-4 w-4" />
+                                                </button>
+                                            </div>
                                         </div>
                                     ))
                                 )}
@@ -421,8 +461,8 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
 
                     </div>
 
-                    {/* Right Panel: Results Visualization - Single View */}
-                    <div className="lg:col-span-9 space-y-6">
+                    {/* Right Panel: Results Visualization - Single View - FULL WIDTH ON PRINT */}
+                    <div className="lg:col-span-9 space-y-6 print:col-span-12 print:w-full">
                         {results.length === 0 ? (
                             <div className="bg-white p-12 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-slate-400 min-h-[400px]">
                                 <CalculatorIcon className="h-20 w-20 mb-4 opacity-10" />
@@ -441,7 +481,7 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                         Fluxo de Redução
                                     </h3>
 
-                                    <div className="flex flex-col xl:flex-row items-center justify-center py-8 gap-4 xl:gap-0 relative z-10 overflow-x-auto">
+                                    <div className="flex flex-col xl:flex-row print:flex-row items-center justify-center py-8 gap-4 xl:gap-0 print:gap-2 relative z-10 overflow-x-auto">
                                         {/* Entry Node */}
                                         <div className="flex flex-col items-center group relative cursor-default">
                                             <div className="w-28 h-28 rounded-full bg-slate-800 text-white flex flex-col items-center justify-center shadow-xl border-4 border-slate-50 ring-4 ring-slate-100 z-20 relative overflow-hidden">
@@ -458,7 +498,7 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                         {results.map((res, i) => (
                                             <React.Fragment key={i}>
                                                 {/* Connector */}
-                                                <div className="flex flex-col items-center justify-center w-24 xl:w-32 relative h-16 xl:h-auto">
+                                                <div className="flex flex-col items-center justify-center w-24 xl:w-32 print:w-24 relative h-16 xl:h-auto print:h-auto">
                                                     <div className="absolute top-1/2 left-0 right-0 h-1 bg-slate-200 overflow-hidden rounded-full">
                                                         <div className="h-full bg-blue-500/20 w-full animate-pulse"></div>
                                                     </div>
@@ -627,6 +667,9 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                     background: #cbd5e1;
                     border-radius: 4px;
                 }
+                 @media print {
+                     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                 }
             `}</style>
         </div>
     );
