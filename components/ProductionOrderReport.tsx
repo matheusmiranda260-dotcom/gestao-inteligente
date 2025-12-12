@@ -191,6 +191,162 @@ const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportDat
         return trelicaModels.find(m => m.modelo === reportData.trelicaModel && m.tamanho === reportData.tamanho);
     }, [reportData]);
 
+    // Treliça Specific Layout
+    if (reportData.machine === 'Treliça') {
+        const sizeMeters = parseFloat((reportData.tamanho || '0').replace('MTS', '').trim());
+        const totalPieces = reportData.actualProducedQuantity || 0;
+        const totalMeters = totalPieces * sizeMeters;
+        const timePerPieceSeconds = totalPieces > 0 ? (effectiveTimeMs / 1000) / totalPieces : 0;
+        const velocityMMin = effectiveTimeMs > 0 ? totalMeters / (effectiveTimeMs / 1000 / 60) : 0;
+
+        const productionItems = reportData.weighedPackages || [];
+        const totalPackageWeight = productionItems.reduce((acc, p) => acc + p.weight, 0);
+        const totalPackageQty = productionItems.reduce((acc, p) => acc + p.quantity, 0);
+        const averageWeight = totalPackageQty > 0 ? totalPackageWeight / totalPackageQty : 0;
+
+        return (
+            <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 print-modal-container">
+                <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-4xl max-h-[95vh] flex flex-col print-modal-content">
+                    <div className="flex justify-between items-center mb-4 pb-4 border-b border-[#0F3F5C]/20 no-print">
+                        <h2 className="text-2xl font-bold text-[#0F3F5C]">Relatório de Produção - Treliça</h2>
+                        <div className="flex gap-3">
+                            <button onClick={() => window.print()} className="bg-gradient-to-r from-[#FF8C00] to-[#FFA333] hover:from-[#E67E00] hover:to-[#FF8C00] text-white font-bold py-2 px-4 rounded-lg transition-all shadow-md flex items-center justify-center gap-2">
+                                <PrinterIcon className="h-5 w-5" /> Imprimir
+                            </button>
+                            <button onClick={onClose} className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-4 rounded-lg transition">Fechar</button>
+                        </div>
+                    </div>
+
+                    <div className="overflow-y-auto print-section bg-white p-2 font-sans text-black">
+                        {/* Header */}
+                        <div className="flex items-center border-2 border-black mb-1 p-2">
+                            <div className="w-32 mr-4 flex flex-col items-center justify-center border-r-2 border-black pr-2">
+                                <div className="font-extrabold text-2xl text-[#0F3F5C] italic leading-tight">IITA <span className="text-[#FF8C00]">AÇOS</span></div>
+                            </div>
+                            <div className="flex-grow text-center">
+                                <h1 className="text-lg font-bold uppercase leading-tight">CONTROLE DE PRODUÇÃO DIARIA - SETOR LAMINAÇÃO</h1>
+                                <h2 className="text-xl font-bold uppercase leading-tight">TRELIÇA</h2>
+                            </div>
+                        </div>
+
+                        {/* Order Info */}
+                        <div className="border-2 border-black mb-1 font-bold text-sm">
+                            <div className="border-b border-black p-1 px-2">Ordem de produção : <span className="text-lg">{reportData.orderNumber}</span></div>
+                            <div className="border-b border-black p-1 px-2">Data da produção: {reportData.startTime ? new Date(reportData.startTime).toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' }) : '-'}</div>
+                            <div className="p-1 px-2">Operador/auxiliar: {operatorNames}</div>
+                        </div>
+
+                        {/* Product Info */}
+                        <div className="border-2 border-black mb-2 p-2">
+                            <div className="font-bold text-base uppercase">Descrição do produto: {reportData.trelicaModel} {reportData.tamanho?.includes('MTS') ? reportData.tamanho : `${reportData.tamanho || 0} MTS`}</div>
+                            <div className="font-bold text-lg mt-1">Qnt. De peças produzidas: <span className="text-4xl ml-2">{totalPieces} peças</span></div>
+                        </div>
+
+                        {/* Stops */}
+                        <div className="mb-3">
+                            <h3 className="text-center italic underline font-bold mb-0.5 text-sm">PARADAS E SEUS MOTIVOS:</h3>
+                            <table className="w-full border-collapse border border-black text-xs text-center font-bold">
+                                <tbody>
+                                    {reportData.downtimeEvents?.filter(e => e.resumeTime).map((event, idx) => {
+                                        const duration = new Date(event.resumeTime!).getTime() - new Date(event.stopTime).getTime();
+                                        return (
+                                            <tr key={idx} className="bg-gray-100 border-b border-black">
+                                                <td className="border-r border-black p-0.5 w-[15%] text-red-600">{new Date(event.stopTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
+                                                <td className="border-r border-black p-0.5 w-[15%] text-green-600">{new Date(event.resumeTime!).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
+                                                <td className="border-r border-black p-0.5 italic text-gray-700 uppercase">{event.reason}</td>
+                                                <td className="w-[15%] text-red-600 font-mono">{formatDuration(duration)}</td>
+                                            </tr>
+                                        )
+                                    })}
+                                    {(!reportData.downtimeEvents || reportData.downtimeEvents.length === 0) && (
+                                        <tr><td className="p-1 italic text-gray-400">Nenhuma parada registrada.</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Stats */}
+                        <div className="border border-black p-2 mb-3">
+                            <h3 className="text-center italic underline font-bold mb-2 text-sm">ESTATÍSTICA DO DIA:</h3>
+                            <div className="max-w-xl mx-auto grid grid-cols-[3fr_2fr] gap-y-1 text-sm font-bold">
+                                <div className="text-right pr-4">Horas (Turno trabalhados):</div>
+                                <div className="text-left font-mono">{formatDuration(totalDurationMs)}</div>
+
+                                <div className="text-right pr-4 text-red-600">Tempo de maquina (parada) :</div>
+                                <div className="text-left text-red-600 font-mono flex gap-4">
+                                    <span className="w-20 text-center">{formatDuration(totalDowntimeMs)}</span>
+                                    <span>{totalDurationMs > 0 ? ((totalDowntimeMs / totalDurationMs) * 100).toFixed(1) : 0}%</span>
+                                </div>
+
+                                <div className="text-right pr-4 text-green-600">Tempo de maquina (Efetivo) :</div>
+                                <div className="text-left text-green-600 font-mono flex gap-4">
+                                    <span className="w-20 text-center">{formatDuration(effectiveTimeMs)}</span>
+                                    <span>{totalDurationMs > 0 ? ((effectiveTimeMs / totalDurationMs) * 100).toFixed(1) : 0}%</span>
+                                </div>
+
+                                <div className="text-right pr-4">Quant. de peças produzidas:</div>
+                                <div className="text-left">{totalPieces} peças de {sizeMeters} metros</div>
+
+                                <div className="text-right pr-4">Quant. de metros produzidos:</div>
+                                <div className="text-left">{totalMeters.toFixed(0)} metros</div>
+
+                                <div className="text-right pr-4">Tempo por peça:</div>
+                                <div className="text-left font-mono">{formatDuration(timePerPieceSeconds * 1000)}</div>
+
+                                <div className="text-right pr-4">Velocidade:</div>
+                                <div className="text-left">{velocityMMin.toFixed(1)} metros/ minuto</div>
+                            </div>
+                        </div>
+
+                        {/* Production Updates Table */}
+                        <div className="border border-black p-2">
+                            <h3 className="text-center italic underline font-bold mb-1 text-sm">ATUALIZAÇÃO DA PRODUÇÃO:</h3>
+                            <div className="text-center font-bold mb-2 text-sm">Qntidade de peças a produzir: {reportData.quantityToProduce || '-'} treliças</div>
+
+                            <table className="w-full max-w-lg mx-auto border-collapse border border-black text-center text-sm font-bold">
+                                <thead>
+                                    <tr className="border-b border-black">
+                                        <th className="border-r border-black p-1 w-20">Qnt.</th>
+                                        <th className="border-r border-black p-1 w-20">peso</th>
+                                        <th className="border-r border-black p-1 w-20">media</th>
+                                        <th className="p-1">Data</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {productionItems.length > 0 ? productionItems.map((pkg, idx) => (
+                                        <tr key={idx} className="border-b border-black">
+                                            <td className="border-r border-black p-1">{pkg.quantity}</td>
+                                            <td className="border-r border-black p-1">{pkg.weight.toFixed(0)}</td>
+                                            <td className="border-r border-black p-1">{(pkg.weight / pkg.quantity).toFixed(2)}</td>
+                                            <td className="p-1">{new Date(pkg.timestamp).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}</td>
+                                        </tr>
+                                    )) : (
+                                        <tr className="border-b border-black">
+                                            <td className="border-r border-black p-1">{totalPieces}</td>
+                                            <td className="border-r border-black p-1">{(reportData.actualProducedWeight || 0).toFixed(0)}</td>
+                                            <td className="border-r border-black p-1">{totalPieces > 0 ? ((reportData.actualProducedWeight || 0) / totalPieces).toFixed(2) : '-'}</td>
+                                            <td className="p-1">{new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}</td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                                {productionItems.length > 0 && (
+                                    <tfoot>
+                                        <tr className="bg-gray-50">
+                                            <td className="border-r border-black p-1">{totalPackageQty}</td>
+                                            <td className="border-r border-black p-1">{totalPackageWeight.toFixed(0)}</td>
+                                            <td className="border-r border-black p-1">{averageWeight.toFixed(2)}</td>
+                                            <td className="p-1"></td>
+                                        </tr>
+                                    </tfoot>
+                                )}
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     // Trefila Specific Layout
     if (reportData.machine === 'Trefila') {
         const inputWeight = consumedLots?.reduce((sum, lot) => sum + lot.originalWeight, 0) || 0;

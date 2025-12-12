@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { Page, User, Message, MachineType } from '../types';
-import { UserGroupIcon, ArchiveIcon, CogIcon, ClipboardListIcon, ChartBarIcon, ChatBubbleLeftRightIcon, WrenchScrewdriverIcon } from './icons';
+import { UserGroupIcon, ArchiveIcon, CogIcon, ClipboardListIcon, ChartBarIcon, ChatBubbleLeftRightIcon, WrenchScrewdriverIcon, AdjustmentsIcon } from './icons';
 import MSMLogo from './MSMLogo';
 
 const ManagerMessagesModal: React.FC<{
@@ -271,6 +271,13 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser, mes
                     description="Controle de estoque de peças de reposição."
                     icon={<WrenchScrewdriverIcon />}
                     color="cyan"
+                />
+                <MenuButton
+                    onClick={() => setPage('continuousImprovement')}
+                    label="Melhoria Contínua"
+                    description="Registre problemas e acompanhe a evolução (Kaizen)."
+                    icon={<AdjustmentsIcon />}
+                    color="indigo"
                 />
             </div>
         </div>
