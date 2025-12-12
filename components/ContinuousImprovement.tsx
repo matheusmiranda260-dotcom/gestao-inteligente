@@ -170,12 +170,25 @@ const ContinuousImprovement: React.FC<{ setPage: (page: Page) => void }> = ({ se
 
     const handleAddImprovement = async () => {
         if (!selectedProblem) return;
+        setUploadingInfo(true);
         try {
+            let photoUrl = undefined;
+            if (selectedFile) {
+                const fileName = `kaizen-action-${Date.now()}-${selectedFile.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+                try {
+                    const uploadedUrl = await uploadFile('kaizen-images', fileName, selectedFile);
+                    if (uploadedUrl) photoUrl = uploadedUrl;
+                } catch (uploadError) {
+                    alert('Erro ao subir foto da melhoria, salvando sem foto.');
+                }
+            }
+
             const newAction: KaizenAction = {
                 id: generateId('ACT'),
                 date: new Date().toISOString(),
                 description: improvementData.description,
-                type: 'action'
+                type: 'action',
+                photoUrl: photoUrl
             };
 
             const updatedProblem = {
@@ -192,11 +205,15 @@ const ContinuousImprovement: React.FC<{ setPage: (page: Page) => void }> = ({ se
             setProblems(problems.map(p => p.id === updatedProblem.id ? updatedProblem : p));
             setSelectedProblem(updatedProblem);
             setImprovementData({ description: '' });
+            setSelectedFile(null);
+            setPreviewUrl(null);
             setView('DETAIL');
+            alert('Melhoria registrada com sucesso!');
         } catch (error) {
             alert('Erro ao registrar melhoria.');
             console.error(error);
         }
+        setUploadingInfo(false);
     };
 
     const handleResolve = async () => {
@@ -453,7 +470,14 @@ const ContinuousImprovement: React.FC<{ setPage: (page: Page) => void }> = ({ se
                                 <div key={action.id} className="relative">
                                     <div className="absolute -left-[21px] top-1 h-3 w-3 rounded-full bg-orange-500 ring-4 ring-white"></div>
                                     <p className="text-xs text-slate-400 mb-1">{new Date(action.date).toLocaleDateString('pt-BR')}</p>
-                                    <p className="text-slate-800">{action.description}</p>
+                                    <p className="text-slate-800 mb-2">{action.description}</p>
+                                    {action.photoUrl && (
+                                        <div className="mt-2 mb-2 w-32 h-24 rounded-lg overflow-hidden bg-slate-100 border border-slate-200">
+                                            <a href={action.photoUrl} target="_blank" rel="noopener noreferrer">
+                                                <img src={action.photoUrl} alt="Foto da melhoria" className="w-full h-full object-cover" />
+                                            </a>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>
@@ -462,7 +486,7 @@ const ContinuousImprovement: React.FC<{ setPage: (page: Page) => void }> = ({ se
 
                 <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t border-slate-200 flex flex-col gap-3">
                     <button
-                        onClick={() => setView('ADD_IMPROVEMENT')}
+                        onClick={() => { setView('ADD_IMPROVEMENT'); setSelectedFile(null); setPreviewUrl(null); }}
                         className="w-full bg-[#F59E0B] text-white font-bold py-3.5 rounded-xl shadow-sm hover:bg-orange-600 transition-colors flex items-center justify-center gap-2"
                     >
                         <PlusIcon className="h-5 w-5" />
@@ -492,9 +516,16 @@ const ContinuousImprovement: React.FC<{ setPage: (page: Page) => void }> = ({ se
             </header>
 
             <div className="p-6 space-y-6">
-                <div className="aspect-video bg-slate-100 rounded-2xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 cursor-pointer hover:bg-slate-50 transition-colors">
-                    <CameraIconLocal className="h-12 w-12 mb-2" />
-                    <span className="text-sm font-medium">Foto da melhoria (Em breve)</span>
+                <div onClick={triggerFileInput} className="aspect-video bg-slate-100 rounded-2xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 cursor-pointer hover:bg-slate-50 transition-colors overflow-hidden relative">
+                    {previewUrl ? (
+                        <img src={previewUrl} alt="Preview" className="w-full h-full object-contain" />
+                    ) : (
+                        <>
+                            <CameraIconLocal className="h-12 w-12 mb-2" />
+                            <span className="text-sm font-medium">Foto da melhoria (opcional)</span>
+                        </>
+                    )}
+                    {/* The input is shared but state is cleared on view change, so it works. */}
                 </div>
 
                 <div className="space-y-4">
