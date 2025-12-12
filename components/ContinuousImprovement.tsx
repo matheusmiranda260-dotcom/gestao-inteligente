@@ -526,6 +526,13 @@ const ContinuousImprovement: React.FC<{ setPage: (page: Page) => void }> = ({ se
                         </>
                     )}
                     {/* The input is shared but state is cleared on view change, so it works. */}
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        className="hidden"
+                        accept="image/*"
+                        onChange={handleFileSelect}
+                    />
                 </div>
 
                 <div className="space-y-4">
