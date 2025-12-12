@@ -106,29 +106,38 @@ interface MainMenuProps {
     addMessage: (messageText: string, productionOrderId: string, machine: MachineType) => void;
 }
 
-const MenuButton: React.FC<{ onClick: () => void; label: string; description: string; icon: React.ReactNode; notificationCount?: number; }> = ({ onClick, label, description, icon, notificationCount }) => {
+const MenuButton: React.FC<{ onClick: () => void; label: string; description: string; icon: React.ReactNode; notificationCount?: number; color?: 'cyan' | 'blue' | 'purple' | 'teal' | 'indigo' }> = ({ onClick, label, description, icon, notificationCount, color = 'blue' }) => {
+
+    const colorStyles = {
+        cyan: { bg: 'bg-cyan-50', text: 'text-cyan-600', border: 'border-cyan-100' },
+        blue: { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-100' },
+        purple: { bg: 'bg-violet-50', text: 'text-violet-600', border: 'border-violet-100' },
+        teal: { bg: 'bg-teal-50', text: 'text-teal-600', border: 'border-teal-100' },
+        indigo: { bg: 'bg-indigo-50', text: 'text-indigo-600', border: 'border-indigo-100' },
+    };
+
+    const style = colorStyles[color] || colorStyles['blue'];
+
     return (
         <button
             onClick={onClick}
-            className="relative card p-6 hover:-translate-y-2 transition-all duration-300 text-left w-full flex flex-col justify-between group overflow-hidden"
+            className="relative bg-white p-6 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300 text-left w-full flex flex-col h-full border border-slate-100 group"
         >
-            <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
             {notificationCount && notificationCount > 0 && (
-                <div className="absolute top-4 right-4 bg-red-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center animate-pulse shadow-lg shadow-red-500/50">
+                <div className="absolute top-4 right-4 bg-red-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center animate-pulse shadow-md">
                     {notificationCount}
                 </div>
             )}
 
-            <div className="relative z-10">
-                <div className="bg-[#00E5FF]/10 inline-block p-3 rounded-lg mb-4 group-hover:bg-[#00E5FF]/20 transition-colors duration-300 border border-[#00E5FF]/20">
-                    {React.cloneElement(icon as React.ReactElement<any>, { className: `h-8 w-8 text-[#00E5FF]` })}
-                </div>
-                <h3 className="text-xl font-bold text-white group-hover:text-[#00E5FF] transition-colors">
-                    {label}
-                </h3>
-                <p className="text-slate-400 mt-2 text-sm leading-relaxed border-t border-white/5 pt-2 group-hover:border-white/10">{description}</p>
+            <div className={`inline-flex p-3 rounded-xl mb-4 transition-colors duration-300 ${style.bg} ${style.text}`}>
+                {React.cloneElement(icon as React.ReactElement<any>, { className: `h-8 w-8` })}
             </div>
+
+            <h3 className="text-lg font-bold text-slate-800 mb-2 group-hover:text-blue-600 transition-colors">
+                {label}
+            </h3>
+
+            <p className="text-slate-500 text-sm leading-relaxed">{description}</p>
         </button>
     );
 };
@@ -153,7 +162,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser, mes
     };
 
     return (
-        <div className="min-h-screen p-4 sm:p-6 md:p-8">
+        <div className="min-h-screen p-4 sm:p-6 md:p-10 bg-[#F8FAFC]">
             <ManagerMessagesModal
                 isOpen={isManagerModalOpen}
                 onClose={() => setIsManagerModalOpen(false)}
@@ -161,63 +170,74 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser, mes
                 currentUser={currentUser}
                 addMessage={addMessage}
             />
-            <header className="flex justify-between items-center mb-8 bg-black/20 p-4 rounded-xl border border-white/5 backdrop-blur-sm">
+
+            <header className="flex justify-between items-center mb-12">
                 <div className="flex items-center gap-4">
-                    <MSMLogo size="sm" showText={false} />
+                    <div className="bg-white p-2 rounded-xl shadow-sm border border-slate-100">
+                        <MSMLogo size="sm" showText={false} />
+                    </div>
                     <div>
-                        <h1 className="text-3xl font-bold text-white drop-shadow-md">Menu Principal</h1>
-                        <p className="text-[#00E5FF] font-medium">Bem-vindo, {currentUser?.username || 'Usuário'}.</p>
+                        <h1 className="text-3xl font-bold text-slate-800">Menu Principal</h1>
+                        <p className="text-slate-500 font-medium">Bem-vindo, {currentUser?.username || 'Usuário'}.</p>
                     </div>
                 </div>
                 <button
                     onClick={onLogout}
-                    className="bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold py-2 px-4 rounded-lg transition hover:border-[#00E5FF]/50"
+                    className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2 px-6 rounded-lg transition"
                 >
                     Sair
                 </button>
             </header>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {hasPermission('stock') && <MenuButton
                     onClick={() => setPage('stock')}
                     label="Controle de Estoque"
                     description="Cadastre, visualize e gerencie os lotes de matéria-prima."
                     icon={<ArchiveIcon />}
+                    color="cyan"
                 />}
                 {hasPermission('finishedGoods') && <MenuButton
                     onClick={() => setPage('finishedGoods')}
                     label="Estoque Acabado (Treliça)"
                     description="Visualize o estoque de treliças prontas para expedição."
                     icon={<ArchiveIcon />}
+                    color="blue"
                 />}
                 {hasPermission('trefila') && <MenuButton
                     onClick={() => setPage('trefila')}
                     label="Produção (TREFILA)"
                     description="Acesse o painel de produção da máquina trefiladeira."
                     icon={<CogIcon />}
+                    color="cyan"
                 />}
                 {hasPermission('trelica') && <MenuButton
                     onClick={() => setPage('trelica')}
                     label="Produção (TRELIÇA)"
                     description="Acesse o painel de produção da máquina de treliça."
                     icon={<CogIcon />}
+                    color="indigo"
                 />}
                 {hasPermission('productionOrder') && <MenuButton
                     onClick={() => setPage('productionOrder')}
                     label="Ordem (Trefila)"
                     description="Crie e acompanhe as ordens para a máquina Trefila."
                     icon={<ClipboardListIcon />}
+                    color="teal"
                 />}
                 {hasPermission('productionOrderTrelica') && <MenuButton
                     onClick={() => setPage('productionOrderTrelica')}
                     label="Ordem (Treliça)"
                     description="Crie e acompanhe as ordens para a máquina Treliça."
                     icon={<ClipboardListIcon />}
+                    color="blue"
                 />}
                 {hasPermission('productionDashboard') && <MenuButton
                     onClick={() => setPage('productionDashboard')}
                     label="Dashboard de Produção"
                     description="Acompanhe Trefila e Treliça em tempo real."
                     icon={<ChartBarIcon />}
+                    color="teal"
                 />}
                 {(currentUser?.role === 'admin' || currentUser?.role === 'gestor') && (
                     <MenuButton
@@ -226,6 +246,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser, mes
                         description="Veja as mensagens dos operadores de produção."
                         icon={<ChatBubbleLeftRightIcon />}
                         notificationCount={unreadCount}
+                        color="blue"
                     />
                 )}
                 {hasPermission('reports') && <MenuButton
@@ -233,6 +254,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser, mes
                     label="Relatórios"
                     description="Acompanhe os indicadores de produção e estoque."
                     icon={<ChartBarIcon />}
+                    color="purple"
                 />}
                 {(currentUser?.role === 'admin' || currentUser?.role === 'gestor') && (
                     <MenuButton
@@ -240,6 +262,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser, mes
                         label="Gerenciar Usuários"
                         description="Adicione, edite ou remova usuários do sistema."
                         icon={<UserGroupIcon />}
+                        color="indigo"
                     />
                 )}
                 <MenuButton
@@ -247,6 +270,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser, mes
                     label="Gerenciador de Peças"
                     description="Controle de estoque de peças de reposição."
                     icon={<WrenchScrewdriverIcon />}
+                    color="cyan"
                 />
             </div>
         </div>

@@ -1,56 +1,47 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap');
 
 :root {
-  /* MSM Brand Colors - Premium Dark Tech Theme */
+  /* MSM Brand Colors - Light Tech Theme */
   --msm-blue: #0A2A3D;
-  /* Deep Navy Base */
   --msm-blue-dark: #020F18;
-  /* Near Black */
   --msm-blue-light: #1A5A7D;
-  /* Accent Blue */
-
   --msm-orange: #FF8C00;
-  /* Primary Brand Orange */
   --msm-orange-glow: #FFA500;
-  /* Glow Orange */
   --msm-orange-dark: #E67E00;
-
   --msm-cyan: #00E5FF;
-  /* Neon Cyan Accent */
   --msm-cyan-dim: #008C9E;
 
-  /* Text Colors */
-  --text-primary: #F0F9FF;
-  --text-secondary: #94A3B8;
-  --text-muted: #64748B;
-  --text-highlight: #00E5FF;
+  /* Text Colors - Adapted for Light Mode */
+  --text-primary: #1E293B;
+  /* Slate 800 */
+  --text-secondary: #475569;
+  /* Slate 600 */
+  --text-muted: #94A3B8;
+  /* Slate 400 */
+  --text-highlight: #0072FF;
+  /* Blue Highlight */
 
-  /* Surfaces & Glass */
-  --surface-glass: rgba(15, 23, 42, 0.65);
-  --surface-glass-border: rgba(255, 255, 255, 0.08);
-  --surface-glass-highlight: rgba(255, 255, 255, 0.1);
-  --card-bg: rgba(10, 20, 30, 0.6);
+  /* Surfaces */
+  --surface-glass: rgba(255, 255, 255, 0.7);
+  --surface-glass-border: rgba(226, 232, 240, 0.8);
+  --card-bg: #FFFFFF;
 
   /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6);
-  --shadow-glow-blue: 0 0 15px rgba(0, 229, 255, 0.25);
-  --shadow-glow-orange: 0 0 20px rgba(255, 140, 0, 0.4);
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
 }
 
 body {
   font-family: 'Inter', sans-serif;
-  /* Deep Dark Gradient Background */
-  background: radial-gradient(circle at 50% 0%, #112e45 0%, #051824 40%, #02080c 100%);
-  background-attachment: fixed;
+  background: #F8FAFC;
+  /* Slate 50 */
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  font-weight: bold;
 }
 
 h1,
@@ -60,271 +51,17 @@ h4,
 h5,
 h6 {
   font-family: 'Outfit', sans-serif;
-  color: white;
+  color: var(--text-primary);
   letter-spacing: 0.5px;
 }
 
-/* Custom Scrollbar for Dark Mode */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--msm-blue-light);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--msm-cyan);
-}
-
-/* Glassmorphism utilities */
-.glass {
-  background: var(--surface-glass);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--surface-glass-border);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-  color: var(--text-primary);
-}
-
-.glass-dark {
-  background: rgba(5, 10, 20, 0.8);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 140, 0, 0.15);
-}
-
-/* Animations */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes slideUp {
-  from {
-    transform: translateY(20px);
-    opacity: 0;
-  }
-
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-@keyframes pulse-glow {
-
-  0%,
-  100% {
-    box-shadow: 0 0 15px rgba(255, 140, 0, 0.2);
-  }
-
-  50% {
-    box-shadow: 0 0 25px rgba(255, 140, 0, 0.5);
-  }
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.5s ease-out forwards;
-}
-
-.animate-slide-up {
-  animation: slideUp 0.6s ease-out forwards;
-}
-
-.animate-pulse {
-  animation: pulse-glow 3s infinite;
-}
-
-/* Card Styles */
-.card {
-  background: var(--card-bg);
-  backdrop-filter: blur(12px);
-  border-radius: 1rem;
-  box-shadow: var(--shadow-md);
-  border: 1px solid var(--surface-glass-border);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  color: var(--text-primary);
-}
-
-.card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-glow-blue);
-  border-color: rgba(0, 229, 255, 0.3);
-  background: rgba(20, 35, 50, 0.7);
-}
-
-/* Button Styles - Chamativos */
-.btn-primary {
-  background: linear-gradient(135deg, #00C6FF 0%, #0072FF 100%);
-  color: white;
-  padding: 0.75rem 1.75rem;
-  border-radius: 0.5rem;
-  font-weight: 600;
-  border: none;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(0, 114, 255, 0.3);
-  text-transform: uppercase;
-  font-size: 0.875rem;
-  letter-spacing: 0.05em;
-  position: relative;
-  overflow: hidden;
-}
-
-.btn-primary:hover {
-  background: linear-gradient(135deg, #21D4FD 0%, #2152FF 100%);
-  box-shadow: 0 6px 20px rgba(0, 114, 255, 0.5);
-  transform: translateY(-2px);
-}
-
-.btn-secondary {
-  background: linear-gradient(135deg, #FF8C00 0%, #FF5100 100%);
-  color: white;
-  padding: 0.75rem 1.75rem;
-  border-radius: 0.5rem;
-  font-weight: 600;
-  border: none;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(255, 140, 0, 0.3);
-  text-transform: uppercase;
-  font-size: 0.875rem;
-  letter-spacing: 0.05em;
-}
-
-.btn-secondary:hover {
-  background: linear-gradient(135deg, #FFA726 0%, #E65100 100%);
-  box-shadow: 0 6px 25px rgba(255, 140, 0, 0.5);
-  transform: translateY(-2px);
-}
-
-/* MSM Gradient Background */
-.msm-gradient {
-  background: linear-gradient(135deg, var(--msm-blue-dark) 0%, var(--msm-blue) 100%);
-}
-
-.msm-gradient-reverse {
-  background: linear-gradient(135deg, var(--msm-blue) 0%, var(--msm-blue-dark) 100%);
-}
-
-/* Print Styles */
-@media print {
-  @page {
-    size: A4;
-    margin: 10mm;
-  }
-
-  body {
-    background: white;
-    color: black;
-    margin: 0;
-    padding: 0;
-  }
-
-  /* Hide everything by default */
-  body * {
-    visibility: hidden;
-  }
-
-  /* Only show the print modal and its children */
-  .print-modal-container,
-  .print-modal-container * {
-    visibility: visible;
-  }
-
-  .print-modal-container {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: auto;
-    background: white;
-    z-index: 9999;
-    display: block !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    overflow: visible !important;
-  }
-
-  .print-modal-content {
-    box-shadow: none !important;
-    border: none !important;
-    width: 100% !important;
-    max-width: none !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    overflow: visible !important;
-    max-height: none !important;
-    position: static !important;
-  }
-
-  .print-section {
-    overflow: visible !important;
-    height: auto !important;
-    padding: 0 !important;
-  }
-
-  .no-print {
-    display: none !important;
-  }
-
-  /* Ensure text colors are black for printing */
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6,
-  p,
-  span,
-  div,
-  td,
-  th {
-    color: black !important;
-  }
-
-  /* Improve table readability */
-  table {
-    border-collapse: collapse;
-    width: 100%;
-    page-break-inside: auto;
-  }
-
-  tr {
-    page-break-inside: avoid;
-    page-break-after: auto;
-  }
-
-  th,
-  td {
-    border: 1px solid #ddd !important;
-    padding: 8px;
-  }
-
-  /* Ensure graphs/charts are visible if possible */
-  .recharts-wrapper {
-    visibility: visible !important;
-  }
-}
-
-/* Global Form Elements - Dark Theme Default */
+/* Global Form Elements - Light Theme Default */
 input,
 select,
 textarea {
-  background-color: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  /* Slate 200 */
   color: var(--text-primary);
   border-radius: 0.5rem;
   padding: 0.625rem;
@@ -335,15 +72,16 @@ textarea {
 input:focus,
 select:focus,
 textarea:focus {
-  background-color: rgba(255, 255, 255, 0.1);
-  border-color: var(--msm-orange);
+  background-color: #FFFFFF;
+  border-color: #3B82F6;
+  /* Blue 500 */
   outline: none;
-  box-shadow: 0 0 0 3px rgba(255, 140, 0, 0.2);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
-/* Fix for Select Options in Dark Mode */
+/* Fix for Select Options */
 option {
-  background-color: var(--msm-blue-dark);
+  background-color: #FFFFFF;
   color: var(--text-primary);
   padding: 10px;
 }
@@ -354,7 +92,8 @@ select:disabled,
 textarea:disabled {
   opacity: 0.6;
   cursor: not-allowed;
-  background-color: rgba(255, 255, 255, 0.02);
+  background-color: #F1F5F9;
+  /* Slate 100 */
 }
 
 /* Placeholder color */
@@ -371,7 +110,8 @@ table {
 }
 
 th {
-  background: rgba(255, 255, 255, 0.05);
+  background: #F1F5F9;
+  /* Slate 100 */
   color: var(--text-secondary);
   font-weight: 600;
   text-transform: uppercase;
@@ -383,12 +123,14 @@ th {
 
 td {
   padding: 1rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid #E2E8F0;
+  /* Slate 200 */
   color: var(--text-primary);
 }
 
 tr:hover td {
-  background: rgba(255, 255, 255, 0.03);
+  background: #F8FAFC;
+  /* Slate 50 */
 }
 
 /* Utility to force text visibility if needed */
