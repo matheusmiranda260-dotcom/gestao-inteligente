@@ -15,17 +15,40 @@ CREATE TABLE IF NOT EXISTS public.kaizen_problems (
 -- Enable RLS
 ALTER TABLE public.kaizen_problems ENABLE ROW LEVEL SECURITY;
 
--- Create policies (permissive for this app's context)
+-- Drop existing policies to avoid conflicts
+DROP POLICY IF EXISTS "Enable all access for authenticated users" ON public.kaizen_problems;
+DROP POLICY IF EXISTS "Enable read access for all users" ON public.kaizen_problems;
+
+-- Re-create policies for table
 CREATE POLICY "Enable all access for authenticated users" ON public.kaizen_problems
     FOR ALL USING (auth.role() = 'authenticated');
 
 CREATE POLICY "Enable read access for all users" ON public.kaizen_problems
     FOR SELECT USING (true);
 
--- Create storage bucket for kaizen images if it doesn't exist
-INSERT INTO storage.buckets (id, name, public) VALUES ('kaizen-images', 'kaizen-images', true)
+
+-- STORAGE SETUP
+
+-- 1. Insert bucket if not exists
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('kaizen-images', 'kaizen-images', true)
 ON CONFLICT (id) DO NOTHING;
 
--- Storage policies
-CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING ( bucket_id = 'kaizen-images' );
-CREATE POLICY "Auth Upload" ON storage.objects FOR INSERT WITH CHECK ( bucket_id = 'kaizen-images' AND auth.role() = 'authenticated' );
+-- 2. Drop existing policies to ensure clean slate
+DROP POLICY IF EXISTS "Kaizen Public Access" ON storage.objects;
+DROP POLICY IF EXISTS "Kaizen Auth Upload" ON storage.objects;
+DROP POLICY IF EXISTS "Public Access" ON storage.objects;
+DROP POLICY IF EXISTS "Auth Upload" ON storage.objects;
+
+-- 3. Create permissive policies for 'kaizen-images'
+-- ALLOW SELECT for everyone (public)
+CREATE POLICY "Kaizen Public Access" ON storage.objects 
+FOR SELECT USING ( bucket_id = 'kaizen-images' );
+
+-- ALLOW INSERT for everyone (auth + anon) to allow easy testing if auth is tricky
+CREATE POLICY "Kaizen Upload" ON storage.objects 
+FOR INSERT WITH CHECK ( bucket_id = 'kaizen-images' );
+
+-- ALLOW UPDATE for everyone
+CREATE POLICY "Kaizen Update" ON storage.objects 
+FOR UPDATE USING ( bucket_id = 'kaizen-images' );

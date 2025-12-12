@@ -94,10 +94,22 @@ const ContinuousImprovement: React.FC<{ setPage: (page: Page) => void }> = ({ se
             let photoUrl = undefined;
 
             if (selectedFile) {
-                const fileName = `kaizen-${Date.now()}-${selectedFile.name}`;
+                const fileName = `kaizen-${Date.now()}-${selectedFile.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`; // Sanitize filename
+                console.log('Attempting to upload file:', fileName, 'to bucket: kaizen-images');
+
                 // Using existing uploadFile service
-                const uploadedUrl = await uploadFile('kaizen-images', fileName, selectedFile);
-                if (uploadedUrl) photoUrl = uploadedUrl;
+                try {
+                    const uploadedUrl = await uploadFile('kaizen-images', fileName, selectedFile);
+                    if (uploadedUrl) {
+                        photoUrl = uploadedUrl;
+                        console.log('Upload successful. URL:', photoUrl);
+                    } else {
+                        throw new Error('Upload returned null URL');
+                    }
+                } catch (uploadError) {
+                    console.error('Detailed Upload Error:', uploadError);
+                    alert(`Falha no upload da imagem: ${(uploadError as any).message || 'Erro desconhecido'}. O problema será salvo sem foto.`);
+                }
             }
 
             const newProblem: KaizenProblem = {
@@ -111,6 +123,7 @@ const ContinuousImprovement: React.FC<{ setPage: (page: Page) => void }> = ({ se
                 photoUrl: photoUrl
             };
 
+            console.log('Saving problem to DB:', newProblem);
             await insertItem('kaizen_problems', newProblem);
 
             setProblems([newProblem, ...problems]);
@@ -119,8 +132,8 @@ const ContinuousImprovement: React.FC<{ setPage: (page: Page) => void }> = ({ se
             setPreviewUrl(null);
             setView('LIST');
         } catch (error) {
-            alert('Erro ao salvar problema. Verifique se o bucket "kaizen-images" existe e é público.');
-            console.error(error);
+            console.error('Final Save Error:', error);
+            alert(`Erro ao salvar problema: ${(error as any).message || JSON.stringify(error)}`);
         }
         setUploadingInfo(false);
     };
