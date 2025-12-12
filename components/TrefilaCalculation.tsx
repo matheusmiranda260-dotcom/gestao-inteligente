@@ -263,25 +263,27 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
         <div className="fixed inset-0 bg-slate-50 z-[100] overflow-y-auto">
             <div className="min-h-screen flex flex-col">
                 {/* Header */}
-                <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-20 shadow-sm">
-                    <div className="flex items-center gap-4">
+                <div className="bg-white border-b border-slate-200 px-4 md:px-6 py-4 flex items-center justify-between sticky top-0 z-20 shadow-sm">
+                    <div className="flex items-center gap-3 md:gap-4">
                         <button onClick={onClose} className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition">
                             <ArrowLeftIcon className="h-5 w-5" />
                         </button>
                         <div>
-                            <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                                <CalculatorIcon className="h-6 w-6 text-blue-600" />
-                                Análise Inteligente de Trefilação
+                            <h1 className="text-lg md:text-xl font-bold text-slate-800 flex items-center gap-2">
+                                <CalculatorIcon className="h-6 w-6 text-blue-600 hidden md:block" />
+                                <span className="hidden md:inline">Análise Inteligente de Trefilação</span>
+                                <span className="md:hidden">Cálculo Trefila</span>
                             </h1>
                         </div>
                     </div>
                     <div className="flex gap-2">
                         <button
                             onClick={() => setShowStockManager(true)}
-                            className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl shadow-sm transition font-bold text-sm"
+                            className="flex items-center gap-2 px-3 md:px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl shadow-sm transition font-bold text-sm"
                         >
                             <AdjustmentsIcon className="h-4 w-4" />
-                            <span>Gerenciar Anéis/Fieiras</span>
+                            <span className="hidden md:inline">Gerenciar Anéis/Fieiras</span>
+                            <span className="md:hidden">Anéis</span>
                         </button>
                     </div>
                 </div>
