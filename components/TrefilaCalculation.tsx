@@ -646,17 +646,22 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                                             const entryStatus = checkStock(entryRing);
                                                             const outputStatus = checkStock(outputRing);
 
+                                                            const isEntryOk = entryRing && entryRing !== '-' && entryStatus.status === 'ok';
+                                                            const isOutputOk = outputRing && outputRing !== '-' && outputStatus.status === 'ok';
+
                                                             return (
                                                                 <>
-                                                                    <div className={`flex justify-between items-center ${entryStatus.status === 'missing' ? 'text-red-600' : ''}`}>
-                                                                        <span className="opacity-75">Ent:</span>
+                                                                    <div className={`flex justify-between items-center px-1.5 py-0.5 rounded ${entryStatus.status === 'missing' ? 'text-red-700 bg-red-100' : (isEntryOk ? 'text-emerald-700 bg-emerald-100' : '')}`}>
+                                                                        <span className="opacity-75 mr-1">Ent:</span>
                                                                         <span className="font-bold">{entryRing || '-'}</span>
-                                                                        {entryStatus.status === 'missing' && <ExclamationIcon className="h-3 w-3" />}
+                                                                        {entryStatus.status === 'missing' && <ExclamationIcon className="h-3 w-3 ml-1" />}
+                                                                        {isEntryOk && <CheckCircleIcon className="h-3 w-3 ml-1" />}
                                                                     </div>
-                                                                    <div className={`flex justify-between items-center ${outputStatus.status === 'missing' ? 'text-red-600' : ''}`}>
-                                                                        <span className="opacity-75">Sai:</span>
+                                                                    <div className={`flex justify-between items-center px-1.5 py-0.5 rounded ${outputStatus.status === 'missing' ? 'text-red-700 bg-red-100' : (isOutputOk ? 'text-emerald-700 bg-emerald-100' : '')}`}>
+                                                                        <span className="opacity-75 mr-1">Sai:</span>
                                                                         <span className="font-bold">{outputRing || '-'}</span>
-                                                                        {outputStatus.status === 'missing' && <ExclamationIcon className="h-3 w-3" />}
+                                                                        {outputStatus.status === 'missing' && <ExclamationIcon className="h-3 w-3 ml-1" />}
+                                                                        {isOutputOk && <CheckCircleIcon className="h-3 w-3 ml-1" />}
                                                                     </div>
                                                                 </>
                                                             );
@@ -734,7 +739,10 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                                         <td className="px-6 py-4 font-bold text-slate-800">#{res.pass}</td>
                                                         <td className="px-6 py-4 bg-blue-50/10 border-l border-slate-100">
                                                             <input type="text"
-                                                                className={`w-full bg-transparent border-b border-dashed outline-none text-center transition-colors ${checkStock(passRings[i]?.entry).status === 'missing' ? 'border-red-400 text-red-600 font-bold' : 'border-slate-300 focus:border-blue-600'}`}
+                                                                className={`w-full bg-transparent border-b border-dashed outline-none text-center transition-colors ${checkStock(passRings[i]?.entry).status === 'missing'
+                                                                        ? 'border-red-400 text-red-600 font-bold bg-red-50'
+                                                                        : (passRings[i]?.entry && passRings[i]?.entry !== '-' ? 'border-emerald-400 text-emerald-600 font-bold bg-emerald-50' : 'border-slate-300 focus:border-blue-600')
+                                                                    }`}
                                                                 placeholder="-"
                                                                 value={passRings[i]?.entry}
                                                                 onChange={e => handleRingChange(i, 'entry', e.target.value)}
@@ -750,7 +758,10 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                                         </td>
                                                         <td className="px-6 py-4 bg-blue-50/10 border-r border-slate-100">
                                                             <input type="text"
-                                                                className={`w-full bg-transparent border-b border-dashed outline-none text-center font-bold transition-colors ${checkStock(passRings[i]?.output).status === 'missing' ? 'border-red-400 text-red-600' : 'border-slate-300 focus:border-blue-600 text-blue-700'}`}
+                                                                className={`w-full bg-transparent border-b border-dashed outline-none text-center font-bold transition-colors ${checkStock(passRings[i]?.output).status === 'missing'
+                                                                        ? 'border-red-400 text-red-600 bg-red-50'
+                                                                        : (passRings[i]?.output && passRings[i]?.output !== '-' ? 'border-emerald-400 text-emerald-600 bg-emerald-50' : 'border-slate-300 focus:border-blue-600 text-blue-700')
+                                                                    }`}
                                                                 placeholder="-"
                                                                 value={passRings[i]?.output}
                                                                 onChange={e => handleRingChange(i, 'output', e.target.value)}
