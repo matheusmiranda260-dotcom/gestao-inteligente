@@ -273,7 +273,7 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
     };
 
     return (
-        <div className="fixed inset-0 bg-slate-50 z-[100] overflow-y-auto print:static print:bg-white print:overflow-visible">
+        <div id="trefila-print-root" className="fixed inset-0 bg-slate-50 z-[100] overflow-y-auto print:static print:bg-white print:overflow-visible">
             <div className="min-h-screen flex flex-col print:min-h-0 print:block">
                 {/* Header - HIDDEN ON PRINT */}
                 <div className="bg-white border-b border-slate-200 px-4 md:px-6 py-4 flex items-center justify-between sticky top-0 z-20 shadow-sm print:hidden">
@@ -298,6 +298,28 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                             <span className="hidden md:inline">Gerenciar Anéis/Fieiras</span>
                             <span className="md:hidden">Anéis</span>
                         </button>
+                    </div>
+                </div>
+
+                {/* PRINT ONLY HEADER */}
+                <div className="hidden print:block p-8 mb-6 bg-white border-b-2 border-slate-800">
+                    <div className="flex items-center justify-between mb-4">
+                        <h1 className="text-2xl font-bold text-slate-900">Relatório de Trefilação</h1>
+                        <div className="text-sm text-slate-500">
+                            DATA: {new Date().toLocaleDateString()}
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 text-sm border-t border-slate-200 pt-4">
+                        <div>
+                            <span className="block text-slate-500 text-xs uppercase font-bold">Receita</span>
+                            <span className="font-bold text-slate-800 text-lg">{recipeName || 'Personalizada'}</span>
+                        </div>
+                        <div className="text-right">
+                            <span className="block text-slate-500 text-xs uppercase font-bold">Parâmetros</span>
+                            <span className="text-slate-700">
+                                {params.type} • {params.entryDiameter}mm → {params.finalDiameter}mm ({params.passes} passes)
+                            </span>
+                        </div>
                     </div>
                 </div>
 
@@ -651,6 +673,20 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                     border-radius: 4px;
                 }
                  @media print {
+                     body * {
+                         visibility: hidden;
+                     }
+                     #trefila-print-root, #trefila-print-root * {
+                         visibility: visible;
+                     }
+                     #trefila-print-root {
+                         position: absolute;
+                         left: 0;
+                         top: 0;
+                         width: 100%;
+                         margin: 0;
+                         padding: 0;
+                     }
                      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                  }
             `}</style>
