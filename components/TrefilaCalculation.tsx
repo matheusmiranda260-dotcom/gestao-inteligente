@@ -3,6 +3,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { ArrowLeftIcon, SaveIcon, CalculatorIcon, AdjustmentsIcon, TrashIcon, BookOpenIcon, CheckCircleIcon, ExclamationIcon } from './icons';
 import { TrefilaRecipe } from '../types';
 import { insertItem, fetchTable, deleteItem } from '../services/supabaseService';
+import RingStockManager from './RingStockManager';
 
 interface TrefilaCalculationProps {
     onClose: () => void;
@@ -18,6 +19,7 @@ interface PassResult {
 const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
     // UI State
     const [isLoading, setIsLoading] = useState(false);
+    const [showStockManager, setShowStockManager] = useState(false);
 
     // Calculation State
     const [params, setParams] = useState({
@@ -274,7 +276,13 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                         </div>
                     </div>
                     <div className="flex gap-2">
-                        {/* Actions could go here */}
+                        <button
+                            onClick={() => setShowStockManager(true)}
+                            className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl shadow-sm transition font-bold text-sm"
+                        >
+                            <AdjustmentsIcon className="h-4 w-4" />
+                            <span>Gerenciar Anéis/Fieiras</span>
+                        </button>
                     </div>
                 </div>
 
@@ -603,6 +611,8 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                     </div>
                 </div>
             </div>
+
+            {showStockManager && <RingStockManager onClose={() => setShowStockManager(false)} />}
 
             <style>{`
                 .custom-scrollbar::-webkit-scrollbar {

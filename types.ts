@@ -287,3 +287,9 @@ export interface TrefilaRecipe {
     passRings: { entry: string; output: string }[];
     createdAt?: string;
 }
+
+export interface TrefilaRingStock {
+    id: string;
+    model: string;
+    quantity: number;
+}
