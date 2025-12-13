@@ -1,12 +1,87 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeftIcon, PlusIcon, StarIcon, ChartBarIcon, TrophyIcon, SearchIcon, FilterIcon, UserIcon, BookOpenIcon, ClockIcon, DocumentTextIcon, PencilIcon, TrashIcon, UserGroupIcon, ExclamationIcon, SaveIcon, XIcon } from './icons';
-import type { Page, Employee, Evaluation, Achievement, User, EmployeeCourse, EmployeeAbsence, EmployeeVacation, EmployeeResponsibility, OrgUnit, OrgPosition } from '../types';
-import { fetchTable, insertItem, updateItem, deleteItem, fetchByColumn } from '../services/supabaseService';
+import { ArrowLeftIcon, PlusIcon, StarIcon, ChartBarIcon, TrophyIcon, SearchIcon, FilterIcon, UserIcon, BookOpenIcon, ClockIcon, DocumentTextIcon, PencilIcon, TrashIcon, UserGroupIcon, ExclamationIcon, SaveIcon, XIcon, DownloadIcon, PrinterIcon } from './icons';
+import type { Page, Employee, Evaluation, Achievement, User, EmployeeCourse, EmployeeAbsence, EmployeeVacation, EmployeeResponsibility, OrgUnit, OrgPosition, EmployeeDocument } from '../types';
+import { fetchTable, insertItem, updateItem, deleteItem, fetchByColumn, uploadFile } from '../services/supabaseService';
 
 interface PeopleManagementProps {
     setPage: (page: Page) => void;
     currentUser: User | null;
 }
+
+// --- DASHBOARD COMPONENT ---
+const DashboardRH: React.FC<{ employees: Employee[], absences: EmployeeAbsence[], vacations: EmployeeVacation[] }> = ({ employees, absences, vacations }) => {
+    const totalEmployees = employees.length;
+    const activeEmployees = employees.filter(e => e.active).length;
+    const inactiveEmployees = totalEmployees - activeEmployees;
+
+    // Simple analysis
+    const currentlyOnVacation = vacations.filter(v => {
+        const now = new Date();
+        return new Date(v.startDate) <= now && new Date(v.endDate) >= now;
+    }).length;
+
+    const recentAbsences = absences.length; // Could filter by date
+
+    return (
+        <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between">
+                    <div>
+                        <p className="text-sm font-bold text-slate-500 uppercase">Total Colaboradores</p>
+                        <p className="text-3xl font-bold text-[#0F3F5C]">{totalEmployees}</p>
+                    </div>
+                    <UserGroupIcon className="h-10 w-10 text-slate-200" />
+                </div>
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between">
+                    <div>
+                        <p className="text-sm font-bold text-slate-500 uppercase">Ativos</p>
+                        <p className="text-3xl font-bold text-green-600">{activeEmployees}</p>
+                    </div>
+                    <UserIcon className="h-10 w-10 text-green-100" />
+                </div>
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between">
+                    <div>
+                        <p className="text-sm font-bold text-slate-500 uppercase">Em Férias (Hoje)</p>
+                        <p className="text-3xl font-bold text-blue-600">{currentlyOnVacation}</p>
+                    </div>
+                    <ClockIcon className="h-10 w-10 text-blue-100" />
+                </div>
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between">
+                    <div>
+                        <p className="text-sm font-bold text-slate-500 uppercase">Faltas/Ausências</p>
+                        <p className="text-3xl font-bold text-red-500">{recentAbsences}</p>
+                    </div>
+                    <ExclamationIcon className="h-10 w-10 text-red-100" />
+                </div>
+            </div>
+
+            {/* Graphs / Lists could go here */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                <h3 className="font-bold text-slate-700 mb-4">Colaboradores em Férias</h3>
+                {vacations.filter(v => new Date(v.endDate) >= new Date()).length > 0 ? (
+                    <table className="w-full text-sm">
+                        <thead className="text-left bg-slate-50 text-slate-500 uppercase text-xs">
+                            <tr><th className="p-2">Colaborador</th><th className="p-2">Início</th><th className="p-2">Fim</th></tr>
+                        </thead>
+                        <tbody>
+                            {vacations.filter(v => new Date(v.endDate) >= new Date()).map(v => {
+                                const emp = employees.find(e => e.id === v.employeeId);
+                                return (
+                                    <tr key={v.id} className="border-b">
+                                        <td className="p-2 font-bold">{emp?.name || 'Desconhecido'}</td>
+                                        <td className="p-2">{new Date(v.startDate).toLocaleDateString()}</td>
+                                        <td className="p-2">{new Date(v.endDate).toLocaleDateString()}</td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                ) : <p className="text-slate-400">Ninguém em férias no momento.</p>}
+            </div>
+        </div>
+    );
+};
+
 
 // ... StarRating Component (Same as before) ...
 const StarRating: React.FC<{ score: number; onChange?: (score: number) => void; max?: number; readonly?: boolean }> = ({ score, onChange, max = 5, readonly = false }) => {
@@ -85,7 +160,7 @@ const EmployeeDetailModal: React.FC<{
     // To ensure I don't break existing features, I will replicate it or assume it's there. 
     // Given the previous step saw the full file, I will perform a full overwrite including the Modal code to be safe.
 
-    const [activeTab, setActiveTab] = useState<'profile' | 'responsibilities' | 'development' | 'hr' | 'evaluations'>('profile');
+    const [activeTab, setActiveTab] = useState<'profile' | 'responsibilities' | 'development' | 'hr' | 'evaluations' | 'documents'>('profile');
     const [empData, setEmpData] = useState<Employee>(employee);
     const [responsibilities, setResponsibilities] = useState<EmployeeResponsibility[]>([]);
     const [courses, setCourses] = useState<EmployeeCourse[]>([]);
@@ -97,6 +172,11 @@ const EmployeeDetailModal: React.FC<{
     const [isEvaluating, setIsEvaluating] = useState(false);
     const [evalScores, setEvalScores] = useState({ organization: 0, cleanliness: 0, effort: 0, communication: 0, improvement: 0 });
     const [evalNote, setEvalNote] = useState('');
+
+    // Documents State
+    const [documents, setDocuments] = useState<EmployeeDocument[]>([]);
+
+    // HR Form State
 
     // HR Form State
     const [newAbsence, setNewAbsence] = useState({ type: 'Falta Injustificada', startDate: '', endDate: '', reason: '' });
@@ -147,6 +227,58 @@ const EmployeeDetailModal: React.FC<{
         loadDetails();
     };
 
+    // Document Handlers
+    const handleUploadDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0) return;
+        const file = e.target.files[0];
+
+        try {
+            // Upload to Supabase bucket 'kb-files'
+            const fileName = `emp_docs/${employee.id}_${Date.now()}_${file.name}`;
+            const publicUrl = await uploadFile('kb-files', fileName, file);
+
+            if (publicUrl) {
+                await insertItem('employee_documents', {
+                    employeeId: employee.id,
+                    title: file.name,
+                    type: 'Documento', // Could be refined
+                    url: publicUrl
+                });
+                alert('Documento anexado com sucesso!');
+                loadDetails();
+            }
+        } catch (error) {
+            console.error(error);
+            alert('Erro ao enviar arquivo. Verifique se o Bucket "kb-files" existe.');
+        }
+    };
+
+    const handleDeleteDocument = async (id: string) => {
+        if (!confirm('Remover este documento?')) return;
+        await deleteItem('employee_documents', id);
+        loadDetails();
+    };
+
+    const handleUpdatePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0) return;
+        const file = e.target.files[0];
+        try {
+            const fileName = `avatars/${employee.id}_${Date.now()}_${file.name}`;
+            const publicUrl = await uploadFile('kb-files', fileName, file);
+            if (publicUrl) {
+                const updated = await updateItem('employees', employee.id, { photoUrl: publicUrl });
+                setEmpData({ ...empData, photoUrl: publicUrl });
+                alert('Foto atualizada!');
+            }
+        } catch (error) { alert('Erro ao atualizar foto.'); }
+    };
+
+    const handlePrintProfile = () => {
+        // Simple print: open a new window with formatted content or use CSS print media queries on the modal
+        // For simplicity, we'll suggest using browser print on a clean view, but opening a new window is cleaner
+        window.print();
+    };
+
     useEffect(() => { loadDetails(); }, [employee.id]);
 
     const loadDetails = async () => {
@@ -162,6 +294,11 @@ const EmployeeDetailModal: React.FC<{
             setCourses(crs);
             setAbsences(abs);
             setVacations(vacs);
+
+            // Fetch Documents
+            const docs = await fetchByColumn<EmployeeDocument>('employee_documents', 'employee_id', employee.id);
+            setDocuments(docs || []);
+
             // Load HR Data
             const absencesData = await fetchByColumn<EmployeeAbsence>('employee_absences', 'employee_id', employee.id);
             const vacationsData = await fetchByColumn<EmployeeVacation>('employee_vacations', 'employee_id', employee.id);
@@ -241,8 +378,12 @@ const EmployeeDetailModal: React.FC<{
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col overflow-hidden">
                 <div className="bg-slate-50 p-6 border-b border-slate-200 flex justify-between items-start">
                     <div className="flex items-center space-x-4">
-                        <div className="h-20 w-20 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden border-4 border-white shadow-sm">
+                        <div className="h-20 w-20 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden border-4 border-white shadow-sm relative group">
                             {empData.photoUrl ? <img src={empData.photoUrl} alt={empData.name} className="h-full w-full object-cover" /> : <span className="text-3xl font-bold text-slate-400">{empData.name.charAt(0)}</span>}
+                            <label className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition">
+                                <PencilIcon className="text-white h-6 w-6" />
+                                <input type="file" accept="image/*" className="hidden" onChange={handleUpdatePhoto} />
+                            </label>
                         </div>
                         <div>
                             <h2 className="text-2xl font-bold text-slate-800">{empData.name}</h2>
@@ -253,6 +394,9 @@ const EmployeeDetailModal: React.FC<{
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
+                        <button onClick={handlePrintProfile} className="text-blue-400 hover:text-blue-600 p-2 rounded-full hover:bg-blue-50 transition" title="Imprimir Ficha">
+                            <PrinterIcon className="h-5 w-5" />
+                        </button>
                         <button onClick={onDelete} className="text-red-400 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition" title="Excluir Este Funcionário">
                             <TrashIcon className="h-5 w-5" />
                         </button>
@@ -265,6 +409,7 @@ const EmployeeDetailModal: React.FC<{
                         { id: 'responsibilities', label: 'Atribuições', icon: <DocumentTextIcon className="h-4 w-4" /> },
                         { id: 'development', label: 'Desenvolvimento', icon: <BookOpenIcon className="h-4 w-4" /> },
                         { id: 'hr', label: 'RH (Férias/Faltas)', icon: <ClockIcon className="h-4 w-4" /> },
+                        { id: 'documents', label: 'Documentos', icon: <DocumentTextIcon className="h-4 w-4" /> },
                         { id: 'evaluations', label: 'Avaliações', icon: <StarIcon className="h-4 w-4" /> },
                     ].map(tab => (
                         <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex items-center space-x-2 px-6 py-4 text-sm font-medium transition-colors border-b-2 ${activeTab === tab.id ? 'border-[#0F3F5C] text-[#0F3F5C] bg-slate-50' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}>
@@ -776,8 +921,10 @@ const OrgChart: React.FC<{
 const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUser }) => {
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
+    const [absences, setAbsences] = useState<EmployeeAbsence[]>([]);
+    const [vacations, setVacations] = useState<EmployeeVacation[]>([]);
     const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
-    const [viewMode, setViewMode] = useState<'cards' | 'orgChart'>('cards');
+    const [viewMode, setViewMode] = useState<'dashboard' | 'cards' | 'orgChart'>('dashboard');
 
     // Employee Form State (Simplified for direct creation)
     const [newEmployeeName, setNewEmployeeName] = useState('');
@@ -785,8 +932,12 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
     const loadData = async () => {
         const emp = await fetchTable<Employee>('employees');
         const evals = await fetchTable<Evaluation>('evaluations');
+        const abs = await fetchTable<EmployeeAbsence>('employee_absences');
+        const vacs = await fetchTable<EmployeeVacation>('employee_vacations');
         setEmployees(emp);
         setEvaluations(evals);
+        setAbsences(abs);
+        setVacations(vacs);
     };
 
     useEffect(() => { loadData(); }, []);
@@ -877,6 +1028,12 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
 
                 <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
                     <button
+                        onClick={() => setViewMode('dashboard')}
+                        className={`px-4 py-2 rounded-md font-medium text-sm transition ${viewMode === 'dashboard' ? 'bg-slate-100 text-[#0F3F5C] font-bold' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                        Dashboard
+                    </button>
+                    <button
                         onClick={() => setViewMode('cards')}
                         className={`px-4 py-2 rounded-md font-medium text-sm transition ${viewMode === 'cards' ? 'bg-slate-100 text-[#0F3F5C] font-bold' : 'text-slate-500 hover:text-slate-700'}`}
                     >
@@ -913,13 +1070,15 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
                         </div>
                     )}
                 </div>
-            ) : (
+            ) : viewMode === 'orgChart' ? (
                 <OrgChart
                     employees={employees}
                     reloadData={loadData}
                     triggerAddEmployee={promptAndCreateEmployee}
                     triggerEditEmployee={(emp) => setSelectedEmployee(emp)}
                 />
+            ) : (
+                <DashboardRH employees={employees} absences={absences} vacations={vacations} />
             )}
         </div>
     );

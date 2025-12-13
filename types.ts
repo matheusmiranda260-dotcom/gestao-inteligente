@@ -427,3 +427,12 @@ export interface Achievement {
     description?: string;
     date: string;
 }
+
+export interface EmployeeDocument {
+    id: string;
+    employeeId: string;
+    title: string;
+    type: string;
+    url: string;
+    createdAt: string;
+}
