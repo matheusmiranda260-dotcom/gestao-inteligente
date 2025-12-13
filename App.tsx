@@ -237,36 +237,21 @@ const App: React.FC = () => {
 
     // User Management
     const addUser = async (data: { username: string; password: string; permissions: Partial<Record<Page, boolean>> }) => {
-        const email = data.username.includes('@') ? data.username : `${data.username}@example.com`;
-
-        const { data: result, error } = await supabase.functions.invoke('create-user', {
-            body: {
-                email,
-                password: data.password,
-                userData: {
-                    username: data.username,
-                    role: 'user',
-                    permissions: data.permissions
-                }
-            }
-        });
-
-        if (error) {
-            showNotification(`Erro ao criar usuário: ${error.message}`, 'error');
-            return;
-        }
-
-        // Optimistically update local state or fetch users again (if we had a list users function)
-        // For now, we add to local state to reflect immediately in UI, although real source of truth is Supabase
         const newUser: User = {
-            id: result.user.id,
+            id: generateId('user'),
             username: data.username,
-            password: '', // Don't store password
+            password: data.password, // Storing simple password as requested
             role: 'user',
             permissions: data.permissions,
         };
-        setUsers(prev => [...prev, newUser]);
-        showNotification('Usuário adicionado com sucesso!', 'success');
+
+        try {
+            await insertItem<User>('app_users', newUser);
+            setUsers(prev => [...prev, newUser]);
+            showNotification('Usuário adicionado com sucesso!', 'success');
+        } catch (error: any) {
+            showNotification('Erro ao adicionar usuário: ' + (error.message || 'Erro desconhecido'), 'error');
+        }
     };
 
     const updateUser = async (userId: string, data: Partial<User>) => {
