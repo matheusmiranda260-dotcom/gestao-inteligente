@@ -556,14 +556,10 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
     const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
-    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [viewMode, setViewMode] = useState<'cards' | 'orgChart'>('cards');
 
-    // Employee Form State
+    // Employee Form State (Simplified for direct creation)
     const [newEmployeeName, setNewEmployeeName] = useState('');
-    const [newEmployeeSector, setNewEmployeeSector] = useState('');
-    const [newEmployeeShift, setNewEmployeeShift] = useState('');
-    const [prefillPositionId, setPrefillPositionId] = useState<string | null>(null); // For direct creation from OrgChart
 
     const loadData = async () => {
         const emp = await fetchTable<Employee>('employees');
@@ -574,30 +570,40 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
 
     useEffect(() => { loadData(); }, []);
 
-    const handleAddEmployee = async (e: React.FormEvent) => {
-        e.preventDefault();
+    // New Flow: Create Placeholder -> Open Detail Modal
+    const handleCreateAndEdit = async (name: string, positionId?: string, sector?: string) => {
+        if (!name) return;
         try {
-            await insertItem<Employee>('employees', {
+            const newEmp = await insertItem<Employee>('employees', {
                 // @ts-ignore
-                name: newEmployeeName,
-                sector: newEmployeeSector,
-                shift: newEmployeeShift,
+                name: name,
+                sector: sector || 'Não Definido',
+                shift: 'Manhã', // Default/Placeholder
                 active: true,
-                orgPositionId: prefillPositionId || undefined
+                orgPositionId: positionId || undefined,
+                jobTitle: '', admissionDate: '', birthDate: '', phone: ''
             } as Employee);
-            alert('Funcionário cadastrado!');
-            setIsAddModalOpen(false);
-            setNewEmployeeName(''); setNewEmployeeSector(''); setNewEmployeeShift(''); setPrefillPositionId(null);
-            loadData();
-        } catch (error) { alert('Erro ao cadastrar.'); }
+
+            await loadData(); // Refresh list to get ID
+            // Ideally insertItem returns the full object with ID.
+            // setEmployees(prev => [...prev, newEmp]); // Optimistic update if needed
+
+            // Now open the modal for this new employee
+            setSelectedEmployee(newEmp);
+
+        } catch (error) {
+            alert('Erro ao criar registro inicial.');
+        }
     };
 
-    const openAddModal = (posId?: string, sector?: string) => {
-        setPrefillPositionId(posId || null);
-        if (sector) setNewEmployeeSector(sector);
-        setIsAddModalOpen(true);
-    }
+    const promptAndCreateEmployee = (posId?: string, sector?: string) => {
+        const name = prompt("Nome do Novo Funcionário:");
+        if (name) {
+            handleCreateAndEdit(name, posId, sector);
+        }
+    };
 
+    // ... delete function remains ...
     const handleDeleteEmployee = async (id: string) => {
         if (!confirm('Tem certeza que deseja excluir este funcionário? Essa ação não pode ser desfeita.')) return;
         try {
@@ -622,25 +628,7 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
                 />
             )}
 
-            {isAddModalOpen && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <form onSubmit={handleAddEmployee} className="bg-white p-6 rounded-xl shadow-xl w-full max-w-md">
-                        <h2 className="text-xl font-bold mb-4">Novo Funcionário {prefillPositionId ? '(Vinculado ao Organograma)' : ''}</h2>
-                        <input className="w-full p-2 border rounded mb-3" placeholder="Nome" value={newEmployeeName} onChange={e => setNewEmployeeName(e.target.value)} required />
-                        <input className="w-full p-2 border rounded mb-3" placeholder="Setor/Máquina" value={newEmployeeSector} onChange={e => setNewEmployeeSector(e.target.value)} required />
-                        <select className="w-full p-2 border rounded mb-4" value={newEmployeeShift} onChange={e => setNewEmployeeShift(e.target.value)} required>
-                            <option value="">Selecione Turno</option>
-                            <option value="Manhã">Manhã</option>
-                            <option value="Tarde">Tarde</option>
-                            <option value="Noite">Noite</option>
-                        </select>
-                        <div className="flex justify-end gap-2">
-                            <button type="button" onClick={() => setIsAddModalOpen(false)} className="px-4 py-2 bg-slate-200 rounded">Cancelar</button>
-                            <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">Salvar</button>
-                        </div>
-                    </form>
-                </div>
-            )}
+            {/* Simple Add Modal removed, replaced by direct prompt logic */}
 
             <header className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
                 <div className="flex items-center">
@@ -668,7 +656,7 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
                     </button>
                 </div>
 
-                <button onClick={() => openAddModal()} className="bg-[#0F3F5C] text-white px-4 py-2 rounded-lg font-bold hover:bg-[#0A2A3D] transition flex items-center gap-2">
+                <button onClick={() => promptAndCreateEmployee()} className="bg-[#0F3F5C] text-white px-4 py-2 rounded-lg font-bold hover:bg-[#0A2A3D] transition flex items-center gap-2">
                     <PlusIcon className="h-5 w-5" />
                     Novo Funcionário
                 </button>
@@ -692,7 +680,7 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
                     )}
                 </div>
             ) : (
-                <OrgChart employees={employees} reloadData={loadData} triggerAddEmployee={openAddModal} />
+                <OrgChart employees={employees} reloadData={loadData} triggerAddEmployee={promptAndCreateEmployee} />
             )}
         </div>
     );
