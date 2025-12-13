@@ -142,3 +142,54 @@ tr:hover td {
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* PRINT STYLES */
+@media print {
+  body {
+    visibility: hidden;
+    background: white;
+  }
+
+  .print-modal-container {
+    visibility: visible;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background: white;
+    display: block;
+  }
+
+  .print-modal-container * {
+    visibility: visible;
+  }
+
+  .print-modal-content {
+    box-shadow: none !important;
+    border: none !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 20px !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-section {
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  /* Force background colors */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+}
