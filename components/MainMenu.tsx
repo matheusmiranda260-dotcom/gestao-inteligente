@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { Page, User, Message, MachineType } from '../types';
-import { UserGroupIcon, ArchiveIcon, CogIcon, ClipboardListIcon, ChartBarIcon, ChatBubbleLeftRightIcon, WrenchScrewdriverIcon, AdjustmentsIcon } from './icons';
+import { UserGroupIcon, ArchiveIcon, CogIcon, ClipboardListIcon, ChartBarIcon, ChatBubbleLeftRightIcon, WrenchScrewdriverIcon, AdjustmentsIcon, DocumentTextIcon } from './icons';
 import MSMLogo from './MSMLogo';
 
 const ManagerMessagesModal: React.FC<{
@@ -275,8 +275,15 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser, mes
                 <MenuButton
                     onClick={() => setPage('continuousImprovement')}
                     label="Melhoria Contínua"
-                    description="Registre problemas e acompanhe a evolução (Kaizen)."
+                    description="Kaizen Digital, Ações e Problemas"
                     icon={<AdjustmentsIcon />}
+                    color="teal"
+                />
+                <MenuButton
+                    onClick={() => setPage('workInstructions')}
+                    label="Instruções de Trabalho"
+                    description="Procedimentos e Guias Padrão"
+                    icon={<DocumentTextIcon />}
                     color="indigo"
                 />
             </div>

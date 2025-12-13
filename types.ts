@@ -26,7 +26,24 @@ export interface TrelicaSelectedLots {
     allSenozoideRight?: string[];
 }
 
-export type Page = 'login' | 'menu' | 'stock' | 'machineSelection' | 'trefila' | 'trelica' | 'productionOrder' | 'productionOrderTrelica' | 'reports' | 'userManagement' | 'productionDashboard' | 'finishedGoods' | 'partsManager' | 'continuousImprovement';
+export type Page = 'login' | 'menu' | 'stock' | 'machineSelection' | 'trefila' | 'trelica' | 'productionOrder' | 'productionOrderTrelica' | 'reports' | 'userManagement' | 'productionDashboard' | 'finishedGoods' | 'partsManager' | 'continuousImprovement' | 'workInstructions';
+
+export interface InstructionStep {
+    id: string;
+    order: number;
+    title: string;
+    description: string;
+    photoUrl?: string;
+}
+
+export interface WorkInstruction {
+    id: string;
+    title: string;
+    machine: string;
+    description: string;
+    steps: InstructionStep[];
+    updatedAt?: string;
+}
 
 export interface PartUsage {
     id: string;

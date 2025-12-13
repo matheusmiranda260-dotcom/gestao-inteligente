@@ -14,6 +14,7 @@ import { trelicaModels } from './components/ProductionOrderTrelica';
 import FinishedGoods from './components/FinishedGoods';
 import SparePartsManager from './components/SparePartsManager';
 import ContinuousImprovement from './components/ContinuousImprovement';
+import WorkInstructions from './components/WorkInstructions';
 import { supabase } from './supabaseClient';
 
 import { fetchTable, insertItem, updateItem, deleteItem, deleteItemByColumn, updateItemByColumn } from './services/supabaseService';
