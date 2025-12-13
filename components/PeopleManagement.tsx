@@ -621,7 +621,7 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
             const newEmpPayload: Partial<Employee> = {
                 name: name,
                 sector: sector || 'Não Definido',
-                // shift: 'Manhã', // Removed
+                shift: '-', // Placeholder to satisfy DB NOT NULL constraint
                 active: true,
                 orgPositionId: positionId || undefined,
                 jobTitle: autoJobTitle, // Auto-sync Job Title
