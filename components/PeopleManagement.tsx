@@ -234,9 +234,9 @@ const EmployeeDetailModal: React.FC<{
                                 <div className="space-y-4">
                                     <div><label className="block text-xs font-semibold text-slate-500 uppercase">Cargo / Função</label><input type="text" className="w-full mt-1 p-2 border rounded-lg" value={empData.jobTitle || ''} onChange={e => setEmpData({ ...empData, jobTitle: e.target.value })} placeholder="Ex: Operador Trefila I" /></div>
                                     <div><label className="block text-xs font-semibold text-slate-500 uppercase">Data Admissão</label><input type="date" className="w-full mt-1 p-2 border rounded-lg" value={empData.admissionDate || ''} onChange={e => setEmpData({ ...empData, admissionDate: e.target.value })} /></div>
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 gap-4">
                                         <div><label className="block text-xs font-semibold text-slate-500 uppercase">Setor</label><input type="text" className="w-full mt-1 p-2 border rounded-lg" value={empData.sector} onChange={e => setEmpData({ ...empData, sector: e.target.value })} /></div>
-                                        <div><label className="block text-xs font-semibold text-slate-500 uppercase">Turno</label><select className="w-full mt-1 p-2 border rounded-lg" value={empData.shift} onChange={e => setEmpData({ ...empData, shift: e.target.value })}><option>Manhã</option><option>Tarde</option><option>Noite</option></select></div>
+                                        {/* Shift removed */}
                                     </div>
                                     <div className="pt-4 flex justify-end"><button type="submit" className="bg-[#0F3F5C] text-white font-bold py-2 px-6 rounded-lg hover:bg-[#0A2A3D] transition">Salvar Alterações</button></div>
                                 </div>
@@ -621,7 +621,7 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
             const newEmpPayload: Partial<Employee> = {
                 name: name,
                 sector: sector || 'Não Definido',
-                shift: 'Manhã', // Default
+                // shift: 'Manhã', // Removed
                 active: true,
                 orgPositionId: positionId || undefined,
                 jobTitle: autoJobTitle, // Auto-sync Job Title
