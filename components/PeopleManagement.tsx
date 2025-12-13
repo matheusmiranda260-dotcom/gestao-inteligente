@@ -501,22 +501,22 @@ const OrgNode: React.FC<{
 
             {/* Positions directly under this Node (Vertical list usually) */}
             {node.positions.length > 0 && (
-                <div className="flex flex-wrap justify-center gap-4 mb-6 px-4">
+                <div className="flex flex-col items-center gap-2 mb-6 px-2 w-full">
                     {node.positions.map(pos => {
                         const occupant = employees.find(e => e.orgPositionId === pos.id);
                         return (
-                            <div key={pos.id} className="flex flex-col items-center relative group/pos">
+                            <div key={pos.id} className="flex flex-col items-center relative group/pos w-full max-w-[180px]">
                                 {/* Blue Box: Role */}
-                                <div className="bg-[#4a86e8] text-white px-4 py-1.5 rounded-t-lg shadow-sm font-semibold text-sm w-48 text-center border-b border-blue-400 relative">
+                                <div className="bg-[#4a86e8] text-white px-2 py-1 rounded-t-lg shadow-sm font-semibold text-xs w-full text-center border-b border-blue-400 relative">
                                     {pos.title}
-                                    <button onClick={() => onDeletePosition(pos.id)} className="absolute top-1 right-1 opacity-0 group-hover/pos:opacity-100 text-white hover:text-red-200">
+                                    <button onClick={() => onDeletePosition(pos.id)} className="absolute top-0.5 right-1 opacity-0 group-hover/pos:opacity-100 text-white hover:text-red-200">
                                         <XIcon className="h-3 w-3" />
                                     </button>
                                 </div>
                                 {/* White Box: Employee */}
-                                <div className="bg-white border-x border-b border-slate-300 rounded-b-lg p-1 w-48 flex items-center shadow-sm text-sm">
+                                <div className="bg-white border-x border-b border-slate-300 rounded-b-lg p-1 w-full flex items-center shadow-sm text-xs">
                                     <select
-                                        className="flex-grow bg-transparent outline-none text-slate-700 font-medium text-center cursor-pointer text-xs py-1"
+                                        className="flex-grow bg-transparent outline-none text-slate-700 font-medium text-center cursor-pointer text-[10px] py-0.5 truncate"
                                         value={occupant ? occupant.id : ''}
                                         onChange={(e) => {
                                             if (e.target.value === 'NEW') {
@@ -530,19 +530,18 @@ const OrgNode: React.FC<{
                                         {employees.map(emp => (
                                             <option key={emp.id} value={emp.id}>{emp.name}</option>
                                         ))}
-                                        <option value="NEW" className="font-bold text-blue-600">+ Novo Funcionário...</option>
+                                        <option value="NEW" className="font-bold text-blue-600">+ Novo...</option>
                                     </select>
                                     {occupant && (
                                         <button
                                             onClick={() => onEditEmployee(occupant)}
-                                            className="p-1 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded mr-1"
+                                            className="ml-1 text-slate-400 hover:text-blue-600"
                                             title="Editar Funcionário"
                                         >
                                             <PencilIcon className="h-3 w-3" />
                                         </button>
                                     )}
                                 </div>
-                                {/* Connector line to parent node if needed, handled by tree structure below */}
                             </div>
                         );
                     })}
