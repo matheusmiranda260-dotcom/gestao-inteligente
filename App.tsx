@@ -1639,6 +1639,8 @@ const App: React.FC = () => {
                 return <SparePartsManager onBack={() => setPage('menu')} />;
             case 'continuousImprovement':
                 return <ContinuousImprovement setPage={setPage} />;
+            case 'workInstructions':
+                return <WorkInstructions setPage={setPage} />;
             default:
                 return <Login onLogin={handleLogin} error={null} />;
         }
