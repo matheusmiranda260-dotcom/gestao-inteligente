@@ -342,6 +342,49 @@ export interface Employee {
     active: boolean;
     appUserId?: string;
     createdAt?: string;
+    // New fields
+    jobTitle?: string;
+    admissionDate?: string;
+    birthDate?: string;
+    maritalStatus?: string;
+    childrenCount?: number;
+    phone?: string;
+    email?: string;
+    managerId?: string;
+}
+
+export interface EmployeeCourse {
+    id: string;
+    employeeId: string;
+    courseName: string;
+    institution?: string;
+    completionDate?: string;
+    expiryDate?: string;
+    status: 'Concluído' | 'Em Andamento' | 'Pendente';
+}
+
+export interface EmployeeAbsence {
+    id: string;
+    employeeId: string;
+    startDate: string;
+    endDate?: string;
+    reason: string;
+    type?: string;
+}
+
+export interface EmployeeVacation {
+    id: string;
+    employeeId: string;
+    startDate: string;
+    endDate: string;
+    status: 'Programada' | 'Gozada' | 'Vendida' | 'Cancelada';
+}
+
+export interface EmployeeResponsibility {
+    id: string;
+    employeeId: string;
+    description: string;
+    isCritical: boolean;
 }
 
 export interface Evaluation {
