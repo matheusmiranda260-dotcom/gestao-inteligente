@@ -30,32 +30,43 @@ const StarRating: React.FC<{ score: number; onChange?: (score: number) => void; 
 };
 
 // ... EmployeeCard Component (Same as before) ...
-const EmployeeCard: React.FC<{ employee: Employee; onSelect: () => void; evaluations: Evaluation[] }> = ({ employee, onSelect, evaluations }) => {
+const EmployeeCard: React.FC<{ employee: Employee; onSelect: () => void; onDelete: () => void; evaluations: Evaluation[] }> = ({ employee, onSelect, onDelete, evaluations }) => {
     const employeeEvals = evaluations.filter(e => e.employeeId === employee.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     const lastEvaluation = employeeEvals[0];
     const displayScore = lastEvaluation ? (lastEvaluation.totalScore / 5) : 0;
 
     return (
-        <div onClick={onSelect} className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all cursor-pointer border border-slate-100 p-4 flex items-center space-x-4">
-            <div className="h-16 w-16 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden border-2 border-slate-100 shrink-0">
-                {employee.photoUrl ? (
-                    <img src={employee.photoUrl} alt={employee.name} className="h-full w-full object-cover" />
-                ) : (
-                    <span className="text-2xl font-bold text-slate-400">{employee.name.charAt(0)}</span>
-                )}
-            </div>
-            <div className="flex-grow min-w-0">
-                <h3 className="font-bold text-slate-800 truncate">{employee.name}</h3>
-                <p className="text-sm text-slate-500 truncate">{employee.sector} • {employee.shift}</p>
-                {employee.jobTitle && <p className="text-xs text-slate-400 truncate">{employee.jobTitle}</p>}
-                <div className="flex items-center mt-1">
-                    <StarIcon className="h-4 w-4 text-yellow-400 fill-current mr-1" />
-                    <span className="font-bold text-slate-700">{displayScore.toFixed(1)}</span>
-                    <span className="text-xs text-slate-400 ml-2">({employeeEvals.length} avaliações)</span>
+        <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all border border-slate-100 p-4 flex items-center space-x-4 relative group">
+            <div onClick={onSelect} className="flex-grow flex items-center space-x-4 cursor-pointer">
+                <div className="h-16 w-16 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden border-2 border-slate-100 shrink-0">
+                    {employee.photoUrl ? (
+                        <img src={employee.photoUrl} alt={employee.name} className="h-full w-full object-cover" />
+                    ) : (
+                        <span className="text-2xl font-bold text-slate-400">{employee.name.charAt(0)}</span>
+                    )}
+                </div>
+                <div className="flex-grow min-w-0">
+                    <h3 className="font-bold text-slate-800 truncate">{employee.name}</h3>
+                    <p className="text-sm text-slate-500 truncate">{employee.sector} • {employee.shift}</p>
+                    {employee.jobTitle && <p className="text-xs text-slate-400 truncate">{employee.jobTitle}</p>}
+                    <div className="flex items-center mt-1">
+                        <StarIcon className="h-4 w-4 text-yellow-400 fill-current mr-1" />
+                        <span className="font-bold text-slate-700">{displayScore.toFixed(1)}</span>
+                        <span className="text-xs text-slate-400 ml-2">({employeeEvals.length} avaliações)</span>
+                    </div>
                 </div>
             </div>
-            <div className="text-blue-500">
-                <ChartBarIcon className="h-6 w-6" />
+            <div className="flex flex-col gap-2">
+                <button onClick={onSelect} className="text-blue-500 hover:text-blue-700">
+                    <ChartBarIcon className="h-6 w-6" />
+                </button>
+                <button
+                    onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                    className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Excluir Funcionário"
+                >
+                    <TrashIcon className="h-5 w-5" />
+                </button>
             </div>
         </div>
     );
@@ -67,8 +78,9 @@ const EmployeeDetailModal: React.FC<{
     employee: Employee;
     onClose: () => void;
     onSave: () => void;
+    onDelete: () => void; // New prop
     currentUser: User | null;
-}> = ({ employee, onClose, onSave, currentUser }) => {
+}> = ({ employee, onClose, onSave, onDelete, currentUser }) => {
     // ... Copy existing implementation or use a placeholder if too long (I'll keep it shortened for this specific file write as the focus is Organograma)
     // To ensure I don't break existing features, I will replicate it or assume it's there. 
     // Given the previous step saw the full file, I will perform a full overwrite including the Modal code to be safe.
@@ -185,7 +197,12 @@ const EmployeeDetailModal: React.FC<{
                             </div>
                         </div>
                     </div>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-200 transition">✕</button>
+                    <div className="flex items-center gap-2">
+                        <button onClick={onDelete} className="text-red-400 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition" title="Excluir Este Funcionário">
+                            <TrashIcon className="h-5 w-5" />
+                        </button>
+                        <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-200 transition">✕</button>
+                    </div>
                 </div>
                 <div className="flex border-b border-slate-200 bg-white">
                     {[
@@ -583,6 +600,18 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
         setIsAddModalOpen(true);
     }
 
+    const handleDeleteEmployee = async (id: string) => {
+        if (!confirm('Tem certeza que deseja excluir este funcionário? Essa ação não pode ser desfeita.')) return;
+        try {
+            await deleteItem('employees', id);
+            alert('Funcionário excluído.');
+            setSelectedEmployee(null);
+            loadData();
+        } catch (error) {
+            alert('Erro ao excluir.');
+        }
+    };
+
     return (
         <div className="min-h-screen bg-slate-50 p-4 sm:p-6 md:p-8">
             {selectedEmployee && (
@@ -591,6 +620,7 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
                     currentUser={currentUser}
                     onClose={() => setSelectedEmployee(null)}
                     onSave={loadData}
+                    onDelete={() => handleDeleteEmployee(selectedEmployee.id)}
                 />
             )}
 
@@ -654,6 +684,7 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
                             employee={emp}
                             evaluations={evaluations}
                             onSelect={() => setSelectedEmployee(emp)}
+                            onDelete={() => handleDeleteEmployee(emp.id)}
                         />
                     ))}
                     {employees.length === 0 && (
