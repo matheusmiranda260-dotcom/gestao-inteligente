@@ -117,28 +117,28 @@ const MultiLotSelector: React.FC<MultiLotSelectorProps> = ({ label, subLabel, av
                 <table className="w-full text-sm text-left">
                     <thead className="bg-white/5 sticky top-0 text-slate-300">
                         <tr>
-                            <th className="p-2 w-10"></th>
-                            <th className="p-2">Lote Interno</th>
-                            <th className="p-2 text-right">Peso (kg)</th>
+                            <th className="p-3 sm:p-2 w-12 text-center text-xs uppercase tracking-wider">Sel</th>
+                            <th className="p-3 sm:p-2 text-xs uppercase tracking-wider">Lote</th>
+                            <th className="p-3 sm:p-2 text-right text-xs uppercase tracking-wider">Peso (kg)</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
                         {availableLots.map(lot => (
-                            <tr key={lot.id} className="hover:bg-white/5 cursor-pointer transition-colors" onClick={(e) => {
+                            <tr key={lot.id} className="active:bg-white/10 hover:bg-white/5 cursor-pointer transition-colors" onClick={(e) => {
                                 if ((e.target as HTMLElement).tagName !== 'INPUT') {
                                     handleSelectLot(lot.id, !selectedLots.includes(lot.id));
                                 }
                             }}>
-                                <td className="p-2 text-center">
+                                <td className="p-4 sm:p-2 text-center">
                                     <input
                                         type="checkbox"
                                         checked={selectedLots.includes(lot.id)}
                                         onChange={(e) => handleSelectLot(lot.id, e.target.checked)}
-                                        className="rounded border-white/30 bg-black/40 text-[#00E5FF] focus:ring-[#00E5FF] pointer-events-none"
+                                        className="h-5 w-5 rounded border-white/30 bg-black/40 text-[#00E5FF] focus:ring-[#00E5FF] pointer-events-none"
                                     />
                                 </td>
-                                <td className="p-2 font-medium text-slate-200">{lot.internalLot}</td>
-                                <td className="p-2 text-right text-slate-300">{lot.availableQuantity.toFixed(2)}</td>
+                                <td className="p-4 sm:p-2 font-medium text-slate-200 text-sm sm:text-xs md:text-sm">{lot.internalLot}</td>
+                                <td className="p-4 sm:p-2 text-right text-slate-300 font-mono text-sm sm:text-xs md:text-sm">{lot.availableQuantity.toFixed(2)}</td>
                             </tr>
                         ))}
                         {availableLots.length === 0 && (
@@ -461,11 +461,30 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
                     </div>
                     <div>
                         <label htmlFor="quantity" className="block text-sm font-medium text-slate-300 mb-1">Quantidade de Peças</label>
-                        <input type="number" id="quantity" value={quantity} onChange={(e) => setQuantity(parseInt(e.target.value, 10) || 1)} min="1" className="w-full pl-3 pr-4 py-2 rounded-lg border border-white/10 bg-black/20 focus:bg-black/40 focus:border-[#00E5FF] focus:ring-1 focus:ring-[#00E5FF] outline-none transition-all text-white placeholder-slate-500" required />
+                        <input
+                            type="number"
+                            id="quantity"
+                            value={quantity}
+                            onChange={(e) => setQuantity(parseInt(e.target.value, 10) || 1)}
+                            min="1"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            className="w-full pl-3 pr-4 py-3 sm:py-2 rounded-lg border border-white/10 bg-black/20 focus:bg-black/40 focus:border-[#00E5FF] focus:ring-1 focus:ring-[#00E5FF] outline-none transition-all text-white placeholder-slate-500 text-lg sm:text-base"
+                            required
+                        />
                     </div>
                     <div>
                         <label htmlFor="machineSpeed" className="block text-sm font-medium text-slate-300 mb-1">Velocidade (m/min)</label>
-                        <input type="number" id="machineSpeed" value={machineSpeed} onChange={(e) => setMachineSpeed(parseFloat(e.target.value) || 1)} min="1" className="w-full pl-3 pr-4 py-2 rounded-lg border border-white/10 bg-black/20 focus:bg-black/40 focus:border-[#00E5FF] focus:ring-1 focus:ring-[#00E5FF] outline-none transition-all text-white placeholder-slate-500" required />
+                        <input
+                            type="number"
+                            id="machineSpeed"
+                            value={machineSpeed}
+                            onChange={(e) => setMachineSpeed(parseFloat(e.target.value) || 1)}
+                            min="1"
+                            inputMode="decimal"
+                            className="w-full pl-3 pr-4 py-3 sm:py-2 rounded-lg border border-white/10 bg-black/20 focus:bg-black/40 focus:border-[#00E5FF] focus:ring-1 focus:ring-[#00E5FF] outline-none transition-all text-white placeholder-slate-500 text-lg sm:text-base"
+                            required
+                        />
                     </div>
                 </div>
 

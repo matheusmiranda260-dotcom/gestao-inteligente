@@ -217,21 +217,25 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
                                 </thead>
                                 <tbody>
                                     {availableLots.map(lot => (
-                                        <tr key={lot.id} className="bg-white border-b hover:bg-slate-50">
-                                            <td className="px-4 py-2">
+                                        <tr key={lot.id} className="bg-white border-b hover:bg-slate-50 active:bg-slate-100 transition-colors" onClick={(e) => {
+                                            if ((e.target as HTMLElement).tagName !== 'INPUT') {
+                                                handleSelectLot(lot.id, !selectedLotIds.includes(lot.id));
+                                            }
+                                        }}>
+                                            <td className="px-4 py-4 sm:py-2 text-center w-12 cursor-pointer">
                                                 <input
                                                     type="checkbox"
                                                     checked={selectedLotIds.includes(lot.id)}
                                                     onChange={(e) => handleSelectLot(lot.id, e.target.checked)}
-                                                    className="h-4 w-4 rounded border-slate-300 text-slate-600 focus:ring-slate-500"
+                                                    className="h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 pointer-events-none"
                                                 />
                                             </td>
-                                            <td className="px-4 py-2 font-medium text-slate-900">{lot.internalLot}</td>
-                                            <td className="px-4 py-2">{lot.supplier}</td>
-                                            <td className="px-4 py-2">{lot.materialType}</td>
-                                            <td className="px-4 py-2">{lot.bitola}</td>
-                                            <td className="px-4 py-2 text-right">{lot.labelWeight.toFixed(2)}</td>
-                                            <td className="px-4 py-2 text-right font-bold">{lot.remainingQuantity.toFixed(2)}</td>
+                                            <td className="px-4 py-4 sm:py-2 font-medium text-slate-900 text-sm sm:text-xs md:text-sm">{lot.internalLot}</td>
+                                            <td className="px-4 py-4 sm:py-2 text-sm sm:text-xs md:text-sm hidden sm:table-cell">{lot.supplier}</td>
+                                            <td className="px-4 py-4 sm:py-2 text-sm sm:text-xs md:text-sm hidden sm:table-cell">{lot.materialType}</td>
+                                            <td className="px-4 py-4 sm:py-2 font-bold text-slate-700 text-sm sm:text-xs md:text-sm">{lot.bitola}</td>
+                                            <td className="px-4 py-4 sm:py-2 text-right text-slate-500 hidden md:table-cell">{lot.labelWeight.toFixed(2)}</td>
+                                            <td className="px-4 py-4 sm:py-2 text-right font-bold text-blue-600 text-base sm:text-sm">{lot.remainingQuantity.toFixed(2)}</td>
                                         </tr>
                                     ))}
                                 </tbody>
