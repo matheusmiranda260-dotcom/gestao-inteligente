@@ -497,21 +497,24 @@ const OrgChart: React.FC<{
     };
 
     const handleAssignEmployee = async (positionId: string, employeeId: string) => {
-        // Clear previous position of this employee if any
-        if (employeeId) {
-            const previousEmp = employees.find(e => e.id === employeeId);
-            // Remove any other employee from this position? No, positions can have multiple people? 
-            // Usually one box = one slot. But we might want multiple. 
-            // For now assume one-to-one mapping for the specific dropdown.
+        // 1. Find details to sync
+        const targetPos = positions.find(p => p.id === positionId);
+        const targetUnit = units.find(u => u.id === targetPos?.orgUnitId);
 
-            // Wait, if I select an employee "Andrius", I should move him here.
-            await updateItem('employees', employeeId, { orgPositionId: positionId });
+        // 2. Clear previous position of this employee if any (logic remains similar)
+        // If we are moving an employee, we just update them. 
+        // If we are unassigning (employeeId is empty), we find who WAS there.
+
+        if (employeeId) {
+            // Sync Job Title and Sector automatically
+            const updates: Partial<Employee> = {
+                orgPositionId: positionId,
+                jobTitle: targetPos?.title || undefined,
+                sector: targetUnit?.name || undefined
+            };
+            await updateItem('employees', employeeId, updates);
         } else {
-            // Unassign? We need to find who was there. 
-            // The Select onchange to "" handles this only if we knew who was there. 
-            // But simpler: we just updated, reload. 
-            // Actually, clearing a select with "" value just means "nobody selected". 
-            // To truly unassign, we'd need to find who currently has this positionId and set to null.
+            // Unassign logic: Find who is currently in this position
             const occupants = employees.filter(e => e.orgPositionId === positionId);
             for (const occ of occupants) {
                 await updateItem('employees', occ.id, { orgPositionId: null });
@@ -587,7 +590,16 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
     const handleCreateAndEdit = async (name: string, positionId?: string, sector?: string) => {
         if (!name) return;
         try {
-            // Validate name to avoid empty inserts
+            // Auto-fill Job Title from Position Name if linked via OrgChart
+            let autoJobTitle = '';
+            if (positionId) {
+                try {
+                    const connectedPosList = await fetchByColumn<OrgPosition>('org_positions', 'id', positionId);
+                    if (connectedPosList && connectedPosList.length > 0) {
+                        autoJobTitle = connectedPosList[0].title;
+                    }
+                } catch (e) { console.error('Error fetching position for auto-fill', e); }
+            }
 
             const newEmpPayload: Partial<Employee> = {
                 name: name,
@@ -595,8 +607,8 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
                 shift: 'Manhã', // Default
                 active: true,
                 orgPositionId: positionId || undefined,
-                jobTitle: '', // Text is fine
-                phone: '',    // Text is fine
+                jobTitle: autoJobTitle, // Auto-sync Job Title
+                phone: '',
                 // Dates MUST be omitted or null, not empty strings
                 // admissionDate: undefined,
                 // birthDate: undefined
