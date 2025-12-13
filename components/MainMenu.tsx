@@ -265,27 +265,27 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser, mes
                         color="indigo"
                     />
                 )}
-                <MenuButton
+                {hasPermission('partsManager') && <MenuButton
                     onClick={() => setPage('partsManager')}
                     label="Gerenciador de Peças"
                     description="Controle de estoque de peças de reposição."
                     icon={<WrenchScrewdriverIcon />}
                     color="cyan"
-                />
-                <MenuButton
+                />}
+                {hasPermission('continuousImprovement') && <MenuButton
                     onClick={() => setPage('continuousImprovement')}
                     label="Melhoria Contínua"
                     description="Kaizen Digital, Ações e Problemas"
                     icon={<AdjustmentsIcon />}
                     color="teal"
-                />
-                <MenuButton
+                />}
+                {hasPermission('workInstructions') && <MenuButton
                     onClick={() => setPage('workInstructions')}
                     label="Instruções de Trabalho"
                     description="Procedimentos e Guias Padrão"
                     icon={<DocumentTextIcon />}
                     color="indigo"
-                />
+                />}
             </div>
         </div>
     );
