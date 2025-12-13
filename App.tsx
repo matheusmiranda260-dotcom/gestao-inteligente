@@ -271,7 +271,7 @@ const App: React.FC = () => {
 
     const updateUser = async (userId: string, data: Partial<User>) => {
         try {
-            await updateItem<User>('profiles', userId, data);
+            await updateItem<User>('app_users', userId, data);
             setUsers(prev => prev.map(u => u.id === userId ? { ...u, ...data } : u));
             showNotification('Usuário atualizado com sucesso!', 'success');
         } catch (error) {
@@ -281,7 +281,7 @@ const App: React.FC = () => {
 
     const deleteUser = async (userId: string) => {
         try {
-            await deleteItem('profiles', userId);
+            await deleteItem('app_users', userId);
             setUsers(prev => prev.filter(u => u.id !== userId));
             showNotification('Usuário removido com sucesso!', 'success');
         } catch (error) {
