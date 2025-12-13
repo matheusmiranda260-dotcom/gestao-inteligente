@@ -290,7 +290,8 @@ const OrgNode: React.FC<{
     onDeletePosition: (id: string) => void;
     onAssignEmployee: (posId: string, empId: string) => void;
     onCreateEmployee: (posId: string) => void; // Shortcut to create emp for this position
-}> = ({ node, employees, onAddSubUnit, onAddPosition, onDeleteUnit, onDeletePosition, onAssignEmployee, onCreateEmployee }) => {
+    onEditEmployee: (employee: Employee) => void; // New prop
+}> = ({ node, employees, onAddSubUnit, onAddPosition, onDeleteUnit, onDeletePosition, onAssignEmployee, onCreateEmployee, onEditEmployee }) => {
 
     // Color mapping based on type
     const getNodeColor = (type?: string) => {
@@ -333,9 +334,9 @@ const OrgNode: React.FC<{
                                     </button>
                                 </div>
                                 {/* White Box: Employee */}
-                                <div className="bg-white border-x border-b border-slate-300 rounded-b-lg p-1 w-48 text-center shadow-sm text-sm">
+                                <div className="bg-white border-x border-b border-slate-300 rounded-b-lg p-1 w-48 flex items-center shadow-sm text-sm">
                                     <select
-                                        className="w-full bg-transparent outline-none text-slate-700 font-medium text-center cursor-pointer text-xs"
+                                        className="flex-grow bg-transparent outline-none text-slate-700 font-medium text-center cursor-pointer text-xs py-1"
                                         value={occupant ? occupant.id : ''}
                                         onChange={(e) => {
                                             if (e.target.value === 'NEW') {
@@ -351,6 +352,15 @@ const OrgNode: React.FC<{
                                         ))}
                                         <option value="NEW" className="font-bold text-blue-600">+ Novo Funcionário...</option>
                                     </select>
+                                    {occupant && (
+                                        <button
+                                            onClick={() => onEditEmployee(occupant)}
+                                            className="p-1 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded mr-1"
+                                            title="Editar Funcionário"
+                                        >
+                                            <PencilIcon className="h-3 w-3" />
+                                        </button>
+                                    )}
                                 </div>
                                 {/* Connector line to parent node if needed, handled by tree structure below */}
                             </div>
@@ -385,6 +395,7 @@ const OrgNode: React.FC<{
                                 onDeletePosition={onDeletePosition}
                                 onAssignEmployee={onAssignEmployee}
                                 onCreateEmployee={onCreateEmployee}
+                                onEditEmployee={onEditEmployee}
                             />
                         </div>
                     ))}
@@ -398,7 +409,8 @@ const OrgChart: React.FC<{
     employees: Employee[];
     reloadData: () => void;
     triggerAddEmployee: (prefillPositionId?: string, prefillSector?: string) => void;
-}> = ({ employees, reloadData, triggerAddEmployee }) => {
+    triggerEditEmployee: (employee: Employee) => void; // New prop
+}> = ({ employees, reloadData, triggerAddEmployee, triggerEditEmployee }) => {
     const [units, setUnits] = useState<OrgUnit[]>([]);
     const [positions, setPositions] = useState<OrgPosition[]>([]);
     const [tree, setTree] = useState<OrgTreeItem[]>([]);
@@ -530,6 +542,7 @@ const OrgChart: React.FC<{
                         onDeletePosition={handleDeletePosition}
                         onAssignEmployee={handleAssignEmployee}
                         onCreateEmployee={handleCreateEmployeeForPosition}
+                        onEditEmployee={triggerEditEmployee}
                     />
                 ))}
 
@@ -684,7 +697,12 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
                     )}
                 </div>
             ) : (
-                <OrgChart employees={employees} reloadData={loadData} triggerAddEmployee={promptAndCreateEmployee} />
+                <OrgChart
+                    employees={employees}
+                    reloadData={loadData}
+                    triggerAddEmployee={promptAndCreateEmployee}
+                    triggerEditEmployee={(emp) => setSelectedEmployee(emp)}
+                />
             )}
         </div>
     );
