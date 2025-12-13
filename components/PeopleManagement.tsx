@@ -291,7 +291,8 @@ const OrgNode: React.FC<{
     onAssignEmployee: (posId: string, empId: string) => void;
     onCreateEmployee: (posId: string) => void; // Shortcut to create emp for this position
     onEditEmployee: (employee: Employee) => void; // New prop
-}> = ({ node, employees, onAddSubUnit, onAddPosition, onDeleteUnit, onDeletePosition, onAssignEmployee, onCreateEmployee, onEditEmployee }) => {
+    onEditUnit: (id: string, currentName: string) => void;
+}> = ({ node, employees, onAddSubUnit, onAddPosition, onDeleteUnit, onDeletePosition, onAssignEmployee, onCreateEmployee, onEditEmployee, onEditUnit }) => {
 
     // Color mapping based on type
     const getNodeColor = (type?: string) => {
@@ -310,6 +311,9 @@ const OrgNode: React.FC<{
                 <div className="font-bold text-lg uppercase tracking-wide">{node.name}</div>
                 {/* Controls */}
                 <div className="absolute -top-3 -right-3 hidden group-hover:flex gap-1">
+                    <button onClick={() => onEditUnit(node.id, node.name)} className="p-1 bg-white rounded-full text-slate-600 shadow-sm hover:scale-110" title="Editar Nome">
+                        <PencilIcon className="h-4 w-4" />
+                    </button>
                     <button onClick={() => onAddSubUnit(node.id)} className="p-1 bg-white rounded-full text-blue-600 shadow-sm hover:scale-110" title="Adicionar Sub-Área">
                         <PlusIcon className="h-4 w-4" />
                     </button>
@@ -399,6 +403,7 @@ const OrgNode: React.FC<{
                                 onAssignEmployee={onAssignEmployee}
                                 onCreateEmployee={onCreateEmployee}
                                 onEditEmployee={onEditEmployee}
+                                onEditUnit={onEditUnit}
                             />
                         </div>
                     ))}
@@ -454,6 +459,14 @@ const OrgChart: React.FC<{
     };
 
     // --- Actions ---
+
+    const handleEditUnit = async (id: string, currentName: string) => {
+        const newName = prompt("Novo nome da área:", currentName);
+        if (newName && newName !== currentName) {
+            await updateItem('org_units', id, { name: newName });
+            loadOrgData();
+        }
+    };
 
     const handleCreateRoot = async () => {
         const name = prompt("Nome do Departamento/Área Principal:");
@@ -549,6 +562,7 @@ const OrgChart: React.FC<{
                         onAssignEmployee={handleAssignEmployee}
                         onCreateEmployee={handleCreateEmployeeForPosition}
                         onEditEmployee={triggerEditEmployee}
+                        onEditUnit={handleEditUnit}
                     />
                 ))}
 
