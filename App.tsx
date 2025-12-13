@@ -19,7 +19,7 @@ import { supabase } from './supabaseClient';
 
 import { fetchTable, insertItem, updateItem, deleteItem, deleteItemByColumn, updateItemByColumn } from './services/supabaseService';
 import { useAllRealtimeSubscriptions } from './hooks/useSupabaseRealtime';
-import RealtimeStatus from './components/RealtimeStatus';
+
 const generateId = (prefix: string) => `${prefix.toUpperCase()}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
 const App: React.FC = () => {
@@ -1651,7 +1651,7 @@ const App: React.FC = () => {
         <div className="bg-slate-100 min-h-screen">
             {notification && <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />}
             {renderPage()}
-            <RealtimeStatus />
+
         </div>
     );
 };
