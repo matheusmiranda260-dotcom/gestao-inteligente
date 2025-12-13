@@ -26,7 +26,7 @@ export interface TrelicaSelectedLots {
     allSenozoideRight?: string[];
 }
 
-export type Page = 'login' | 'menu' | 'stock' | 'machineSelection' | 'trefila' | 'trelica' | 'productionOrder' | 'productionOrderTrelica' | 'reports' | 'userManagement' | 'productionDashboard' | 'finishedGoods' | 'partsManager' | 'continuousImprovement' | 'workInstructions';
+export type Page = 'login' | 'menu' | 'stock' | 'machineSelection' | 'trefila' | 'trelica' | 'productionOrder' | 'productionOrderTrelica' | 'reports' | 'userManagement' | 'productionDashboard' | 'finishedGoods' | 'partsManager' | 'continuousImprovement' | 'workInstructions' | 'peopleManagement';
 
 export interface InstructionStep {
     id: string;
@@ -331,4 +331,39 @@ export interface KaizenProblem {
     date: string;
     photoUrl?: string;
     history: KaizenAction[];
+}
+
+export interface Employee {
+    id: string;
+    name: string;
+    photoUrl?: string; // Mapped from photo_url
+    sector: string;
+    shift: string;
+    active: boolean;
+    appUserId?: string;
+    createdAt?: string;
+}
+
+export interface Evaluation {
+    id: string;
+    employeeId: string; // Mapped from employee_id
+    evaluator: string;
+    date: string;
+    organizationScore: number;
+    cleanlinessScore: number;
+    effortScore: number;
+    communicationScore: number;
+    improvementScore: number;
+    totalScore: number;
+    note?: string;
+    photoUrl?: string;
+}
+
+export interface Achievement {
+    id: string;
+    employeeId: string;
+    type: 'model_area' | 'idea_month' | 'highlight_week' | 'custom';
+    title: string;
+    description?: string;
+    date: string;
 }

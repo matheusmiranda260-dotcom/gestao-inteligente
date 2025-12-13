@@ -22,6 +22,7 @@ const manageablePages: { page: Page; label: string }[] = [
     { page: 'partsManager', label: 'Gerenciador de Peças' },
     { page: 'continuousImprovement', label: 'Melhoria Contínua' },
     { page: 'workInstructions', label: 'Instruções de Trabalho' },
+    { page: 'peopleManagement', label: 'Gestão de Pessoas' },
 ];
 
 const UserModal: React.FC<{

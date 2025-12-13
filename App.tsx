@@ -15,6 +15,7 @@ import FinishedGoods from './components/FinishedGoods';
 import SparePartsManager from './components/SparePartsManager';
 import ContinuousImprovement from './components/ContinuousImprovement';
 import WorkInstructions from './components/WorkInstructions';
+import PeopleManagement from './components/PeopleManagement';
 import { supabase } from './supabaseClient';
 
 import { fetchTable, insertItem, updateItem, deleteItem, deleteItemByColumn, updateItemByColumn } from './services/supabaseService';
@@ -1642,6 +1643,8 @@ const App: React.FC = () => {
                 return <ContinuousImprovement setPage={setPage} />;
             case 'workInstructions':
                 return <WorkInstructions setPage={setPage} />;
+            case 'peopleManagement':
+                return <PeopleManagement setPage={setPage} currentUser={currentUser} />;
             default:
                 return <Login onLogin={handleLogin} error={null} />;
         }

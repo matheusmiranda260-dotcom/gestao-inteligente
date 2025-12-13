@@ -286,6 +286,13 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser, mes
                     icon={<DocumentTextIcon />}
                     color="indigo"
                 />}
+                {hasPermission('peopleManagement') && <MenuButton
+                    onClick={() => setPage('peopleManagement')}
+                    label="Gestão de Pessoas"
+                    description="Engajamento, Disciplina e Melhoria"
+                    icon={<UserGroupIcon />}
+                    color="cyan"
+                />}
             </div>
         </div>
     );
