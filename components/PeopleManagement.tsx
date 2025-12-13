@@ -259,143 +259,279 @@ const EmployeeDetailModal: React.FC<{
 
 // --- ORG CHART COMPONENTS ---
 
-const OrgChart: React.FC<{ employees: Employee[]; reloadData: () => void }> = ({ employees, reloadData }) => {
+interface OrgTreeItem extends OrgUnit {
+    children: OrgTreeItem[];
+    positions: OrgPosition[];
+}
+
+const OrgNode: React.FC<{
+    node: OrgTreeItem;
+    employees: Employee[];
+    onAddSubUnit: (parentId: string) => void;
+    onAddPosition: (unitId: string) => void;
+    onDeleteUnit: (id: string) => void;
+    onDeletePosition: (id: string) => void;
+    onAssignEmployee: (posId: string, empId: string) => void;
+    onCreateEmployee: (posId: string) => void; // Shortcut to create emp for this position
+}> = ({ node, employees, onAddSubUnit, onAddPosition, onDeleteUnit, onDeletePosition, onAssignEmployee, onCreateEmployee }) => {
+
+    // Color mapping based on type
+    const getNodeColor = (type?: string) => {
+        switch (type) {
+            case 'department': return 'bg-amber-400 border-amber-500 text-white'; // Amarelo (Administrativo, Produção)
+            case 'group': return 'bg-green-600 border-green-700 text-white'; // Verde (Máquinas)
+            case 'machine': return 'bg-orange-500 border-orange-600 text-white'; // Laranja (Máquinas Trefila/Treliça)
+            default: return 'bg-slate-500 border-slate-600 text-white';
+        }
+    };
+
+    return (
+        <div className="flex flex-col items-center">
+            {/* The Node Itself */}
+            <div className={`relative p-3 rounded-lg shadow-md border-b-4 mb-4 min-w-[200px] text-center group transition-transform hover:-translate-y-1 ${getNodeColor(node.unitType)}`}>
+                <div className="font-bold text-lg uppercase tracking-wide">{node.name}</div>
+                {/* Controls */}
+                <div className="absolute -top-3 -right-3 hidden group-hover:flex gap-1">
+                    <button onClick={() => onAddSubUnit(node.id)} className="p-1 bg-white rounded-full text-blue-600 shadow-sm hover:scale-110" title="Adicionar Abaixo">
+                        <PlusIcon className="h-4 w-4" />
+                    </button>
+                    <button onClick={() => onDeleteUnit(node.id)} className="p-1 bg-white rounded-full text-red-600 shadow-sm hover:scale-110" title="Remover Área">
+                        <TrashIcon className="h-4 w-4" />
+                    </button>
+                </div>
+            </div>
+
+            {/* Positions directly under this Node (Vertical list usually) */}
+            {node.positions.length > 0 && (
+                <div className="flex flex-wrap justify-center gap-4 mb-6 px-4">
+                    {node.positions.map(pos => {
+                        const occupant = employees.find(e => e.orgPositionId === pos.id);
+                        return (
+                            <div key={pos.id} className="flex flex-col items-center relative group/pos">
+                                {/* Blue Box: Role */}
+                                <div className="bg-[#4a86e8] text-white px-4 py-1.5 rounded-t-lg shadow-sm font-semibold text-sm w-48 text-center border-b border-blue-400 relative">
+                                    {pos.title}
+                                    <button onClick={() => onDeletePosition(pos.id)} className="absolute top-1 right-1 opacity-0 group-hover/pos:opacity-100 text-white hover:text-red-200">
+                                        <XIcon className="h-3 w-3" />
+                                    </button>
+                                </div>
+                                {/* White Box: Employee */}
+                                <div className="bg-white border-x border-b border-slate-300 rounded-b-lg p-1 w-48 text-center shadow-sm text-sm">
+                                    <select
+                                        className="w-full bg-transparent outline-none text-slate-700 font-medium text-center cursor-pointer text-xs"
+                                        value={occupant ? occupant.id : ''}
+                                        onChange={(e) => {
+                                            if (e.target.value === 'NEW') {
+                                                onCreateEmployee(pos.id);
+                                            } else {
+                                                onAssignEmployee(pos.id, e.target.value);
+                                            }
+                                        }}
+                                    >
+                                        <option value="">(Vago)</option>
+                                        {employees.map(emp => (
+                                            <option key={emp.id} value={emp.id}>{emp.name}</option>
+                                        ))}
+                                        <option value="NEW" className="font-bold text-blue-600">+ Novo Funcionário...</option>
+                                    </select>
+                                </div>
+                                {/* Connector line to parent node if needed, handled by tree structure below */}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+
+            {/* Add Position Button for this Node */}
+            <div className="mb-6 opacity-0 hover:opacity-100 transition-opacity -mt-4">
+                <button onClick={() => onAddPosition(node.id)} className="text-xs bg-slate-200 hover:bg-slate-300 text-slate-600 px-2 py-1 rounded-full flex items-center gap-1">
+                    <PlusIcon className="h-3 w-3" /> Cargo
+                </button>
+            </div>
+
+            {/* Children Nodes (Horizontal Layout) */}
+            {node.children.length > 0 && (
+                <div className="relative flex justify-center gap-8 mt-4 pt-8 border-t-2 border-slate-300">
+                    {/* Vertical line from parent to the horizontal bar */}
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 h-8 w-0.5 bg-slate-300"></div>
+
+                    {node.children.map(child => (
+                        <div key={child.id} className="relative flex flex-col items-center">
+                            {/* Vertical line to child */}
+                            <div className="absolute -top-8 left-1/2 -translate-x-1/2 h-8 w-0.5 bg-slate-300"></div>
+                            <OrgNode
+                                node={child}
+                                employees={employees}
+                                onAddSubUnit={onAddSubUnit}
+                                onAddPosition={onAddPosition}
+                                onDeleteUnit={onDeleteUnit}
+                                onDeletePosition={onDeletePosition}
+                                onAssignEmployee={onAssignEmployee}
+                                onCreateEmployee={onCreateEmployee}
+                            />
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
+const OrgChart: React.FC<{
+    employees: Employee[];
+    reloadData: () => void;
+    triggerAddEmployee: (prefillPositionId?: string, prefillSector?: string) => void;
+}> = ({ employees, reloadData, triggerAddEmployee }) => {
     const [units, setUnits] = useState<OrgUnit[]>([]);
     const [positions, setPositions] = useState<OrgPosition[]>([]);
-    const [isEditing, setIsEditing] = useState(false);
+    const [tree, setTree] = useState<OrgTreeItem[]>([]);
 
-    // Add Unit
-    const [newUnitName, setNewUnitName] = useState('');
-
-    useEffect(() => {
-        loadOrgData();
-    }, [employees]);
+    useEffect(() => { loadOrgData(); }, [employees]);
 
     const loadOrgData = async () => {
         const u = await fetchTable<OrgUnit>('org_units');
         const p = await fetchTable<OrgPosition>('org_positions');
-        // Sort by display order if available, or name
-        setUnits(u.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0)));
+        setUnits(u);
         setPositions(p);
+        setTree(buildTree(u, p));
     };
 
-    const handleAddUnit = async () => {
-        if (!newUnitName) return;
-        await insertItem('org_units', { name: newUnitName, unitType: 'machine', displayOrder: units.length + 1 });
-        setNewUnitName('');
+    const buildTree = (allUnits: OrgUnit[], allPositions: OrgPosition[]): OrgTreeItem[] => {
+        const unitMap = new Map<string, OrgTreeItem>();
+        allUnits.forEach(u => unitMap.set(u.id, { ...u, children: [], positions: [] }));
+
+        const roots: OrgTreeItem[] = [];
+
+        // Assign positions to units
+        allPositions.forEach(p => {
+            const unit = unitMap.get(p.orgUnitId);
+            if (unit) unit.positions.push(p);
+        });
+
+        // Build hierarchy
+        allUnits.forEach(u => {
+            const item = unitMap.get(u.id)!;
+            if (u.parentId && unitMap.has(u.parentId)) {
+                unitMap.get(u.parentId)!.children.push(item);
+            } else {
+                roots.push(item);
+            }
+        });
+
+        return roots.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+    };
+
+    // --- Actions ---
+
+    const handleCreateRoot = async () => {
+        const name = prompt("Nome do Departamento/Área Principal:");
+        if (!name) return;
+
+        // Simple heuristic: if name contains 'Maquina' -> machine, else department
+        const type = name.toLowerCase().includes('maquina') ? 'machine' : (name.toLowerCase().includes('maquinas') ? 'group' : 'department');
+
+        await insertItem('org_units', { name, unitType: type, displayOrder: units.length + 1 });
+        loadOrgData();
+    };
+
+    const handleAddSubUnit = async (parentId: string) => {
+        const name = prompt("Nome da Sub-Área / Máquina:");
+        if (!name) return;
+        const parent = units.find(u => u.id === parentId);
+
+        let type = 'department';
+        if (parent?.unitType === 'department') type = 'group'; // Dept -> Group (e.g. Produção -> Máquinas)
+        if (parent?.unitType === 'group') type = 'machine'; // Group -> Machine (e.g. Máquinas -> Trefila 01)
+        if (name.toLowerCase().includes('maquina')) type = 'machine';
+
+        await insertItem('org_units', { name, unitType: type, parentId, displayOrder: 99 });
+        loadOrgData();
+    };
+
+    const handleAddPosition = async (unitId: string) => {
+        const title = prompt("Nome do Cargo/Função:");
+        if (!title) return;
+        await insertItem('org_positions', { orgUnitId: unitId, title, isLeadership: false });
         loadOrgData();
     };
 
     const handleDeleteUnit = async (id: string) => {
-        if (!confirm('Ao deletar a unidade, todos os cargos vinculados serão removidos. Continuar?')) return;
+        if (!confirm('Excluir esta área e todos os itens dentro dela?')) return;
         await deleteItem('org_units', id);
         loadOrgData();
     };
 
-    // Position Handlers
-    const handleAddPosition = async (unitId: string, title: string) => {
-        await insertItem('org_positions', { orgUnitId: unitId, title, isLeadership: false, displayOrder: 0 });
-        loadOrgData();
-    };
-
     const handleDeletePosition = async (id: string) => {
-        if (!confirm('Remover este cargo?')) return;
+        if (!confirm('Excluir cargo?')) return;
         await deleteItem('org_positions', id);
         loadOrgData();
     };
 
     const handleAssignEmployee = async (positionId: string, employeeId: string) => {
-        // Find employee and update
-        // If employeeId is empty, it means unassign. But we need the employee who is currently there?
-        // Actually, we iterate employees to find who has this positionId.
-        const currentOccupant = employees.find(e => e.orgPositionId === positionId);
-        if (currentOccupant) {
-            await updateItem('employees', currentOccupant.id, { orgPositionId: null });
-        }
-
+        // Clear previous position of this employee if any
         if (employeeId) {
-            // Check if new employee is elsewhere? Maybe warning? For now just move them.
+            const previousEmp = employees.find(e => e.id === employeeId);
+            // Remove any other employee from this position? No, positions can have multiple people? 
+            // Usually one box = one slot. But we might want multiple. 
+            // For now assume one-to-one mapping for the specific dropdown.
+
+            // Wait, if I select an employee "Andrius", I should move him here.
             await updateItem('employees', employeeId, { orgPositionId: positionId });
+        } else {
+            // Unassign? We need to find who was there. 
+            // The Select onchange to "" handles this only if we knew who was there. 
+            // But simpler: we just updated, reload. 
+            // Actually, clearing a select with "" value just means "nobody selected". 
+            // To truly unassign, we'd need to find who currently has this positionId and set to null.
+            const occupants = employees.filter(e => e.orgPositionId === positionId);
+            for (const occ of occupants) {
+                await updateItem('employees', occ.id, { orgPositionId: null });
+            }
         }
-        reloadData(); // Reload employees in parent
+        reloadData();
+    };
+
+    const handleCreateEmployeeForPosition = (positionId: string) => {
+        // Find unit name for prefill
+        const pos = positions.find(p => p.id === positionId);
+        const unit = units.find(u => u.id === pos?.orgUnitId);
+        triggerAddEmployee(positionId, unit?.name);
     };
 
     return (
-        <div className="overflow-x-auto pb-8">
-            <div className="flex items-start gap-8 min-w-max p-4">
-                {/* Unit Columns */}
-                {units.map(unit => (
-                    <div key={unit.id} className="w-80 flex-shrink-0 flex flex-col gap-2">
-                        {/* Orange Box: Unit Header */}
-                        <div className="bg-orange-500 text-white p-3 rounded-lg shadow-md font-bold text-center relative group">
-                            {unit.name}
-                            <button onClick={() => handleDeleteUnit(unit.id)} className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 hover:text-red-200 transition">
-                                <TrashIcon className="h-4 w-4" />
-                            </button>
-                        </div>
-
-                        {/* Blue Boxes: Positions */}
-                        <div className="flex flex-col gap-4 mt-2 border-l-2 border-dashed border-slate-300 pl-4 ml-4">
-                            {positions.filter(p => p.orgUnitId === unit.id).map(pos => {
-                                const occupant = employees.find(e => e.orgPositionId === pos.id);
-                                return (
-                                    <div key={pos.id} className="flex flex-col items-center">
-                                        {/* Blue Box: Job Title */}
-                                        <div className="bg-blue-500 text-white px-4 py-2 rounded shadow-sm text-sm font-semibold mb-1 w-full text-center relative group">
-                                            {pos.title}
-                                            <button onClick={() => handleDeletePosition(pos.id)} className="absolute top-1 right-2 opacity-0 group-hover:opacity-100 hover:text-red-200 transition">
-                                                <XIcon className="h-3 w-3" />
-                                            </button>
-                                        </div>
-
-                                        {/* White Box: Employee */}
-                                        <div className="bg-white border border-slate-300 rounded px-3 py-1 text-sm text-slate-700 shadow-sm w-3/4 text-center">
-                                            <select
-                                                className="w-full bg-transparent outline-none text-center cursor-pointer"
-                                                value={occupant ? occupant.id : ''}
-                                                onChange={(e) => handleAssignEmployee(pos.id, e.target.value)}
-                                            >
-                                                <option value="">-- Vago --</option>
-                                                {employees.map(emp => (
-                                                    <option key={emp.id} value={emp.id}>{emp.name}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-
-                            {/* Add Position Button */}
-                            <div className="mt-2">
-                                <input
-                                    placeholder="+ Cargo"
-                                    className="w-full text-sm p-1 border rounded bg-slate-50"
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            handleAddPosition(unit.id, e.currentTarget.value);
-                                            e.currentTarget.value = '';
-                                        }
-                                    }}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                ))}
-
-                {/* Add Unit Column */}
-                <div className="w-80 flex-shrink-0 opacity-50 hover:opacity-100 transition">
-                    <div className="border-2 border-dashed border-slate-400 rounded-lg p-4 flex flex-col items-center justify-center h-32 cursor-pointer bg-slate-100">
-                        <input
-                            placeholder="Nova Máquina/Área..."
-                            className="bg-transparent border-b border-slate-400 focus:outline-none text-center mb-2"
-                            value={newUnitName}
-                            onChange={e => setNewUnitName(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && handleAddUnit()}
-                        />
-                        <button onClick={handleAddUnit} className="bg-slate-300 px-3 py-1 rounded text-sm hover:bg-slate-400">Criar</button>
-                    </div>
+        <div className="overflow-auto p-8 min-h-[600px] bg-slate-50 relative">
+            {tree.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                    <p className="mb-4">O organograma está vazio.</p>
+                    <button onClick={handleCreateRoot} className="bg-[#0F3F5C] text-white px-6 py-3 rounded-lg font-bold shadow-lg hover:bg-[#0A2A3D]">
+                        + Criar Área Principal (Ex: Administrativo)
+                    </button>
                 </div>
-            </div>
+            )}
+
+            {tree.length > 0 && (
+                <div className="flex flex-col items-center min-w-max">
+                    <div className="flex gap-16">
+                        {tree.map(root => (
+                            <OrgNode
+                                key={root.id}
+                                node={root}
+                                employees={employees}
+                                onAddSubUnit={handleAddSubUnit}
+                                onAddPosition={handleAddPosition}
+                                onDeleteUnit={handleDeleteUnit}
+                                onDeletePosition={handleDeletePosition}
+                                onAssignEmployee={handleAssignEmployee}
+                                onCreateEmployee={handleCreateEmployeeForPosition}
+                            />
+                        ))}
+                    </div>
+                    {/* Floating Add Root Button */}
+                    <button onClick={handleCreateRoot} className="fixed bottom-8 right-8 bg-[#0F3F5C] text-white p-4 rounded-full shadow-2xl hover:bg-[#0A2A3D] z-50 border-4 border-white" title="Adicionar Nova Área Raiz">
+                        <PlusIcon className="h-6 w-6" />
+                    </button>
+                </div>
+            )}
         </div>
     );
 };
@@ -412,6 +548,7 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
     const [newEmployeeName, setNewEmployeeName] = useState('');
     const [newEmployeeSector, setNewEmployeeSector] = useState('');
     const [newEmployeeShift, setNewEmployeeShift] = useState('');
+    const [prefillPositionId, setPrefillPositionId] = useState<string | null>(null); // For direct creation from OrgChart
 
     const loadData = async () => {
         const emp = await fetchTable<Employee>('employees');
@@ -427,14 +564,24 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
         try {
             await insertItem<Employee>('employees', {
                 // @ts-ignore
-                name: newEmployeeName, sector: newEmployeeSector, shift: newEmployeeShift, active: true
+                name: newEmployeeName,
+                sector: newEmployeeSector,
+                shift: newEmployeeShift,
+                active: true,
+                orgPositionId: prefillPositionId || undefined
             } as Employee);
             alert('Funcionário cadastrado!');
             setIsAddModalOpen(false);
-            setNewEmployeeName(''); setNewEmployeeSector(''); setNewEmployeeShift('');
+            setNewEmployeeName(''); setNewEmployeeSector(''); setNewEmployeeShift(''); setPrefillPositionId(null);
             loadData();
         } catch (error) { alert('Erro ao cadastrar.'); }
     };
+
+    const openAddModal = (posId?: string, sector?: string) => {
+        setPrefillPositionId(posId || null);
+        if (sector) setNewEmployeeSector(sector);
+        setIsAddModalOpen(true);
+    }
 
     return (
         <div className="min-h-screen bg-slate-50 p-4 sm:p-6 md:p-8">
@@ -450,7 +597,7 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
             {isAddModalOpen && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <form onSubmit={handleAddEmployee} className="bg-white p-6 rounded-xl shadow-xl w-full max-w-md">
-                        <h2 className="text-xl font-bold mb-4">Novo Funcionário</h2>
+                        <h2 className="text-xl font-bold mb-4">Novo Funcionário {prefillPositionId ? '(Vinculado ao Organograma)' : ''}</h2>
                         <input className="w-full p-2 border rounded mb-3" placeholder="Nome" value={newEmployeeName} onChange={e => setNewEmployeeName(e.target.value)} required />
                         <input className="w-full p-2 border rounded mb-3" placeholder="Setor/Máquina" value={newEmployeeSector} onChange={e => setNewEmployeeSector(e.target.value)} required />
                         <select className="w-full p-2 border rounded mb-4" value={newEmployeeShift} onChange={e => setNewEmployeeShift(e.target.value)} required>
@@ -493,7 +640,7 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
                     </button>
                 </div>
 
-                <button onClick={() => setIsAddModalOpen(true)} className="bg-[#0F3F5C] text-white px-4 py-2 rounded-lg font-bold hover:bg-[#0A2A3D] transition flex items-center gap-2">
+                <button onClick={() => openAddModal()} className="bg-[#0F3F5C] text-white px-4 py-2 rounded-lg font-bold hover:bg-[#0A2A3D] transition flex items-center gap-2">
                     <PlusIcon className="h-5 w-5" />
                     Novo Funcionário
                 </button>
@@ -516,7 +663,7 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
                     )}
                 </div>
             ) : (
-                <OrgChart employees={employees} reloadData={loadData} />
+                <OrgChart employees={employees} reloadData={loadData} triggerAddEmployee={openAddModal} />
             )}
         </div>
     );
