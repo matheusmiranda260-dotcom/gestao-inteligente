@@ -574,25 +574,29 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
     const handleCreateAndEdit = async (name: string, positionId?: string, sector?: string) => {
         if (!name) return;
         try {
-            const newEmp = await insertItem<Employee>('employees', {
-                // @ts-ignore
+            // Validate name to avoid empty inserts
+
+            const newEmpPayload: Partial<Employee> = {
                 name: name,
                 sector: sector || 'Não Definido',
-                shift: 'Manhã', // Default/Placeholder
+                shift: 'Manhã', // Default
                 active: true,
                 orgPositionId: positionId || undefined,
-                jobTitle: '', admissionDate: '', birthDate: '', phone: ''
-            } as Employee);
+                jobTitle: '', // Text is fine
+                phone: '',    // Text is fine
+                // Dates MUST be omitted or null, not empty strings
+                // admissionDate: undefined,
+                // birthDate: undefined
+            };
 
-            await loadData(); // Refresh list to get ID
-            // Ideally insertItem returns the full object with ID.
-            // setEmployees(prev => [...prev, newEmp]); // Optimistic update if needed
+            const newEmp = await insertItem<Employee>('employees', newEmpPayload as Employee);
 
-            // Now open the modal for this new employee
+            await loadData();
             setSelectedEmployee(newEmp);
 
         } catch (error) {
-            alert('Erro ao criar registro inicial.');
+            console.error(error);
+            alert('Erro ao criar registro inicial. Verifique o console.');
         }
     };
 
