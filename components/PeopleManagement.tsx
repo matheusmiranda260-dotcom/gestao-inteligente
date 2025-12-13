@@ -98,6 +98,55 @@ const EmployeeDetailModal: React.FC<{
     const [evalScores, setEvalScores] = useState({ organization: 0, cleanliness: 0, effort: 0, communication: 0, improvement: 0 });
     const [evalNote, setEvalNote] = useState('');
 
+    // HR Form State
+    const [newAbsence, setNewAbsence] = useState({ type: 'Falta Injustificada', startDate: '', endDate: '', reason: '' });
+    const [newVacation, setNewVacation] = useState({ period: '', startDate: '', endDate: '' });
+
+    // Handlers for HR
+    const handleAddAbsence = async () => {
+        if (!newAbsence.startDate) return;
+        try {
+            await insertItem('employee_absences', {
+                employeeId: employee.id,
+                type: newAbsence.type,
+                startDate: newAbsence.startDate,
+                endDate: newAbsence.endDate || null,
+                reason: newAbsence.reason
+            });
+            alert('Ausência registrada');
+            setNewAbsence({ type: 'Falta Injustificada', startDate: '', endDate: '', reason: '' });
+            loadDetails();
+        } catch (e) { alert('Erro ao registrar ausência'); }
+    };
+
+    const handleDeleteAbsence = async (id: string) => {
+        if (!confirm('Excluir registro?')) return;
+        await deleteItem('employee_absences', id);
+        loadDetails();
+    };
+
+    const handleAddVacation = async () => {
+        if (!newVacation.startDate || !newVacation.endDate) return;
+        try {
+            await insertItem('employee_vacations', {
+                employeeId: employee.id,
+                period: newVacation.period,
+                startDate: newVacation.startDate,
+                endDate: newVacation.endDate,
+                status: 'Agendada'
+            });
+            alert('Férias agendadas');
+            setNewVacation({ period: '', startDate: '', endDate: '' });
+            loadDetails();
+        } catch (e) { alert('Erro ao registrar férias'); }
+    };
+
+    const handleDeleteVacation = async (id: string) => {
+        if (!confirm('Excluir registro?')) return;
+        await deleteItem('employee_vacations', id);
+        loadDetails();
+    };
+
     useEffect(() => { loadDetails(); }, [employee.id]);
 
     const loadDetails = async () => {
@@ -113,6 +162,12 @@ const EmployeeDetailModal: React.FC<{
             setCourses(crs);
             setAbsences(abs);
             setVacations(vacs);
+            // Load HR Data
+            const absencesData = await fetchByColumn<EmployeeAbsence>('employee_absences', 'employee_id', employee.id);
+            const vacationsData = await fetchByColumn<EmployeeVacation>('employee_vacations', 'employee_id', employee.id);
+            if (absencesData) setAbsences(absencesData);
+            if (vacationsData) setVacations(vacationsData);
+
             setEvaluations(evals.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
         } catch (e) {
             console.error("Error loading employee details", e);
@@ -267,7 +322,125 @@ const EmployeeDetailModal: React.FC<{
                             <div className="space-y-4">{evaluations.map(ev => (<div key={ev.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm"><div className="flex justify-between items-start mb-2"><div><p className="text-sm font-bold text-slate-800">{new Date(ev.date).toLocaleDateString()} - Avaliado por {ev.evaluator}</p><div className="flex items-center mt-1"><StarIcon className="h-4 w-4 text-yellow-400 fill-current mr-1" /><span className="font-bold">{(ev.totalScore / 5).toFixed(1)}</span></div></div><span className="text-xs text-slate-400">Total: {ev.totalScore}/25</span></div>{ev.note && <p className="text-sm text-slate-600 bg-slate-50 p-2 rounded italic">"{ev.note}"</p>}</div>))}</div>
                         </div>
                     )}
-                    {activeTab === 'hr' && <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 text-center"><ClockIcon className="h-12 w-12 text-slate-300 mx-auto mb-4" /><h3 className="text-lg font-medium text-slate-700">Histórico de Férias e Ausências</h3><p className="text-slate-500 mb-6">Em breve você poderá gerenciar programações de férias e atestados aqui.</p><button className="bg-slate-200 text-slate-600 px-4 py-2 rounded-lg" disabled>Funcionalidade em desenvolvimento</button></div>}
+                    {activeTab === 'hr' && (
+                        <div className="space-y-6">
+                            {/* Ausências / Faltas */}
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                                <h3 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2 flex items-center gap-2">
+                                    <ExclamationIcon className="h-5 w-5 text-red-500" />
+                                    Registro de Ausências e Faltas
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 bg-slate-50 p-4 rounded-lg">
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500">Tipo</label>
+                                        <select className="w-full p-2 border rounded" value={newAbsence.type} onChange={e => setNewAbsence({ ...newAbsence, type: e.target.value })}>
+                                            <option value="Falta Injustificada">Falta Injustificada</option>
+                                            <option value="Atestado Médico">Atestado Médico</option>
+                                            <option value="Licença">Licença</option>
+                                            <option value="Suspensão">Suspensão</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500">Data Início</label>
+                                        <input type="date" className="w-full p-2 border rounded" value={newAbsence.startDate} onChange={e => setNewAbsence({ ...newAbsence, startDate: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500">Data Fim (Opcional)</label>
+                                        <input type="date" className="w-full p-2 border rounded" value={newAbsence.endDate} onChange={e => setNewAbsence({ ...newAbsence, endDate: e.target.value })} />
+                                    </div>
+                                    <div className="flex flex-col justify-end">
+                                        <button onClick={handleAddAbsence} className="bg-red-600 text-white font-bold py-2 px-4 rounded hover:bg-red-700 transition">Registrar Ausência</button>
+                                    </div>
+                                    <div className="md:col-span-4">
+                                        <label className="text-xs font-bold text-slate-500">Motivo / Observação</label>
+                                        <input type="text" className="w-full p-2 border rounded" placeholder="Ex: Dor de barriga, Atestado Dr. Fulano..." value={newAbsence.reason} onChange={e => setNewAbsence({ ...newAbsence, reason: e.target.value })} />
+                                    </div>
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm text-left">
+                                        <thead className="bg-slate-100 text-slate-600 font-bold">
+                                            <tr>
+                                                <th className="p-3">Tipo</th>
+                                                <th className="p-3">Período</th>
+                                                <th className="p-3">Motivo</th>
+                                                <th className="p-3 text-center">Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {absences.map(abs => (
+                                                <tr key={abs.id} className="border-b hover:bg-slate-50">
+                                                    <td className="p-3 font-semibold text-slate-700">{abs.type}</td>
+                                                    <td className="p-3 text-slate-600">
+                                                        {new Date(abs.startDate).toLocaleDateString()}
+                                                        {abs.endDate ? ` até ${new Date(abs.endDate).toLocaleDateString()}` : ''}
+                                                    </td>
+                                                    <td className="p-3 text-slate-500 italic">{abs.reason || '-'}</td>
+                                                    <td className="p-3 text-center">
+                                                        <button onClick={() => handleDeleteAbsence(abs.id)} className="text-red-400 hover:text-red-600"><TrashIcon className="h-4 w-4" /></button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {absences.length === 0 && <tr><td colSpan={4} className="p-4 text-center text-slate-400">Nenhum registro encontrado.</td></tr>}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {/* Férias */}
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                                <h3 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2 flex items-center gap-2">
+                                    <ClockIcon className="h-5 w-5 text-blue-500" />
+                                    Controle de Férias
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 bg-blue-50 p-4 rounded-lg">
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500">Período Aquisitivo</label>
+                                        <input type="text" placeholder="Ex: 2024-2025" className="w-full p-2 border rounded" value={newVacation.period} onChange={e => setNewVacation({ ...newVacation, period: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500">Início do Gozo</label>
+                                        <input type="date" className="w-full p-2 border rounded" value={newVacation.startDate} onChange={e => setNewVacation({ ...newVacation, startDate: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500">Fim do Gozo</label>
+                                        <input type="date" className="w-full p-2 border rounded" value={newVacation.endDate} onChange={e => setNewVacation({ ...newVacation, endDate: e.target.value })} />
+                                    </div>
+                                    <div className="flex flex-col justify-end">
+                                        <button onClick={handleAddVacation} className="bg-blue-600 text-white font-bold py-2 px-4 rounded hover:bg-blue-700 transition">Agendar Férias</button>
+                                    </div>
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm text-left">
+                                        <thead className="bg-slate-100 text-slate-600 font-bold">
+                                            <tr>
+                                                <th className="p-3">Período Aquisitivo</th>
+                                                <th className="p-3">Data de Gozo</th>
+                                                <th className="p-3">Status</th>
+                                                <th className="p-3 text-center">Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {vacations.map(vac => (
+                                                <tr key={vac.id} className="border-b hover:bg-slate-50">
+                                                    <td className="p-3 font-semibold text-slate-700">{vac.period}</td>
+                                                    <td className="p-3 text-slate-600">
+                                                        {new Date(vac.startDate).toLocaleDateString()} a {new Date(vac.endDate).toLocaleDateString()}
+                                                    </td>
+                                                    <td className="p-3">
+                                                        <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">{vac.status}</span>
+                                                    </td>
+                                                    <td className="p-3 text-center">
+                                                        <button onClick={() => handleDeleteVacation(vac.id)} className="text-red-400 hover:text-red-600"><TrashIcon className="h-4 w-4" /></button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {vacations.length === 0 && <tr><td colSpan={4} className="p-4 text-center text-slate-400">Nenhuma férias registrada.</td></tr>}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
