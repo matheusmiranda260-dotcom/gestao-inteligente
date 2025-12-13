@@ -557,29 +557,45 @@ const OrgNode: React.FC<{
             </div>
 
             {/* Children Nodes (Horizontal Layout) */}
+            {/* Line from Parent down to Children */}
             {node.children.length > 0 && (
-                <div className="relative flex justify-center gap-8 mt-4 pt-8 border-t-2 border-slate-300">
-                    {/* Vertical line from parent to the horizontal bar */}
-                    <div className="absolute top-0 left-1/2 -translate-x-1/2 h-8 w-0.5 bg-slate-300"></div>
+                <div className="h-6 w-0.5 bg-slate-300"></div>
+            )}
 
-                    {node.children.map(child => (
-                        <div key={child.id} className="relative flex flex-col items-center">
-                            {/* Vertical line to child */}
-                            <div className="absolute -top-8 left-1/2 -translate-x-1/2 h-8 w-0.5 bg-slate-300"></div>
-                            <OrgNode
-                                node={child}
-                                employees={employees}
-                                onAddSubUnit={onAddSubUnit}
-                                onAddPosition={onAddPosition}
-                                onDeleteUnit={onDeleteUnit}
-                                onDeletePosition={onDeletePosition}
-                                onAssignEmployee={onAssignEmployee}
-                                onCreateEmployee={onCreateEmployee}
-                                onEditEmployee={onEditEmployee}
-                                onEditUnit={onEditUnit}
-                            />
-                        </div>
-                    ))}
+            {/* Children Nodes (Horizontal Layout) */}
+            {node.children.length > 0 && (
+                <div className="relative flex justify-center">
+                    {node.children.map((child, index) => {
+                        const isFirst = index === 0;
+                        const isLast = index === node.children.length - 1;
+
+                        return (
+                            <div key={child.id} className="relative flex flex-col items-center px-6 pt-6">
+                                {/* Connector Lines */}
+                                {/* Vertical Line Up */}
+                                <div className="absolute top-0 left-1/2 -translate-x-1/2 h-6 w-0.5 bg-slate-300"></div>
+
+                                {/* Horizontal Line Left (to connect to previous sibling) */}
+                                {!isFirst && <div className="absolute top-0 left-0 w-[50%] h-0.5 bg-slate-300"></div>}
+
+                                {/* Horizontal Line Right (to connect to next sibling) */}
+                                {!isLast && <div className="absolute top-0 right-0 w-[50%] h-0.5 bg-slate-300"></div>}
+
+                                <OrgNode
+                                    node={child}
+                                    employees={employees}
+                                    onAddSubUnit={onAddSubUnit}
+                                    onAddPosition={onAddPosition}
+                                    onDeleteUnit={onDeleteUnit}
+                                    onDeletePosition={onDeletePosition}
+                                    onAssignEmployee={onAssignEmployee}
+                                    onCreateEmployee={onCreateEmployee}
+                                    onEditEmployee={onEditEmployee}
+                                    onEditUnit={onEditUnit}
+                                />
+                            </div>
+                        );
+                    })}
                 </div>
             )}
         </div>
