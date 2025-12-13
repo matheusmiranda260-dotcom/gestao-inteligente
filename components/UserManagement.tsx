@@ -19,6 +19,9 @@ const manageablePages: { page: Page; label: string }[] = [
     { page: 'productionOrderTrelica', label: 'Ordem (Treliça)' },
     { page: 'productionDashboard', label: 'Dashboard de Produção' },
     { page: 'reports', label: 'Relatórios' },
+    { page: 'partsManager', label: 'Gerenciador de Peças' },
+    { page: 'continuousImprovement', label: 'Melhoria Contínua' },
+    { page: 'workInstructions', label: 'Instruções de Trabalho' },
 ];
 
 const UserModal: React.FC<{
@@ -114,7 +117,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, addUser, updateU
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [deletingUser, setDeletingUser] = useState<User | null>(null);
-    
+
     const manageableUsers = users.filter(u => u.role !== 'admin' && u.role !== 'gestor');
 
     const handleAddUser = (data: { username: string; password: string; permissions: Partial<Record<Page, boolean>> }) => {
@@ -128,7 +131,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, addUser, updateU
         }
         setEditingUser(null);
     };
-    
+
     const handleDeleteConfirm = () => {
         if (deletingUser) {
             deleteUser(deletingUser.id);
@@ -141,7 +144,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, addUser, updateU
             {isModalOpen && <UserModal onClose={() => setIsModalOpen(false)} onSubmit={handleAddUser} />}
             {editingUser && <UserModal user={editingUser} onClose={() => setEditingUser(null)} onSubmit={handleEditUser} />}
             {deletingUser && (
-                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white p-8 rounded-xl shadow-xl w-full max-w-md text-center">
                         <WarningIcon className="h-16 w-16 mx-auto text-red-500 mb-4" />
                         <p className="text-lg text-slate-700 mb-6">Tem certeza que deseja excluir o usuário <strong>{deletingUser.username}</strong>? Esta ação não pode ser desfeita.</p>
@@ -201,7 +204,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, addUser, updateU
                             ))}
                         </tbody>
                     </table>
-                     {manageableUsers.length === 0 && (
+                    {manageableUsers.length === 0 && (
                         <div className="text-center text-slate-500 py-10">
                             <p>Nenhum usuário cadastrado ainda.</p>
                             <p className="text-sm">Clique em "Adicionar Usuário" para começar.</p>
