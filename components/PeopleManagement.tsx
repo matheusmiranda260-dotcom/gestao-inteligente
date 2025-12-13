@@ -570,7 +570,7 @@ const OrgNode: React.FC<{
                         const isLast = index === node.children.length - 1;
 
                         return (
-                            <div key={child.id} className="relative flex flex-col items-center px-6 pt-6">
+                            <div key={child.id} className="relative flex flex-col items-center px-3 pt-6">
                                 {/* Connector Lines */}
                                 {/* Vertical Line Up */}
                                 <div className="absolute top-0 left-1/2 -translate-x-1/2 h-6 w-0.5 bg-slate-300"></div>
@@ -737,7 +737,7 @@ const OrgChart: React.FC<{
 
     return (
         <div className="overflow-auto p-8 min-h-[600px] bg-slate-50 relative">
-            <div className="flex gap-16 min-w-max justify-center items-start pt-10">
+            <div className="flex gap-8 min-w-max justify-center items-start pt-10">
                 {/* Render Existing Roots */}
                 {tree.map(root => (
                     <OrgNode
