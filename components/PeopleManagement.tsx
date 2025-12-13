@@ -310,8 +310,11 @@ const OrgNode: React.FC<{
                 <div className="font-bold text-lg uppercase tracking-wide">{node.name}</div>
                 {/* Controls */}
                 <div className="absolute -top-3 -right-3 hidden group-hover:flex gap-1">
-                    <button onClick={() => onAddSubUnit(node.id)} className="p-1 bg-white rounded-full text-blue-600 shadow-sm hover:scale-110" title="Adicionar Abaixo">
+                    <button onClick={() => onAddSubUnit(node.id)} className="p-1 bg-white rounded-full text-blue-600 shadow-sm hover:scale-110" title="Adicionar Sub-Área">
                         <PlusIcon className="h-4 w-4" />
+                    </button>
+                    <button onClick={() => onAddPosition(node.id)} className="p-1 bg-white rounded-full text-amber-600 shadow-sm hover:scale-110" title="Adicionar Cargo/Função">
+                        <UserIcon className="h-4 w-4" />
                     </button>
                     <button onClick={() => onDeleteUnit(node.id)} className="p-1 bg-white rounded-full text-red-600 shadow-sm hover:scale-110" title="Remover Área">
                         <TrashIcon className="h-4 w-4" />
