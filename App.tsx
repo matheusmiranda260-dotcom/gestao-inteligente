@@ -50,7 +50,7 @@ const App: React.FC = () => {
                     fetchedOrders, fetchedFinishedGoods, fetchedPontas, fetchedFGTransfers,
                     fetchedParts, fetchedReports, fetchedProductionRecords, fetchedMessages
                 ] = await Promise.all([
-                    fetchTable<User>('profiles'),
+                    fetchTable<User>('app_users'),
                     fetchTable<StockItem>('stock_items'),
                     fetchTable<ConferenceData>('conferences'),
                     fetchTable<TransferRecord>('transfers'),
@@ -150,37 +150,53 @@ const App: React.FC = () => {
     };
 
     const handleLogin = async (username: string, password: string): Promise<void> => {
-        // Hardcoded bypass for the requested user "gestor"
-        // Hardcoded bypass for the requested user
-        if ((username.toLowerCase() === 'gestor' || username.toLowerCase() === 'matheusmiranda357@gmail.com') && password === '070223') {
-            const adminUser: User = {
-                id: 'local-admin-gestor',
-                username: 'Matheus Miranda',
-                password: '',
-                role: 'gestor',
-                permissions: { trelica: true, trefila: true }
-            };
-            setCurrentUser(adminUser);
-            setPage('menu');
-            showNotification('Login realizado com sucesso (Modo Gestor).', 'success');
-            return;
-        }
+        try {
+            // 1. Try Simple Auth (app_users table)
+            const { data: usersFound, error: dbError } = await supabase
+                .from('app_users')
+                .select('*')
+                .eq('username', username)
+                .single();
 
-        // Expect username to be email for Supabase
-        const email = username.includes('@') ? username : `${username}@example.com`; // Fallback for legacy usernames
+            if (usersFound && usersFound.password === password) {
+                const appUser: User = {
+                    id: usersFound.id,
+                    username: usersFound.username,
+                    password: usersFound.password,
+                    role: usersFound.role,
+                    permissions: usersFound.permissions || {}
+                };
+                setCurrentUser(appUser);
+                setPage('menu');
+                showNotification(`Bem-vindo, ${appUser.username}!`, 'success');
+                return;
+            }
 
-        const { error } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-        });
+            // 2. Legacy/Admin Hardcoded Fallback
+            if ((username.toLowerCase() === 'gestor' || username.toLowerCase() === 'matheusmiranda357@gmail.com') && password === '070223') {
+                const adminUser: User = {
+                    id: 'local-admin-gestor',
+                    username: 'Matheus Miranda',
+                    password: '',
+                    role: 'gestor',
+                    permissions: { trelica: true, trefila: true }
+                };
+                setCurrentUser(adminUser);
+                setPage('menu');
+                showNotification('Login realizado com sucesso (Modo Gestor).', 'success');
+                return;
+            }
 
-        if (error) {
-            showNotification(`Erro ao entrar: ${error.message}`, 'error');
+            showNotification('Usuário ou senha incorretos.', 'error');
+
+        } catch (error: any) {
+            console.error('Login error:', error);
+            showNotification('Erro ao tentar realizar login. Verifique sua conexão.', 'error');
         }
     };
 
     const handleLogout = async (): Promise<void> => {
-        await supabase.auth.signOut();
+        // await supabase.auth.signOut(); // Not strictly needed for custom auth but good practice if hybrid
         setCurrentUser(null);
         setPage('login');
     };
