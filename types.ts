@@ -351,6 +351,23 @@ export interface Employee {
     phone?: string;
     email?: string;
     managerId?: string;
+    orgPositionId?: string; // Link to the Org Chart Position
+}
+
+export interface OrgUnit {
+    id: string;
+    name: string;
+    unitType?: 'machine' | 'department' | 'sector';
+    parentId?: string;
+    displayOrder: number;
+}
+
+export interface OrgPosition {
+    id: string;
+    orgUnitId: string;
+    title: string;
+    isLeadership: boolean;
+    displayOrder: number;
 }
 
 export interface EmployeeCourse {
