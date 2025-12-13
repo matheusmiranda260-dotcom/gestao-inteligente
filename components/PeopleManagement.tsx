@@ -517,38 +517,36 @@ const OrgChart: React.FC<{
 
     return (
         <div className="overflow-auto p-8 min-h-[600px] bg-slate-50 relative">
-            {tree.length === 0 && (
-                <div className="flex flex-col items-center justify-center h-full text-slate-400">
-                    <p className="mb-4">O organograma está vazio.</p>
-                    <button onClick={handleCreateRoot} className="bg-[#0F3F5C] text-white px-6 py-3 rounded-lg font-bold shadow-lg hover:bg-[#0A2A3D]">
-                        + Criar Área Principal (Ex: Administrativo)
-                    </button>
-                </div>
-            )}
+            <div className="flex gap-16 min-w-max justify-center items-start pt-10">
+                {/* Render Existing Roots */}
+                {tree.map(root => (
+                    <OrgNode
+                        key={root.id}
+                        node={root}
+                        employees={employees}
+                        onAddSubUnit={handleAddSubUnit}
+                        onAddPosition={handleAddPosition}
+                        onDeleteUnit={handleDeleteUnit}
+                        onDeletePosition={handleDeletePosition}
+                        onAssignEmployee={handleAssignEmployee}
+                        onCreateEmployee={handleCreateEmployeeForPosition}
+                    />
+                ))}
 
-            {tree.length > 0 && (
-                <div className="flex flex-col items-center min-w-max">
-                    <div className="flex gap-16">
-                        {tree.map(root => (
-                            <OrgNode
-                                key={root.id}
-                                node={root}
-                                employees={employees}
-                                onAddSubUnit={handleAddSubUnit}
-                                onAddPosition={handleAddPosition}
-                                onDeleteUnit={handleDeleteUnit}
-                                onDeletePosition={handleDeletePosition}
-                                onAssignEmployee={handleAssignEmployee}
-                                onCreateEmployee={handleCreateEmployeeForPosition}
-                            />
-                        ))}
-                    </div>
-                    {/* Floating Add Root Button */}
-                    <button onClick={handleCreateRoot} className="fixed bottom-8 right-8 bg-[#0F3F5C] text-white p-4 rounded-full shadow-2xl hover:bg-[#0A2A3D] z-50 border-4 border-white" title="Adicionar Nova Área Raiz">
-                        <PlusIcon className="h-6 w-6" />
+                {/* Add New Root Button (Inline) */}
+                <div className="flex flex-col items-center opacity-60 hover:opacity-100 transition-opacity">
+                    <button
+                        onClick={handleCreateRoot}
+                        className="w-[200px] h-[100px] border-4 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 hover:border-slate-400 transition"
+                    >
+                        <PlusIcon className="h-8 w-8 mb-2" />
+                        <span className="font-bold">Nova Área Principal</span>
                     </button>
+                    <p className="text-xs text-slate-400 mt-2 text-center max-w-[180px]">
+                        Ex: Administrativo, Comercial, Logística...
+                    </p>
                 </div>
-            )}
+            </div>
         </div>
     );
 };
