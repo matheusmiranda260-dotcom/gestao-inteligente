@@ -1,7 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import type { Page, User, Message, MachineType } from '../types';
-import { UserGroupIcon, ArchiveIcon, CogIcon, ClipboardListIcon, ChartBarIcon, ChatBubbleLeftRightIcon, WrenchScrewdriverIcon, AdjustmentsIcon, DocumentTextIcon } from './icons';
+import { UserGroupIcon, ArchiveIcon, CogIcon, ClipboardListIcon, ChartBarIcon, ChatBubbleLeftRightIcon, WrenchScrewdriverIcon, AdjustmentsIcon, DocumentTextIcon, ExclamationIcon } from './icons';
 import MSMLogo from './MSMLogo';
+import { fetchTable } from '../services/supabaseService';
+import type { KaizenProblem } from '../types';
 
 const ManagerMessagesModal: React.FC<{
     isOpen: boolean;
@@ -145,8 +147,29 @@ const MenuButton: React.FC<{ onClick: () => void; label: string; description: st
 
 const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser, messages, markAllMessagesAsRead, addMessage }) => {
     const [isManagerModalOpen, setIsManagerModalOpen] = useState(false);
+    const [pendingKaizenCount, setPendingKaizenCount] = useState(0);
 
     const unreadCount = useMemo(() => messages.filter(m => !m.isRead).length, [messages]);
+
+    // Check for pending Kaizen tasks for the current user
+    React.useEffect(() => {
+        if (currentUser?.employeeId) {
+            const checkTasks = async () => {
+                try {
+                    const allProblems = await fetchTable<KaizenProblem>('kaizen_problems');
+                    const myTasks = allProblems.filter(p => {
+                        const isResponsibleId = p.responsibleIds?.includes(currentUser.employeeId!);
+                        const isResponsibleName = p.responsible && currentUser.username && p.responsible.includes(currentUser.username); // Fallback attempt
+                        return (isResponsibleId || isResponsibleName) && p.status !== 'Resolvido';
+                    });
+                    setPendingKaizenCount(myTasks.length);
+                } catch (e) {
+                    console.error('Error fetching pending tasks for menu', e);
+                }
+            };
+            checkTasks();
+        }
+    }, [currentUser]);
 
     const handleOpenManagerMessages = () => {
         markAllMessagesAsRead();
@@ -295,6 +318,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser, mes
                     description="Engajamento, Disciplina e Melhoria"
                     icon={<UserGroupIcon />}
                     color="cyan"
+                    notificationCount={pendingKaizenCount}
                 />}
             </div>
         </div>
