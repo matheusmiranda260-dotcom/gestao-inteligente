@@ -148,12 +148,47 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
     const [extraRows, setExtraRows] = useState<string[]>([]); // For rows that might be empty momentarily logic
 
 
+    // Helper to find next available row name globally (across all stock)
+    const nextRowLetter = useMemo(() => {
+        const existingRowLetters = new Set<string>();
+        stock.forEach(item => {
+            if (item.location && item.location.startsWith('Fileira ')) {
+                const parts = item.location.split(' ');
+                if (parts.length > 1) existingRowLetters.add(parts[1]);
+            }
+        });
+        extraRows.forEach(row => {
+            const parts = row.split(' ');
+            if (parts.length > 1) existingRowLetters.add(parts[1]);
+        });
+
+        // Try single letters A-Z
+        const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        for (const char of alphabet) {
+            if (!existingRowLetters.has(char)) return char;
+        }
+        // Try A1, A2... if needed, or AA, AB (simple fallback for now: numbers)
+        let i = 1;
+        while (true) {
+            if (!existingRowLetters.has(String(i))) return String(i);
+            i++;
+        }
+    }, [stock, extraRows]);
+
+    const [newRowName, setNewRowName] = useState('');
 
     const handleAddRow = () => {
-        const name = `Fileira ${newRowName.toUpperCase()}`;
-        if (newRowName && !derivedRows.includes(name)) {
-            setExtraRows(prev => [...prev, name]);
+        const nameToUse = newRowName.trim() || nextRowLetter;
+        const fullName = `Fileira ${nameToUse.toUpperCase()}`;
+
+        // Check duplication
+        const alreadyExists = derivedRows.includes(fullName) || stock.some(s => s.location === fullName);
+
+        if (!alreadyExists) {
+            setExtraRows(prev => [...prev, fullName]);
             setNewRowName('');
+        } else {
+            alert('Esta fileira já existe!');
         }
     };
 
@@ -315,16 +350,18 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                         Sair
                     </button>
                     {/* Add Row Controls */}
-                    <div className="flex bg-white/10 p-1 rounded-lg">
+                    <div className="flex bg-white/10 p-1 rounded-lg items-center">
+                        <span className="text-white/50 text-xs pl-2 whitespace-nowrap hidden sm:inline">Nova Fileira:</span>
                         <input
                             type="text"
                             value={newRowName}
                             onChange={e => setNewRowName(e.target.value)}
-                            placeholder="Ex: A, B, C..."
-                            className="bg-transparent border-none text-white placeholder-white/50 focus:ring-0 w-24 text-sm"
+                            placeholder={nextRowLetter}
+                            className="bg-transparent border-none text-white placeholder-white/30 focus:ring-0 w-12 text-center text-lg font-bold uppercase"
+                            maxLength={3}
                         />
-                        <button onClick={handleAddRow} disabled={!newRowName} className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1 rounded text-sm font-bold disabled:opacity-50">
-                            + Add Fileira
+                        <button onClick={handleAddRow} className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1 rounded text-sm font-bold shadow-sm whitespace-nowrap">
+                            + Criar
                         </button>
                     </div>
                     {/* Quick Add Lot Button */}
