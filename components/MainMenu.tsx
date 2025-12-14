@@ -158,6 +158,9 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser, mes
         if (currentUser.role === 'admin' || currentUser.role === 'gestor') {
             return true;
         }
+        if (page === 'peopleManagement' && currentUser.employeeId) {
+            return true;
+        }
         return !!currentUser.permissions?.[page];
     };
 
@@ -178,7 +181,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser, mes
                     </div>
                     <div>
                         <h1 className="text-3xl font-bold text-slate-800">Menu Principal</h1>
-                        <p className="text-slate-500 font-medium">Bem-vindo, {currentUser?.username || 'Usuário'}.</p>
+                        <p className="text-slate-500 font-medium">Bem-vindo, {currentUser?.username || 'Usuário'}. <span className="text-xs text-slate-300">({currentUser?.role} | EmpID: {currentUser?.employeeId || 'Nenhum'} | Perms: {Object.keys(currentUser?.permissions || {}).filter(k => currentUser?.permissions?.[k as Page]).length})</span></p>
                     </div>
                 </div>
                 <button
