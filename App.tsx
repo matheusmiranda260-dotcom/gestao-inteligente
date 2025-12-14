@@ -1283,7 +1283,7 @@ const App: React.FC = () => {
                 distributeConsumption(superiorLots, totalConsumed.superior);
 
                 const halfInferiorWeight = totalConsumed.inferior / 2;
-                if (lots.allInferiorLeft && lots.allInferiorRight && lots.allInferiorLeft.length > 0 && lots.allInferiorRight.length > 0) {
+                if (lots.allInferiorLeft && lots.allInferiorRight && (lots.allInferiorLeft.length > 0 || lots.allInferiorRight.length > 0)) {
                     distributeConsumption(lots.allInferiorLeft, halfInferiorWeight);
                     distributeConsumption(lots.allInferiorRight, halfInferiorWeight);
                 } else if (lots.allInferior && lots.allInferior.length > 0) {
@@ -1294,7 +1294,7 @@ const App: React.FC = () => {
                 }
 
                 const halfSenozoideWeight = totalConsumed.senozoide / 2;
-                if (lots.allSenozoideLeft && lots.allSenozoideRight && lots.allSenozoideLeft.length > 0 && lots.allSenozoideRight.length > 0) {
+                if (lots.allSenozoideLeft && lots.allSenozoideRight && (lots.allSenozoideLeft.length > 0 || lots.allSenozoideRight.length > 0)) {
                     distributeConsumption(lots.allSenozoideLeft, halfSenozoideWeight);
                     distributeConsumption(lots.allSenozoideRight, halfSenozoideWeight);
                 } else if (lots.allSenozoide && lots.allSenozoide.length > 0) {
@@ -1310,27 +1310,42 @@ const App: React.FC = () => {
                     const stockItem = currentStock.find(s => s.id === cleanId) || stock.find(s => s.id === cleanId);
 
                     if (stockItem) {
-                        const currentQty = parseFloat(String(stockItem.remainingQuantity));
+                        const currentQty = parseFloat(String(stockItem.remainingQuantity || 0));
                         const newRemainingQty = Math.max(0, currentQty - consumedQty);
 
                         // Check if lot is used in other active orders
-                        const remainingOrderIds = (stockItem.productionOrderIds || []).filter(id => id !== orderId);
+                        // Filter out the current order ID from the list
+                        const currentOrderIds = stockItem.productionOrderIds || [];
+                        const remainingOrderIds = currentOrderIds.filter(id => id !== orderId);
+
+                        // Check if any of the remaining IDs belong to an active order
                         const hasOtherActiveOrders = remainingOrderIds.some(otherId => {
                             const otherOrder = productionOrders.find(o => o.id === otherId);
+                            // Consider 'pending' and 'in_progress' as active
                             return otherOrder && (otherOrder.status === 'pending' || otherOrder.status === 'in_progress');
                         });
 
-                        let newStatus: any = 'Disponível Suporte para Treliça';
+                        // Logic for status update
+                        let newStatus: string = stockItem.status;
+
                         if (newRemainingQty <= 0.01) {
                             newStatus = 'Consumido para fazer treliça';
-                        } else if (hasOtherActiveOrders) {
-                            newStatus = stockItem.status;
+                        } else {
+                            // If it has NO other active orders, it becomes available support
+                            if (!hasOtherActiveOrders) {
+                                newStatus = 'Disponível Suporte para Treliça';
+                            } else {
+                                // If it HAS other active orders, we keep it as Em Produção (or whatever it was)
+                                // But ensure it is not 'Disponível' if it is active.
+                                // Assuming 'Em Produção - Treliça' was set previously.
+                                // We keep the current status if it suggests being busy.
+                            }
                         }
 
                         const historyEntry = {
                             type: 'Consumido na Produção de Treliça',
                             date: now,
-                            details: { 'Ordem': orderToComplete.orderNumber, 'Qtd Consumida': consumedQty.toFixed(2) }
+                            details: { 'Ordem': orderToComplete.orderNumber, 'Qtd Consumida': consumedQty.toFixed(2), 'Status Novo': newStatus }
                         };
 
                         stockUpdates.push({
@@ -1338,7 +1353,7 @@ const App: React.FC = () => {
                             changes: {
                                 remainingQuantity: newRemainingQty,
                                 labelWeight: newRemainingQty, // Sync label weight
-                                productionOrderIds: remainingOrderIds.length > 0 ? remainingOrderIds : undefined,
+                                productionOrderIds: remainingOrderIds.length > 0 ? remainingOrderIds : [], // Send empty array instead of undefined if empty, to clear
                                 status: newStatus,
                                 history: [...(stockItem.history || []), historyEntry]
                             }
