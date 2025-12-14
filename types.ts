@@ -332,6 +332,7 @@ export interface KaizenProblem {
     date: string;
     photoUrl?: string;
     history: KaizenAction[];
+    responsibleIds?: string[];
 }
 
 export interface Employee {

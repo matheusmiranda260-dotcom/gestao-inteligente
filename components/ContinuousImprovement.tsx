@@ -32,7 +32,8 @@ const ContinuousImprovement: React.FC<{ setPage: (page: Page) => void }> = ({ se
     const [view, setView] = useState<ViewState>('LIST');
     const [problems, setProblems] = useState<KaizenProblem[]>([]);
     const [selectedProblem, setSelectedProblem] = useState<KaizenProblem | null>(null);
-    const [newProblemData, setNewProblemData] = useState({ description: '', sector: '', responsible: '' });
+    const [newProblemData, setNewProblemData] = useState({ description: '', sector: '' });
+    const [selectedResponsibles, setSelectedResponsibles] = useState<{ id: string, name: string }[]>([]);
     const [improvementData, setImprovementData] = useState({ description: '' });
     const [loading, setLoading] = useState(false);
     const [uploadingInfo, setUploadingInfo] = useState(false);
@@ -129,7 +130,8 @@ const ContinuousImprovement: React.FC<{ setPage: (page: Page) => void }> = ({ se
                 id: generateId('KZ'),
                 description: newProblemData.description,
                 sector: newProblemData.sector,
-                responsible: newProblemData.responsible,
+                responsible: selectedResponsibles.map(r => r.name).join(', '), // Legacy display string
+                responsibleIds: selectedResponsibles.map(r => r.id), // New link
                 status: 'Aberto',
                 date: new Date().toISOString(),
                 history: [],
@@ -137,10 +139,22 @@ const ContinuousImprovement: React.FC<{ setPage: (page: Page) => void }> = ({ se
             };
 
             console.log('Saving problem to DB:', newProblem);
-            await insertItem('kaizen_problems', newProblem);
+            // Map camelCase to snake_case manually if needed for specialized columns, but responsible_ids needs to be explicit if the type has keys that don't match.
+            // My types usually match or I rely on the service.
+            // Let's explicitly cast to any to pass snake_case for the new column if needed, or rely on Supabase handling it if I renamed the prop in the interface. 
+            // In types.ts I named it responsibleIds. Supabase JS client usually keeps case if not configured otherwise. 
+            // Actually, best practice with Supabase JS: stick to DB column names in object OR rely on auto-mapping.
+            // I'll send specific payload to be safe.
+            const payload = {
+                ...newProblem,
+                responsible_ids: newProblem.responsibleIds
+            };
+
+            await insertItem('kaizen_problems', payload);
 
             setProblems([newProblem, ...problems]);
-            setNewProblemData({ description: '', sector: '', responsible: '' });
+            setNewProblemData({ description: '', sector: '' });
+            setSelectedResponsibles([]);
             setSelectedFile(null);
             setPreviewUrl(null);
             setView('LIST');
@@ -361,27 +375,59 @@ const ContinuousImprovement: React.FC<{ setPage: (page: Page) => void }> = ({ se
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Responsável</label>
-                        {employees.length > 0 ? (
-                            <select
-                                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
-                                value={newProblemData.responsible}
-                                onChange={e => setNewProblemData({ ...newProblemData, responsible: e.target.value })}
-                            >
-                                <option value="">Selecione um responsável...</option>
-                                {employees.filter(e => e.active).map(emp => (
-                                    <option key={emp.id} value={emp.name}>{emp.name}</option>
-                                ))}
-                            </select>
-                        ) : (
-                            <input
-                                type="text"
-                                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
-                                placeholder="Digite o responsável"
-                                value={newProblemData.responsible}
-                                onChange={e => setNewProblemData({ ...newProblemData, responsible: e.target.value })}
-                            />
-                        )}
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Responsáveis</label>
+                        <div className="flex gap-2 mb-2">
+                            {employees.length > 0 ? (
+                                <select
+                                    className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
+                                    onChange={(e) => {
+                                        const empId = e.target.value;
+                                        if (!empId) return;
+                                        const emp = employees.find(ep => ep.id === empId);
+                                        if (emp && !selectedResponsibles.find(r => r.id === emp.id)) {
+                                            setSelectedResponsibles([...selectedResponsibles, { id: emp.id, name: emp.name }]);
+                                        }
+                                        e.target.value = ''; // Reset select
+                                    }}
+                                >
+                                    <option value="">Selecione para adicionar...</option>
+                                    {employees.filter(e => e.active).map(emp => (
+                                        <option key={emp.id} value={emp.id}>{emp.name}</option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <div className="flex-1 flex gap-2">
+                                    <input
+                                        type="text"
+                                        className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
+                                        placeholder="Digite o nome"
+                                        id="manualResponsibleInput"
+                                    />
+                                    <button
+                                        onClick={() => {
+                                            const input = document.getElementById('manualResponsibleInput') as HTMLInputElement;
+                                            if (input.value) {
+                                                setSelectedResponsibles([...selectedResponsibles, { id: generateId('manual'), name: input.value }]);
+                                                input.value = '';
+                                            }
+                                        }}
+                                        className="bg-blue-600 text-white px-4 rounded-xl"
+                                    >Adicionar</button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Chips */}
+                        <div className="flex flex-wrap gap-2">
+                            {selectedResponsibles.map(r => (
+                                <span key={r.id} className="bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full flex items-center gap-2">
+                                    {r.name}
+                                    <button onClick={() => setSelectedResponsibles(selectedResponsibles.filter(sr => sr.id !== r.id))}>
+                                        <XIcon className="h-4 w-4" />
+                                    </button>
+                                </span>
+                            ))}
+                        </div>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Data</label>

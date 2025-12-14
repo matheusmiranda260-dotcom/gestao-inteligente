@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ArrowLeftIcon, PlusIcon, StarIcon, ChartBarIcon, TrophyIcon, SearchIcon, FilterIcon, UserIcon, BookOpenIcon, ClockIcon, DocumentTextIcon, PencilIcon, TrashIcon, UserGroupIcon, ExclamationIcon, SaveIcon, XIcon, DownloadIcon, PrinterIcon } from './icons';
-import type { Page, Employee, Evaluation, Achievement, User, EmployeeCourse, EmployeeAbsence, EmployeeVacation, EmployeeResponsibility, OrgUnit, OrgPosition, EmployeeDocument } from '../types';
+import { ArrowLeftIcon, PlusIcon, StarIcon, ChartBarIcon, TrophyIcon, SearchIcon, FilterIcon, UserIcon, BookOpenIcon, ClockIcon, DocumentTextIcon, PencilIcon, TrashIcon, UserGroupIcon, ExclamationIcon, SaveIcon, XIcon, DownloadIcon, PrinterIcon, CheckCircleIcon } from './icons';
+import type { Page, Employee, Evaluation, Achievement, User, EmployeeCourse, EmployeeAbsence, EmployeeVacation, EmployeeResponsibility, OrgUnit, OrgPosition, EmployeeDocument, KaizenProblem } from '../types';
 import { fetchTable, insertItem, updateItem, deleteItem, fetchByColumn, uploadFile } from '../services/supabaseService';
 
 interface PeopleManagementProps {
@@ -291,6 +291,7 @@ const EmployeeDetailModal: React.FC<{
     const [absences, setAbsences] = useState<EmployeeAbsence[]>([]);
     const [vacations, setVacations] = useState<EmployeeVacation[]>([]);
     const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
+    const [kaizenTasks, setKaizenTasks] = useState<KaizenProblem[]>([]);
     const [newResp, setNewResp] = useState('');
 
     // Refs for file inputs to ensure reliable mobile triggering
@@ -478,6 +479,18 @@ const EmployeeDetailModal: React.FC<{
             if (vacationsData) setVacations(vacationsData);
 
             setEvaluations(evals.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+
+            // Fetch Kaizen Tasks
+            try {
+                const allProblems = await fetchTable<KaizenProblem>('kaizen_problems');
+                const employeeTasks = allProblems.filter(p => {
+                    const isResponsibleId = p.responsibleIds?.includes(employee.id);
+                    const isResponsibleName = p.responsible && p.responsible.includes(employee.name); // Backward compatibility
+                    return (isResponsibleId || isResponsibleName) && p.status !== 'Resolvido';
+                });
+                setKaizenTasks(employeeTasks);
+            } catch (kErr) { console.error('Error fetching kaizen tasks', kErr); }
+
         } catch (e) {
             console.error("Error loading employee details", e);
         }
@@ -628,9 +641,16 @@ const EmployeeDetailModal: React.FC<{
                         { id: 'hr', label: 'RH (Férias/Faltas)', icon: <ClockIcon className="h-4 w-4" /> },
                         { id: 'documents', label: 'Documentos', icon: <DocumentTextIcon className="h-4 w-4" /> },
                         { id: 'evaluations', label: 'Avaliações', icon: <StarIcon className="h-4 w-4" /> },
+                        { id: 'tasks', label: 'Pendências', icon: <CheckCircleIcon className="h-4 w-4" /> },
                     ].map(tab => (
-                        <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex items-center space-x-2 px-6 py-4 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === tab.id ? 'border-[#0F3F5C] text-[#0F3F5C] bg-slate-50' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}>
+                        <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`relative flex items-center space-x-2 px-6 py-4 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === tab.id ? 'border-[#0F3F5C] text-[#0F3F5C] bg-slate-50' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}>
                             {tab.icon} <span>{tab.label}</span>
+                            {tab.id === 'tasks' && kaizenTasks.length > 0 && (
+                                <span className="absolute top-2 right-2 flex h-3 w-3">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                                </span>
+                            )}
                         </button>
                     ))}
                 </div>
@@ -933,6 +953,32 @@ const EmployeeDetailModal: React.FC<{
                                     </table>
                                 </div>
                             </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'tasks' && (
+                        <div className="space-y-6">
+                            <h3 className="text-lg font-bold text-slate-800">Pendências e Kaizens Atribuídos</h3>
+                            {kaizenTasks.length === 0 ? (
+                                <p className="text-slate-500">Nenhuma pendência encontrada para este funcionário.</p>
+                            ) : (
+                                <div className="grid grid-cols-1 gap-4">
+                                    {kaizenTasks.map(task => (
+                                        <div key={task.id} className="bg-white p-4 rounded-xl shadow-sm border border-l-4 border-l-orange-500 border-slate-100 flex gap-4">
+                                            <div className="flex-1">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <h4 className="font-bold text-slate-800">{task.description}</h4>
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${task.status === 'Aberto' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'}`}>{task.status}</span>
+                                                </div>
+                                                <p className="text-sm text-slate-500 mb-2">Setor: {task.sector} | Aberto em: {new Date(task.date).toLocaleDateString('pt-BR')}</p>
+                                                <div className="bg-yellow-50 p-3 rounded-lg text-sm text-yellow-800 border border-yellow-200">
+                                                    <strong>Ação Necessária:</strong> Este problema foi atribuído a você. Por favor, acesse o módulo de Melhoria Contínua para registrar as ações tomadas ou resolver o problema.
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
