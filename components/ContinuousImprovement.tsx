@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Page, KaizenProblem, KaizenAction } from '../types';
+import { Page, KaizenProblem, KaizenAction, OrgUnit, Employee } from '../types';
 import {
     ArrowLeftIcon,
     PlusIcon,
@@ -42,9 +42,22 @@ const ContinuousImprovement: React.FC<{ setPage: (page: Page) => void }> = ({ se
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    const [orgUnits, setOrgUnits] = useState<OrgUnit[]>([]);
+    const [employees, setEmployees] = useState<Employee[]>([]);
+
     useEffect(() => {
         loadProblems();
+        loadMetadata();
     }, []);
+
+    const loadMetadata = async () => {
+        try {
+            const units = await fetchTable<OrgUnit>('org_units');
+            const emps = await fetchTable<Employee>('employees');
+            setOrgUnits(units);
+            setEmployees(emps);
+        } catch (e) { console.error('Error loading metadata', e); }
+    };
 
     const loadProblems = async () => {
         setLoading(true);
@@ -317,12 +330,16 @@ const ContinuousImprovement: React.FC<{ setPage: (page: Page) => void }> = ({ se
                 <div className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Setor / Máquina</label>
-                        <input
-                            type="text"
+                        <select
                             className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
                             value={newProblemData.sector}
                             onChange={e => setNewProblemData({ ...newProblemData, sector: e.target.value })}
-                        />
+                        >
+                            <option value="">Selecione um setor...</option>
+                            {orgUnits.map(u => (
+                                <option key={u.id} value={u.name}>{u.name}</option>
+                            ))}
+                        </select>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Descrição</label>
@@ -335,12 +352,16 @@ const ContinuousImprovement: React.FC<{ setPage: (page: Page) => void }> = ({ se
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Responsável</label>
-                        <input
-                            type="text"
+                        <select
                             className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
                             value={newProblemData.responsible}
                             onChange={e => setNewProblemData({ ...newProblemData, responsible: e.target.value })}
-                        />
+                        >
+                            <option value="">Selecione um responsável...</option>
+                            {employees.filter(e => e.active).map(emp => (
+                                <option key={emp.id} value={emp.name}>{emp.name}</option>
+                            ))}
+                        </select>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Data</label>
