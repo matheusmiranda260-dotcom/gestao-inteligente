@@ -1243,11 +1243,21 @@ const App: React.FC = () => {
                     senozoide: consumedFull.senozoide + consumedPontas.senozoide,
                 };
 
-                // DEBUG: Show calculated consumption
-                // showNotification(`Consumo Calc: Sup=${totalConsumed.superior.toFixed(1)}, Inf=${totalConsumed.inferior.toFixed(1)}, Sen=${totalConsumed.senozoide.toFixed(1)}`, 'info');
+                // DEBUG: Diagnostics
+                const debugMsg = `Modelo: ${modelInfo.modelo} | Peso Sup: ${modelInfo.pesoSuperior} | Peso Inf: ${modelInfo.pesoInferior} | Peso Sen: ${modelInfo.pesoSenozoide} | Qtd: ${fullPiecesQty}`;
+                console.log(debugMsg); // Keep console log for dev tools
+                // Uncomment to show to user if needed, but let's rely on specific warnings below
 
                 const distributeConsumption = (lotIds: string[] | undefined, totalWeight: number, partName: string) => {
-                    if (!lotIds || lotIds.length === 0 || totalWeight <= 0) return;
+                    if (!lotIds || lotIds.length === 0) {
+                        // showNotification(`Debug: Sem lotes definidos para ${partName}`, 'info');
+                        return;
+                    }
+                    if (totalWeight <= 0) {
+                        showNotification(`Aviso: Peso calculado para ${partName} é zero. Verifique cadastro.`, 'warning');
+                        return;
+                    }
+
                     let remainingWeight = totalWeight;
 
                     // Filter valid lots using latest stock
@@ -1258,7 +1268,7 @@ const App: React.FC = () => {
 
                     if (validLots.length === 0) {
                         // Warn user if declared lots are missing from stock
-                        showNotification(`Atenção: Lotes de ${partName} não encontrados no estoque. Peso não será baixado.`, 'error');
+                        showNotification(`ERRO: Lotes de ${partName} (IDs: ${lotIds.join(', ')}) não encontrados no estoque.`, 'error');
                         return;
                     }
 
@@ -1284,12 +1294,16 @@ const App: React.FC = () => {
                 };
 
                 // Distribute
+                // Check if we have ANY lots to distribute
                 const superiorLots = (lots.allSuperior && lots.allSuperior.length > 0) ? lots.allSuperior : (lots.superior ? [lots.superior] : []);
+                if (superiorLots.length === 0 && totalConsumed.superior > 0) showNotification('Aviso: Nenhum lote Superior selecionado para consumo.', 'warning');
                 distributeConsumption(superiorLots, totalConsumed.superior, "Superior");
 
                 const halfInferiorWeight = totalConsumed.inferior / 2;
                 const inferiorLeft = (lots.allInferiorLeft && lots.allInferiorLeft.length > 0) ? lots.allInferiorLeft : (lots.inferior1 ? [lots.inferior1] : []);
                 const inferiorRight = (lots.allInferiorRight && lots.allInferiorRight.length > 0) ? lots.allInferiorRight : (lots.inferior2 ? [lots.inferior2] : []);
+
+                if (inferiorLeft.length === 0 && halfInferiorWeight > 0 && !(lots.allInferior && lots.allInferior.length > 0)) showNotification('Aviso: Nenhum lote Inferior Esq selecionado.', 'warning');
 
                 if (inferiorLeft.length > 0) distributeConsumption(inferiorLeft, halfInferiorWeight, "Inferior Esq");
                 else if (lots.allInferior) distributeConsumption(lots.allInferior, halfInferiorWeight, "Inferior (Geral)");
@@ -1300,6 +1314,64 @@ const App: React.FC = () => {
                 const halfSenozoideWeight = totalConsumed.senozoide / 2;
                 const senozoideLeft = (lots.allSenozoideLeft && lots.allSenozoideLeft.length > 0) ? lots.allSenozoideLeft : (lots.senozoide1 ? [lots.senozoide1] : []);
                 const senozoideRight = (lots.allSenozoideRight && lots.allSenozoideRight.length > 0) ? lots.allSenozoideRight : (lots.senozoide2 ? [lots.senozoide2] : []);
+
+                // DEBUG: Show calculated consumption
+                // showNotification(`Consumo Calc: Sup=${totalConsumed.superior.toFixed(1)}, Inf=${totalConsumed.inferior.toFixed(1)}, Sen=${totalConsumed.senozoide.toFixed(1)}`, 'info');
+
+                // const distributeConsumption = (lotIds: string[] | undefined, totalWeight: number, partName: string) => {
+                //     if (!lotIds || lotIds.length === 0) return;
+                //     let remainingWeight = totalWeight;
+
+                //     // Filter valid lots using latest stock
+                //     const validLots = lotIds
+                //         .map(id => String(id).trim())
+                //         .map(id => currentStockLookup.get(id))
+                //         .filter((item): item is StockItem => !!item);
+
+                //     if (validLots.length === 0) {
+                //         // Warn user if declared lots are missing from stock
+                //         showNotification(`Atenção: Lotes de ${partName} não encontrados no estoque. Peso não será baixado.`, 'error');
+                //         return;
+                //     }
+
+                //     for (const stockItem of validLots) {
+                //         if (remainingWeight <= 0.0001) break;
+
+                //         const alreadyConsumed = consumedMap.get(stockItem.id) || 0;
+                //         const currentRemaining = parseFloat(String(stockItem.remainingQuantity || 0));
+                //         const available = Math.max(0, currentRemaining - alreadyConsumed);
+                //         const toConsume = Math.min(remainingWeight, available);
+
+                //         if (toConsume > 0) {
+                //             consumedMap.set(stockItem.id, alreadyConsumed + toConsume);
+                //             remainingWeight -= toConsume;
+                //         }
+                //     }
+
+                //     // Force remaining on last lot if needed
+                //     if (remainingWeight > 0.0001 && validLots.length > 0) {
+                //         const lastLotId = validLots[validLots.length - 1].id;
+                //         consumedMap.set(lastLotId, (consumedMap.get(lastLotId) || 0) + remainingWeight);
+                //     }
+                // };
+
+                // Distribute
+                // const superiorLots = (lots.allSuperior && lots.allSuperior.length > 0) ? lots.allSuperior : (lots.superior ? [lots.superior] : []);
+                // distributeConsumption(superiorLots, totalConsumed.superior, "Superior");
+
+                // const halfInferiorWeight = totalConsumed.inferior / 2;
+                // const inferiorLeft = (lots.allInferiorLeft && lots.allInferiorLeft.length > 0) ? lots.allInferiorLeft : (lots.inferior1 ? [lots.inferior1] : []);
+                // const inferiorRight = (lots.allInferiorRight && lots.allInferiorRight.length > 0) ? lots.allInferiorRight : (lots.inferior2 ? [lots.inferior2] : []);
+
+                // if (inferiorLeft.length > 0) distributeConsumption(inferiorLeft, halfInferiorWeight, "Inferior Esq");
+                // else if (lots.allInferior) distributeConsumption(lots.allInferior, halfInferiorWeight, "Inferior (Geral)");
+
+                // if (inferiorRight.length > 0) distributeConsumption(inferiorRight, halfInferiorWeight, "Inferior Dir");
+                // else if (lots.allInferior) distributeConsumption(lots.allInferior, halfInferiorWeight, "Inferior (Geral)");
+
+                // const halfSenozoideWeight = totalConsumed.senozoide / 2;
+                // const senozoideLeft = (lots.allSenozoideLeft && lots.allSenozoideLeft.length > 0) ? lots.allSenozoideLeft : (lots.senozoide1 ? [lots.senozoide1] : []);
+                // const senozoideRight = (lots.allSenozoideRight && lots.allSenozoideRight.length > 0) ? lots.allSenozoideRight : (lots.senozoide2 ? [lots.senozoide2] : []);
 
                 if (senozoideLeft.length > 0) distributeConsumption(senozoideLeft, halfSenozoideWeight, "Senozoide Esq");
                 else if (lots.allSenozoide) distributeConsumption(lots.allSenozoide, halfSenozoideWeight, "Senozoide (Geral)");

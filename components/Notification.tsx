@@ -4,7 +4,7 @@ import { CheckCircleIcon, XCircleIcon } from './icons';
 
 interface NotificationProps {
   message: string;
-  type: 'success' | 'error';
+  type: 'success' | 'error' | 'warning' | 'info';
   onClose: () => void;
 }
 
@@ -18,7 +18,10 @@ const Notification: React.FC<NotificationProps> = ({ message, type, onClose }) =
   }, [onClose]);
 
   const isSuccess = type === 'success';
-  const bgColor = isSuccess ? 'bg-emerald-600' : 'bg-red-600';
+  let bgColor = 'bg-emerald-600';
+  if (type === 'error') bgColor = 'bg-red-600';
+  if (type === 'warning') bgColor = 'bg-amber-500';
+  if (type === 'info') bgColor = 'bg-blue-500';
   const Icon = isSuccess ? CheckCircleIcon : XCircleIcon;
 
   return (
