@@ -305,7 +305,7 @@ const ContinuousImprovement: React.FC<{ setPage: (page: Page) => void }> = ({ se
                 <button onClick={() => setView('LIST')} className="p-2 -ml-2 text-slate-600">
                     <ArrowLeftIcon className="h-6 w-6" />
                 </button>
-                <h1 className="text-xl font-bold text-slate-800">Registrar Problema</h1>
+                <h1 className="text-xl font-bold text-slate-800">Registrar Problema (v2.1)</h1>
             </header>
 
             <div className="p-6 space-y-6">
@@ -330,16 +330,26 @@ const ContinuousImprovement: React.FC<{ setPage: (page: Page) => void }> = ({ se
                 <div className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Setor / Máquina</label>
-                        <select
-                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
-                            value={newProblemData.sector}
-                            onChange={e => setNewProblemData({ ...newProblemData, sector: e.target.value })}
-                        >
-                            <option value="">Selecione um setor...</option>
-                            {orgUnits.map(u => (
-                                <option key={u.id} value={u.name}>{u.name}</option>
-                            ))}
-                        </select>
+                        {orgUnits.length > 0 ? (
+                            <select
+                                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
+                                value={newProblemData.sector}
+                                onChange={e => setNewProblemData({ ...newProblemData, sector: e.target.value })}
+                            >
+                                <option value="">Selecione um setor...</option>
+                                {orgUnits.map(u => (
+                                    <option key={u.id} value={u.name}>{u.name}</option>
+                                ))}
+                            </select>
+                        ) : (
+                            <input
+                                type="text"
+                                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
+                                placeholder="Digite o setor (Lista vazia)"
+                                value={newProblemData.sector}
+                                onChange={e => setNewProblemData({ ...newProblemData, sector: e.target.value })}
+                            />
+                        )}
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Descrição</label>
@@ -352,16 +362,26 @@ const ContinuousImprovement: React.FC<{ setPage: (page: Page) => void }> = ({ se
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Responsável</label>
-                        <select
-                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
-                            value={newProblemData.responsible}
-                            onChange={e => setNewProblemData({ ...newProblemData, responsible: e.target.value })}
-                        >
-                            <option value="">Selecione um responsável...</option>
-                            {employees.filter(e => e.active).map(emp => (
-                                <option key={emp.id} value={emp.name}>{emp.name}</option>
-                            ))}
-                        </select>
+                        {employees.length > 0 ? (
+                            <select
+                                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
+                                value={newProblemData.responsible}
+                                onChange={e => setNewProblemData({ ...newProblemData, responsible: e.target.value })}
+                            >
+                                <option value="">Selecione um responsável...</option>
+                                {employees.filter(e => e.active).map(emp => (
+                                    <option key={emp.id} value={emp.name}>{emp.name}</option>
+                                ))}
+                            </select>
+                        ) : (
+                            <input
+                                type="text"
+                                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
+                                placeholder="Digite o responsável"
+                                value={newProblemData.responsible}
+                                onChange={e => setNewProblemData({ ...newProblemData, responsible: e.target.value })}
+                            />
+                        )}
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Data</label>
