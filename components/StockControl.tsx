@@ -10,6 +10,7 @@ import TransfersHistoryModal from './TransfersHistoryModal';
 import TransferReport from './TransferReport';
 import InventoryReport from './InventoryReport';
 import StockDashboard from './StockDashboard';
+import StockPyramidMap from './StockPyramidMap';
 
 
 
@@ -372,6 +373,7 @@ const StockControl: React.FC<{
     const [transferReportData, setTransferReportData] = useState<TransferRecord | null>(null);
     const [showInventoryReport, setShowInventoryReport] = useState(false);
     const [stockDashboardOpen, setStockDashboardOpen] = useState(false);
+    const [isStockMapOpen, setIsStockMapOpen] = useState(false);
 
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
@@ -493,6 +495,7 @@ const StockControl: React.FC<{
             {transferReportData && <TransferReport reportData={transferReportData} onClose={() => setTransferReportData(null)} />}
 
             {showInventoryReport && <InventoryReport stock={stock} filters={{ searchTerm, statusFilter, materialFilter, bitolaFilter }} onClose={() => setShowInventoryReport(false)} />}
+            {isStockMapOpen && <StockPyramidMap stock={stock} onUpdateStockItem={updateStockItem} onClose={() => setIsStockMapOpen(false)} />}
             {deletingItem && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white p-8 rounded-xl shadow-xl w-full max-w-md text-center">
@@ -534,9 +537,14 @@ const StockControl: React.FC<{
             </header>
             <div className="bg-white p-6 rounded-xl shadow-sm flex flex-wrap gap-4 items-center justify-between">
                 <div>
-                    <button onClick={() => setIsAddConferenceModalOpen(true)} className="bg-[#0F3F5C] hover:bg-[#0A2A3D] text-white font-bold py-2 px-4 rounded-lg transition text-base">
-                        + Adicionar Conferência
-                    </button>
+                    <div className="flex gap-2">
+                        <button onClick={() => setIsAddConferenceModalOpen(true)} className="bg-[#0F3F5C] hover:bg-[#0A2A3D] text-white font-bold py-2 px-4 rounded-lg transition text-base">
+                            + Adicionar Conferência
+                        </button>
+                        <button onClick={() => setIsStockMapOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg transition text-base flex items-center gap-2 shadow-lg animate-pulse">
+                            <ArchiveIcon className="w-5 h-5" /> CONFERIR ESTOQUE (MAPA)
+                        </button>
+                    </div>
                 </div>
                 <div className="flex gap-4">
                     <button onClick={() => setStockDashboardOpen(true)} className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
@@ -620,12 +628,19 @@ const StockControl: React.FC<{
                         </thead>
                         <tbody className="divide-y divide-slate-200">
                             {filteredStock.map(item => (
-                                <tr key={item.id} className="bg-white hover:bg-slate-50">
+                                <tr key={item.id} className={`hover:bg-slate-50 ${item.location ? 'bg-emerald-50/30' : 'bg-white'}`}>
                                     <td className="p-4">
                                         <input type="checkbox" checked={selectedLotIdsForTransfer.includes(item.id)} onChange={() => handleSelectLotForTransfer(item.id)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="h-4 w-4 rounded border-slate-300 text-slate-600 focus:ring-slate-500" />
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">{new Date(item.entryDate).toLocaleDateString('pt-BR')}</td>
-                                    <td className="px-6 py-4 font-medium text-slate-800 whitespace-nowrap">{item.internalLot}</td>
+                                    <td className="px-6 py-4 font-medium text-slate-800 whitespace-nowrap">
+                                        {item.internalLot}
+                                        {item.location && (
+                                            <div className="text-[10px] bg-emerald-100 text-emerald-800 px-1 rounded inline-block ml-2 border border-emerald-200">
+                                                {item.location}
+                                            </div>
+                                        )}
+                                    </td>
                                     <td className="px-6 py-4 whitespace-nowrap">{item.supplierLot}</td>
                                     <td className="px-6 py-4 whitespace-nowrap">{item.supplier}</td>
                                     <td className="px-6 py-4 whitespace-nowrap">{item.materialType}</td>
