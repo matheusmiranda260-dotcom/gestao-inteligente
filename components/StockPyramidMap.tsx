@@ -330,44 +330,91 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
         );
     }
 
+    // Stats for Progress
+    const totalCount = relevantStock.length;
+    const mappedCount = relevantStock.filter(s => s.location && s.location.startsWith('Fileira ')).length;
+    const unmappedCount = totalCount - mappedCount;
+    const progressPercentage = totalCount === 0 ? 0 : Math.round((mappedCount / totalCount) * 100);
+
     return (
         <div className="fixed inset-0 bg-slate-100 z-50 flex flex-col animate-fadeIn">
-            <div className="bg-[#0F3F5C] p-4 text-white flex justify-between items-center shadow-md">
+            {/* Main Header */}
+            <div className="bg-[#0F3F5C] p-4 text-white flex justify-between items-center shadow-md z-20">
                 <div className="flex items-center gap-3">
-                    <button onClick={() => { setSelectedMaterial(null); setSelectedBitola(null); }} className="p-2 hover:bg-white/10 rounded-full transition" title="Voltar para seleção">
+                    <button onClick={() => { setSelectedMaterial(null); setSelectedBitola(null); }} className="p-2 hover:bg-white/10 rounded-full transition text-white/80 hover:text-white" title="Voltar para seleção">
                         <ArrowLeftIcon className="w-6 h-6" />
                     </button>
                     <div>
                         <h1 className="text-xl font-bold flex items-center gap-2">
-                            Mapa de Estoque
-                            <span className="bg-emerald-500 text-xs px-2 py-0.5 rounded font-bold uppercase">{selectedMaterial} - {selectedBitola}</span>
+                            Mapeamento de Estoque
+                            <span className="bg-emerald-500 text-white text-xs px-2 py-1 rounded-full font-bold uppercase shadow-sm border border-emerald-400">{selectedMaterial} - {selectedBitola}</span>
                         </h1>
-                        <p className="text-xs opacity-70">Selecione uma fileira e clique nos lotes pendentes para adicionar.</p>
                     </div>
                 </div>
                 <div className="flex gap-3 items-center">
-                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition text-sm font-bold opacity-70 hover:opacity-100">
+                    {/* Visual spacer or toolbar items */}
+                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition text-sm font-bold opacity-70 hover:opacity-100 flex items-center gap-1">
                         Sair
                     </button>
-                    {/* Add Row Controls */}
-                    <div className="flex bg-white/10 p-1 rounded-lg items-center">
-                        <span className="text-white/50 text-xs pl-2 whitespace-nowrap hidden sm:inline">Nova Fileira:</span>
+                </div>
+            </div>
+
+            {/* Progress / Info Bar */}
+            <div className="bg-white border-b shadow-sm p-3 flex items-center justify-between gap-6 z-10 px-6">
+
+                {/* Add Row Controls moved here for better context or keep in header? Let's keep Add Row here for easier access near the workspace */}
+                <div className="flex items-center gap-2 border-r pr-6">
+                    <div className="flex bg-slate-100 p-1 rounded-lg items-center border border-slate-200">
+                        <span className="text-slate-500 text-xs pl-2 whitespace-nowrap hidden sm:inline font-bold">Nova Fileira:</span>
                         <input
                             type="text"
                             value={newRowName}
                             onChange={e => setNewRowName(e.target.value)}
                             placeholder={nextRowLetter}
-                            className="bg-transparent border-none text-white placeholder-white/30 focus:ring-0 w-12 text-center text-lg font-bold uppercase"
+                            className="bg-transparent border-none text-slate-800 placeholder-slate-400 focus:ring-0 w-12 text-center text-lg font-bold uppercase"
                             maxLength={3}
                         />
-                        <button onClick={handleAddRow} className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1 rounded text-sm font-bold shadow-sm whitespace-nowrap">
+                        <button onClick={handleAddRow} className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded text-sm font-bold shadow-sm whitespace-nowrap transition">
                             + Criar
                         </button>
                     </div>
-                    {/* Quick Add Lot Button */}
-                    {/* <button onClick={() => setIsQuickAddOpen(true)} className="bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg font-bold text-sm shadow inline-flex items-center gap-2">
-                        <PlusIcon className="w-4 h-4" /> Novo Lote (Chão)
-                    </button> */}
+                </div>
+
+
+                <div className="flex-1 flex items-center gap-8 justify-center">
+                    {/* Stat Cards */}
+                    <div className="flex items-center gap-6">
+                        <div className="text-center">
+                            <span className="block text-2xl font-bold text-slate-700 leading-none">{totalCount}</span>
+                            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total</span>
+                        </div>
+                        <div className="h-8 w-px bg-slate-200"></div>
+                        <div className="text-center">
+                            <span className="block text-2xl font-bold text-emerald-600 leading-none">{mappedCount}</span>
+                            <span className="text-[10px] uppercase font-bold text-emerald-600/70 tracking-wider">Mapeados</span>
+                        </div>
+                        <div className="h-8 w-px bg-slate-200"></div>
+                        <div className="text-center group cursor-help relative">
+                            <span className="block text-2xl font-bold text-amber-500 leading-none">{unmappedCount}</span>
+                            <span className="text-[10px] uppercase font-bold text-amber-600/70 tracking-wider">Pendentes</span>
+                        </div>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="flex-1 max-w-md">
+                        <div className="flex justify-between text-xs font-bold text-slate-500 mb-1">
+                            <span>Progresso</span>
+                            <span>{progressPercentage}%</span>
+                        </div>
+                        <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden border border-slate-200">
+                            <div
+                                className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500 shadow-[0_0_10px_rgba(16,185,129,0.3)] relative"
+                                style={{ width: `${progressPercentage}%` }}
+                            >
+                                <div className="absolute inset-0 bg-white/20 animate-[pulse_2s_infinite]"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
