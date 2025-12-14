@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Page, StockItem, ConferenceData, ConferenceLotData, Bitola, MaterialType, TransferRecord } from '../types';
 import { MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions } from '../types';
-import { ArrowLeftIcon, PencilIcon, TrashIcon, WarningIcon, BookOpenIcon, TruckIcon, DocumentReportIcon, PrinterIcon, LockOpenIcon, ClipboardListIcon, ChartBarIcon, XCircleIcon, ArchiveIcon, CheckCircleIcon } from './icons';
+import { ArrowLeftIcon, PencilIcon, TrashIcon, WarningIcon, BookOpenIcon, TruckIcon, DocumentReportIcon, PrinterIcon, LockOpenIcon, ClipboardListIcon, ChartBarIcon, XCircleIcon, ArchiveIcon } from './icons';
 import LotHistoryModal from './LotHistoryModal';
 import FinishedConferencesModal from './FinishedConferencesModal';
 import ConferenceReport from './ConferenceReport';
@@ -10,7 +10,7 @@ import TransfersHistoryModal from './TransfersHistoryModal';
 import TransferReport from './TransferReport';
 import InventoryReport from './InventoryReport';
 import StockDashboard from './StockDashboard';
-import StockPyramidMapModal from './StockPyramidMapModal';
+
 
 
 
@@ -372,7 +372,6 @@ const StockControl: React.FC<{
     const [transferReportData, setTransferReportData] = useState<TransferRecord | null>(null);
     const [showInventoryReport, setShowInventoryReport] = useState(false);
     const [stockDashboardOpen, setStockDashboardOpen] = useState(false);
-    const [isStockMapOpen, setIsStockMapOpen] = useState(false);
 
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
@@ -397,11 +396,7 @@ const StockControl: React.FC<{
             .filter(item => materialFilter === '' || item.materialType === materialFilter)
             .filter(item => bitolaFilter === '' || item.bitola === bitolaFilter)
             .sort((a, b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime());
-    }, [stock, searchTerm, statusFilter, materialFilter, bitolaFilter]);
 
-
-
-    const handleAddConferenceSubmit = (data: ConferenceData) => {
         addConference(data);
     };
 
@@ -496,7 +491,7 @@ const StockControl: React.FC<{
             {transferReportData && <TransferReport reportData={transferReportData} onClose={() => setTransferReportData(null)} />}
 
             {showInventoryReport && <InventoryReport stock={stock} filters={{ searchTerm, statusFilter, materialFilter, bitolaFilter }} onClose={() => setShowInventoryReport(false)} />}
-            {isStockMapOpen && <StockPyramidMapModal stock={stock} onClose={() => setIsStockMapOpen(false)} onUpdateStockItem={updateStockItem} />}
+            {showInventoryReport && <InventoryReport stock={stock} filters={{ searchTerm, statusFilter, materialFilter, bitolaFilter }} onClose={() => setShowInventoryReport(false)} />}
             {deletingItem && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white p-8 rounded-xl shadow-xl w-full max-w-md text-center">
@@ -546,9 +541,7 @@ const StockControl: React.FC<{
                     <button onClick={() => setStockDashboardOpen(true)} className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
                         <ChartBarIcon className="h-5 w-5" />Estatística
                     </button>
-                    <button onClick={() => setIsStockMapOpen(true)} className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
-                        <ArchiveIcon className="h-5 w-5 text-emerald-600" />Mapa de Estoque
-                    </button>
+
                     <button onClick={() => setShowInventoryReport(true)} className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
                         <PrinterIcon className="h-5 w-5" />Imprimir Inventário
                     </button>
