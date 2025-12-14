@@ -8,6 +8,85 @@ interface PeopleManagementProps {
     currentUser: User | null;
 }
 
+const MobileFriendlyDateInput: React.FC<{
+    label: string;
+    value: string | null | undefined;
+    onChange: (val: string) => void;
+    disabled?: boolean;
+}> = ({ label, value, onChange, disabled }) => {
+    // Internal state for text input (DD/MM/YYYY)
+    const [textValue, setTextValue] = useState('');
+
+    useEffect(() => {
+        if (value) {
+            const [y, m, d] = value.split('-');
+            setTextValue(`${d}/${m}/${y}`);
+        } else {
+            setTextValue('');
+        }
+    }, [value]);
+
+    const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        let val = e.target.value.replace(/\D/g, ''); // Remove non-digits
+        if (val.length > 8) val = val.substring(0, 8);
+
+        // Simple mask logic
+        let formatted = val;
+        if (val.length >= 3) formatted = `${val.substring(0, 2)}/${val.substring(2)}`;
+        if (val.length >= 5) formatted = `${formatted.substring(0, 5)}/${formatted.substring(5)}`;
+
+        setTextValue(formatted);
+
+        // Parse if complete
+        if (val.length === 8) {
+            const day = val.substring(0, 2);
+            const month = val.substring(2, 4);
+            const year = val.substring(4, 8);
+            // Basic validity check
+            const date = new Date(`${year}-${month}-${day}`);
+            if (!isNaN(date.getTime())) {
+                onChange(`${year}-${month}-${day}`);
+            }
+        } else if (val.length === 0) {
+            onChange('');
+        }
+    };
+
+    const handleDateSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        onChange(e.target.value);
+    };
+
+    return (
+        <div>
+            <label className="block text-xs font-semibold text-slate-500 uppercase">{label}</label>
+            <div className="relative mt-1">
+                <input
+                    type="text"
+                    disabled={disabled}
+                    placeholder="DD/MM/AAAA"
+                    className="w-full p-2 border rounded-lg disabled:bg-slate-100 pr-10"
+                    value={textValue}
+                    onChange={handleTextChange}
+                />
+                <div className="absolute inset-y-0 right-0 flex items-center pr-2">
+                    <div className="relative">
+                        <input
+                            type="date"
+                            className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                            onChange={handleDateSelect}
+                            value={value || ''}
+                            disabled={disabled}
+                        />
+                        <button type="button" tabIndex={-1} className="text-slate-400 hover:text-blue-500">
+                            <ClockIcon className="h-5 w-5" />
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // --- DASHBOARD COMPONENT ---
 const DashboardRH: React.FC<{ employees: Employee[], absences: EmployeeAbsence[], vacations: EmployeeVacation[] }> = ({ employees, absences, vacations }) => {
     const totalEmployees = employees.length;
@@ -476,7 +555,7 @@ const EmployeeDetailModal: React.FC<{
                                 <h3 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2">Dados Pessoais</h3>
                                 <div className="space-y-4">
                                     <div><label className="block text-xs font-semibold text-slate-500 uppercase">Nome Completo</label><input type="text" disabled={readOnly} className="w-full mt-1 p-2 border rounded-lg disabled:bg-slate-100" value={empData.name} onChange={e => setEmpData({ ...empData, name: e.target.value })} /></div>
-                                    <div><label className="block text-xs font-semibold text-slate-500 uppercase">Data Nascimento</label><input type="date" disabled={readOnly} className="w-full mt-1 p-2 border rounded-lg disabled:bg-slate-100" value={empData.birthDate || ''} onChange={e => setEmpData({ ...empData, birthDate: e.target.value })} /></div>
+                                    <MobileFriendlyDateInput label="Data Nascimento" value={empData.birthDate} onChange={v => setEmpData({ ...empData, birthDate: v })} disabled={readOnly} />
                                     <div><label className="block text-xs font-semibold text-slate-500 uppercase">Estado Civil</label><select disabled={readOnly} className="w-full mt-1 p-2 border rounded-lg disabled:bg-slate-100" value={empData.maritalStatus || ''} onChange={e => setEmpData({ ...empData, maritalStatus: e.target.value })}><option value="">Selecione</option><option value="Solteiro(a)">Solteiro(a)</option><option value="Casado(a)">Casado(a)</option><option value="Divorciado(a)">Divorciado(a)</option></select></div>
                                     <div><label className="block text-xs font-semibold text-slate-500 uppercase">Filhos</label><input type="number" disabled={readOnly} className="w-full mt-1 p-2 border rounded-lg disabled:bg-slate-100" value={empData.childrenCount || 0} onChange={e => setEmpData({ ...empData, childrenCount: parseInt(e.target.value) })} /></div>
                                     <div><label className="block text-xs font-semibold text-slate-500 uppercase">Telefone / Contato</label><input type="text" disabled={readOnly} className="w-full mt-1 p-2 border rounded-lg disabled:bg-slate-100" value={empData.phone || ''} onChange={e => setEmpData({ ...empData, phone: e.target.value })} /></div>
@@ -486,7 +565,7 @@ const EmployeeDetailModal: React.FC<{
                                 <h3 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2">Dados Profissionais</h3>
                                 <div className="space-y-4">
                                     <div><label className="block text-xs font-semibold text-slate-500 uppercase">Cargo / Função</label><input type="text" disabled={readOnly} className="w-full mt-1 p-2 border rounded-lg disabled:bg-slate-100" value={empData.jobTitle || ''} onChange={e => setEmpData({ ...empData, jobTitle: e.target.value })} placeholder="Ex: Operador Trefila I" /></div>
-                                    <div><label className="block text-xs font-semibold text-slate-500 uppercase">Data Admissão</label><input type="date" disabled={readOnly} className="w-full mt-1 p-2 border rounded-lg disabled:bg-slate-100" value={empData.admissionDate || ''} onChange={e => setEmpData({ ...empData, admissionDate: e.target.value })} /></div>
+                                    <MobileFriendlyDateInput label="Data Admissão" value={empData.admissionDate} onChange={v => setEmpData({ ...empData, admissionDate: v })} disabled={readOnly} />
                                     <div className="grid grid-cols-1 gap-4">
                                         <div><label className="block text-xs font-semibold text-slate-500 uppercase">Setor</label><input type="text" disabled={readOnly} className="w-full mt-1 p-2 border rounded-lg disabled:bg-slate-100" value={empData.sector} onChange={e => setEmpData({ ...empData, sector: e.target.value })} /></div>
                                         {/* Shift removed */}
@@ -533,9 +612,9 @@ const EmployeeDetailModal: React.FC<{
                                         <label className="text-xs font-bold text-slate-500">Instituição</label>
                                         <input className="w-full p-2 border rounded" placeholder="Ex: SENAI, USP..." value={newCourseData.institution} onChange={e => setNewCourseData({ ...newCourseData, institution: e.target.value })} />
                                     </div>
+
                                     <div>
-                                        <label className="text-xs font-bold text-slate-500">Data Conclusão</label>
-                                        <input type="date" className="w-full p-2 border rounded" value={newCourseData.completionDate} onChange={e => setNewCourseData({ ...newCourseData, completionDate: e.target.value })} />
+                                        <MobileFriendlyDateInput label="Data Conclusão" value={newCourseData.completionDate} onChange={v => setNewCourseData({ ...newCourseData, completionDate: v })} disabled={readOnly} />
                                     </div>
                                     <div>
                                         <label className="text-xs font-bold text-slate-500">Carga Horária (h)</label>
@@ -636,12 +715,10 @@ const EmployeeDetailModal: React.FC<{
                                             </select>
                                         </div>
                                         <div>
-                                            <label className="text-xs font-bold text-slate-500">Data Início</label>
-                                            <input type="date" className="w-full p-2 border rounded" value={newAbsence.startDate} onChange={e => setNewAbsence({ ...newAbsence, startDate: e.target.value })} />
+                                            <MobileFriendlyDateInput label="Data Início" value={newAbsence.startDate} onChange={v => setNewAbsence({ ...newAbsence, startDate: v })} disabled={readOnly} />
                                         </div>
                                         <div>
-                                            <label className="text-xs font-bold text-slate-500">Data Fim (Opcional)</label>
-                                            <input type="date" className="w-full p-2 border rounded" value={newAbsence.endDate} onChange={e => setNewAbsence({ ...newAbsence, endDate: e.target.value })} />
+                                            <MobileFriendlyDateInput label="Data Fim (Opcional)" value={newAbsence.endDate} onChange={v => setNewAbsence({ ...newAbsence, endDate: v })} disabled={readOnly} />
                                         </div>
                                         <div className="flex flex-col justify-end">
                                             <button onClick={handleAddAbsence} className="bg-red-600 text-white font-bold py-2 px-4 rounded hover:bg-red-700 transition">Registrar Ausência</button>
@@ -710,12 +787,10 @@ const EmployeeDetailModal: React.FC<{
                                             <input type="text" placeholder="Ex: 2024-2025" className="w-full p-2 border rounded" value={newVacation.period} onChange={e => setNewVacation({ ...newVacation, period: e.target.value })} />
                                         </div>
                                         <div>
-                                            <label className="text-xs font-bold text-slate-500">Início do Gozo</label>
-                                            <input type="date" className="w-full p-2 border rounded" value={newVacation.startDate} onChange={e => setNewVacation({ ...newVacation, startDate: e.target.value })} />
+                                            <MobileFriendlyDateInput label="Início do Gozo" value={newVacation.startDate} onChange={v => setNewVacation({ ...newVacation, startDate: v })} disabled={readOnly} />
                                         </div>
                                         <div>
-                                            <label className="text-xs font-bold text-slate-500">Fim do Gozo</label>
-                                            <input type="date" className="w-full p-2 border rounded" value={newVacation.endDate} onChange={e => setNewVacation({ ...newVacation, endDate: e.target.value })} />
+                                            <MobileFriendlyDateInput label="Fim do Gozo" value={newVacation.endDate} onChange={v => setNewVacation({ ...newVacation, endDate: v })} disabled={readOnly} />
                                         </div>
                                         <div className="flex flex-col justify-end">
                                             <button onClick={handleAddVacation} className="bg-blue-600 text-white font-bold py-2 px-4 rounded hover:bg-blue-700 transition">Agendar Férias</button>
