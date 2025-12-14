@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ArrowLeftIcon, PlusIcon, StarIcon, ChartBarIcon, TrophyIcon, SearchIcon, FilterIcon, UserIcon, BookOpenIcon, ClockIcon, DocumentTextIcon, PencilIcon, TrashIcon, UserGroupIcon, ExclamationIcon, SaveIcon, XIcon, DownloadIcon, PrinterIcon } from './icons';
 import type { Page, Employee, Evaluation, Achievement, User, EmployeeCourse, EmployeeAbsence, EmployeeVacation, EmployeeResponsibility, OrgUnit, OrgPosition, EmployeeDocument } from '../types';
 import { fetchTable, insertItem, updateItem, deleteItem, fetchByColumn, uploadFile } from '../services/supabaseService';
@@ -194,7 +194,7 @@ const EmployeeCard: React.FC<{ employee: Employee; onSelect: () => void; onDelet
             <div onClick={onSelect} className="flex-grow flex items-center space-x-4 cursor-pointer">
                 <div className="h-16 w-16 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden border-2 border-slate-100 shrink-0">
                     {employee.photoUrl ? (
-                        <img src={employee.photoUrl} alt={employee.name} className="h-full w-full object-cover" />
+                        <img src={employee.photoUrl} alt={employee.name} className="h-full w-full object-cover" loading="lazy" />
                     ) : (
                         <span className="text-2xl font-bold text-slate-400">{employee.name.charAt(0)}</span>
                     )}
@@ -248,6 +248,11 @@ const EmployeeDetailModal: React.FC<{
     const [vacations, setVacations] = useState<EmployeeVacation[]>([]);
     const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
     const [newResp, setNewResp] = useState('');
+
+    // Refs for file inputs to ensure reliable mobile triggering
+    const profilePhotoInputRef = useRef<HTMLInputElement>(null);
+    const courseFileInputRef = useRef<HTMLInputElement>(null);
+    const absenceFileInputRef = useRef<HTMLInputElement>(null);
     const [newCourse, setNewCourse] = useState('');
     const [isEvaluating, setIsEvaluating] = useState(false);
     const [evalScores, setEvalScores] = useState({ organization: 0, cleanliness: 0, effort: 0, communication: 0, improvement: 0 });
@@ -509,10 +514,18 @@ const EmployeeDetailModal: React.FC<{
                     <div className="flex items-center space-x-4">
                         <div className="h-20 w-20 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden border-4 border-white shadow-sm relative group">
                             {empData.photoUrl ? <img src={empData.photoUrl} alt={empData.name} className="h-full w-full object-cover" /> : <span className="text-3xl font-bold text-slate-400">{empData.name.charAt(0)}</span>}
-                            <label className={`absolute inset-0 bg-black/30 flex items-center justify-center cursor-pointer transition ${readOnly ? 'hidden' : ''}`}>
+                            <div onClick={() => !readOnly && profilePhotoInputRef.current?.click()} className={`absolute inset-0 bg-black/30 flex items-center justify-center cursor-pointer transition ${readOnly ? 'hidden' : ''}`}>
                                 <PencilIcon className="text-white h-6 w-6 opacity-70 hover:opacity-100" />
-                                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleUpdatePhoto} disabled={readOnly} />
-                            </label>
+                                <input
+                                    ref={profilePhotoInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    capture="user"
+                                    className="hidden"
+                                    onChange={handleUpdatePhoto}
+                                    disabled={readOnly}
+                                />
+                            </div>
                         </div>
                         <div>
                             <h2 className="text-2xl font-bold text-slate-800">{empData.name}</h2>
@@ -623,12 +636,20 @@ const EmployeeDetailModal: React.FC<{
                                     <div className="md:col-span-2">
                                         <label className="text-xs font-bold text-slate-500">Certificado (PDF/Img)</label>
                                         <input
+                                            ref={courseFileInputRef}
                                             type="file"
                                             accept="image/*"
                                             capture="environment"
-                                            className="w-full text-xs text-slate-500 file:mr-2 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                            className="hidden"
                                             onChange={(e) => setCourseFile(e.target.files ? e.target.files[0] : null)}
                                         />
+                                        <button
+                                            onClick={() => courseFileInputRef.current?.click()}
+                                            className="w-full py-2 px-4 border border-dashed border-blue-300 rounded-lg text-blue-600 bg-blue-50 hover:bg-blue-100 text-xs font-bold flex items-center justify-center gap-2"
+                                        >
+                                            <DocumentTextIcon className="h-4 w-4" />
+                                            {courseFile ? 'Arquivo Selecionado (Clique para alterar)' : 'Tirar Foto ou Escolher Arquivo'}
+                                        </button>
                                     </div>
                                     <div className="flex items-end">
                                         <button onClick={handleAddCourse} className="w-full bg-blue-600 text-white font-bold py-2 rounded hover:bg-blue-700 transition">Adicionar Qualificação</button>
@@ -732,12 +753,20 @@ const EmployeeDetailModal: React.FC<{
                                         <div className="md:col-span-1">
                                             <label className="text-xs font-bold text-slate-500">Anexo (Atestado/Foto)</label>
                                             <input
+                                                ref={absenceFileInputRef}
                                                 type="file"
                                                 accept="image/*"
                                                 capture="environment"
-                                                className="w-full text-xs text-slate-500 file:mr-2 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                                className="hidden"
                                                 onChange={(e) => setAbsenceFile(e.target.files ? e.target.files[0] : null)}
                                             />
+                                            <button
+                                                onClick={() => absenceFileInputRef.current?.click()}
+                                                className="w-full py-2 px-4 border border-dashed border-blue-300 rounded-lg text-blue-600 bg-blue-50 hover:bg-blue-100 text-xs font-bold flex items-center justify-center gap-2"
+                                            >
+                                                <DocumentTextIcon className="h-4 w-4" />
+                                                {absenceFile ? 'Arquivo Selecionado' : 'Anexar Foto/Atestado'}
+                                            </button>
                                         </div>
                                     </div>
                                 )}
