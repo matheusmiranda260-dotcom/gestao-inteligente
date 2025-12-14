@@ -176,6 +176,15 @@ const EmployeeDetailModal: React.FC<{
     // Documents State
     const [documents, setDocuments] = useState<EmployeeDocument[]>([]);
 
+    // Development Form State
+    const [newCourseData, setNewCourseData] = useState<{
+        educationType: 'Escolaridade' | 'Graduação' | 'Pós-Graduação' | 'Técnico' | 'Curso Livre' | 'Certificação';
+        courseName: string;
+        institution: string;
+        completionDate: string;
+        workloadHours: string;
+    }>({ educationType: 'Curso Livre', courseName: '', institution: '', completionDate: '', workloadHours: '' });
+    const [courseFile, setCourseFile] = useState<File | null>(null);
     // HR Form State
 
     // HR Form State
@@ -461,8 +470,100 @@ const EmployeeDetailModal: React.FC<{
                     )}
                     {activeTab === 'development' && (
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-                            <div className="flex gap-2 mb-6"><input className="flex-grow p-2 border rounded-lg" placeholder="Adicionar curso/treinamento..." value={newCourse} onChange={e => setNewCourse(e.target.value)} /><button onClick={handleAddCourse} className="bg-blue-600 text-white px-4 rounded-lg hover:bg-blue-700">Adicionar</button></div>
-                            <table className="w-full text-sm text-left"><thead className="text-xs uppercase bg-slate-50 text-slate-500"><tr><th className="px-4 py-2">Curso</th><th className="px-4 py-2">Instituição</th><th className="px-4 py-2">Status</th></tr></thead><tbody>{courses.map(c => (<tr key={c.id} className="border-b"><td className="px-4 py-3 font-medium">{c.courseName}</td><td className="px-4 py-3 text-slate-500">{c.institution || '-'}</td><td className="px-4 py-3"><span className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs">{c.status}</span></td></tr>))}</tbody></table>
+                            <h3 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2 flex items-center gap-2">
+                                <BookOpenIcon className="h-5 w-5 text-blue-500" />
+                                Histórico Educacional e Cursos
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 bg-slate-50 p-4 rounded-lg">
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500">Tipo</label>
+                                    <select
+                                        className="w-full p-2 border rounded"
+                                        value={newCourseData.educationType}
+                                        onChange={e => setNewCourseData({ ...newCourseData, educationType: e.target.value as any })}
+                                    >
+                                        <option value="Escolaridade">Escolaridade Básica</option>
+                                        <option value="Graduação">Graduação</option>
+                                        <option value="Pós-Graduação">Pós-Graduação</option>
+                                        <option value="Técnico">Curso Técnico</option>
+                                        <option value="Curso Livre">Curso Livre / Treinamento</option>
+                                        <option value="Certificação">Certificação</option>
+                                    </select>
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="text-xs font-bold text-slate-500">Nome do Curso / Formação</label>
+                                    <input className="w-full p-2 border rounded" placeholder="Ex: Engenharia de Produção, NR-12..." value={newCourseData.courseName} onChange={e => setNewCourseData({ ...newCourseData, courseName: e.target.value })} />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500">Instituição</label>
+                                    <input className="w-full p-2 border rounded" placeholder="Ex: SENAI, USP..." value={newCourseData.institution} onChange={e => setNewCourseData({ ...newCourseData, institution: e.target.value })} />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500">Data Conclusão</label>
+                                    <input type="date" className="w-full p-2 border rounded" value={newCourseData.completionDate} onChange={e => setNewCourseData({ ...newCourseData, completionDate: e.target.value })} />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500">Carga Horária (h)</label>
+                                    <input type="number" className="w-full p-2 border rounded" placeholder="Ex: 40" value={newCourseData.workloadHours} onChange={e => setNewCourseData({ ...newCourseData, workloadHours: e.target.value })} />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="text-xs font-bold text-slate-500">Certificado (PDF/Img)</label>
+                                    <input
+                                        type="file"
+                                        className="w-full text-xs text-slate-500 file:mr-2 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                        onChange={(e) => setCourseFile(e.target.files ? e.target.files[0] : null)}
+                                    />
+                                </div>
+                                <div className="flex items-end">
+                                    <button onClick={handleAddCourse} className="w-full bg-blue-600 text-white font-bold py-2 rounded hover:bg-blue-700 transition">Adicionar Qualificação</button>
+                                </div>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="text-xs uppercase bg-slate-100 text-slate-600 font-bold">
+                                        <tr>
+                                            <th className="px-4 py-3">Tipo</th>
+                                            <th className="px-4 py-3">Curso / Instituição</th>
+                                            <th className="px-4 py-3">Conclusão</th>
+                                            <th className="px-4 py-3 text-center">Certificado</th>
+                                            <th className="px-4 py-3 text-center">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {courses.map(c => (
+                                            <tr key={c.id} className="border-b hover:bg-slate-50">
+                                                <td className="px-4 py-3">
+                                                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${c.educationType?.includes('Graduação') ? 'bg-purple-100 text-purple-700' :
+                                                            c.educationType === 'Técnico' ? 'bg-orange-100 text-orange-700' :
+                                                                'bg-slate-200 text-slate-700'
+                                                        }`}>
+                                                        {c.educationType || 'Curso'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <div className="font-bold text-slate-800">{c.courseName}</div>
+                                                    <div className="text-xs text-slate-500">{c.institution} {c.workloadHours ? `• ${c.workloadHours}h` : ''}</div>
+                                                </td>
+                                                <td className="px-4 py-3 text-slate-600">
+                                                    {c.completionDate ? new Date(c.completionDate).toLocaleDateString() : '-'}
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    {c.attachmentUrl ? (
+                                                        <a href={c.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline flex items-center justify-center gap-1 text-xs font-bold">
+                                                            <DocumentTextIcon className="h-4 w-4" /> Ver Anexo
+                                                        </a>
+                                                    ) : <span className="text-slate-300">-</span>}
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    <button onClick={() => handleDeleteCourse(c.id)} className="text-red-400 hover:text-red-600"><TrashIcon className="h-4 w-4" /></button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {courses.length === 0 && <tr><td colSpan={5} className="p-4 text-center text-slate-400">Nenhum curso registrado.</td></tr>}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     )}
                     {activeTab === 'evaluations' && (

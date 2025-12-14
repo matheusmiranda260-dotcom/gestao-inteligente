@@ -378,6 +378,9 @@ export interface EmployeeCourse {
     completionDate?: string;
     expiryDate?: string;
     status: 'Concluído' | 'Em Andamento' | 'Pendente';
+    educationType?: 'Escolaridade' | 'Graduação' | 'Pós-Graduação' | 'Técnico' | 'Curso Livre' | 'Certificação';
+    attachmentUrl?: string; // Link to certificate/diploma
+    workloadHours?: number;
 }
 
 export interface EmployeeAbsence {
