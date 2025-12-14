@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Page, StockItem, ConferenceData, ConferenceLotData, Bitola, MaterialType, TransferRecord } from '../types';
 import { MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions } from '../types';
-import { ArrowLeftIcon, PencilIcon, TrashIcon, WarningIcon, BookOpenIcon, TruckIcon, DocumentReportIcon, PrinterIcon, LockOpenIcon, ClipboardListIcon, ChartBarIcon, XCircleIcon, ArchiveIcon } from './icons';
+import { ArrowLeftIcon, PencilIcon, TrashIcon, WarningIcon, BookOpenIcon, TruckIcon, DocumentReportIcon, PrinterIcon, LockOpenIcon, ClipboardListIcon, ChartBarIcon, XCircleIcon, ArchiveIcon, CheckCircleIcon } from './icons';
 import LotHistoryModal from './LotHistoryModal';
 import FinishedConferencesModal from './FinishedConferencesModal';
 import ConferenceReport from './ConferenceReport';
@@ -11,6 +11,10 @@ import TransferReport from './TransferReport';
 import InventoryReport from './InventoryReport';
 import StockDashboard from './StockDashboard';
 import StockPyramidMapModal from './StockPyramidMapModal';
+import StockConference from './StockConference';
+
+
+
 
 const getStatusBadge = (status: StockItem['status']) => {
     const styles = {
@@ -357,6 +361,7 @@ const StockControl: React.FC<{
     editConference: (conferenceNumber: string, updatedData: ConferenceData) => void;
     deleteConference: (conferenceNumber: string) => void;
 }> = ({ stock, conferences, transfers, setPage, addConference, deleteStockItem, updateStockItem, createTransfer, editConference, deleteConference }) => {
+    const [activeTab, setActiveTab] = useState<'stock' | 'conference'>('stock');
     const [isAddConferenceModalOpen, setIsAddConferenceModalOpen] = useState(false);
     const [isMultiLotTransferModalOpen, setIsMultiLotTransferModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<StockItem | null>(null);
@@ -525,141 +530,170 @@ const StockControl: React.FC<{
                 </div>
             )}
 
-            <header className="flex items-center">
-                <button onClick={() => setPage('menu')} className="mr-4 p-2 rounded-full hover:bg-slate-200 transition">
-                    <ArrowLeftIcon className="h-6 w-6 text-slate-800" />
-                </button>
-                <h1 className="text-3xl font-bold text-slate-800">Controle de Estoque</h1>
+            <header className="flex items-center justify-between">
+                <div className="flex items-center">
+                    <button onClick={() => setPage('menu')} className="mr-4 p-2 rounded-full hover:bg-slate-200 transition">
+                        <ArrowLeftIcon className="h-6 w-6 text-slate-800" />
+                    </button>
+                    <h1 className="text-3xl font-bold text-slate-800">Controle de Estoque</h1>
+                </div>
+
+                {/* View Switcher Tabs */}
+                <div className="bg-slate-200 p-1 rounded-lg flex gap-1">
+                    <button
+                        onClick={() => setActiveTab('stock')}
+                        className={`px-4 py-2 rounded-md font-bold text-sm transition ${activeTab === 'stock' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-600 hover:text-slate-800'}`}
+                    >
+                        Lista Geral
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('conference')}
+                        className={`px-4 py-2 rounded-md font-bold text-sm transition flex items-center gap-2 ${activeTab === 'conference' ? 'bg-white text-emerald-800 shadow-sm' : 'text-slate-600 hover:text-slate-800'}`}
+                    >
+                        <CheckCircleIcon className="w-4 h-4" /> Conferência e Mapa
+                    </button>
+                </div>
             </header>
 
-            <div className="bg-white p-6 rounded-xl shadow-sm flex flex-wrap gap-4 items-center justify-between">
-                <div>
-                    <button onClick={() => setIsAddConferenceModalOpen(true)} className="bg-[#0F3F5C] hover:bg-[#0A2A3D] text-white font-bold py-2 px-4 rounded-lg transition text-base">
-                        + Adicionar Conferência
-                    </button>
-                </div>
-                <div className="flex gap-4">
-                    <button onClick={() => setStockDashboardOpen(true)} className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
-                        <ChartBarIcon className="h-5 w-5" />Estatística
-                    </button>
-                    <button onClick={() => setIsStockMapOpen(true)} className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
-                        <ArchiveIcon className="h-5 w-5 text-emerald-600" />Mapa de Estoque
-                    </button>
-                    <button onClick={() => setShowInventoryReport(true)} className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
-                        <PrinterIcon className="h-5 w-5" />Imprimir Inventário
-                    </button>
-                    <button onClick={() => setConferenceHistoryOpen(true)} className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
-                        <DocumentReportIcon className="h-5 w-5" />Conferências Finalizadas
-                    </button>
-                    <button onClick={() => setTransferHistoryOpen(true)} className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
-                        <TruckIcon className="h-5 w-5" />Transferências Feitas
-                    </button>
-                </div>
-            </div>
-
-            {stockDashboardOpen && (
-                <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-7xl max-h-[95vh] overflow-y-auto flex flex-col relative">
-                        <button onClick={() => setStockDashboardOpen(false)} className="absolute top-4 right-4 text-slate-500 hover:text-slate-800">
-                            <XCircleIcon className="h-8 w-8" />
-                        </button>
-                        <h2 className="text-2xl font-bold text-slate-800 mb-6">Estatísticas do Estoque</h2>
-                        <StockDashboard stock={stock} />
+            {activeTab === 'conference' ? (
+                <StockConference
+                    stock={stock}
+                    onUpdateStockItem={updateStockItem}
+                    onDeleteStockItem={deleteStockItem}
+                    onAddStockItem={(item) => {/* TODO: Implement add item */ console.warn("Add item not implemented here, use Add Conference flow") }}
+                />
+            ) : (
+                <>
+                    <div className="bg-white p-6 rounded-xl shadow-sm flex flex-wrap gap-4 items-center justify-between">
+                        <div>
+                            <button onClick={() => setIsAddConferenceModalOpen(true)} className="bg-[#0F3F5C] hover:bg-[#0A2A3D] text-white font-bold py-2 px-4 rounded-lg transition text-base">
+                                + Adicionar Conferência
+                            </button>
+                        </div>
+                        <div className="flex gap-4">
+                            <button onClick={() => setStockDashboardOpen(true)} className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
+                                <ChartBarIcon className="h-5 w-5" />Estatística
+                            </button>
+                            <button onClick={() => setIsStockMapOpen(true)} className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
+                                <ArchiveIcon className="h-5 w-5 text-emerald-600" />Mapa de Estoque
+                            </button>
+                            <button onClick={() => setShowInventoryReport(true)} className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
+                                <PrinterIcon className="h-5 w-5" />Imprimir Inventário
+                            </button>
+                            <button onClick={() => setConferenceHistoryOpen(true)} className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
+                                <DocumentReportIcon className="h-5 w-5" />Conferências Finalizadas
+                            </button>
+                            <button onClick={() => setTransferHistoryOpen(true)} className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
+                                <TruckIcon className="h-5 w-5" />Transferências Feitas
+                            </button>
+                        </div>
                     </div>
-                </div>
-            )}
 
-            <div className="bg-white p-6 rounded-xl shadow-sm">
-                <h2 className="text-xl font-semibold text-slate-800 mb-4">Filtros de Busca</h2>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <input type="text" placeholder="Buscar por lote, fornecedor, NFe..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="p-2 border border-slate-300 rounded-md md:col-span-2 text-slate-800" />
-                    <select value={bitolaFilter} onChange={e => setBitolaFilter(e.target.value)} className="p-2 border border-slate-300 rounded-md bg-white text-slate-800">
-                        <option value="">Todas as Bitolas</option>
-                        {allBitolaOptions.map(b => <option key={b} value={b}>{b}</option>)}
-                    </select>
-                    <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="p-2 border border-slate-300 rounded-md bg-white text-slate-800">
-                        <option value="">Todos os Status</option>
-                        <option value="Disponível">Disponível</option>
-                        <option value="Disponível - Suporte Treliça">Disponível - Suporte Treliça</option>
-                        <option value="Em Produção">Em Produção</option>
-                        <option value="Em Produção - Treliça">Em Produção - Treliça</option>
-                        <option value="Transferido">Transferido</option>
-                    </select>
-                </div>
-            </div>
-
-
-
-            <div className="bg-white rounded-xl shadow-sm">
-                <div className="p-6 border-b flex justify-between items-center">
-                    <div>
-                        <h2 className="text-xl font-semibold text-slate-800">Lotes em Estoque</h2>
-                        <p className="text-sm text-slate-500">Exibindo {filteredStock.length} de {stock.length} lotes.</p>
-                    </div>
-                    <button
-                        onClick={() => setIsMultiLotTransferModalOpen(true)}
-                        disabled={selectedLotIdsForTransfer.length === 0}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg transition flex items-center gap-2 disabled:bg-slate-400 disabled:cursor-not-allowed"
-                    >
-                        <TruckIcon className="h-5 w-5" />Transferir Selecionados ({selectedLotIdsForTransfer.length})
-                    </button>
-                </div>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left">
-                        <thead className="text-xs text-slate-600 uppercase bg-slate-50">
-                            <tr>
-                                <th className="p-4 w-12"><input type="checkbox" onChange={handleSelectAllForTransfer} checked={filteredStock.length > 0 && selectedLotIdsForTransfer.length === filteredStock.filter(i => i.status === 'Disponível' || i.status === 'Disponível - Suporte Treliça').length} className="h-4 w-4 rounded border-slate-300 text-slate-600 focus:ring-slate-500" /></th>
-                                <th className="px-6 py-3">Data Entrada</th>
-                                <th className="px-6 py-3">Lote Interno</th>
-                                <th className="px-6 py-3">Lote Fornecedor</th>
-                                <th className="px-6 py-3">Fornecedor</th>
-                                <th className="px-6 py-3">Tipo de Material</th>
-                                <th className="px-6 py-3">Bitola</th>
-                                <th className="px-6 py-3 text-right">Peso Etiqueta (kg)</th>
-                                <th className="px-6 py-3 text-center">Status</th>
-                                <th className="px-6 py-3 text-center">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200">
-                            {filteredStock.map(item => (
-                                <tr key={item.id} className="bg-white hover:bg-slate-50">
-                                    <td className="p-4">
-                                        <input type="checkbox" checked={selectedLotIdsForTransfer.includes(item.id)} onChange={() => handleSelectLotForTransfer(item.id)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="h-4 w-4 rounded border-slate-300 text-slate-600 focus:ring-slate-500" />
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">{new Date(item.entryDate).toLocaleDateString('pt-BR')}</td>
-                                    <td className="px-6 py-4 font-medium text-slate-800 whitespace-nowrap">{item.internalLot}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap">{item.supplierLot}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap">{item.supplier}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap">{item.materialType}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap font-semibold">{item.bitola}</td>
-                                    <td className="px-6 py-4 text-right font-medium text-slate-800 whitespace-nowrap">
-                                        {item.labelWeight.toFixed(2)}
-                                    </td>
-                                    <td className="px-6 py-4 text-center">{getStatusBadge(item.status)}</td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center justify-center space-x-2">
-                                            <button onClick={() => setHistoryLot(item)} className="p-1 text-slate-500 hover:text-slate-800" title="Ver Histórico"><BookOpenIcon className="h-5 w-5" /></button>
-                                            <button onClick={() => setEditingItem(item)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="p-1 text-slate-500 hover:text-emerald-700 disabled:opacity-30 disabled:cursor-not-allowed" title="Editar Lote"><PencilIcon className="h-5 w-5" /></button>
-                                            <button onClick={() => setDeletingItem(item)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="p-1 text-slate-500 hover:text-red-700 disabled:opacity-30 disabled:cursor-not-allowed" title="Excluir Lote"><TrashIcon className="h-5 w-5" /></button>
-                                            {(item.status.includes('Em Produção') || item.status === 'Disponível - Suporte Treliça') && (
-                                                <button onClick={() => setReleasingItem(item)} className="p-1 text-amber-500 hover:text-amber-700" title="Liberar Lote Manualmente (Correção)">
-                                                    <LockOpenIcon className="h-5 w-5" />
-                                                </button>
-                                            )}
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                    {filteredStock.length === 0 && (
-                        <div className="text-center text-slate-500 py-16">
-                            <p className="font-semibold">Nenhum item encontrado.</p>
-                            <p className="text-sm">Tente ajustar os filtros ou adicione uma nova conferência.</p>
+                    {stockDashboardOpen && (
+                        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-7xl max-h-[95vh] overflow-y-auto flex flex-col relative">
+                                <button onClick={() => setStockDashboardOpen(false)} className="absolute top-4 right-4 text-slate-500 hover:text-slate-800">
+                                    <XCircleIcon className="h-8 w-8" />
+                                </button>
+                                <h2 className="text-2xl font-bold text-slate-800 mb-6">Estatísticas do Estoque</h2>
+                                <StockDashboard stock={stock} />
+                            </div>
                         </div>
                     )}
-                </div>
-            </div>
+
+                    <div className="bg-white p-6 rounded-xl shadow-sm">
+                        <h2 className="text-xl font-semibold text-slate-800 mb-4">Filtros de Busca</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <input type="text" placeholder="Buscar por lote, fornecedor, NFe..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="p-2 border border-slate-300 rounded-md md:col-span-2 text-slate-800" />
+                            <select value={bitolaFilter} onChange={e => setBitolaFilter(e.target.value)} className="p-2 border border-slate-300 rounded-md bg-white text-slate-800">
+                                <option value="">Todas as Bitolas</option>
+                                {allBitolaOptions.map(b => <option key={b} value={b}>{b}</option>)}
+                            </select>
+                            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="p-2 border border-slate-300 rounded-md bg-white text-slate-800">
+                                <option value="">Todos os Status</option>
+                                <option value="Disponível">Disponível</option>
+                                <option value="Disponível - Suporte Treliça">Disponível - Suporte Treliça</option>
+                                <option value="Em Produção">Em Produção</option>
+                                <option value="Em Produção - Treliça">Em Produção - Treliça</option>
+                                <option value="Transferido">Transferido</option>
+                            </select>
+                        </div>
+                    </div>
+
+
+
+                    <div className="bg-white rounded-xl shadow-sm">
+                        <div className="p-6 border-b flex justify-between items-center">
+                            <div>
+                                <h2 className="text-xl font-semibold text-slate-800">Lotes em Estoque</h2>
+                                <p className="text-sm text-slate-500">Exibindo {filteredStock.length} de {stock.length} lotes.</p>
+                            </div>
+                            <button
+                                onClick={() => setIsMultiLotTransferModalOpen(true)}
+                                disabled={selectedLotIdsForTransfer.length === 0}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg transition flex items-center gap-2 disabled:bg-slate-400 disabled:cursor-not-allowed"
+                            >
+                                <TruckIcon className="h-5 w-5" />Transferir Selecionados ({selectedLotIdsForTransfer.length})
+                            </button>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="text-xs text-slate-600 uppercase bg-slate-50">
+                                    <tr>
+                                        <th className="p-4 w-12"><input type="checkbox" onChange={handleSelectAllForTransfer} checked={filteredStock.length > 0 && selectedLotIdsForTransfer.length === filteredStock.filter(i => i.status === 'Disponível' || i.status === 'Disponível - Suporte Treliça').length} className="h-4 w-4 rounded border-slate-300 text-slate-600 focus:ring-slate-500" /></th>
+                                        <th className="px-6 py-3">Data Entrada</th>
+                                        <th className="px-6 py-3">Lote Interno</th>
+                                        <th className="px-6 py-3">Lote Fornecedor</th>
+                                        <th className="px-6 py-3">Fornecedor</th>
+                                        <th className="px-6 py-3">Tipo de Material</th>
+                                        <th className="px-6 py-3">Bitola</th>
+                                        <th className="px-6 py-3 text-right">Peso Etiqueta (kg)</th>
+                                        <th className="px-6 py-3 text-center">Status</th>
+                                        <th className="px-6 py-3 text-center">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-200">
+                                    {filteredStock.map(item => (
+                                        <tr key={item.id} className="bg-white hover:bg-slate-50">
+                                            <td className="p-4">
+                                                <input type="checkbox" checked={selectedLotIdsForTransfer.includes(item.id)} onChange={() => handleSelectLotForTransfer(item.id)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="h-4 w-4 rounded border-slate-300 text-slate-600 focus:ring-slate-500" />
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">{new Date(item.entryDate).toLocaleDateString('pt-BR')}</td>
+                                            <td className="px-6 py-4 font-medium text-slate-800 whitespace-nowrap">{item.internalLot}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap">{item.supplierLot}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap">{item.supplier}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap">{item.materialType}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap font-semibold">{item.bitola}</td>
+                                            <td className="px-6 py-4 text-right font-medium text-slate-800 whitespace-nowrap">
+                                                {item.labelWeight.toFixed(2)}
+                                            </td>
+                                            <td className="px-6 py-4 text-center">{getStatusBadge(item.status)}</td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center justify-center space-x-2">
+                                                    <button onClick={() => setHistoryLot(item)} className="p-1 text-slate-500 hover:text-slate-800" title="Ver Histórico"><BookOpenIcon className="h-5 w-5" /></button>
+                                                    <button onClick={() => setEditingItem(item)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="p-1 text-slate-500 hover:text-emerald-700 disabled:opacity-30 disabled:cursor-not-allowed" title="Editar Lote"><PencilIcon className="h-5 w-5" /></button>
+                                                    <button onClick={() => setDeletingItem(item)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="p-1 text-slate-500 hover:text-red-700 disabled:opacity-30 disabled:cursor-not-allowed" title="Excluir Lote"><TrashIcon className="h-5 w-5" /></button>
+                                                    {(item.status.includes('Em Produção') || item.status === 'Disponível - Suporte Treliça') && (
+                                                        <button onClick={() => setReleasingItem(item)} className="p-1 text-amber-500 hover:text-amber-700" title="Liberar Lote Manualmente (Correção)">
+                                                            <LockOpenIcon className="h-5 w-5" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            {filteredStock.length === 0 && (
+                                <div className="text-center text-slate-500 py-16">
+                                    <p className="font-semibold">Nenhum item encontrado.</p>
+                                    <p className="text-sm">Tente ajustar os filtros ou adicione uma nova conferência.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     );
 };
