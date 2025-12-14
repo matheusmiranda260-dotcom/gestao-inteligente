@@ -210,7 +210,7 @@ const EmployeeDetailModal: React.FC<{
                 endDate: newAbsence.endDate || null,
                 reason: newAbsence.reason,
                 attachmentUrl: attachmentUrl
-            });
+            } as any);
             alert('Ausência registrada');
             setNewAbsence({ type: 'Falta Injustificada', startDate: '', endDate: '', reason: '' });
             setAbsenceFile(null);
@@ -262,7 +262,7 @@ const EmployeeDetailModal: React.FC<{
                     title: file.name,
                     type: 'Documento', // Could be refined
                     url: publicUrl
-                });
+                } as any);
                 alert('Documento anexado com sucesso!');
                 loadDetails();
             }
@@ -357,15 +357,42 @@ const EmployeeDetailModal: React.FC<{
         setResponsibilities(responsibilities.filter(r => r.id !== id));
     };
 
+    // Development Handlers
     const handleAddCourse = async () => {
-        if (!newCourse) return;
+        if (!newCourseData.courseName) return;
         try {
-            const added = await insertItem<EmployeeCourse>('employee_courses', {
-                employeeId: employee.id, courseName: newCourse, status: 'Concluído'
-            } as EmployeeCourse);
-            setCourses([...courses, added]);
-            setNewCourse('');
-        } catch (e) { alert('Erro ao adicionar curso'); }
+            let attachmentUrl = null;
+            if (courseFile) {
+                const fileName = `courses/${employee.id}_${Date.now()}_${courseFile.name}`;
+                attachmentUrl = await uploadFile('kb-files', fileName, courseFile);
+            }
+
+            const added = await insertItem('employee_courses', {
+                employeeId: employee.id,
+                courseName: newCourseData.courseName,
+                institution: newCourseData.institution,
+                educationType: newCourseData.educationType,
+                completionDate: newCourseData.completionDate || null,
+                workloadHours: newCourseData.workloadHours ? parseFloat(newCourseData.workloadHours) : null,
+                status: 'Concluído',
+                attachmentUrl: attachmentUrl
+            } as any);
+
+            setCourses([...courses, added as EmployeeCourse]);
+            alert('Qualificação adicionada!');
+            setNewCourseData({ educationType: 'Curso Livre', courseName: '', institution: '', completionDate: '', workloadHours: '' });
+            setCourseFile(null);
+            loadDetails();
+        } catch (e) {
+            console.error(e);
+            alert('Erro ao registrar curso. Verifique se executou o script SQL.');
+        }
+    };
+
+    const handleDeleteCourse = async (id: string) => {
+        if (!confirm('Remover esta qualificação?')) return;
+        await deleteItem('employee_courses', id);
+        loadDetails();
     };
 
     const handleSubmitEvaluation = async (e: React.FormEvent) => {
@@ -535,8 +562,8 @@ const EmployeeDetailModal: React.FC<{
                                             <tr key={c.id} className="border-b hover:bg-slate-50">
                                                 <td className="px-4 py-3">
                                                     <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${c.educationType?.includes('Graduação') ? 'bg-purple-100 text-purple-700' :
-                                                            c.educationType === 'Técnico' ? 'bg-orange-100 text-orange-700' :
-                                                                'bg-slate-200 text-slate-700'
+                                                        c.educationType === 'Técnico' ? 'bg-orange-100 text-orange-700' :
+                                                            'bg-slate-200 text-slate-700'
                                                         }`}>
                                                         {c.educationType || 'Curso'}
                                                     </span>
