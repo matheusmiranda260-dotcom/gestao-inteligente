@@ -25,6 +25,26 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
         e.currentTarget.classList.remove('bg-emerald-50');
     };
 
+    // Pyramid Logic: Calculate levels
+    // Base Level = baseSize items. Next Level = baseSize - 1, etc.
+    const levels: StockItem[][] = [];
+    let currentIndex = 0;
+    let currentCapacity = baseSize;
+
+    if (items.length > 0) {
+        while (currentIndex < items.length) {
+            // If currentCapacity drops to 0 or less, we usually just stack 1s on top, or maybe maintain 1.
+            // Let's cap minimum capacity at 1.
+            const capacity = Math.max(1, currentCapacity);
+
+            const levelItems = items.slice(currentIndex, currentIndex + capacity);
+            levels.push(levelItems);
+
+            currentIndex += capacity;
+            currentCapacity--;
+        }
+    }
+
     return (
         <div
             className={`flex-1 min-w-[300px] border-2 rounded-xl p-4 relative transition-all duration-300 ${isActive ? 'border-emerald-500 bg-emerald-50 shadow-md ring-2 ring-emerald-300' : 'border-dashed border-slate-300 bg-slate-50 opacity-90'}`}
@@ -40,8 +60,7 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                 }
             }}
             onClick={(e) => {
-                // Prevent bubbling if clicking empty space?
-                // onSetActive(); // We could auto-activate, but let's stick to header click for explicit activation.
+                // Prevent bubbling
             }}
         >
             <div className="flex justify-between items-center mb-4 border-b pb-2">
@@ -54,10 +73,10 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                 </div>
 
                 <div className="flex items-center gap-2">
-                    {/* Base Size Controls (Height Control) */}
-                    <div className="flex items-center bg-white rounded-lg border border-slate-200 mr-2">
+                    {/* Base Size Controls */}
+                    <div className="flex items-center bg-white rounded-lg border border-slate-200 mr-2" title="Tamanho da Base (Chão)">
                         <button onClick={(e) => { e.stopPropagation(); setBaseSize(Math.max(1, baseSize - 1)); }} className="px-2 py-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-l-lg font-bold">-</button>
-                        <span className="text-xs font-mono w-4 text-center">{baseSize}</span>
+                        <span className="text-xs font-mono w-6 text-center border-x bg-slate-50">{baseSize}</span>
                         <button onClick={(e) => { e.stopPropagation(); setBaseSize(baseSize + 1); }} className="px-2 py-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-r-lg font-bold">+</button>
                     </div>
 
@@ -65,48 +84,45 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                 </div>
             </div>
 
-            {/* Pyramid / Stack Area */}
-            {/* Using Grid to simulate base width. Items fill from bottom-left (reverse) logic is complex in CSS Grid without specific placement.
-                Flex wrap reverse is actually easier for "piling up". 
-                The "Base Size" here will constrain the container WIDTH to roughly (ItemWidth + Gap) * BaseSize.
-                Item Width = 4rem (w-16) + gap-2 (0.5rem) -> 4.5rem per item.
-            */}
-            <div
-                className="flex flex-wrap-reverse content-start gap-2 min-h-[150px] mx-auto transition-all duration-300 items-end justify-center"
-                style={{ maxWidth: `calc(${baseSize} * 4.5rem)` }} // 4rem item + 0.5rem gap approx.
-            >
+            {/* Pyramid Render Area */}
+            <div className="flex flex-col-reverse items-center gap-1 min-h-[150px] transition-all duration-300">
                 {items.length === 0 && (
                     <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm pointer-events-none">
                         Arraste ou Clique
                     </div>
                 )}
-                {items.map(item => (
-                    <div
-                        key={item.id}
-                        className="w-16 h-16 rounded-full bg-slate-800 text-white flex items-center justify-center text-xs font-bold shadow-lg relative group cursor-grab active:cursor-grabbing border-4 border-white transition-transform hover:scale-105 z-0 hover:z-10"
-                        title={`${item.internalLot} - ${item.bitola} - ${item.remainingQuantity}kg`}
-                        draggable
-                        onDragStart={(e) => {
-                            e.dataTransfer.setData('application/json', JSON.stringify(item));
-                            e.dataTransfer.effectAllowed = 'move';
-                        }}
-                    >
-                        <div className="text-center leading-tight pointer-events-none">
-                            <div>{item.bitola}</div>
-                            <div className="text-[10px] opacity-70">{item.remainingQuantity.toFixed(0)}</div>
-                        </div>
 
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                e.preventDefault();
-                                onRemove(item);
-                            }}
-                            className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 opacity-100 shadow-md hover:bg-red-700 hover:scale-110 transition-all z-20 cursor-pointer"
-                            title="Remover da fileira"
-                        >
-                            <TrashIcon className="w-3 h-3" />
-                        </button>
+                {levels.map((levelItems, levelIndex) => (
+                    <div key={levelIndex} className="flex justify-center gap-1">
+                        {levelItems.map(item => (
+                            <div
+                                key={item.id}
+                                className="w-14 h-14 rounded-full bg-slate-800 text-white flex items-center justify-center text-[10px] font-bold shadow-lg relative group cursor-grab active:cursor-grabbing border-2 border-white transition-transform hover:scale-110 z-0 hover:z-10"
+                                title={`${item.internalLot} - ${item.bitola} - ${item.remainingQuantity}kg`}
+                                draggable
+                                onDragStart={(e) => {
+                                    e.dataTransfer.setData('application/json', JSON.stringify(item));
+                                    e.dataTransfer.effectAllowed = 'move';
+                                }}
+                            >
+                                <div className="text-center leading-tight pointer-events-none">
+                                    <div className="text-emerald-300">{item.internalLot}</div>
+                                    <div className="opacity-70 scale-90">{item.remainingQuantity.toFixed(0)}</div>
+                                </div>
+
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        e.preventDefault();
+                                        onRemove(item);
+                                    }}
+                                    className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 opacity-100 shadow-md hover:bg-red-700 hover:scale-110 transition-all z-20 cursor-pointer"
+                                    title="Remover da fileira"
+                                >
+                                    <TrashIcon className="w-3 h-3" />
+                                </button>
+                            </div>
+                        ))}
                     </div>
                 ))}
             </div>
