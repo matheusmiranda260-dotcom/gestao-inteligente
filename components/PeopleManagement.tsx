@@ -268,7 +268,6 @@ const EmployeeCard: React.FC<{ employee: Employee; onSelect: () => void; onDelet
             </div>
         </div>
     );
-    );
 });
 
 
