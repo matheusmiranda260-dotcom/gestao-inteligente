@@ -1183,7 +1183,8 @@ const App: React.FC = () => {
             // Treliça Stock Update Logic
             // 1. Fetch Latest Stock
             const latestStock = await fetchTable<StockItem>('stock_items');
-            const currentStockLookup = new Map(latestStock.map(s => [s.id, { ...s }]));
+            // FIX: Trim IDs in the map key to ensure matching works even if DB has spaces
+            const currentStockLookup = new Map(latestStock.map(s => [String(s.id).trim(), { ...s }]));
 
             // 2. Parse Lots
             let lots: TrelicaSelectedLots;
@@ -1242,20 +1243,22 @@ const App: React.FC = () => {
                     senozoide: consumedFull.senozoide + consumedPontas.senozoide,
                 };
 
-                const distributeConsumption = (lotIds: string[] | undefined, totalWeight: number) => {
+                // DEBUG: Show calculated consumption
+                // showNotification(`Consumo Calc: Sup=${totalConsumed.superior.toFixed(1)}, Inf=${totalConsumed.inferior.toFixed(1)}, Sen=${totalConsumed.senozoide.toFixed(1)}`, 'info');
+
+                const distributeConsumption = (lotIds: string[] | undefined, totalWeight: number, partName: string) => {
                     if (!lotIds || lotIds.length === 0 || totalWeight <= 0) return;
                     let remainingWeight = totalWeight;
 
                     // Filter valid lots using latest stock
                     const validLots = lotIds
-                        .map(id => id.trim())
+                        .map(id => String(id).trim())
                         .map(id => currentStockLookup.get(id))
                         .filter((item): item is StockItem => !!item);
 
                     if (validLots.length === 0) {
-                        console.warn("Sem lotes válidos no estoque para consumir:", totalWeight);
-                        // Try to find ANY match ignoring status restrictions just for consumption recording?
-                        // No, unsafe. 
+                        // Warn user if declared lots are missing from stock
+                        showNotification(`Atenção: Lotes de ${partName} não encontrados no estoque. Peso não será baixado.`, 'error');
                         return;
                     }
 
@@ -1282,25 +1285,27 @@ const App: React.FC = () => {
 
                 // Distribute
                 const superiorLots = (lots.allSuperior && lots.allSuperior.length > 0) ? lots.allSuperior : (lots.superior ? [lots.superior] : []);
-                distributeConsumption(superiorLots, totalConsumed.superior);
+                distributeConsumption(superiorLots, totalConsumed.superior, "Superior");
 
                 const halfInferiorWeight = totalConsumed.inferior / 2;
                 const inferiorLeft = (lots.allInferiorLeft && lots.allInferiorLeft.length > 0) ? lots.allInferiorLeft : (lots.inferior1 ? [lots.inferior1] : []);
                 const inferiorRight = (lots.allInferiorRight && lots.allInferiorRight.length > 0) ? lots.allInferiorRight : (lots.inferior2 ? [lots.inferior2] : []);
-                if (inferiorLeft.length > 0) distributeConsumption(inferiorLeft, halfInferiorWeight);
-                else if (lots.allInferior) distributeConsumption(lots.allInferior, halfInferiorWeight);
 
-                if (inferiorRight.length > 0) distributeConsumption(inferiorRight, halfInferiorWeight);
-                else if (lots.allInferior) distributeConsumption(lots.allInferior, halfInferiorWeight);
+                if (inferiorLeft.length > 0) distributeConsumption(inferiorLeft, halfInferiorWeight, "Inferior Esq");
+                else if (lots.allInferior) distributeConsumption(lots.allInferior, halfInferiorWeight, "Inferior (Geral)");
+
+                if (inferiorRight.length > 0) distributeConsumption(inferiorRight, halfInferiorWeight, "Inferior Dir");
+                else if (lots.allInferior) distributeConsumption(lots.allInferior, halfInferiorWeight, "Inferior (Geral)");
 
                 const halfSenozoideWeight = totalConsumed.senozoide / 2;
                 const senozoideLeft = (lots.allSenozoideLeft && lots.allSenozoideLeft.length > 0) ? lots.allSenozoideLeft : (lots.senozoide1 ? [lots.senozoide1] : []);
                 const senozoideRight = (lots.allSenozoideRight && lots.allSenozoideRight.length > 0) ? lots.allSenozoideRight : (lots.senozoide2 ? [lots.senozoide2] : []);
-                if (senozoideLeft.length > 0) distributeConsumption(senozoideLeft, halfSenozoideWeight);
-                else if (lots.allSenozoide) distributeConsumption(lots.allSenozoide, halfSenozoideWeight);
 
-                if (senozoideRight.length > 0) distributeConsumption(senozoideRight, halfSenozoideWeight);
-                else if (lots.allSenozoide) distributeConsumption(lots.allSenozoide, halfSenozoideWeight);
+                if (senozoideLeft.length > 0) distributeConsumption(senozoideLeft, halfSenozoideWeight, "Senozoide Esq");
+                else if (lots.allSenozoide) distributeConsumption(lots.allSenozoide, halfSenozoideWeight, "Senozoide (Geral)");
+
+                if (senozoideRight.length > 0) distributeConsumption(senozoideRight, halfSenozoideWeight, "Senozoide Dir");
+                else if (lots.allSenozoide) distributeConsumption(lots.allSenozoide, halfSenozoideWeight, "Senozoide (Geral)");
 
                 // 4. Prepare Updates
                 consumedMap.forEach((consumedQty, lotId) => {
