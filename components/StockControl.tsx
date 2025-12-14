@@ -396,7 +396,9 @@ const StockControl: React.FC<{
             .filter(item => materialFilter === '' || item.materialType === materialFilter)
             .filter(item => bitolaFilter === '' || item.bitola === bitolaFilter)
             .sort((a, b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime());
+    }, [stock, searchTerm, statusFilter, materialFilter, bitolaFilter]);
 
+    const handleAddConferenceSubmit = (data: ConferenceData) => {
         addConference(data);
     };
 
@@ -490,7 +492,6 @@ const StockControl: React.FC<{
             {transferHistoryOpen && <TransfersHistoryModal transfers={transfers} onClose={() => setTransferHistoryOpen(false)} onShowReport={setTransferReportData} />}
             {transferReportData && <TransferReport reportData={transferReportData} onClose={() => setTransferReportData(null)} />}
 
-            {showInventoryReport && <InventoryReport stock={stock} filters={{ searchTerm, statusFilter, materialFilter, bitolaFilter }} onClose={() => setShowInventoryReport(false)} />}
             {showInventoryReport && <InventoryReport stock={stock} filters={{ searchTerm, statusFilter, materialFilter, bitolaFilter }} onClose={() => setShowInventoryReport(false)} />}
             {deletingItem && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
