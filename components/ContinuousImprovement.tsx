@@ -150,7 +150,18 @@ const ContinuousImprovement: React.FC<{ setPage: (page: Page) => void }> = ({ se
                 responsible_ids: newProblem.responsibleIds
             };
 
-            await insertItem('kaizen_problems', payload);
+            try {
+                await insertItem('kaizen_problems', payload);
+            } catch (error: any) {
+                console.warn('Initial save failed, retrying without responsible_ids...', error);
+
+                // Fallback for missing column
+                const fallbackPayload = { ...newProblem };
+                delete fallbackPayload.responsibleIds;
+
+                await insertItem('kaizen_problems', fallbackPayload);
+                alert('Aviso: O problema foi salvo, mas não foi possível vincular ao RH pois o Banco de Dados precisa de atualização (coluna responsável faltando).');
+            }
 
             setProblems([newProblem, ...problems]);
             setNewProblemData({ description: '', sector: '' });
