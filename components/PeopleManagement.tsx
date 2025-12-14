@@ -215,7 +215,10 @@ const EmployeeDetailModal: React.FC<{
             setNewAbsence({ type: 'Falta Injustificada', startDate: '', endDate: '', reason: '' });
             setAbsenceFile(null);
             loadDetails();
-        } catch (e) { alert('Erro ao registrar ausência'); }
+        } catch (e) {
+            console.error(e);
+            alert('Erro ao registrar ausência. Verifique se criou a coluna attachment_url no banco.');
+        }
     };
 
     const handleDeleteAbsence = async (id: string) => {
