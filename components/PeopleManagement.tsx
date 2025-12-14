@@ -624,6 +624,7 @@ const EmployeeDetailModal: React.FC<{
                                         <label className="text-xs font-bold text-slate-500">Certificado (PDF/Img)</label>
                                         <input
                                             type="file"
+                                            accept="image/*,application/pdf"
                                             className="w-full text-xs text-slate-500 file:mr-2 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                                             onChange={(e) => setCourseFile(e.target.files ? e.target.files[0] : null)}
                                         />
@@ -731,6 +732,7 @@ const EmployeeDetailModal: React.FC<{
                                             <label className="text-xs font-bold text-slate-500">Anexo (Atestado/Foto)</label>
                                             <input
                                                 type="file"
+                                                accept="image/*,application/pdf"
                                                 className="w-full text-xs text-slate-500 file:mr-2 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                                                 onChange={(e) => setAbsenceFile(e.target.files ? e.target.files[0] : null)}
                                             />
