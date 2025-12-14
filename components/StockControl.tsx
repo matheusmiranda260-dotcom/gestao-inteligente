@@ -378,6 +378,11 @@ const StockControl: React.FC<{
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
     const [materialFilter, setMaterialFilter] = useState('');
+    const [bitolaFilter, setBitolaFilter] = useState('');
+    const [selectedLotIdsForTransfer, setSelectedLotIdsForTransfer] = useState<string[]>([]);
+
+    const allBitolaOptions = useMemo(() => [...new Set([...FioMaquinaBitolaOptions, ...TrefilaBitolaOptions])].sort(), []);
+
     const [mappedFilter, setMappedFilter] = useState<'all' | 'mapped' | 'unmapped'>('all');
 
     const filteredStock = useMemo(() => {
@@ -407,7 +412,88 @@ const StockControl: React.FC<{
     const mappedStockCount = stock.filter(s => !!s.location).length;
     const unmappedStockCount = totalStockCount - mappedStockCount;
 
-    // ... (keep existing handlers) ...
+    const handleAddConferenceSubmit = (data: ConferenceData) => {
+        addConference(data);
+    };
+
+    const handleTransferSubmit = (destinationSector: string, lotsToTransfer: Map<string, number>) => {
+        const result = createTransfer(destinationSector, lotsToTransfer);
+        if (result) {
+            setIsMultiLotTransferModalOpen(false);
+            setSelectedLotIdsForTransfer([]);
+            setTransferReportData(result);
+        }
+    };
+
+    const handleSelectAllForTransfer = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.checked) {
+            const availableToSelect = filteredStock.filter(item => item.status === 'Disponível' || item.status === 'Disponível - Suporte Treliça').map(item => item.id);
+            setSelectedLotIdsForTransfer(availableToSelect);
+        } else {
+            setSelectedLotIdsForTransfer([]);
+        }
+    };
+
+    const handleSelectLotForTransfer = (lotId: string) => {
+        const lotIndex = filteredStock.findIndex(item => item.id === lotId);
+        if (lotIndex === -1) return;
+
+        const isCurrentlySelected = selectedLotIdsForTransfer.includes(lotId);
+        let newSelectedIds: string[] = [];
+
+        if (!isCurrentlySelected) {
+            const transferableLots = filteredStock.filter(item => item.status === 'Disponível' || item.status === 'Disponível - Suporte Treliça');
+            const targetLotInTransferableIndex = transferableLots.findIndex(item => item.id === lotId);
+
+            if (targetLotInTransferableIndex !== -1) {
+                const lotsToSelect = transferableLots.slice(0, targetLotInTransferableIndex + 1).map(item => item.id);
+                newSelectedIds = [...new Set([...selectedLotIdsForTransfer, ...lotsToSelect])];
+            } else {
+                newSelectedIds = [...selectedLotIdsForTransfer, lotId];
+            }
+
+        } else {
+            const transferableLots = filteredStock.filter(item => item.status === 'Disponível' || item.status === 'Disponível - Suporte Treliça');
+            const targetLotInTransferableIndex = transferableLots.findIndex(item => item.id === lotId);
+
+            if (targetLotInTransferableIndex !== -1) {
+                const lotsToKeep = transferableLots.slice(0, targetLotInTransferableIndex).map(item => item.id);
+                newSelectedIds = lotsToKeep;
+            } else {
+                newSelectedIds = selectedLotIdsForTransfer.filter(id => id !== lotId);
+            }
+        }
+
+        setSelectedLotIdsForTransfer(newSelectedIds);
+    };
+
+    const handleDelete = () => {
+        if (deletingItem) {
+            deleteStockItem(deletingItem.id);
+            setDeletingItem(null);
+        }
+    };
+
+    const handleRelease = () => {
+        if (releasingItem) {
+            const updatedItem: StockItem = {
+                ...releasingItem,
+                status: 'Disponível',
+                productionOrderIds: []
+            };
+            updatedItem.history = [...(releasingItem.history || []), {
+                type: 'Liberação Manual',
+                date: new Date().toISOString(),
+                details: {
+                    action: 'Status alterado manualmente para Disponível',
+                    reason: 'Solicitação do usuário (Correção)'
+                }
+            }];
+
+            updateStockItem(updatedItem);
+            setReleasingItem(null);
+        }
+    };
 
     return (
         <div className="p-4 sm:p-6 md:p-8 space-y-6">
