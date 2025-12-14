@@ -180,21 +180,31 @@ const EmployeeDetailModal: React.FC<{
 
     // HR Form State
     const [newAbsence, setNewAbsence] = useState({ type: 'Falta Injustificada', startDate: '', endDate: '', reason: '' });
+    const [absenceFile, setAbsenceFile] = useState<File | null>(null);
     const [newVacation, setNewVacation] = useState({ period: '', startDate: '', endDate: '' });
 
     // Handlers for HR
     const handleAddAbsence = async () => {
         if (!newAbsence.startDate) return;
         try {
+            let attachmentUrl = null;
+
+            if (absenceFile) {
+                const fileName = `absences/${employee.id}_${Date.now()}_${absenceFile.name}`;
+                attachmentUrl = await uploadFile('kb-files', fileName, absenceFile);
+            }
+
             await insertItem('employee_absences', {
                 employeeId: employee.id,
                 type: newAbsence.type,
                 startDate: newAbsence.startDate,
                 endDate: newAbsence.endDate || null,
-                reason: newAbsence.reason
+                reason: newAbsence.reason,
+                attachmentUrl: attachmentUrl
             });
             alert('Ausência registrada');
             setNewAbsence({ type: 'Falta Injustificada', startDate: '', endDate: '', reason: '' });
+            setAbsenceFile(null);
             loadDetails();
         } catch (e) { alert('Erro ao registrar ausência'); }
     };
@@ -496,9 +506,17 @@ const EmployeeDetailModal: React.FC<{
                                     <div className="flex flex-col justify-end">
                                         <button onClick={handleAddAbsence} className="bg-red-600 text-white font-bold py-2 px-4 rounded hover:bg-red-700 transition">Registrar Ausência</button>
                                     </div>
-                                    <div className="md:col-span-4">
+                                    <div className="md:col-span-3">
                                         <label className="text-xs font-bold text-slate-500">Motivo / Observação</label>
                                         <input type="text" className="w-full p-2 border rounded" placeholder="Ex: Dor de barriga, Atestado Dr. Fulano..." value={newAbsence.reason} onChange={e => setNewAbsence({ ...newAbsence, reason: e.target.value })} />
+                                    </div>
+                                    <div className="md:col-span-1">
+                                        <label className="text-xs font-bold text-slate-500">Anexo (Atestado/Foto)</label>
+                                        <input
+                                            type="file"
+                                            className="w-full text-xs text-slate-500 file:mr-2 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                            onChange={(e) => setAbsenceFile(e.target.files ? e.target.files[0] : null)}
+                                        />
                                     </div>
                                 </div>
                                 <div className="overflow-x-auto">
@@ -519,7 +537,14 @@ const EmployeeDetailModal: React.FC<{
                                                         {new Date(abs.startDate).toLocaleDateString()}
                                                         {abs.endDate ? ` até ${new Date(abs.endDate).toLocaleDateString()}` : ''}
                                                     </td>
-                                                    <td className="p-3 text-slate-500 italic">{abs.reason || '-'}</td>
+                                                    <td className="p-3 text-slate-500 italic">
+                                                        {abs.reason || '-'}
+                                                        {abs.attachmentUrl && (
+                                                            <a href={abs.attachmentUrl} target="_blank" rel="noopener noreferrer" className="ml-2 inline-flex items-center gap-1 text-blue-500 hover:underline text-xs">
+                                                                <DownloadIcon className="h-3 w-3" /> Ver Anexo
+                                                            </a>
+                                                        )}
+                                                    </td>
                                                     <td className="p-3 text-center">
                                                         <button onClick={() => handleDeleteAbsence(abs.id)} className="text-red-400 hover:text-red-600"><TrashIcon className="h-4 w-4" /></button>
                                                     </td>

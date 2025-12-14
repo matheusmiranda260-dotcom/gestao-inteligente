@@ -387,6 +387,7 @@ export interface EmployeeAbsence {
     endDate?: string;
     reason: string;
     type?: string;
+    attachmentUrl?: string;
 }
 
 export interface EmployeeVacation {
