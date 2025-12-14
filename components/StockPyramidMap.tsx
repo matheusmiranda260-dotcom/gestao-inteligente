@@ -14,8 +14,7 @@ interface PyramidRowProps {
 }
 
 const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemove, onRemoveRow, isActive, onSetActive }) => {
-    // ...
-    // ...
+    const [baseSize, setBaseSize] = useState(4); // Default base size
 
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();
@@ -24,10 +23,6 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
 
     const handleDragLeave = (e: React.DragEvent) => {
         e.currentTarget.classList.remove('bg-emerald-50');
-    };
-
-    const handleDrop = (e: React.DragEvent) => {
-        // ...
     };
 
     return (
@@ -45,29 +40,50 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                 }
             }}
             onClick={(e) => {
-                // Determine if we should set active or not. If clicked empty space, maybe set active?
-                // But let's rely on specific button for clarity or header click.
+                // Prevent bubbling if clicking empty space?
+                // onSetActive(); // We could auto-activate, but let's stick to header click for explicit activation.
             }}
         >
-            <div className="flex justify-between items-center mb-4 border-b pb-2 cursor-pointer" onClick={onSetActive} title="Clique para ativar esta fileira para adição rápida">
-                <div className="flex items-center gap-2">
-                    <div className={`w-4 h-4 rounded-full border ${isActive ? 'bg-emerald-500 border-emerald-500' : 'bg-white border-slate-400'}`}></div>
-                    <h3 className={`font-bold text-lg ${isActive ? 'text-emerald-800' : 'text-slate-700'}`}>{rowName} <span className="text-sm font-normal text-slate-500">({items.length} itens)</span></h3>
+            <div className="flex justify-between items-center mb-4 border-b pb-2">
+                <div onClick={onSetActive} className="flex items-center gap-2 cursor-pointer flex-grow" title="Clique para ativar esta fileira para adição rápida">
+                    <div className={`w-4 h-4 rounded-full border transition-colors ${isActive ? 'bg-emerald-500 border-emerald-500' : 'bg-white border-slate-400'}`}></div>
+                    <div>
+                        <h3 className={`font-bold text-lg leading-none ${isActive ? 'text-emerald-800' : 'text-slate-700'}`}>{rowName}</h3>
+                        <span className="text-xs text-slate-500 font-normal">{items.length} itens</span>
+                    </div>
                 </div>
-                <button onClick={(e) => { e.stopPropagation(); onRemoveRow(); }} className="text-red-400 hover:text-red-600 p-1"><TrashIcon className="w-4 h-4" /></button>
+
+                <div className="flex items-center gap-2">
+                    {/* Base Size Controls (Height Control) */}
+                    <div className="flex items-center bg-white rounded-lg border border-slate-200 mr-2">
+                        <button onClick={(e) => { e.stopPropagation(); setBaseSize(Math.max(1, baseSize - 1)); }} className="px-2 py-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-l-lg font-bold">-</button>
+                        <span className="text-xs font-mono w-4 text-center">{baseSize}</span>
+                        <button onClick={(e) => { e.stopPropagation(); setBaseSize(baseSize + 1); }} className="px-2 py-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-r-lg font-bold">+</button>
+                    </div>
+
+                    <button onClick={(e) => { e.stopPropagation(); onRemoveRow(); }} className="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition"><TrashIcon className="w-4 h-4" /></button>
+                </div>
             </div>
 
             {/* Pyramid / Stack Area */}
-            <div className="flex flex-wrap-reverse justify-center content-end gap-2 min-h-[150px]">
+            {/* Using Grid to simulate base width. Items fill from bottom-left (reverse) logic is complex in CSS Grid without specific placement.
+                Flex wrap reverse is actually easier for "piling up". 
+                The "Base Size" here will constrain the container WIDTH to roughly (ItemWidth + Gap) * BaseSize.
+                Item Width = 4rem (w-16) + gap-2 (0.5rem) -> 4.5rem per item.
+            */}
+            <div
+                className="flex flex-wrap-reverse content-start gap-2 min-h-[150px] mx-auto transition-all duration-300 items-end justify-center"
+                style={{ maxWidth: `calc(${baseSize} * 4.5rem)` }} // 4rem item + 0.5rem gap approx.
+            >
                 {items.length === 0 && (
                     <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm pointer-events-none">
-                        Arraste lotes para cá
+                        Arraste ou Clique
                     </div>
                 )}
                 {items.map(item => (
                     <div
                         key={item.id}
-                        className="w-16 h-16 rounded-full bg-slate-800 text-white flex items-center justify-center text-xs font-bold shadow-lg relative group cursor-grab active:cursor-grabbing border-4 border-white"
+                        className="w-16 h-16 rounded-full bg-slate-800 text-white flex items-center justify-center text-xs font-bold shadow-lg relative group cursor-grab active:cursor-grabbing border-4 border-white transition-transform hover:scale-105 z-0 hover:z-10"
                         title={`${item.internalLot} - ${item.bitola} - ${item.remainingQuantity}kg`}
                         draggable
                         onDragStart={(e) => {
@@ -75,14 +91,19 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                             e.dataTransfer.effectAllowed = 'move';
                         }}
                     >
-                        <div className="text-center leading-tight">
+                        <div className="text-center leading-tight pointer-events-none">
                             <div>{item.bitola}</div>
                             <div className="text-[10px] opacity-70">{item.remainingQuantity.toFixed(0)}</div>
                         </div>
 
                         <button
-                            onClick={(e) => { e.stopPropagation(); onRemove(item); }}
-                            className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                onRemove(item);
+                            }}
+                            className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 opacity-100 shadow-md hover:bg-red-700 hover:scale-110 transition-all z-20 cursor-pointer"
+                            title="Remover da fileira"
                         >
                             <TrashIcon className="w-3 h-3" />
                         </button>
