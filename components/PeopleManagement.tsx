@@ -610,7 +610,8 @@ const OrgNode: React.FC<{
     onCreateEmployee: (posId: string) => void; // Shortcut to create emp for this position
     onEditEmployee: (employee: Employee) => void; // New prop
     onEditUnit: (id: string, currentName: string) => void;
-}> = ({ node, employees, onAddSubUnit, onAddPosition, onDeleteUnit, onDeletePosition, onAssignEmployee, onCreateEmployee, onEditEmployee, onEditUnit }) => {
+    evaluations: Evaluation[];
+}> = ({ node, employees, onAddSubUnit, onAddPosition, onDeleteUnit, onDeletePosition, onAssignEmployee, onCreateEmployee, onEditEmployee, onEditUnit, evaluations }) => {
 
     // Color mapping based on type
     const getNodeColor = (type?: string) => {
@@ -649,42 +650,58 @@ const OrgNode: React.FC<{
                 <div className="flex flex-col items-center gap-2 mb-6 px-2 w-full">
                     {node.positions.map(pos => {
                         const occupant = employees.find(e => e.orgPositionId === pos.id);
+                        // Calculate Rating
+                        const empEvals = occupant ? evaluations.filter(ev => ev.employeeId === occupant.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) : [];
+                        const lastScore = empEvals.length > 0 ? (empEvals[0].totalScore / 5) : 0;
+
                         return (
-                            <div key={pos.id} className="flex flex-col items-center relative group/pos w-full max-w-[180px]">
+                            <div key={pos.id} className="flex flex-col items-center relative group/pos w-full max-w-[200px]">
                                 {/* Blue Box: Role */}
-                                <div className="bg-[#4a86e8] text-white px-2 py-1 rounded-t-lg shadow-sm font-semibold text-xs w-full text-center border-b border-blue-400 relative">
+                                <div className="bg-[#4a86e8] text-white px-2 py-1 rounded-t-lg shadow-sm font-semibold text-xs w-full text-center border-b border-blue-400 relative truncate" title={pos.title}>
                                     {pos.title}
                                     <button onClick={() => onDeletePosition(pos.id)} className="absolute top-0.5 right-1 opacity-0 group-hover/pos:opacity-100 text-white hover:text-red-200">
                                         <XIcon className="h-3 w-3" />
                                     </button>
                                 </div>
-                                {/* White Box: Employee */}
-                                <div className="bg-white border-x border-b border-slate-300 rounded-b-lg p-1 w-full flex items-center shadow-sm text-xs">
-                                    <select
-                                        className="flex-grow bg-transparent outline-none text-slate-700 font-medium text-center cursor-pointer text-[10px] py-0.5 truncate"
-                                        value={occupant ? occupant.id : ''}
-                                        onChange={(e) => {
-                                            if (e.target.value === 'NEW') {
-                                                onCreateEmployee(pos.id);
-                                            } else {
-                                                onAssignEmployee(pos.id, e.target.value);
-                                            }
-                                        }}
-                                    >
-                                        <option value="">(Vago)</option>
-                                        {employees.map(emp => (
-                                            <option key={emp.id} value={emp.id}>{emp.name}</option>
-                                        ))}
-                                        <option value="NEW" className="font-bold text-blue-600">+ Novo...</option>
-                                    </select>
-                                    {occupant && (
-                                        <button
-                                            onClick={() => onEditEmployee(occupant)}
-                                            className="ml-1 text-slate-400 hover:text-blue-600"
-                                            title="Editar Funcionário"
+
+                                {/* Employee Box Content */}
+                                <div className="bg-white border-x border-b border-slate-300 rounded-b-lg p-2 w-full shadow-sm min-h-[50px] flex items-center justify-center relative hover:bg-slate-50 transition-colors">
+                                    {occupant ? (
+                                        <div className="flex items-center w-full gap-2 cursor-pointer" onClick={() => onEditEmployee(occupant)}>
+                                            {/* Avatar */}
+                                            <div className="h-10 w-10 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden border border-slate-300 shrink-0">
+                                                {occupant.photoUrl ? (
+                                                    <img src={occupant.photoUrl} alt={occupant.name} className="h-full w-full object-cover" />
+                                                ) : (
+                                                    <span className="text-xs font-bold text-slate-500">{occupant.name.charAt(0)}</span>
+                                                )}
+                                            </div>
+                                            {/* Info */}
+                                            <div className="flex flex-col min-w-0 flex-grow">
+                                                <p className="font-bold text-xs text-slate-800 truncate leading-tight mb-0.5">{occupant.name}</p>
+                                                <div className="flex items-center">
+                                                    <StarIcon className={`h-3 w-3 ${lastScore > 0 ? 'text-yellow-400 fill-current' : 'text-slate-200'}`} />
+                                                    <span className="text-[10px] text-slate-500 ml-1 font-semibold">{lastScore > 0 ? lastScore.toFixed(1) : '-'}</span>
+                                                </div>
+                                            </div>
+                                            {/* Hidden Edit Trigger for quick swap (optional, or just click to edit) */}
+                                        </div>
+                                    ) : (
+                                        // Empty State - Dropdown to assign
+                                        <select
+                                            className="w-full bg-transparent outline-none text-slate-400 font-medium text-center cursor-pointer text-[10px] py-1"
+                                            value=""
+                                            onChange={(e) => {
+                                                if (e.target.value === 'NEW') onCreateEmployee(pos.id);
+                                                else if (e.target.value) onAssignEmployee(pos.id, e.target.value);
+                                            }}
                                         >
-                                            <PencilIcon className="h-3 w-3" />
-                                        </button>
+                                            <option value="">(Vago)</option>
+                                            {employees.filter(e => !e.orgPositionId).map(emp => (
+                                                <option key={emp.id} value={emp.id}>{emp.name}</option>
+                                            ))}
+                                            <option value="NEW" className="font-bold text-blue-600">+ Contratar</option>
+                                        </select>
                                     )}
                                 </div>
                             </div>
@@ -736,6 +753,7 @@ const OrgNode: React.FC<{
                                     onCreateEmployee={onCreateEmployee}
                                     onEditEmployee={onEditEmployee}
                                     onEditUnit={onEditUnit}
+                                    evaluations={evaluations}
                                 />
                             </div>
                         );
@@ -749,9 +767,10 @@ const OrgNode: React.FC<{
 const OrgChart: React.FC<{
     employees: Employee[];
     reloadData: () => void;
-    triggerAddEmployee: (prefillPositionId?: string, prefillSector?: string) => void;
-    triggerEditEmployee: (employee: Employee) => void; // New prop
-}> = ({ employees, reloadData, triggerAddEmployee, triggerEditEmployee }) => {
+    triggerAddEmployee: (posId?: string, prefillSector?: string) => void;
+    triggerEditEmployee: (emp: Employee) => void;
+    evaluations: Evaluation[];
+}> = ({ employees, reloadData, triggerAddEmployee, triggerEditEmployee, evaluations }) => {
     const [units, setUnits] = useState<OrgUnit[]>([]);
     const [positions, setPositions] = useState<OrgPosition[]>([]);
     const [tree, setTree] = useState<OrgTreeItem[]>([]);
@@ -896,6 +915,7 @@ const OrgChart: React.FC<{
                         onCreateEmployee={handleCreateEmployeeForPosition}
                         onEditEmployee={triggerEditEmployee}
                         onEditUnit={handleEditUnit}
+                        evaluations={evaluations}
                     />
                 ))}
 
@@ -1073,6 +1093,7 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
             ) : viewMode === 'orgChart' ? (
                 <OrgChart
                     employees={employees}
+                    evaluations={evaluations}
                     reloadData={loadData}
                     triggerAddEmployee={promptAndCreateEmployee}
                     triggerEditEmployee={(emp) => setSelectedEmployee(emp)}
