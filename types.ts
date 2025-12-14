@@ -138,6 +138,7 @@ export interface User {
     password: string;
     role: 'admin' | 'user' | 'gestor';
     permissions?: Partial<Record<Page, boolean>>;
+    employeeId?: string;
 }
 
 export interface DowntimeEvent {

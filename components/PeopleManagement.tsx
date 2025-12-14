@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ArrowLeftIcon, PlusIcon, StarIcon, ChartBarIcon, TrophyIcon, SearchIcon, FilterIcon, UserIcon, BookOpenIcon, ClockIcon, DocumentTextIcon, PencilIcon, TrashIcon, UserGroupIcon, ExclamationIcon, SaveIcon, XIcon, DownloadIcon, PrinterIcon } from './icons';
 import type { Page, Employee, Evaluation, Achievement, User, EmployeeCourse, EmployeeAbsence, EmployeeVacation, EmployeeResponsibility, OrgUnit, OrgPosition, EmployeeDocument } from '../types';
 import { fetchTable, insertItem, updateItem, deleteItem, fetchByColumn, uploadFile } from '../services/supabaseService';
@@ -1105,18 +1105,36 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
     // Employee Form State (Simplified for direct creation)
     const [newEmployeeName, setNewEmployeeName] = useState('');
 
+    const isRestrictedUser = useMemo(() => currentUser?.role === 'user' && !!currentUser?.employeeId, [currentUser]);
+
     const loadData = async () => {
-        const emp = await fetchTable<Employee>('employees');
-        const evals = await fetchTable<Evaluation>('evaluations');
-        const abs = await fetchTable<EmployeeAbsence>('employee_absences');
-        const vacs = await fetchTable<EmployeeVacation>('employee_vacations');
+        let emp = await fetchTable<Employee>('employees');
+        let evals = await fetchTable<Evaluation>('evaluations');
+        let abs = await fetchTable<EmployeeAbsence>('employee_absences');
+        let vacs = await fetchTable<EmployeeVacation>('employee_vacations');
+
+        if (isRestrictedUser) {
+            emp = emp.filter(e => e.id === currentUser!.employeeId);
+            evals = evals.filter(ev => ev.employeeId === currentUser!.employeeId);
+            // We might want to filter absences/vacations too if they have employeeId, but let's assume UI filters by selectedEmployee anyway.
+            // But for safety, filtering here is good if table view exposes all.
+            // However, the dashboard uses these states.
+            abs = abs.filter(a => a.employeeId === currentUser!.employeeId);
+            vacs = vacs.filter(v => v.employeeId === currentUser!.employeeId);
+        }
+
         setEmployees(emp);
         setEvaluations(evals);
         setAbsences(abs);
         setVacations(vacs);
     };
 
-    useEffect(() => { loadData(); }, []);
+    useEffect(() => {
+        loadData();
+        if (isRestrictedUser) {
+            setViewMode('cards');
+        }
+    }, [isRestrictedUser]);
 
     // New Flow: Create Placeholder -> Open Detail Modal
     const handleCreateAndEdit = async (name: string, positionId?: string, sector?: string) => {
@@ -1202,31 +1220,35 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
-                    <button
-                        onClick={() => setViewMode('dashboard')}
-                        className={`px-4 py-2 rounded-md font-medium text-sm transition ${viewMode === 'dashboard' ? 'bg-slate-100 text-[#0F3F5C] font-bold' : 'text-slate-500 hover:text-slate-700'}`}
-                    >
-                        Dashboard
-                    </button>
-                    <button
-                        onClick={() => setViewMode('cards')}
-                        className={`px-4 py-2 rounded-md font-medium text-sm transition ${viewMode === 'cards' ? 'bg-slate-100 text-[#0F3F5C] font-bold' : 'text-slate-500 hover:text-slate-700'}`}
-                    >
-                        Cards / Lista
-                    </button>
-                    <button
-                        onClick={() => setViewMode('orgChart')}
-                        className={`px-4 py-2 rounded-md font-medium text-sm transition ${viewMode === 'orgChart' ? 'bg-slate-100 text-[#0F3F5C] font-bold' : 'text-slate-500 hover:text-slate-700'}`}
-                    >
-                        Organograma Visual
-                    </button>
-                </div>
+                {!isRestrictedUser && (
+                    <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
+                        <button
+                            onClick={() => setViewMode('dashboard')}
+                            className={`px-4 py-2 rounded-md font-medium text-sm transition ${viewMode === 'dashboard' ? 'bg-slate-100 text-[#0F3F5C] font-bold' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            Dashboard
+                        </button>
+                        <button
+                            onClick={() => setViewMode('cards')}
+                            className={`px-4 py-2 rounded-md font-medium text-sm transition ${viewMode === 'cards' ? 'bg-slate-100 text-[#0F3F5C] font-bold' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            Cards / Lista
+                        </button>
+                        <button
+                            onClick={() => setViewMode('orgChart')}
+                            className={`px-4 py-2 rounded-md font-medium text-sm transition ${viewMode === 'orgChart' ? 'bg-slate-100 text-[#0F3F5C] font-bold' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            Organograma Visual
+                        </button>
+                    </div>
+                )}
 
-                <button onClick={() => promptAndCreateEmployee()} className="bg-[#0F3F5C] text-white px-4 py-2 rounded-lg font-bold hover:bg-[#0A2A3D] transition flex items-center gap-2">
-                    <PlusIcon className="h-5 w-5" />
-                    Novo Funcionário
-                </button>
+                {!isRestrictedUser && (
+                    <button onClick={() => promptAndCreateEmployee()} className="bg-[#0F3F5C] text-white px-4 py-2 rounded-lg font-bold hover:bg-[#0A2A3D] transition flex items-center gap-2">
+                        <PlusIcon className="h-5 w-5" />
+                        Novo Funcionário
+                    </button>
+                )}
             </header>
 
             {viewMode === 'cards' ? (

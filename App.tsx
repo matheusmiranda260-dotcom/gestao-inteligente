@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type { Page, User, StockItem, ConferenceData, ProductionOrderData, TransferRecord, Bitola, MachineType, PartsRequest, ShiftReport, ProductionRecord, TransferredLotInfo, ProcessedLot, DowntimeEvent, OperatorLog, TrelicaSelectedLots, WeighedPackage, FinishedProductItem, Ponta, PontaItem, FinishedGoodsTransferRecord, TransferredFinishedGoodInfo, Message } from './types';
+import type { Page, User, Employee, StockItem, ConferenceData, ProductionOrderData, TransferRecord, Bitola, MachineType, PartsRequest, ShiftReport, ProductionRecord, TransferredLotInfo, ProcessedLot, DowntimeEvent, OperatorLog, TrelicaSelectedLots, WeighedPackage, FinishedProductItem, Ponta, PontaItem, FinishedGoodsTransferRecord, TransferredFinishedGoodInfo, Message } from './types';
 import Login from './components/Login';
 import MainMenu from './components/MainMenu';
 import StockControl from './components/StockControl';
@@ -30,6 +30,7 @@ const App: React.FC = () => {
     const [loading, setLoading] = useState(true);
 
     const [users, setUsers] = useState<User[]>([]);
+    const [employees, setEmployees] = useState<Employee[]>([]);
     const [stock, setStock] = useState<StockItem[]>([]);
     const [conferences, setConferences] = useState<ConferenceData[]>([]);
     const [transfers, setTransfers] = useState<TransferRecord[]>([]);
@@ -47,11 +48,12 @@ const App: React.FC = () => {
         const loadData = async () => {
             try {
                 const [
-                    fetchedUsers, fetchedStock, fetchedConferences, fetchedTransfers,
+                    fetchedUsers, fetchedEmployees, fetchedStock, fetchedConferences, fetchedTransfers,
                     fetchedOrders, fetchedFinishedGoods, fetchedPontas, fetchedFGTransfers,
                     fetchedParts, fetchedReports, fetchedProductionRecords, fetchedMessages
                 ] = await Promise.all([
                     fetchTable<User>('app_users'),
+                    fetchTable<Employee>('employees'),
                     fetchTable<StockItem>('stock_items'),
                     fetchTable<ConferenceData>('conferences'),
                     fetchTable<TransferRecord>('transfers'),
@@ -66,6 +68,7 @@ const App: React.FC = () => {
                 ]);
 
                 setUsers(fetchedUsers);
+                setEmployees(fetchedEmployees);
                 setStock(fetchedStock);
                 setConferences(fetchedConferences);
                 setTransfers(fetchedTransfers);
@@ -165,7 +168,8 @@ const App: React.FC = () => {
                     username: usersFound.username,
                     password: usersFound.password,
                     role: usersFound.role,
-                    permissions: usersFound.permissions || {}
+                    permissions: usersFound.permissions || {},
+                    employeeId: usersFound.employee_id
                 };
                 setCurrentUser(appUser);
                 setPage('menu');
@@ -237,13 +241,14 @@ const App: React.FC = () => {
     };
 
     // User Management
-    const addUser = async (data: { username: string; password: string; permissions: Partial<Record<Page, boolean>> }) => {
+    const addUser = async (data: { username: string; password: string; permissions: Partial<Record<Page, boolean>>; employeeId?: string }) => {
         const newUser: User = {
             id: generateId('user'),
             username: data.username,
             password: data.password, // Storing simple password as requested
             role: 'user',
             permissions: data.permissions,
+            employeeId: data.employeeId,
         };
 
         try {
@@ -1634,7 +1639,7 @@ const App: React.FC = () => {
             case 'reports':
                 return <Reports setPage={setPage} stock={stock} trefilaProduction={trefilaProduction} trelicaProduction={trelicaProduction} />;
             case 'userManagement':
-                return <UserManagement users={users} addUser={addUser} updateUser={updateUser} deleteUser={deleteUser} setPage={setPage} />;
+                return <UserManagement users={users} employees={employees} addUser={addUser} updateUser={updateUser} deleteUser={deleteUser} setPage={setPage} />;
             case 'finishedGoods':
                 return <FinishedGoods finishedGoods={finishedGoods} pontasStock={pontasStock} setPage={setPage} finishedGoodsTransfers={finishedGoodsTransfers} createFinishedGoodsTransfer={createFinishedGoodsTransfer} onDelete={deleteFinishedGoods} />;
             case 'partsManager':

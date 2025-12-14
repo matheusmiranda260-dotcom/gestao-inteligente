@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
-import type { Page, User } from '../types';
+import type { Page, User, Employee } from '../types';
 import { ArrowLeftIcon, PencilIcon, TrashIcon, WarningIcon } from './icons';
 
 interface UserManagementProps {
     users: User[];
-    addUser: (data: { username: string; password: string; permissions: Partial<Record<Page, boolean>> }) => void;
+    employees: Employee[];
+    addUser: (data: { username: string; password: string; permissions: Partial<Record<Page, boolean>>; employeeId?: string }) => void;
     updateUser: (userId: string, data: Partial<User>) => void;
     deleteUser: (userId: string) => void;
     setPage: (page: Page) => void;
 }
 
 const manageablePages: { page: Page; label: string }[] = [
-    { page: 'stock', label: 'Controle de Estoque' },
+    { page: 'stock', label: 'Controle de Estoque (Almoxarifado)' },
     { page: 'finishedGoods', label: 'Estoque Acabado' },
     { page: 'trefila', label: 'Produção (Trefila)' },
     { page: 'trelica', label: 'Produção (Treliça)' },
@@ -27,14 +28,16 @@ const manageablePages: { page: Page; label: string }[] = [
 
 const UserModal: React.FC<{
     user?: User | null;
+    employees: Employee[];
     onClose: () => void;
     onSubmit: (data: any) => void;
-}> = ({ user, onClose, onSubmit }) => {
+}> = ({ user, employees, onClose, onSubmit }) => {
     const [username, setUsername] = useState(user?.username || '');
     const [password, setPassword] = useState('');
     const [permissions, setPermissions] = useState<Partial<Record<Page, boolean>>>(
         user?.permissions || {}
     );
+    const [employeeId, setEmployeeId] = useState(user?.employeeId || '');
     const isEditing = !!user;
 
     const handlePermissionChange = (page: Page, isChecked: boolean) => {
@@ -48,13 +51,13 @@ const UserModal: React.FC<{
             return;
         }
         if (isEditing) {
-            const dataToSubmit: Partial<User> = { permissions };
+            const dataToSubmit: Partial<User> = { permissions, employeeId };
             if (password) {
                 dataToSubmit.password = password;
             }
             onSubmit(dataToSubmit);
         } else {
-            onSubmit({ username, password, permissions });
+            onSubmit({ username, password, permissions, employeeId });
         }
         onClose();
     };
@@ -76,6 +79,21 @@ const UserModal: React.FC<{
                             />
                         </div>
                     )}
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium text-slate-700">Vincular Funcionário (Opcional)</label>
+                        <select
+                            value={employeeId}
+                            onChange={(e) => setEmployeeId(e.target.value)}
+                            className="mt-1 p-2 w-full border border-slate-300 rounded-md"
+                        >
+                            <option value="">-- Nenhum --</option>
+                            {employees.filter(e => e.active).map(emp => (
+                                <option key={emp.id} value={emp.id}>{emp.name} ({emp.sector || 'Sem setor'})</option>
+                            ))}
+                        </select>
+                        <p className="text-xs text-slate-500 mt-1">Ao vincular, o usuário verá seu próprio Painel de RH.</p>
+                    </div>
+
                     <div className="mb-6">
                         <label className="block text-sm font-medium text-slate-700">{isEditing ? 'Nova Senha' : 'Senha'}</label>
                         <input
@@ -114,14 +132,14 @@ const UserModal: React.FC<{
 };
 
 
-const UserManagement: React.FC<UserManagementProps> = ({ users, addUser, updateUser, deleteUser, setPage }) => {
+const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUser, updateUser, deleteUser, setPage }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [deletingUser, setDeletingUser] = useState<User | null>(null);
 
     const manageableUsers = users.filter(u => u.role !== 'admin' && u.role !== 'gestor');
 
-    const handleAddUser = (data: { username: string; password: string; permissions: Partial<Record<Page, boolean>> }) => {
+    const handleAddUser = (data: { username: string; password: string; permissions: Partial<Record<Page, boolean>>; employeeId?: string }) => {
         addUser(data);
         setIsModalOpen(false);
     };
@@ -142,8 +160,8 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, addUser, updateU
 
     return (
         <div className="p-4 sm:p-6 md:p-8">
-            {isModalOpen && <UserModal onClose={() => setIsModalOpen(false)} onSubmit={handleAddUser} />}
-            {editingUser && <UserModal user={editingUser} onClose={() => setEditingUser(null)} onSubmit={handleEditUser} />}
+            {isModalOpen && <UserModal employees={employees} onClose={() => setIsModalOpen(false)} onSubmit={handleAddUser} />}
+            {editingUser && <UserModal user={editingUser} employees={employees} onClose={() => setEditingUser(null)} onSubmit={handleEditUser} />}
             {deletingUser && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white p-8 rounded-xl shadow-xl w-full max-w-md text-center">
