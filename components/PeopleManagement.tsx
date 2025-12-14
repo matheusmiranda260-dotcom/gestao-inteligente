@@ -509,9 +509,9 @@ const EmployeeDetailModal: React.FC<{
                     <div className="flex items-center space-x-4">
                         <div className="h-20 w-20 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden border-4 border-white shadow-sm relative group">
                             {empData.photoUrl ? <img src={empData.photoUrl} alt={empData.name} className="h-full w-full object-cover" /> : <span className="text-3xl font-bold text-slate-400">{empData.name.charAt(0)}</span>}
-                            <label className={`absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition ${readOnly ? 'hidden' : ''}`}>
-                                <PencilIcon className="text-white h-6 w-6" />
-                                <input type="file" accept="image/*" className="hidden" onChange={handleUpdatePhoto} disabled={readOnly} />
+                            <label className={`absolute inset-0 bg-black/30 flex items-center justify-center cursor-pointer transition ${readOnly ? 'hidden' : ''}`}>
+                                <PencilIcon className="text-white h-6 w-6 opacity-70 hover:opacity-100" />
+                                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleUpdatePhoto} disabled={readOnly} />
                             </label>
                         </div>
                         <div>
@@ -624,7 +624,8 @@ const EmployeeDetailModal: React.FC<{
                                         <label className="text-xs font-bold text-slate-500">Certificado (PDF/Img)</label>
                                         <input
                                             type="file"
-                                            accept="image/*,application/pdf"
+                                            accept="image/*"
+                                            capture="environment"
                                             className="w-full text-xs text-slate-500 file:mr-2 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                                             onChange={(e) => setCourseFile(e.target.files ? e.target.files[0] : null)}
                                         />
@@ -732,7 +733,8 @@ const EmployeeDetailModal: React.FC<{
                                             <label className="text-xs font-bold text-slate-500">Anexo (Atestado/Foto)</label>
                                             <input
                                                 type="file"
-                                                accept="image/*,application/pdf"
+                                                accept="image/*"
+                                                capture="environment"
                                                 className="w-full text-xs text-slate-500 file:mr-2 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                                                 onChange={(e) => setAbsenceFile(e.target.files ? e.target.files[0] : null)}
                                             />
