@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
-import { StockItem, MaterialType, Bitola, MaterialOptions } from '../types';
-import { ArchiveIcon, CheckCircleIcon, PlusIcon, SearchIcon, TrashIcon, ExclamationIcon } from './icons';
+import { StockItem, MaterialType, Bitola, MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions } from '../types';
+import { ArchiveIcon, CheckCircleIcon, PlusIcon, SearchIcon, TrashIcon, ExclamationIcon, ArrowLeftIcon, ChartBarIcon } from './icons';
 
 interface PyramidRowProps {
     rowName: string;
@@ -110,25 +110,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
     // We treat unique location strings as rows.
     const [extraRows, setExtraRows] = useState<string[]>([]); // For rows that might be empty momentarily logic
 
-    const derivedRows = useMemo(() => {
-        const rows = new Set<string>();
-        stock.forEach(item => {
-            if (item.location && item.location.startsWith('Fileira ')) {
-                rows.add(item.location);
-            }
-        });
-        extraRows.forEach(r => rows.add(r));
-        return Array.from(rows).sort();
-    }, [stock, extraRows]);
 
-    const unassignedStock = useMemo(() => {
-        return stock
-            .filter(item => !item.location)
-            .filter(item =>
-                item.internalLot.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                item.supplierLot.toLowerCase().includes(searchTerm.toLowerCase())
-            );
-    }, [stock, searchTerm]);
 
     const handleAddRow = () => {
         const name = `Fileira ${newRowName.toUpperCase()}`;
@@ -184,21 +166,117 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
     const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
     const [activeRow, setActiveRow] = useState<string | null>(null);
 
-    // ... logic for quick add ...
+    const [selectedMaterial, setSelectedMaterial] = useState<MaterialType | null>(null);
+    const [selectedBitola, setSelectedBitola] = useState<Bitola | null>(null);
+
+    const availableBitolas = useMemo(() => {
+        if (!selectedMaterial) return [];
+        if (selectedMaterial === 'Fio Máquina') return FioMaquinaBitolaOptions;
+        if (selectedMaterial === 'CA-60') return TrefilaBitolaOptions;
+        return [...FioMaquinaBitolaOptions, ...TrefilaBitolaOptions];
+    }, [selectedMaterial]);
+
+    // Filter stock based on selection
+    const relevantStock = useMemo(() => {
+        if (!selectedMaterial || !selectedBitola) return [];
+        return stock.filter(item => item.materialType === selectedMaterial && item.bitola === selectedBitola);
+    }, [stock, selectedMaterial, selectedBitola]);
+
+
+    const derivedRows = useMemo(() => {
+        if (!selectedMaterial || !selectedBitola) return [];
+        const rows = new Set<string>();
+        relevantStock.forEach(item => {
+            if (item.location && item.location.startsWith('Fileira ')) {
+                rows.add(item.location);
+            }
+        });
+        extraRows.forEach(r => rows.add(r));
+        return Array.from(rows).sort();
+    }, [relevantStock, extraRows, selectedMaterial, selectedBitola]);
+
+    const unassignedStock = useMemo(() => {
+        if (!selectedMaterial || !selectedBitola) return [];
+        return relevantStock
+            .filter(item => !item.location)
+            .filter(item =>
+                item.internalLot.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                item.supplierLot.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+    }, [relevantStock, searchTerm, selectedMaterial, selectedBitola]);
+
+
+    if (!selectedMaterial || !selectedBitola) {
+        return (
+            <div className="fixed inset-0 bg-slate-100 z-50 flex flex-col items-center justify-center animate-fadeIn p-4">
+                <div className="bg-white p-8 rounded-2xl shadow-xl max-w-lg w-full text-center">
+                    <div className="mx-auto bg-emerald-100 w-16 h-16 rounded-full flex items-center justify-center mb-6">
+                        <ArchiveIcon className="w-8 h-8 text-emerald-600" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-slate-800 mb-2">Iniciar Conferência</h2>
+                    <p className="text-slate-500 mb-8">Selecione o tipo de material e a bitola para começar a mapear o estoque.</p>
+
+                    <div className="space-y-4 text-left">
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 mb-1">Tipo de Material</label>
+                            <div className="grid grid-cols-2 gap-3">
+                                {MaterialOptions.map(option => (
+                                    <button
+                                        key={option}
+                                        onClick={() => { setSelectedMaterial(option); setSelectedBitola(null); }}
+                                        className={`p-3 rounded-xl border-2 font-bold transition-all ${selectedMaterial === option ? 'border-emerald-500 bg-emerald-50 text-emerald-800' : 'border-slate-200 hover:border-slate-300 text-slate-600'}`}
+                                    >
+                                        {option}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className={`transition-opacity duration-300 ${selectedMaterial ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
+                            <label className="block text-sm font-bold text-slate-700 mb-1">Bitola (mm)</label>
+                            <div className="grid grid-cols-4 gap-2">
+                                {availableBitolas.map(bitola => (
+                                    <button
+                                        key={bitola}
+                                        onClick={() => setSelectedBitola(bitola)}
+                                        className={`p-2 rounded-lg border-2 font-bold text-sm transition-all ${selectedBitola === bitola ? 'border-emerald-500 bg-emerald-50 text-emerald-800' : 'border-slate-200 hover:border-slate-300 text-slate-600'}`}
+                                    >
+                                        {bitola}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mt-8 flex gap-3">
+                        <button onClick={onClose} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-3 rounded-xl transition">
+                            Cancelar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="fixed inset-0 bg-slate-100 z-50 flex flex-col animate-fadeIn">
             <div className="bg-[#0F3F5C] p-4 text-white flex justify-between items-center shadow-md">
                 <div className="flex items-center gap-3">
-                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition">
-                        <ArchiveIcon className="w-6 h-6" />
+                    <button onClick={() => { setSelectedMaterial(null); setSelectedBitola(null); }} className="p-2 hover:bg-white/10 rounded-full transition" title="Voltar para seleção">
+                        <ArrowLeftIcon className="w-6 h-6" />
                     </button>
                     <div>
-                        <h1 className="text-xl font-bold">Mapa de Estoque e Conferência</h1>
+                        <h1 className="text-xl font-bold flex items-center gap-2">
+                            Mapa de Estoque
+                            <span className="bg-emerald-500 text-xs px-2 py-0.5 rounded font-bold uppercase">{selectedMaterial} - {selectedBitola}</span>
+                        </h1>
                         <p className="text-xs opacity-70">Selecione uma fileira e clique nos lotes pendentes para adicionar.</p>
                     </div>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex gap-3 items-center">
+                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition text-sm font-bold opacity-70 hover:opacity-100">
+                        Sair
+                    </button>
                     {/* Add Row Controls */}
                     <div className="flex bg-white/10 p-1 rounded-lg">
                         <input
@@ -297,7 +375,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                             <PyramidRow
                                 key={row}
                                 rowName={row}
-                                items={stock.filter(s => s.location === row)}
+                                items={relevantStock.filter(s => s.location === row)}
                                 onDrop={(item) => handleDropOnRow(item, row)}
                                 onRemove={handleRemoveFromRow}
                                 onRemoveRow={() => handleRemoveRow(row)}
@@ -314,7 +392,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                 If the user finds a lot that is NOT in the list, they can add it here.
                 This needs to reuse AddConferenceModal logic or be a stripped down version.
              */}
-        </div>
+        </div >
     );
 };
 
