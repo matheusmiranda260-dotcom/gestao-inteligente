@@ -163,7 +163,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
     const handleRemoveFromRow = (item: StockItem) => {
         onUpdateStockItem({
             ...item,
-            location: undefined // Remove location, goes back to unassigned
+            location: null // Remove location, goes back to unassigned
         });
     };
 
