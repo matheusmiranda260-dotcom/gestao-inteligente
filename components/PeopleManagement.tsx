@@ -228,7 +228,7 @@ const StarRating: React.FC<{ score: number; onChange?: (score: number) => void; 
 };
 
 // ... EmployeeCard Component (Same as before) ...
-const EmployeeCard: React.FC<{ employee: Employee; onSelect: () => void; onDelete: () => void; evaluations: Evaluation[] }> = ({ employee, onSelect, onDelete, evaluations }) => {
+const EmployeeCard: React.FC<{ employee: Employee; onSelect: () => void; onDelete: () => void; evaluations: Evaluation[] }> = React.memo(({ employee, onSelect, onDelete, evaluations }) => {
     const employeeEvals = evaluations.filter(e => e.employeeId === employee.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     const lastEvaluation = employeeEvals[0];
     const displayScore = lastEvaluation ? (lastEvaluation.totalScore / 5) : 0;
@@ -268,7 +268,8 @@ const EmployeeCard: React.FC<{ employee: Employee; onSelect: () => void; onDelet
             </div>
         </div>
     );
-};
+    );
+});
 
 
 // ... EmployeeDetailModal (Same as before) ...
@@ -573,7 +574,7 @@ const EmployeeDetailModal: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-0 md:p-4">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-0 md:p-4">
             <div className="bg-white md:rounded-2xl shadow-2xl w-full md:max-w-4xl h-full md:h-[90vh] flex flex-col overflow-hidden">
                 <div className="bg-slate-50 p-6 border-b border-slate-200 flex justify-between items-start">
                     <div className="flex items-center space-x-4">
