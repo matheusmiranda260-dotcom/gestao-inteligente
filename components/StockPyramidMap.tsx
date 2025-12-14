@@ -9,14 +9,13 @@ interface PyramidRowProps {
     onDrop: (item: StockItem) => void;
     onRemove: (item: StockItem) => void;
     onRemoveRow: () => void;
+    isActive: boolean;
+    onSetActive: () => void;
 }
 
-const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemove, onRemoveRow }) => {
-    // Simple visual stacking logic
-    // We can just display them in a flex container for now, "Pyramid" shape can be complex purely with CSS if quantities vary.
-    // Let's assume a max base width and stack up. Or just a flex-wrap-reverse to stack from bottom?
-    // User requested "ideas de rolos em piramedes" (pyramid rolls). 
-    // Usually that means: Base level 3, next 2, top 1.
+const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemove, onRemoveRow, isActive, onSetActive }) => {
+    // ...
+    // ...
 
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();
@@ -28,19 +27,12 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
     };
 
     const handleDrop = (e: React.DragEvent) => {
-        e.preventDefault();
-        e.currentTarget.classList.remove('bg-emerald-50');
-        const itemId = e.dataTransfer.getData('text/plain');
-        // We pass the partial item data via handleDrop in parent, 
-        // effectively we need to find the item in parent state. 
-        // Here we just signal the drop.
-        // But drag data usually only has strings. 
-        // Let's assume we pass ID and parent handles lookup.
+        // ...
     };
 
     return (
         <div
-            className="flex-1 min-w-[300px] border-2 border-dashed border-slate-300 rounded-xl p-4 bg-slate-50 relative transition-colors duration-300"
+            className={`flex-1 min-w-[300px] border-2 rounded-xl p-4 relative transition-all duration-300 ${isActive ? 'border-emerald-500 bg-emerald-50 shadow-md ring-2 ring-emerald-300' : 'border-dashed border-slate-300 bg-slate-50 opacity-90'}`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={(e) => {
@@ -52,10 +44,17 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                     onDrop(item);
                 }
             }}
+            onClick={(e) => {
+                // Determine if we should set active or not. If clicked empty space, maybe set active?
+                // But let's rely on specific button for clarity or header click.
+            }}
         >
-            <div className="flex justify-between items-center mb-4 border-b pb-2">
-                <h3 className="font-bold text-lg text-slate-700">{rowName} <span className="text-sm font-normal text-slate-500">({items.length} itens)</span></h3>
-                <button onClick={onRemoveRow} className="text-red-400 hover:text-red-600 p-1"><TrashIcon className="w-4 h-4" /></button>
+            <div className="flex justify-between items-center mb-4 border-b pb-2 cursor-pointer" onClick={onSetActive} title="Clique para ativar esta fileira para adição rápida">
+                <div className="flex items-center gap-2">
+                    <div className={`w-4 h-4 rounded-full border ${isActive ? 'bg-emerald-500 border-emerald-500' : 'bg-white border-slate-400'}`}></div>
+                    <h3 className={`font-bold text-lg ${isActive ? 'text-emerald-800' : 'text-slate-700'}`}>{rowName} <span className="text-sm font-normal text-slate-500">({items.length} itens)</span></h3>
+                </div>
+                <button onClick={(e) => { e.stopPropagation(); onRemoveRow(); }} className="text-red-400 hover:text-red-600 p-1"><TrashIcon className="w-4 h-4" /></button>
             </div>
 
             {/* Pyramid / Stack Area */}
@@ -183,6 +182,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
 
     // Quick Add New Lot ("Cadastrar ali mesmo")
     const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
+    const [activeRow, setActiveRow] = useState<string | null>(null);
 
     // ... logic for quick add ...
 
@@ -195,7 +195,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                     </button>
                     <div>
                         <h1 className="text-xl font-bold">Mapa de Estoque e Conferência</h1>
-                        <p className="text-xs opacity-70">Arraste os lotes para as fileiras para conferir e organizar.</p>
+                        <p className="text-xs opacity-70">Selecione uma fileira e clique nos lotes pendentes para adicionar.</p>
                     </div>
                 </div>
                 <div className="flex gap-3">
@@ -248,10 +248,17 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                             unassignedStock.map(item => (
                                 <div
                                     key={item.id}
-                                    className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:shadow-md cursor-grab active:cursor-grabbing transition-all border-l-4 border-l-amber-400"
+                                    className={`bg-white p-3 rounded-lg border shadow-sm hover:shadow-md cursor-pointer transition-all border-l-4 ${activeRow ? 'border-l-emerald-500 hover:bg-emerald-50' : 'border-l-amber-400 group'}`}
                                     draggable
                                     onDragStart={(e) => {
                                         e.dataTransfer.setData('application/json', JSON.stringify(item));
+                                    }}
+                                    onClick={() => {
+                                        if (activeRow) {
+                                            handleDropOnRow(item, activeRow);
+                                        } else {
+                                            alert("Selecione uma fileira (clique no título dela) para adicionar itens rapidamente.");
+                                        }
                                     }}
                                 >
                                     <div className="flex justify-between items-start">
@@ -264,6 +271,11 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                                     <div className="mt-2 text-xs font-mono text-slate-700 bg-slate-50 p-1 rounded text-center">
                                         {item.remainingQuantity.toFixed(2)} kg
                                     </div>
+                                    {!activeRow && (
+                                        <div className="hidden group-hover:block text-[10px] text-amber-600 font-bold mt-1 text-center animate-pulse">
+                                            Selecione uma fileira para mover
+                                        </div>
+                                    )}
                                 </div>
                             ))
                         )}
@@ -289,6 +301,8 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                                 onDrop={(item) => handleDropOnRow(item, row)}
                                 onRemove={handleRemoveFromRow}
                                 onRemoveRow={() => handleRemoveRow(row)}
+                                isActive={activeRow === row}
+                                onSetActive={() => setActiveRow(row)}
                             />
                         ))}
                     </div>
