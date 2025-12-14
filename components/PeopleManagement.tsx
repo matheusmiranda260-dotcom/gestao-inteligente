@@ -155,7 +155,8 @@ const EmployeeDetailModal: React.FC<{
     onSave: () => void;
     onDelete: () => void; // New prop
     currentUser: User | null;
-}> = ({ employee, onClose, onSave, onDelete, currentUser }) => {
+    readOnly?: boolean;
+}> = ({ employee, onClose, onSave, onDelete, currentUser, readOnly }) => {
     // ... Copy existing implementation or use a placeholder if too long (I'll keep it shortened for this specific file write as the focus is Organograma)
     // To ensure I don't break existing features, I will replicate it or assume it's there. 
     // Given the previous step saw the full file, I will perform a full overwrite including the Modal code to be safe.
@@ -429,9 +430,9 @@ const EmployeeDetailModal: React.FC<{
                     <div className="flex items-center space-x-4">
                         <div className="h-20 w-20 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden border-4 border-white shadow-sm relative group">
                             {empData.photoUrl ? <img src={empData.photoUrl} alt={empData.name} className="h-full w-full object-cover" /> : <span className="text-3xl font-bold text-slate-400">{empData.name.charAt(0)}</span>}
-                            <label className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition">
+                            <label className={`absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition ${readOnly ? 'hidden' : ''}`}>
                                 <PencilIcon className="text-white h-6 w-6" />
-                                <input type="file" accept="image/*" className="hidden" onChange={handleUpdatePhoto} />
+                                <input type="file" accept="image/*" className="hidden" onChange={handleUpdatePhoto} disabled={readOnly} />
                             </label>
                         </div>
                         <div>
@@ -446,9 +447,11 @@ const EmployeeDetailModal: React.FC<{
                         <button onClick={handlePrintProfile} className="text-blue-400 hover:text-blue-600 p-2 rounded-full hover:bg-blue-50 transition" title="Imprimir Ficha">
                             <PrinterIcon className="h-5 w-5" />
                         </button>
-                        <button onClick={onDelete} className="text-red-400 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition" title="Excluir Este Funcionário">
-                            <TrashIcon className="h-5 w-5" />
-                        </button>
+                        {!readOnly && (
+                            <button onClick={onDelete} className="text-red-400 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition" title="Excluir Este Funcionário">
+                                <TrashIcon className="h-5 w-5" />
+                            </button>
+                        )}
                         <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-200 transition">✕</button>
                     </div>
                 </div>
@@ -472,30 +475,30 @@ const EmployeeDetailModal: React.FC<{
                             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                                 <h3 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2">Dados Pessoais</h3>
                                 <div className="space-y-4">
-                                    <div><label className="block text-xs font-semibold text-slate-500 uppercase">Data Nascimento</label><input type="date" className="w-full mt-1 p-2 border rounded-lg" value={empData.birthDate || ''} onChange={e => setEmpData({ ...empData, birthDate: e.target.value })} /></div>
-                                    <div><label className="block text-xs font-semibold text-slate-500 uppercase">Estado Civil</label><select className="w-full mt-1 p-2 border rounded-lg" value={empData.maritalStatus || ''} onChange={e => setEmpData({ ...empData, maritalStatus: e.target.value })}><option value="">Selecione</option><option value="Solteiro(a)">Solteiro(a)</option><option value="Casado(a)">Casado(a)</option><option value="Divorciado(a)">Divorciado(a)</option></select></div>
-                                    <div><label className="block text-xs font-semibold text-slate-500 uppercase">Filhos</label><input type="number" className="w-full mt-1 p-2 border rounded-lg" value={empData.childrenCount || 0} onChange={e => setEmpData({ ...empData, childrenCount: parseInt(e.target.value) })} /></div>
-                                    <div><label className="block text-xs font-semibold text-slate-500 uppercase">Telefone / Contato</label><input type="text" className="w-full mt-1 p-2 border rounded-lg" value={empData.phone || ''} onChange={e => setEmpData({ ...empData, phone: e.target.value })} /></div>
+                                    <div><label className="block text-xs font-semibold text-slate-500 uppercase">Data Nascimento</label><input type="date" disabled={readOnly} className="w-full mt-1 p-2 border rounded-lg disabled:bg-slate-100" value={empData.birthDate || ''} onChange={e => setEmpData({ ...empData, birthDate: e.target.value })} /></div>
+                                    <div><label className="block text-xs font-semibold text-slate-500 uppercase">Estado Civil</label><select disabled={readOnly} className="w-full mt-1 p-2 border rounded-lg disabled:bg-slate-100" value={empData.maritalStatus || ''} onChange={e => setEmpData({ ...empData, maritalStatus: e.target.value })}><option value="">Selecione</option><option value="Solteiro(a)">Solteiro(a)</option><option value="Casado(a)">Casado(a)</option><option value="Divorciado(a)">Divorciado(a)</option></select></div>
+                                    <div><label className="block text-xs font-semibold text-slate-500 uppercase">Filhos</label><input type="number" disabled={readOnly} className="w-full mt-1 p-2 border rounded-lg disabled:bg-slate-100" value={empData.childrenCount || 0} onChange={e => setEmpData({ ...empData, childrenCount: parseInt(e.target.value) })} /></div>
+                                    <div><label className="block text-xs font-semibold text-slate-500 uppercase">Telefone / Contato</label><input type="text" disabled={readOnly} className="w-full mt-1 p-2 border rounded-lg disabled:bg-slate-100" value={empData.phone || ''} onChange={e => setEmpData({ ...empData, phone: e.target.value })} /></div>
                                 </div>
                             </div>
                             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                                 <h3 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2">Dados Profissionais</h3>
                                 <div className="space-y-4">
-                                    <div><label className="block text-xs font-semibold text-slate-500 uppercase">Cargo / Função</label><input type="text" className="w-full mt-1 p-2 border rounded-lg" value={empData.jobTitle || ''} onChange={e => setEmpData({ ...empData, jobTitle: e.target.value })} placeholder="Ex: Operador Trefila I" /></div>
-                                    <div><label className="block text-xs font-semibold text-slate-500 uppercase">Data Admissão</label><input type="date" className="w-full mt-1 p-2 border rounded-lg" value={empData.admissionDate || ''} onChange={e => setEmpData({ ...empData, admissionDate: e.target.value })} /></div>
+                                    <div><label className="block text-xs font-semibold text-slate-500 uppercase">Cargo / Função</label><input type="text" disabled={readOnly} className="w-full mt-1 p-2 border rounded-lg disabled:bg-slate-100" value={empData.jobTitle || ''} onChange={e => setEmpData({ ...empData, jobTitle: e.target.value })} placeholder="Ex: Operador Trefila I" /></div>
+                                    <div><label className="block text-xs font-semibold text-slate-500 uppercase">Data Admissão</label><input type="date" disabled={readOnly} className="w-full mt-1 p-2 border rounded-lg disabled:bg-slate-100" value={empData.admissionDate || ''} onChange={e => setEmpData({ ...empData, admissionDate: e.target.value })} /></div>
                                     <div className="grid grid-cols-1 gap-4">
-                                        <div><label className="block text-xs font-semibold text-slate-500 uppercase">Setor</label><input type="text" className="w-full mt-1 p-2 border rounded-lg" value={empData.sector} onChange={e => setEmpData({ ...empData, sector: e.target.value })} /></div>
+                                        <div><label className="block text-xs font-semibold text-slate-500 uppercase">Setor</label><input type="text" disabled={readOnly} className="w-full mt-1 p-2 border rounded-lg disabled:bg-slate-100" value={empData.sector} onChange={e => setEmpData({ ...empData, sector: e.target.value })} /></div>
                                         {/* Shift removed */}
                                     </div>
-                                    <div className="pt-4 flex justify-end"><button type="submit" className="bg-[#0F3F5C] text-white font-bold py-2 px-6 rounded-lg hover:bg-[#0A2A3D] transition">Salvar Alterações</button></div>
+                                    {!readOnly && <div className="pt-4 flex justify-end"><button type="submit" className="bg-[#0F3F5C] text-white font-bold py-2 px-6 rounded-lg hover:bg-[#0A2A3D] transition">Salvar Alterações</button></div>}
                                 </div>
                             </div>
                         </form>
                     )}
                     {activeTab === 'responsibilities' && (
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-                            <div className="flex gap-2 mb-6"><input className="flex-grow p-2 border rounded-lg" placeholder="Adicionar nova responsabilidade..." value={newResp} onChange={e => setNewResp(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddResponsibility()} /><button onClick={handleAddResponsibility} className="bg-green-600 text-white px-4 rounded-lg hover:bg-green-700">Adicionar</button></div>
-                            <ul className="space-y-2">{responsibilities.map(r => (<li key={r.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100"><span className="text-slate-700">{r.description}</span><button onClick={() => handleDeleteResponsibility(r.id)} className="text-red-500 hover:text-red-700"><TrashIcon className="h-4 w-4" /></button></li>))} {responsibilities.length === 0 && <p className="text-slate-400 text-center py-4">Nenhuma atribuição cadastrada.</p>}</ul>
+                            {!readOnly && <div className="flex gap-2 mb-6"><input className="flex-grow p-2 border rounded-lg" placeholder="Adicionar nova responsabilidade..." value={newResp} onChange={e => setNewResp(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddResponsibility()} /><button onClick={handleAddResponsibility} className="bg-green-600 text-white px-4 rounded-lg hover:bg-green-700">Adicionar</button></div>}
+                            <ul className="space-y-2">{responsibilities.map(r => (<li key={r.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100"><span className="text-slate-700">{r.description}</span>{!readOnly && <button onClick={() => handleDeleteResponsibility(r.id)} className="text-red-500 hover:text-red-700"><TrashIcon className="h-4 w-4" /></button>}</li>))} {responsibilities.length === 0 && <p className="text-slate-400 text-center py-4">Nenhuma atribuição cadastrada.</p>}</ul>
                         </div>
                     )}
                     {activeTab === 'development' && (
@@ -504,50 +507,52 @@ const EmployeeDetailModal: React.FC<{
                                 <BookOpenIcon className="h-5 w-5 text-blue-500" />
                                 Histórico Educacional e Cursos
                             </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 bg-slate-50 p-4 rounded-lg">
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500">Tipo</label>
-                                    <select
-                                        className="w-full p-2 border rounded"
-                                        value={newCourseData.educationType}
-                                        onChange={e => setNewCourseData({ ...newCourseData, educationType: e.target.value as any })}
-                                    >
-                                        <option value="Escolaridade">Escolaridade Básica</option>
-                                        <option value="Graduação">Graduação</option>
-                                        <option value="Pós-Graduação">Pós-Graduação</option>
-                                        <option value="Técnico">Curso Técnico</option>
-                                        <option value="Curso Livre">Curso Livre / Treinamento</option>
-                                        <option value="Certificação">Certificação</option>
-                                    </select>
+                            {!readOnly && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 bg-slate-50 p-4 rounded-lg">
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500">Tipo</label>
+                                        <select
+                                            className="w-full p-2 border rounded"
+                                            value={newCourseData.educationType}
+                                            onChange={e => setNewCourseData({ ...newCourseData, educationType: e.target.value as any })}
+                                        >
+                                            <option value="Escolaridade">Escolaridade Básica</option>
+                                            <option value="Graduação">Graduação</option>
+                                            <option value="Pós-Graduação">Pós-Graduação</option>
+                                            <option value="Técnico">Curso Técnico</option>
+                                            <option value="Curso Livre">Curso Livre / Treinamento</option>
+                                            <option value="Certificação">Certificação</option>
+                                        </select>
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className="text-xs font-bold text-slate-500">Nome do Curso / Formação</label>
+                                        <input className="w-full p-2 border rounded" placeholder="Ex: Engenharia de Produção, NR-12..." value={newCourseData.courseName} onChange={e => setNewCourseData({ ...newCourseData, courseName: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500">Instituição</label>
+                                        <input className="w-full p-2 border rounded" placeholder="Ex: SENAI, USP..." value={newCourseData.institution} onChange={e => setNewCourseData({ ...newCourseData, institution: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500">Data Conclusão</label>
+                                        <input type="date" className="w-full p-2 border rounded" value={newCourseData.completionDate} onChange={e => setNewCourseData({ ...newCourseData, completionDate: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500">Carga Horária (h)</label>
+                                        <input type="number" className="w-full p-2 border rounded" placeholder="Ex: 40" value={newCourseData.workloadHours} onChange={e => setNewCourseData({ ...newCourseData, workloadHours: e.target.value })} />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className="text-xs font-bold text-slate-500">Certificado (PDF/Img)</label>
+                                        <input
+                                            type="file"
+                                            className="w-full text-xs text-slate-500 file:mr-2 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                            onChange={(e) => setCourseFile(e.target.files ? e.target.files[0] : null)}
+                                        />
+                                    </div>
+                                    <div className="flex items-end">
+                                        <button onClick={handleAddCourse} className="w-full bg-blue-600 text-white font-bold py-2 rounded hover:bg-blue-700 transition">Adicionar Qualificação</button>
+                                    </div>
                                 </div>
-                                <div className="md:col-span-2">
-                                    <label className="text-xs font-bold text-slate-500">Nome do Curso / Formação</label>
-                                    <input className="w-full p-2 border rounded" placeholder="Ex: Engenharia de Produção, NR-12..." value={newCourseData.courseName} onChange={e => setNewCourseData({ ...newCourseData, courseName: e.target.value })} />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500">Instituição</label>
-                                    <input className="w-full p-2 border rounded" placeholder="Ex: SENAI, USP..." value={newCourseData.institution} onChange={e => setNewCourseData({ ...newCourseData, institution: e.target.value })} />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500">Data Conclusão</label>
-                                    <input type="date" className="w-full p-2 border rounded" value={newCourseData.completionDate} onChange={e => setNewCourseData({ ...newCourseData, completionDate: e.target.value })} />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500">Carga Horária (h)</label>
-                                    <input type="number" className="w-full p-2 border rounded" placeholder="Ex: 40" value={newCourseData.workloadHours} onChange={e => setNewCourseData({ ...newCourseData, workloadHours: e.target.value })} />
-                                </div>
-                                <div className="md:col-span-2">
-                                    <label className="text-xs font-bold text-slate-500">Certificado (PDF/Img)</label>
-                                    <input
-                                        type="file"
-                                        className="w-full text-xs text-slate-500 file:mr-2 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                                        onChange={(e) => setCourseFile(e.target.files ? e.target.files[0] : null)}
-                                    />
-                                </div>
-                                <div className="flex items-end">
-                                    <button onClick={handleAddCourse} className="w-full bg-blue-600 text-white font-bold py-2 rounded hover:bg-blue-700 transition">Adicionar Qualificação</button>
-                                </div>
-                            </div>
+                            )}
 
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm text-left">
@@ -586,7 +591,7 @@ const EmployeeDetailModal: React.FC<{
                                                     ) : <span className="text-slate-300">-</span>}
                                                 </td>
                                                 <td className="px-4 py-3 text-center">
-                                                    <button onClick={() => handleDeleteCourse(c.id)} className="text-red-400 hover:text-red-600"><TrashIcon className="h-4 w-4" /></button>
+                                                    {!readOnly && <button onClick={() => handleDeleteCourse(c.id)} className="text-red-400 hover:text-red-600"><TrashIcon className="h-4 w-4" /></button>}
                                                 </td>
                                             </tr>
                                         ))}
@@ -598,12 +603,14 @@ const EmployeeDetailModal: React.FC<{
                     )}
                     {activeTab === 'evaluations' && (
                         <div className="space-y-6">
-                            {!isEvaluating ? (<button onClick={() => setIsEvaluating(true)} className="w-full bg-[#0F3F5C] text-white font-bold py-3 rounded-xl hover:bg-[#0A2A3D] transition shadow-md">+ Nova Avaliação Rápida</button>) : (
-                                <div className="bg-white p-6 rounded-xl border border-blue-100 shadow-md">
-                                    <h4 className="font-bold text-lg mb-4 text-[#0F3F5C]">Nova Avaliação</h4>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">{[{ key: 'organization', label: 'Organização' }, { key: 'cleanliness', label: 'Limpeza Máquina' }, { key: 'effort', label: 'Empenho' }, { key: 'communication', label: 'Comunicação' }, { key: 'improvement', label: 'Melhoria' }].map(cat => (<div key={cat.key} className="flex justify-between items-center bg-slate-50 p-3 rounded-lg"><span className="text-sm font-medium">{cat.label}</span>{/* @ts-ignore */}<StarRating score={evalScores[cat.key]} onChange={v => setEvalScores({ ...evalScores, [cat.key]: v })} /></div>))}</div>
-                                    <textarea className="w-full border p-2 rounded-lg text-sm mb-4" placeholder="Observação..." value={evalNote} onChange={e => setEvalNote(e.target.value)} /><div className="flex justify-end gap-3"><button onClick={() => setIsEvaluating(false)} className="text-slate-500 hover:text-slate-700">Cancelar</button><button onClick={handleSubmitEvaluation} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold">Salvar Avaliação</button></div>
-                                </div>
+                            {!readOnly && (
+                                !isEvaluating ? (<button onClick={() => setIsEvaluating(true)} className="w-full bg-[#0F3F5C] text-white font-bold py-3 rounded-xl hover:bg-[#0A2A3D] transition shadow-md">+ Nova Avaliação Rápida</button>) : (
+                                    <div className="bg-white p-6 rounded-xl border border-blue-100 shadow-md">
+                                        <h4 className="font-bold text-lg mb-4 text-[#0F3F5C]">Nova Avaliação</h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">{[{ key: 'organization', label: 'Organização' }, { key: 'cleanliness', label: 'Limpeza Máquina' }, { key: 'effort', label: 'Empenho' }, { key: 'communication', label: 'Comunicação' }, { key: 'improvement', label: 'Melhoria' }].map(cat => (<div key={cat.key} className="flex justify-between items-center bg-slate-50 p-3 rounded-lg"><span className="text-sm font-medium">{cat.label}</span>{/* @ts-ignore */}<StarRating score={evalScores[cat.key]} onChange={v => setEvalScores({ ...evalScores, [cat.key]: v })} /></div>))}</div>
+                                        <textarea className="w-full border p-2 rounded-lg text-sm mb-4" placeholder="Observação..." value={evalNote} onChange={e => setEvalNote(e.target.value)} /><div className="flex justify-end gap-3"><button onClick={() => setIsEvaluating(false)} className="text-slate-500 hover:text-slate-700">Cancelar</button><button onClick={handleSubmitEvaluation} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold">Salvar Avaliação</button></div>
+                                    </div>
+                                )
                             )}
                             <div className="space-y-4">{evaluations.map(ev => (<div key={ev.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm"><div className="flex justify-between items-start mb-2"><div><p className="text-sm font-bold text-slate-800">{new Date(ev.date).toLocaleDateString()} - Avaliado por {ev.evaluator}</p><div className="flex items-center mt-1"><StarIcon className="h-4 w-4 text-yellow-400 fill-current mr-1" /><span className="font-bold">{(ev.totalScore / 5).toFixed(1)}</span></div></div><span className="text-xs text-slate-400">Total: {ev.totalScore}/25</span></div>{ev.note && <p className="text-sm text-slate-600 bg-slate-50 p-2 rounded italic">"{ev.note}"</p>}</div>))}</div>
                         </div>
@@ -616,40 +623,42 @@ const EmployeeDetailModal: React.FC<{
                                     <ExclamationIcon className="h-5 w-5 text-red-500" />
                                     Registro de Ausências e Faltas
                                 </h3>
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 bg-slate-50 p-4 rounded-lg">
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-500">Tipo</label>
-                                        <select className="w-full p-2 border rounded" value={newAbsence.type} onChange={e => setNewAbsence({ ...newAbsence, type: e.target.value })}>
-                                            <option value="Falta Injustificada">Falta Injustificada</option>
-                                            <option value="Atestado Médico">Atestado Médico</option>
-                                            <option value="Licença">Licença</option>
-                                            <option value="Suspensão">Suspensão</option>
-                                        </select>
+                                {!readOnly && (
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 bg-slate-50 p-4 rounded-lg">
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500">Tipo</label>
+                                            <select className="w-full p-2 border rounded" value={newAbsence.type} onChange={e => setNewAbsence({ ...newAbsence, type: e.target.value })}>
+                                                <option value="Falta Injustificada">Falta Injustificada</option>
+                                                <option value="Atestado Médico">Atestado Médico</option>
+                                                <option value="Licença">Licença</option>
+                                                <option value="Suspensão">Suspensão</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500">Data Início</label>
+                                            <input type="date" className="w-full p-2 border rounded" value={newAbsence.startDate} onChange={e => setNewAbsence({ ...newAbsence, startDate: e.target.value })} />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500">Data Fim (Opcional)</label>
+                                            <input type="date" className="w-full p-2 border rounded" value={newAbsence.endDate} onChange={e => setNewAbsence({ ...newAbsence, endDate: e.target.value })} />
+                                        </div>
+                                        <div className="flex flex-col justify-end">
+                                            <button onClick={handleAddAbsence} className="bg-red-600 text-white font-bold py-2 px-4 rounded hover:bg-red-700 transition">Registrar Ausência</button>
+                                        </div>
+                                        <div className="md:col-span-3">
+                                            <label className="text-xs font-bold text-slate-500">Motivo / Observação</label>
+                                            <input type="text" className="w-full p-2 border rounded" placeholder="Ex: Dor de barriga, Atestado Dr. Fulano..." value={newAbsence.reason} onChange={e => setNewAbsence({ ...newAbsence, reason: e.target.value })} />
+                                        </div>
+                                        <div className="md:col-span-1">
+                                            <label className="text-xs font-bold text-slate-500">Anexo (Atestado/Foto)</label>
+                                            <input
+                                                type="file"
+                                                className="w-full text-xs text-slate-500 file:mr-2 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                                onChange={(e) => setAbsenceFile(e.target.files ? e.target.files[0] : null)}
+                                            />
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-500">Data Início</label>
-                                        <input type="date" className="w-full p-2 border rounded" value={newAbsence.startDate} onChange={e => setNewAbsence({ ...newAbsence, startDate: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-500">Data Fim (Opcional)</label>
-                                        <input type="date" className="w-full p-2 border rounded" value={newAbsence.endDate} onChange={e => setNewAbsence({ ...newAbsence, endDate: e.target.value })} />
-                                    </div>
-                                    <div className="flex flex-col justify-end">
-                                        <button onClick={handleAddAbsence} className="bg-red-600 text-white font-bold py-2 px-4 rounded hover:bg-red-700 transition">Registrar Ausência</button>
-                                    </div>
-                                    <div className="md:col-span-3">
-                                        <label className="text-xs font-bold text-slate-500">Motivo / Observação</label>
-                                        <input type="text" className="w-full p-2 border rounded" placeholder="Ex: Dor de barriga, Atestado Dr. Fulano..." value={newAbsence.reason} onChange={e => setNewAbsence({ ...newAbsence, reason: e.target.value })} />
-                                    </div>
-                                    <div className="md:col-span-1">
-                                        <label className="text-xs font-bold text-slate-500">Anexo (Atestado/Foto)</label>
-                                        <input
-                                            type="file"
-                                            className="w-full text-xs text-slate-500 file:mr-2 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                                            onChange={(e) => setAbsenceFile(e.target.files ? e.target.files[0] : null)}
-                                        />
-                                    </div>
-                                </div>
+                                )}
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-sm text-left">
                                         <thead className="bg-slate-100 text-slate-600 font-bold">
@@ -677,7 +686,7 @@ const EmployeeDetailModal: React.FC<{
                                                         )}
                                                     </td>
                                                     <td className="p-3 text-center">
-                                                        <button onClick={() => handleDeleteAbsence(abs.id)} className="text-red-400 hover:text-red-600"><TrashIcon className="h-4 w-4" /></button>
+                                                        {!readOnly && <button onClick={() => handleDeleteAbsence(abs.id)} className="text-red-400 hover:text-red-600"><TrashIcon className="h-4 w-4" /></button>}
                                                     </td>
                                                 </tr>
                                             ))}
@@ -693,23 +702,25 @@ const EmployeeDetailModal: React.FC<{
                                     <ClockIcon className="h-5 w-5 text-blue-500" />
                                     Controle de Férias
                                 </h3>
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 bg-blue-50 p-4 rounded-lg">
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-500">Período Aquisitivo</label>
-                                        <input type="text" placeholder="Ex: 2024-2025" className="w-full p-2 border rounded" value={newVacation.period} onChange={e => setNewVacation({ ...newVacation, period: e.target.value })} />
+                                {!readOnly && (
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 bg-blue-50 p-4 rounded-lg">
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500">Período Aquisitivo</label>
+                                            <input type="text" placeholder="Ex: 2024-2025" className="w-full p-2 border rounded" value={newVacation.period} onChange={e => setNewVacation({ ...newVacation, period: e.target.value })} />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500">Início do Gozo</label>
+                                            <input type="date" className="w-full p-2 border rounded" value={newVacation.startDate} onChange={e => setNewVacation({ ...newVacation, startDate: e.target.value })} />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500">Fim do Gozo</label>
+                                            <input type="date" className="w-full p-2 border rounded" value={newVacation.endDate} onChange={e => setNewVacation({ ...newVacation, endDate: e.target.value })} />
+                                        </div>
+                                        <div className="flex flex-col justify-end">
+                                            <button onClick={handleAddVacation} className="bg-blue-600 text-white font-bold py-2 px-4 rounded hover:bg-blue-700 transition">Agendar Férias</button>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-500">Início do Gozo</label>
-                                        <input type="date" className="w-full p-2 border rounded" value={newVacation.startDate} onChange={e => setNewVacation({ ...newVacation, startDate: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-500">Fim do Gozo</label>
-                                        <input type="date" className="w-full p-2 border rounded" value={newVacation.endDate} onChange={e => setNewVacation({ ...newVacation, endDate: e.target.value })} />
-                                    </div>
-                                    <div className="flex flex-col justify-end">
-                                        <button onClick={handleAddVacation} className="bg-blue-600 text-white font-bold py-2 px-4 rounded hover:bg-blue-700 transition">Agendar Férias</button>
-                                    </div>
-                                </div>
+                                )}
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-sm text-left">
                                         <thead className="bg-slate-100 text-slate-600 font-bold">
@@ -731,7 +742,7 @@ const EmployeeDetailModal: React.FC<{
                                                         <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">{vac.status}</span>
                                                     </td>
                                                     <td className="p-3 text-center">
-                                                        <button onClick={() => handleDeleteVacation(vac.id)} className="text-red-400 hover:text-red-600"><TrashIcon className="h-4 w-4" /></button>
+                                                        {!readOnly && <button onClick={() => handleDeleteVacation(vac.id)} className="text-red-400 hover:text-red-600"><TrashIcon className="h-4 w-4" /></button>}
                                                     </td>
                                                 </tr>
                                             ))}
@@ -1204,6 +1215,7 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
                     onClose={() => setSelectedEmployee(null)}
                     onSave={loadData}
                     onDelete={() => handleDeleteEmployee(selectedEmployee.id)}
+                    readOnly={isRestrictedUser}
                 />
             )}
 
