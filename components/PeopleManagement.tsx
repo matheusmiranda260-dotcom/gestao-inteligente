@@ -8,6 +8,50 @@ interface PeopleManagementProps {
     currentUser: User | null;
 }
 
+// Helper for resizing images (Mobile Optimization)
+const resizeImage = (file: File, maxWidth = 1200, quality = 0.7): Promise<File> => {
+    return new Promise((resolve, reject) => {
+        if (!file.type.match(/image.*/)) {
+            resolve(file); // Not an image, return original
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = (readerEvent: any) => {
+            const image = new Image();
+            image.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = image.width;
+                let height = image.height;
+                if (width > maxWidth) {
+                    height *= maxWidth / width;
+                    width = maxWidth;
+                }
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    ctx.drawImage(image, 0, 0, width, height);
+                    const dataUrl = canvas.toDataURL('image/jpeg', quality);
+                    const byteString = atob(dataUrl.split(',')[1]);
+                    const ab = new ArrayBuffer(byteString.length);
+                    const ia = new Uint8Array(ab);
+                    for (let i = 0; i < byteString.length; i++) {
+                        ia[i] = byteString.charCodeAt(i);
+                    }
+                    const blob = new Blob([ab], { type: 'image/jpeg' });
+                    const resizedFile = new File([blob], file.name, { type: 'image/jpeg' });
+                    resolve(resizedFile);
+                } else {
+                    resolve(file); // Fallback
+                }
+            };
+            image.src = readerEvent.target.result;
+        };
+        reader.onerror = (e) => reject(e);
+        reader.readAsDataURL(file);
+    });
+};
+
 const MobileFriendlyDateInput: React.FC<{
     label: string;
     value: string | null | undefined;
@@ -254,6 +298,7 @@ const EmployeeDetailModal: React.FC<{
     const courseFileInputRef = useRef<HTMLInputElement>(null);
     const absenceFileInputRef = useRef<HTMLInputElement>(null);
     const [newCourse, setNewCourse] = useState('');
+    const [isUploading, setIsUploading] = useState(false); // New state for feedback
     const [isEvaluating, setIsEvaluating] = useState(false);
     const [evalScores, setEvalScores] = useState({ organization: 0, cleanliness: 0, effort: 0, communication: 0, improvement: 0 });
     const [evalNote, setEvalNote] = useState('');
@@ -368,16 +413,36 @@ const EmployeeDetailModal: React.FC<{
 
     const handleUpdatePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files || e.target.files.length === 0) return;
-        const file = e.target.files[0];
+        let file = e.target.files[0];
+
+        setIsUploading(true);
         try {
-            const fileName = `avatars/${employee.id}_${Date.now()}_${file.name}`;
+            // Compress image if it's large
+            if (file.size > 1024 * 1024) { // Only resize if > 1MB
+                try {
+                    file = await resizeImage(file);
+                } catch (err) { console.error("Error resizing", err); }
+            }
+
+            const fileName = `avatars/${employee.id}_${Date.now()}_normalized.jpg`;
             const publicUrl = await uploadFile('kb-files', fileName, file);
             if (publicUrl) {
-                const updated = await updateItem('employees', employee.id, { photoUrl: publicUrl });
-                setEmpData({ ...empData, photoUrl: publicUrl });
-                alert('Foto atualizada!');
+                // Force a query param to bust cache
+                const urlWithCacheBust = `${publicUrl}?t=${Date.now()}`;
+                const updated = await updateItem('employees', employee.id, { photoUrl: urlWithCacheBust });
+                setEmpData({ ...empData, photoUrl: urlWithCacheBust });
+                // Also update local list if possible? Ideally reloadData but we are in modal.
+                // We'll trust onSave() or next reload.
+                alert('Foto atualizada com sucesso!');
             }
-        } catch (error) { alert('Erro ao atualizar foto.'); }
+        } catch (error) {
+            console.error(error);
+            alert('Erro ao atualizar foto. Tente uma imagem menor.');
+        } finally {
+            setIsUploading(false);
+            // Clear input
+            if (profilePhotoInputRef.current) profilePhotoInputRef.current.value = '';
+        }
     };
 
     const handlePrintProfile = () => {
@@ -513,8 +578,16 @@ const EmployeeDetailModal: React.FC<{
                 <div className="bg-slate-50 p-6 border-b border-slate-200 flex justify-between items-start">
                     <div className="flex items-center space-x-4">
                         <div className="h-20 w-20 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden border-4 border-white shadow-sm relative group">
-                            {empData.photoUrl ? <img src={empData.photoUrl} alt={empData.name} className="h-full w-full object-cover" /> : <span className="text-3xl font-bold text-slate-400">{empData.name.charAt(0)}</span>}
-                            <div onClick={() => !readOnly && profilePhotoInputRef.current?.click()} className={`absolute inset-0 bg-black/30 flex items-center justify-center cursor-pointer transition ${readOnly ? 'hidden' : ''}`}>
+                            {empData.photoUrl ? <img src={empData.photoUrl} alt={empData.name} className={`h-full w-full object-cover transition-opacity ${isUploading ? 'opacity-50' : ''}`} /> : <span className="text-3xl font-bold text-slate-400">{empData.name.charAt(0)}</span>}
+
+                            {/* Loading Spinner */}
+                            {isUploading && (
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/40 z-20">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                                </div>
+                            )}
+
+                            <div onClick={() => !readOnly && !isUploading && profilePhotoInputRef.current?.click()} className={`absolute inset-0 bg-black/30 flex items-center justify-center cursor-pointer transition ${readOnly ? 'hidden' : ''} ${isUploading ? 'hidden' : ''}`}>
                                 <PencilIcon className="text-white h-6 w-6 opacity-70 hover:opacity-100" />
                                 <input
                                     ref={profilePhotoInputRef}
@@ -523,7 +596,7 @@ const EmployeeDetailModal: React.FC<{
                                     capture="user"
                                     className="hidden"
                                     onChange={handleUpdatePhoto}
-                                    disabled={readOnly}
+                                    disabled={readOnly || isUploading}
                                 />
                             </div>
                         </div>
