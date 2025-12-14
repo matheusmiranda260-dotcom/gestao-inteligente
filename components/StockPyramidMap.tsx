@@ -175,7 +175,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
         }
     }, [stock, extraRows]);
 
-    const [newRowName, setNewRowName] = useState('');
+
 
     const handleAddRow = () => {
         const nameToUse = newRowName.trim() || nextRowLetter;
