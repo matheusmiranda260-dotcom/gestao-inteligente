@@ -1320,7 +1320,7 @@ const App: React.FC = () => {
                             return otherOrder && (otherOrder.status === 'pending' || otherOrder.status === 'in_progress');
                         });
 
-                        let newStatus: any = 'Disponível - Suporte Treliça';
+                        let newStatus: any = 'Disponível Suporte para Treliça';
                         if (newRemainingQty <= 0.01) {
                             newStatus = 'Consumido para fazer treliça';
                         } else if (hasOtherActiveOrders) {
