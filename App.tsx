@@ -1180,22 +1180,22 @@ const App: React.FC = () => {
                 actualProducedWeight,
             };
 
-            // Calculate stock updates for Treliça
-            const currentStock = await fetchTable<StockItem>('stock_items');
-            const fullPiecesQty = finalData.actualProducedQuantity || 0;
+            // Treliça Stock Update Logic
+            // 1. Fetch Latest Stock
+            const latestStock = await fetchTable<StockItem>('stock_items');
+            const currentStockLookup = new Map(latestStock.map(s => [s.id, { ...s }]));
 
+            // 2. Parse Lots
             let lots: TrelicaSelectedLots;
-
             if (Array.isArray(orderToComplete.selectedLotIds)) {
-                // If it's an array, it likely doesn't have the rich structure, so we have to guess or use index
-                // Assuming standard order: Superior, Inf1, Inf2, Sen1, Sen2
-                const arr = orderToComplete.selectedLotIds as string[];
+                // Legacy support or fallback if array passed
+                const arr = orderToComplete.selectedLotIds;
                 lots = {
-                    superior: arr[0] || '',
-                    inferior1: arr[1] || '',
-                    inferior2: arr[2] || '',
-                    senozoide1: arr[3] || '',
-                    senozoide2: arr[4] || '',
+                    superior: arr[0],
+                    inferior1: arr[1],
+                    inferior2: arr[2],
+                    senozoide1: arr[3],
+                    senozoide2: arr[4],
                     allSuperior: arr[0] ? [arr[0]] : [],
                     allInferiorLeft: arr[1] ? [arr[1]] : [],
                     allInferiorRight: arr[2] ? [arr[2]] : [],
@@ -1206,18 +1206,18 @@ const App: React.FC = () => {
                 lots = orderToComplete.selectedLotIds as TrelicaSelectedLots;
             }
 
+            // 3. Calculate Consumption
             const consumedMap = new Map<string, number>();
 
-            // Robust Model Lookup
             const modelInfo = trelicaModels.find(m =>
                 m.modelo.trim().toLowerCase() === orderToComplete.trelicaModel?.trim().toLowerCase() &&
                 String(m.tamanho).trim() === String(orderToComplete.tamanho).trim()
             );
 
-            if (!modelInfo && fullPiecesQty > 0) {
-                showNotification(`Erro CRÍTICO: Modelo de treliça não encontrado (${orderToComplete.trelicaModel} - ${orderToComplete.tamanho}). Estoque não será baixado.`, 'error');
-            } else if (modelInfo) {
+            if (modelInfo) {
                 const parse = (s: string) => parseFloat(s.replace(',', '.'));
+                const fullPiecesQty = finalData.actualProducedQuantity || 0;
+
                 const consumedFull = {
                     superior: parse(modelInfo.pesoSuperior) * fullPiecesQty,
                     inferior: parse(modelInfo.pesoInferior) * fullPiecesQty,
@@ -1243,102 +1243,87 @@ const App: React.FC = () => {
                 };
 
                 const distributeConsumption = (lotIds: string[] | undefined, totalWeight: number) => {
-                    if (!lotIds || lotIds.length === 0) return;
+                    if (!lotIds || lotIds.length === 0 || totalWeight <= 0) return;
                     let remainingWeight = totalWeight;
 
-                    // First pass: verify lots
-                    const validLotIds = lotIds.filter(id => {
-                        const exists = currentStock.some(s => s.id === id) || stock.some(s => s.id === id);
-                        return exists;
-                    });
+                    // Filter valid lots using latest stock
+                    const validLots = lotIds
+                        .map(id => id.trim())
+                        .map(id => currentStockLookup.get(id))
+                        .filter((item): item is StockItem => !!item);
 
-                    if (validLotIds.length === 0 && totalWeight > 0.001) {
-                        console.warn("Sem lotes válidos para consumir:", totalWeight);
+                    if (validLots.length === 0) {
+                        console.warn("Sem lotes válidos no estoque para consumir:", totalWeight);
+                        // Try to find ANY match ignoring status restrictions just for consumption recording?
+                        // No, unsafe. 
                         return;
                     }
 
-                    for (const lotId of validLotIds) {
+                    for (const stockItem of validLots) {
                         if (remainingWeight <= 0.0001) break;
-                        const stockItem = currentStock.find(s => s.id === lotId) || stock.find(s => s.id === lotId);
-                        if (!stockItem) continue;
 
-                        const alreadyConsumed = consumedMap.get(lotId) || 0;
-                        const available = Math.max(0, parseFloat(String(stockItem.remainingQuantity)) - alreadyConsumed);
+                        const alreadyConsumed = consumedMap.get(stockItem.id) || 0;
+                        const currentRemaining = parseFloat(String(stockItem.remainingQuantity || 0));
+                        const available = Math.max(0, currentRemaining - alreadyConsumed);
                         const toConsume = Math.min(remainingWeight, available);
 
                         if (toConsume > 0) {
-                            consumedMap.set(lotId, alreadyConsumed + toConsume);
+                            consumedMap.set(stockItem.id, alreadyConsumed + toConsume);
                             remainingWeight -= toConsume;
                         }
                     }
-                    // Force remaining on last valid lot if still needed (overconsumption)
-                    if (remainingWeight > 0.0001 && validLotIds.length > 0) {
-                        const lastLotId = validLotIds[validLotIds.length - 1];
+
+                    // Force remaining on last lot if needed
+                    if (remainingWeight > 0.0001 && validLots.length > 0) {
+                        const lastLotId = validLots[validLots.length - 1].id;
                         consumedMap.set(lastLotId, (consumedMap.get(lastLotId) || 0) + remainingWeight);
                     }
                 };
 
-                // Separate Consumption by Side (Left/Right) if available
+                // Distribute
                 const superiorLots = (lots.allSuperior && lots.allSuperior.length > 0) ? lots.allSuperior : (lots.superior ? [lots.superior] : []);
                 distributeConsumption(superiorLots, totalConsumed.superior);
 
                 const halfInferiorWeight = totalConsumed.inferior / 2;
-                if (lots.allInferiorLeft && lots.allInferiorRight && (lots.allInferiorLeft.length > 0 || lots.allInferiorRight.length > 0)) {
-                    distributeConsumption(lots.allInferiorLeft, halfInferiorWeight);
-                    distributeConsumption(lots.allInferiorRight, halfInferiorWeight);
-                } else if (lots.allInferior && lots.allInferior.length > 0) {
-                    distributeConsumption(lots.allInferior, totalConsumed.inferior);
-                } else {
-                    distributeConsumption([lots.inferior1].filter(Boolean), halfInferiorWeight);
-                    distributeConsumption([lots.inferior2].filter(Boolean), halfInferiorWeight);
-                }
+                const inferiorLeft = (lots.allInferiorLeft && lots.allInferiorLeft.length > 0) ? lots.allInferiorLeft : (lots.inferior1 ? [lots.inferior1] : []);
+                const inferiorRight = (lots.allInferiorRight && lots.allInferiorRight.length > 0) ? lots.allInferiorRight : (lots.inferior2 ? [lots.inferior2] : []);
+                if (inferiorLeft.length > 0) distributeConsumption(inferiorLeft, halfInferiorWeight);
+                else if (lots.allInferior) distributeConsumption(lots.allInferior, halfInferiorWeight);
+
+                if (inferiorRight.length > 0) distributeConsumption(inferiorRight, halfInferiorWeight);
+                else if (lots.allInferior) distributeConsumption(lots.allInferior, halfInferiorWeight);
 
                 const halfSenozoideWeight = totalConsumed.senozoide / 2;
-                if (lots.allSenozoideLeft && lots.allSenozoideRight && (lots.allSenozoideLeft.length > 0 || lots.allSenozoideRight.length > 0)) {
-                    distributeConsumption(lots.allSenozoideLeft, halfSenozoideWeight);
-                    distributeConsumption(lots.allSenozoideRight, halfSenozoideWeight);
-                } else if (lots.allSenozoide && lots.allSenozoide.length > 0) {
-                    distributeConsumption(lots.allSenozoide, totalConsumed.senozoide);
-                } else {
-                    distributeConsumption([lots.senozoide1].filter(Boolean), halfSenozoideWeight);
-                    distributeConsumption([lots.senozoide2].filter(Boolean), halfSenozoideWeight);
-                }
+                const senozoideLeft = (lots.allSenozoideLeft && lots.allSenozoideLeft.length > 0) ? lots.allSenozoideLeft : (lots.senozoide1 ? [lots.senozoide1] : []);
+                const senozoideRight = (lots.allSenozoideRight && lots.allSenozoideRight.length > 0) ? lots.allSenozoideRight : (lots.senozoide2 ? [lots.senozoide2] : []);
+                if (senozoideLeft.length > 0) distributeConsumption(senozoideLeft, halfSenozoideWeight);
+                else if (lots.allSenozoide) distributeConsumption(lots.allSenozoide, halfSenozoideWeight);
 
-                // Apply mapped consumption to stock updates
+                if (senozoideRight.length > 0) distributeConsumption(senozoideRight, halfSenozoideWeight);
+                else if (lots.allSenozoide) distributeConsumption(lots.allSenozoide, halfSenozoideWeight);
+
+                // 4. Prepare Updates
                 consumedMap.forEach((consumedQty, lotId) => {
-                    const cleanId = lotId.trim();
-                    const stockItem = currentStock.find(s => s.id === cleanId) || stock.find(s => s.id === cleanId);
-
+                    const stockItem = currentStockLookup.get(lotId);
                     if (stockItem) {
                         const currentQty = parseFloat(String(stockItem.remainingQuantity || 0));
                         const newRemainingQty = Math.max(0, currentQty - consumedQty);
 
-                        // Check if lot is used in other active orders
-                        // Filter out the current order ID from the list
                         const currentOrderIds = stockItem.productionOrderIds || [];
-                        const remainingOrderIds = currentOrderIds.filter(id => id !== orderId);
+                        const remainingOrderIds = currentOrderIds.filter(id => id !== orderToComplete.id);
 
-                        // Check if any of the remaining IDs belong to an active order
                         const hasOtherActiveOrders = remainingOrderIds.some(otherId => {
                             const otherOrder = productionOrders.find(o => o.id === otherId);
-                            // Consider 'pending' and 'in_progress' as active
                             return otherOrder && (otherOrder.status === 'pending' || otherOrder.status === 'in_progress');
                         });
 
-                        // Logic for status update
-                        let newStatus: string = stockItem.status;
+                        let newStatus: any = stockItem.status;
 
                         if (newRemainingQty <= 0.01) {
                             newStatus = 'Consumido para fazer treliça';
                         } else {
-                            // If it has NO other active orders, it becomes available support
                             if (!hasOtherActiveOrders) {
                                 newStatus = 'Disponível Suporte para Treliça';
-                            } else {
-                                // If it HAS other active orders, we keep it as Em Produção (or whatever it was)
-                                // But ensure it is not 'Disponível' if it is active.
-                                // Assuming 'Em Produção - Treliça' was set previously.
-                                // We keep the current status if it suggests being busy.
                             }
                         }
 
@@ -1352,8 +1337,8 @@ const App: React.FC = () => {
                             id: stockItem.id,
                             changes: {
                                 remainingQuantity: newRemainingQty,
-                                labelWeight: newRemainingQty, // Sync label weight
-                                productionOrderIds: remainingOrderIds.length > 0 ? remainingOrderIds : [], // Send empty array instead of undefined if empty, to clear
+                                labelWeight: newRemainingQty,
+                                productionOrderIds: remainingOrderIds.length > 0 ? remainingOrderIds : [],
                                 status: newStatus,
                                 history: [...(stockItem.history || []), historyEntry]
                             }
@@ -1366,29 +1351,29 @@ const App: React.FC = () => {
                 } else {
                     showNotification(`Aviso: Produção finalizada, mas nenhum lote sofreu baixa de estoque. Verifique o cadastro do modelo.`, 'error');
                 }
+
+            } else {
+                showNotification(`Erro CRÍTICO: Modelo de treliça não encontrado.`, 'error');
             }
         }
+
 
         const completedOrder = { ...orderToComplete, ...updates } as ProductionOrderData;
 
         try {
-            // 1. Update Production Order
+            // Update Order
             const updatedOrder = await updateItem<ProductionOrderData>('production_orders', completedOrder.id, updates);
             setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
 
-            // 2. Apply Stock Updates
+            // Update Stock
             for (const update of stockUpdates) {
-                try {
-                    await updateItem<StockItem>('stock_items', update.id, update.changes);
-                } catch (err: any) {
-                    console.error(`Failed to update lot ${update.id}:`, err);
-                    showNotification(`Erro ao atualizar lote ${update.id}: ${err.message}`, 'error');
-                }
+                await updateItem<StockItem>('stock_items', update.id, update.changes);
             }
 
-            // Refresh stock
+            // Refresh Stock Globally
             const finalStock = await fetchTable<StockItem>('stock_items');
             setStock(finalStock);
+
 
             // 3. Create Pontas (Treliça)
             if (completedOrder.machine === 'Treliça' && finalData.pontas) {
