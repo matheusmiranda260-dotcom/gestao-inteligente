@@ -424,8 +424,8 @@ const EmployeeDetailModal: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col overflow-hidden">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-0 md:p-4">
+            <div className="bg-white md:rounded-2xl shadow-2xl w-full md:max-w-4xl h-full md:h-[90vh] flex flex-col overflow-hidden">
                 <div className="bg-slate-50 p-6 border-b border-slate-200 flex justify-between items-start">
                     <div className="flex items-center space-x-4">
                         <div className="h-20 w-20 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden border-4 border-white shadow-sm relative group">
@@ -455,7 +455,7 @@ const EmployeeDetailModal: React.FC<{
                         <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-200 transition">✕</button>
                     </div>
                 </div>
-                <div className="flex border-b border-slate-200 bg-white">
+                <div className="flex border-b border-slate-200 bg-white overflow-x-auto no-scrollbar">
                     {[
                         { id: 'profile', label: 'Resumo / Perfil', icon: <UserIcon className="h-4 w-4" /> },
                         { id: 'responsibilities', label: 'Atribuições', icon: <DocumentTextIcon className="h-4 w-4" /> },
@@ -464,7 +464,7 @@ const EmployeeDetailModal: React.FC<{
                         { id: 'documents', label: 'Documentos', icon: <DocumentTextIcon className="h-4 w-4" /> },
                         { id: 'evaluations', label: 'Avaliações', icon: <StarIcon className="h-4 w-4" /> },
                     ].map(tab => (
-                        <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex items-center space-x-2 px-6 py-4 text-sm font-medium transition-colors border-b-2 ${activeTab === tab.id ? 'border-[#0F3F5C] text-[#0F3F5C] bg-slate-50' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}>
+                        <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex items-center space-x-2 px-6 py-4 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === tab.id ? 'border-[#0F3F5C] text-[#0F3F5C] bg-slate-50' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}>
                             {tab.icon} <span>{tab.label}</span>
                         </button>
                     ))}
@@ -1223,44 +1223,52 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
             {/* Simple Add Modal removed, replaced by direct prompt logic */}
 
             <header className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-                <div className="flex items-center">
-                    <button onClick={() => setPage('menu')} className="mr-4 p-2 rounded-full hover:bg-slate-200 transition">
-                        <ArrowLeftIcon className="h-6 w-6 text-slate-700" />
-                    </button>
-                    <div>
-                        <h1 className="text-3xl font-bold text-slate-800">Gestão de Pessoas</h1>
-                        <p className="text-slate-500">Prontuário Digital e Organograma</p>
+                <div className="flex items-center justify-between md:justify-start w-full md:w-auto">
+                    <div className="flex items-center">
+                        <button onClick={() => setPage('menu')} className="mr-4 p-2 rounded-full hover:bg-slate-200 transition">
+                            <ArrowLeftIcon className="h-6 w-6 text-slate-700" />
+                        </button>
+                        <div>
+                            <h1 className="text-2xl md:text-3xl font-bold text-slate-800">Gestão de Pessoas</h1>
+                            <p className="text-sm md:text-base text-slate-500">Prontuário Digital</p>
+                        </div>
                     </div>
+                    {/* Mobile Only Add Button */}
+                    {!isRestrictedUser && (
+                        <button onClick={() => promptAndCreateEmployee()} className="md:hidden bg-[#0F3F5C] text-white p-2 rounded-lg shadow-lg">
+                            <PlusIcon className="h-6 w-6" />
+                        </button>
+                    )}
                 </div>
 
                 {!isRestrictedUser && (
-                    <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
-                        <button
-                            onClick={() => setViewMode('dashboard')}
-                            className={`px-4 py-2 rounded-md font-medium text-sm transition ${viewMode === 'dashboard' ? 'bg-slate-100 text-[#0F3F5C] font-bold' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                            Dashboard
-                        </button>
-                        <button
-                            onClick={() => setViewMode('cards')}
-                            className={`px-4 py-2 rounded-md font-medium text-sm transition ${viewMode === 'cards' ? 'bg-slate-100 text-[#0F3F5C] font-bold' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                            Cards / Lista
-                        </button>
-                        <button
-                            onClick={() => setViewMode('orgChart')}
-                            className={`px-4 py-2 rounded-md font-medium text-sm transition ${viewMode === 'orgChart' ? 'bg-slate-100 text-[#0F3F5C] font-bold' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                            Organograma Visual
+                    <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                        <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200 shadow-sm overflow-x-auto w-full md:w-auto">
+                            <button
+                                onClick={() => setViewMode('dashboard')}
+                                className={`flex-1 md:flex-none px-4 py-2 rounded-md font-medium text-sm transition whitespace-nowrap ${viewMode === 'dashboard' ? 'bg-slate-100 text-[#0F3F5C] font-bold' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                Dashboard
+                            </button>
+                            <button
+                                onClick={() => setViewMode('cards')}
+                                className={`flex-1 md:flex-none px-4 py-2 rounded-md font-medium text-sm transition whitespace-nowrap ${viewMode === 'cards' ? 'bg-slate-100 text-[#0F3F5C] font-bold' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                Lista
+                            </button>
+                            <button
+                                onClick={() => setViewMode('orgChart')}
+                                className={`flex-1 md:flex-none px-4 py-2 rounded-md font-medium text-sm transition whitespace-nowrap ${viewMode === 'orgChart' ? 'bg-slate-100 text-[#0F3F5C] font-bold' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                Organograma
+                            </button>
+                        </div>
+
+                        <button onClick={() => promptAndCreateEmployee()} className="hidden md:flex bg-[#0F3F5C] text-white px-4 py-2 rounded-lg font-bold hover:bg-[#0A2A3D] transition items-center gap-2 whitespace-nowrap">
+                            <PlusIcon className="h-5 w-5" />
+                            Novo Funcionário
                         </button>
                     </div>
-                )}
-
-                {!isRestrictedUser && (
-                    <button onClick={() => promptAndCreateEmployee()} className="bg-[#0F3F5C] text-white px-4 py-2 rounded-lg font-bold hover:bg-[#0A2A3D] transition flex items-center gap-2">
-                        <PlusIcon className="h-5 w-5" />
-                        Novo Funcionário
-                    </button>
                 )}
             </header>
 
