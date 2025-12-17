@@ -15,9 +15,10 @@ interface PyramidRowProps {
     onExpand?: () => void; // New prop for landscape toggle
     activeSlot?: { l: number, p: number } | null; // New slot highlight
     onSlotClick?: (l: number, p: number) => void;
+    movingItem?: StockItem | null; // Visual feedback for move mode
 }
 
-const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemove, onRemoveRow, isActive, onSetActive, onItemClick, onExpand, activeSlot, onSlotClick }) => {
+const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemove, onRemoveRow, isActive, onSetActive, onItemClick, onExpand, activeSlot, onSlotClick, movingItem }) => {
     // Determine initial base size. High enough to fit existing items or default 7 as requested.
     const [baseSize, setBaseSize] = useState(7);
     const [maxHeight, setMaxHeight] = useState(20); // Default high enough
@@ -170,18 +171,22 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                         <ChartBarIcon className="w-5 h-5 rotate-90" />
                     </button>
 
-                    <div className="flex items-center bg-white rounded-lg border border-slate-200 mr-2 scale-90 origin-right" title="Tamanho da Base (Chão)">
-                        <button onClick={(e) => { e.stopPropagation(); setBaseSize(Math.max(1, baseSize - 1)); }} className="px-2 py-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-l-lg font-bold">-</button>
-                        <span className="text-xs font-mono w-6 text-center border-x bg-slate-50">{baseSize}</span>
-                        <button onClick={(e) => { e.stopPropagation(); setBaseSize(baseSize + 1); }} className="px-2 py-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-r-lg font-bold">+</button>
+                    <div className="flex items-center bg-white rounded-lg border border-slate-200 mr-2 scale-90 origin-right shadow-sm" title="Tamanho da Base (Chão)">
+                        <button onClick={(e) => { e.stopPropagation(); setBaseSize(Math.max(1, baseSize - 1)); }} className="px-3 py-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-l-lg font-bold border-r active:bg-slate-200">-</button>
+                        <div className="flex flex-col items-center justify-center w-10 bg-slate-50 px-1 select-none">
+                            <span className="text-[8px] uppercase text-slate-400 leading-none mb-0.5">Base</span>
+                            <span className="text-sm font-mono font-bold leading-none text-slate-700">{baseSize}</span>
+                        </div>
+                        <button onClick={(e) => { e.stopPropagation(); setBaseSize(baseSize + 1); }} className="px-3 py-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-r-lg font-bold border-l active:bg-slate-200">+</button>
                     </div>
 
-                    <div className="flex items-center bg-white rounded-lg border border-slate-200 mr-2 scale-90 origin-right" title="Altura Máxima">
-                        <div className="grid grid-cols-1 w-5 border-r">
-                            <button onClick={(e) => { e.stopPropagation(); setMaxHeight(maxHeight + 1) }} className="text-[8px] hover:bg-slate-100 h-3 flex items-center justify-center">▲</button>
-                            <button onClick={(e) => { e.stopPropagation(); setMaxHeight(Math.max(1, maxHeight - 1)) }} className="text-[8px] hover:bg-slate-100 h-3 flex items-center justify-center">▼</button>
+                    <div className="flex items-center bg-white rounded-lg border border-slate-200 mr-2 scale-90 origin-right shadow-sm" title="Altura Máxima (Pilha)">
+                        <button onClick={(e) => { e.stopPropagation(); setMaxHeight(Math.max(1, maxHeight - 1)) }} className="px-3 py-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-l-lg font-bold border-r active:bg-slate-200">-</button>
+                        <div className="flex flex-col items-center justify-center w-10 bg-slate-50 px-1 select-none">
+                            <span className="text-[8px] uppercase text-slate-400 leading-none mb-0.5">Alt</span>
+                            <span className="text-sm font-mono font-bold leading-none text-slate-700">{maxHeight >= 20 ? '∞' : maxHeight}</span>
                         </div>
-                        <span className="text-xs font-mono w-6 text-center bg-slate-50 flex items-center justify-center">{maxHeight >= 20 ? '∞' : maxHeight}</span>
+                        <button onClick={(e) => { e.stopPropagation(); setMaxHeight(maxHeight + 1) }} className="px-3 py-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-r-lg font-bold border-l active:bg-slate-200">+</button>
                     </div>
 
                     <button onClick={(e) => { e.stopPropagation(); onRemoveRow(); }} className="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition"><TrashIcon className="w-4 h-4" /></button>
@@ -196,12 +201,17 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                     <div key={levelIndex} className="flex justify-center gap-1">
                         {levelSlots.map((slot, slotIndex) => {
                             const isSlotActive = activeSlot && activeSlot.l === slot.coords.l && activeSlot.p === slot.coords.p;
+                            const isMovingThis = movingItem && slot.item && movingItem.id === slot.item.id;
+                            const isSwapTarget = movingItem && slot.item && movingItem.id !== slot.item.id;
 
                             if (slot.item) {
                                 return (
                                     <div
                                         key={slot.item.id}
-                                        className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-slate-800 text-white flex items-center justify-center text-[10px] font-bold shadow-lg relative group cursor-grab active:cursor-grabbing border-2 border-white transition-transform hover:scale-110 z-10"
+                                        className={`w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center text-[10px] font-bold shadow-lg relative group cursor-grab active:cursor-grabbing border-2 transition-transform hover:scale-110 z-10
+                                            ${isMovingThis ? 'bg-amber-400 border-amber-600 text-amber-900 animate-pulse ring-4 ring-amber-200' : 'bg-slate-800 border-white text-white'}
+                                            ${isSwapTarget ? 'cursor-pointer hover:border-amber-400 hover:ring-2 hover:ring-amber-200' : ''}
+                                        `}
                                         title={`${slot.item.internalLot} - ${slot.item.bitola} - ${slot.item.remainingQuantity.toFixed(0)}kg`}
                                         draggable
                                         onDragStart={(e) => {
@@ -214,9 +224,15 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                         }}
                                     >
                                         <div className="text-center leading-tight pointer-events-none">
-                                            <div className="text-emerald-300 text-[9px] md:text-[10px]">{slot.item.internalLot}</div>
-                                            <div className="opacity-70 scale-90">{slot.item.remainingQuantity.toFixed(0)}</div>
+                                            <div className={`${isMovingThis ? 'text-amber-800' : 'text-emerald-300'} text-[9px] md:text-[10px]`}>{slot.item.internalLot}</div>
+                                            <div className={`opacity-70 scale-90 ${isMovingThis ? 'text-amber-800' : 'text-white'}`}>{slot.item.remainingQuantity.toFixed(0)}</div>
                                         </div>
+
+                                        {isSwapTarget && (
+                                            <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-full animate-pulse pointer-events-none">
+                                                <span className="text-lg">⇄</span>
+                                            </div>
+                                        )}
 
                                         <button
                                             onClick={(e) => {
@@ -782,6 +798,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                                     onRemove={handleRemoveFromRow}
                                     onRemoveRow={() => handleRemoveRow(row)}
                                     isActive={activeRow === row}
+                                    movingItem={itemToMove} // Pass the moving state
                                     activeSlot={activeSlot && activeSlot.row === row ? activeSlot : null}
                                     onSetActive={() => {
                                         if (itemToMove) {
