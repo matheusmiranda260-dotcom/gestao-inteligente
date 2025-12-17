@@ -40,7 +40,7 @@ const StockDashboard: React.FC<StockDashboardProps> = ({ stock }) => {
 
         const materialData = Object.entries(materialGroups).map(([name, value]) => ({
             name,
-            value: Number(value.toFixed(2)),
+            value: Number((value as number).toFixed(2)),
         }));
 
         // Group by Bitola
@@ -53,7 +53,7 @@ const StockDashboard: React.FC<StockDashboardProps> = ({ stock }) => {
         const bitolaData = Object.entries(bitolaGroups)
             .map(([name, value]) => ({
                 name,
-                value: Number(value.toFixed(2)),
+                value: Number((value as number).toFixed(2)),
             }))
             .sort((a, b) => parseFloat(a.name) - parseFloat(b.name));
 

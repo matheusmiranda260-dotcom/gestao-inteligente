@@ -368,7 +368,7 @@ const EmployeeDetailModal: React.FC<{
                 startDate: newVacation.startDate,
                 endDate: newVacation.endDate,
                 status: 'Agendada'
-            });
+            } as any);
             alert('Férias agendadas');
             setNewVacation({ period: '', startDate: '', endDate: '' });
             loadDetails();
@@ -1223,7 +1223,7 @@ const OrgChart: React.FC<{
         // Simple heuristic: if name contains 'Maquina' -> machine, else department
         const type = name.toLowerCase().includes('maquina') ? 'machine' : (name.toLowerCase().includes('maquinas') ? 'group' : 'department');
 
-        await insertItem('org_units', { name, unitType: type, displayOrder: units.length + 1 });
+        await insertItem('org_units', { name, unitType: type, displayOrder: units.length + 1 } as any);
         loadOrgData();
     };
 
@@ -1237,14 +1237,14 @@ const OrgChart: React.FC<{
         if (parent?.unitType === 'group') type = 'machine'; // Group -> Machine (e.g. Máquinas -> Trefila 01)
         if (name.toLowerCase().includes('maquina')) type = 'machine';
 
-        await insertItem('org_units', { name, unitType: type, parentId, displayOrder: 99 });
+        await insertItem('org_units', { name, unitType: type, parentId, displayOrder: 99 } as any);
         loadOrgData();
     };
 
     const handleAddPosition = async (unitId: string) => {
         const title = prompt("Nome do Cargo/Função:");
         if (!title) return;
-        await insertItem('org_positions', { orgUnitId: unitId, title, isLeadership: false });
+        await insertItem('org_positions', { orgUnitId: unitId, title, isLeadership: false } as any);
         loadOrgData();
     };
 
