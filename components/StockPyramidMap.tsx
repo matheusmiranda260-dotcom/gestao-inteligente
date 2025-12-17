@@ -464,7 +464,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                             unassignedStock.map(item => (
                                 <div
                                     key={item.id}
-                                    className={`bg-white p-4 rounded-xl border-l-4 shadow-sm active:scale-95 transition-all cursor-pointer ${activeRow ? 'border-emerald-500 ring-2 ring-emerald-100 hover:bg-emerald-50' : 'border-slate-300 hover:border-amber-400'}`}
+                                    className={`bg-white p-5 rounded-xl border-l-4 shadow-sm active:scale-95 transition-all cursor-pointer mb-3 ${activeRow ? 'border-emerald-500 ring-2 ring-emerald-100 hover:bg-emerald-50' : 'border-slate-300 hover:border-amber-400'}`}
                                     onClick={() => {
                                         if (activeRow) {
                                             handleDropOnRow(item, activeRow);
@@ -474,16 +474,16 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                                         }
                                     }}
                                 >
-                                    <div className="flex justify-between items-start mb-2">
-                                        <span className="font-bold text-slate-800 text-lg">{item.internalLot}</span>
-                                        <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-600 font-bold">{item.bitola}</span>
+                                    <div className="flex justify-between items-center mb-3">
+                                        <span className="font-bold text-slate-800 text-xl">{item.internalLot}</span>
+                                        <span className="text-sm bg-slate-100 px-3 py-1.5 rounded-lg text-slate-600 font-bold border border-slate-200">{item.bitola}</span>
                                     </div>
-                                    <div className="flex justify-between text-sm text-slate-500">
+                                    <div className="flex justify-between text-base text-slate-500">
                                         <span>{item.supplier}</span>
                                         <span className="font-medium text-slate-700">{item.remainingQuantity.toFixed(0)} kg</span>
                                     </div>
                                     {activeRow && (
-                                        <div className="mt-2 text-center text-xs font-bold text-emerald-600 bg-emerald-50 py-1 rounded">
+                                        <div className="mt-3 text-center text-sm font-bold text-emerald-600 bg-emerald-50 py-2 rounded-lg border border-emerald-100 uppercase tracking-wide">
                                             Toque para mover para {activeRow}
                                         </div>
                                     )}
@@ -511,27 +511,36 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                             </div>
                         )}
 
-                        {derivedRows.map(row => (
-                            <PyramidRow
-                                key={row}
-                                rowName={row}
-                                items={relevantStock.filter(s => s.location === row)}
-                                onDrop={(item) => handleDropOnRow(item, row)}
-                                onRemove={handleRemoveFromRow}
-                                onRemoveRow={() => handleRemoveRow(row)}
-                                isActive={activeRow === row}
-                                onSetActive={() => {
-                                    if (itemToMove) {
-                                        // If moving mode, click = drop
-                                        handleDropOnRow(itemToMove, row);
-                                    } else {
-                                        // Toggle active
-                                        setActiveRow(row === activeRow ? null : row);
-                                    }
-                                }}
-                                onItemClick={(item) => setItemToMove(item)}
-                            />
-                        ))}
+                        {derivedRows.map(row => {
+                            // Sort items by last history date (insertion/edit time) to maintain order stability
+                            const rowItems = relevantStock
+                                .filter(s => s.location === row)
+                                .sort((a, b) => {
+                                    const dateA = a.history && a.history.length > 0 ? a.history[a.history.length - 1].date : (a.entryDate || '');
+                                    const dateB = b.history && b.history.length > 0 ? b.history[b.history.length - 1].date : (b.entryDate || '');
+                                    return dateA.localeCompare(dateB);
+                                });
+
+                            return (
+                                <PyramidRow
+                                    key={row}
+                                    rowName={row}
+                                    items={rowItems}
+                                    onDrop={(item) => handleDropOnRow(item, row)}
+                                    onRemove={handleRemoveFromRow}
+                                    onRemoveRow={() => handleRemoveRow(row)}
+                                    isActive={activeRow === row}
+                                    onSetActive={() => {
+                                        if (itemToMove) {
+                                            handleDropOnRow(itemToMove, row);
+                                        } else {
+                                            setActiveRow(row === activeRow ? null : row);
+                                        }
+                                    }}
+                                    onItemClick={(item) => setItemToMove(item)}
+                                />
+                            );
+                        })}
                     </div>
                 </div>
             </div>
