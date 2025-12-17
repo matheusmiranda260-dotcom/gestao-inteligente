@@ -142,6 +142,8 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
     // If location is null, it's in "Unassigned".
     // Location format: "Fileira A", "Fileira B", etc.
 
+    const safeStock = Array.isArray(stock) ? stock : [];
+
     const [newRowName, setNewRowName] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     // We treat unique location strings as rows.
@@ -151,10 +153,13 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
     const [selectedBitola, setSelectedBitola] = useState<Bitola | null>(null);
     const [isPendingListOpen, setIsPendingListOpen] = useState(false); // Mobile: Toggle pending list
 
+    // Quick Add New Lot ("Cadastrar ali mesmo")
+    const [activeRow, setActiveRow] = useState<string | null>(null);
+
     // Helper to find next available row name globally (across all stock)
     const nextRowLetter = useMemo(() => {
         const existingRowLetters = new Set<string>();
-        stock.forEach(item => {
+        safeStock.forEach(item => {
             if (item.location && item.location.startsWith('Fileira ')) {
                 const parts = item.location.split(' ');
                 if (parts.length > 1) existingRowLetters.add(parts[1]);
@@ -176,7 +181,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
             if (!existingRowLetters.has(String(i))) return String(i);
             i++;
         }
-    }, [stock, extraRows]);
+    }, [safeStock, extraRows]);
 
 
 
@@ -185,7 +190,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
         const fullName = `Fileira ${nameToUse.toUpperCase()}`;
 
         // Check duplication
-        const alreadyExists = derivedRows.includes(fullName) || stock.some(s => s.location === fullName);
+        const alreadyExists = derivedRows.includes(fullName) || safeStock.some(s => s.location === fullName);
 
         if (!alreadyExists) {
             setExtraRows(prev => [...prev, fullName]);
@@ -229,37 +234,35 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
     const handleRemoveRow = (rowName: string) => {
         // Only if empty? 
         // Or unassign all items in it? Let's check if empty.
-        const hasItems = stock.some(s => s.location === rowName);
+        const hasItems = safeStock.some(s => s.location === rowName);
         if (hasItems) {
             if (!confirm(`A ${rowName} contém itens. Deseja remover a fileira e mover os itens para "Não Atribuído"?`)) {
                 return;
             }
             // Move items
-            stock.filter(s => s.location === rowName).forEach(item => {
+            safeStock.filter(s => s.location === rowName).forEach(item => {
                 handleRemoveFromRow(item);
             });
         }
         setExtraRows(prev => prev.filter(r => r !== rowName));
     };
 
-    // Quick Add New Lot ("Cadastrar ali mesmo")
-    const [activeRow, setActiveRow] = useState<string | null>(null);
 
     const availableBitolas = useMemo(() => {
-        if (!selectedMaterial) return [...FioMaquinaBitolaOptions, ...TrefilaBitolaOptions];
-        if (selectedMaterial === 'Fio Máquina') return FioMaquinaBitolaOptions;
-        if (selectedMaterial === 'CA-60') return TrefilaBitolaOptions;
-        return [...FioMaquinaBitolaOptions, ...TrefilaBitolaOptions];
+        if (!selectedMaterial) return [...(FioMaquinaBitolaOptions || []), ...(TrefilaBitolaOptions || [])]; // Safety spreads
+        if (selectedMaterial === 'Fio Máquina') return FioMaquinaBitolaOptions || [];
+        if (selectedMaterial === 'CA-60') return TrefilaBitolaOptions || [];
+        return [...(FioMaquinaBitolaOptions || []), ...(TrefilaBitolaOptions || [])];
     }, [selectedMaterial]);
 
     // Filter stock based on selection
     const relevantStock = useMemo(() => {
-        return stock.filter(item => {
+        return safeStock.filter(item => {
             if (selectedMaterial && item.materialType !== selectedMaterial) return false;
             if (selectedBitola && item.bitola !== selectedBitola) return false;
             return true;
         });
-    }, [stock, selectedMaterial, selectedBitola]);
+    }, [safeStock, selectedMaterial, selectedBitola]);
 
 
     const derivedRows = useMemo(() => {
@@ -279,8 +282,8 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
         return relevantStock
             .filter(item => !item.location)
             .filter(item =>
-                item.internalLot.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                item.supplierLot.toLowerCase().includes(searchTerm.toLowerCase())
+                (item.internalLot || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (item.supplierLot || '').toLowerCase().includes(searchTerm.toLowerCase())
             );
     }, [relevantStock, searchTerm]);
 
@@ -410,7 +413,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                     <div className="p-4 bg-slate-50 border-b flex justify-between items-center">
                         <h2 className="font-bold text-slate-700 flex items-center gap-2">
                             <ExclamationIcon className="w-5 h-5 text-amber-500" />
-                            Lotes Pendentes ({unmappedStock.length})
+                            Lotes Pendentes ({unassignedStock.length})
                         </h2>
                         <button onClick={() => setIsPendingListOpen(false)} className="md:hidden text-slate-400 hover:text-slate-600">
                             ✕
