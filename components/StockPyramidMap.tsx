@@ -16,7 +16,8 @@ interface PyramidRowProps {
 }
 
 const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemove, onRemoveRow, isActive, onSetActive, onItemClick, onExpand }) => {
-    const [baseSize, setBaseSize] = useState(4); // Default base size
+    // Determine initial base size. High enough to fit existing items or default 7 as requested.
+    const [baseSize, setBaseSize] = useState(7);
 
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();
@@ -27,25 +28,94 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
         e.currentTarget.classList.remove('bg-emerald-50');
     };
 
-    // Pyramid Logic: Calculate levels
-    // Base Level = baseSize items. Next Level = baseSize - 1, etc.
-    const levels: StockItem[][] = [];
-    let currentIndex = 0;
-    let currentCapacity = baseSize;
-
-    if (items.length > 0) {
-        while (currentIndex < items.length) {
-            // If currentCapacity drops to 0 or less, we usually just stack 1s on top, or maybe maintain 1.
-            // Let's cap minimum capacity at 1.
-            const capacity = Math.max(1, currentCapacity);
-
-            const levelItems = items.slice(currentIndex, currentIndex + capacity);
-            levels.push(levelItems);
-
-            currentIndex += capacity;
-            currentCapacity--;
+    // Helper: Parse location to get coordinates
+    // Format: "RowName:L{l}:P{p}"
+    const getItemCoords = (item: StockItem) => {
+        if (!item.location) return null;
+        // Check if location string has coordinate suffix
+        // Matches ":Lb:Pc" where b and c are digits
+        // We use a simpler split check
+        const parts = item.location.split(':');
+        if (parts.length >= 3) {
+            const lPart = parts.find(p => p.startsWith('L'));
+            const pPart = parts.find(p => p.startsWith('P'));
+            if (lPart && pPart) {
+                const lVal = parseInt(lPart.substring(1));
+                const pVal = parseInt(pPart.substring(1));
+                if (!isNaN(lVal) && !isNaN(pVal)) return { l: lVal, p: pVal };
+            }
         }
+        return null;
+    };
+
+    // Pyramid Structure Generation with Fixed Slots
+    const builtLevels = [];
+    let currentCapacity = baseSize;
+    let currentLevel = 0;
+
+    // Use a safety cap for levels
+    while (currentCapacity > 0 && currentLevel < 20) {
+        const levelSlots = [];
+        for (let i = 0; i < currentCapacity; i++) {
+            // Find item in this specific slot
+            const slotItem = items.find(item => {
+                const coords = getItemCoords(item);
+                if (coords) return coords.l === currentLevel && coords.p === i;
+                return false;
+            });
+
+            levelSlots.push({
+                coords: { l: currentLevel, p: i },
+                item: slotItem
+            });
+        }
+        builtLevels.push(levelSlots);
+        currentLevel++;
+        currentCapacity--;
     }
+
+    // Identify "Floating" items (those without valid coords or coords out of range)
+    const floatingItems = items.filter(item => {
+        const coords = getItemCoords(item);
+        if (!coords) return true; // No coords
+        // Check if coords exist in our generated structure
+        // If row resized smaller, items might be out of range
+        // For now, easier to treating everything without coords as 'floating'
+        // We need to auto-assign them to empty slots purely for display?
+        // Or render them in a 'overflow' pile? 
+        // Let's render them in first available empty slots for visual consistency,
+        // but DO NOT persist unless they are moved.
+        return false;
+    });
+
+    // VISUAL ASSIGNMENT: Fill empty slots with floating items for display purposes
+    // This allows migration without DB writes immediately
+    let floatIdx = 0;
+    builtLevels.forEach(level => {
+        level.forEach(slot => {
+            if (!slot.item && floatIdx < floatingItems.length) {
+                slot.item = floatingItems[floatIdx];
+                // Mark as temp?
+                floatIdx++;
+            }
+        });
+    });
+
+
+    const handleSlotDrop = (e: React.DragEvent, l: number, p: number) => {
+        e.preventDefault();
+        e.stopPropagation();
+        e.currentTarget.classList.remove('bg-emerald-50'); // Cleanup local dragover
+        const data = e.dataTransfer.getData('application/json');
+        if (data) {
+            const item = JSON.parse(data) as StockItem;
+            // Force location to this slot
+            // Location format: "Row Name:L0:P0"
+            const newLocation = `${rowName}:L${l}:P${p}`;
+            console.log("Dropping to specific slot: ", newLocation);
+            onDrop({ ...item, location: newLocation });
+        }
+    };
 
     return (
         <div
@@ -58,12 +128,40 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                 const data = e.dataTransfer.getData('application/json');
                 if (data) {
                     const item = JSON.parse(data) as StockItem;
-                    onDrop(item);
+                    // Auto-find first real empty slot in the structure
+                    // We iterate levels bottom-up (0 -> N) or top-down? 
+                    // Arrays are 0-indexed (Bottom level is 0).
+                    // Prefer filling bottom-left first.
+                    for (let l = 0; l < builtLevels.length; l++) {
+                        for (let p = 0; p < builtLevels[l].length; p++) {
+                            // Check original logic, ignore the visual-fill for a moment? 
+                            // Actually visual-fill modifies the array. We should check if item ID matches a floating item to consider it "filled"
+                            const slot = builtLevels[l][p];
+                            // If slot has item, is it a persisted one?
+                            // Simpler: Just check if slot.item is null.
+                            // If we visually filled it, it acts as full.
+                            // So we append to next empty.
+
+                            // Re-check original items list to see if a slot is truly taken by coordinate-matching item
+                            const realItem = items.find(it => {
+                                const c = getItemCoords(it);
+                                return c && c.l === l && c.p === p;
+                            });
+
+                            if (!realItem) {
+                                // Empty or just visually filled by floating.
+                                // We take this slot.
+                                const newLocation = `${rowName}:L${l}:P${p}`;
+                                onDrop({ ...item, location: newLocation });
+                                return;
+                            }
+                        }
+                    }
+                    alert('Fileira cheia! Aumente o tamanho da base.');
                 }
             }}
-            onClick={(e) => {
-                // Prevent bubbling if needed, but actually we want click on row to set active?
-                // The header has onClick, but the body?
+            onClick={() => {
+                // Header click handled below
             }}
         >
             <div className="flex justify-between items-center mb-4 border-b pb-2">
@@ -81,7 +179,6 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                         <ChartBarIcon className="w-5 h-5 rotate-90" />
                     </button>
 
-                    {/* Base Size Controls - Hidden on mobile to save space? or small */}
                     <div className="flex items-center bg-white rounded-lg border border-slate-200 mr-2 scale-90 origin-right" title="Tamanho da Base (Chão)">
                         <button onClick={(e) => { e.stopPropagation(); setBaseSize(Math.max(1, baseSize - 1)); }} className="px-2 py-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-l-lg font-bold">-</button>
                         <span className="text-xs font-mono w-6 text-center border-x bg-slate-50">{baseSize}</span>
@@ -94,47 +191,63 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
 
             {/* Pyramid Render Area */}
             <div className="flex flex-col-reverse items-center gap-1 min-h-[100px] md:min-h-[150px] transition-all duration-300">
-                {items.length === 0 && (
-                    <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm pointer-events-none opacity-60">
-                        {isActive ? 'Toque nos lotes para adicionar' : 'Arraste ou Toque'}
-                    </div>
-                )}
-
-                {levels.map((levelItems, levelIndex) => (
+                {builtLevels.map((levelSlots, levelIndex) => (
                     <div key={levelIndex} className="flex justify-center gap-1">
-                        {levelItems.map(item => (
-                            <div
-                                key={item.id}
-                                className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-slate-800 text-white flex items-center justify-center text-[10px] font-bold shadow-lg relative group cursor-grab active:cursor-grabbing border-2 border-white transition-transform hover:scale-110 z-0 hover:z-10"
-                                title={`${item.internalLot} - ${item.bitola} - ${item.remainingQuantity}kg`}
-                                draggable
-                                onDragStart={(e) => {
-                                    e.dataTransfer.setData('application/json', JSON.stringify(item));
-                                    e.dataTransfer.effectAllowed = 'move';
-                                }}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (onItemClick) onItemClick(item);
-                                }}
-                            >
-                                <div className="text-center leading-tight pointer-events-none">
-                                    <div className="text-emerald-300 text-[9px] md:text-[10px]">{item.internalLot}</div>
-                                    <div className="opacity-70 scale-90">{item.remainingQuantity.toFixed(0)}</div>
-                                </div>
+                        {levelSlots.map((slot, slotIndex) => {
+                            if (slot.item) {
+                                return (
+                                    <div
+                                        key={slot.item.id}
+                                        className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-slate-800 text-white flex items-center justify-center text-[10px] font-bold shadow-lg relative group cursor-grab active:cursor-grabbing border-2 border-white transition-transform hover:scale-110 z-10"
+                                        title={`${slot.item.internalLot} - ${slot.item.bitola} - ${slot.item.remainingQuantity.toFixed(0)}kg`}
+                                        draggable
+                                        onDragStart={(e) => {
+                                            e.dataTransfer.setData('application/json', JSON.stringify(slot.item));
+                                            e.dataTransfer.effectAllowed = 'move';
+                                        }}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (onItemClick) onItemClick(slot.item!);
+                                        }}
+                                    >
+                                        <div className="text-center leading-tight pointer-events-none">
+                                            <div className="text-emerald-300 text-[9px] md:text-[10px]">{slot.item.internalLot}</div>
+                                            <div className="opacity-70 scale-90">{slot.item.remainingQuantity.toFixed(0)}</div>
+                                        </div>
 
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        e.preventDefault();
-                                        onRemove(item);
-                                    }}
-                                    className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 opacity-100 shadow-md hover:bg-red-700 hover:scale-110 transition-all z-20 cursor-pointer"
-                                    title="Remover da fileira"
-                                >
-                                    <TrashIcon className="w-3 h-3" />
-                                </button>
-                            </div>
-                        ))}
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                e.preventDefault();
+                                                onRemove(slot.item!);
+                                            }}
+                                            className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 opacity-100 shadow-md hover:bg-red-700 hover:scale-110 transition-all z-20 cursor-pointer"
+                                            title="Remover da fileira"
+                                        >
+                                            <TrashIcon className="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                );
+                            } else {
+                                // Empty Slot
+                                return (
+                                    <div
+                                        key={`empty-${levelIndex}-${slotIndex}`}
+                                        className="w-12 h-12 md:w-14 md:h-14 rounded-full border-2 border-dashed border-slate-300 bg-slate-50/50 flex items-center justify-center text-xs text-slate-300 transition-colors hover:border-emerald-400 hover:bg-emerald-50 cursor-pointer z-0"
+                                        onDragOver={handleDragOver}
+                                        onDragLeave={handleDragLeave}
+                                        onDrop={(e) => handleSlotDrop(e, slot.coords.l, slot.coords.p)}
+                                        onClick={() => {
+                                            // If Active Row is THIS row, maybe we want to verify logic?
+                                            // For now simpler: drop logic handles move.
+                                        }}
+                                        title={`Vazio (L${slot.coords.l}:P${slot.coords.p})`}
+                                    >
+                                        <div className="pointer-events-none opacity-50">+</div>
+                                    </div>
+                                );
+                            }
+                        })}
                     </div>
                 ))}
             </div>
