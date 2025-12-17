@@ -221,7 +221,7 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                 return (
                                     <div
                                         key={`empty-${levelIndex}-${slotIndex}`}
-                                        className="w-12 h-12 md:w-14 md:h-14 rounded-full border-2 border-dashed border-slate-300 bg-slate-50/50 flex items-center justify-center text-xs text-slate-300 transition-colors hover:border-emerald-400 hover:bg-emerald-50 cursor-pointer z-0"
+                                        className="w-12 h-12 md:w-14 md:h-14 rounded-full border-2 border-dashed border-slate-300 bg-slate-50/50 flex items-center justify-center text-xs text-slate-300 transition-colors hover:border-emerald-400 hover:bg-emerald-50 cursor-pointer z-0 pointer-events-auto"
                                         onDragOver={handleDragOver}
                                         onDragLeave={handleDragLeave}
                                         onDrop={(e) => handleSlotDrop(e, slot.coords.l, slot.coords.p)}
@@ -318,7 +318,18 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
     };
 
     const handleDropOnRow = (item: StockItem, rowName: string) => {
-        if (item.location === rowName) return; // No change
+        // Validation: Verify if the proposed location is different from the current one
+        let validLocation = rowName;
+        // Check if item.location is already a specific slot in this row
+        if (item.location && item.location.startsWith(rowName + ':')) {
+            validLocation = item.location;
+        }
+
+        // Find the original item to compare
+        const originalItem = safeStock.find(s => s.id === item.id);
+
+        // If the location hasn't changed, don't update/spam history
+        if (originalItem && originalItem.location === validLocation) return;
 
         onUpdateStockItem({
             ...item,
