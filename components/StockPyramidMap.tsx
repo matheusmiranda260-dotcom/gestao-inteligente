@@ -128,36 +128,24 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                 const data = e.dataTransfer.getData('application/json');
                 if (data) {
                     const item = JSON.parse(data) as StockItem;
-                    // Auto-find first real empty slot in the structure
-                    // We iterate levels bottom-up (0 -> N) or top-down? 
-                    // Arrays are 0-indexed (Bottom level is 0).
-                    // Prefer filling bottom-left first.
+                    // Auto-find logic
                     for (let l = 0; l < builtLevels.length; l++) {
                         for (let p = 0; p < builtLevels[l].length; p++) {
-                            // Check original logic, ignore the visual-fill for a moment? 
-                            // Actually visual-fill modifies the array. We should check if item ID matches a floating item to consider it "filled"
-                            const slot = builtLevels[l][p];
-                            // If slot has item, is it a persisted one?
-                            // Simpler: Just check if slot.item is null.
-                            // If we visually filled it, it acts as full.
-                            // So we append to next empty.
-
-                            // Re-check original items list to see if a slot is truly taken by coordinate-matching item
                             const realItem = items.find(it => {
                                 const c = getItemCoords(it);
                                 return c && c.l === l && c.p === p;
                             });
-
-                            if (!realItem) {
-                                // Empty or just visually filled by floating.
-                                // We take this slot.
+                            // If slot is truly empty (not just visually filled by floaters, unless we want to stack? No, assume strict)
+                            // We prefer filling REAL empty.
+                            if (!realItem && !builtLevels[l][p].item) { // Check both to avoid overwriting floaters visually
                                 const newLocation = `${rowName}:L${l}:P${p}`;
                                 onDrop({ ...item, location: newLocation });
                                 return;
                             }
                         }
                     }
-                    alert('Fileira cheia! Aumente o tamanho da base.');
+                    // Fallback if full: Just drop in row name (will float)
+                    onDrop({ ...item, location: rowName });
                 }
             }}
             onClick={() => {
@@ -237,9 +225,9 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                         onDragOver={handleDragOver}
                                         onDragLeave={handleDragLeave}
                                         onDrop={(e) => handleSlotDrop(e, slot.coords.l, slot.coords.p)}
-                                        onClick={() => {
-                                            // If Active Row is THIS row, maybe we want to verify logic?
-                                            // For now simpler: drop logic handles move.
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (onSlotClick) onSlotClick(slot.coords.l, slot.coords.p);
                                         }}
                                         title={`Vazio (L${slot.coords.l}:P${slot.coords.p})`}
                                     >
@@ -454,7 +442,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
 
                             {/* Use PyramindRow inside here but scaled up logic */}
                             {(() => {
-                                const rowItems = relevantStock.filter(s => s.location === landscapeRow);
+                                const rowItems = relevantStock.filter(s => s.location && s.location.startsWith(landscapeRow + ':'));
 
                                 // Pyramid Logic Redux
                                 const baseSize = 7; // Bigger base for landscape
@@ -692,8 +680,9 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                         {derivedRows.map(row => {
                             // Sort items by last history date (insertion/edit time) to maintain order stability
                             const rowItems = relevantStock
-                                .filter(s => s.location === row)
+                                .filter(s => s.location && s.location.startsWith(row))
                                 .sort((a, b) => {
+                                    // Note: Items without coords sort naturally? Maybe irrelevant now with strict slots.
                                     const dateA = a.history && a.history.length > 0 ? a.history[a.history.length - 1].date : (a.entryDate || '');
                                     const dateB = b.history && b.history.length > 0 ? b.history[b.history.length - 1].date : (b.entryDate || '');
                                     return dateA.localeCompare(dateB);
@@ -717,13 +706,20 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                                     }}
                                     onItemClick={(item) => setItemToMove(item)}
                                     onExpand={() => setLandscapeRow(row)}
+                                    onSlotClick={(l, p) => {
+                                        if (itemToMove) {
+                                            const newLocation = `${row}:L${l}:P${p}`;
+                                            handleDropOnRow({ ...itemToMove, location: newLocation }, row);
+                                        }
+                                    }}
                                 />
                             );
                         })}
                     </div>
                 </div>
+                {/* Closing divs for main layout */}
             </div>
-        </div >
+        </div>
     );
 };
 
