@@ -429,15 +429,18 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
     const handleRemoveRow = (rowName: string) => {
         // Only if empty? 
         // Or unassign all items in it? Let's check if empty.
-        const hasItems = safeStock.some(s => s.location === rowName);
+        // FIX: Check for both exact row name AND items with coordinates in that row
+        const hasItems = safeStock.some(s => s.location === rowName || (s.location && s.location.startsWith(rowName + ':')));
+
         if (hasItems) {
             if (!confirm(`A ${rowName} contém itens. Deseja remover a fileira e mover os itens para "Não Atribuído"?`)) {
                 return;
             }
-            // Move items
-            safeStock.filter(s => s.location === rowName).forEach(item => {
-                handleRemoveFromRow(item);
-            });
+            // Move items - filtering correctly for coordinates too
+            safeStock.filter(s => s.location === rowName || (s.location && s.location.startsWith(rowName + ':')))
+                .forEach(item => {
+                    handleRemoveFromRow(item);
+                });
         }
         setExtraRows(prev => prev.filter(r => r !== rowName));
     };
