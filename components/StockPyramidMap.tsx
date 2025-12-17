@@ -147,6 +147,9 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
     // We treat unique location strings as rows.
     const [extraRows, setExtraRows] = useState<string[]>([]); // For rows that might be empty momentarily logic
 
+    const [selectedMaterial, setSelectedMaterial] = useState<MaterialType | null>(null);
+    const [selectedBitola, setSelectedBitola] = useState<Bitola | null>(null);
+    const [isPendingListOpen, setIsPendingListOpen] = useState(false); // Mobile: Toggle pending list
 
     // Helper to find next available row name globally (across all stock)
     const nextRowLetter = useMemo(() => {
@@ -209,6 +212,11 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                 }
             }]
         });
+        // Close list on mobile after assigning
+        if (window.innerWidth < 768) {
+            setIsPendingListOpen(false);
+        }
+        setActiveRow(null); // Reset active row after drop? logic choice. Let's keep it null to reset state.
     };
 
     const handleRemoveFromRow = (item: StockItem) => {
@@ -235,14 +243,10 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
     };
 
     // Quick Add New Lot ("Cadastrar ali mesmo")
-    const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
     const [activeRow, setActiveRow] = useState<string | null>(null);
 
-    const [selectedMaterial, setSelectedMaterial] = useState<MaterialType | null>(null);
-    const [selectedBitola, setSelectedBitola] = useState<Bitola | null>(null);
-
     const availableBitolas = useMemo(() => {
-        if (!selectedMaterial) return [];
+        if (!selectedMaterial) return [...FioMaquinaBitolaOptions, ...TrefilaBitolaOptions];
         if (selectedMaterial === 'Fio Máquina') return FioMaquinaBitolaOptions;
         if (selectedMaterial === 'CA-60') return TrefilaBitolaOptions;
         return [...FioMaquinaBitolaOptions, ...TrefilaBitolaOptions];
@@ -250,14 +254,18 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
 
     // Filter stock based on selection
     const relevantStock = useMemo(() => {
-        if (!selectedMaterial || !selectedBitola) return [];
-        return stock.filter(item => item.materialType === selectedMaterial && item.bitola === selectedBitola);
+        return stock.filter(item => {
+            if (selectedMaterial && item.materialType !== selectedMaterial) return false;
+            if (selectedBitola && item.bitola !== selectedBitola) return false;
+            return true;
+        });
     }, [stock, selectedMaterial, selectedBitola]);
 
 
     const derivedRows = useMemo(() => {
-        if (!selectedMaterial || !selectedBitola) return [];
         const rows = new Set<string>();
+        // Only show rows that contain RELEVANT items, PLUS any manually added empty rows
+        // If no filter selected, show all rows? Yes.
         relevantStock.forEach(item => {
             if (item.location && item.location.startsWith('Fileira ')) {
                 rows.add(item.location);
@@ -265,70 +273,17 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
         });
         extraRows.forEach(r => rows.add(r));
         return Array.from(rows).sort();
-    }, [relevantStock, extraRows, selectedMaterial, selectedBitola]);
+    }, [relevantStock, extraRows]);
 
     const unassignedStock = useMemo(() => {
-        if (!selectedMaterial || !selectedBitola) return [];
         return relevantStock
             .filter(item => !item.location)
             .filter(item =>
                 item.internalLot.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 item.supplierLot.toLowerCase().includes(searchTerm.toLowerCase())
             );
-    }, [relevantStock, searchTerm, selectedMaterial, selectedBitola]);
+    }, [relevantStock, searchTerm]);
 
-
-    if (!selectedMaterial || !selectedBitola) {
-        return (
-            <div className="fixed inset-0 bg-slate-100 z-50 flex flex-col items-center justify-center animate-fadeIn p-4">
-                <div className="bg-white p-8 rounded-2xl shadow-xl max-w-lg w-full text-center">
-                    <div className="mx-auto bg-emerald-100 w-16 h-16 rounded-full flex items-center justify-center mb-6">
-                        <ArchiveIcon className="w-8 h-8 text-emerald-600" />
-                    </div>
-                    <h2 className="text-2xl font-bold text-slate-800 mb-2">Iniciar Conferência</h2>
-                    <p className="text-slate-500 mb-8">Selecione o tipo de material e a bitola para começar a mapear o estoque.</p>
-
-                    <div className="space-y-4 text-left">
-                        <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-1">Tipo de Material</label>
-                            <div className="grid grid-cols-2 gap-3">
-                                {MaterialOptions.map(option => (
-                                    <button
-                                        key={option}
-                                        onClick={() => { setSelectedMaterial(option); setSelectedBitola(null); }}
-                                        className={`p-3 rounded-xl border-2 font-bold transition-all ${selectedMaterial === option ? 'border-emerald-500 bg-emerald-50 text-emerald-800' : 'border-slate-200 hover:border-slate-300 text-slate-600'}`}
-                                    >
-                                        {option}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className={`transition-opacity duration-300 ${selectedMaterial ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
-                            <label className="block text-sm font-bold text-slate-700 mb-1">Bitola (mm)</label>
-                            <div className="grid grid-cols-4 gap-2">
-                                {availableBitolas.map(bitola => (
-                                    <button
-                                        key={bitola}
-                                        onClick={() => setSelectedBitola(bitola)}
-                                        className={`p-2 rounded-lg border-2 font-bold text-sm transition-all ${selectedBitola === bitola ? 'border-emerald-500 bg-emerald-50 text-emerald-800' : 'border-slate-200 hover:border-slate-300 text-slate-600'}`}
-                                    >
-                                        {bitola}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="mt-8 flex gap-3">
-                        <button onClick={onClose} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-3 rounded-xl transition">
-                            Cancelar
-                        </button>
-                    </div>
-                </div>
-            </div>
-        );
-    }
 
     // Stats for Progress
     const totalCount = relevantStock.length;
@@ -339,33 +294,51 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
     return (
         <div className="fixed inset-0 bg-slate-100 z-50 flex flex-col animate-fadeIn">
             {/* Main Header */}
-            <div className="bg-[#0F3F5C] p-4 text-white flex justify-between items-center shadow-md z-20">
-                <div className="flex items-center gap-3">
-                    <button onClick={() => { setSelectedMaterial(null); setSelectedBitola(null); }} className="p-2 hover:bg-white/10 rounded-full transition text-white/80 hover:text-white" title="Voltar para seleção">
-                        <ArrowLeftIcon className="w-6 h-6" />
-                    </button>
-                    <div>
+            <div className="bg-[#0F3F5C] p-4 text-white shadow-md z-30 flex flex-col md:flex-row gap-4 justify-between">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition text-white/80 hover:text-white md:hidden">
+                            <ArrowLeftIcon className="w-6 h-6" />
+                        </button>
                         <h1 className="text-xl font-bold flex items-center gap-2">
-                            Mapeamento de Estoque
-                            <span className="bg-emerald-500 text-white text-xs px-2 py-1 rounded-full font-bold uppercase shadow-sm border border-emerald-400">{selectedMaterial} - {selectedBitola}</span>
+                            <ArchiveIcon className="w-6 h-6" />
+                            <span className="hidden md:inline">Mapeamento de Estoque</span>
+                            <span className="md:hidden">Mapeamento</span>
                         </h1>
                     </div>
-                </div>
-                <div className="flex gap-3 items-center">
-                    {/* Visual spacer or toolbar items */}
-                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition text-sm font-bold opacity-70 hover:opacity-100 flex items-center gap-1">
+                    <button onClick={onClose} className="bg-white/10 hover:bg-white/20 px-3 py-1 rounded text-sm font-bold ml-4 hidden md:block">
                         Sair
                     </button>
+                </div>
+
+                {/* Filters */}
+                <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+                    <select
+                        value={selectedMaterial || ''}
+                        onChange={e => setSelectedMaterial(e.target.value ? e.target.value as MaterialType : null)}
+                        className="bg-white/10 border border-white/20 text-white rounded-lg px-3 py-2 text-sm font-semibold focus:bg-[#0A2A3D] focus:ring-1 focus:ring-emerald-500 outline-none"
+                    >
+                        <option value="" className="text-slate-800">Todos Materiais</option>
+                        {MaterialOptions.map(m => <option key={m} value={m} className="text-slate-800">{m}</option>)}
+                    </select>
+
+                    <select
+                        value={selectedBitola || ''}
+                        onChange={e => setSelectedBitola(e.target.value ? e.target.value as Bitola : null)}
+                        className="bg-white/10 border border-white/20 text-white rounded-lg px-3 py-2 text-sm font-semibold focus:bg-[#0A2A3D] focus:ring-1 focus:ring-emerald-500 outline-none"
+                    >
+                        <option value="" className="text-slate-800">Todas Bitolas</option>
+                        {availableBitolas.map(b => <option key={b} value={b} className="text-slate-800">{b}</option>)}
+                    </select>
                 </div>
             </div>
 
             {/* Progress / Info Bar */}
-            <div className="bg-white border-b shadow-sm p-3 flex items-center justify-between gap-6 z-10 px-6">
-
-                {/* Add Row Controls moved here for better context or keep in header? Let's keep Add Row here for easier access near the workspace */}
-                <div className="flex items-center gap-2 border-r pr-6">
-                    <div className="flex bg-slate-100 p-1 rounded-lg items-center border border-slate-200">
-                        <span className="text-slate-500 text-xs pl-2 whitespace-nowrap hidden sm:inline font-bold">Nova Fileira:</span>
+            <div className="bg-white border-b shadow-sm p-3 flex flex-col md:flex-row items-center justify-between gap-4 z-20 px-4 md:px-6">
+                {/* Add Row Controls */}
+                <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-start">
+                    <div className="flex bg-slate-100 p-1 rounded-lg items-center border border-slate-200 flex-grow md:flex-grow-0">
+                        <span className="text-slate-500 text-xs pl-2 whitespace-nowrap font-bold mr-2">Nova Fileira:</span>
                         <input
                             type="text"
                             value={newRowName}
@@ -375,33 +348,34 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                             maxLength={3}
                         />
                         <button onClick={handleAddRow} className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded text-sm font-bold shadow-sm whitespace-nowrap transition">
-                            + Criar
+                            + OK
                         </button>
                     </div>
                 </div>
 
 
-                <div className="flex-1 flex items-center gap-8 justify-center">
+                <div className="flex-1 flex items-center gap-4 md:gap-8 justify-between w-full md:w-auto">
                     {/* Stat Cards */}
-                    <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-4 md:gap-6 flex-grow justify-center">
                         <div className="text-center">
-                            <span className="block text-2xl font-bold text-slate-700 leading-none">{totalCount}</span>
+                            <span className="block text-xl md:text-2xl font-bold text-slate-700 leading-none">{totalCount}</span>
                             <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total</span>
                         </div>
                         <div className="h-8 w-px bg-slate-200"></div>
-                        <div className="text-center">
-                            <span className="block text-2xl font-bold text-emerald-600 leading-none">{mappedCount}</span>
-                            <span className="text-[10px] uppercase font-bold text-emerald-600/70 tracking-wider">Mapeados</span>
-                        </div>
-                        <div className="h-8 w-px bg-slate-200"></div>
-                        <div className="text-center group cursor-help relative">
-                            <span className="block text-2xl font-bold text-amber-500 leading-none">{unmappedCount}</span>
-                            <span className="text-[10px] uppercase font-bold text-amber-600/70 tracking-wider">Pendentes</span>
-                        </div>
+                        <button
+                            onClick={() => setIsPendingListOpen(true)}
+                            className="text-center group cursor-pointer hover:bg-amber-50 rounded px-2 py-1 transition relative"
+                        >
+                            <span className="block text-xl md:text-2xl font-bold text-amber-500 leading-none">{unmappedCount}</span>
+                            <span className="text-[10px] uppercase font-bold text-amber-600/70 tracking-wider flex items-center gap-1">
+                                Pendentes <SearchIcon className="w-3 h-3" />
+                            </span>
+                            {unmappedCount > 0 && <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>}
+                        </button>
                     </div>
 
                     {/* Progress Bar */}
-                    <div className="flex-1 max-w-md">
+                    <div className="flex-1 max-w-[150px] md:max-w-xs hidden sm:block">
                         <div className="flex justify-between text-xs font-bold text-slate-500 mb-1">
                             <span>Progresso</span>
                             <span>{progressPercentage}%</span>
@@ -418,30 +392,50 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                 </div>
             </div>
 
-            <div className="flex-1 flex overflow-hidden">
-                {/* Sidebar: Unassigned Items */}
-                <div className="w-80 bg-white border-r shadow-lg flex flex-col z-10">
-                    <div className="p-4 bg-slate-50 border-b">
-                        <h2 className="font-bold text-slate-700 mb-2 flex items-center gap-2">
+            <div className="flex-1 flex overflow-hidden relative">
+                {/* Sidebar: Unassigned Items (Desktop) / Drawer (Mobile) */}
+                <div
+                    className={`
+                        fixed inset-0 z-40 bg-black/50 transition-opacity md:hidden
+                        ${isPendingListOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}
+                    `}
+                    onClick={() => setIsPendingListOpen(false)}
+                />
+                <div
+                    className={`
+                        absolute md:static inset-y-0 left-0 w-full md:w-80 bg-white border-r shadow-lg flex flex-col z-50 transition-transform duration-300 transform
+                        ${isPendingListOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+                    `}
+                >
+                    <div className="p-4 bg-slate-50 border-b flex justify-between items-center">
+                        <h2 className="font-bold text-slate-700 flex items-center gap-2">
                             <ExclamationIcon className="w-5 h-5 text-amber-500" />
-                            Pendentes / Não Atribuídos
+                            Lotes Pendentes ({unmappedStock.length})
                         </h2>
+                        <button onClick={() => setIsPendingListOpen(false)} className="md:hidden text-slate-400 hover:text-slate-600">
+                            ✕
+                        </button>
+                    </div>
+
+                    <div className="p-2 border-b bg-white">
                         <div className="relative">
                             <SearchIcon className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
                             <input
                                 type="text"
-                                placeholder="Filtrar..."
+                                placeholder="Filtrar lote..."
                                 value={searchTerm}
                                 onChange={e => setSearchTerm(e.target.value)}
-                                className="w-full pl-9 p-2 border border-slate-300 rounded-lg text-sm bg-white"
+                                className="w-full pl-9 p-2 border border-slate-300 rounded-lg text-sm bg-slate-50 focus:bg-white transition"
                             />
                         </div>
                     </div>
 
                     <div className="overflow-y-auto flex-1 p-3 space-y-2">
                         {unassignedStock.length === 0 ? (
-                            <div className="text-center text-slate-400 py-10 text-sm">
-                                Todos os itens visíveis foram atribuídos a fileiras!
+                            <div className="text-center text-slate-400 py-10 text-sm px-4">
+                                <CheckCircleIcon className="w-12 h-12 mx-auto text-emerald-200 mb-2" />
+                                <p>Tudo organizado!</p>
+                                <p className="text-xs mt-1">Nenhum lote pendente com os filtros atuais.</p>
                             </div>
                         ) : (
                             unassignedStock.map(item => (
@@ -456,7 +450,12 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                                         if (activeRow) {
                                             handleDropOnRow(item, activeRow);
                                         } else {
-                                            alert("Selecione uma fileira (clique no título dela) para adicionar itens rapidamente.");
+                                            // Mobile friendliness: if no row selected, maybe just highlight that rows need selection?
+                                            // Or auto-close and toast?
+                                            // Let's stick to alert for now, but improved text.
+                                            alert(`Selecione uma FILEIRA no mapa (clique no título dela) para onde enviar o lote ${item.internalLot}.`);
+                                            // On mobile, close this drawer so they can pick a row?
+                                            if (window.innerWidth < 768) setIsPendingListOpen(false);
                                         }
                                     }}
                                 >
@@ -464,15 +463,13 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                                         <span className="font-bold text-slate-800 text-sm">{item.internalLot}</span>
                                         <span className="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-600 font-bold">{item.bitola}</span>
                                     </div>
-                                    <div className="text-xs text-slate-500 mt-1">
-                                        {item.supplier} | {item.materialType}
-                                    </div>
-                                    <div className="mt-2 text-xs font-mono text-slate-700 bg-slate-50 p-1 rounded text-center">
-                                        {item.remainingQuantity.toFixed(2)} kg
+                                    <div className="text-xs text-slate-500 mt-1 flex justify-between">
+                                        <span>{item.supplier}</span>
+                                        <span className="font-medium text-slate-700">{item.remainingQuantity.toFixed(2)}kg</span>
                                     </div>
                                     {!activeRow && (
-                                        <div className="hidden group-hover:block text-[10px] text-amber-600 font-bold mt-1 text-center animate-pulse">
-                                            Selecione uma fileira para mover
+                                        <div className="hidden group-hover:block text-[10px] text-amber-600 font-bold mt-2 text-center bg-amber-50 p-1 rounded">
+                                            Toque em uma fileira para mover
                                         </div>
                                     )}
                                 </div>
@@ -482,13 +479,23 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                 </div>
 
                 {/* Main Map Area */}
-                <div className="flex-1 overflow-auto p-8 bg-slate-100">
-                    <div className="flex flex-wrap items-start gap-6">
+                <div className="flex-1 overflow-auto p-4 md:p-8 bg-slate-100 relative">
+                    {/* Filter Status Badge Overlay */}
+                    {(selectedMaterial || selectedBitola) && (
+                        <div className="fixed bottom-4 right-4 bg-slate-800 text-white text-xs px-3 py-1 rounded-full shadow-lg z-20 md:hidden opacity-80 pointer-events-none">
+                            Filtro: {selectedMaterial || 'Todos'} / {selectedBitola || 'Todas'}
+                        </div>
+                    )}
+
+                    <div className="flex flex-wrap items-start gap-4 md:gap-6 justify-center md:justify-start pb-20 md:pb-0">
                         {derivedRows.length === 0 && (
-                            <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 mt-20">
-                                <ArchiveIcon className="w-24 h-24 opacity-20 mb-4" />
-                                <h3 className="text-xl font-bold opacity-50">Mapa Vazio</h3>
-                                <p>Adicione fileiras usando o menu superior para começar a organizar.</p>
+                            <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 mt-20 text-center px-4">
+                                <ArchiveIcon className="w-16 h-16 md:w-24 md:h-24 opacity-20 mb-4" />
+                                <h3 className="text-lg md:text-xl font-bold opacity-50">Mapa de Estoque</h3>
+                                <p className="text-sm md:text-base mb-4">Selecione filtros acima ou crie uma nova fileira para começar a organizar.</p>
+                                <button onClick={() => setIsPendingListOpen(true)} className="md:hidden bg-[#0F3F5C] text-white px-4 py-2 rounded-lg font-bold shadow-lg">
+                                    Ver Lotes Pendentes
+                                </button>
                             </div>
                         )}
 
@@ -501,18 +508,12 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                                 onRemove={handleRemoveFromRow}
                                 onRemoveRow={() => handleRemoveRow(row)}
                                 isActive={activeRow === row}
-                                onSetActive={() => setActiveRow(row)}
+                                onSetActive={() => setActiveRow(row === activeRow ? null : row)}
                             />
                         ))}
                     </div>
                 </div>
             </div>
-
-            {/* Quick Add Modal PlaceHolder */}
-            {/* 
-                If the user finds a lot that is NOT in the list, they can add it here.
-                This needs to reuse AddConferenceModal logic or be a stripped down version.
-             */}
         </div >
     );
 };
