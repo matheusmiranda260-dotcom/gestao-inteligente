@@ -442,3 +442,9 @@ export interface EmployeeDocument {
     url: string;
     createdAt: string;
 }
+
+export interface RowConfig {
+    rowName: string;
+    baseSize: number;
+    maxHeight: number;
+}

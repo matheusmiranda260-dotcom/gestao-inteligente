@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
-import { StockItem, MaterialType, Bitola, MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions } from '../types';
+import { StockItem, MaterialType, Bitola, MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions, RowConfig } from '../types';
+import { fetchTable, upsertItem } from '../services/supabaseService';
 import { ArchiveIcon, CheckCircleIcon, PlusIcon, SearchIcon, TrashIcon, ExclamationIcon, ArrowLeftIcon, ChartBarIcon, PencilIcon } from './icons';
 
 interface PyramidRowProps {
@@ -16,14 +17,36 @@ interface PyramidRowProps {
     activeSlot?: { l: number, p: number } | null; // New slot highlight
     onSlotClick?: (l: number, p: number) => void;
     movingItem?: StockItem | null; // Visual feedback for move mode
+    onRenameRow: (newName: string) => void;
+    onPrintRow: () => void;
+    config?: RowConfig;
+    onUpdateConfig?: (rowName: string, baseSize: number, maxHeight: number) => void;
 }
 
-const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemove, onRemoveRow, isActive, onSetActive, onItemClick, onExpand, activeSlot, onSlotClick, movingItem, onRenameRow, onPrintRow }) => {
+const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemove, onRemoveRow, isActive, onSetActive, onItemClick, onExpand, activeSlot, onSlotClick, movingItem, onRenameRow, onPrintRow, config, onUpdateConfig }) => {
     // Determine initial base size. High enough to fit existing items or default 7 as requested.
-    const [baseSize, setBaseSize] = useState(7);
-    const [maxHeight, setMaxHeight] = useState(20); // Default high enough
+    // Use config if available, else default
+    const [baseSize, setBaseSize] = useState(config?.baseSize || 7);
+    const [maxHeight, setMaxHeight] = useState(config?.maxHeight || 20);
     const [isEditingName, setIsEditingName] = useState(false);
     const [editedName, setEditedName] = useState(rowName);
+
+    // Sync config -> local state when config loads/changes
+    React.useEffect(() => {
+        if (config) {
+            setBaseSize(config.baseSize);
+            setMaxHeight(config.maxHeight);
+        }
+    }, [config]);
+
+    // Handle Config Updates
+    const updateConfig = (newBase: number, newHeight: number) => {
+        setBaseSize(newBase);
+        setMaxHeight(newHeight);
+        if (onUpdateConfig) {
+            onUpdateConfig(rowName, newBase, newHeight);
+        }
+    };
 
     const isFinalized = rowName.includes('[FINALIZADA]');
 
@@ -170,13 +193,13 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
             <div className="flex justify-between items-center mb-4 border-b pb-2">
                 <div onClick={onSetActive} className="flex items-center gap-2 cursor-pointer flex-grow" title="Clique para ativar esta fileira">
                     <div className={`w-4 h-4 rounded-full border transition-colors ${isActive ? 'bg-emerald-500 border-emerald-500' : 'bg-white border-slate-400'}`}></div>
-                    
+
                     {isEditingName ? (
                         <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                            <input 
-                                type="text" 
-                                value={editedName} 
-                                onChange={(e) => setEditedName(e.target.value)} 
+                            <input
+                                type="text"
+                                value={editedName}
+                                onChange={(e) => setEditedName(e.target.value)}
                                 className="border rounded px-2 py-1 text-lg font-bold w-40"
                                 autoFocus
                             />
@@ -205,21 +228,21 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                     </button>
 
                     <div className="flex items-center bg-white rounded-lg border border-slate-200 mr-2 scale-90 origin-right shadow-sm" title="Tamanho da Base (Chão)">
-                        <button onClick={(e) => { e.stopPropagation(); setBaseSize(Math.max(1, baseSize - 1)); }} className="px-3 py-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-l-lg font-bold border-r active:bg-slate-200">-</button>
+                        <button onClick={(e) => { e.stopPropagation(); updateConfig(Math.max(1, baseSize - 1), maxHeight); }} className="px-3 py-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-l-lg font-bold border-r active:bg-slate-200">-</button>
                         <div className="flex flex-col items-center justify-center w-10 bg-slate-50 px-1 select-none">
                             <span className="text-[8px] uppercase text-slate-400 leading-none mb-0.5">Base</span>
                             <span className="text-sm font-mono font-bold leading-none text-slate-700">{baseSize}</span>
                         </div>
-                        <button onClick={(e) => { e.stopPropagation(); setBaseSize(baseSize + 1); }} className="px-3 py-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-r-lg font-bold border-l active:bg-slate-200">+</button>
+                        <button onClick={(e) => { e.stopPropagation(); updateConfig(baseSize + 1, maxHeight); }} className="px-3 py-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-r-lg font-bold border-l active:bg-slate-200">+</button>
                     </div>
 
                     <div className="flex items-center bg-white rounded-lg border border-slate-200 mr-2 scale-90 origin-right shadow-sm" title="Altura Máxima (Pilha)">
-                        <button onClick={(e) => { e.stopPropagation(); setMaxHeight(Math.max(1, maxHeight - 1)) }} className="px-3 py-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-l-lg font-bold border-r active:bg-slate-200">-</button>
+                        <button onClick={(e) => { e.stopPropagation(); updateConfig(baseSize, Math.max(1, maxHeight - 1)); }} className="px-3 py-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-l-lg font-bold border-r active:bg-slate-200">-</button>
                         <div className="flex flex-col items-center justify-center w-10 bg-slate-50 px-1 select-none">
                             <span className="text-[8px] uppercase text-slate-400 leading-none mb-0.5">Alt</span>
                             <span className="text-sm font-mono font-bold leading-none text-slate-700">{maxHeight >= 20 ? '∞' : maxHeight}</span>
                         </div>
-                        <button onClick={(e) => { e.stopPropagation(); setMaxHeight(maxHeight + 1) }} className="px-3 py-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-r-lg font-bold border-l active:bg-slate-200">+</button>
+                        <button onClick={(e) => { e.stopPropagation(); updateConfig(baseSize, maxHeight + 1); }} className="px-3 py-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-r-lg font-bold border-l active:bg-slate-200">+</button>
                     </div>
 
                     {/* Actions Group */}
@@ -234,20 +257,22 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                 </button>
                             </>
                         ) : (
-                             <button onClick={(e) => { e.stopPropagation(); onRenameRow(`${rowName} [FINALIZADA]`); }} className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-xs font-bold hover:bg-emerald-200 whitespace-nowrap" title="Finalizar Fileira">
+                            <button onClick={(e) => { e.stopPropagation(); onRenameRow(`${rowName} [FINALIZADA]`); }} className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-xs font-bold hover:bg-emerald-200 whitespace-nowrap" title="Finalizar Fileira">
                                 ✔ OK
                             </button>
                         )}
                         {!isFinalized && (
-                            <button onClick={(e) => { 
-                                e.stopPropagation(); 
+                            <button onClick={(e) => {
+                                e.stopPropagation();
                                 if (items.length > 0) {
-                                     alert("Esvazie a fileira antes de excluir.");
-                                     return;
+                                    alert("Esvazie a fileira antes de excluir.");
+                                    return;
                                 }
-                                if(confirm(`Deseja realmente excluir a fileira "${rowName}"?`)) {
-                                    onRemoveRow(); 
+                                if (items.length > 0) {
+                                    alert("Esvazie a fileira antes de excluir.");
+                                    return;
                                 }
+                                onRemoveRow();
                             }} className="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition ml-1"><TrashIcon className="w-4 h-4" /></button>
                         )}
                     </div>
@@ -299,9 +324,7 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 e.preventDefault();
-                                                if (confirm("Deseja remover este lote da fileira?")) {
-                                                    onRemove(slot.item!);
-                                                }
+                                                onRemove(slot.item!);
                                             }}
                                             className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 opacity-100 shadow-md hover:bg-red-700 hover:scale-110 transition-all z-20 cursor-pointer"
                                             title="Remover da fileira"
@@ -360,11 +383,41 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
     // We treat unique location strings as rows.
     const [extraRows, setExtraRows] = useState<string[]>([]); // For rows that might be empty momentarily logic
     const [printRowName, setPrintRowName] = useState<string | null>(null); // For printing modal
+    const [rowConfigs, setRowConfigs] = useState<RowConfig[]>([]);
+
+    // Modal State
+    const [itemToDelete, setItemToDelete] = useState<StockItem | null>(null);
+    const [rowToDelete, setRowToDelete] = useState<string | null>(null);
+
+    useEffect(() => {
+        const loadConfigs = async () => {
+            const rc = await fetchTable<RowConfig>('row_configs');
+            if (rc) setRowConfigs(rc);
+        };
+        loadConfigs().catch(console.error);
+    }, []);
+
+    const handleUpdateRowConfig = async (rowName: string, baseSize: number, maxHeight: number) => {
+        setRowConfigs(prev => {
+            const exists = prev.some(r => r.rowName === rowName);
+            if (exists) {
+                return prev.map(r => r.rowName === rowName ? { ...r, baseSize, maxHeight } : r);
+            }
+            return [...prev, { rowName, baseSize, maxHeight }];
+        });
+
+        // Persist to DB
+        try {
+            await upsertItem('row_configs', { rowName, baseSize, maxHeight }, 'row_name');
+        } catch (error) {
+            console.error("Failed to save row config", error);
+        }
+    };
 
     const [selectedMaterial, setSelectedMaterial] = useState<MaterialType | null>(null);
     const [selectedBitola, setSelectedBitola] = useState<Bitola | null>(null);
     const [isPendingListOpen, setIsPendingListOpen] = useState(false); // Mobile: Toggle pending list
-    
+
     // Add PencilIcon to imports
     // Wait, imports are at top. I need to make sure PencilIcon is available.
     // Use existing imports list and add PencilIcon if missing. 
@@ -372,7 +425,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
     // I need to add it to imports later or assume it is available? 
     // Wait, StockPyramidMap does NOT import PencilIcon. StockControl DOES.
     // I need to add PencilIcon to imports. I'll do it in a separate block.
-    
+
     // Quick Add New Lot ("Cadastrar ali mesmo")
 
     // Quick Add New Lot ("Cadastrar ali mesmo")
@@ -415,20 +468,8 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
 
 
 
-    const handleAddRow = () => {
-        const nameToUse = newRowName.trim() || nextRowLetter;
-        const fullName = `Fileira ${nameToUse.toUpperCase()}`;
+    // Moved handleAddRow down to fix referencing derivedRows before initialization
 
-        // Check duplication
-        const alreadyExists = derivedRows.includes(fullName) || safeStock.some(s => s.location === fullName);
-
-        if (!alreadyExists) {
-            setExtraRows(prev => [...prev, fullName]);
-            setNewRowName('');
-        } else {
-            alert('Esta fileira já existe!');
-        }
-    };
 
     const handleDropOnRow = (item: StockItem, rowName: string) => {
         // Validation: Verify if the proposed location is different from the current one
@@ -467,13 +508,14 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
         if (activeSlot && validLocation === `${activeSlot.row}:L${activeSlot.l}:P${activeSlot.p}`) {
             setActiveSlot(null);
         }
+    };
     // Handle Rename Logic
     const handleRenameRow = (oldName: string, newName: string) => {
         if (!newName || newName === oldName) return;
-        
+
         // Find all items in this row
         const itemsToUpdate = safeStock.filter(s => s.location === oldName || (s.location && s.location.startsWith(oldName + ':')));
-        
+
         itemsToUpdate.forEach(item => {
             let newLoc = item.location || '';
             if (newLoc === oldName) {
@@ -481,7 +523,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
             } else if (newLoc.startsWith(oldName + ':')) {
                 newLoc = newLoc.replace(oldName + ':', newName + ':');
             }
-            
+
             onUpdateStockItem({
                 ...item,
                 location: newLoc,
@@ -492,10 +534,41 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                 }]
             });
         });
-        
+
         // Update extraRows if it was an empty row
         if (extraRows.includes(oldName)) {
             setExtraRows(prev => prev.map(r => r === oldName ? newName : r));
+        }
+    };
+
+    // Calculate derivedRows
+    const derivedRows = useMemo(() => {
+        // Logic
+        const rows = new Set<string>();
+        safeStock.forEach(s => {
+            if (s.location) {
+                const part = s.location.split(':')[0];
+                rows.add(part);
+            }
+        });
+        extraRows.forEach(r => rows.add(r));
+        const sorted = Array.from(rows).sort();
+        return sorted;
+    }, [safeStock, extraRows]);
+
+    // MOVED handleAddRow HERE
+    const handleAddRow = () => {
+        const nameToUse = newRowName.trim() || nextRowLetter;
+        const fullName = `Fileira ${nameToUse.toUpperCase()}`;
+
+        // Check duplication
+        const alreadyExists = derivedRows.includes(fullName) || safeStock.some(s => s.location === fullName);
+
+        if (!alreadyExists) {
+            setExtraRows(prev => [...prev, fullName]);
+            setNewRowName('');
+        } else {
+            alert('Esta fileira já existe!');
         }
     };
 
@@ -532,11 +605,11 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
     // We DO NOT close the drawer here anymore to allow "Rapid Fire" adding on mobile.
     // User closes drawer manually when done.
     if (window.innerWidth < 768 && !itemToMove) { // Only close if coming from drawer, keep open if rapid? Actually let's keep it open.
-        // setIsPendingListOpen(false); 
+        // setIsPendingListOpen(false);
     }
 
     // Keep activeRow active for rapid fire!
-    // setActiveRow(null); 
+    // setActiveRow(null);
 
 
     const handleRemoveFromRow = (item: StockItem) => {
@@ -547,7 +620,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
     };
 
     const handleRemoveRow = (rowName: string) => {
-        // Only if empty? 
+        // Only if empty?
         // Or unassign all items in it? Let's check if empty.
         // FIX: Check for both exact row name AND items with coordinates in that row
         const hasItems = safeStock.some(s => s.location === rowName || (s.location && s.location.startsWith(rowName + ':')));
@@ -582,20 +655,6 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
         });
     }, [safeStock, selectedMaterial, selectedBitola]);
 
-
-    const derivedRows = useMemo(() => {
-        const rows = new Set<string>();
-        // Only show rows that contain RELEVANT items, PLUS any manually added empty rows
-        // If no filter selected, show all rows? Yes.
-        relevantStock.forEach(item => {
-            if (item.location && item.location.startsWith('Fileira ')) {
-                const rowName = item.location.split(':')[0];
-                rows.add(rowName);
-            }
-        });
-        extraRows.forEach(r => rows.add(r));
-        return Array.from(rows).sort();
-    }, [relevantStock, extraRows]);
 
     const unassignedStock = useMemo(() => {
         return relevantStock
@@ -911,28 +970,21 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                                     rowName={row}
                                     items={rowItems}
                                     onDrop={(item) => handleDropOnRow(item, row)}
-                                    onRemove={handleRemoveFromRow}
-                                    onRemoveRow={() => handleRemoveRow(row)}
+                                    onRemove={(item) => setItemToDelete(item)}
+                                    onRemoveRow={() => setRowToDelete(row)}
                                     isActive={activeRow === row}
-                                    movingItem={itemToMove} // Pass the moving state
-                                    activeSlot={activeSlot && activeSlot.row === row ? activeSlot : null}
-                                    onSetActive={() => {
-                                        if (itemToMove) {
-                                            handleDropOnRow(itemToMove, row);
-                                        } else {
-                                            setActiveRow(row === activeRow ? null : row);
-                                        }
-                                    }}
-                                    onItemClick={(clickedItem) => {
-                                        if (itemToMove && itemToMove.id !== clickedItem.id) {
+                                    onSetActive={() => setActiveRow(row === activeRow ? null : row)}
+                                    onItemClick={(item) => {
+                                        if (itemToMove && itemToMove.id !== item.id) {
                                             // SWAP DETECTED
-                                            handleSwap(itemToMove, clickedItem);
+                                            handleSwap(itemToMove, item);
                                         } else {
-                                            setItemToMove(clickedItem);
+                                            setItemToMove(item);
                                             setActiveSlot(null); // Clear slot selection if selecting item to move
                                         }
                                     }}
                                     onExpand={() => setLandscapeRow(row)}
+                                    activeSlot={activeSlot && activeSlot.row === row ? { l: activeSlot.l, p: activeSlot.p } : null}
                                     onSlotClick={(l, p) => {
                                         if (itemToMove) {
                                             const newLocation = `${row}:L${l}:P${p}`;
@@ -949,23 +1001,68 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                                             }
                                         }
                                     }}
+                                    movingItem={itemToMove}
                                     onRenameRow={(newName) => handleRenameRow(row, newName)}
                                     onPrintRow={() => setPrintRowName(row)}
+                                    config={rowConfigs.find(rc => rc.rowName === row)}
+                                    onUpdateConfig={handleUpdateRowConfig}
                                 />
                             );
                         })}
                     </div>
                 </div>
-                
-                 {/* Print Modal */}
+
+                {/* Confirm Delete Modal */}
+                {(itemToDelete || rowToDelete) && (
+                    <div className="fixed inset-0 bg-black/50 z-[150] flex items-center justify-center p-4">
+                        <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full">
+                            <div className="flex flex-col items-center text-center">
+                                <div className="bg-red-100 p-3 rounded-full mb-4">
+                                    <ExclamationIcon className="w-8 h-8 text-red-600" />
+                                </div>
+                                <h3 className="text-xl font-bold text-slate-800 mb-2">Confirmação</h3>
+                                <p className="text-slate-600 mb-6">
+                                    {itemToDelete
+                                        ? `Deseja remover o lote ${itemToDelete.internalLot} da fileira?`
+                                        : `Deseja realmente excluir a fileira "${rowToDelete}"? Esta ação não pode ser desfeita.`
+                                    }
+                                </p>
+                                <div className="flex gap-3 w-full">
+                                    <button
+                                        onClick={() => { setItemToDelete(null); setRowToDelete(null); }}
+                                        className="flex-1 px-4 py-2 border border-slate-300 rounded-lg font-bold text-slate-700 hover:bg-slate-50"
+                                    >
+                                        CANCELAR
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            if (itemToDelete) {
+                                                handleRemoveFromRow(itemToDelete);
+                                                setItemToDelete(null);
+                                            } else if (rowToDelete) {
+                                                handleRemoveRow(rowToDelete);
+                                                setRowToDelete(null);
+                                            }
+                                        }}
+                                        className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700"
+                                    >
+                                        EXCLUIR
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Print Modal */}
                 {printRowName && (
                     <div className="fixed inset-0 bg-white z-[100] p-8 flex flex-col items-center justify-center">
                         <div className="w-full max-w-4xl border-2 border-slate-800 p-8 relative print:border-none print:w-full">
                             <button onClick={() => setPrintRowName(null)} className="absolute top-4 right-4 bg-red-600 text-white px-4 py-2 rounded print:hidden font-bold">FECHAR</button>
-                             <button onClick={() => window.print()} className="absolute top-4 right-28 bg-blue-600 text-white px-4 py-2 rounded print:hidden font-bold">IMPRIMIR</button>
-                            
+                            <button onClick={() => window.print()} className="absolute top-4 right-28 bg-blue-600 text-white px-4 py-2 rounded print:hidden font-bold">IMPRIMIR</button>
+
                             <h1 className="text-4xl font-bold text-center mb-8 border-b-2 border-black pb-4">{printRowName}</h1>
-                            
+
                             {(() => {
                                 const rowItems = relevantStock.filter(s => s.location && s.location.startsWith(printRowName + ':'));
                                 // Reconstruct levels for print
@@ -981,10 +1078,10 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                                         currentCapacity--;
                                     }
                                 }
-                                
+
                                 return (
                                     <div className="flex flex-col-reverse items-center gap-4">
-                                         {levels.map((levelItems, lvlIdx) => (
+                                        {levels.map((levelItems, lvlIdx) => (
                                             <div key={lvlIdx} className="flex justify-center gap-4">
                                                 {levelItems.map(item => (
                                                     <div key={item.id} className="w-24 h-24 rounded-full border-4 border-black flex flex-col items-center justify-center text-center p-1">
@@ -994,15 +1091,15 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                                                     </div>
                                                 ))}
                                             </div>
-                                         ))}
+                                        ))}
                                     </div>
                                 );
                             })()}
-                             
-                             <div className="mt-12 border-t pt-4 flex justify-between text-sm text-slate-500">
+
+                            <div className="mt-12 border-t pt-4 flex justify-between text-sm text-slate-500">
                                 <span>Impressão: {new Date().toLocaleString()}</span>
                                 <span>Total Itens: {relevantStock.filter(s => s.location && s.location.startsWith(printRowName + ':')).length}</span>
-                             </div>
+                            </div>
                         </div>
                     </div>
                 )}

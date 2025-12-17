@@ -142,6 +142,17 @@ export const updateItem = async <T>(table: string, id: string, updates: Partial<
     return mapToCamelCase(data) as T;
 };
 
+/** Upsert item (Insert or Update if exists) */
+export const upsertItem = async <T>(table: string, item: T, onConflict: string = 'id'): Promise<T> => {
+    const snakeItem = mapToSnakeCase(item);
+    const { data, error } = await supabase.from(table).upsert(snakeItem, { onConflict }).select().single();
+    if (error) {
+        console.error(`Error upserting into ${table}:`, error);
+        throw error;
+    }
+    return mapToCamelCase(data) as T;
+};
+
 /** Delete item by id */
 export const deleteItem = async (table: string, id: string): Promise<void> => {
     const { error } = await supabase.from(table).delete().eq('id', id);
