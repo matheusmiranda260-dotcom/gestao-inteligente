@@ -12,9 +12,10 @@ interface PyramidRowProps {
     isActive: boolean;
     onSetActive: () => void;
     onItemClick?: (item: StockItem) => void; // New prop for mobile move
+    onExpand?: () => void; // New prop for landscape toggle
 }
 
-const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemove, onRemoveRow, isActive, onSetActive, onItemClick }) => {
+const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemove, onRemoveRow, isActive, onSetActive, onItemClick, onExpand }) => {
     const [baseSize, setBaseSize] = useState(4); // Default base size
 
     const handleDragOver = (e: React.DragEvent) => {
@@ -75,6 +76,11 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                 </div>
 
                 <div className="flex items-center gap-2">
+                    {/* Expand/Landscape Button (Mobile Only) */}
+                    <button onClick={(e) => { e.stopPropagation(); if (onExpand) onExpand(); }} className="md:hidden bg-emerald-100 p-1.5 rounded hover:bg-emerald-200 text-emerald-700 mr-1" title="Visualizar Deitado (Paisagem)">
+                        <ChartBarIcon className="w-5 h-5 rotate-90" />
+                    </button>
+
                     {/* Base Size Controls - Hidden on mobile to save space? or small */}
                     <div className="flex items-center bg-white rounded-lg border border-slate-200 mr-2 scale-90 origin-right" title="Tamanho da Base (Chão)">
                         <button onClick={(e) => { e.stopPropagation(); setBaseSize(Math.max(1, baseSize - 1)); }} className="px-2 py-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-l-lg font-bold">-</button>
@@ -164,6 +170,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
 
     // Move Mode State (Mobile)
     const [itemToMove, setItemToMove] = useState<StockItem | null>(null);
+    const [landscapeRow, setLandscapeRow] = useState<string | null>(null); // New state for full-screen landscape view
 
     // Helper to find next available row name globally (across all stock)
     const nextRowLetter = useMemo(() => {
@@ -314,6 +321,64 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
 
     return (
         <div className="fixed inset-0 bg-slate-100 z-50 flex flex-col animate-fadeIn">
+            {/* Fullscreen Landscape Overlay */}
+            {landscapeRow && (
+                <div className="fixed inset-0 z-[60] bg-slate-900 text-white flex items-center justify-center overflow-hidden">
+                    <div className="absolute inset-0 flex items-center justify-center w-[100vh] h-[100vw] origin-center -rotate-90 top-[calc(50%-50vw)] left-[calc(50%-50vh)]">
+                        {/* Wrapper for landscape content content */}
+                        <div className="w-full h-full p-8 flex flex-col items-center justify-center bg-slate-100 relative">
+                            <button
+                                onClick={() => setLandscapeRow(null)}
+                                className="absolute top-4 right-4 bg-red-600 text-white px-4 py-3 rounded-xl font-bold shadow-lg z-50 text-lg flex items-center gap-2"
+                            >
+                                ✕ <span className="opacity-90">FECHAR</span>
+                            </button>
+
+                            <h2 className="text-3xl font-bold text-slate-800 mb-8 flex items-center gap-4 border-b pb-4 w-full justify-center">
+                                <ArchiveIcon className="w-10 h-10 text-emerald-600" />
+                                {landscapeRow}
+                            </h2>
+
+                            {/* Use PyramindRow inside here but scaled up logic */}
+                            {(() => {
+                                const rowItems = relevantStock.filter(s => s.location === landscapeRow);
+
+                                // Pyramid Logic Redux
+                                const baseSize = 7; // Bigger base for landscape
+                                const levels: StockItem[][] = [];
+                                let currentIndex = 0;
+                                let currentCapacity = baseSize;
+                                if (rowItems.length > 0) {
+                                    while (currentIndex < rowItems.length) {
+                                        const capacity = Math.max(1, currentCapacity);
+                                        levels.push(rowItems.slice(currentIndex, currentIndex + capacity));
+                                        currentIndex += capacity;
+                                        currentCapacity--;
+                                    }
+                                }
+
+                                return (
+                                    <div className="flex flex-col-reverse items-center justify-end gap-2 p-12 overflow-y-auto w-full h-full pb-32">
+                                        {levels.map((levelItems, lvlIdx) => (
+                                            <div key={lvlIdx} className="flex justify-center gap-2 mb-2">
+                                                {levelItems.map(item => (
+                                                    <div key={item.id} className="w-24 h-24 rounded-full bg-slate-800 text-white flex items-center justify-center text-sm font-bold shadow-2xl border-4 border-white transform hover:scale-105 transition">
+                                                        <div className="text-center leading-tight">
+                                                            <div className="text-emerald-300 text-sm">{item.internalLot}</div>
+                                                            <div className="opacity-70 scale-90 text-xs">{item.remainingQuantity.toFixed(0)}</div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ))}
+                                        {rowItems.length === 0 && <p className="text-slate-400 text-3xl mt-20">Vazio</p>}
+                                    </div>
+                                )
+                            })()}
+                        </div>
+                    </div>
+                </div>
+            )}
             {/* Main Header */}
             <div className="bg-[#0F3F5C] p-4 text-white shadow-md z-30 flex flex-col md:flex-row gap-4 justify-between shrink-0">
                 <div className="flex items-center justify-between">
@@ -538,6 +603,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                                         }
                                     }}
                                     onItemClick={(item) => setItemToMove(item)}
+                                    onExpand={() => setLandscapeRow(row)}
                                 />
                             );
                         })}
