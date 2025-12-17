@@ -466,7 +466,8 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
         // If no filter selected, show all rows? Yes.
         relevantStock.forEach(item => {
             if (item.location && item.location.startsWith('Fileira ')) {
-                rows.add(item.location);
+                const rowName = item.location.split(':')[0];
+                rows.add(rowName);
             }
         });
         extraRows.forEach(r => rows.add(r));
@@ -761,7 +762,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                         {derivedRows.map(row => {
                             // Sort items by last history date (insertion/edit time) to maintain order stability
                             const rowItems = relevantStock
-                                .filter(s => s.location && s.location.startsWith(row))
+                                .filter(s => s.location && (s.location === row || s.location.startsWith(row + ':')))
                                 .sort((a, b) => {
                                     // Note: Items without coords sort naturally? Maybe irrelevant now with strict slots.
                                     const dateA = a.history && a.history.length > 0 ? a.history[a.history.length - 1].date : (a.entryDate || '');
