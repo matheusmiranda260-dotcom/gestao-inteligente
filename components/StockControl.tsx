@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Page, StockItem, ConferenceData, ConferenceLotData, Bitola, MaterialType, TransferRecord } from '../types';
 import { MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions } from '../types';
-import { ArrowLeftIcon, PencilIcon, TrashIcon, WarningIcon, BookOpenIcon, TruckIcon, DocumentReportIcon, PrinterIcon, LockOpenIcon, ClipboardListIcon, ChartBarIcon, XCircleIcon, ArchiveIcon } from './icons';
+import { ArrowLeftIcon, PencilIcon, TrashIcon, WarningIcon, BookOpenIcon, TruckIcon, DocumentReportIcon, PrinterIcon, LockOpenIcon, ClipboardListIcon, ChartBarIcon, XCircleIcon, ArchiveIcon, LocationOffIcon } from './icons';
 import LotHistoryModal from './LotHistoryModal';
 import FinishedConferencesModal from './FinishedConferencesModal';
 import ConferenceReport from './ConferenceReport';
@@ -373,7 +373,9 @@ const StockControl: React.FC<{
     const [transferReportData, setTransferReportData] = useState<TransferRecord | null>(null);
     const [showInventoryReport, setShowInventoryReport] = useState(false);
     const [stockDashboardOpen, setStockDashboardOpen] = useState(false);
+
     const [isStockMapOpen, setIsStockMapOpen] = useState(false);
+    const [unmappingItem, setUnmappingItem] = useState<StockItem | null>(null);
 
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
@@ -495,6 +497,25 @@ const StockControl: React.FC<{
         }
     };
 
+    const handleUnmap = () => {
+        if (unmappingItem) {
+            const updatedItem: StockItem = {
+                ...unmappingItem,
+                location: null
+            };
+            updatedItem.history = [...(unmappingItem.history || []), {
+                type: 'Remoção do Mapa',
+                date: new Date().toISOString(),
+                details: {
+                    action: 'Localização removida manualmente',
+                    reason: 'Solicitação do usuário (Correção)'
+                }
+            }];
+            updateStockItem(updatedItem);
+            setUnmappingItem(null);
+        }
+    };
+
     return (
         <div className="p-4 sm:p-6 md:p-8 space-y-6">
             {/* Keeping Modals ... */}
@@ -535,6 +556,22 @@ const StockControl: React.FC<{
                         <div className="flex justify-center gap-4">
                             <button onClick={() => setReleasingItem(null)} className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-6 rounded-lg transition">Cancelar</button>
                             <button onClick={handleRelease} className="bg-amber-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-amber-700 transition">Confirmar Liberação</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {unmappingItem && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white p-8 rounded-xl shadow-xl w-full max-w-md text-center">
+                        <LocationOffIcon className="h-16 w-16 mx-auto text-amber-500 mb-4" />
+                        <p className="text-lg text-slate-800 mb-2">Remover do Mapa?</p>
+                        <p className="text-sm text-slate-500 mb-6">
+                            O lote <strong>{unmappingItem.internalLot}</strong> está mapeado em <strong>{unmappingItem.location}</strong>.
+                            Deseja remover esta localização?
+                        </p>
+                        <div className="flex justify-center gap-4">
+                            <button onClick={() => setUnmappingItem(null)} className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-6 rounded-lg transition">Cancelar</button>
+                            <button onClick={handleUnmap} className="bg-amber-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-amber-700 transition">Confirmar Remoção</button>
                         </div>
                     </div>
                 </div>
@@ -722,6 +759,11 @@ const StockControl: React.FC<{
                                             {(item.status.includes('Em Produção') || item.status === 'Disponível - Suporte Treliça') && (
                                                 <button onClick={() => setReleasingItem(item)} className="p-1 text-amber-500 hover:text-amber-700" title="Liberar Lote Manualmente (Correção)">
                                                     <LockOpenIcon className="h-5 w-5" />
+                                                </button>
+                                            )}
+                                            {item.location && (
+                                                <button onClick={() => setUnmappingItem(item)} className="p-1 text-slate-500 hover:text-amber-600" title="Remover do Mapa (Resetar Local)">
+                                                    <LocationOffIcon className="h-5 w-5" />
                                                 </button>
                                             )}
                                         </div>
