@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { StockItem, MaterialType, Bitola, MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions } from '../types';
-import { ArchiveIcon, CheckCircleIcon, PlusIcon, SearchIcon, TrashIcon, ExclamationIcon, ArrowLeftIcon, ChartBarIcon } from './icons';
+import { ArchiveIcon, CheckCircleIcon, PlusIcon, SearchIcon, TrashIcon, ExclamationIcon, ArrowLeftIcon, ChartBarIcon, PencilIcon } from './icons';
 
 interface PyramidRowProps {
     rowName: string;
@@ -18,10 +18,21 @@ interface PyramidRowProps {
     movingItem?: StockItem | null; // Visual feedback for move mode
 }
 
-const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemove, onRemoveRow, isActive, onSetActive, onItemClick, onExpand, activeSlot, onSlotClick, movingItem }) => {
+const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemove, onRemoveRow, isActive, onSetActive, onItemClick, onExpand, activeSlot, onSlotClick, movingItem, onRenameRow, onPrintRow }) => {
     // Determine initial base size. High enough to fit existing items or default 7 as requested.
     const [baseSize, setBaseSize] = useState(7);
     const [maxHeight, setMaxHeight] = useState(20); // Default high enough
+    const [isEditingName, setIsEditingName] = useState(false);
+    const [editedName, setEditedName] = useState(rowName);
+
+    const isFinalized = rowName.includes('[FINALIZADA]');
+
+    const handleSaveName = () => {
+        if (editedName.trim() && editedName !== rowName) {
+            onRenameRow(editedName.trim());
+        }
+        setIsEditingName(false);
+    };
 
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();
@@ -159,10 +170,32 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
             <div className="flex justify-between items-center mb-4 border-b pb-2">
                 <div onClick={onSetActive} className="flex items-center gap-2 cursor-pointer flex-grow" title="Clique para ativar esta fileira">
                     <div className={`w-4 h-4 rounded-full border transition-colors ${isActive ? 'bg-emerald-500 border-emerald-500' : 'bg-white border-slate-400'}`}></div>
-                    <div>
-                        <h3 className={`font-bold text-lg leading-none ${isActive ? 'text-emerald-800' : 'text-slate-700'}`}>{rowName}</h3>
-                        <span className="text-xs text-slate-500 font-normal">{items.length} itens</span>
-                    </div>
+                    
+                    {isEditingName ? (
+                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                            <input 
+                                type="text" 
+                                value={editedName} 
+                                onChange={(e) => setEditedName(e.target.value)} 
+                                className="border rounded px-2 py-1 text-lg font-bold w-40"
+                                autoFocus
+                            />
+                            <button onClick={handleSaveName} className="text-emerald-600 font-bold text-sm bg-emerald-100 p-1 rounded">OK</button>
+                            <button onClick={() => setIsEditingName(false)} className="text-red-500 font-bold text-sm bg-red-100 p-1 rounded">X</button>
+                        </div>
+                    ) : (
+                        <div>
+                            <h3 className={`font-bold text-lg leading-none flex items-center gap-2 ${isActive ? 'text-emerald-800' : 'text-slate-700'}`}>
+                                {rowName}
+                                {!isFinalized && (
+                                    <button onClick={(e) => { e.stopPropagation(); setIsEditingName(true); setEditedName(rowName); }} className="text-slate-400 hover:text-slate-600">
+                                        <PencilIcon className="w-4 h-4" />
+                                    </button>
+                                )}
+                            </h3>
+                            <span className="text-xs text-slate-500 font-normal">{items.length} itens {isFinalized && <span className="text-emerald-600 font-bold opacity-100 bg-emerald-100 px-1 rounded ml-1">FINALIZADA</span>}</span>
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -189,7 +222,35 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                         <button onClick={(e) => { e.stopPropagation(); setMaxHeight(maxHeight + 1) }} className="px-3 py-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-r-lg font-bold border-l active:bg-slate-200">+</button>
                     </div>
 
-                    <button onClick={(e) => { e.stopPropagation(); onRemoveRow(); }} className="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition"><TrashIcon className="w-4 h-4" /></button>
+                    {/* Actions Group */}
+                    <div className="flex items-center gap-1">
+                        {isFinalized ? (
+                            <>
+                                <button onClick={(e) => { e.stopPropagation(); onRenameRow(rowName.replace(' [FINALIZADA]', '')); }} className="px-2 py-1 bg-amber-100 text-amber-700 rounded text-xs font-bold hover:bg-amber-200" title="Editar Fileira">
+                                    EDITAR
+                                </button>
+                                <button onClick={(e) => { e.stopPropagation(); onPrintRow(); }} className="px-2 py-1 bg-slate-100 text-slate-700 rounded text-xs font-bold hover:bg-slate-200" title="Imprimir Fileira">
+                                    🖨️
+                                </button>
+                            </>
+                        ) : (
+                             <button onClick={(e) => { e.stopPropagation(); onRenameRow(`${rowName} [FINALIZADA]`); }} className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-xs font-bold hover:bg-emerald-200 whitespace-nowrap" title="Finalizar Fileira">
+                                ✔ OK
+                            </button>
+                        )}
+                        {!isFinalized && (
+                            <button onClick={(e) => { 
+                                e.stopPropagation(); 
+                                if (items.length > 0) {
+                                     alert("Esvazie a fileira antes de excluir.");
+                                     return;
+                                }
+                                if(confirm(`Deseja realmente excluir a fileira "${rowName}"?`)) {
+                                    onRemoveRow(); 
+                                }
+                            }} className="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition ml-1"><TrashIcon className="w-4 h-4" /></button>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -238,7 +299,9 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 e.preventDefault();
-                                                onRemove(slot.item!);
+                                                if (confirm("Deseja remover este lote da fileira?")) {
+                                                    onRemove(slot.item!);
+                                                }
                                             }}
                                             className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 opacity-100 shadow-md hover:bg-red-700 hover:scale-110 transition-all z-20 cursor-pointer"
                                             title="Remover da fileira"
@@ -296,10 +359,21 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
     const [searchTerm, setSearchTerm] = useState('');
     // We treat unique location strings as rows.
     const [extraRows, setExtraRows] = useState<string[]>([]); // For rows that might be empty momentarily logic
+    const [printRowName, setPrintRowName] = useState<string | null>(null); // For printing modal
 
     const [selectedMaterial, setSelectedMaterial] = useState<MaterialType | null>(null);
     const [selectedBitola, setSelectedBitola] = useState<Bitola | null>(null);
     const [isPendingListOpen, setIsPendingListOpen] = useState(false); // Mobile: Toggle pending list
+    
+    // Add PencilIcon to imports
+    // Wait, imports are at top. I need to make sure PencilIcon is available.
+    // Use existing imports list and add PencilIcon if missing. 
+    // Checking imports... PencilIcon is NOT in line 4.
+    // I need to add it to imports later or assume it is available? 
+    // Wait, StockPyramidMap does NOT import PencilIcon. StockControl DOES.
+    // I need to add PencilIcon to imports. I'll do it in a separate block.
+    
+    // Quick Add New Lot ("Cadastrar ali mesmo")
 
     // Quick Add New Lot ("Cadastrar ali mesmo")
     const [activeRow, setActiveRow] = useState<string | null>(null);
@@ -392,6 +466,36 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
         // Construction Mode UX: Only clear slot if we just filled it
         if (activeSlot && validLocation === `${activeSlot.row}:L${activeSlot.l}:P${activeSlot.p}`) {
             setActiveSlot(null);
+        }
+    // Handle Rename Logic
+    const handleRenameRow = (oldName: string, newName: string) => {
+        if (!newName || newName === oldName) return;
+        
+        // Find all items in this row
+        const itemsToUpdate = safeStock.filter(s => s.location === oldName || (s.location && s.location.startsWith(oldName + ':')));
+        
+        itemsToUpdate.forEach(item => {
+            let newLoc = item.location || '';
+            if (newLoc === oldName) {
+                newLoc = newName;
+            } else if (newLoc.startsWith(oldName + ':')) {
+                newLoc = newLoc.replace(oldName + ':', newName + ':');
+            }
+            
+            onUpdateStockItem({
+                ...item,
+                location: newLoc,
+                history: [...(item.history || []), {
+                    type: 'Renomear Fileira',
+                    date: new Date().toISOString(),
+                    details: { from: oldName, to: newName, action: 'Rename Row' }
+                }]
+            });
+        });
+        
+        // Update extraRows if it was an empty row
+        if (extraRows.includes(oldName)) {
+            setExtraRows(prev => prev.map(r => r === oldName ? newName : r));
         }
     };
 
@@ -845,11 +949,63 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                                             }
                                         }
                                     }}
+                                    onRenameRow={(newName) => handleRenameRow(row, newName)}
+                                    onPrintRow={() => setPrintRowName(row)}
                                 />
                             );
                         })}
                     </div>
                 </div>
+                
+                 {/* Print Modal */}
+                {printRowName && (
+                    <div className="fixed inset-0 bg-white z-[100] p-8 flex flex-col items-center justify-center">
+                        <div className="w-full max-w-4xl border-2 border-slate-800 p-8 relative print:border-none print:w-full">
+                            <button onClick={() => setPrintRowName(null)} className="absolute top-4 right-4 bg-red-600 text-white px-4 py-2 rounded print:hidden font-bold">FECHAR</button>
+                             <button onClick={() => window.print()} className="absolute top-4 right-28 bg-blue-600 text-white px-4 py-2 rounded print:hidden font-bold">IMPRIMIR</button>
+                            
+                            <h1 className="text-4xl font-bold text-center mb-8 border-b-2 border-black pb-4">{printRowName}</h1>
+                            
+                            {(() => {
+                                const rowItems = relevantStock.filter(s => s.location && s.location.startsWith(printRowName + ':'));
+                                // Reconstruct levels for print
+                                const baseSize = 7;
+                                const levels: StockItem[][] = [];
+                                let currentIndex = 0;
+                                let currentCapacity = baseSize;
+                                if (rowItems.length > 0) {
+                                    while (currentIndex < rowItems.length) {
+                                        const capacity = Math.max(1, currentCapacity);
+                                        levels.push(rowItems.slice(currentIndex, currentIndex + capacity));
+                                        currentIndex += capacity;
+                                        currentCapacity--;
+                                    }
+                                }
+                                
+                                return (
+                                    <div className="flex flex-col-reverse items-center gap-4">
+                                         {levels.map((levelItems, lvlIdx) => (
+                                            <div key={lvlIdx} className="flex justify-center gap-4">
+                                                {levelItems.map(item => (
+                                                    <div key={item.id} className="w-24 h-24 rounded-full border-4 border-black flex flex-col items-center justify-center text-center p-1">
+                                                        <span className="font-bold text-lg leading-none mb-1">{item.internalLot}</span>
+                                                        <span className="text-sm">{item.remainingQuantity.toFixed(0)}kg</span>
+                                                        <span className="text-xs italic">{item.bitola}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                         ))}
+                                    </div>
+                                );
+                            })()}
+                             
+                             <div className="mt-12 border-t pt-4 flex justify-between text-sm text-slate-500">
+                                <span>Impressão: {new Date().toLocaleString()}</span>
+                                <span>Total Itens: {relevantStock.filter(s => s.location && s.location.startsWith(printRowName + ':')).length}</span>
+                             </div>
+                        </div>
+                    </div>
+                )}
                 {/* Closing divs for main layout */}
             </div>
         </div >
