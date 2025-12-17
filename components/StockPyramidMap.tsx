@@ -509,9 +509,11 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
     const unmappedCount = totalCount - mappedCount;
     const progressPercentage = totalCount === 0 ? 0 : Math.round((mappedCount / totalCount) * 100);
 
+    const [forceLandscape, setForceLandscape] = useState(false);
+
     return (
-        <div className="fixed inset-0 bg-slate-100 z-50 flex flex-col animate-fadeIn">
-            {/* Fullscreen Landscape Overlay */}
+        <div className={`fixed inset-0 bg-slate-100 z-50 flex flex-col animate-fadeIn transition-all duration-500 ${forceLandscape ? 'w-[100vh] h-[100vw] rotate-90 origin-center absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2' : ''}`}>
+            {/* Fullscreen Landscape Overlay (Row Specific) - Hide if global landscape is on? Or keep? Keep. */}
             {landscapeRow && (
                 <div className="fixed inset-0 z-[60] bg-slate-900 text-white flex items-center justify-center overflow-hidden">
                     <div className="absolute inset-0 flex items-center justify-center w-[100vh] h-[100vw] origin-center -rotate-90 top-[calc(50%-50vw)] left-[calc(50%-50vh)]">
@@ -582,6 +584,16 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                             <span className="md:hidden">Mapeamento</span>
                         </h1>
                     </div>
+
+                    {/* Rotated Landscape Toggle */}
+                    <button
+                        onClick={() => setForceLandscape(!forceLandscape)}
+                        className={`md:hidden p-2 rounded-lg font-bold text-xs flex items-center gap-1 transition ${forceLandscape ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white'}`}
+                        title="Girar Tela"
+                    >
+                        <ChartBarIcon className="w-5 h-5 rotate-90" />
+                        <span>{forceLandscape ? 'Normal' : 'Girar'}</span>
+                    </button>
                 </div>
 
                 {/* Filters */}
