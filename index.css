@@ -193,3 +193,52 @@ tr:hover td {
     color-adjust: exact !important;
   }
 }
+
+/* ANIMATIONS */
+@keyframes grid-flow {
+  0% {
+    background-position: 0 0;
+  }
+
+  100% {
+    background-position: 50px 50px;
+  }
+}
+
+@keyframes scanline {
+  0% {
+    top: -10%;
+    opacity: 0;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  100% {
+    top: 110%;
+    opacity: 0;
+  }
+}
+
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-grid-flow {
+  animation: grid-flow 4s linear infinite;
+}
+
+.animate-scanline {
+  animation: scanline 3s linear infinite;
+}
+
+.animate-spin-slow {
+  animation: spin-slow 12s linear infinite;
+}
