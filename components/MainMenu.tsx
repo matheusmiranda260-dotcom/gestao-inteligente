@@ -199,8 +199,8 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser, mes
 
             <header className="flex justify-between items-center mb-12">
                 <div className="flex items-center gap-4">
-                    <div className="bg-white p-2 rounded-xl shadow-sm border border-slate-100">
-                        <MSMLogo size="sm" showText={false} />
+                    <div className="bg-[#020B1A] p-1.5 rounded-xl shadow-sm border border-slate-800/50">
+                        <img src="/logo-msm-intensified.png" alt="MSM Logo" className="w-14 h-14 object-contain" />
                     </div>
                     <div>
                         <h1 className="text-3xl font-bold text-slate-800">Menu Principal</h1>
