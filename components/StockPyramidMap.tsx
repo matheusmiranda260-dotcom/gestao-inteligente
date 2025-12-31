@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { StockItem, MaterialType, Bitola, MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions, RowConfig } from '../types';
 import { fetchTable, upsertItem } from '../services/supabaseService';
 import { ArchiveIcon, CheckCircleIcon, PlusIcon, SearchIcon, TrashIcon, ExclamationIcon, ArrowLeftIcon, ChartBarIcon, PencilIcon } from './icons';
@@ -268,10 +268,6 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                     alert("Esvazie a fileira antes de excluir.");
                                     return;
                                 }
-                                if (items.length > 0) {
-                                    alert("Esvazie a fileira antes de excluir.");
-                                    return;
-                                }
                                 onRemoveRow();
                             }} className="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition ml-1"><TrashIcon className="w-4 h-4" /></button>
                         )}
@@ -298,7 +294,7 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                             ${isMovingThis ? 'bg-amber-400 border-amber-600 text-amber-900 animate-pulse ring-4 ring-amber-200' : 'bg-slate-800 border-white text-white'}
                                             ${isSwapTarget ? 'cursor-pointer hover:border-amber-400 hover:ring-2 hover:ring-amber-200' : ''}
                                         `}
-                                        title={`${slot.item.internalLot} - ${slot.item.bitola} - ${slot.item.remainingQuantity.toFixed(0)}kg`}
+                                        title={`${slot.item.internalLot} - ${slot.item.bitola} - ${(slot.item.remainingQuantity || 0).toFixed(0)}kg`}
                                         draggable
                                         onDragStart={(e) => {
                                             e.dataTransfer.setData('application/json', JSON.stringify(slot.item));
@@ -311,7 +307,7 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                     >
                                         <div className="text-center leading-tight pointer-events-none">
                                             <div className={`${isMovingThis ? 'text-amber-800' : 'text-emerald-300'} text-[9px] md:text-[10px]`}>{slot.item.internalLot}</div>
-                                            <div className={`opacity-70 scale-90 ${isMovingThis ? 'text-amber-800' : 'text-white'}`}>{slot.item.remainingQuantity.toFixed(0)}</div>
+                                            <div className={`opacity-70 scale-90 ${isMovingThis ? 'text-amber-800' : 'text-white'}`}>{(slot.item.remainingQuantity || 0).toFixed(0)}</div>
                                         </div>
 
                                         {isSwapTarget && (
@@ -720,7 +716,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                                                     <div key={item.id} className="w-24 h-24 rounded-full bg-slate-800 text-white flex items-center justify-center text-sm font-bold shadow-2xl border-4 border-white transform hover:scale-105 transition">
                                                         <div className="text-center leading-tight">
                                                             <div className="text-emerald-300 text-sm">{item.internalLot}</div>
-                                                            <div className="opacity-70 scale-90 text-xs">{item.remainingQuantity.toFixed(0)}</div>
+                                                            <div className="opacity-70 scale-90 text-xs">{(item.remainingQuantity || 0).toFixed(0)}</div>
                                                         </div>
                                                     </div>
                                                 ))}
@@ -1086,7 +1082,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                                                 {levelItems.map(item => (
                                                     <div key={item.id} className="w-24 h-24 rounded-full border-4 border-black flex flex-col items-center justify-center text-center p-1">
                                                         <span className="font-bold text-lg leading-none mb-1">{item.internalLot}</span>
-                                                        <span className="text-sm">{item.remainingQuantity.toFixed(0)}kg</span>
+                                                        <span className="text-sm">{(item.remainingQuantity || 0).toFixed(0)}kg</span>
                                                         <span className="text-xs italic">{item.bitola}</span>
                                                     </div>
                                                 ))}
