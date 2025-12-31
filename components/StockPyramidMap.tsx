@@ -964,7 +964,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
     const [forceLandscape, setForceLandscape] = useState(false);
 
     return (
-        <div className={`fixed inset-0 bg-slate-100 z-50 flex flex-col animate-fadeIn transition-all duration-500 ${forceLandscape ? 'w-[100vh] h-[100vw] rotate-90 origin-center absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2' : ''}`}>
+        <div className={`fixed inset-0 bg-slate-100 z-40 md:static md:z-0 md:h-[calc(100vh-140px)] md:w-full md:rounded-xl md:border md:border-slate-200 md:shadow-lg flex flex-col animate-fadeIn transition-all duration-500 ${forceLandscape ? 'w-[100vh] h-[100vw] rotate-90 origin-center absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2' : ''}`}>
             {/* Fullscreen Landscape Overlay (Row Specific) - Hide if global landscape is on? Or keep? Keep. */}
             {landscapeRow && (
                 <div className="fixed inset-0 z-[60] bg-slate-900 text-white flex items-center justify-center overflow-hidden">
@@ -1073,7 +1073,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
             {/* New Layout: Top Bar (Tabs) + Main Content (Single Row) */}
             <div className="flex flex-col h-full overflow-hidden bg-slate-50">
                 {/* Top Tab Bar & Actions */}
-                <div className="bg-white border-b flex items-center gap-4 px-4 h-16 shrink-0 shadow-sm z-30">
+                <div className="bg-white border-b flex flex-wrap items-center gap-4 px-4 py-3 min-h-[4rem] shrink-0 shadow-sm z-30 h-auto">
 
                     {/* Drawer Toggle (Mobile) */}
                     <button onClick={() => setIsPendingListOpen(!isPendingListOpen)} className="md:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-lg">
@@ -1081,7 +1081,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                     </button>
 
                     {/* Row Tabs */}
-                    <div className="flex-1 flex items-center gap-2 overflow-x-auto scrollbar-thin pb-1 md:pb-0 h-full">
+                    <div className="flex-1 flex flex-wrap items-center gap-2 w-full">
                         {/* Auto-Generated Rows Only */}
                         {derivedRows.length === 0 && <span className="text-slate-400 text-xs italic whitespace-nowrap">Sem fileiras...</span>}
 

@@ -10,7 +10,8 @@ import {
     DocumentTextIcon,
     WrenchScrewdriverIcon,
     ChatBubbleLeftRightIcon,
-    StarIcon
+    StarIcon,
+    ChevronRightIcon
 } from './icons';
 
 interface SidebarProps {
@@ -23,6 +24,11 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificationCount, isMobileMenuOpen }) => {
     const [isCollapsed, setIsCollapsed] = useState(false);
+    const [expandedMenus, setExpandedMenus] = useState<string[]>(['stock']); // Default open
+
+    const toggleMenu = (menu: string) => {
+        setExpandedMenus(prev => prev.includes(menu) ? prev.filter(m => m !== menu) : [...prev, menu]);
+    };
 
     const hasPermission = (targetPage: Page): boolean => {
         if (!currentUser) return false;
@@ -95,7 +101,49 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                 {/* ESTOQUE */}
                 <div className="sidebar-category">
                     <div className="sidebar-category-title">{isCollapsed ? '📦' : '📦 Estoque'}</div>
-                    <MenuItem target="stock" label="Matéria-prima" icon={ArchiveIcon} />
+
+                    {hasPermission('stock') && (
+                        <>
+                            {/* Collapsible Matéria-prima */}
+                            <button
+                                onClick={() => toggleMenu('stock')}
+                                className={`sidebar-item ${['stock', 'stock_map', 'stock_add', 'stock_inventory', 'stock_transfer'].includes(page) ? 'active' : ''} justify-between group`}
+                                title={isCollapsed ? 'Matéria-prima' : ''}
+                            >
+                                <div className="flex items-center gap-3 overflow-hidden">
+                                    <div className="sidebar-item-icon shrink-0">
+                                        <ArchiveIcon className="w-full h-full" />
+                                    </div>
+                                    {!isCollapsed && <span className="sidebar-item-label whitespace-nowrap">Matéria-prima</span>}
+                                </div>
+                                {!isCollapsed && (
+                                    <ChevronRightIcon className={`w-3 h-3 text-slate-500 transition-transform duration-200 ${expandedMenus.includes('stock') ? 'rotate-90' : ''}`} />
+                                )}
+                            </button>
+
+                            {/* Submenu */}
+                            {!isCollapsed && expandedMenus.includes('stock') && (
+                                <div className="ml-4 pl-4 border-l border-slate-700/50 flex flex-col gap-0.5 mt-1 mb-2 animate-in slide-in-from-left-2 duration-200">
+                                    <button onClick={() => setPage('stock_add')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stock_add' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                        + Conferência
+                                    </button>
+                                    <button onClick={() => setPage('stock_map')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stock_map' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                        🗺️ Mapa
+                                    </button>
+                                    <button onClick={() => setPage('stock_transfer')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stock_transfer' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                        ➡️ Transferência
+                                    </button>
+                                    <button onClick={() => setPage('stock_inventory')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stock_inventory' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                        📋 Inventário (Relatório)
+                                    </button>
+                                    <button onClick={() => setPage('stock')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stock' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                        ⚙️ Gestão de Lotes
+                                    </button>
+                                </div>
+                            )}
+                        </>
+                    )}
+
                     <MenuItem target="finishedGoods" label="Produto Acabado" icon={ArchiveIcon} />
                 </div>
 

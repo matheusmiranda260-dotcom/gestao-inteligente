@@ -18,6 +18,8 @@ import ContinuousImprovement from './components/ContinuousImprovement';
 import WorkInstructions from './components/WorkInstructions';
 import PeopleManagement from './components/PeopleManagement';
 import MessageCenter from './components/MessageCenter';
+import StockInventory from './components/StockInventory';
+import StockTransfer from './components/StockTransfer';
 import { supabase } from './supabaseClient';
 
 import { fetchTable, insertItem, updateItem, deleteItem, deleteItemByColumn, updateItemByColumn } from './services/supabaseService';
@@ -1551,7 +1553,11 @@ const App: React.FC = () => {
         switch (page) {
             case 'login': return <Login onLogin={handleLogin} error={notification?.type === 'error' ? notification.message : null} />;
             case 'menu': return <MainMenu setPage={setPage} onLogout={handleLogout} currentUser={currentUser} messages={messages} markAllMessagesAsRead={markAllMessagesAsRead} addMessage={addMessage} />;
-            case 'stock': return <StockControl stock={stock} conferences={conferences} transfers={transfers} setPage={setPage} addConference={addConference} deleteStockItem={deleteStockItem} updateStockItem={(item) => updateStockItem(item.id, item)} createTransfer={createTransfer} editConference={editConference} deleteConference={deleteConference} productionOrders={productionOrders} />;
+            case 'stock': return <StockControl stock={stock} conferences={conferences} transfers={transfers} setPage={setPage} addConference={addConference} deleteStockItem={deleteStockItem} updateStockItem={(item) => updateStockItem(item.id, item)} createTransfer={createTransfer} editConference={editConference} deleteConference={deleteConference} productionOrders={productionOrders} initialView="list" />;
+            case 'stock_map': return <StockControl stock={stock} conferences={conferences} transfers={transfers} setPage={setPage} addConference={addConference} deleteStockItem={deleteStockItem} updateStockItem={(item) => updateStockItem(item.id, item)} createTransfer={createTransfer} editConference={editConference} deleteConference={deleteConference} productionOrders={productionOrders} initialView="map" />;
+            case 'stock_add': return <StockControl stock={stock} conferences={conferences} transfers={transfers} setPage={setPage} addConference={addConference} deleteStockItem={deleteStockItem} updateStockItem={(item) => updateStockItem(item.id, item)} createTransfer={createTransfer} editConference={editConference} deleteConference={deleteConference} productionOrders={productionOrders} initialView="add" />;
+            case 'stock_inventory': return <StockInventory stock={stock} setPage={setPage} />;
+            case 'stock_transfer': return <StockTransfer stock={stock} setPage={setPage} createTransfer={createTransfer} />;
             case 'trefila': return <MachineControl machineType="Trefila" {...mcProps} />;
             case 'trelica': return <MachineControl machineType="Treliça" {...mcProps} />;
             case 'machineSelection': return <MachineSelection setPage={setPage} />;

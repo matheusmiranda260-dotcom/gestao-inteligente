@@ -26,7 +26,7 @@ export interface TrelicaSelectedLots {
     allSenozoideRight?: string[];
 }
 
-export type Page = 'login' | 'menu' | 'stock' | 'machineSelection' | 'trefila' | 'trelica' | 'productionOrder' | 'productionOrderTrelica' | 'reports' | 'userManagement' | 'productionDashboard' | 'finishedGoods' | 'partsManager' | 'continuousImprovement' | 'workInstructions' | 'peopleManagement' | 'messages';
+export type Page = 'login' | 'menu' | 'stock' | 'stock_map' | 'stock_add' | 'stock_inventory' | 'stock_transfer' | 'machineSelection' | 'trefila' | 'trelica' | 'productionOrder' | 'productionOrderTrelica' | 'reports' | 'userManagement' | 'productionDashboard' | 'finishedGoods' | 'partsManager' | 'continuousImprovement' | 'workInstructions' | 'peopleManagement' | 'messages';
 
 export interface InstructionStep {
     id: string;
