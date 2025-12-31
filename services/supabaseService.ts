@@ -55,7 +55,7 @@ export const deleteData = async (table: string, id: string): Promise<boolean> =>
 };
 
 /** Helper to convert snake_case DB fields to camelCase JS */
-const mapToCamelCase = (obj: any): any => {
+export const mapToCamelCase = (obj: any): any => {
     if (Array.isArray(obj)) return obj.map(v => mapToCamelCase(v));
     if (obj && typeof obj === 'object' && obj.constructor === Object) {
         return Object.keys(obj).reduce((acc, key) => {

@@ -125,7 +125,8 @@ const App: React.FC = () => {
     };
 
     // Supabase Realtime - Atualiza dados automaticamente quando há mudanças no banco
-    useAllRealtimeSubscriptions({
+    // Supabase Realtime - Atualiza dados automaticamente quando há mudanças no banco
+    const realtimeSetters = useMemo(() => ({
         setStock,
         setConferences,
         setProductionOrders,
@@ -138,7 +139,9 @@ const App: React.FC = () => {
         setTrefilaProduction,
         setTrelicaProduction,
         setMessages,
-    }, !!currentUser);
+    }), []);
+
+    useAllRealtimeSubscriptions(realtimeSetters, !!currentUser);
 
     useEffect(() => {
         // Load stored user from localStorage if exists

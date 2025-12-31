@@ -6,6 +6,7 @@ import type {
     FinishedProductItem, PontaItem, FinishedGoodsTransferRecord,
     PartsRequest, ShiftReport, ProductionRecord, Message
 } from '../types';
+import { mapToCamelCase } from '../services/supabaseService';
 
 interface RealtimeSetters {
     setStock: React.Dispatch<React.SetStateAction<StockItem[]>>;
@@ -43,6 +44,7 @@ export function useAllRealtimeSubscriptions(setters: RealtimeSetters, enabled: b
         const channels: RealtimeChannel[] = [];
 
         // Helper function para criar subscriptions
+
         const createSubscription = <T extends object>(
             tableName: string,
             setter: React.Dispatch<React.SetStateAction<T[]>>,
@@ -69,21 +71,23 @@ export function useAllRealtimeSubscriptions(setters: RealtimeSetters, enabled: b
                         switch (payload.eventType) {
                             case 'INSERT':
                                 if (payload.new) {
+                                    const newItem = mapToCamelCase(payload.new) as T;
                                     setter(prev =>
                                         options?.onInsert
-                                            ? options.onInsert(payload.new as T, prev)
-                                            : [...prev, payload.new as T]
+                                            ? options.onInsert(newItem, prev)
+                                            : [...prev, newItem]
                                     );
                                 }
                                 break;
                             case 'UPDATE':
                                 if (payload.new) {
+                                    const updatedItem = mapToCamelCase(payload.new) as T;
                                     setter(prev =>
                                         options?.onUpdate
-                                            ? options.onUpdate(payload.new as T, prev)
+                                            ? options.onUpdate(updatedItem, prev)
                                             : prev.map(item =>
-                                                (item as any)[idField] === (payload.new as any)[idField]
-                                                    ? payload.new as T
+                                                (item as any)[idField] === (updatedItem as any)[idField]
+                                                    ? updatedItem
                                                     : item
                                             )
                                     );
@@ -91,11 +95,12 @@ export function useAllRealtimeSubscriptions(setters: RealtimeSetters, enabled: b
                                 break;
                             case 'DELETE':
                                 if (payload.old) {
+                                    const deletedItem = mapToCamelCase(payload.old) as T;
                                     setter(prev =>
                                         options?.onDelete
-                                            ? options.onDelete(payload.old as T, prev)
+                                            ? options.onDelete(deletedItem, prev)
                                             : prev.filter(item =>
-                                                (item as any)[idField] !== (payload.old as any)[idField]
+                                                (item as any)[idField] !== (deletedItem as any)[idField]
                                             )
                                     );
                                 }
@@ -171,7 +176,7 @@ export function useAllRealtimeSubscriptions(setters: RealtimeSetters, enabled: b
                 },
                 (payload) => {
                     console.log(`[Realtime] production_records - ${payload.eventType}:`, payload);
-                    const record = (payload.eventType === 'DELETE' ? payload.old : payload.new) as ProductionRecord;
+                    const record = mapToCamelCase(payload.eventType === 'DELETE' ? payload.old : payload.new) as ProductionRecord;
 
                     if (record.machine === 'Trefila') {
                         switch (payload.eventType) {
