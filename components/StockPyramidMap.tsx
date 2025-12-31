@@ -24,6 +24,10 @@ interface PyramidRowProps {
 }
 
 const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemove, onRemoveRow, isActive, onSetActive, onItemClick, onExpand, activeSlot, onSlotClick, movingItem, onRenameRow, onPrintRow, config, onUpdateConfig }) => {
+
+    // Determine type for visual logic (defined early for use in render)
+    const isCARow = rowName.includes('CA') && !rowName.includes('50') && !rowName.includes('Fio');
+
     // Determine initial base size. High enough to fit existing items or default 7 as requested.
     // Use config if available, else default
 
@@ -301,16 +305,21 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                     // If we want to hide levels > maxHeight, we can filter.
                     if (levelIndex >= maxHeight) return null;
 
+                    const isRowInteractive = levelSlots.some(s => s.item?.id === menuItemId);
+
                     return (
-                        <div key={levelIndex} className="flex justify-center -space-x-[1px] md:space-x-[2px] z-10 relative" style={{ zIndex: levelIndex }}>
+                        <div key={levelIndex} className={`flex justify-center z-10 relative ${isCARow ? 'gap-0.5 md:gap-1' : '-space-x-[1px] md:space-x-[2px]'}`} style={{ zIndex: isRowInteractive ? 100 : levelIndex }}>
                             {levelSlots.map((slot, slotIndex) => {
                                 const isSlotActive = activeSlot && activeSlot.l === slot.coords.l && activeSlot.p === slot.coords.p;
                                 const isMovingThis = movingItem && slot.item && movingItem.id === slot.item.id;
                                 const isSwapTarget = movingItem && slot.item && movingItem.id !== slot.item.id;
 
-                                // Dynamic coil visuals - simple version
+                                // Dynamic visually
                                 const coilColor = slot.item?.materialType === 'CA-60' ? 'bg-slate-600' : 'bg-slate-700';
                                 const borderColor = slot.item?.materialType === 'CA-60' ? 'border-slate-500' : 'border-slate-600';
+
+                                // Dynamic Shape based on Row Name (CA-60 = Rectangular/Square)
+                                const shapeClass = isCARow ? 'rounded-lg' : 'rounded-full';
 
                                 if (slot.item) {
                                     const isMenuOpen = menuItemId === slot.item.id;
@@ -319,7 +328,7 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                         <div
                                             key={slot.item.id}
                                             className={`
-                                            w-14 h-14 md:w-20 md:h-20 rounded-full flex items-center justify-center relative cursor-pointer transform transition-all shrink-0
+                                            w-14 h-14 md:w-20 md:h-20 ${shapeClass} flex items-center justify-center relative cursor-pointer transform transition-all shrink-0
                                             ${isMovingThis ? 'z-50 scale-110 drop-shadow-2xl' : ''}
                                             ${isMenuOpen ? 'z-50 scale-110 ring-4 ring-emerald-400 bg-white shadow-xl' : 'hover:scale-105 active:scale-95'}
                                         `}
@@ -338,48 +347,69 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                                 }
                                             }}
                                         >
-                                            {isMenuOpen ? (
-                                                <div className="flex flex-col gap-1 items-center justify-center w-full h-full bg-white/95 rounded-full backdrop-blur-sm p-1 animate-fadeIn overflow-hidden">
+                                            {isMenuOpen && (
+                                                <div
+                                                    className="absolute z-[100] bottom-full left-1/2 -translate-x-1/2 mb-2 w-32 bg-white rounded-xl shadow-2xl p-1.5 flex flex-col gap-1 border border-slate-100 animate-in slide-in-from-bottom-2 fade-in duration-200"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    <div className="text-[10px] font-bold text-center text-slate-500 border-b border-slate-100 pb-1 mb-0.5 overflow-hidden text-ellipsis whitespace-nowrap">
+                                                        {slot.item.internalLot}
+                                                    </div>
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); if (onItemClick) onItemClick(slot.item!); setMenuItemId(null); }}
-                                                        className="bg-amber-100 hover:bg-amber-200 text-amber-700 text-[9px] md:text-[10px] font-bold px-1 py-1 rounded w-full flex items-center justify-center gap-1 leading-none shadow-sm border border-amber-200 grow uppercase tracking-tight"
+                                                        className="bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-1.5 rounded-lg w-full flex items-center justify-center gap-2 transition-colors"
                                                     >
-                                                        MOVER
+                                                        <span className="text-lg leading-none">✋</span> Mover
                                                     </button>
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); onRemove(slot.item!); setMenuItemId(null); }}
-                                                        className="bg-red-100 hover:bg-red-200 text-red-700 text-[9px] md:text-[10px] font-bold px-1 py-1 rounded w-full flex items-center justify-center gap-1 leading-none shadow-sm border border-red-200 grow uppercase tracking-tight"
+                                                        className="bg-red-50 hover:bg-red-100 text-red-700 text-[10px] font-bold px-2 py-1.5 rounded-lg w-full flex items-center justify-center gap-2 transition-colors"
                                                     >
-                                                        EXCLUIR
+                                                        <span className="text-lg leading-none">🗑️</span> Excluir
                                                     </button>
+
+                                                    {/* Arrow */}
+                                                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-[6px] border-transparent border-t-white drop-shadow-sm"></div>
                                                 </div>
-                                            ) : (
-                                                <>
-                                                    {/* Standard Coil Content */}
-                                                    <div className={`absolute inset-0 rounded-full border-[6px] md:border-[10px] ${isMovingThis ? 'border-amber-500 animate-pulse' : borderColor} ${coilColor} shadow-[inset_2px_2px_6px_rgba(0,0,0,0.6),2px_2px_4px_rgba(0,0,0,0.4)]`}></div>
-                                                    {/* Inner Hole */}
-                                                    <div className="absolute inset-[30%] rounded-full bg-slate-900/40 shadow-inner border border-white/5"></div>
-                                                    <div className="absolute top-[10%] right-[15%] w-3 h-4 bg-white shadow-sm rotate-12 z-10 opacity-90"></div>
+                                            )}
 
-                                                    {/* Content Overlay */}
-                                                    <div className="relative z-20 text-center leading-none drop-shadow-md pointer-events-none">
-                                                        <div className="bg-white/90 px-1 rounded-sm text-[8px] md:text-[10px] font-bold text-slate-900 border border-slate-300 mb-0.5 whitespace-nowrap overflow-hidden max-w-[40px] md:max-w-[50px] text-ellipsis">
-                                                            {slot.item.internalLot}
-                                                        </div>
-                                                        <div className="text-[9px] md:text-xs text-white font-mono font-bold tracking-tighter">
-                                                            {(slot.item.remainingQuantity || 0).toFixed(0)}
-                                                        </div>
-                                                        <div className="text-[7px] md:text-[8px] text-emerald-200 mt-0.5">
-                                                            {slot.item.bitola}mm
-                                                        </div>
-                                                    </div>
+                                            {/* Standard Coil Content (Always Visible, with z-index separation if menu open) */}
+                                            <div
+                                                className={`absolute inset-0 ${shapeClass} 
+                                                            ${isCARow ? `border-[6px] md:border-[10px] ${borderColor} ${coilColor}` : ''}
+                                                            ${isMovingThis ? 'ring-4 ring-orange-500 z-10' : ''}
+                                                            shadow-[2px_2px_5px_rgba(0,0,0,0.5)]
+                                                        `}
+                                                style={!isCARow ? {
+                                                    background: 'repeating-radial-gradient(circle at 50% 50%, #475569 0, #475569 2px, #334155 3px, #1e293b 4px)',
+                                                    boxShadow: 'inset 0 0 15px rgba(0,0,0,0.7), 2px 4px 8px rgba(0,0,0,0.6)'
+                                                } : {}}
+                                            ></div>
 
-                                                    {isSwapTarget && (
-                                                        <div className="absolute inset-0 flex items-center justify-center bg-amber-500/40 rounded-full animate-pulse pointer-events-none z-30 ring-4 ring-amber-400">
-                                                            <span className="text-xl font-bold text-white drop-shadow-md">⇄</span>
-                                                        </div>
-                                                    )}
-                                                </>
+                                            {/* Inner Hole */}
+                                            <div className={`absolute inset-[30%] ${shapeClass} ${!isCARow ? 'bg-black/70 shadow-[inset_0_4px_10px_rgba(0,0,0,1)]' : 'bg-slate-900/40 shadow-inner'} border border-white/5`}></div>
+
+                                            {/* Glare for Fio Máquina */}
+                                            {!isCARow && <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-white/5 via-transparent to-transparent pointer-events-none"></div>}
+                                            {isCARow && <div className="absolute top-[10%] right-[15%] w-3 h-4 bg-white shadow-sm rotate-12 z-10 opacity-90"></div>}
+
+                                            {/* Content Overlay */}
+                                            <div className="relative z-20 text-center leading-none drop-shadow-md pointer-events-none">
+                                                <div className="bg-white/90 px-1 rounded-sm text-[8px] md:text-[10px] font-bold text-slate-900 border border-slate-300 mb-0.5 whitespace-nowrap overflow-hidden max-w-[40px] md:max-w-[50px] text-ellipsis">
+                                                    {slot.item.internalLot}
+                                                </div>
+                                                <div className="text-[9px] md:text-xs text-white font-mono font-bold tracking-tighter">
+                                                    {(slot.item.remainingQuantity || 0).toFixed(0)}
+                                                </div>
+                                                <div className="text-[7px] md:text-[8px] text-emerald-200 mt-0.5">
+                                                    {slot.item.bitola}mm
+                                                </div>
+                                            </div>
+
+                                            {isSwapTarget && (
+                                                <div className={`absolute inset-0 flex items-center justify-center bg-amber-500/40 ${shapeClass} animate-pulse pointer-events-none z-30 ring-4 ring-amber-400`}>
+                                                    <span className="text-xl font-bold text-white drop-shadow-md">⇄</span>
+                                                </div>
                                             )}
                                         </div>
                                     );
@@ -389,10 +419,10 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                         <div
                                             key={`empty-${levelIndex}-${slotIndex}`}
                                             className={`
-                                            w-14 h-14 md:w-20 md:h-20 rounded-full border-[3px] border-dashed flex items-center justify-center transition-all cursor-pointer z-0 pointer-events-auto shrink-0 relative
+                                            w-14 h-14 md:w-20 md:h-20 ${shapeClass} flex items-center justify-center transition-all cursor-pointer z-0 pointer-events-auto shrink-0 relative
                                             ${isSlotActive
-                                                    ? 'border-orange-500 bg-orange-50 scale-105 shadow-[0_0_15px_rgba(255,165,0,0.5)] z-20'
-                                                    : 'border-slate-300 bg-slate-100/50 hover:border-emerald-400 hover:bg-emerald-50'}
+                                                    ? 'scale-105 shadow-[0_0_15px_rgba(255,165,0,0.5)] z-20'
+                                                    : 'hover:scale-105 opacity-60 hover:opacity-100'}
                                         `}
                                             onDragOver={handleDragOver}
                                             onDragLeave={handleDragLeave}
@@ -403,9 +433,24 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                             }}
                                             title={isSlotActive ? 'Vaga SELECIONADA' : `Vazio (L${slot.coords.l}:P${slot.coords.p})`}
                                         >
-                                            {/* Ghost Coil Shape for empty slots */}
-                                            <div className={`absolute inset-[15%] rounded-full border-2 border-dashed ${isSlotActive ? 'border-orange-300' : 'border-slate-200'}`}></div>
-                                            <div className={`pointer-events-none ${isSlotActive ? 'font-bold text-2xl text-orange-500 animate-bounce' : 'text-slate-300 text-xl'}`}>{isSlotActive ? '⬇' : '+'}</div>
+                                            {/* Realistic "Shadow" Placeholder */}
+                                            <div
+                                                className={`absolute inset-0 ${shapeClass} ${isSlotActive ? 'ring-2 ring-orange-500' : ''}`}
+                                                style={{
+                                                    background: !isCARow
+                                                        ? 'repeating-radial-gradient(circle at 50% 50%, rgba(0,0,0,0.15) 0, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.25) 3px, rgba(0,0,0,0.35) 4px)'
+                                                        : 'rgba(0,0,0,0.15)',
+                                                    boxShadow: 'inset 0 0 10px rgba(0,0,0,0.2)'
+                                                }}
+                                            ></div>
+
+                                            {/* Inner Hole Shadow (Fio Máquina Only) */}
+                                            {!isCARow && <div className={`absolute inset-[30%] ${shapeClass} bg-black/10 border border-white/5`}></div>}
+
+                                            {/* Dashed Outline (Faint) */}
+                                            <div className={`absolute inset-0 ${shapeClass} border-2 border-dashed ${isSlotActive ? 'border-orange-500' : 'border-slate-500/30'}`}></div>
+
+                                            <div className={`pointer-events-none z-10 ${isSlotActive ? 'font-bold text-2xl text-orange-500 animate-bounce' : 'text-slate-600/50 text-xl'}`}>{isSlotActive ? '⬇' : '+'}</div>
                                         </div>
                                     );
                                 }
@@ -982,7 +1027,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
             <div className="bg-[#0F3F5C] p-4 text-white shadow-md z-30 flex flex-col md:flex-row gap-4 justify-between shrink-0">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition text-white/80 hover:text-white md:hidden">
+                        <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition text-white/80 hover:text-white mr-2">
                             <ArrowLeftIcon className="w-6 h-6" />
                         </button>
                         <h1 className="text-xl font-bold flex items-center gap-2">
@@ -1129,7 +1174,15 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                     </div>
 
                     {/* Main Canvas */}
-                    <div className="flex-1 overflow-auto bg-slate-200/50 p-4 md:p-8 flex items-start justify-center relative">
+                    <div
+                        className="flex-1 overflow-auto p-4 md:p-8 flex items-start justify-center relative"
+                        style={{
+                            backgroundImage: `linear-gradient(to bottom, rgba(241, 245, 249, 0.85), rgba(241, 245, 249, 0.92)), url(/industrial-bg.png)`,
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                            backgroundAttachment: 'fixed'
+                        }}
+                    >
                         {/* Overlay Controls */}
                         {isPendingListOpen && <div className="absolute inset-0 bg-black/20 z-30 md:hidden" onClick={() => setIsPendingListOpen(false)}></div>}
 
