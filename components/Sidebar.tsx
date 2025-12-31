@@ -18,9 +18,10 @@ interface SidebarProps {
     setPage: (page: Page) => void;
     currentUser: User | null;
     notificationCount?: number;
+    isMobileMenuOpen?: boolean;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificationCount }) => {
+const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificationCount, isMobileMenuOpen }) => {
     const [isCollapsed, setIsCollapsed] = useState(false);
 
     const hasPermission = (targetPage: Page): boolean => {
@@ -58,7 +59,7 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
     };
 
     return (
-        <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
+        <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
             <div className="sidebar-header">
                 {!isCollapsed && (
                     <div className="sidebar-logo">

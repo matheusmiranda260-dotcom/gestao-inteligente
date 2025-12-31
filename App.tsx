@@ -46,6 +46,7 @@ const App: React.FC = () => {
     const [trelicaProduction, setTrelicaProduction] = useState<ProductionRecord[]>([]);
     const [messages, setMessages] = useState<Message[]>([]);
     const [pendingKaizenCount, setPendingKaizenCount] = useState(0);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     const unreadMessagesCount = useMemo(() => messages.filter(m => !m.isRead).length, [messages]);
 
@@ -1717,18 +1718,37 @@ const App: React.FC = () => {
             )}
 
             {showSidebar && (
-                <Sidebar
-                    page={page}
-                    setPage={setPage}
-                    currentUser={currentUser}
-                    notificationCount={pendingKaizenCount}
-                />
+                <>
+                    <div
+                        className={`sidebar-overlay ${isMobileMenuOpen ? 'active' : ''}`}
+                        onClick={() => setIsMobileMenuOpen(false)}
+                    />
+                    <Sidebar
+                        page={page}
+                        setPage={(p) => {
+                            setPage(p);
+                            setIsMobileMenuOpen(false);
+                        }}
+                        currentUser={currentUser}
+                        notificationCount={pendingKaizenCount}
+                        isMobileMenuOpen={isMobileMenuOpen}
+                    />
+                </>
             )}
 
             <main className="main-content">
                 {showSidebar && (
                     <header className="top-bar no-print">
                         <div className="flex items-center gap-4">
+                            <button
+                                onClick={() => setIsMobileMenuOpen(true)}
+                                className="mobile-menu-btn"
+                                title="Abrir menu"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                                </svg>
+                            </button>
                             <span className="text-slate-400 text-sm font-medium">MSM / {page.charAt(0).toUpperCase() + page.slice(1)}</span>
                         </div>
 
