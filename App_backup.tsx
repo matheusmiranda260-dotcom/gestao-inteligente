@@ -729,33 +729,27 @@ const App: React.FC = () => {
                 setStock(updatedStock);
             } else if (newOrder.machine === 'Treliça') {
                 const lots = newOrder.selectedLotIds as TrelicaSelectedLots;
-                const lotRoleMap = new Map<string, string>();
 
-                const assignRole = (ids: string | string[] | undefined, role: string) => {
-                    if (!ids) return;
-                    if (Array.isArray(ids)) {
-                        ids.forEach(id => lotRoleMap.set(String(id).trim(), role));
-                    } else {
-                        lotRoleMap.set(String(ids).trim(), role);
-                    }
-                };
-
-                assignRole(lots.allSuperior || lots.superior, 'Superior');
-                assignRole(lots.allInferiorLeft || lots.inferior1, 'Inferior Esq.');
-                assignRole(lots.allInferiorRight || lots.inferior2, 'Inferior Dir.');
-                assignRole(lots.allSenozoideLeft || lots.senozoide1, 'Senozoide Esq.');
-                assignRole(lots.allSenozoideRight || lots.senozoide2, 'Senozoide Dir.');
-
-                // Fallback for older formats if specific ones are missing but general ones exist
-                if (lots.allInferior) assignRole(lots.allInferior, 'Inferior');
-                if (lots.allSenozoide) assignRole(lots.allSenozoide, 'Senozoide');
-
-                for (const [lotId, role] of lotRoleMap.entries()) {
+                let lotIds: string[] = [];
+                if (lots.allSuperior && lots.allInferiorLeft && lots.allInferiorRight && lots.allSenozoideLeft && lots.allSenozoideRight) {
+                    lotIds = [
+                        ...lots.allSuperior,
+                        ...lots.allInferiorLeft,
+                        ...lots.allInferiorRight,
+                        ...lots.allSenozoideLeft,
+                        ...lots.allSenozoideRight
+                    ];
+                } else if (lots.allSuperior && lots.allInferior && lots.allSenozoide) {
+                    lotIds = [...lots.allSuperior, ...lots.allInferior, ...lots.allSenozoide];
+                } else {
+                    lotIds = [lots.superior, lots.inferior1, lots.inferior2, lots.senozoide1, lots.senozoide2];
+                }
+                const uniqueLotIds = [...new Set(lotIds)];
+                for (const lotId of uniqueLotIds) {
                     const stockItem = stock.find(s => s.id === lotId);
                     if (stockItem) {
                         await updateItem<StockItem>('stock_items', lotId, {
                             status: 'Em Produção - Treliça',
-                            location: role,
                             productionOrderIds: [...(stockItem.productionOrderIds || []), savedOrder.id]
                         });
                     }
@@ -802,11 +796,8 @@ const App: React.FC = () => {
                 const stockItem = stock.find(s => s.id === lotId);
                 if (stockItem) {
                     const newProductionOrderIds = (stockItem.productionOrderIds || []).filter(id => id !== orderId);
-                    const isNowAvailable = newProductionOrderIds.length === 0;
-
                     await updateItem<StockItem>('stock_items', lotId, {
-                        status: isNowAvailable ? 'Disponível' : stockItem.status,
-                        location: isNowAvailable ? '' : stockItem.location, // Clear role if back to available
+                        status: newProductionOrderIds.length === 0 ? 'Disponível' : stockItem.status,
                         productionOrderIds: newProductionOrderIds.length > 0 ? newProductionOrderIds : undefined,
                     });
                 }
@@ -1137,13 +1128,16 @@ const App: React.FC = () => {
 
     const completeProduction = async (orderId: string, finalData: { actualProducedQuantity?: number; scrapWeight?: number; pontas?: Ponta[] }) => {
         const now = new Date().toISOString();
+
         const orderToComplete = productionOrders.find(o => o.id === orderId);
 
-        if (!orderToComplete || orderToComplete.status === 'completed') return;
+        if (!orderToComplete || orderToComplete.status === 'completed') {
+            return;
+        }
 
-        let updates: Partial<ProductionOrderData> = {};
-        const stockUpdates: { id: string, changes: Partial<StockItem> }[] = [];
+        let updates: Partial<ProductionOrderData>;
 
+        // Common completion logic
         const newEvents = [...(orderToComplete.downtimeEvents || [])];
         let lastEventIndex = -1;
         for (let i = newEvents.length - 1; i >= 0; i--) {
@@ -1155,6 +1149,8 @@ const App: React.FC = () => {
         if (lastEventIndex !== -1) {
             newEvents[lastEventIndex].resumeTime = now;
         }
+
+        const stockUpdates: { id: string, changes: Partial<StockItem> }[] = [];
 
         if (orderToComplete.machine === 'Trefila') {
             const actualProducedWeight = (orderToComplete.processedLots || []).reduce((sum, lot) => sum + (lot.finalWeight || 0), 0);
@@ -1172,6 +1168,7 @@ const App: React.FC = () => {
                 scrapWeight: calculatedScrapWeight >= 0 ? calculatedScrapWeight : 0,
             };
 
+            // Calculate stock updates for Trefila
             for (const item of stock) {
                 const processedLotData = (orderToComplete.processedLots || []).find(pLot => pLot.lotId === item.id);
                 if (processedLotData) {
@@ -1185,7 +1182,7 @@ const App: React.FC = () => {
                             initialQuantity: finalWeight,
                             remainingQuantity: finalWeight,
                             status: 'Disponível',
-                            productionOrderIds: (item.productionOrderIds || []).filter(id => id !== orderId),
+                            productionOrderIds: undefined,
                             history: [...(item.history || []), {
                                 type: 'Transformado em CA-60',
                                 date: now,
@@ -1200,404 +1197,672 @@ const App: React.FC = () => {
                     });
                 }
             }
-        } else { // Treliça
-            try {
-                // Determine actual production quantity
-                // Priority: 1. Modal data, 2. Current production count, 3. Planned order quantity
-                let fullQty = Number(finalData.actualProducedQuantity || 0);
-                if (fullQty <= 0) {
-                    fullQty = Number(orderToComplete.actualProducedQuantity || 0);
-                }
-                if (fullQty <= 0) {
-                    fullQty = Number(orderToComplete.quantityToProduce || 1); // Ultimate fallback to 1 piece to avoid 0 consumption if completed
-                }
-
-                let actualWeight = (orderToComplete.weighedPackages || []).reduce((sum, pkg) => sum + pkg.weight, 0);
-                const modelInfo = trelicaModels.find(m =>
-                    m.modelo.trim().toLowerCase() === orderToComplete.trelicaModel?.trim().toLowerCase() &&
-                    String(m.tamanho).trim() === String(orderToComplete.tamanho).trim()
-                );
-
-                if (!modelInfo) {
-                    showNotification('Erro: Modelo de treliça não encontrado no cadastro.', 'error');
-                    return;
-                }
-
-                // If no packages weighed but we have production qty, estimate weight
-                if ((actualWeight === 0 || isNaN(actualWeight)) && fullQty > 0) {
-                    actualWeight = parseFloat(String(modelInfo.pesoFinal).replace(',', '.')) * fullQty;
-                }
-
-                updates = {
-                    status: 'completed',
-                    endTime: now,
-                    downtimeEvents: newEvents,
-                    actualProducedQuantity: fullQty,
-                    pontas: finalData.pontas,
-                    actualProducedWeight: actualWeight,
-                };
-
-                const latestStock = await fetchTable<StockItem>('stock_items');
-                const currentStockLookup = new Map(latestStock.map(s => [String(s.id).trim(), { ...s }]));
-
-                // Helper to normalize lot lists from old/new formats
-                const getLotsArray = (ids: any, fallback?: any) => {
-                    const primary = Array.isArray(ids) ? ids : (ids ? [ids] : []);
-                    const secondary = Array.isArray(fallback) ? fallback : (fallback ? [fallback] : []);
-                    const combined = [...primary, ...secondary]
-                        .map(id => String(id || '').trim())
-                        .filter(id => id.length > 0 && id !== 'undefined' && id !== 'null');
-                    return [...new Set(combined)];
-                };
-
-                let lotsObj: TrelicaSelectedLots;
-                const rawSelected = orderToComplete.selectedLotIds;
-                if (Array.isArray(rawSelected)) {
-                    lotsObj = {
-                        superior: rawSelected[0] || '',
-                        inferior1: rawSelected[1] || '',
-                        inferior2: rawSelected[2] || '',
-                        senozoide1: rawSelected[3] || '',
-                        senozoide2: rawSelected[4] || '',
-                        allSuperior: [rawSelected[0]].filter(Boolean),
-                        allInferiorLeft: [rawSelected[1]].filter(Boolean),
-                        allInferiorRight: [rawSelected[2]].filter(Boolean),
-                        allSenozoideLeft: [rawSelected[3]].filter(Boolean),
-                        allSenozoideRight: [rawSelected[4]].filter(Boolean)
-                    };
-                } else {
-                    lotsObj = rawSelected as TrelicaSelectedLots;
-                }
-
-                const parseW = (s: any) => parseFloat(String(s || '0').replace(',', '.'));
-
-                // Calculate total consumption needs
-                const totalConsumed = {
-                    superior: parseW(modelInfo.pesoSuperior) * fullQty,
-                    inferior: parseW(modelInfo.pesoInferior) * fullQty,
-                    senozoide: parseW(modelInfo.pesoSenozoide) * fullQty,
-                };
-
-                // Account for pontas (extra consumption for scrap/leftover items being created)
-                const totalModelWeight = parseW(modelInfo.pesoFinal);
-                if (finalData.pontas && totalModelWeight > 0) {
-                    for (const ponta of finalData.pontas) {
-                        totalConsumed.superior += (parseW(modelInfo.pesoSuperior) / totalModelWeight) * ponta.totalWeight;
-                        totalConsumed.inferior += (parseW(modelInfo.pesoInferior) / totalModelWeight) * ponta.totalWeight;
-                        totalConsumed.senozoide += (parseW(modelInfo.pesoSenozoide) / totalModelWeight) * ponta.totalWeight;
-                    }
-                }
-
-                const consumedMap = new Map<string, number>();
-                const dist = (lotIds: string[], weight: number) => {
-                    if (lotIds.length === 0 || weight <= 0) return;
-                    let remainingToDistribute = weight;
-
-                    const items = lotIds
-                        .map(id => currentStockLookup.get(id))
-                        .filter((i): i is StockItem => !!i)
-                        .sort((a, b) => {
-                            const pA = a.status.includes('Suporte') || a.status.includes('Produção');
-                            const pB = b.status.includes('Suporte') || b.status.includes('Produção');
-                            if (pA && !pB) return -1;
-                            if (!pA && pB) return 1;
-                            return a.internalLot.localeCompare(b.internalLot, undefined, { numeric: true });
-                        });
-
-                    for (const item of items) {
-                        if (remainingToDistribute <= 0.0001) break;
-                        const currentBalance = parseW(item.remainingQuantity);
-                        const alreadyConsumedInThisOrder = consumedMap.get(item.id) || 0;
-                        const availableInThisLot = Math.max(0, currentBalance - alreadyConsumedInThisOrder);
-
-                        const consume = Math.min(remainingToDistribute, availableInThisLot);
-                        if (consume > 0) {
-                            consumedMap.set(item.id, alreadyConsumedInThisOrder + consume);
-                            remainingToDistribute -= consume;
-                        }
-                    }
-                };
-
-                // Execute distribution across all components
-                dist(getLotsArray(lotsObj.allSuperior, lotsObj.superior), totalConsumed.superior);
-                dist(getLotsArray(lotsObj.allInferiorLeft, lotsObj.inferior1), totalConsumed.inferior / 2);
-                dist(getLotsArray(lotsObj.allInferiorRight, lotsObj.inferior2), totalConsumed.inferior / 2);
-                dist(getLotsArray(lotsObj.allSenozoideLeft, lotsObj.senozoide1), totalConsumed.senozoide / 2);
-                dist(getLotsArray(lotsObj.allSenozoideRight, lotsObj.senozoide2), totalConsumed.senozoide / 2);
-
-                // Involved IDs for both status update and weight deduction
-                const involved = new Set<string>();
-                const lotToRole = new Map<string, string>();
-
-                const trackRole = (ids: any, role: string) => {
-                    getLotsArray(ids).forEach(id => {
-                        involved.add(id);
-                        lotToRole.set(id, role);
-                    });
-                };
-
-                trackRole(lotsObj.allSuperior || lotsObj.superior, 'Superior');
-                trackRole(lotsObj.allInferiorLeft || lotsObj.inferior1, 'Inferior Esq.');
-                trackRole(lotsObj.allInferiorRight || lotsObj.inferior2, 'Inferior Dir.');
-                trackRole(lotsObj.allSenozoideLeft || lotsObj.senozoide1, 'Senozoide Esq.');
-                trackRole(lotsObj.allSenozoideRight || lotsObj.senozoide2, 'Senozoide Dir.');
-
-                consumedMap.forEach((_, id) => involved.add(id));
-
-                involved.forEach(lotId => {
-                    const item = currentStockLookup.get(lotId);
-                    if (item) {
-                        const consumed = consumedMap.get(lotId) || 0;
-                        const oldRem = parseW(item.remainingQuantity);
-                        let newRem = Math.max(0, oldRem - consumed);
-
-                        const remIds = (item.productionOrderIds || []).filter(id => id !== orderId);
-                        const hasOtherActive = remIds.some(id => {
-                            const o = productionOrders.find(po => po.id === id);
-                            return o && (o.status === 'pending' || o.status === 'in_progress');
-                        });
-
-                        let newStatus = item.status;
-                        if (newRem <= 0.05) {
-                            newStatus = 'Consumido para fazer treliça';
-                            newRem = 0;
-                        } else if (!hasOtherActive) {
-                            newStatus = 'Disponível - Suporte Treliça';
-                        } else {
-                            newStatus = 'Em Produção - Treliça';
-                        }
-
-                        stockUpdates.push({
-                            id: item.id,
-                            changes: {
-                                remainingQuantity: Number(newRem.toFixed(2)),
-                                labelWeight: Number(newRem.toFixed(2)),
-                                productionOrderIds: remIds,
-                                status: newStatus,
-                                location: lotToRole.get(lotId) || item.location, // Assign support role as location
-                                history: [...(item.history || []), {
-                                    type: 'Consumido na Produção de Treliça',
-                                    date: now,
-                                    details: {
-                                        'Ordem': orderToComplete.orderNumber,
-                                        'Consumo': consumed.toFixed(2) + 'kg',
-                                        'Saldo Anterior': oldRem.toFixed(2) + 'kg',
-                                        'Saldo Novo': newRem.toFixed(2) + 'kg',
-                                        'Status Novo': newStatus,
-                                        'Local Novo': lotToRole.get(lotId) || item.location
-                                    }
-                                }]
-                            }
-                        });
-                    }
-                });
-            } catch (err: any) {
-                showNotification(`Erro no cálculo de treliça: ${err.message}`, 'error');
-                return;
-            }
         }
-
-
+    } else { // Treliça
         try {
-            const updatedOrder = await updateItem<ProductionOrderData>('production_orders', orderId, updates);
-            setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
+            let actualProducedWeight = (orderToComplete.weighedPackages || []).reduce((sum, pkg) => sum + pkg.weight, 0);
 
-            for (const update of stockUpdates) {
-                await updateItem<StockItem>('stock_items', update.id, update.changes);
-            }
+    const hasProducedQty = finalData.actualProducedQuantity && finalData.actualProducedQuantity > 0;
 
-            const finalStock = await fetchTable<StockItem>('stock_items');
-            setStock(finalStock);
-
-            if (orderToComplete.machine === 'Treliça') {
-                if (finalData.pontas) {
-                    const pontasItems: PontaItem[] = finalData.pontas.map(p => ({
-                        id: generateId('ponta'), productionDate: now, productionOrderId: orderId, orderNumber: orderToComplete.orderNumber,
-                        productType: 'Ponta de Treliça', model: orderToComplete.trelicaModel!, size: `${p.size}`, quantity: p.quantity, totalWeight: p.totalWeight, status: 'Disponível'
-                    }));
-                    for (const pi of pontasItems) await insertItem('pontas_stock', pi);
-                    const allPontas = await fetchTable<PontaItem>('pontas_stock');
-                    setPontasStock(allPontas.sort((a, b) => new Date(b.productionDate).getTime() - new Date(a.productionDate).getTime()));
-                }
-                const weight = updates.actualProducedWeight || 0;
-                if (weight > 0) {
-                    const fg: FinishedProductItem = {
-                        id: generateId('fg'), productionDate: now, productionOrderId: orderId, orderNumber: orderToComplete.orderNumber,
-                        productType: 'Treliça', model: orderToComplete.trelicaModel!, size: `${orderToComplete.tamanho!}`, quantity: finalData.actualProducedQuantity || 0,
-                        totalWeight: weight, status: 'Disponível'
-                    };
-                    await insertItem('finished_goods', fg);
-                    const allFG = await fetchTable<FinishedProductItem>('finished_goods');
-                    setFinishedGoods(allFG.sort((a, b) => new Date(b.productionDate).getTime() - new Date(a.productionDate).getTime()));
-                }
-            }
-            showNotification(`Ordem ${orderToComplete.orderNumber} finalizada com sucesso.`, 'success');
-        } catch (err: any) {
-            console.error('Erro fatal ao finalizar ordem:', err);
-            showNotification(`Erro ao salvar finalização: ${err.message}`, 'error');
+    // Fallback: Use theoretical weight if no packages were weighed
+    if ((actualProducedWeight === 0 || isNaN(actualProducedWeight)) && hasProducedQty) {
+        const modelInfo = trelicaModels.find(m =>
+            m.modelo.trim().toLowerCase() === orderToComplete.trelicaModel?.trim().toLowerCase() &&
+            String(m.tamanho).trim() === String(orderToComplete.tamanho).trim()
+        );
+        if (modelInfo) {
+            actualProducedWeight = parseFloat(modelInfo.pesoFinal.replace(',', '.')) * finalData.actualProducedQuantity!;
         }
+    }
+
+    updates = {
+        status: 'completed',
+        endTime: now,
+        downtimeEvents: newEvents,
+        actualProducedQuantity: finalData.actualProducedQuantity,
+        pontas: finalData.pontas,
+        actualProducedWeight,
     };
 
-    const recordLotWeight = async (orderId: string, lotId: string, finalWeight: number, measuredGauge?: number) => {
-        const order = productionOrders.find(o => o.id === orderId);
-        if (!order) return;
-        const newProcessedLots = (order.processedLots || []).map(p => p.lotId === lotId ? { ...p, finalWeight, measuredGauge } : p);
-        try {
-            const updatedOrder = await updateItem('production_orders', orderId, { processedLots: newProcessedLots });
-            setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
-            showNotification('Peso do lote registrado.', 'success');
-        } catch (error) { showNotification('Erro ao registrar peso.', 'error'); }
-    };
+    // Treliça Stock Update Logic
+    // 1. Fetch Latest Stock
+    const latestStock = await fetchTable<StockItem>('stock_items');
+    // FIX: Trim IDs in the map key to ensure matching works even if DB has spaces
+    const currentStockLookup = new Map(latestStock.map(s => [String(s.id).trim(), { ...s }]));
 
-    const recordPackageWeight = async (orderId: string, packageData: { packageNumber: number; quantity: number; weight: number; }) => {
-        const order = productionOrders.find(o => o.id === orderId);
-        if (!order) return;
-        const newPackage: WeighedPackage = { ...packageData, timestamp: new Date().toISOString() };
-        const newWeighedPackages = [...(order.weighedPackages || []).filter(p => p.packageNumber !== packageData.packageNumber), newPackage].sort((a, b) => a.packageNumber - b.packageNumber);
-        try {
-            const updatedOrder = await updateItem('production_orders', orderId, { weighedPackages: newWeighedPackages });
-            setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
-            showNotification(`Peso do pacote #${packageData.packageNumber} registrado.`, 'success');
-        } catch (error) { showNotification('Erro ao registrar pacote.', 'error'); }
-    };
+    // 2. Parse Lots
+    let lots: TrelicaSelectedLots;
+    if (Array.isArray(orderToComplete.selectedLotIds)) {
+        // Legacy support or fallback if array passed
+        const arr = orderToComplete.selectedLotIds;
+        lots = {
+            superior: arr[0],
+            inferior1: arr[1],
+            inferior2: arr[2],
+            senozoide1: arr[3],
+            senozoide2: arr[4],
+            allSuperior: arr[0] ? [arr[0]] : [],
+            allInferiorLeft: arr[1] ? [arr[1]] : [],
+            allInferiorRight: arr[2] ? [arr[2]] : [],
+            allSenozoideLeft: arr[3] ? [arr[3]] : [],
+            allSenozoideRight: arr[4] ? [arr[4]] : [],
+        };
+    } else {
+        lots = orderToComplete.selectedLotIds as TrelicaSelectedLots;
+    }
 
-    const updateProducedQuantity = async (orderId: string, quantity: number) => {
-        try {
-            await updateItem('production_orders', orderId, { actualProducedQuantity: quantity });
-            setProductionOrders(prev => prev.map(o => o.id === orderId ? { ...o, actualProducedQuantity: quantity } : o));
-            showNotification('Contagem de peças atualizada.', 'success');
-        } catch (error) { showNotification('Erro ao atualizar contagem.', 'error'); }
-    };
+    // 3. Calculate Consumption
+    const consumedMap = new Map<string, number>();
 
-    const addPartsRequest = async (data: Omit<PartsRequest, 'id' | 'date' | 'operator' | 'status'>) => {
-        if (!currentUser) return;
-        const activeOrder = productionOrders.find(o => o.status === 'in_progress');
-        if (!activeOrder) return;
-        const newRequest: PartsRequest = { ...data, id: generateId('part'), date: new Date().toISOString(), operator: currentUser.username, status: 'Pendente', machine: activeOrder.machine, productionOrderId: activeOrder.id };
-        try {
-            const savedRequest = await insertItem<PartsRequest>('parts_requests', newRequest);
-            setPartsRequests(prev => [...prev, savedRequest]);
-            showNotification('Solicitação de peças enviada.', 'success');
-        } catch (error) { showNotification('Erro ao enviar solicitação.', 'error'); }
-    };
+    const modelInfo = trelicaModels.find(m =>
+        m.modelo.trim().toLowerCase() === orderToComplete.trelicaModel?.trim().toLowerCase() &&
+        String(m.tamanho).trim() === String(orderToComplete.tamanho).trim()
+    );
 
-    const logPostProductionActivity = async (activity: string) => {
-        if (!currentUser) return;
-        let targetOrderIndex = -1;
-        let latestEndTime = 0;
-        productionOrders.forEach((order, index) => {
-            if (order.status === 'completed' && order.endTime) {
-                const orderEndTime = new Date(order.endTime).getTime();
-                const hasOpenLog = (order.operatorLogs || []).some(log => log.operator === currentUser.username && !log.endTime);
-                if (hasOpenLog && orderEndTime > latestEndTime) { latestEndTime = orderEndTime; targetOrderIndex = index; }
-            }
-        });
-        if (targetOrderIndex !== -1) {
-            const targetOrder = { ...productionOrders[targetOrderIndex] };
-            const logsCopy = [...(targetOrder.operatorLogs || [])];
-            const logIndex = logsCopy.findIndex(log => log.operator === currentUser.username && !log.endTime);
-            if (logIndex !== -1) {
-                const updatedLog = { ...logsCopy[logIndex] };
-                if (!updatedLog.postProductionActivities) updatedLog.postProductionActivities = [];
-                updatedLog.postProductionActivities.push({ timestamp: new Date().toISOString(), description: activity });
-                logsCopy[logIndex] = updatedLog;
-                try {
-                    const updatedOrder = await updateItem('production_orders', targetOrder.id, { operatorLogs: logsCopy });
-                    setProductionOrders(prev => {
-                        const newOrders = [...prev];
-                        newOrders[targetOrderIndex] = updatedOrder;
-                        return newOrders;
-                    });
-                    showNotification('Atividade registrada.', 'success');
-                } catch (error) { showNotification('Erro ao registrar atividade.', 'error'); }
-            }
-        }
-    };
+    if (modelInfo) {
+        const parse = (s: string) => parseFloat(s.replace(',', '.'));
+        const fullPiecesQty = finalData.actualProducedQuantity || 0;
 
-    const registerProduction = async (machine: MachineType, producedWeight: number) => {
-        const newRecord: ProductionRecord = { id: generateId('prod'), date: new Date().toISOString(), machine, producedWeight, consumedLots: [] };
-        try {
-            const savedRecord = await insertItem<ProductionRecord>('production_records', newRecord);
-            if (machine === 'Trefila') setTrefilaProduction(prev => [...prev, savedRecord]);
-            else setTrelicaProduction(prev => [...prev, savedRecord]);
-            showNotification(`Produção registrada.`, 'success');
-        } catch (error) { showNotification('Erro ao registrar produção.', 'error'); }
-    };
-
-    const deleteFinishedGoods = async (ids: string[]) => {
-        if (!confirm('Excluir itens?')) return;
-        try {
-            for (const id of ids) await deleteItem('finished_goods', id);
-            setFinishedGoods(prev => prev.filter(item => !ids.includes(item.id)));
-            const pontasToDelete = pontasStock.filter(p => ids.includes(p.id));
-            for (const p of pontasToDelete) await deleteItem('pontas_stock', p.id);
-            if (pontasToDelete.length > 0) setPontasStock(prev => prev.filter(p => !ids.includes(p.id)));
-            showNotification('Excluído.', 'success');
-        } catch (error) { showNotification('Erro ao excluir.', 'error'); }
-    };
-
-    const renderPage = () => {
-        const mcProps = {
-            setPage, stock, currentUser, registerProduction, productionOrders, shiftReports,
-            startProductionOrder, startOperatorShift, endOperatorShift, logDowntime,
-            logResumeProduction, startLotProcessing, finishLotProcessing, recordLotWeight,
-            addPartsRequest, logPostProductionActivity, completeProduction, recordPackageWeight,
-            updateProducedQuantity, messages, addMessage, users
+        const consumedFull = {
+            superior: parse(modelInfo.pesoSuperior) * fullPiecesQty,
+            inferior: parse(modelInfo.pesoInferior) * fullPiecesQty,
+            senozoide: parse(modelInfo.pesoSenozoide) * fullPiecesQty,
         };
 
-        switch (page) {
-            case 'login': return <Login onLogin={handleLogin} error={notification?.type === 'error' ? notification.message : null} />;
-            case 'menu': return <MainMenu setPage={setPage} onLogout={handleLogout} currentUser={currentUser} messages={messages} markAllMessagesAsRead={markAllMessagesAsRead} addMessage={addMessage} />;
-            case 'stock': return <StockControl stock={stock} conferences={conferences} transfers={transfers} setPage={setPage} addConference={addConference} deleteStockItem={deleteStockItem} updateStockItem={(item) => updateStockItem(item.id, item)} createTransfer={createTransfer} editConference={editConference} deleteConference={deleteConference} productionOrders={productionOrders} />;
-            case 'trefila': return <MachineControl machineType="Trefila" {...mcProps} />;
-            case 'trelica': return <MachineControl machineType="Treliça" {...mcProps} />;
-            case 'machineSelection': return <MachineSelection setPage={setPage} />;
-            case 'productionOrder': return <ProductionOrder setPage={setPage} stock={stock} productionOrders={productionOrders} addProductionOrder={addProductionOrder} showNotification={showNotification} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} />;
-            case 'productionOrderTrelica': return <ProductionOrderTrelica setPage={setPage} stock={stock} productionOrders={productionOrders} addProductionOrder={addProductionOrder} showNotification={showNotification} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} />;
-            case 'productionDashboard': return <ProductionDashboard setPage={setPage} productionOrders={productionOrders} stock={stock} currentUser={currentUser} />;
-            case 'reports': return <Reports setPage={setPage} stock={stock} trefilaProduction={trefilaProduction} trelicaProduction={trelicaProduction} />;
-            case 'userManagement': return <UserManagement users={users} employees={employees} addUser={addUser} updateUser={updateUser} deleteUser={deleteUser} setPage={setPage} />;
-            case 'finishedGoods': return <FinishedGoods finishedGoods={finishedGoods} pontasStock={pontasStock} setPage={setPage} finishedGoodsTransfers={finishedGoodsTransfers} createFinishedGoodsTransfer={createFinishedGoodsTransfer} onDelete={deleteFinishedGoods} />;
-            case 'partsManager': return <SparePartsManager onBack={() => setPage('menu')} />;
-            case 'continuousImprovement': return <ContinuousImprovement setPage={setPage} />;
-            case 'workInstructions': return <WorkInstructions setPage={setPage} />;
-            case 'peopleManagement': return <PeopleManagement setPage={setPage} currentUser={currentUser} />;
-            case 'messages': return <MessageCenter messages={messages} currentUser={currentUser} addMessage={addMessage} markAllMessagesAsRead={markAllMessagesAsRead} />;
-            default: return <Login onLogin={handleLogin} error={null} />;
+        const consumedPontas = { superior: 0, inferior: 0, senozoide: 0 };
+        if (finalData.pontas) {
+            const totalModelWeight = parse(modelInfo.pesoFinal);
+            for (const ponta of finalData.pontas) {
+                if (totalModelWeight > 0) {
+                    consumedPontas.superior += (parse(modelInfo.pesoSuperior) / totalModelWeight) * ponta.totalWeight;
+                    consumedPontas.inferior += (parse(modelInfo.pesoInferior) / totalModelWeight) * ponta.totalWeight;
+                    consumedPontas.senozoide += (parse(modelInfo.pesoSenozoide) / totalModelWeight) * ponta.totalWeight;
+                }
+            }
         }
+
+        const totalConsumed = {
+            superior: consumedFull.superior + consumedPontas.superior,
+            inferior: consumedFull.inferior + consumedPontas.inferior,
+            senozoide: consumedFull.senozoide + consumedPontas.senozoide,
+        };
+
+        const distributeConsumption = (lotIds: string[] | undefined, totalWeight: number, partName: string) => {
+            if (!lotIds || lotIds.length === 0 || totalWeight <= 0) return;
+
+            let remainingWeight = totalWeight;
+
+            const validLots = lotIds
+                .map(id => String(id).trim())
+                .map(id => currentStockLookup.get(id))
+                .filter((item): item is StockItem => !!item)
+                .sort((a, b) => {
+                    // Priority to support or already in production status
+                    const isPriorityA = a.status === 'Disponível - Suporte Treliça' || a.status === 'Em Produção - Treliça';
+                    const isPriorityB = b.status === 'Disponível - Suporte Treliça' || b.status === 'Em Produção - Treliça';
+                    if (isPriorityA && !isPriorityB) return -1;
+                    if (!isPriorityA && isPriorityB) return 1;
+                    return a.internalLot.localeCompare(b.internalLot, undefined, { numeric: true, sensitivity: 'base' });
+                });
+
+            for (const stockItem of validLots) {
+                if (remainingWeight <= 0.0001) break;
+                const alreadyConsumed = consumedMap.get(stockItem.id) || 0;
+                const currentRemaining = parseFloat(String(stockItem.remainingQuantity || 0));
+                const available = Math.max(0, currentRemaining - alreadyConsumed);
+                const toConsume = Math.min(remainingWeight, available);
+
+                if (toConsume > 0) {
+                    consumedMap.set(stockItem.id, alreadyConsumed + toConsume);
+                    remainingWeight -= toConsume;
+                }
+            }
+        };
+
+        // Distribute
+        const superiorLots = (lots.allSuperior && lots.allSuperior.length > 0) ? lots.allSuperior : (lots.superior ? [lots.superior] : []);
+        distributeConsumption(superiorLots, totalConsumed.superior, "Superior");
+
+        const halfInferiorWeight = totalConsumed.inferior / 2;
+        const inferiorLeft = (lots.allInferiorLeft && lots.allInferiorLeft.length > 0) ? lots.allInferiorLeft : (lots.inferior1 ? [lots.inferior1] : []);
+        const inferiorRight = (lots.allInferiorRight && lots.allInferiorRight.length > 0) ? lots.allInferiorRight : (lots.inferior2 ? [lots.inferior2] : []);
+        distributeConsumption(inferiorLeft, halfInferiorWeight, "Inferior Esq");
+        distributeConsumption(inferiorRight, halfInferiorWeight, "Inferior Dir");
+
+        const halfSenozoideWeight = totalConsumed.senozoide / 2;
+        const senozoideLeft = (lots.allSenozoideLeft && lots.allSenozoideLeft.length > 0) ? lots.allSenozoideLeft : (lots.senozoide1 ? [lots.senozoide1] : []);
+        const senozoideRight = (lots.allSenozoideRight && lots.allSenozoideRight.length > 0) ? lots.allSenozoideRight : (lots.senozoide2 ? [lots.senozoide2] : []);
+        distributeConsumption(senozoideLeft, halfSenozoideWeight, "Senozoide Esq");
+        distributeConsumption(senozoideRight, halfSenozoideWeight, "Senozoide Dir");
+
+        // 4. Identify ALL involved lots to ensure status change
+        const allInvolvedLotIds = new Set<string>();
+        const addLotsToSet = (ids: any) => {
+            if (!ids) return;
+            if (Array.isArray(ids)) ids.forEach(id => allInvolvedLotIds.add(String(id).trim()));
+            else allInvolvedLotIds.add(String(ids).trim());
+        };
+        addLotsToSet(lots.superior); addLotsToSet(lots.allSuperior);
+        addLotsToSet(lots.inferior1); addLotsToSet(lots.inferior2); addLotsToSet(lots.allInferiorLeft); addLotsToSet(lots.allInferiorRight);
+        addLotsToSet(lots.senozoide1); addLotsToSet(lots.senozoide2); addLotsToSet(lots.allSenozoideLeft); addLotsToSet(lots.allSenozoideRight);
+
+        // Also include anything that was actually consumed
+        consumedMap.forEach((_, id) => allInvolvedLotIds.add(String(id).trim()));
+
+        // 5. Build Updates for ALL involved lots
+        allInvolvedLotIds.forEach(lotId => {
+            const stockItem = currentStockLookup.get(lotId);
+            if (stockItem) {
+                const consumedQty = consumedMap.get(lotId) || 0;
+                const currentQty = parseFloat(String(stockItem.remainingQuantity || 0));
+                let newRemainingQty = Math.max(0, currentQty - consumedQty);
+
+                const currentOrderIds = stockItem.productionOrderIds || [];
+                const remainingOrderIds = currentOrderIds.filter(id => id !== orderToComplete.id);
+                const hasOtherActiveOrders = remainingOrderIds.some(otherId => {
+                    const otherOrder = productionOrders.find(o => o.id === otherId);
+                    return otherOrder && (otherOrder.status === 'pending' || otherOrder.status === 'in_progress');
+                });
+
+                let newStatus: any = stockItem.status;
+                if (newRemainingQty <= 0.05) {
+                    newStatus = 'Consumido para fazer treliça';
+                    newRemainingQty = 0;
+                } else {
+                    if (!hasOtherActiveOrders) {
+                        newStatus = 'Disponível - Suporte Treliça';
+                    } else {
+                        newStatus = 'Em Produção - Treliça';
+                    }
+                }
+
+                const historyEntry = {
+                    type: 'Consumido na Produção de Treliça',
+                    date: now,
+                    details: {
+                        'Ordem': orderToComplete.orderNumber,
+                        'Qtd Consumida': consumedQty.toFixed(2) + ' kg',
+                        'Saldo Anterior': currentQty.toFixed(2) + ' kg',
+                        'Saldo Novo': newRemainingQty.toFixed(2) + ' kg',
+                        'Status Novo': newStatus
+                    }
+                };
+
+                stockUpdates.push({
+                    id: stockItem.id,
+                    changes: {
+                        remainingQuantity: Number(newRemainingQty.toFixed(2)),
+                        labelWeight: Number(newRemainingQty.toFixed(2)),
+                        productionOrderIds: remainingOrderIds,
+                        status: newStatus,
+                        history: [...(stockItem.history || []), historyEntry]
+                    }
+                });
+            }
+        });
+    }
+    if (stockUpdates.length > 0) {
+        const summary = stockUpdates.map(u => {
+            const item = currentStockLookup.get(u.id);
+            const changes = u.changes as any;
+            return `[${item?.internalLot}: ${changes.remainingQuantity}kg]`;
+        }).join(' ');
+        if (stockUpdates.length > 0) {
+            const summary = stockUpdates.map(u => {
+                const item = currentStockLookup.get(u.id);
+                const changes = u.changes as any;
+                return `[${item?.internalLot}: ${changes.remainingQuantity}kg]`;
+            }).join(' ');
+            showNotification(`Sucesso! Saldos atualizados: ${summary}`, 'success');
+        } else {
+            showNotification(`Aviso: Produção finalizada, mas nenhum lote sofreu baixa de estoque. Verifique o cadastro do modelo.`, 'error');
+        }
+    } else { // Treliça
+        showNotification(`Erro CRÍTICO: Modelo de treliça não encontrado.`, 'error');
+    }
+    try { // This try-catch block was misplaced, it should wrap the entire Treliça logic
+        const completedOrder = { ...orderToComplete, ...updates } as ProductionOrderData;
+
+        // Update Order
+        const updatedOrder = await updateItem<ProductionOrderData>('production_orders', completedOrder.id, updates);
+        setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
+
+        // Update Stock
+        for (const update of stockUpdates) {
+            await updateItem<StockItem>('stock_items', update.id, update.changes);
+        }
+
+        // Refresh Stock Globally
+        const finalStock = await fetchTable<StockItem>('stock_items');
+        setStock(finalStock);
+
+
+        // 3. Create Pontas (Treliça)
+        if (completedOrder.machine === 'Treliça' && finalData.pontas) {
+            const newPontaItems: PontaItem[] = finalData.pontas.map(ponta => ({
+                id: generateId('ponta'),
+                productionDate: now,
+                productionOrderId: completedOrder.id,
+                orderNumber: completedOrder.orderNumber,
+                productType: 'Ponta de Treliça',
+                model: completedOrder.trelicaModel!,
+                size: `${ponta.size}`,
+                quantity: ponta.quantity,
+                totalWeight: ponta.totalWeight,
+                status: 'Disponível',
+            }));
+
+            for (const item of newPontaItems) {
+                await insertItem<PontaItem>('pontas_stock', item);
+            }
+            setPontasStock(prev => [...prev, ...newPontaItems].sort((a, b) => new Date(b.productionDate).getTime() - new Date(a.productionDate).getTime()));
+        }
+
+        // 4. Create Finished Goods (Treliça)
+        const isTrelica = completedOrder.machine === 'Treliça';
+        let finalFinishedWeight = completedOrder.actualProducedWeight || 0;
+
+        if (isTrelica && finalFinishedWeight <= 0 && completedOrder.actualProducedQuantity && completedOrder.actualProducedQuantity > 0) {
+            // Fallback calculation again if needed (should be covered above, but safe to keep)
+            const modelInfo = trelicaModels.find(m =>
+                m.modelo.trim().toLowerCase() === completedOrder.trelicaModel?.trim().toLowerCase() &&
+                String(m.tamanho).trim() === String(completedOrder.tamanho).trim()
+            );
+            if (modelInfo) {
+                finalFinishedWeight = parseFloat(modelInfo.pesoFinal.replace(',', '.')) * completedOrder.actualProducedQuantity;
+            }
+        }
+
+        if (isTrelica && finalFinishedWeight > 0) {
+            const newFinishedProduct: FinishedProductItem = {
+                id: generateId('fg'),
+                productionDate: now,
+                productionOrderId: completedOrder.id,
+                orderNumber: completedOrder.orderNumber,
+                productType: 'Treliça',
+                model: completedOrder.trelicaModel || 'Desconhecido',
+                size: completedOrder.tamanho || '0',
+                quantity: completedOrder.actualProducedQuantity || 0,
+                totalWeight: finalFinishedWeight,
+                status: 'Disponível',
+            };
+            await insertItem<FinishedProductItem>('finished_goods', newFinishedProduct);
+            setFinishedGoods(prev => [...prev, newFinishedProduct].sort((a, b) => new Date(b.productionDate).getTime() - new Date(a.productionDate).getTime()));
+        }
+
+        showNotification(`Ordem ${completedOrder.orderNumber} finalizada e estoque atualizado.`, 'success');
+
+    } catch (err: any) {
+        console.error("Erro no cálculo de baixa de treliça:", err);
+        showNotification(`Erro interno ao calcular baixa de estoque: ${err.message}`, 'error');
+    }
+
+
+    // Update Stock
+    for (const update of stockUpdates) {
+        await updateItem<StockItem>('stock_items', update.id, update.changes);
+    }
+
+    // Refresh Stock Globally
+    const finalStock = await fetchTable<StockItem>('stock_items');
+    setStock(finalStock);
+
+
+    // 3. Create Pontas (Treliça)
+    if (completedOrder.machine === 'Treliça' && finalData.pontas) {
+        const newPontaItems: PontaItem[] = finalData.pontas.map(ponta => ({
+            id: generateId('ponta'),
+            productionDate: now,
+            productionOrderId: completedOrder.id,
+            orderNumber: completedOrder.orderNumber,
+            productType: 'Ponta de Treliça',
+            model: completedOrder.trelicaModel!,
+            size: `${ponta.size}`,
+            quantity: ponta.quantity,
+            totalWeight: ponta.totalWeight,
+            status: 'Disponível',
+        }));
+
+        for (const item of newPontaItems) {
+            await insertItem<PontaItem>('pontas_stock', item);
+        }
+        setPontasStock(prev => [...prev, ...newPontaItems].sort((a, b) => new Date(b.productionDate).getTime() - new Date(a.productionDate).getTime()));
+    }
+
+    // 4. Create Finished Goods (Treliça)
+    const isTrelica = completedOrder.machine === 'Treliça';
+    let finalFinishedWeight = completedOrder.actualProducedWeight || 0;
+
+    if (isTrelica && finalFinishedWeight <= 0 && completedOrder.actualProducedQuantity && completedOrder.actualProducedQuantity > 0) {
+        // Fallback calculation again if needed (should be covered above, but safe to keep)
+        const modelInfo = trelicaModels.find(m =>
+            m.modelo.trim().toLowerCase() === completedOrder.trelicaModel?.trim().toLowerCase() &&
+            String(m.tamanho).trim() === String(completedOrder.tamanho).trim()
+        );
+        if (modelInfo) {
+            finalFinishedWeight = parseFloat(modelInfo.pesoFinal.replace(',', '.')) * completedOrder.actualProducedQuantity;
+        }
+    }
+
+    if (isTrelica && finalFinishedWeight > 0) {
+        const newFinishedProduct: FinishedProductItem = {
+            id: generateId('fg'),
+            productionDate: now,
+            productionOrderId: completedOrder.id,
+            orderNumber: completedOrder.orderNumber,
+            productType: 'Treliça',
+            model: completedOrder.trelicaModel || 'Desconhecido',
+            size: completedOrder.tamanho || '0',
+            quantity: completedOrder.actualProducedQuantity || 0,
+            totalWeight: finalFinishedWeight,
+            status: 'Disponível',
+        };
+        await insertItem<FinishedProductItem>('finished_goods', newFinishedProduct);
+        setFinishedGoods(prev => [...prev, newFinishedProduct].sort((a, b) => new Date(b.productionDate).getTime() - new Date(a.productionDate).getTime()));
+    }
+
+    showNotification(`Ordem ${completedOrder.orderNumber} finalizada e estoque atualizado.`, 'success');
+
+} catch (error: any) {
+    console.error('Erro fatal ao finalizar ordem:', error);
+    showNotification('Erro ao finalizar ordem: ' + (error.message || 'Erro desconhecido'), 'error');
+}
+};
+
+
+const recordLotWeight = async (orderId: string, lotId: string, finalWeight: number, measuredGauge?: number) => {
+    const order = productionOrders.find(o => o.id === orderId);
+    if (!order) return;
+
+    const newProcessedLots = (order.processedLots || []).map(p =>
+        p.lotId === lotId ? { ...p, finalWeight, measuredGauge } : p
+    );
+    const updates: Partial<ProductionOrderData> = { processedLots: newProcessedLots };
+
+    try {
+        const updatedOrder = await updateItem('production_orders', orderId, updates);
+        setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
+        showNotification('Peso do lote registrado com sucesso.', 'success');
+    } catch (error) {
+        showNotification('Erro ao registrar peso do lote.', 'error');
+    }
+};
+
+const recordPackageWeight = async (orderId: string, packageData: { packageNumber: number; quantity: number; weight: number; }) => {
+    const now = new Date().toISOString();
+    const order = productionOrders.find(o => o.id === orderId);
+    if (!order) return;
+
+    const newPackage: WeighedPackage = { ...packageData, timestamp: now };
+    const existingPackages = order.weighedPackages || [];
+    const otherPackages = existingPackages.filter(p => p.packageNumber !== packageData.packageNumber);
+    const newWeighedPackages = [...otherPackages, newPackage].sort((a, b) => a.packageNumber - b.packageNumber);
+
+    const updates: Partial<ProductionOrderData> = { weighedPackages: newWeighedPackages };
+
+    try {
+        const updatedOrder = await updateItem('production_orders', orderId, updates);
+        setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
+        showNotification(`Peso do pacote #${packageData.packageNumber} registrado com sucesso.`, 'success');
+    } catch (error) {
+        showNotification('Erro ao registrar pacote.', 'error');
+    }
+};
+
+const updateProducedQuantity = async (orderId: string, quantity: number) => {
+    try {
+        await updateItem('production_orders', orderId, { actualProducedQuantity: quantity });
+        setProductionOrders(prev => prev.map(o => {
+            if (o.id === orderId) {
+                return { ...o, actualProducedQuantity: quantity };
+            }
+            return o;
+        }));
+        showNotification('Contagem de peças atualizada.', 'success');
+    } catch (error) {
+        showNotification('Erro ao atualizar contagem.', 'error');
+    }
+};
+
+const addPartsRequest = async (data: Omit<PartsRequest, 'id' | 'date' | 'operator' | 'status'>) => {
+    if (!currentUser) return;
+    const activeOrder = productionOrders.find(o => o.status === 'in_progress');
+    if (!activeOrder) return;
+    const newRequest: PartsRequest = {
+        ...data,
+        id: generateId('part'),
+        date: new Date().toISOString(),
+        operator: currentUser.username,
+        status: 'Pendente',
+        machine: activeOrder.machine,
+        productionOrderId: activeOrder.id,
+    };
+    try {
+        const savedRequest = await insertItem<PartsRequest>('parts_requests', newRequest);
+        setPartsRequests(prev => [...prev, savedRequest]);
+        showNotification('Solicitação de peças enviada.', 'success');
+    } catch (error) {
+        showNotification('Erro ao enviar solicitação de peças.', 'error');
+    }
+};
+
+const logPostProductionActivity = async (activity: string) => {
+    if (!currentUser) return;
+
+    let targetOrderIndex = -1;
+    let latestEndTime = 0;
+
+    productionOrders.forEach((order, index) => {
+        if (order.status === 'completed' && order.endTime) {
+            const orderEndTime = new Date(order.endTime).getTime();
+            const hasOpenLog = (order.operatorLogs || []).some(log => log.operator === currentUser.username && !log.endTime);
+
+            if (hasOpenLog && orderEndTime > latestEndTime) {
+                latestEndTime = orderEndTime;
+                targetOrderIndex = index;
+            }
+        }
+    });
+
+    if (targetOrderIndex !== -1) {
+        const targetOrder = { ...productionOrders[targetOrderIndex] };
+        const logsCopy = [...(targetOrder.operatorLogs || [])];
+        const logIndex = logsCopy.findIndex(log => log.operator === currentUser.username && !log.endTime);
+
+        if (logIndex !== -1) {
+            const updatedLog = { ...logsCopy[logIndex] };
+            if (!updatedLog.postProductionActivities) {
+                updatedLog.postProductionActivities = [];
+            }
+            updatedLog.postProductionActivities.push({
+                timestamp: new Date().toISOString(),
+                description: activity
+            });
+            logsCopy[logIndex] = updatedLog;
+
+            try {
+                const updatedOrder = await updateItem('production_orders', targetOrder.id, { operatorLogs: logsCopy });
+                setProductionOrders(prev => {
+                    const newOrders = [...prev];
+                    newOrders[targetOrderIndex] = updatedOrder;
+                    return newOrders;
+                });
+                showNotification('Atividade registrada com sucesso.', 'success');
+            } catch (error) {
+                showNotification('Erro ao registrar atividade.', 'error');
+            }
+        }
+    }
+};
+
+// Machine Control Treliça
+const registerProduction = async (machine: MachineType, producedWeight: number) => {
+    const newRecord: ProductionRecord = {
+        id: generateId('prod'),
+        date: new Date().toISOString(),
+        machine,
+        producedWeight,
+        consumedLots: [], // Simplified for this implementation
+    };
+    try {
+        const savedRecord = await insertItem<ProductionRecord>('production_records', newRecord);
+        if (machine === 'Trefila') {
+            setTrefilaProduction(prev => [...prev, savedRecord]);
+        } else {
+            setTrelicaProduction(prev => [...prev, savedRecord]);
+        }
+        showNotification(`Produção de ${producedWeight.toFixed(2)} kg registrada para ${machine}.`, 'success');
+    } catch (error) {
+        showNotification('Erro ao registrar produção.', 'error');
+    }
+};
+
+const deleteFinishedGoods = async (ids: string[]) => {
+    if (!confirm('Tem certeza que deseja excluir os itens selecionados?')) return;
+
+    try {
+        for (const id of ids) {
+            await deleteItem('finished_goods', id);
+        }
+        setFinishedGoods(prev => prev.filter(item => !ids.includes(item.id)));
+
+        // Check if any ID is in pontasStock and delete if necessary
+        const pontasToDelete = pontasStock.filter(p => ids.includes(p.id));
+        if (pontasToDelete.length > 0) {
+            for (const p of pontasToDelete) {
+                await deleteItem('pontas_stock', p.id);
+            }
+            setPontasStock(prev => prev.filter(p => !ids.includes(p.id)));
+        }
+        showNotification('Itens excluídos com sucesso.', 'success');
+    } catch (error: any) {
+        console.error('Error deleting finished goods:', error);
+        showNotification('Erro ao excluir itens: ' + error.message, 'error');
+    }
+};
+
+const renderPage = () => {
+    const machineControlProps = {
+        setPage, stock, currentUser, registerProduction, productionOrders, shiftReports,
+        startProductionOrder, startOperatorShift, endOperatorShift, logDowntime,
+        logResumeProduction, startLotProcessing, finishLotProcessing, recordLotWeight,
+        addPartsRequest, logPostProductionActivity, completeProduction, recordPackageWeight,
+        updateProducedQuantity, messages, addMessage
     };
 
-    return (
-        <div className="app-container">
-            {notification && <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />}
-            {currentUser && page !== 'login' && (
-                <>
-                    <div className={`sidebar-overlay ${isMobileMenuOpen ? 'active' : ''}`} onClick={() => setIsMobileMenuOpen(false)} />
-                    <Sidebar page={page} setPage={(p) => { setPage(p); setIsMobileMenuOpen(false); }} currentUser={currentUser} notificationCount={pendingKaizenCount} isMobileMenuOpen={isMobileMenuOpen} />
-                </>
+    switch (page) {
+        case 'login':
+            return <Login onLogin={handleLogin} error={notification?.type === 'error' ? notification.message : null} />;
+        case 'menu':
+            return <MainMenu setPage={setPage} onLogout={handleLogout} currentUser={currentUser} messages={messages} markAllMessagesAsRead={markAllMessagesAsRead} addMessage={addMessage} />;
+        case 'stock':
+            return <StockControl stock={stock} conferences={conferences} transfers={transfers} setPage={setPage} addConference={addConference} deleteStockItem={deleteStockItem} updateStockItem={(item) => updateStockItem(item.id, item)} createTransfer={createTransfer} editConference={editConference} deleteConference={deleteConference} productionOrders={productionOrders} />;
+        case 'trefila':
+            return <MachineControl machineType="Trefila" {...machineControlProps} />;
+        case 'trelica':
+            return <MachineControl machineType="Treliça" {...machineControlProps} users={users} />;
+        case 'machineSelection':
+            return <MachineSelection setPage={setPage} />;
+        case 'productionOrder':
+            return <ProductionOrder setPage={setPage} stock={stock} productionOrders={productionOrders} addProductionOrder={addProductionOrder} showNotification={showNotification} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} />;
+        case 'productionOrderTrelica':
+            return <ProductionOrderTrelica setPage={setPage} stock={stock} productionOrders={productionOrders} addProductionOrder={addProductionOrder} showNotification={showNotification} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} />;
+        case 'productionDashboard':
+            return <ProductionDashboard setPage={setPage} productionOrders={productionOrders} stock={stock} currentUser={currentUser} />;
+        case 'reports':
+            return <Reports setPage={setPage} stock={stock} trefilaProduction={trefilaProduction} trelicaProduction={trelicaProduction} />;
+        case 'userManagement':
+            return <UserManagement users={users} employees={employees} addUser={addUser} updateUser={updateUser} deleteUser={deleteUser} setPage={setPage} />;
+        case 'finishedGoods':
+            return <FinishedGoods finishedGoods={finishedGoods} pontasStock={pontasStock} setPage={setPage} finishedGoodsTransfers={finishedGoodsTransfers} createFinishedGoodsTransfer={createFinishedGoodsTransfer} onDelete={deleteFinishedGoods} />;
+        case 'partsManager':
+            return <SparePartsManager onBack={() => setPage('menu')} />;
+        case 'continuousImprovement':
+            return <ContinuousImprovement setPage={setPage} />;
+        case 'workInstructions':
+            return <WorkInstructions setPage={setPage} />;
+        case 'peopleManagement':
+            return <PeopleManagement setPage={setPage} currentUser={currentUser} />;
+        case 'messages':
+            return <MessageCenter messages={messages} currentUser={currentUser} addMessage={addMessage} markAllMessagesAsRead={markAllMessagesAsRead} />;
+        default:
+            return <Login onLogin={handleLogin} error={null} />;
+    }
+};
+
+const showSidebar = currentUser && page !== 'login';
+
+return (
+    <div className="app-container">
+        {notification && (
+            <Notification
+                message={notification.message}
+                type={notification.type}
+                onClose={() => setNotification(null)}
+            />
+        )}
+
+        {showSidebar && (
+            <>
+                <div
+                    className={`sidebar-overlay ${isMobileMenuOpen ? 'active' : ''}`}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                />
+                <Sidebar
+                    page={page}
+                    setPage={(p) => {
+                        setPage(p);
+                        setIsMobileMenuOpen(false);
+                    }}
+                    currentUser={currentUser}
+                    notificationCount={pendingKaizenCount}
+                    isMobileMenuOpen={isMobileMenuOpen}
+                />
+            </>
+        )}
+
+        <main className="main-content">
+            {showSidebar && (
+                <header className="top-bar no-print">
+                    <div className="flex items-center gap-4">
+                        <button
+                            onClick={() => setIsMobileMenuOpen(true)}
+                            className="mobile-menu-btn"
+                            title="Abrir menu"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                            </svg>
+                        </button>
+                        <span className="text-slate-400 text-sm font-medium">MSM / {page.charAt(0).toUpperCase() + page.slice(1)}</span>
+                    </div>
+
+                    <div className="flex items-center gap-6">
+                        <div className="flex flex-col items-end">
+                            <span className="text-sm font-bold text-slate-800">{currentUser?.username}</span>
+                            <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">{currentUser?.role}</span>
+                        </div>
+
+                        <button
+                            onClick={handleLogout}
+                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors group"
+                            title="Sair do sistema"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                            </svg>
+                        </button>
+                    </div>
+                </header>
             )}
-            <main className="main-content">
-                {currentUser && page !== 'login' && (
-                    <header className="top-bar no-print">
-                        <div className="flex items-center gap-4">
-                            <button onClick={() => setIsMobileMenuOpen(true)} className="mobile-menu-btn">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
-                            </button>
-                            <span className="text-slate-400 text-sm font-medium">MSM / {page.charAt(0).toUpperCase() + page.slice(1)}</span>
-                        </div>
-                        <div className="flex items-center gap-6">
-                            <div className="flex flex-col items-end">
-                                <span className="text-sm font-bold text-slate-800">{currentUser?.username}</span>
-                                <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">{currentUser?.role}</span>
-                            </div>
-                            <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg></button>
-                        </div>
-                    </header>
-                )}
-                <div className={currentUser && page !== 'login' ? 'p-4' : ''}>{renderPage()}</div>
-            </main>
-        </div>
-    );
+
+            <div className={showSidebar ? 'p-4' : ''}>
+                {renderPage()}
+            </div>
+        </main>
+    </div>
+);
 };
 
 export default App;
+
