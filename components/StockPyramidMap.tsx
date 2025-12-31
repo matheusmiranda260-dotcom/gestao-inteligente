@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { StockItem, MaterialType, Bitola, MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions, RowConfig } from '../types';
 import { fetchTable, upsertItem } from '../services/supabaseService';
-import { ArchiveIcon, CheckCircleIcon, PlusIcon, SearchIcon, TrashIcon, ExclamationIcon, ArrowLeftIcon, ChartBarIcon, PencilIcon } from './icons';
+import { ArchiveIcon, CheckCircleIcon, PlusIcon, SearchIcon, TrashIcon, ExclamationIcon, ArrowLeftIcon, ChartBarIcon, PencilIcon, XIcon } from './icons';
 
 interface PyramidRowProps {
     rowName: string;
@@ -26,18 +26,34 @@ interface PyramidRowProps {
 const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemove, onRemoveRow, isActive, onSetActive, onItemClick, onExpand, activeSlot, onSlotClick, movingItem, onRenameRow, onPrintRow, config, onUpdateConfig }) => {
     // Determine initial base size. High enough to fit existing items or default 7 as requested.
     // Use config if available, else default
+
+    const getDefaultHeight = (name: string) => {
+        // User Rule: CA50 (mapped to Fio Máquina) -> 4
+        // CA60 -> 3
+        // Logic: If Name contains "CA" and NOT "50", assume CA-60 -> 3.
+        // Else (FM, Fio, CA50, Generic) -> 4.
+        if (name.includes('CA') && !name.includes('50') && !name.includes('Fio')) return 3;
+        return 4;
+    };
+
     const [baseSize, setBaseSize] = useState(config?.baseSize || 7);
-    const [maxHeight, setMaxHeight] = useState(config?.maxHeight || 20);
+    const [maxHeight, setMaxHeight] = useState(config?.maxHeight || getDefaultHeight(rowName));
     const [isEditingName, setIsEditingName] = useState(false);
     const [editedName, setEditedName] = useState(rowName);
 
+    const [menuItemId, setMenuItemId] = useState<string | null>(null);
+
     // Sync config -> local state when config loads/changes
+    // Also reset defaults if config is null (for virtual rows)
     React.useEffect(() => {
         if (config) {
             setBaseSize(config.baseSize);
             setMaxHeight(config.maxHeight);
+        } else {
+            setMaxHeight(getDefaultHeight(rowName));
+            setBaseSize(7);
         }
-    }, [config]);
+    }, [config, rowName]);
 
     // Handle Config Updates
     const updateConfig = (newBase: number, newHeight: number) => {
@@ -49,6 +65,11 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
     };
 
     const isFinalized = rowName.includes('[FINALIZADA]');
+
+    // Close menu when clicking outside (on row bg)
+    const handleRowClick = () => {
+        if (menuItemId) setMenuItemId(null);
+    };
 
     const handleSaveName = () => {
         if (editedName.trim() && editedName !== rowName) {
@@ -86,13 +107,13 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
         return null;
     };
 
-    // Pyramid Structure Generation with Fixed Slots
+    // Pyramid Structure Generation (Dynamic)
     const builtLevels = [];
     let currentCapacity = baseSize;
     let currentLevel = 0;
 
-    // Use a safety cap for levels
-    while (currentCapacity > 0 && currentLevel < 20 && currentLevel < maxHeight) {
+    // Build levels until capacity runs out
+    while (currentCapacity > 0) {
         const levelSlots = [];
         for (let i = 0; i < currentCapacity; i++) {
             // Find item in this specific slot
@@ -118,11 +139,13 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
         if (!coords) return true; // No coords
         // Check if coords exist in our generated structure
         // If row resized smaller, items might be out of range
-        // For now, easier to treating everything without coords as 'floating'
-        // We need to auto-assign them to empty slots purely for display?
-        // Or render them in a 'overflow' pile? 
-        // Let's render them in first available empty slots for visual consistency,
-        // but DO NOT persist unless they are moved.
+        const maxLevel = builtLevels.length - 1;
+        if (coords.l > maxLevel) return true;
+
+        // Safety check for empty level
+        const levelCapacity = (baseSize - coords.l);
+        if (coords.p >= levelCapacity) return true;
+
         return false;
     });
 
@@ -186,12 +209,10 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                     onDrop({ ...item, location: rowName });
                 }
             }}
-            onClick={() => {
-                // Header click handled below
-            }}
+            onClick={handleRowClick}
         >
             <div className="flex justify-between items-center mb-4 border-b pb-2">
-                <div onClick={onSetActive} className="flex items-center gap-2 cursor-pointer flex-grow" title="Clique para ativar esta fileira">
+                <div onClick={(e) => { e.stopPropagation(); onSetActive(); handleRowClick(); }} className="flex items-center gap-2 cursor-pointer flex-grow" title="Clique para ativar esta fileira">
                     <div className={`w-4 h-4 rounded-full border transition-colors ${isActive ? 'bg-emerald-500 border-emerald-500' : 'bg-white border-slate-400'}`}></div>
 
                     {isEditingName ? (
@@ -240,9 +261,9 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                         <button onClick={(e) => { e.stopPropagation(); updateConfig(baseSize, Math.max(1, maxHeight - 1)); }} className="px-3 py-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-l-lg font-bold border-r active:bg-slate-200">-</button>
                         <div className="flex flex-col items-center justify-center w-10 bg-slate-50 px-1 select-none">
                             <span className="text-[8px] uppercase text-slate-400 leading-none mb-0.5">Alt</span>
-                            <span className="text-sm font-mono font-bold leading-none text-slate-700">{maxHeight >= 20 ? '∞' : maxHeight}</span>
+                            <span className="text-sm font-mono font-bold leading-none text-slate-700">{maxHeight}</span>
                         </div>
-                        <button onClick={(e) => { e.stopPropagation(); updateConfig(baseSize, maxHeight + 1); }} className="px-3 py-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-r-lg font-bold border-l active:bg-slate-200">+</button>
+                        <button onClick={(e) => { e.stopPropagation(); updateConfig(baseSize, Math.min(5, maxHeight + 1)); }} className={`px-3 py-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-r-lg font-bold border-l active:bg-slate-200 ${maxHeight >= 5 ? 'opacity-50 cursor-not-allowed' : ''}`} disabled={maxHeight >= 5}>+</button>
                     </div>
 
                     {/* Actions Group */}
@@ -264,97 +285,134 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                         {!isFinalized && (
                             <button onClick={(e) => {
                                 e.stopPropagation();
-                                if (items.length > 0) {
-                                    alert("Esvazie a fileira antes de excluir.");
-                                    return;
-                                }
                                 onRemoveRow();
-                            }} className="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition ml-1"><TrashIcon className="w-4 h-4" /></button>
+                            }} className="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition ml-1" title="Excluir Fileira"><TrashIcon className="w-4 h-4" /></button>
                         )}
                     </div>
                 </div>
             </div>
 
             {/* Pyramid Render Area */}
-            <div className="flex flex-col-reverse items-center gap-1 min-h-[100px] md:min-h-[150px] transition-all duration-300"
+            <div className="flex flex-col-reverse items-center min-h-[100px] md:min-h-[150px] transition-all duration-300 md:-space-y-3 pb-2"
                 style={{ height: maxHeight < 5 ? 'auto' : undefined }} // Fluid height if small
             >
-                {builtLevels.map((levelSlots, levelIndex) => (
-                    <div key={levelIndex} className="flex justify-center gap-1">
-                        {levelSlots.map((slot, slotIndex) => {
-                            const isSlotActive = activeSlot && activeSlot.l === slot.coords.l && activeSlot.p === slot.coords.p;
-                            const isMovingThis = movingItem && slot.item && movingItem.id === slot.item.id;
-                            const isSwapTarget = movingItem && slot.item && movingItem.id !== slot.item.id;
+                {builtLevels.map((levelSlots, levelIndex) => {
+                    // Check if level is within visual max height if needed, but standard logic renders all.
+                    // If we want to hide levels > maxHeight, we can filter.
+                    if (levelIndex >= maxHeight) return null;
 
-                            if (slot.item) {
-                                return (
-                                    <div
-                                        key={slot.item.id}
-                                        className={`w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center text-[10px] font-bold shadow-lg relative group cursor-grab active:cursor-grabbing border-2 transition-transform hover:scale-110 z-10
-                                            ${isMovingThis ? 'bg-amber-400 border-amber-600 text-amber-900 animate-pulse ring-4 ring-amber-200' : 'bg-slate-800 border-white text-white'}
-                                            ${isSwapTarget ? 'cursor-pointer hover:border-amber-400 hover:ring-2 hover:ring-amber-200' : ''}
+                    return (
+                        <div key={levelIndex} className="flex justify-center -space-x-[1px] md:space-x-[2px] z-10 relative" style={{ zIndex: levelIndex }}>
+                            {levelSlots.map((slot, slotIndex) => {
+                                const isSlotActive = activeSlot && activeSlot.l === slot.coords.l && activeSlot.p === slot.coords.p;
+                                const isMovingThis = movingItem && slot.item && movingItem.id === slot.item.id;
+                                const isSwapTarget = movingItem && slot.item && movingItem.id !== slot.item.id;
+
+                                // Dynamic coil visuals - simple version
+                                const coilColor = slot.item?.materialType === 'CA-60' ? 'bg-slate-600' : 'bg-slate-700';
+                                const borderColor = slot.item?.materialType === 'CA-60' ? 'border-slate-500' : 'border-slate-600';
+
+                                if (slot.item) {
+                                    const isMenuOpen = menuItemId === slot.item.id;
+
+                                    return (
+                                        <div
+                                            key={slot.item.id}
+                                            className={`
+                                            w-14 h-14 md:w-20 md:h-20 rounded-full flex items-center justify-center relative cursor-pointer transform transition-all shrink-0
+                                            ${isMovingThis ? 'z-50 scale-110 drop-shadow-2xl' : ''}
+                                            ${isMenuOpen ? 'z-50 scale-110 ring-4 ring-emerald-400 bg-white shadow-xl' : 'hover:scale-105 active:scale-95'}
                                         `}
-                                        title={`${slot.item.internalLot} - ${slot.item.bitola} - ${(slot.item.remainingQuantity || 0).toFixed(0)}kg`}
-                                        draggable
-                                        onDragStart={(e) => {
-                                            e.dataTransfer.setData('application/json', JSON.stringify(slot.item));
-                                            e.dataTransfer.effectAllowed = 'move';
-                                        }}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            if (onItemClick) onItemClick(slot.item!);
-                                        }}
-                                    >
-                                        <div className="text-center leading-tight pointer-events-none">
-                                            <div className={`${isMovingThis ? 'text-amber-800' : 'text-emerald-300'} text-[9px] md:text-[10px]`}>{slot.item.internalLot}</div>
-                                            <div className={`opacity-70 scale-90 ${isMovingThis ? 'text-amber-800' : 'text-white'}`}>{(slot.item.remainingQuantity || 0).toFixed(0)}</div>
-                                        </div>
-
-                                        {isSwapTarget && (
-                                            <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-full animate-pulse pointer-events-none">
-                                                <span className="text-lg">⇄</span>
-                                            </div>
-                                        )}
-
-                                        <button
+                                            title={`${slot.item.internalLot} - ${slot.item.bitola} - ${(slot.item.remainingQuantity || 0).toFixed(0)}kg`}
+                                            draggable={!isMenuOpen}
+                                            onDragStart={(e) => {
+                                                e.dataTransfer.setData('application/json', JSON.stringify(slot.item));
+                                                e.dataTransfer.effectAllowed = 'move';
+                                            }}
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                e.preventDefault();
-                                                onRemove(slot.item!);
+                                                if (isMenuOpen) {
+                                                    setMenuItemId(null);
+                                                } else {
+                                                    setMenuItemId(slot.item!.id);
+                                                }
                                             }}
-                                            className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 opacity-100 shadow-md hover:bg-red-700 hover:scale-110 transition-all z-20 cursor-pointer"
-                                            title="Remover da fileira"
                                         >
-                                            <TrashIcon className="w-3 h-3" />
-                                        </button>
-                                    </div>
-                                );
-                            } else {
-                                // Empty Slot
-                                return (
-                                    <div
-                                        key={`empty-${levelIndex}-${slotIndex}`}
-                                        className={`w-12 h-12 md:w-14 md:h-14 rounded-full border-2 border-dashed flex items-center justify-center text-xs transition-colors cursor-pointer z-0 pointer-events-auto
+                                            {isMenuOpen ? (
+                                                <div className="flex flex-col gap-1 items-center justify-center w-full h-full bg-white/95 rounded-full backdrop-blur-sm p-1 animate-fadeIn overflow-hidden">
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); if (onItemClick) onItemClick(slot.item!); setMenuItemId(null); }}
+                                                        className="bg-amber-100 hover:bg-amber-200 text-amber-700 text-[9px] md:text-[10px] font-bold px-1 py-1 rounded w-full flex items-center justify-center gap-1 leading-none shadow-sm border border-amber-200 grow uppercase tracking-tight"
+                                                    >
+                                                        MOVER
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); onRemove(slot.item!); setMenuItemId(null); }}
+                                                        className="bg-red-100 hover:bg-red-200 text-red-700 text-[9px] md:text-[10px] font-bold px-1 py-1 rounded w-full flex items-center justify-center gap-1 leading-none shadow-sm border border-red-200 grow uppercase tracking-tight"
+                                                    >
+                                                        EXCLUIR
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    {/* Standard Coil Content */}
+                                                    <div className={`absolute inset-0 rounded-full border-[6px] md:border-[10px] ${isMovingThis ? 'border-amber-500 animate-pulse' : borderColor} ${coilColor} shadow-[inset_2px_2px_6px_rgba(0,0,0,0.6),2px_2px_4px_rgba(0,0,0,0.4)]`}></div>
+                                                    {/* Inner Hole */}
+                                                    <div className="absolute inset-[30%] rounded-full bg-slate-900/40 shadow-inner border border-white/5"></div>
+                                                    <div className="absolute top-[10%] right-[15%] w-3 h-4 bg-white shadow-sm rotate-12 z-10 opacity-90"></div>
+
+                                                    {/* Content Overlay */}
+                                                    <div className="relative z-20 text-center leading-none drop-shadow-md pointer-events-none">
+                                                        <div className="bg-white/90 px-1 rounded-sm text-[8px] md:text-[10px] font-bold text-slate-900 border border-slate-300 mb-0.5 whitespace-nowrap overflow-hidden max-w-[40px] md:max-w-[50px] text-ellipsis">
+                                                            {slot.item.internalLot}
+                                                        </div>
+                                                        <div className="text-[9px] md:text-xs text-white font-mono font-bold tracking-tighter">
+                                                            {(slot.item.remainingQuantity || 0).toFixed(0)}
+                                                        </div>
+                                                        <div className="text-[7px] md:text-[8px] text-emerald-200 mt-0.5">
+                                                            {slot.item.bitola}mm
+                                                        </div>
+                                                    </div>
+
+                                                    {isSwapTarget && (
+                                                        <div className="absolute inset-0 flex items-center justify-center bg-amber-500/40 rounded-full animate-pulse pointer-events-none z-30 ring-4 ring-amber-400">
+                                                            <span className="text-xl font-bold text-white drop-shadow-md">⇄</span>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+                                    );
+                                } else {
+                                    // Empty Slot
+                                    return (
+                                        <div
+                                            key={`empty-${levelIndex}-${slotIndex}`}
+                                            className={`
+                                            w-14 h-14 md:w-20 md:h-20 rounded-full border-[3px] border-dashed flex items-center justify-center transition-all cursor-pointer z-0 pointer-events-auto shrink-0 relative
                                             ${isSlotActive
-                                                ? 'border-orange-500 bg-orange-100 text-orange-600 scale-110 shadow-lg animate-pulse'
-                                                : 'border-slate-300 bg-slate-50/50 text-slate-300 hover:border-emerald-400 hover:bg-emerald-50'}
+                                                    ? 'border-orange-500 bg-orange-50 scale-105 shadow-[0_0_15px_rgba(255,165,0,0.5)] z-20'
+                                                    : 'border-slate-300 bg-slate-100/50 hover:border-emerald-400 hover:bg-emerald-50'}
                                         `}
-                                        onDragOver={handleDragOver}
-                                        onDragLeave={handleDragLeave}
-                                        onDrop={(e) => handleSlotDrop(e, slot.coords.l, slot.coords.p)}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            if (onSlotClick) onSlotClick(slot.coords.l, slot.coords.p);
-                                        }}
-                                        title={isSlotActive ? 'Vaga SELECIONADA (Toque num lote para preencher)' : `Vazio (L${slot.coords.l}:P${slot.coords.p})`}
-                                    >
-                                        <div className={`pointer-events-none ${isSlotActive ? 'font-bold text-lg' : 'opacity-50'}`}>{isSlotActive ? '📍' : '+'}</div>
-                                    </div>
-                                );
-                            }
-                        })}
-                    </div>
-                ))}
+                                            onDragOver={handleDragOver}
+                                            onDragLeave={handleDragLeave}
+                                            onDrop={(e) => handleSlotDrop(e, slot.coords.l, slot.coords.p)}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (onSlotClick) onSlotClick(slot.coords.l, slot.coords.p);
+                                            }}
+                                            title={isSlotActive ? 'Vaga SELECIONADA' : `Vazio (L${slot.coords.l}:P${slot.coords.p})`}
+                                        >
+                                            {/* Ghost Coil Shape for empty slots */}
+                                            <div className={`absolute inset-[15%] rounded-full border-2 border-dashed ${isSlotActive ? 'border-orange-300' : 'border-slate-200'}`}></div>
+                                            <div className={`pointer-events-none ${isSlotActive ? 'font-bold text-2xl text-orange-500 animate-bounce' : 'text-slate-300 text-xl'}`}>{isSlotActive ? '⬇' : '+'}</div>
+                                        </div>
+                                    );
+                                }
+                            })}
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );
@@ -435,39 +493,260 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
     // When set, the next click on a pending item will fill this exact slot.
     const [activeSlot, setActiveSlot] = useState<{ row: string, l: number, p: number } | null>(null);
 
+    // Helper to identify row "type" based on name
+    const getRowTypeInfo = (rowName: string) => {
+        const isFM = rowName.includes('FM') || rowName.includes('Fio');
+        const isCA = rowName.includes('CA');
+        // Try to extract bitola
+        const bitolaMatch = rowName.match(/(\d+\.\d+)/);
+        const bitola = bitolaMatch ? bitolaMatch[1] : null;
+        return { isFM, isCA, bitola };
+    };
+
     // Helper to find next available row name globally (across all stock)
-    const nextRowLetter = useMemo(() => {
-        const existingRowLetters = new Set<string>();
+    const getNextRowName = (prefix: string) => {
+        const existingNames = new Set<string>();
         safeStock.forEach(item => {
-            if (item.location && item.location.startsWith('Fileira ')) {
-                const parts = item.location.split(' ');
-                if (parts.length > 1) existingRowLetters.add(parts[1]);
+            if (item.location) {
+                const rName = item.location.split(':')[0];
+                existingNames.add(rName);
             }
         });
-        extraRows.forEach(row => {
-            const parts = row.split(' ');
-            if (parts.length > 1) existingRowLetters.add(parts[1]);
-        });
+        extraRows.forEach(r => existingNames.add(r));
 
-        // Try single letters A-Z
+        // Generate A, B, C...
         const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
         for (const char of alphabet) {
-            if (!existingRowLetters.has(char)) return char;
+            const candidate = `${prefix} ${char}`.trim();
+            if (!existingNames.has(candidate)) return candidate;
         }
-        // Try A1, A2... if needed, or AA, AB (simple fallback for now: numbers)
-        let i = 1;
-        while (true) {
-            if (!existingRowLetters.has(String(i))) return String(i);
-            i++;
+        // Fallback
+        return `${prefix} Z-Ext`;
+    };
+
+    // Auto-suggest name when filters change
+    useEffect(() => {
+        if (!selectedMaterial && !selectedBitola) {
+            setNewRowName(''); // Default manual
+            return;
         }
-    }, [safeStock, extraRows]);
 
+        // Build prefix
+        let prefix = '';
+        if (selectedMaterial === 'Fio Máquina') prefix += 'FM';
+        if (selectedMaterial === 'CA-60') prefix += 'CA';
 
+        if (selectedBitola) {
+            // Handle 6.35 vs 6.3 naming preference? Let's use full bitola for clarity
+            prefix += ` ${selectedBitola}`;
+        } else {
+            prefix += ' Geral';
+        }
 
-    // Moved handleAddRow down to fix referencing derivedRows before initialization
+        const suggestion = getNextRowName(prefix.trim());
+        setNewRowName(suggestion);
+    }, [selectedMaterial, selectedBitola, safeStock, extraRows]); // Recalc suggestion when stock changes too
 
+    // Calculate derivedRows - VISIBLY FILTERED based on context
+    const derivedRows = useMemo(() => {
+        // 1. Get ALL rows first (Existing in DB + Manually Added)
+        const allRows = new Set<string>();
+        safeStock.forEach(s => {
+            if (s.location) {
+                const part = s.location.split(':')[0];
+                allRows.add(part);
+            }
+        });
+        extraRows.forEach(r => allRows.add(r));
+        // Also include rows that have configurations (even if empty)
+        rowConfigs.forEach(rc => allRows.add(rc.rowName));
+
+        // 2. AUTO-SUGGEST Logic: "Ele já deixa as fileiras prontas"
+        // Generate virtual rows based on quantity of unassigned items
+        // ALWAYS run suggestion logic
+        {
+            const matchingUnassigned = safeStock.filter(s => {
+                if (s.location) return false; // Only count unassigned
+                if (selectedMaterial && s.materialType !== selectedMaterial) return false;
+                if (selectedBitola && s.bitola !== selectedBitola) return false;
+                return true;
+            });
+
+            if (matchingUnassigned.length > 0) {
+                const capacityPerRow = 28; // Standard pyramid base 7
+
+                // Group by unique "Material + Bitola" to determine sets of rows needed
+                const groups: Record<string, { count: number, material: string, bitola: string }> = {};
+
+                matchingUnassigned.forEach(s => {
+                    const key = `${s.materialType}|${s.bitola}`;
+                    if (!groups[key]) {
+                        groups[key] = { count: 0, material: s.materialType, bitola: s.bitola };
+                    }
+                    groups[key].count++;
+                });
+
+                Object.values(groups).forEach(({ count: unassignedCount, material, bitola }) => {
+                    let prefix = '';
+                    if (material === 'Fio Máquina') prefix += 'FM';
+                    else if (material === 'CA-60') prefix += 'CA';
+                    else prefix += 'Geral';
+                    prefix += ` ${bitola}`;
+
+                    // Helper for capacity calculation
+                    const getCapacity = (base: number, height: number) => {
+                        let cap = 0;
+                        // Valid levels are 0 to height-1
+                        // Level 0 size = base. Level 1 = base-1.
+                        for (let h = 0; h < height; h++) {
+                            const layerSize = base - h;
+                            if (layerSize > 0) cap += layerSize;
+                        }
+                        return cap;
+                    };
+
+                    // 1. Find Existing Rows matching Prefix
+                    const relevantExistingRows = Array.from(allRows).filter(r => r.startsWith(prefix));
+
+                    let totalFreeSlots = 0;
+
+                    relevantExistingRows.forEach(rName => {
+                        // Get config from prop/state - respecting user customizations
+                        const config = rowConfigs.find(rc => rc.rowName === rName);
+
+                        // Default Determinations matching PyramidRow logic
+                        let defH = 4;
+                        if (rName.includes('CA') && !rName.includes('50') && !rName.includes('Fio')) defH = 3;
+
+                        const base = config?.baseSize || 7;
+                        const height = config?.maxHeight || defH;
+
+                        const capacity = getCapacity(base, height);
+
+                        // Count items physically in this row
+                        const assignedCount = safeStock.filter(s => s.location && s.location.startsWith(rName)).length;
+
+                        if (capacity > assignedCount) {
+                            totalFreeSlots += (capacity - assignedCount);
+                        }
+                    });
+
+                    let remainingItems = unassignedCount - totalFreeSlots;
+
+                    // 2. If remaining items > 0, we need NEW rows.
+                    if (remainingItems > 0) {
+                        // Defaults for NEW rows
+                        let defH = 4;
+                        if (material === 'CA-60') defH = 3;
+                        const defBase = 7;
+                        const defCap = getCapacity(defBase, defH);
+
+                        const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+                        // Try to find next available names
+                        for (let i = 0; i < 50; i++) {
+                            const char = alphabet[i] || `Z${i}`;
+                            const candidate = `${prefix} ${char}`.trim();
+
+                            if (!allRows.has(candidate)) {
+                                allRows.add(candidate);
+                                remainingItems -= defCap;
+                                if (remainingItems <= 0) break;
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        const sortedAll = Array.from(allRows).sort();
+
+        // 3. Filter them based on selection (Standard View Logic)
+        if (!selectedMaterial && !selectedBitola) return sortedAll;
+
+        return sortedAll.filter(rowName => {
+            // Check contents
+            const itemsInRow = safeStock.filter(s => s.location && s.location.startsWith(rowName));
+            if (itemsInRow.length > 0) {
+                const hasMatchingItem = itemsInRow.some(item => {
+                    let matchMat = true;
+                    let matchBit = true;
+                    if (selectedMaterial) matchMat = item.materialType === selectedMaterial;
+                    if (selectedBitola) matchBit = item.bitola === selectedBitola;
+                    return matchMat && matchBit;
+                });
+                if (hasMatchingItem) return true;
+                return false;
+            }
+
+            // If Empty Row: Check Name Convention
+            const { isFM, isCA, bitola } = getRowTypeInfo(rowName);
+            if (selectedMaterial === 'Fio Máquina' && !isFM && !rowName.includes('Fileira')) return false; // "Fileira" is generic
+            if (selectedMaterial === 'CA-60' && !isCA && !rowName.includes('Fileira')) return false;
+            if (selectedBitola && bitola && bitola !== selectedBitola) return false;
+
+            return true;
+        });
+    }, [safeStock, extraRows, selectedMaterial, selectedBitola, rowConfigs]);
+
+    const handleAddRow = () => {
+        // Use suggestion or manual input
+        const nameToUse = newRowName.trim();
+        if (!nameToUse) return;
+
+        // Check duplication
+        // We check derivedRows AND full stock because we might be creating a name hidden by filter (bad practice but safe)
+        const exists = safeStock.some(s => s.location && s.location.startsWith(nameToUse)) || extraRows.includes(nameToUse);
+
+        if (!exists) {
+            setExtraRows(prev => [...prev, nameToUse]);
+            // Recalculate suggestion for NEXT add
+            // We can't easily force trigger Effect, but next render will fix it or we can just append logic
+        } else {
+            alert('Esta fileira já existe!');
+        }
+    };
+
+    // Sync filters with Active Row context
+    useEffect(() => {
+        if (!activeRow) return;
+
+        const { isFM, isCA, bitola } = getRowTypeInfo(activeRow);
+
+        if (isFM) setSelectedMaterial('Fio Máquina');
+        else if (isCA) setSelectedMaterial('CA-60');
+
+        if (bitola) {
+            setSelectedBitola(bitola as Bitola);
+        } else {
+            // If row is generic, maybe clear bitola filter? 
+            // Or keep it to allow "Mixed" viewing? 
+            // User wants "When I click row, appear pending lots of respective bitolas".
+            // So if row has NO bitola in name, maybe we shouldn't force filter.
+            // But if it HAS, we MUST force it.
+            setSelectedBitola(null);
+        }
+
+    }, [activeRow]);
 
     const handleDropOnRow = (item: StockItem, rowName: string) => {
+        // 1. Strict Validation based on Row Name Convention
+        const { isFM, isCA, bitola } = getRowTypeInfo(rowName);
+
+        if (isFM && item.materialType !== 'Fio Máquina') {
+            alert(`Esta fileira é exclusiva para Fio Máquina. O item é ${item.materialType}.`);
+            return;
+        }
+        if (isCA && item.materialType !== 'CA-60') {
+            alert(`Esta fileira é exclusiva para CA-60. O item é ${item.materialType}.`);
+            return;
+        }
+        if (bitola && item.bitola !== bitola) {
+            alert(`Esta fileira é exclusiva para bitola ${bitola}mm. O item é ${item.bitola}mm.`);
+            return;
+        }
+
+
         // Validation: Verify if the proposed location is different from the current one
         let validLocation = rowName;
         // Check if item.location is already a specific slot in this row
@@ -505,7 +784,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
             setActiveSlot(null);
         }
     };
-    // Handle Rename Logic
+
     const handleRenameRow = (oldName: string, newName: string) => {
         if (!newName || newName === oldName) return;
 
@@ -534,37 +813,6 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
         // Update extraRows if it was an empty row
         if (extraRows.includes(oldName)) {
             setExtraRows(prev => prev.map(r => r === oldName ? newName : r));
-        }
-    };
-
-    // Calculate derivedRows
-    const derivedRows = useMemo(() => {
-        // Logic
-        const rows = new Set<string>();
-        safeStock.forEach(s => {
-            if (s.location) {
-                const part = s.location.split(':')[0];
-                rows.add(part);
-            }
-        });
-        extraRows.forEach(r => rows.add(r));
-        const sorted = Array.from(rows).sort();
-        return sorted;
-    }, [safeStock, extraRows]);
-
-    // MOVED handleAddRow HERE
-    const handleAddRow = () => {
-        const nameToUse = newRowName.trim() || nextRowLetter;
-        const fullName = `Fileira ${nameToUse.toUpperCase()}`;
-
-        // Check duplication
-        const alreadyExists = derivedRows.includes(fullName) || safeStock.some(s => s.location === fullName);
-
-        if (!alreadyExists) {
-            setExtraRows(prev => [...prev, fullName]);
-            setNewRowName('');
-        } else {
-            alert('Esta fileira já existe!');
         }
     };
 
@@ -777,331 +1025,264 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                 </div>
             </div>
 
-            {/* Sticky Actions Bar */}
-            <div className="bg-white border-b shadow-sm p-3 flex flex-col md:flex-row items-center justify-between gap-2 z-20 shrink-0 sticky top-0 md:relative">
-                <div className="flex items-center gap-2 w-full md:w-auto">
-                    {/* Active Row Indicator (Mobile) */}
-                    {activeRow && (
-                        <div className="flex-1 md:hidden bg-emerald-100 text-emerald-800 px-3 py-2 rounded-lg text-sm font-bold border border-emerald-200 animate-pulse flex items-center justify-between" onClick={() => setActiveRow(null)}>
-                            <span>Add em: {activeRow}</span>
-                            <span className="text-[10px] bg-white px-1 rounded">PARAR</span>
-                        </div>
-                    )}
+            {/* New Layout: Top Bar (Tabs) + Main Content (Single Row) */}
+            <div className="flex flex-col h-full overflow-hidden bg-slate-50">
+                {/* Top Tab Bar & Actions */}
+                <div className="bg-white border-b flex items-center gap-4 px-4 h-16 shrink-0 shadow-sm z-30">
 
-                    {!activeRow && (
-                        <div className="flex bg-slate-100 p-1 rounded-lg items-center border border-slate-200 flex-grow md:flex-grow-0">
-                            <span className="text-slate-500 text-xs pl-2 whitespace-nowrap font-bold mr-2">Nova:</span>
-                            <input
-                                type="text"
-                                value={newRowName}
-                                onChange={e => setNewRowName(e.target.value)}
-                                placeholder={nextRowLetter}
-                                className="bg-transparent border-none text-slate-800 placeholder-slate-400 focus:ring-0 w-12 text-center text-lg font-bold uppercase p-0"
-                                maxLength={3}
-                            />
-                            <button onClick={handleAddRow} className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded text-sm font-bold shadow-sm whitespace-nowrap transition h-full">
-                                + OK
-                            </button>
-                        </div>
-                    )}
-                </div>
+                    {/* Drawer Toggle (Mobile) */}
+                    <button onClick={() => setIsPendingListOpen(!isPendingListOpen)} className="md:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-lg">
+                        <ExclamationIcon className="w-6 h-6 text-amber-500" />
+                    </button>
 
+                    {/* Row Tabs */}
+                    <div className="flex-1 flex items-center gap-2 overflow-x-auto scrollbar-thin pb-1 md:pb-0 h-full">
+                        {/* Auto-Generated Rows Only */}
+                        {derivedRows.length === 0 && <span className="text-slate-400 text-xs italic whitespace-nowrap">Sem fileiras...</span>}
 
-                <div className="flex-1 flex items-center justify-between w-full md:w-auto gap-4">
-                    {/* Move Mode Indicator */}
-                    {itemToMove && (
-                        <div className="flex-1 bg-amber-100 text-amber-800 px-3 py-2 rounded-lg text-sm font-bold border border-amber-200 flex items-center justify-between animate-fadeIn">
-                            <span className="truncate">Movendo: {itemToMove.internalLot}</span>
-                            <button onClick={() => setItemToMove(null)} className="text-xs bg-white/50 px-2 py-1 rounded hover:bg-white uppercase">Cancelar</button>
-                        </div>
-                    )}
-
-                    {!itemToMove && (
-                        <div className="flex items-center gap-4 flex-grow justify-end md:justify-center">
-                            <div className="text-center">
-                                <span className="block text-xl font-bold text-slate-700 leading-none">{totalCount}</span>
-                                <span className="text-[9px] uppercase font-bold text-slate-400">Total</span>
-                            </div>
-                            <div className="h-6 w-px bg-slate-200"></div>
-                            <button
-                                onClick={() => setIsPendingListOpen(true)}
-                                className="text-center group cursor-pointer hover:bg-amber-50 rounded px-2 py-1 transition relative"
-                            >
-                                <span className="block text-xl font-bold text-amber-500 leading-none">{unmappedCount}</span>
-                                <span className="text-[9px] uppercase font-bold text-amber-600/70 flex items-center gap-1">
-                                    Pendentes <SearchIcon className="w-3 h-3" />
-                                </span>
-                                {unmappedCount > 0 && <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>}
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            <div className="flex-1 flex overflow-hidden relative">
-                {/* Mobile Drawer */}
-                <div
-                    className={`
-                        fixed inset-0 z-40 bg-black/60 transition-opacity backdrop-blur-sm md:hidden
-                        ${isPendingListOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}
-                    `}
-                    onClick={() => setIsPendingListOpen(false)}
-                />
-                <div
-                    className={`
-                        absolute md:static inset-y-0 left-0 w-4/5 md:w-80 bg-slate-50 border-r shadow-2xl flex flex-col z-50 transition-transform duration-300 transform
-                        ${isPendingListOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-                    `}
-                >
-                    <div className={`p-4 border-b flex justify-between items-center ${activeRow ? 'bg-emerald-100' : 'bg-white'}`}>
-                        <div className="flex flex-col">
-                            <h2 className="font-bold text-slate-700 flex items-center gap-2">
-                                <ExclamationIcon className="w-5 h-5 text-amber-500" />
-                                Lotes Pendentes
-                            </h2>
-                            {activeRow && <span className="text-xs text-emerald-700 font-bold mt-1">Adicionando em: {activeRow}</span>}
-                        </div>
-                        <button onClick={() => setIsPendingListOpen(false)} className="md:hidden bg-white rounded-full p-2 text-slate-400 hover:text-slate-600 shadow-sm">
-                            ✕
-                        </button>
-                    </div>
-
-                    <div className="p-3 border-b bg-white">
-                        <div className="relative">
-                            <SearchIcon className="w-5 h-5 absolute left-3 top-3 text-slate-400" />
-                            <input
-                                type="text"
-                                placeholder="Buscar lote..."
-                                value={searchTerm}
-                                onChange={e => setSearchTerm(e.target.value)}
-                                className="w-full pl-10 p-3 border border-slate-300 rounded-xl text-base bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 transition"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="overflow-y-auto flex-1 p-3 space-y-3 pb-20 md:pb-3">
-                        {unassignedStock.length === 0 ? (
-                            <div className="text-center text-slate-400 py-10 px-4">
-                                <CheckCircleIcon className="w-16 h-16 mx-auto text-emerald-200 mb-4" />
-                                <p className="font-medium">Tudo limpo!</p>
-                                <p className="text-sm mt-2 opacity-75">Nenhum lote pendente para os filtros selecionados.</p>
-                            </div>
-                        ) : (
-                            unassignedStock.map(item => (
-                                <div
-                                    key={item.id}
-                                    className={`bg-white p-5 rounded-xl border-l-4 shadow-sm active:scale-95 transition-all cursor-pointer mb-3 ${activeRow ? 'border-emerald-500 ring-2 ring-emerald-100 hover:bg-emerald-50' : 'border-slate-300 hover:border-amber-400'}`}
-                                    onClick={() => {
-                                        if (activeSlot) {
-                                            // Construction Mode: Fill specific slot
-                                            const specificLoc = `${activeSlot.row}:L${activeSlot.l}:P${activeSlot.p}`;
-                                            handleDropOnRow({ ...item, location: specificLoc }, activeSlot.row);
-                                        } else if (activeRow) {
-                                            // Legacy/Rapid Mode: Fill row generically
-                                            handleDropOnRow(item, activeRow);
-                                        } else {
-                                            alert("Selecione uma VAGA (+) ou uma Fileira no mapa primeiro, depois toque aqui para adicionar.");
-                                            setIsPendingListOpen(false);
-                                        }
-                                    }}
-                                >
-                                    <div className="flex justify-between items-center mb-3">
-                                        <span className="font-bold text-slate-800 text-xl">{item.internalLot}</span>
-                                        <span className="text-sm bg-slate-100 px-3 py-1.5 rounded-lg text-slate-600 font-bold border border-slate-200">{item.bitola}</span>
-                                    </div>
-                                    <div className="flex justify-between text-base text-slate-500">
-                                        <span>{item.supplier}</span>
-                                        <span className="font-medium text-slate-700">{item.remainingQuantity.toFixed(0)} kg</span>
-                                    </div>
-                                    {activeRow && (
-                                        <div className="mt-3 text-center text-sm font-bold text-emerald-600 bg-emerald-50 py-2 rounded-lg border border-emerald-100 uppercase tracking-wide">
-                                            Toque para mover para {activeRow}
-                                        </div>
-                                    )}
-                                </div>
-                            ))
-                        )}
-                    </div>
-                </div>
-
-                {/* Main Map Area */}
-                <div className="flex-1 overflow-auto p-2 md:p-8 bg-slate-100 relative">
-                    {/* Visual Overlay for Move Mode or Target Mode */}
-                    {itemToMove && (
-                        <div className="sticky top-0 left-0 right-0 z-20 bg-amber-500/90 text-white text-center py-2 px-4 shadow-lg mb-4 rounded mx-2 animate-bounce flex flex-col items-center">
-                            <span className="font-bold text-lg">Movendo: {itemToMove.internalLot}</span>
-                            <span className="text-sm opacity-90">Toque em (+) para mover ou em OUTRO LOTE para trocar</span>
-                        </div>
-                    )}
-                    {activeSlot && !itemToMove && (
-                        <div className="sticky top-0 left-0 right-0 z-20 bg-emerald-600/90 text-white text-center py-2 px-4 shadow-lg mb-4 rounded mx-2 animate-pulse flex flex-col items-center">
-                            <span className="font-bold text-lg">Vaga Selecionada: {activeSlot.row} (L{activeSlot.l}:P{activeSlot.p})</span>
-                            <span className="text-sm opacity-90">Selecione um lote à esquerda (ou na lista) para preencher esta vaga.</span>
-                        </div>
-                    )}
-
-                    <div className="flex flex-wrap items-start gap-3 md:gap-6 justify-center md:justify-start pb-20">
-                        {derivedRows.length === 0 && (
-                            <div className="w-full flex flex-col items-center justify-center text-slate-400 mt-20 text-center px-4 opacity-70">
-                                <ArchiveIcon className="w-20 h-20 mb-4 text-slate-300" />
-                                <h3 className="text-xl font-bold">Mapa Vazio</h3>
-                                <p className="mb-6">Crie a primeira fileira acima para começar.</p>
-                            </div>
-                        )}
-
-                        {derivedRows.map(row => {
-                            // Sort items by last history date (insertion/edit time) to maintain order stability
-                            const rowItems = relevantStock
-                                .filter(s => s.location && (s.location === row || s.location.startsWith(row + ':')))
-                                .sort((a, b) => {
-                                    // Note: Items without coords sort naturally? Maybe irrelevant now with strict slots.
-                                    const dateA = a.history && a.history.length > 0 ? a.history[a.history.length - 1].date : (a.entryDate || '');
-                                    const dateB = b.history && b.history.length > 0 ? b.history[b.history.length - 1].date : (b.entryDate || '');
-                                    return dateA.localeCompare(dateB);
-                                });
+                        {derivedRows.map(rName => {
+                            const isSelected = (activeRow === rName) || (!activeRow && rName === derivedRows[0]);
+                            const count = relevantStock.filter(s => s.location && s.location.startsWith(rName)).length;
 
                             return (
-                                <PyramidRow
-                                    key={row}
-                                    rowName={row}
-                                    items={rowItems}
-                                    onDrop={(item) => handleDropOnRow(item, row)}
-                                    onRemove={(item) => setItemToDelete(item)}
-                                    onRemoveRow={() => setRowToDelete(row)}
-                                    isActive={activeRow === row}
-                                    onSetActive={() => setActiveRow(row === activeRow ? null : row)}
-                                    onItemClick={(item) => {
-                                        if (itemToMove && itemToMove.id !== item.id) {
-                                            // SWAP DETECTED
-                                            handleSwap(itemToMove, item);
-                                        } else {
-                                            setItemToMove(item);
-                                            setActiveSlot(null); // Clear slot selection if selecting item to move
+                                <button
+                                    key={rName}
+                                    onClick={() => setActiveRow(rName)}
+                                    className={`
+                                        relative group flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-bold transition-all whitespace-nowrap
+                                        ${isSelected
+                                            ? 'bg-slate-800 text-white border-slate-800 shadow-md transform scale-105 z-10'
+                                            : 'bg-white text-slate-500 border-slate-200 hover:border-emerald-400 hover:text-emerald-600'
                                         }
-                                    }}
-                                    onExpand={() => setLandscapeRow(row)}
-                                    activeSlot={activeSlot && activeSlot.row === row ? { l: activeSlot.l, p: activeSlot.p } : null}
-                                    onSlotClick={(l, p) => {
-                                        if (itemToMove) {
-                                            const newLocation = `${row}:L${l}:P${p}`;
-                                            handleDropOnRow({ ...itemToMove, location: newLocation }, row);
-                                        } else {
-                                            // NEW WORKFLOW: Select slot first
-                                            if (activeSlot && activeSlot.row === row && activeSlot.l === l && activeSlot.p === p) {
-                                                setActiveSlot(null); // Deselect
-                                                setIsPendingListOpen(false);
-                                            } else {
-                                                setActiveSlot({ row, l, p });
-                                                setIsPendingListOpen(true); // Open drawer to pick item
-                                                setActiveRow(row); // Also set row active for visual context
-                                            }
-                                        }
-                                    }}
-                                    movingItem={itemToMove}
-                                    onRenameRow={(newName) => handleRenameRow(row, newName)}
-                                    onPrintRow={() => setPrintRowName(row)}
-                                    config={rowConfigs.find(rc => rc.rowName === row)}
-                                    onUpdateConfig={handleUpdateRowConfig}
-                                />
-                            );
+                                    `}
+                                >
+                                    {rName}
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-600'}`}>{count}</span>
+                                </button>
+                            )
                         })}
                     </div>
                 </div>
 
-                {/* Confirm Delete Modal */}
-                {(itemToDelete || rowToDelete) && (
-                    <div className="fixed inset-0 bg-black/50 z-[150] flex items-center justify-center p-4">
-                        <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full">
-                            <div className="flex flex-col items-center text-center">
-                                <div className="bg-red-100 p-3 rounded-full mb-4">
-                                    <ExclamationIcon className="w-8 h-8 text-red-600" />
+                <div className="flex-1 flex overflow-hidden relative">
+                    {/* Left Drawer (Pending) - kept distinct */}
+                    <div className={`
+                        absolute md:relative z-40 bg-white border-r border-slate-200 shadow-2xl md:shadow-none w-[300px] transition-transform duration-300 h-full flex flex-col shrink-0
+                        ${isPendingListOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+                    `}>
+                        {/* Drawer Header */}
+                        <div className="p-4 border-b bg-slate-50">
+                            <h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3">
+                                <ExclamationIcon className="w-5 h-5 text-amber-500" />
+                                Pendentes ({unassignedStock.length})
+                            </h3>
+                            <div className="relative">
+                                <SearchIcon className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar..."
+                                    value={searchTerm}
+                                    onChange={e => setSearchTerm(e.target.value)}
+                                    className="w-full pl-9 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                                />
+                            </div>
+                        </div>
+
+                        {/* List */}
+                        <div className="flex-1 overflow-y-auto p-2 space-y-2 bg-slate-100/50">
+                            {unassignedStock.length === 0 ? (
+                                <div className="text-center p-8 opacity-50">
+                                    <CheckCircleIcon className="w-12 h-12 text-emerald-500 mx-auto mb-2" />
+                                    <p className="text-sm font-bold">Sem pendências</p>
                                 </div>
-                                <h3 className="text-xl font-bold text-slate-800 mb-2">Confirmação</h3>
-                                <p className="text-slate-600 mb-6">
-                                    {itemToDelete
-                                        ? `Deseja remover o lote ${itemToDelete.internalLot} da fileira?`
-                                        : `Deseja realmente excluir a fileira "${rowToDelete}"? Esta ação não pode ser desfeita.`
-                                    }
-                                </p>
-                                <div className="flex gap-3 w-full">
-                                    <button
-                                        onClick={() => { setItemToDelete(null); setRowToDelete(null); }}
-                                        className="flex-1 px-4 py-2 border border-slate-300 rounded-lg font-bold text-slate-700 hover:bg-slate-50"
-                                    >
-                                        CANCELAR
-                                    </button>
-                                    <button
+                            ) : (
+                                unassignedStock.map(item => (
+                                    <div
+                                        key={item.id}
+                                        draggable
+                                        onDragStart={(e) => {
+                                            e.dataTransfer.setData('application/json', JSON.stringify(item));
+                                            e.dataTransfer.effectAllowed = 'copyMove';
+                                        }}
                                         onClick={() => {
-                                            if (itemToDelete) {
-                                                handleRemoveFromRow(itemToDelete);
-                                                setItemToDelete(null);
-                                            } else if (rowToDelete) {
-                                                handleRemoveRow(rowToDelete);
-                                                setRowToDelete(null);
+                                            if (activeSlot) {
+                                                const loc = `${activeSlot.row}:L${activeSlot.l}:P${activeSlot.p}`;
+                                                handleDropOnRow({ ...item, location: loc }, activeSlot.row);
+                                            } else {
+                                                setItemToMove(itemToMove?.id === item.id ? null : item);
                                             }
                                         }}
-                                        className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700"
+                                        className={`bg-white p-3 rounded-lg border shadow-sm cursor-grab hover:shadow-md transition-all ${itemToMove?.id === item.id ? 'border-amber-500 ring-2 ring-amber-200' : 'border-slate-200 hover:border-emerald-400'}`}
                                     >
-                                        EXCLUIR
-                                    </button>
-                                </div>
-                            </div>
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span className="font-bold text-slate-800">{item.internalLot}</span>
+                                            <span className="text-xs bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 font-mono">{item.bitola}</span>
+                                        </div>
+                                        <div className="text-xs text-slate-500 flex justify-between">
+                                            <span>{item.materialType}</span>
+                                            <span className="font-bold">{item.remainingQuantity} kg</span>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </div>
-                )}
 
-                {/* Print Modal */}
-                {printRowName && (
-                    <div className="fixed inset-0 bg-white z-[100] p-8 flex flex-col items-center justify-center">
-                        <div className="w-full max-w-4xl border-2 border-slate-800 p-8 relative print:border-none print:w-full">
-                            <button onClick={() => setPrintRowName(null)} className="absolute top-4 right-4 bg-red-600 text-white px-4 py-2 rounded print:hidden font-bold">FECHAR</button>
-                            <button onClick={() => window.print()} className="absolute top-4 right-28 bg-blue-600 text-white px-4 py-2 rounded print:hidden font-bold">IMPRIMIR</button>
+                    {/* Main Canvas */}
+                    <div className="flex-1 overflow-auto bg-slate-200/50 p-4 md:p-8 flex items-start justify-center relative">
+                        {/* Overlay Controls */}
+                        {isPendingListOpen && <div className="absolute inset-0 bg-black/20 z-30 md:hidden" onClick={() => setIsPendingListOpen(false)}></div>}
 
-                            <h1 className="text-4xl font-bold text-center mb-8 border-b-2 border-black pb-4">{printRowName}</h1>
+                        {activeSlot && (
+                            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-emerald-600 text-white px-6 py-2 rounded-full shadow-lg z-50 animate-bounce cursor-pointer" onClick={() => setActiveSlot(null)}>
+                                <span className="font-bold">Vaga Selecionada: {activeSlot.row}</span>
+                                <span className="text-xs ml-2 opacity-80">(Clique aqui para cancelar)</span>
+                            </div>
+                        )}
 
-                            {(() => {
-                                const rowItems = relevantStock.filter(s => s.location && s.location.startsWith(printRowName + ':'));
-                                // Reconstruct levels for print
-                                const baseSize = 7;
-                                const levels: StockItem[][] = [];
-                                let currentIndex = 0;
-                                let currentCapacity = baseSize;
-                                if (rowItems.length > 0) {
-                                    while (currentIndex < rowItems.length) {
-                                        const capacity = Math.max(1, currentCapacity);
-                                        levels.push(rowItems.slice(currentIndex, currentIndex + capacity));
-                                        currentIndex += capacity;
-                                        currentCapacity--;
-                                    }
-                                }
-
+                        {/* Actual Row Render */}
+                        {(() => {
+                            const targetRowName = activeRow || derivedRows[0];
+                            if (!targetRowName) {
                                 return (
-                                    <div className="flex flex-col-reverse items-center gap-4">
-                                        {levels.map((levelItems, lvlIdx) => (
-                                            <div key={lvlIdx} className="flex justify-center gap-4">
-                                                {levelItems.map(item => (
-                                                    <div key={item.id} className="w-24 h-24 rounded-full border-4 border-black flex flex-col items-center justify-center text-center p-1">
-                                                        <span className="font-bold text-lg leading-none mb-1">{item.internalLot}</span>
-                                                        <span className="text-sm">{(item.remainingQuantity || 0).toFixed(0)}kg</span>
-                                                        <span className="text-xs italic">{item.bitola}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        ))}
+                                    <div className="flex flex-col items-center justify-center h-full text-slate-400 mt-20">
+                                        <ArchiveIcon className="w-24 h-24 mb-4 opacity-50" />
+                                        <h3 className="text-xl font-bold">Nenhuma Fileira Selecionada</h3>
+                                        <p>Crie uma fileira ou selecione uma existente acima.</p>
                                     </div>
                                 );
-                            })()}
+                            }
 
-                            <div className="mt-12 border-t pt-4 flex justify-between text-sm text-slate-500">
-                                <span>Impressão: {new Date().toLocaleString()}</span>
-                                <span>Total Itens: {relevantStock.filter(s => s.location && s.location.startsWith(printRowName + ':')).length}</span>
+                            const itemsForThisRow = relevantStock.filter(s => s.location === targetRowName || (s.location && s.location.startsWith(targetRowName + ':')));
+                            const config = rowConfigs.find(rc => rc.rowName === targetRowName);
+
+                            return (
+                                <div className="w-full max-w-6xl animate-fadeIn">
+                                    <PyramidRow
+                                        rowName={targetRowName}
+                                        items={itemsForThisRow}
+                                        config={config}
+                                        isActive={true}
+                                        onSetActive={() => { }}
+                                        onDrop={(item) => handleDropOnRow(item, targetRowName)}
+                                        onRemove={handleRemoveFromRow}
+                                        onRemoveRow={() => handleRemoveRow(targetRowName)}
+                                        onRenameRow={(newName) => handleRenameRow(targetRowName, newName)}
+                                        onItemClick={(item) => setItemToMove(itemToMove?.id === item.id ? null : item)}
+                                        onSlotClick={(l, p) => setActiveSlot({ row: targetRowName, l, p })}
+                                        onExpand={() => setLandscapeRow(targetRowName)}
+                                        activeSlot={activeSlot?.row === targetRowName ? activeSlot : null}
+                                        movingItem={itemToMove}
+                                        onPrintRow={() => setPrintRowName(targetRowName)}
+                                        onUpdateConfig={handleUpdateRowConfig}
+                                    />
+
+                                    {itemsForThisRow.length === 0 && (
+                                        <div className="text-center mt-8 p-8 border-2 border-dashed border-slate-300 rounded-xl bg-white/50">
+                                            <p className="text-slate-500 font-bold mb-2">Fileira Vazia</p>
+                                            <p className="text-sm text-slate-400">Arraste lotes da lista à esquerda para começar a preencher.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })()}
+                    </div>
+                </div>
+            </div>
+
+            {/* Confirm Delete Modal */}
+            {(itemToDelete || rowToDelete) && (
+                <div className="fixed inset-0 bg-black/50 z-[150] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full">
+                        <div className="flex flex-col items-center text-center">
+                            <div className="bg-red-100 p-3 rounded-full mb-4">
+                                <ExclamationIcon className="w-8 h-8 text-red-600" />
+                            </div>
+                            <h3 className="text-xl font-bold text-slate-800 mb-2">Confirmação</h3>
+                            <p className="text-slate-600 mb-6">
+                                {itemToDelete
+                                    ? `Deseja remover o lote ${itemToDelete.internalLot} da fileira?`
+                                    : `Deseja realmente excluir a fileira "${rowToDelete}"? Esta ação não pode ser desfeita.`
+                                }
+                            </p>
+                            <div className="flex gap-3 w-full">
+                                <button
+                                    onClick={() => { setItemToDelete(null); setRowToDelete(null); }}
+                                    className="flex-1 px-4 py-2 border border-slate-300 rounded-lg font-bold text-slate-700 hover:bg-slate-50"
+                                >
+                                    CANCELAR
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        if (itemToDelete) {
+                                            handleRemoveFromRow(itemToDelete);
+                                            setItemToDelete(null);
+                                        } else if (rowToDelete) {
+                                            handleRemoveRow(rowToDelete);
+                                            setRowToDelete(null);
+                                        }
+                                    }}
+                                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700"
+                                >
+                                    EXCLUIR
+                                </button>
                             </div>
                         </div>
                     </div>
-                )}
-                {/* Closing divs for main layout */}
-            </div>
-        </div >
+                </div>
+            )}
+
+            {/* Print Modal */}
+            {printRowName && (
+                <div className="fixed inset-0 bg-white z-[100] p-8 flex flex-col items-center justify-center">
+                    <div className="w-full max-w-4xl border-2 border-slate-800 p-8 relative print:border-none print:w-full">
+                        <button onClick={() => setPrintRowName(null)} className="absolute top-4 right-4 bg-red-600 text-white px-4 py-2 rounded print:hidden font-bold">FECHAR</button>
+                        <button onClick={() => window.print()} className="absolute top-4 right-28 bg-blue-600 text-white px-4 py-2 rounded print:hidden font-bold">IMPRIMIR</button>
+
+                        <h1 className="text-4xl font-bold text-center mb-8 border-b-2 border-black pb-4">{printRowName}</h1>
+
+                        {(() => {
+                            const rowItems = relevantStock.filter(s => s.location && s.location.startsWith(printRowName + ':'));
+                            // Reconstruct levels for print
+                            const baseSize = 7;
+                            const levels: StockItem[][] = [];
+                            let currentIndex = 0;
+                            let currentCapacity = baseSize;
+                            if (rowItems.length > 0) {
+                                while (currentIndex < rowItems.length) {
+                                    const capacity = Math.max(1, currentCapacity);
+                                    levels.push(rowItems.slice(currentIndex, currentIndex + capacity));
+                                    currentIndex += capacity;
+                                    currentCapacity--;
+                                }
+                            }
+
+                            return (
+                                <div className="flex flex-col-reverse items-center gap-4">
+                                    {levels.map((levelItems, lvlIdx) => (
+                                        <div key={lvlIdx} className="flex justify-center gap-4">
+                                            {levelItems.map(item => (
+                                                <div key={item.id} className="w-24 h-24 rounded-full border-4 border-black flex flex-col items-center justify-center text-center p-1">
+                                                    <span className="font-bold text-lg leading-none mb-1">{item.internalLot}</span>
+                                                    <span className="text-sm">{(item.remainingQuantity || 0).toFixed(0)}kg</span>
+                                                    <span className="text-xs italic">{item.bitola}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ))}
+                                </div>
+                            );
+                        })()}
+
+                        <div className="mt-12 border-t pt-4 flex justify-between text-sm text-slate-500">
+                            <span>Impressão: {new Date().toLocaleString()}</span>
+                            <span>Total Itens: {relevantStock.filter(s => s.location && s.location.startsWith(printRowName + ':')).length}</span>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Closing divs for main layout */}
+        </div>
     );
 };
 
