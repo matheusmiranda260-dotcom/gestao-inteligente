@@ -141,7 +141,24 @@ const App: React.FC = () => {
     }, !!currentUser);
 
     useEffect(() => {
-        // Check active session
+        // Load stored user from localStorage if exists
+        const storedUser = localStorage.getItem('msm_user');
+        if (storedUser) {
+            try {
+                const user = JSON.parse(storedUser);
+                setCurrentUser(user);
+                // If we have a stored user, direct them to dashboard unless they were already on a specific page
+                // (Using dashboard as safe default)
+                if (page === 'login') {
+                    setPage('productionDashboard');
+                }
+            } catch (e) {
+                console.error("Failed to parse stored user", e);
+                localStorage.removeItem('msm_user');
+            }
+        }
+
+        // Check active Supabase session (for hybrid support)
         supabase.auth.getSession().then(({ data: { session } }) => {
             if (session?.user) {
                 handleUserSession(session.user);
@@ -152,7 +169,8 @@ const App: React.FC = () => {
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             if (session?.user) {
                 handleUserSession(session.user);
-            } else {
+            } else if (!_event.includes('SIGNED_IN') && !localStorage.getItem('msm_user')) {
+                // Only reset if no custom session exists either
                 setCurrentUser(null);
                 setPage('login');
             }
@@ -162,19 +180,17 @@ const App: React.FC = () => {
     }, []);
 
     const handleUserSession = (supabaseUser: any) => {
-        // Map Supabase user to App User
-        // For now, we'll determine role based on email or metadata
-        // Defaulting to 'gestor' for the first user for testing purposes if email contains 'gestor'
         const role = (supabaseUser.email?.includes('gestor') || supabaseUser.email?.includes('admin') || supabaseUser.email === 'matheusmiranda357@gmail.com') ? 'gestor' : 'user';
 
         const appUser: User = {
             id: supabaseUser.id,
             username: supabaseUser.email || 'Usuario',
-            password: '', // Not needed locally
+            password: '',
             role: role,
-            permissions: { trelica: true, trefila: true } // Default permissions
+            permissions: { trelica: true, trefila: true }
         };
         setCurrentUser(appUser);
+        localStorage.setItem('msm_user', JSON.stringify(appUser));
         setPage('productionDashboard');
     };
 
@@ -197,6 +213,7 @@ const App: React.FC = () => {
                     employeeId: usersFound.employee_id
                 };
                 setCurrentUser(appUser);
+                localStorage.setItem('msm_user', JSON.stringify(appUser));
                 setPage('productionDashboard');
                 showNotification(`Bem-vindo, ${appUser.username}!`, 'success');
                 return;
@@ -212,6 +229,7 @@ const App: React.FC = () => {
                     permissions: { trelica: true, trefila: true }
                 };
                 setCurrentUser(adminUser);
+                localStorage.setItem('msm_user', JSON.stringify(adminUser));
                 setPage('productionDashboard');
                 showNotification('Login realizado com sucesso (Modo Gestor).', 'success');
                 return;
@@ -226,7 +244,7 @@ const App: React.FC = () => {
     };
 
     const handleLogout = async (): Promise<void> => {
-        // await supabase.auth.signOut(); // Not strictly needed for custom auth but good practice if hybrid
+        localStorage.removeItem('msm_user');
         setCurrentUser(null);
         setPage('login');
     };

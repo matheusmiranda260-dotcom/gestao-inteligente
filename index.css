@@ -578,12 +578,86 @@ tr:hover td {
     background: #e2e8f0;
   }
 
-  /* Ajustes para cards no mobile */
-  .p-8 {
+  /* Comprehensive Mobile Overrides */
+  .p-8,
+  .p-6,
+  .p-4 {
     padding: 1rem !important;
   }
 
   .grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+  }
+
+  /* Tables */
+  .overflow-x-auto,
+  .overflow-auto {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    min-width: 750px;
+    font-size: 0.85rem;
+  }
+
+  /* Modals */
+  .fixed.inset-0 {
+    padding: 0.5rem !important;
+  }
+
+  .fixed.inset-0>div:not(.bg-black) {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    max-height: 95vh;
+    padding: 1.25rem !important;
+    border-radius: 1.25rem !important;
+    overflow-y: auto;
+  }
+
+  /* Layout */
+  .top-bar .flex-col {
+    display: none;
+  }
+
+  .top-bar {
+    padding: 0 0.75rem;
+  }
+
+  h1 {
+    font-size: 1.35rem !important;
+  }
+
+  h2 {
+    font-size: 1.15rem !important;
+  }
+
+  input,
+  select,
+  button,
+  a {
+    min-height: 48px;
+  }
+
+  .flex.gap-4,
+  .flex.gap-6,
+  .flex.space-x-4 {
+    flex-direction: column !important;
+    gap: 0.75rem !important;
+    align-items: stretch !important;
+  }
+
+  .grid-cols-2,
+  .grid-cols-3,
+  .grid-cols-4,
+  .grid-cols-5,
+  .md\:grid-cols-2,
+  .md\:grid-cols-3,
+  .md\:grid-cols-4,
+  .lg\:grid-cols-2 {
     grid-template-columns: 1fr !important;
   }
 }
