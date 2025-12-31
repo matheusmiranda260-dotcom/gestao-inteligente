@@ -42,7 +42,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             return { status: 'Produzindo', reason: '', since, durationMs };
         }
     }, [activeOrder, now]);
-    
+
     const currentOperator = useMemo(() => {
         if (!activeOrder?.operatorLogs) return 'N/A';
         const activeLog = [...activeOrder.operatorLogs].reverse().find(log => !log.endTime);
@@ -52,7 +52,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     const timelineEvents = useMemo(() => {
         if (!activeOrder) return [];
         let events: { timestamp: string; message: string; details?: string; type: string }[] = [];
-        
+
         events.push({ timestamp: activeOrder.startTime!, message: `Ordem ${activeOrder.orderNumber} iniciada`, type: 'start' });
         (activeOrder.downtimeEvents || []).forEach(event => {
             events.push({ timestamp: event.stopTime, message: 'Máquina Parada', details: event.reason, type: 'stop' });
@@ -60,12 +60,28 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                 events.push({ timestamp: event.resumeTime, message: 'Produção Retomada', type: 'resume' });
             }
         });
-        
+
         return events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     }, [activeOrder]);
-    
+
     const isAlertActive = machineStatus.status === 'Parada' && machineStatus.durationMs > 30000;
     const currentStyle = statusStyles[machineStatus.status as keyof typeof statusStyles] || statusStyles.Ocioso;
+
+    const { processedLotsCount, totalLotsCount, producedQuantity, plannedQuantity, progress } = useMemo(() => {
+        let processedLotsCount = 0, totalLotsCount = 0, producedQuantity = 0, plannedQuantity = 0, progress = 0;
+        if (!activeOrder) return { processedLotsCount, totalLotsCount, producedQuantity, plannedQuantity, progress };
+
+        if (machineType === 'Trefila' && Array.isArray(activeOrder.selectedLotIds)) {
+            processedLotsCount = (activeOrder.processedLots || []).length;
+            totalLotsCount = activeOrder.selectedLotIds.length;
+            if (totalLotsCount > 0) progress = (processedLotsCount / totalLotsCount) * 100;
+        } else if (machineType === 'Treliça') {
+            producedQuantity = activeOrder.actualProducedQuantity || 0;
+            plannedQuantity = activeOrder.quantityToProduce || 1;
+            progress = (producedQuantity / plannedQuantity) * 100;
+        }
+        return { processedLotsCount, totalLotsCount, producedQuantity, plannedQuantity, progress: Math.min(100, progress) };
+    }, [activeOrder, machineType]);
 
     if (!activeOrder) {
         return (
@@ -79,31 +95,17 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             </div>
         );
     }
-    
-    const { processedLotsCount, totalLotsCount, producedQuantity, plannedQuantity, progress } = useMemo(() => {
-        let processedLotsCount = 0, totalLotsCount = 0, producedQuantity = 0, plannedQuantity = 0, progress = 0;
-        if (machineType === 'Trefila' && Array.isArray(activeOrder.selectedLotIds)) {
-            processedLotsCount = (activeOrder.processedLots || []).length;
-            totalLotsCount = activeOrder.selectedLotIds.length;
-            if(totalLotsCount > 0) progress = (processedLotsCount / totalLotsCount) * 100;
-        } else if (machineType === 'Treliça') {
-            producedQuantity = activeOrder.actualProducedQuantity || 0;
-            plannedQuantity = activeOrder.quantityToProduce || 1;
-            progress = (producedQuantity / plannedQuantity) * 100;
-        }
-        return { processedLotsCount, totalLotsCount, producedQuantity, plannedQuantity, progress: Math.min(100, progress) };
-    }, [activeOrder, machineType]);
 
 
     return (
         <div className="bg-white p-6 rounded-xl shadow-lg flex flex-col space-y-4">
-             <h2 className="text-2xl font-bold text-slate-800">{machineType}</h2>
-             {isAlertActive && (
+            <h2 className="text-2xl font-bold text-slate-800">{machineType}</h2>
+            {isAlertActive && (
                 <div className="bg-red-500 text-white p-2 rounded-md text-center animate-pulse text-sm font-semibold">
                     ALERTA: MÁQUINA PARADA HÁ {formatDuration(machineStatus.durationMs)}
                 </div>
-             )}
-             <div className={`p-4 rounded-md border-t-4 ${currentStyle.border} ${currentStyle.bg}`}>
+            )}
+            <div className={`p-4 rounded-md border-t-4 ${currentStyle.border} ${currentStyle.bg}`}>
                 <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
                         {currentStyle.icon}
@@ -116,68 +118,68 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                         <p className={`text-3xl font-mono font-bold ${currentStyle.text}`}>{formatDuration(machineStatus.durationMs)}</p>
                     </div>
                 </div>
-             </div>
+            </div>
 
-             <div className="border p-4 rounded-md">
-                 <h3 className="font-semibold text-slate-700 mb-2">Detalhes da Ordem</h3>
-                 <div className="text-sm space-y-1">
-                     <p><strong>Nº Ordem:</strong> {activeOrder.orderNumber}</p>
-                     <p><strong>Operador:</strong> {currentOperator}</p>
-                     {machineType === 'Trefila' ? (
+            <div className="border p-4 rounded-md">
+                <h3 className="font-semibold text-slate-700 mb-2">Detalhes da Ordem</h3>
+                <div className="text-sm space-y-1">
+                    <p><strong>Nº Ordem:</strong> {activeOrder.orderNumber}</p>
+                    <p><strong>Operador:</strong> {currentOperator}</p>
+                    {machineType === 'Trefila' ? (
                         <p><strong>Produto:</strong> CA-60 {activeOrder.targetBitola}mm</p>
-                     ) : (
+                    ) : (
                         <p><strong>Produto:</strong> {activeOrder.trelicaModel} ({activeOrder.tamanho} mts)</p>
-                     )}
-                 </div>
-             </div>
-             
-             <div className="border p-4 rounded-md">
+                    )}
+                </div>
+            </div>
+
+            <div className="border p-4 rounded-md">
                 <h3 className="font-semibold text-slate-700 mb-2">Progresso da Produção</h3>
-                 {machineType === 'Trefila' ? (
-                     <div className="text-center">
-                         <span className="text-3xl font-bold text-slate-800">{processedLotsCount}</span>
-                         <span className="text-slate-600"> / {totalLotsCount} lotes processados</span>
-                     </div>
-                 ) : (
-                     <div>
-                         <div className="flex justify-between items-baseline mb-1">
-                             <span className="text-slate-600">Peças Produzidas</span>
-                             <span className="text-xl font-bold text-slate-800">{producedQuantity} / {plannedQuantity}</span>
-                         </div>
-                         <div className="w-full bg-slate-200 rounded-full h-4">
+                {machineType === 'Trefila' ? (
+                    <div className="text-center">
+                        <span className="text-3xl font-bold text-slate-800">{processedLotsCount}</span>
+                        <span className="text-slate-600"> / {totalLotsCount} lotes processados</span>
+                    </div>
+                ) : (
+                    <div>
+                        <div className="flex justify-between items-baseline mb-1">
+                            <span className="text-slate-600">Peças Produzidas</span>
+                            <span className="text-xl font-bold text-slate-800">{producedQuantity} / {plannedQuantity}</span>
+                        </div>
+                        <div className="w-full bg-slate-200 rounded-full h-4">
                             <div className="bg-emerald-500 h-4 rounded-full text-white text-xs flex items-center justify-center font-bold" style={{ width: `${progress}%` }}>
                                 {progress > 10 && `${progress.toFixed(0)}%`}
                             </div>
-                         </div>
-                     </div>
-                 )}
-             </div>
+                        </div>
+                    </div>
+                )}
+            </div>
 
-             <div className="border p-4 rounded-md">
+            <div className="border p-4 rounded-md">
                 <h3 className="font-semibold text-slate-700 mb-2">Linha do Tempo Recente</h3>
-                 <div className="max-h-48 overflow-y-auto pr-2 space-y-3">
-                     {timelineEvents.slice(0, 10).map((event, index) => (
-                         <div key={index} className="flex gap-2 text-xs">
-                             <div className={`w-3 h-3 mt-0.5 rounded-full flex-shrink-0 ${event.type === 'stop' ? 'bg-red-500' : 'bg-[#e6f0f5]0'}`}></div>
-                             <div>
-                                 <span className="font-mono text-slate-500 mr-2">{new Date(event.timestamp).toLocaleTimeString('pt-BR')}</span>
-                                 <span className="font-semibold">{event.message}</span>
-                                 {event.details && <span className="text-slate-600">: {event.details}</span>}
-                             </div>
-                         </div>
-                     ))}
-                 </div>
-             </div>
+                <div className="max-h-48 overflow-y-auto pr-2 space-y-3">
+                    {timelineEvents.slice(0, 10).map((event, index) => (
+                        <div key={index} className="flex gap-2 text-xs">
+                            <div className={`w-3 h-3 mt-0.5 rounded-full flex-shrink-0 ${event.type === 'stop' ? 'bg-red-500' : 'bg-[#e6f0f5]0'}`}></div>
+                            <div>
+                                <span className="font-mono text-slate-500 mr-2">{new Date(event.timestamp).toLocaleTimeString('pt-BR')}</span>
+                                <span className="font-semibold">{event.message}</span>
+                                {event.details && <span className="text-slate-600">: {event.details}</span>}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
         </div>
     );
 };
 
 
 interface ProductionDashboardProps {
-  setPage: (page: Page) => void;
-  productionOrders: ProductionOrderData[];
-  stock: StockItem[];
-  currentUser: User | null;
+    setPage: (page: Page) => void;
+    productionOrders: ProductionOrderData[];
+    stock: StockItem[];
+    currentUser: User | null;
 }
 
 const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, productionOrders, stock, currentUser }) => {
@@ -188,13 +190,13 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
         return () => clearInterval(timerId);
     }, []);
 
-    const activeTrefilaOrder = useMemo(() => 
-        productionOrders.find(o => o.machine === 'Trefila' && o.status === 'in_progress'), 
-    [productionOrders]);
+    const activeTrefilaOrder = useMemo(() =>
+        productionOrders.find(o => o.machine === 'Trefila' && o.status === 'in_progress'),
+        [productionOrders]);
 
-    const activeTrelicaOrder = useMemo(() => 
+    const activeTrelicaOrder = useMemo(() =>
         productionOrders.find(o => o.machine === 'Treliça' && o.status === 'in_progress'),
-    [productionOrders]);
+        [productionOrders]);
 
     return (
         <div className="p-4 sm:p-6 md:p-8">
@@ -206,13 +208,13 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
             </header>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <MachineStatusView 
+                <MachineStatusView
                     machineType="Trefila"
                     activeOrder={activeTrefilaOrder}
                     stock={stock}
                     now={now}
                 />
-                 <MachineStatusView 
+                <MachineStatusView
                     machineType="Treliça"
                     activeOrder={activeTrelicaOrder}
                     stock={stock}

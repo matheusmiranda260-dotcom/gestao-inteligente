@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'; // Refresh Trigger
-import type { Page, User, Employee, StockItem, ConferenceData, ProductionOrderData, TransferRecord, Bitola, MachineType, PartsRequest, ShiftReport, ProductionRecord, TransferredLotInfo, ProcessedLot, DowntimeEvent, OperatorLog, TrelicaSelectedLots, WeighedPackage, FinishedProductItem, Ponta, PontaItem, FinishedGoodsTransferRecord, TransferredFinishedGoodInfo, Message } from './types';
+import type { Page, User, Employee, StockItem, ConferenceData, ProductionOrderData, TransferRecord, Bitola, MachineType, PartsRequest, ShiftReport, ProductionRecord, TransferredLotInfo, ProcessedLot, DowntimeEvent, OperatorLog, TrelicaSelectedLots, WeighedPackage, FinishedProductItem, Ponta, PontaItem, FinishedGoodsTransferRecord, TransferredFinishedGoodInfo, Message, KaizenProblem } from './types';
 import Login from './components/Login';
 import MainMenu from './components/MainMenu';
 import StockControl from './components/StockControl';
@@ -9,6 +9,7 @@ import ProductionOrderTrelica from './components/ProductionOrderTrelica';
 import Reports from './components/Reports';
 import UserManagement from './components/UserManagement';
 import Notification from './components/Notification';
+import Sidebar from './components/Sidebar';
 import ProductionDashboard from './components/ProductionDashboard';
 import { trelicaModels } from './components/ProductionOrderTrelica';
 import FinishedGoods from './components/FinishedGoods';
@@ -16,6 +17,7 @@ import SparePartsManager from './components/SparePartsManager';
 import ContinuousImprovement from './components/ContinuousImprovement';
 import WorkInstructions from './components/WorkInstructions';
 import PeopleManagement from './components/PeopleManagement';
+import MessageCenter from './components/MessageCenter';
 import { supabase } from './supabaseClient';
 
 import { fetchTable, insertItem, updateItem, deleteItem, deleteItemByColumn, updateItemByColumn } from './services/supabaseService';
@@ -43,6 +45,28 @@ const App: React.FC = () => {
     const [trefilaProduction, setTrefilaProduction] = useState<ProductionRecord[]>([]);
     const [trelicaProduction, setTrelicaProduction] = useState<ProductionRecord[]>([]);
     const [messages, setMessages] = useState<Message[]>([]);
+    const [pendingKaizenCount, setPendingKaizenCount] = useState(0);
+
+    const unreadMessagesCount = useMemo(() => messages.filter(m => !m.isRead).length, [messages]);
+
+    useEffect(() => {
+        if (currentUser?.employeeId) {
+            const checkTasks = async () => {
+                try {
+                    const allProblems = await fetchTable<KaizenProblem>('kaizen_problems');
+                    const myTasks = allProblems.filter(p => {
+                        const isResponsibleId = p.responsibleIds?.includes(currentUser.employeeId!);
+                        const isResponsibleName = p.responsible && currentUser.username && p.responsible.includes(currentUser.username);
+                        return (isResponsibleId || isResponsibleName) && p.status !== 'Resolvido';
+                    });
+                    setPendingKaizenCount(myTasks.length);
+                } catch (e) {
+                    console.error('Error fetching pending tasks for menu', e);
+                }
+            };
+            checkTasks();
+        }
+    }, [currentUser, page]); // Refresh when page changes too
 
     useEffect(() => {
         const loadData = async () => {
@@ -150,7 +174,7 @@ const App: React.FC = () => {
             permissions: { trelica: true, trefila: true } // Default permissions
         };
         setCurrentUser(appUser);
-        setPage('menu');
+        setPage('productionDashboard');
     };
 
     const handleLogin = async (username: string, password: string): Promise<void> => {
@@ -172,7 +196,7 @@ const App: React.FC = () => {
                     employeeId: usersFound.employee_id
                 };
                 setCurrentUser(appUser);
-                setPage('menu');
+                setPage('productionDashboard');
                 showNotification(`Bem-vindo, ${appUser.username}!`, 'success');
                 return;
             }
@@ -187,7 +211,7 @@ const App: React.FC = () => {
                     permissions: { trelica: true, trefila: true }
                 };
                 setCurrentUser(adminUser);
-                setPage('menu');
+                setPage('productionDashboard');
                 showNotification('Login realizado com sucesso (Modo Gestor).', 'success');
                 return;
             }
@@ -1673,16 +1697,64 @@ const App: React.FC = () => {
                 return <WorkInstructions setPage={setPage} />;
             case 'peopleManagement':
                 return <PeopleManagement setPage={setPage} currentUser={currentUser} />;
+            case 'messages':
+                return <MessageCenter messages={messages} currentUser={currentUser} addMessage={addMessage} markAllMessagesAsRead={markAllMessagesAsRead} />;
             default:
                 return <Login onLogin={handleLogin} error={null} />;
         }
     };
 
-    return (
-        <div className="bg-slate-100 min-h-screen">
-            {notification && <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />}
-            {renderPage()}
+    const showSidebar = currentUser && page !== 'login';
 
+    return (
+        <div className="app-container">
+            {notification && (
+                <Notification
+                    message={notification.message}
+                    type={notification.type}
+                    onClose={() => setNotification(null)}
+                />
+            )}
+
+            {showSidebar && (
+                <Sidebar
+                    page={page}
+                    setPage={setPage}
+                    currentUser={currentUser}
+                    notificationCount={pendingKaizenCount}
+                />
+            )}
+
+            <main className="main-content">
+                {showSidebar && (
+                    <header className="top-bar no-print">
+                        <div className="flex items-center gap-4">
+                            <span className="text-slate-400 text-sm font-medium">MSM / {page.charAt(0).toUpperCase() + page.slice(1)}</span>
+                        </div>
+
+                        <div className="flex items-center gap-6">
+                            <div className="flex flex-col items-end">
+                                <span className="text-sm font-bold text-slate-800">{currentUser?.username}</span>
+                                <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">{currentUser?.role}</span>
+                            </div>
+
+                            <button
+                                onClick={handleLogout}
+                                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors group"
+                                title="Sair do sistema"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                </svg>
+                            </button>
+                        </div>
+                    </header>
+                )}
+
+                <div className={showSidebar ? 'p-4' : ''}>
+                    {renderPage()}
+                </div>
+            </main>
         </div>
     );
 };

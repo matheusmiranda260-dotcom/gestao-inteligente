@@ -111,11 +111,11 @@ interface MainMenuProps {
 const MenuButton: React.FC<{ onClick: () => void; label: string; description: string; icon: React.ReactNode; notificationCount?: number; color?: 'cyan' | 'blue' | 'purple' | 'teal' | 'indigo' }> = ({ onClick, label, description, icon, notificationCount, color = 'blue' }) => {
 
     const colorStyles = {
-        cyan: { bg: 'bg-cyan-50', text: 'text-cyan-600', border: 'border-cyan-100' },
-        blue: { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-100' },
-        purple: { bg: 'bg-violet-50', text: 'text-violet-600', border: 'border-violet-100' },
-        teal: { bg: 'bg-teal-50', text: 'text-teal-600', border: 'border-teal-100' },
-        indigo: { bg: 'bg-indigo-50', text: 'text-indigo-600', border: 'border-indigo-100' },
+        cyan: { bg: 'bg-cyan-50/50', text: 'text-cyan-600', border: 'border-cyan-100' },
+        blue: { bg: 'bg-blue-50/50', text: 'text-blue-600', border: 'border-blue-100' },
+        purple: { bg: 'bg-violet-50/50', text: 'text-violet-600', border: 'border-violet-100' },
+        teal: { bg: 'bg-teal-50/50', text: 'text-teal-600', border: 'border-teal-100' },
+        indigo: { bg: 'bg-indigo-50/50', text: 'text-indigo-600', border: 'border-indigo-100' },
     };
 
     const style = colorStyles[color] || colorStyles['blue'];
@@ -123,23 +123,28 @@ const MenuButton: React.FC<{ onClick: () => void; label: string; description: st
     return (
         <button
             onClick={onClick}
-            className="relative bg-white p-6 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300 text-left w-full flex flex-col h-full border border-slate-100 group"
+            className="group relative flex flex-col p-5 rounded-2xl glass-card text-left transition-all duration-300 h-full overflow-hidden"
         >
             {notificationCount && notificationCount > 0 && (
-                <div className="absolute top-4 right-4 bg-red-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center animate-pulse shadow-md">
+                <div className="badge-count">
                     {notificationCount}
                 </div>
             )}
 
-            <div className={`inline-flex p-3 rounded-xl mb-4 transition-colors duration-300 ${style.bg} ${style.text}`}>
-                {React.cloneElement(icon as React.ReactElement<any>, { className: `h-8 w-8` })}
+            <div className="flex items-start justify-between mb-4">
+                <div className={`menu-icon-container inline-flex p-3 rounded-xl ${style.bg} ${style.text}`}>
+                    {React.cloneElement(icon as React.ReactElement<any>, { className: `h-6 w-6` })}
+                </div>
             </div>
 
-            <h3 className="text-lg font-bold text-slate-800 mb-2 group-hover:text-blue-600 transition-colors">
-                {label}
-            </h3>
+            <div>
+                <h3 className="text-base font-bold text-slate-800 mb-1.5 group-hover:text-blue-600 transition-colors">
+                    {label}
+                </h3>
+                <p className="text-slate-500 text-xs leading-relaxed line-clamp-2">{description}</p>
+            </div>
 
-            <p className="text-slate-500 text-sm leading-relaxed">{description}</p>
+            <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-right from-transparent via-blue-400 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
         </button>
     );
 };
@@ -151,7 +156,6 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser, mes
 
     const unreadCount = useMemo(() => messages.filter(m => !m.isRead).length, [messages]);
 
-    // Check for pending Kaizen tasks for the current user
     React.useEffect(() => {
         if (currentUser?.employeeId) {
             const checkTasks = async () => {
@@ -159,7 +163,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser, mes
                     const allProblems = await fetchTable<KaizenProblem>('kaizen_problems');
                     const myTasks = allProblems.filter(p => {
                         const isResponsibleId = p.responsibleIds?.includes(currentUser.employeeId!);
-                        const isResponsibleName = p.responsible && currentUser.username && p.responsible.includes(currentUser.username); // Fallback attempt
+                        const isResponsibleName = p.responsible && currentUser.username && p.responsible.includes(currentUser.username);
                         return (isResponsibleId || isResponsibleName) && p.status !== 'Resolvido';
                     });
                     setPendingKaizenCount(myTasks.length);
@@ -187,8 +191,10 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser, mes
         return !!currentUser.permissions?.[page];
     };
 
+    const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor';
+
     return (
-        <div className="min-h-screen p-4 sm:p-6 md:p-10 bg-[#F8FAFC]">
+        <div className="min-h-screen p-6 sm:p-8 md:p-12 bg-[#F8FAFC]">
             <ManagerMessagesModal
                 isOpen={isManagerModalOpen}
                 onClose={() => setIsManagerModalOpen(false)}
@@ -197,132 +203,219 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser, mes
                 addMessage={addMessage}
             />
 
-            <header className="flex justify-between items-center mb-12">
-                <div className="flex items-center gap-4">
-                    <div className="bg-[#020B1A] p-1.5 rounded-xl shadow-sm border border-slate-800/50">
-                        <img src="/logo-msm-intensified.png" alt="MSM Logo" className="w-14 h-14 object-contain" />
-                    </div>
-                    <div>
-                        <h1 className="text-3xl font-bold text-slate-800">Menu Principal</h1>
-                        <p className="text-slate-500 font-medium">Bem-vindo, {currentUser?.username || 'Usuário'}. <span className="text-xs text-slate-300">({currentUser?.role} | EmpID: {currentUser?.employeeId || 'Nenhum'} | Perms: {Object.keys(currentUser?.permissions || {}).filter(k => currentUser?.permissions?.[k as Page]).length})</span></p>
+            <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
+                <div>
+                    <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 mb-2">
+                        <span className="gradient-text">MSM</span> Gestão Inteligente
+                    </h1>
+                    <div className="flex items-center gap-2 text-slate-500 font-medium">
+                        <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                        <p>Bem-vindo, <span className="text-slate-900 font-bold">{currentUser?.username || 'Usuário'}</span></p>
+                        <span className="mx-2 text-slate-300">|</span>
+                        <span className="text-xs px-2 py-0.5 bg-slate-100 rounded-full border border-slate-200">
+                            {currentUser?.role === 'admin' ? 'Administrador' : currentUser?.role === 'gestor' ? 'Gestor' : 'Operador'}
+                        </span>
                     </div>
                 </div>
-                <button
-                    onClick={onLogout}
-                    className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2 px-6 rounded-lg transition"
-                >
-                    Sair
-                </button>
+
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={onLogout}
+                        className="px-6 py-2.5 bg-white text-slate-700 font-bold rounded-xl border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm flex items-center gap-2 group"
+                    >
+                        <span>Sair da conta</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-400 group-hover:text-red-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                    </button>
+                </div>
             </header>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {hasPermission('stock') && <MenuButton
-                    onClick={() => setPage('stock')}
-                    label="Controle de Estoque"
-                    description="Cadastre, visualize e gerencie os lotes de matéria-prima."
-                    icon={<ArchiveIcon />}
-                    color="cyan"
-                />}
-                {hasPermission('finishedGoods') && <MenuButton
-                    onClick={() => setPage('finishedGoods')}
-                    label="Estoque Acabado (Treliça)"
-                    description="Visualize o estoque de treliças prontas para expedição."
-                    icon={<ArchiveIcon />}
-                    color="blue"
-                />}
-                {hasPermission('trefila') && <MenuButton
-                    onClick={() => setPage('trefila')}
-                    label="Produção (TREFILA)"
-                    description="Acesse o painel de produção da máquina trefiladeira."
-                    icon={<CogIcon />}
-                    color="cyan"
-                />}
-                {hasPermission('trelica') && <MenuButton
-                    onClick={() => setPage('trelica')}
-                    label="Produção (TRELIÇA)"
-                    description="Acesse o painel de produção da máquina de treliça."
-                    icon={<CogIcon />}
-                    color="indigo"
-                />}
-                {hasPermission('productionOrder') && <MenuButton
-                    onClick={() => setPage('productionOrder')}
-                    label="Ordem (Trefila)"
-                    description="Crie e acompanhe as ordens para a máquina Trefila."
-                    icon={<ClipboardListIcon />}
-                    color="teal"
-                />}
-                {hasPermission('productionOrderTrelica') && <MenuButton
-                    onClick={() => setPage('productionOrderTrelica')}
-                    label="Ordem (Treliça)"
-                    description="Crie e acompanhe as ordens para a máquina Treliça."
-                    icon={<ClipboardListIcon />}
-                    color="blue"
-                />}
-                {hasPermission('productionDashboard') && <MenuButton
-                    onClick={() => setPage('productionDashboard')}
-                    label="Dashboard de Produção"
-                    description="Acompanhe Trefila e Treliça em tempo real."
-                    icon={<ChartBarIcon />}
-                    color="teal"
-                />}
-                {(currentUser?.role === 'admin' || currentUser?.role === 'gestor') && (
-                    <MenuButton
-                        onClick={handleOpenManagerMessages}
-                        label="Central de Mensagens"
-                        description="Veja as mensagens dos operadores de produção."
-                        icon={<ChatBubbleLeftRightIcon />}
-                        notificationCount={unreadCount}
-                        color="blue"
-                    />
+            <main className="space-y-10">
+                {/* ESTOQUE */}
+                {(hasPermission('stock') || hasPermission('finishedGoods')) && (
+                    <section>
+                        <div className="section-title">
+                            <h2>Estoque</h2>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                            {hasPermission('stock') && (
+                                <MenuButton
+                                    onClick={() => setPage('stock')}
+                                    label="Controle de Estoque"
+                                    description="Gestão de lotes de matéria-prima e localização."
+                                    icon={<ArchiveIcon />}
+                                    color="cyan"
+                                />
+                            )}
+                            {hasPermission('finishedGoods') && (
+                                <MenuButton
+                                    onClick={() => setPage('finishedGoods')}
+                                    label="Estoque Acabado (Treliça)"
+                                    description="Visualização de produtos prontos para expedição."
+                                    icon={<ArchiveIcon />}
+                                    color="blue"
+                                />
+                            )}
+                        </div>
+                    </section>
                 )}
-                {hasPermission('reports') && <MenuButton
-                    onClick={() => setPage('reports')}
-                    label="Relatórios"
-                    description="Acompanhe os indicadores de produção e estoque."
-                    icon={<ChartBarIcon />}
-                    color="purple"
-                />}
-                {(currentUser?.role === 'admin' || currentUser?.role === 'gestor') && (
-                    <MenuButton
-                        onClick={() => setPage('userManagement')}
-                        label="Gerenciar Usuários"
-                        description="Adicione, edite ou remova usuários do sistema."
-                        icon={<UserGroupIcon />}
-                        color="indigo"
-                    />
+
+                {/* ORDEM DE PRODUÇÃO */}
+                {(hasPermission('productionOrderTrelica') || hasPermission('productionOrder')) && (
+                    <section>
+                        <div className="section-title">
+                            <h2>Ordem de Produção</h2>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                            {hasPermission('productionOrderTrelica') && (
+                                <MenuButton
+                                    onClick={() => setPage('productionOrderTrelica')}
+                                    label="Ordem (Treliça)"
+                                    description="Criação e acompanhamento de ordens para treliça."
+                                    icon={<ClipboardListIcon />}
+                                    color="blue"
+                                />
+                            )}
+                            {hasPermission('productionOrder') && (
+                                <MenuButton
+                                    onClick={() => setPage('productionOrder')}
+                                    label="Ordem (Trefila)"
+                                    description="Criação e acompanhamento de ordens para trefila."
+                                    icon={<ClipboardListIcon />}
+                                    color="teal"
+                                />
+                            )}
+                        </div>
+                    </section>
                 )}
-                {hasPermission('partsManager') && <MenuButton
-                    onClick={() => setPage('partsManager')}
-                    label="Gerenciador de Peças"
-                    description="Controle de estoque de peças de reposição."
-                    icon={<WrenchScrewdriverIcon />}
-                    color="cyan"
-                />}
-                {hasPermission('continuousImprovement') && <MenuButton
-                    onClick={() => setPage('continuousImprovement')}
-                    label="Melhoria Contínua"
-                    description="Kaizen Digital, Ações e Problemas"
-                    icon={<AdjustmentsIcon />}
-                    color="teal"
-                />}
-                {hasPermission('workInstructions') && <MenuButton
-                    onClick={() => setPage('workInstructions')}
-                    label="Instruções de Trabalho"
-                    description="Procedimentos e Guias Padrão"
-                    icon={<DocumentTextIcon />}
-                    color="indigo"
-                />}
-                {hasPermission('peopleManagement') && <MenuButton
-                    onClick={() => setPage('peopleManagement')}
-                    label="Gestão de Pessoas"
-                    description="Engajamento, Disciplina e Melhoria"
-                    icon={<UserGroupIcon />}
-                    color="cyan"
-                    notificationCount={pendingKaizenCount}
-                />}
-            </div>
+
+                {/* RH */}
+                {(hasPermission('continuousImprovement') || hasPermission('peopleManagement')) && (
+                    <section>
+                        <div className="section-title">
+                            <h2>Recursos Humanos</h2>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                            {hasPermission('continuousImprovement') && (
+                                <MenuButton
+                                    onClick={() => setPage('continuousImprovement')}
+                                    label="Melhoria Contínua"
+                                    description="Kaizen Digital, gestão de ações e problemas."
+                                    icon={<AdjustmentsIcon />}
+                                    color="teal"
+                                />
+                            )}
+                            {hasPermission('peopleManagement') && (
+                                <MenuButton
+                                    onClick={() => setPage('peopleManagement')}
+                                    label="Gestão de Pessoas"
+                                    description="Engajamento, disciplina e desenvolvimento."
+                                    icon={<UserGroupIcon />}
+                                    color="cyan"
+                                    notificationCount={pendingKaizenCount}
+                                />
+                            )}
+                        </div>
+                    </section>
+                )}
+
+                {/* EM PRODUÇÃO */}
+                {(hasPermission('trefila') || hasPermission('trelica') || hasPermission('productionDashboard')) && (
+                    <section>
+                        <div className="section-title">
+                            <h2>Em Produção</h2>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                            {hasPermission('trefila') && (
+                                <MenuButton
+                                    onClick={() => setPage('trefila')}
+                                    label="Produção (Trefila)"
+                                    description="Painel de operação da máquina trefiladeira."
+                                    icon={<CogIcon />}
+                                    color="cyan"
+                                />
+                            )}
+                            {hasPermission('trelica') && (
+                                <MenuButton
+                                    onClick={() => setPage('trelica')}
+                                    label="Produção (Treliça)"
+                                    description="Painel de operação da máquina de treliça."
+                                    icon={<CogIcon />}
+                                    color="indigo"
+                                />
+                            )}
+                            {hasPermission('productionDashboard') && (
+                                <MenuButton
+                                    onClick={() => setPage('productionDashboard')}
+                                    label="Dashboard"
+                                    description="Monitoramento em tempo real da produção."
+                                    icon={<ChartBarIcon />}
+                                    color="teal"
+                                />
+                            )}
+                        </div>
+                    </section>
+                )}
+
+                {/* GESTÃO & FERRAMENTAS */}
+                <section>
+                    <div className="section-title">
+                        <h2>Gestão & Ferramentas</h2>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                        {isGestor && (
+                            <MenuButton
+                                onClick={handleOpenManagerMessages}
+                                label="Central de Mensagens"
+                                description="Comunicação com operadores de produção."
+                                icon={<ChatBubbleLeftRightIcon />}
+                                notificationCount={unreadCount}
+                                color="blue"
+                            />
+                        )}
+                        {hasPermission('reports') && (
+                            <MenuButton
+                                onClick={() => setPage('reports')}
+                                label="Relatórios"
+                                description="Indicadores de performance e resultados."
+                                icon={<ChartBarIcon />}
+                                color="purple"
+                            />
+                        )}
+                        {isGestor && (
+                            <MenuButton
+                                onClick={() => setPage('userManagement')}
+                                label="Gerenciar Usuários"
+                                description="Controle de acesso e perfis do sistema."
+                                icon={<UserGroupIcon />}
+                                color="indigo"
+                            />
+                        )}
+                        {hasPermission('partsManager') && (
+                            <MenuButton
+                                onClick={() => setPage('partsManager')}
+                                label="Gerenciador de Peças"
+                                description="Estoque de manutenção e peças de reposição."
+                                icon={<WrenchScrewdriverIcon />}
+                                color="cyan"
+                            />
+                        )}
+                        {hasPermission('workInstructions') && (
+                            <MenuButton
+                                onClick={() => setPage('workInstructions')}
+                                label="Instruções de Trabalho"
+                                description="Procedimentos e guias operacionais."
+                                icon={<DocumentTextIcon />}
+                                color="indigo"
+                            />
+                        )}
+                    </div>
+                </section>
+            </main>
         </div>
     );
 };
+
 
 export default MainMenu;
