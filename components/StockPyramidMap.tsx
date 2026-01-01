@@ -78,11 +78,11 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
     // Aggressive Dynamic Sizing to FIT mobile screens
     const dims = useMemo(() => {
         // Base sizes for mobile (<640px) vs desktop
-        if (baseSize <= 6) return { slot: 'w-[46px] h-[46px] sm:w-24 sm:h-24', gap: 'gap-x-1.5', font: 'text-[9px] sm:text-base' };
-        if (baseSize <= 9) return { slot: 'w-[32px] h-[32px] sm:w-20 sm:h-20', gap: 'gap-x-1', font: 'text-[8px] sm:text-sm' };
-        if (baseSize <= 12) return { slot: 'w-[24px] h-[24px] sm:w-16 sm:h-16', gap: 'gap-x-1', font: 'text-[7px] sm:text-xs' };
-        if (baseSize <= 15) return { slot: 'w-[20px] h-[20px] sm:w-14 sm:h-14', gap: 'gap-x-0.5', font: 'text-[6px] sm:text-[11px]' };
-        return { slot: 'w-[16px] h-[16px] sm:w-11 sm:h-11', gap: 'gap-x-0.5', font: 'text-[5px] sm:text-[9px]' };
+        if (baseSize <= 6) return { slot: 'w-[62px] h-[62px] sm:w-24 sm:h-24', gap: 'gap-x-3', font: 'text-[11px] sm:text-base' };
+        if (baseSize <= 9) return { slot: 'w-[48px] h-[48px] sm:w-20 sm:h-20', gap: 'gap-x-2', font: 'text-[9px] sm:text-sm' };
+        if (baseSize <= 12) return { slot: 'w-[38px] h-[38px] sm:w-16 sm:h-16', gap: 'gap-x-1.5', font: 'text-[8.5px] sm:text-xs' };
+        if (baseSize <= 15) return { slot: 'w-[30px] h-[30px] sm:w-14 sm:h-14', gap: 'gap-x-1', font: 'text-[7.5px] sm:text-[11px]' };
+        return { slot: 'w-[24px] h-[24px] sm:w-11 sm:h-11', gap: 'gap-x-0.5', font: 'text-[6.5px] sm:text-[9px]' };
     }, [baseSize]);
 
     const handleSaveName = () => {
@@ -194,7 +194,7 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
 
     return (
         <div
-            className={`flex-1 min-w-full md:min-w-[300px] border-2 rounded-xl p-2 md:p-4 relative transition-all duration-300 ${isActive ? 'border-emerald-500 bg-emerald-50 shadow-md ring-2 ring-emerald-300' : 'border-dashed border-slate-300 bg-slate-50 opacity-90'}`}
+            className={`flex-1 min-w-full md:min-w-[300px] border-2 rounded-2xl p-4 md:p-6 relative transition-all duration-300 min-h-[50vh] flex flex-col ${isActive ? 'border-emerald-500 bg-emerald-50/80 shadow-xl ring-2 ring-emerald-300' : 'border-dashed border-slate-300 bg-slate-50 opacity-90'}`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={(e) => {
@@ -285,8 +285,8 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
             </div>
 
             {/* Pyramid Render Area */}
-            <div className="flex-1 w-full overflow-x-auto no-scrollbar py-4 px-2 flex justify-start md:justify-center">
-                <div className="flex flex-col-reverse items-center min-h-[120px] md:min-h-[150px] transition-all duration-300 gap-y-1 pb-4 w-max"
+            <div className="flex-1 w-full overflow-x-auto no-scrollbar py-12 px-2 flex justify-start md:justify-center items-center">
+                <div className="flex flex-col-reverse items-center min-h-[120px] md:min-h-[150px] transition-all duration-300 gap-y-4 md:gap-y-1 pb-12 w-max"
                     style={{ height: maxHeight < 5 ? 'auto' : undefined }} // Fluid height if small
                 >
                     {builtLevels.map((levelSlots, levelIndex) => {
@@ -1257,7 +1257,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
 
                     {/* Main Canvas */}
                     <div
-                        className="flex-1 overflow-auto p-1.5 md:p-8 flex items-start justify-center relative no-scrollbar"
+                        className="flex-1 overflow-auto p-2 md:p-8 flex items-center justify-center relative no-scrollbar"
                         style={{
                             backgroundImage: `linear-gradient(to bottom, rgba(241, 245, 249, 0.85), rgba(241, 245, 249, 0.92)), url(/industrial-bg.png)`,
                             backgroundSize: 'cover',
