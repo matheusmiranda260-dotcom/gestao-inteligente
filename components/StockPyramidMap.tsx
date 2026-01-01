@@ -75,13 +75,14 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
         if (menuItemId) setMenuItemId(null);
     };
 
-    // Dynamic Sizing based on baseSize to prevent clipping
+    // Aggressive Dynamic Sizing to FIT mobile screens
     const dims = useMemo(() => {
         // Base sizes for mobile (<640px) vs desktop
-        if (baseSize <= 8) return { slot: 'w-[52px] h-[52px] sm:w-20 sm:h-20 md:w-24 md:h-24', gap: 'gap-x-2', font: 'text-[10px] sm:text-sm md:text-base' };
-        if (baseSize <= 12) return { slot: 'w-[40px] h-[40px] sm:w-16 sm:h-16 md:w-20 md:h-20', gap: 'gap-x-1', font: 'text-[8px] sm:text-xs md:text-sm' };
-        if (baseSize <= 16) return { slot: 'w-[32px] h-[32px] sm:w-14 sm:h-14 md:w-16 md:h-16', gap: 'gap-x-1', font: 'text-[7px] sm:text-[11px] md:text-xs' };
-        return { slot: 'w-[24px] h-[24px] sm:w-11 sm:h-11 md:w-13 md:h-13', gap: 'gap-x-0.5', font: 'text-[6px] sm:text-[9px] md:text-[10px]' };
+        if (baseSize <= 6) return { slot: 'w-[52px] h-[52px] sm:w-24 sm:h-24', gap: 'gap-x-2', font: 'text-[10px] sm:text-base' };
+        if (baseSize <= 9) return { slot: 'w-[42px] h-[42px] sm:w-20 sm:h-20', gap: 'gap-x-1.5', font: 'text-[9px] sm:text-sm' };
+        if (baseSize <= 12) return { slot: 'w-[32px] h-[32px] sm:w-16 sm:h-16', gap: 'gap-x-1', font: 'text-[8px] sm:text-xs' };
+        if (baseSize <= 16) return { slot: 'w-[26px] h-[26px] sm:w-14 sm:h-14', gap: 'gap-x-0.5', font: 'text-[7px] sm:text-[11px]' };
+        return { slot: 'w-[20px] h-[20px] sm:w-11 sm:h-11', gap: 'gap-x-0.5', font: 'text-[6px] sm:text-[9px]' };
     }, [baseSize]);
 
     const handleSaveName = () => {
@@ -1049,41 +1050,41 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
             )}
             {/* Main Header */}
             {/* Main Header - Collapsible on Mobile */}
-            <div className={`bg-[#0F3F5C] p-4 text-white shadow-md z-30 transition-all duration-300 ${isHeaderCollapsed ? 'md:p-4 p-2' : ''}`}>
+            <div className={`bg-[#0F3F5C] text-white shadow-md z-30 transition-all duration-300 ${isHeaderCollapsed ? 'p-1.5 md:p-4' : 'p-3 md:p-4'}`}>
                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition text-white/80 hover:text-white">
-                            <ArrowLeftIcon className="w-6 h-6" />
+                    <div className="flex items-center gap-2 md:gap-3">
+                        <button onClick={onClose} className="p-1.5 hover:bg-white/10 rounded-full transition text-white/80 hover:text-white">
+                            <ArrowLeftIcon className="w-5 h-5 md:w-6 md:h-6" />
                         </button>
                         <div>
-                            <h1 className="text-lg md:text-xl font-bold flex items-center gap-2 leading-none">
-                                <ArchiveIcon className="w-5 h-5 md:w-6 md:h-6" />
+                            <h1 className="text-sm md:text-xl font-bold flex items-center gap-1.5 leading-none">
+                                <ArchiveIcon className="w-4 h-4 md:w-6 md:h-6" />
                                 <span className="hidden sm:inline">Mapeamento de Estoque</span>
                                 <span className="sm:hidden">Estoque</span>
                             </h1>
-                            <div className="md:hidden flex items-center gap-2 mt-1 px-1">
-                                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                                <span className="text-[10px] text-white/60 uppercase font-bold tracking-wider">{activeRow}</span>
+                            <div className="md:hidden flex items-center gap-1.5 mt-0.5 px-0.5">
+                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                                <span className="text-[9px] text-white/60 uppercase font-black tracking-widest">{activeRow}</span>
                             </div>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                         {/* Toggle Controls for Mobile */}
                         <button
                             onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)}
-                            className="md:hidden p-2 bg-white/10 rounded-lg text-white"
+                            className="md:hidden p-1.5 bg-white/10 rounded-lg text-white"
                         >
-                            <SearchIcon className="w-5 h-5" />
+                            <SearchIcon className="w-4 h-4" />
                         </button>
 
                         {/* Rotated Landscape Toggle */}
                         <button
                             onClick={() => setForceLandscape(!forceLandscape)}
-                            className={`p-2 rounded-lg font-bold text-xs flex items-center gap-1 transition ${forceLandscape ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white'}`}
+                            className={`p-1.5 rounded-lg font-bold text-[10px] flex items-center gap-1 transition ${forceLandscape ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white'}`}
                             title="Girar Tela"
                         >
-                            <ChartBarIcon className="w-5 h-5 rotate-90" />
+                            <ChartBarIcon className="w-4 h-4 rotate-90" />
                             <span className="hidden sm:inline">{forceLandscape ? 'Normal' : 'Girar'}</span>
                         </button>
                     </div>
@@ -1161,7 +1162,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                                     key={rName}
                                     onClick={() => setActiveRow(rName)}
                                     className={`
-                                        relative group flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-bold transition-all whitespace-nowrap
+                                        relative group flex items-center gap-1 px-3 py-1.5 rounded-full border text-[11px] md:text-sm font-black transition-all whitespace-nowrap
                                         ${isSelected
                                             ? 'bg-slate-800 text-white border-slate-800 shadow-md transform scale-105 z-10'
                                             : 'bg-white text-slate-500 border-slate-200 hover:border-emerald-400 hover:text-emerald-600'
@@ -1169,7 +1170,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                                     `}
                                 >
                                     {rName}
-                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-600'}`}>{count}</span>
+                                    <span className={`text-[9px] px-1 py-0.5 rounded-full ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-600'}`}>{count}</span>
                                 </button>
                             )
                         })}
