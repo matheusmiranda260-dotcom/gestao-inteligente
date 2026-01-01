@@ -77,10 +77,11 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
 
     // Dynamic Sizing based on baseSize to prevent clipping
     const dims = useMemo(() => {
-        if (baseSize <= 8) return { slot: 'w-[64px] h-[64px] sm:w-20 sm:h-20 md:w-24 md:h-24', gap: 'gap-x-2', font: 'text-[11px] sm:text-sm md:text-base' };
-        if (baseSize <= 12) return { slot: 'w-[58px] h-[58px] sm:w-16 sm:h-16 md:w-20 md:h-20', gap: 'gap-x-1.5', font: 'text-[10px] sm:text-xs md:text-sm' };
-        if (baseSize <= 16) return { slot: 'w-[48px] h-[48px] sm:w-14 sm:h-14 md:w-16 md:h-16', gap: 'gap-x-1', font: 'text-[9px] sm:text-[11px] md:text-xs' };
-        return { slot: 'w-[42px] h-[42px] sm:w-11 sm:h-11 md:w-13 md:h-13', gap: 'gap-x-1', font: 'text-[8px] sm:text-[9px] md:text-[10px]' };
+        // Base sizes for mobile (<640px) vs desktop
+        if (baseSize <= 8) return { slot: 'w-[52px] h-[52px] sm:w-20 sm:h-20 md:w-24 md:h-24', gap: 'gap-x-2', font: 'text-[10px] sm:text-sm md:text-base' };
+        if (baseSize <= 12) return { slot: 'w-[40px] h-[40px] sm:w-16 sm:h-16 md:w-20 md:h-20', gap: 'gap-x-1', font: 'text-[8px] sm:text-xs md:text-sm' };
+        if (baseSize <= 16) return { slot: 'w-[32px] h-[32px] sm:w-14 sm:h-14 md:w-16 md:h-16', gap: 'gap-x-1', font: 'text-[7px] sm:text-[11px] md:text-xs' };
+        return { slot: 'w-[24px] h-[24px] sm:w-11 sm:h-11 md:w-13 md:h-13', gap: 'gap-x-0.5', font: 'text-[6px] sm:text-[9px] md:text-[10px]' };
     }, [baseSize]);
 
     const handleSaveName = () => {
@@ -283,7 +284,7 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
             </div>
 
             {/* Pyramid Render Area */}
-            <div className="flex-1 w-full overflow-x-auto no-scrollbar py-8 px-4 flex justify-center">
+            <div className="flex-1 w-full overflow-x-auto no-scrollbar py-8 px-4 flex justify-start md:justify-center">
                 <div className="flex flex-col-reverse items-center min-h-[120px] md:min-h-[150px] transition-all duration-300 gap-y-1 pb-4 w-max"
                     style={{ height: maxHeight < 5 ? 'auto' : undefined }} // Fluid height if small
                 >
@@ -382,7 +383,7 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
 
                                                 {/* Content Overlay */}
                                                 <div className="relative z-20 text-center leading-none drop-shadow-md pointer-events-none">
-                                                    <div className="bg-white/90 px-1 rounded-sm text-[8px] sm:text-[9px] md:text-[10px] font-bold text-slate-900 border border-slate-300 mb-0.5 whitespace-nowrap overflow-hidden max-w-[44px] sm:max-w-[54px] md:max-w-[64px] text-ellipsis">
+                                                    <div className="bg-white/90 px-1 rounded-sm text-[8px] sm:text-[9px] md:text-[10px] font-bold text-slate-900 border border-slate-300 mb-0.5 whitespace-nowrap overflow-hidden max-w-[90%] text-ellipsis">
                                                         {slot.item.internalLot}
                                                     </div>
                                                     <div className={`${dims.font} text-white font-mono font-bold tracking-tighter`}>
@@ -964,7 +965,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
     const [forceLandscape, setForceLandscape] = useState(false);
 
     return (
-        <div className={`fixed inset-0 bg-slate-100 z-40 md:static md:z-0 md:h-[calc(100vh-140px)] md:w-full md:rounded-xl md:border md:border-slate-200 md:shadow-lg flex flex-col animate-fadeIn transition-all duration-500 ${forceLandscape ? 'w-[100vh] h-[100vw] rotate-90 origin-center absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2' : ''}`}>
+        <div className={`fixed inset-0 bg-slate-100 z-50 md:static md:z-0 md:h-[calc(100vh-140px)] md:w-full md:rounded-xl md:border md:border-slate-200 md:shadow-lg flex flex-col animate-fadeIn transition-all duration-500 ${forceLandscape ? 'w-[100vh] h-[100vw] rotate-90 origin-center absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2' : ''}`}>
             {/* Fullscreen Landscape Overlay (Row Specific) - Hide if global landscape is on? Or keep? Keep. */}
             {landscapeRow && (
                 <div className="fixed inset-0 z-[60] bg-slate-900 text-white flex items-center justify-center overflow-hidden">
