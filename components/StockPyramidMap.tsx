@@ -401,8 +401,17 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                                     </div>
                                                 </div>
 
-                                                {isSwapTarget && (
-                                                    <div className={`absolute inset-0 flex items-center justify-center bg-amber-500/40 ${shapeClass} animate-pulse pointer-events-none z-30 ring-4 ring-amber-400`}>
+                                                {movingItem && movingItem.id !== slot.item.id && (
+                                                    <div
+                                                        className={`absolute inset-0 flex items-center justify-center bg-amber-500/40 ${shapeClass} animate-pulse cursor-pointer z-30 ring-4 ring-amber-400`}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            // SWAP logic: just move here, the old item will float or we could swap locations.
+                                                            // For now, simpler: move current to this slot's coordinates.
+                                                            const targetLoc = `${rowName}:L${slot.coords.l}:P${slot.coords.p}`;
+                                                            onDrop({ ...movingItem, location: targetLoc });
+                                                        }}
+                                                    >
                                                         <span className="text-xl font-bold text-white drop-shadow-md">⇄</span>
                                                     </div>
                                                 )}
@@ -424,7 +433,13 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                                 onDrop={(e) => handleSlotDrop(e, slot.coords.l, slot.coords.p)}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    if (onSlotClick) onSlotClick(slot.coords.l, slot.coords.p);
+                                                    // Move functionality: If there's an item to move, drop it here!
+                                                    if (movingItem) {
+                                                        const targetLoc = `${rowName}:L${slot.coords.l}:P${slot.coords.p}`;
+                                                        onDrop({ ...movingItem, location: targetLoc });
+                                                    } else if (onSlotClick) {
+                                                        onSlotClick(slot.coords.l, slot.coords.p);
+                                                    }
                                                 }}
                                                 title={isSlotActive ? 'Vaga SELECIONADA' : `Vazio (L${slot.coords.l}:P${slot.coords.p})`}
                                             >
