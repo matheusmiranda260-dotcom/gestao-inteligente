@@ -78,11 +78,11 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
     // Aggressive Dynamic Sizing to FIT mobile screens
     const dims = useMemo(() => {
         // Base sizes for mobile (<640px) vs desktop
-        if (baseSize <= 6) return { slot: 'w-[52px] h-[52px] sm:w-24 sm:h-24', gap: 'gap-x-2', font: 'text-[10px] sm:text-base' };
-        if (baseSize <= 9) return { slot: 'w-[42px] h-[42px] sm:w-20 sm:h-20', gap: 'gap-x-1.5', font: 'text-[9px] sm:text-sm' };
-        if (baseSize <= 12) return { slot: 'w-[32px] h-[32px] sm:w-16 sm:h-16', gap: 'gap-x-1', font: 'text-[8px] sm:text-xs' };
-        if (baseSize <= 16) return { slot: 'w-[26px] h-[26px] sm:w-14 sm:h-14', gap: 'gap-x-0.5', font: 'text-[7px] sm:text-[11px]' };
-        return { slot: 'w-[20px] h-[20px] sm:w-11 sm:h-11', gap: 'gap-x-0.5', font: 'text-[6px] sm:text-[9px]' };
+        if (baseSize <= 6) return { slot: 'w-[48px] h-[48px] sm:w-24 sm:h-24', gap: 'gap-x-1.5', font: 'text-[9px] sm:text-base' };
+        if (baseSize <= 9) return { slot: 'w-[36px] h-[36px] sm:w-20 sm:h-20', gap: 'gap-x-1', font: 'text-[8px] sm:text-sm' };
+        if (baseSize <= 12) return { slot: 'w-[28px] h-[28px] sm:w-16 sm:h-16', gap: 'gap-x-1', font: 'text-[7px] sm:text-xs' };
+        if (baseSize <= 15) return { slot: 'w-[22px] h-[22px] sm:w-14 sm:h-14', gap: 'gap-x-0.5', font: 'text-[6px] sm:text-[11px]' };
+        return { slot: 'w-[18px] h-[18px] sm:w-11 sm:h-11', gap: 'gap-x-0.5', font: 'text-[5px] sm:text-[9px]' };
     }, [baseSize]);
 
     const handleSaveName = () => {
@@ -285,7 +285,7 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
             </div>
 
             {/* Pyramid Render Area */}
-            <div className="flex-1 w-full overflow-x-auto no-scrollbar py-8 px-4 flex justify-start md:justify-center">
+            <div className="flex-1 w-full overflow-x-auto no-scrollbar py-4 px-2 flex justify-start md:justify-center">
                 <div className="flex flex-col-reverse items-center min-h-[120px] md:min-h-[150px] transition-all duration-300 gap-y-1 pb-4 w-max"
                     style={{ height: maxHeight < 5 ? 'auto' : undefined }} // Fluid height if small
                 >
@@ -1131,7 +1131,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
             {/* New Layout: Top Bar (Tabs) + Main Content (Single Row) */}
             <div className="flex flex-col h-full overflow-hidden bg-slate-50">
                 {/* Top Tab Bar & Actions */}
-                <div className="bg-white border-b flex items-center gap-2 px-4 py-2 min-h-[3rem] md:min-h-[3.5rem] shrink-0 shadow-sm z-30 h-auto">
+                <div className="bg-white border-b flex items-center gap-1.5 px-2 py-1.5 min-h-[2.5rem] md:min-h-[3.5rem] shrink-0 shadow-sm z-30 h-auto overflow-x-auto no-scrollbar">
 
                     {/* Pending Items FAB - Clean Mobile View (only visible if header is collapsed) */}
                     <button
@@ -1162,7 +1162,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                                     key={rName}
                                     onClick={() => setActiveRow(rName)}
                                     className={`
-                                        relative group flex items-center gap-1 px-3 py-1.5 rounded-full border text-[11px] md:text-sm font-black transition-all whitespace-nowrap
+                                        relative group flex items-center gap-1 px-2 py-1 rounded-full border text-[10px] md:text-sm font-black transition-all whitespace-nowrap
                                         ${isSelected
                                             ? 'bg-slate-800 text-white border-slate-800 shadow-md transform scale-105 z-10'
                                             : 'bg-white text-slate-500 border-slate-200 hover:border-emerald-400 hover:text-emerald-600'
@@ -1170,7 +1170,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                                     `}
                                 >
                                     {rName}
-                                    <span className={`text-[9px] px-1 py-0.5 rounded-full ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-600'}`}>{count}</span>
+                                    <span className={`text-[8px] px-1 py-0.5 rounded-full ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-600'}`}>{count}</span>
                                 </button>
                             )
                         })}
