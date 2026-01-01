@@ -21,9 +21,10 @@ interface PyramidRowProps {
     onPrintRow: () => void;
     config?: RowConfig;
     onUpdateConfig?: (rowName: string, baseSize: number, maxHeight: number) => void;
+    onMoveItem?: (item: StockItem) => void; // Dedicated move callback
 }
 
-const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemove, onRemoveRow, isActive, onSetActive, onItemClick, onExpand, activeSlot, onSlotClick, movingItem, onRenameRow, onPrintRow, config, onUpdateConfig }) => {
+const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemove, onRemoveRow, isActive, onSetActive, onItemClick, onExpand, activeSlot, onSlotClick, movingItem, onRenameRow, onPrintRow, config, onUpdateConfig, onMoveItem }) => {
 
     // Determine type for visual logic (defined early for use in render)
     const isCARow = rowName.includes('CA') && !rowName.includes('50') && !rowName.includes('Fio');
@@ -329,9 +330,40 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                                 }}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
+                                                    // Desktop logic
+                                                    setMenuItemId(menuItemId === slot.item!.id ? null : slot.item!.id);
+                                                    // Mobile logic (parent handles bottom sheet)
                                                     if (onItemClick) onItemClick(slot.item!);
                                                 }}
                                             >
+                                                {/* Desktop Context Menu (Hidden on Mobile) */}
+                                                {isMenuOpen && (
+                                                    <div
+                                                        className="hidden md:flex absolute z-[100] bottom-full left-1/2 -translate-x-1/2 mb-4 w-40 bg-white rounded-2xl shadow-2xl p-2 flex-col gap-1.5 border border-slate-100 animate-in slide-in-from-bottom-2 fade-in duration-200"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        <div className="text-[10px] font-black text-center text-slate-400 border-b border-slate-100 pb-2 mb-1 tracking-wider uppercase">
+                                                            LOTE {slot.item.internalLot}
+                                                        </div>
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); if (onMoveItem) onMoveItem(slot.item!); setMenuItemId(null); }}
+                                                            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold px-3 py-2.5 rounded-xl w-full flex items-center justify-between transition-all active:scale-95 group"
+                                                        >
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-base">✋</span>
+                                                                <span>Mover Lote</span>
+                                                            </div>
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400"></div>
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); onRemove(slot.item!); setMenuItemId(null); }}
+                                                            className="bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold px-3 py-2.5 rounded-xl w-full flex items-center justify-between transition-all active:scale-95 group"
+                                                        >
+                                                            <span>🗑️ Remover</span>
+                                                        </button>
+                                                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-[8px] border-transparent border-t-white"></div>
+                                                    </div>
+                                                )}
 
                                                 {/* Standard Coil Content (Always Visible, with z-index separation if menu open) */}
                                                 <div
@@ -415,7 +447,7 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                                         background: !isCARow
                                                             ? 'repeating-radial-gradient(circle at 50% 50%, rgba(0,0,0,0.1) 0, rgba(0,0,0,0.1) 2px, rgba(0,0,0,0.15) 3px, rgba(0,0,0,0.2) 4px)'
                                                             : 'rgba(0,0,0,0.05)',
-                                                        boxShadow: isSlotActive ? 'none' : 'inset 0 0 10px rgba(0,0,0,0.1)'
+                                                        boxShadow: isSlotActive && window.innerWidth < 768 ? 'none' : 'inset 0 0 10px rgba(0,0,0,0.1)'
                                                     }}
                                                 ></div>
 
@@ -1308,6 +1340,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                                         movingItem={itemToMove}
                                         onPrintRow={() => setPrintRowName(targetRowName)}
                                         onUpdateConfig={handleUpdateRowConfig}
+                                        onMoveItem={(item) => setItemToMove(item)}
                                     />
 
                                     {itemsForThisRow.length === 0 && (
