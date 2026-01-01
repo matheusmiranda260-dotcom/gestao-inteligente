@@ -1,15 +1,18 @@
 import React, { useState, useMemo } from 'react';
 import type { StockItem, Page, TransferRecord, MaterialType, Bitola } from '../types';
 import { MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions } from '../types';
-import { ArrowLeftIcon, TruckIcon, CalculatorIcon, CheckCircleIcon, ExclamationIcon } from './icons';
+import { ArrowLeftIcon, TruckIcon, CalculatorIcon, CheckCircleIcon, ExclamationIcon, ClipboardListIcon } from './icons';
+import TransfersHistoryModal from './TransfersHistoryModal';
+import TransferReport from './TransferReport';
 
 interface StockTransferProps {
     stock: StockItem[];
+    transfers: TransferRecord[];
     setPage: (page: Page) => void;
     createTransfer: (destinationSector: string, lotsToTransfer: Map<string, number>) => TransferRecord | null;
 }
 
-const StockTransfer: React.FC<StockTransferProps> = ({ stock, setPage, createTransfer }) => {
+const StockTransfer: React.FC<StockTransferProps> = ({ stock, transfers, setPage, createTransfer }) => {
     const [destinationSector, setDestinationSector] = useState('Coluna');
 
     interface TransferRequest {
@@ -18,6 +21,9 @@ const StockTransfer: React.FC<StockTransferProps> = ({ stock, setPage, createTra
         bitola: Bitola | '';
         targetWeight: number;
     }
+
+    const [transferHistoryOpen, setTransferHistoryOpen] = useState(false);
+    const [transferReportData, setTransferReportData] = useState<TransferRecord | null>(null);
 
     const [requests, setRequests] = useState<TransferRequest[]>([
         { id: Date.now().toString(), materialType: '', bitola: '', targetWeight: 0 }
@@ -28,6 +34,9 @@ const StockTransfer: React.FC<StockTransferProps> = ({ stock, setPage, createTra
     const [isSuggestionCalculated, setIsSuggestionCalculated] = useState(false);
 
     const allBitolaOptions = useMemo(() => [...new Set([...FioMaquinaBitolaOptions, ...TrefilaBitolaOptions])].sort(), []);
+
+    const [selectionMode, setSelectionMode] = useState<'full' | 'exact'>('full');
+    const [recommendedMode, setRecommendedMode] = useState<'full' | 'exact' | null>(null);
 
     const addRequest = () => {
         setRequests([...requests, { id: Date.now().toString(), materialType: '', bitola: '', targetWeight: 0 }]);
@@ -44,6 +53,111 @@ const StockTransfer: React.FC<StockTransferProps> = ({ stock, setPage, createTra
         setRequests(newRequests);
     };
 
+    // Helper function to simulate lot selection based on a given mode
+    const simulateSelection = (mode: 'full' | 'exact', currentRequests: TransferRequest[], currentStock: StockItem[]) => {
+        let totalWeightAchieved = 0;
+        const simUsage = new Map<string, number>(); // Track lot usage across requests for simulation
+
+        currentRequests.forEach(req => {
+            const candidates = currentStock.filter(item =>
+                (item.status === 'Disponível' || item.status === 'Disponível - Suporte Treliça') &&
+                item.materialType === req.materialType &&
+                item.bitola === req.bitola
+            );
+            candidates.sort((a, b) => new Date(a.entryDate).getTime() - new Date(b.entryDate).getTime());
+
+            let currentRequestAccumulated = 0;
+
+            for (const lot of candidates) {
+                const used = simUsage.get(lot.id) || 0;
+                const available = lot.remainingQuantity - used;
+                if (available <= 0.01) continue;
+
+                const fullLotQty = available; // Always take full lot for simulation
+
+                if (mode === 'full') {
+                    // 'Para Cima' mode: Keep taking full lots until target is met or exceeded
+                    // We take the lot if we still need some quantity, even if it exceeds the target
+                    if (currentRequestAccumulated < req.targetWeight + 0.01) { // Check if we still need more or are just slightly over
+                        currentRequestAccumulated += fullLotQty;
+                        simUsage.set(lot.id, used + fullLotQty);
+                    }
+                } else { // mode === 'exact'
+                    // 'Para Baixo' mode: Keep taking full lots ONLY if the total accumulated does not exceed the target
+                    if (currentRequestAccumulated + fullLotQty <= req.targetWeight + 0.01) {
+                        currentRequestAccumulated += fullLotQty;
+                        simUsage.set(lot.id, used + fullLotQty);
+                    } else {
+                        // If adding this lot would exceed the target, stop for this request
+                        break;
+                    }
+                }
+            }
+            totalWeightAchieved += currentRequestAccumulated;
+        });
+        return totalWeightAchieved;
+    };
+
+    // Helper function to generate the actual suggestedLots array based on a given mode
+    const generateSuggestions = (mode: 'full' | 'exact') => {
+        const suggestion: { requestIndex: number; lot: StockItem; suggestQty: number; selected: boolean }[] = [];
+        const stockUsage = new Map<string, number>(); // Track actual lot usage for the displayed suggestion
+
+        requests.forEach((req, index) => {
+            const candidates = stock.filter(item =>
+                (item.status === 'Disponível' || item.status === 'Disponível - Suporte Treliça') &&
+                item.materialType === req.materialType &&
+                item.bitola === req.bitola
+            );
+            candidates.sort((a, b) => new Date(a.entryDate).getTime() - new Date(b.entryDate).getTime());
+
+            let currentRequestAccumulated = 0;
+
+            for (const lot of candidates) {
+                const alreadyUsed = stockUsage.get(lot.id) || 0;
+                const availableInLot = lot.remainingQuantity - alreadyUsed;
+                if (availableInLot <= 0.01) continue;
+
+                let qtyToTake = 0;
+                let selected = false;
+                const fullLotQty = availableInLot; // Always consider taking the full lot
+
+                if (mode === 'full') {
+                    // 'Para Cima' logic: Take if we still need more (even if it exceeds)
+                    if (currentRequestAccumulated < req.targetWeight + 0.01) {
+                        qtyToTake = fullLotQty;
+                        selected = true;
+                        currentRequestAccumulated += qtyToTake;
+                    }
+                } else { // mode === 'exact'
+                    // 'Para Baixo' logic: Take ONLY if it fits under target
+                    if (currentRequestAccumulated + fullLotQty <= req.targetWeight + 0.01) {
+                        qtyToTake = fullLotQty;
+                        selected = true;
+                        currentRequestAccumulated += qtyToTake;
+                    }
+                }
+
+                // If not selected by the mode logic, it's still a candidate but with 0 qty and not selected
+                if (!selected) {
+                    qtyToTake = 0;
+                }
+
+                suggestion.push({
+                    requestIndex: index,
+                    lot,
+                    suggestQty: qtyToTake,
+                    selected: selected
+                });
+
+                if (selected) {
+                    stockUsage.set(lot.id, alreadyUsed + fullLotQty);
+                }
+            }
+        });
+        setSuggestedLots(suggestion);
+    };
+
     const calculateSuggestion = () => {
         // Validate
         for (const req of requests) {
@@ -53,56 +167,40 @@ const StockTransfer: React.FC<StockTransferProps> = ({ stock, setPage, createTra
             }
         }
 
-        const suggestion: { requestIndex: number; lot: StockItem; suggestQty: number; selected: boolean }[] = [];
-        const stockUsage = new Map<string, number>(); // track consumption of lotId -> amount used
+        // --- Simulation Phase to determine recommended mode ---
+        const sumTarget = requests.reduce((acc, r) => acc + r.targetWeight, 0);
 
-        requests.forEach((req, index) => {
-            // 1. Filter available candidates matching this request
-            const candidates = stock.filter(item =>
-                (item.status === 'Disponível' || item.status === 'Disponível - Suporte Treliça') &&
-                item.materialType === req.materialType &&
-                item.bitola === req.bitola
-            );
+        const sumAchievedFull = simulateSelection('full', requests, stock);
+        const sumAchievedExact = simulateSelection('exact', requests, stock);
 
-            // 2. Sort by Entry Date (FIFO) - Oldest first
-            candidates.sort((a, b) => new Date(a.entryDate).getTime() - new Date(b.entryDate).getTime());
+        const diffFull = Math.abs(sumAchievedFull - sumTarget);
+        const diffExact = Math.abs(sumTarget - sumAchievedExact); // For 'exact', we care about being under or as close as possible without going over
 
-            let remainingNeeded = req.targetWeight;
+        const bestMode = diffFull <= diffExact ? 'full' : 'exact';
+        setRecommendedMode(bestMode);
 
-            for (const lot of candidates) {
-                if (remainingNeeded <= 0) break;
-
-                const alreadyUsed = stockUsage.get(lot.id) || 0;
-                const availableInLot = lot.remainingQuantity - alreadyUsed;
-
-                if (availableInLot <= 0.01) continue; // Skip if empty or fully used
-
-                const qtyToTake = Math.min(availableInLot, remainingNeeded);
-
-                suggestion.push({
-                    requestIndex: index,
-                    lot,
-                    suggestQty: qtyToTake,
-                    selected: true
-                });
-
-                // Update usage tracking
-                stockUsage.set(lot.id, alreadyUsed + qtyToTake);
-                remainingNeeded -= qtyToTake;
-            }
-        });
-
-        setSuggestedLots(suggestion);
+        // Set the selection mode to the recommended one and generate suggestions
+        setSelectionMode(bestMode);
+        generateSuggestions(bestMode);
         setIsSuggestionCalculated(true);
     };
 
     const handleConfirmTransfer = () => {
         const lotsMap = new Map<string, number>();
 
-        // Aggregate all selections per lot (in case multiple requests use the same lot, though FIFO logic usually splits cleanly, but aggregation is safer)
+        // Aggregate all selections
         suggestedLots.filter(s => s.selected).forEach(s => {
+            // Use the displayed suggestQty (which user might have edited, or auto-calc)
+            // If user manually selected a disabled row, suggestQty might be 0?
+            // We should ensure if 'selected' is true, qty is valid.
+            let finalQty = s.suggestQty;
+            if (finalQty <= 0) {
+                // Fallback: If selected but 0, take full available (or remaining of lot)
+                finalQty = s.lot.remainingQuantity; // Simplification
+            }
+
             const currentQty = lotsMap.get(s.lot.id) || 0;
-            lotsMap.set(s.lot.id, currentQty + s.suggestQty);
+            lotsMap.set(s.lot.id, currentQty + finalQty);
         });
 
         if (lotsMap.size === 0) {
@@ -118,20 +216,37 @@ const StockTransfer: React.FC<StockTransferProps> = ({ stock, setPage, createTra
         }
     };
 
+    const handleModeSwitch = (mode: 'full' | 'exact') => {
+        setSelectionMode(mode);
+        if (isSuggestionCalculated) {
+            // If suggestions have already been calculated, re-apply the selection logic
+            generateSuggestions(mode);
+        }
+    };
+
     // Calculate total weight to confirm matches across all requests
     const totalTargetWeight = requests.reduce((acc, req) => acc + req.targetWeight, 0);
-    const totalSelectedWeight = suggestedLots.filter(s => s.selected).reduce((acc, s) => acc + s.suggestQty, 0);
+    const totalSelectedWeight = suggestedLots.filter(s => s.selected).reduce((acc, s) => acc + (s.suggestQty > 0 ? s.suggestQty : s.lot.remainingQuantity), 0);
 
     return (
         <div className="min-h-screen bg-slate-50 p-4 md:p-8 space-y-6">
-            <div className="flex items-center gap-4 mb-6">
-                <button onClick={() => setPage('menu')} className="bg-white p-2 rounded-full shadow-sm hover:bg-slate-100 transition text-slate-700">
-                    <ArrowLeftIcon className="h-6 w-6" />
-                </button>
-                <div>
-                    <h1 className="text-3xl font-bold text-slate-800">Transferência Inteligente</h1>
-                    <p className="text-slate-500 text-sm">Transferência FIFO multi-material.</p>
+            <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center gap-4">
+                    <button onClick={() => setPage('menu')} className="bg-white p-2 rounded-full shadow-sm hover:bg-slate-100 transition text-slate-700">
+                        <ArrowLeftIcon className="h-6 w-6" />
+                    </button>
+                    <div>
+                        <h1 className="text-3xl font-bold text-slate-800">Transferência Inteligente</h1>
+                        <p className="text-slate-500 text-sm">Transferência FIFO multi-material.</p>
+                    </div>
                 </div>
+                <button
+                    onClick={() => setTransferHistoryOpen(true)}
+                    className="flex items-center gap-2 bg-white text-slate-700 font-semibold py-2 px-4 rounded-lg shadow-sm border border-slate-200 hover:bg-slate-50 transition-colors"
+                >
+                    <ClipboardListIcon className="h-5 w-5 text-slate-500" />
+                    Transferências Feitas
+                </button>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -161,8 +276,38 @@ const StockTransfer: React.FC<StockTransferProps> = ({ stock, setPage, createTra
 
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                         <h2 className="text-lg font-bold text-[#0F3F5C] mb-4 flex items-center gap-2">
-                            <CalculatorIcon className="h-5 w-5" /> Lista de Materiais
+                            <CalculatorIcon className="h-5 w-5" /> Parâmetros
                         </h2>
+
+                        <div className="mb-6 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                            <label className="block text-xs font-bold text-slate-500 mb-2 uppercase">Modo de Sugestão</label>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => handleModeSwitch('full')}
+                                    className={`relative flex-1 py-3 px-2 text-xs font-bold rounded-md transition-all ${selectionMode === 'full' ? 'bg-[#0F3F5C] text-white shadow-md ring-2 ring-[#0F3F5C] ring-offset-1' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'}`}
+                                >
+                                    {recommendedMode === 'full' && (
+                                        <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-amber-400 text-amber-900 text-[9px] px-2 py-0.5 rounded-full font-extrabold shadow-sm whitespace-nowrap z-10">
+                                            MELHOR OPÇÃO
+                                        </div>
+                                    )}
+                                    Para Cima
+                                    <span className="block text-[9px] opacity-80 font-normal mt-0.5">Maior que Meta</span>
+                                </button>
+                                <button
+                                    onClick={() => handleModeSwitch('exact')}
+                                    className={`relative flex-1 py-3 px-2 text-xs font-bold rounded-md transition-all ${selectionMode === 'exact' ? 'bg-[#0F3F5C] text-white shadow-md ring-2 ring-[#0F3F5C] ring-offset-1' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'}`}
+                                >
+                                    {recommendedMode === 'exact' && (
+                                        <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-amber-400 text-amber-900 text-[9px] px-2 py-0.5 rounded-full font-extrabold shadow-sm whitespace-nowrap z-10">
+                                            MELHOR OPÇÃO
+                                        </div>
+                                    )}
+                                    Para Baixo
+                                    <span className="block text-[9px] opacity-80 font-normal mt-0.5">Menor que Meta</span>
+                                </button>
+                            </div>
+                        </div>
 
                         <div className="space-y-6">
                             {requests.map((req, index) => (
@@ -266,7 +411,7 @@ const StockTransfer: React.FC<StockTransferProps> = ({ stock, setPage, createTra
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
                                             {suggestedLots.map((item, idx) => (
-                                                <tr key={`${item.lot.id}-${idx}`} className="hover:bg-slate-50">
+                                                <tr key={`${item.lot.id}-${idx}`} className={`hover:bg-slate-50 ${item.selected ? 'bg-blue-50/20' : ''}`}>
                                                     <td className="p-3">
                                                         <div className="font-bold text-slate-700">{item.lot.materialType}</div>
                                                         <div className="text-xs text-slate-500">{item.lot.bitola}mm</div>
@@ -274,8 +419,21 @@ const StockTransfer: React.FC<StockTransferProps> = ({ stock, setPage, createTra
                                                     <td className="p-3 text-slate-500">{new Date(item.lot.entryDate).toLocaleDateString('pt-BR')}</td>
                                                     <td className="p-3 font-medium text-[#0F3F5C]">{item.lot.internalLot}</td>
                                                     <td className="p-3 text-right text-slate-400">{item.lot.remainingQuantity.toFixed(2)}</td>
-                                                    <td className="p-3 text-right font-bold text-[#0F3F5C] bg-blue-50/50 rounded-lg">
-                                                        {item.suggestQty.toFixed(2)}
+                                                    <td className="p-3 text-right">
+                                                        <input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={item.suggestQty > 0 ? item.suggestQty : ''}
+                                                            placeholder={item.selected && item.suggestQty === 0 ? item.lot.remainingQuantity.toFixed(2) : '0.00'}
+                                                            disabled={!item.selected}
+                                                            onChange={(e) => {
+                                                                const val = parseFloat(e.target.value);
+                                                                const newSuggestions = [...suggestedLots];
+                                                                newSuggestions[idx].suggestQty = isNaN(val) ? 0 : val;
+                                                                setSuggestedLots(newSuggestions);
+                                                            }}
+                                                            className={`w-24 p-1 text-right border rounded bg-white font-bold ${item.selected ? 'text-[#0F3F5C] border-blue-200' : 'text-slate-300 border-slate-100'}`}
+                                                        />
                                                     </td>
                                                     <td className="p-3 text-center">
                                                         <input
@@ -284,6 +442,10 @@ const StockTransfer: React.FC<StockTransferProps> = ({ stock, setPage, createTra
                                                             onChange={e => {
                                                                 const newSuggestions = [...suggestedLots];
                                                                 newSuggestions[idx].selected = e.target.checked;
+                                                                // If manually selected and 0, autofill full amount
+                                                                if (e.target.checked && newSuggestions[idx].suggestQty === 0) {
+                                                                    newSuggestions[idx].suggestQty = item.lot.remainingQuantity;
+                                                                }
                                                                 setSuggestedLots(newSuggestions);
                                                             }}
                                                             className="h-5 w-5 text-[#0F3F5C] rounded focus:ring-[#0F3F5C]"
@@ -321,6 +483,8 @@ const StockTransfer: React.FC<StockTransferProps> = ({ stock, setPage, createTra
                     )}
                 </div>
             </div>
+            {transferHistoryOpen && <TransfersHistoryModal transfers={transfers} onClose={() => setTransferHistoryOpen(false)} onShowReport={setTransferReportData} />}
+            {transferReportData && <TransferReport reportData={transferReportData} onClose={() => setTransferReportData(null)} />}
         </div>
     );
 };

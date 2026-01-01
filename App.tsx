@@ -338,7 +338,7 @@ const App: React.FC = () => {
             const newStockItems: StockItem[] = data.lots.map(lot => ({
                 id: generateId('STOCK'),
                 entryDate: data.entryDate,
-                supplier: data.supplier,
+                supplier: lot.supplier || data.supplier,
                 nfe: data.nfe,
                 conferenceNumber: data.conferenceNumber,
                 internalLot: lot.internalLot,
@@ -552,7 +552,7 @@ const App: React.FC = () => {
         }
 
         const newTransferRecord: TransferRecord = {
-            id: generateId('transf-mp'),
+            id: String(transfers.length + 1),
             date: new Date().toISOString(),
             operator: currentUser.username,
             destinationSector,
@@ -1557,7 +1557,7 @@ const App: React.FC = () => {
             case 'stock_map': return <StockControl stock={stock} conferences={conferences} transfers={transfers} setPage={setPage} addConference={addConference} deleteStockItem={deleteStockItem} updateStockItem={(item) => updateStockItem(item.id, item)} createTransfer={createTransfer} editConference={editConference} deleteConference={deleteConference} productionOrders={productionOrders} initialView="map" />;
             case 'stock_add': return <StockControl stock={stock} conferences={conferences} transfers={transfers} setPage={setPage} addConference={addConference} deleteStockItem={deleteStockItem} updateStockItem={(item) => updateStockItem(item.id, item)} createTransfer={createTransfer} editConference={editConference} deleteConference={deleteConference} productionOrders={productionOrders} initialView="add" />;
             case 'stock_inventory': return <StockInventory stock={stock} setPage={setPage} />;
-            case 'stock_transfer': return <StockTransfer stock={stock} setPage={setPage} createTransfer={createTransfer} />;
+            case 'stock_transfer': return <StockTransfer stock={stock} transfers={transfers} setPage={setPage} createTransfer={createTransfer} />;
             case 'trefila': return <MachineControl machineType="Trefila" {...mcProps} />;
             case 'trelica': return <MachineControl machineType="Treliça" {...mcProps} />;
             case 'machineSelection': return <MachineSelection setPage={setPage} />;

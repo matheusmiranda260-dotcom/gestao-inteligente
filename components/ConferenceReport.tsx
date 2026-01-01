@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import type { ConferenceData } from '../types';
 import { PrinterIcon } from './icons';
 
@@ -13,8 +14,8 @@ const ConferenceReport: React.FC<ConferenceReportProps> = ({ reportData, onClose
   const difference = totalScaleWeight - totalLabelWeight;
   const differencePercentage = totalLabelWeight > 0 ? ((difference / totalLabelWeight) * 100) : 0;
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 print-modal-container">
+  return createPortal(
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[9999] print-modal-container">
       <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-5xl max-h-[95vh] flex flex-col print-modal-content">
         {/* Header with actions */}
         <div className="flex justify-between items-center mb-4 pb-4 border-b border-[#0F3F5C]/20 no-print">
@@ -38,121 +39,127 @@ const ConferenceReport: React.FC<ConferenceReportProps> = ({ reportData, onClose
         </div>
 
         {/* Printable Content */}
-        <div className="overflow-y-auto print-section bg-white">
-          <div className="p-6">
-            {/* Professional Header with MSM Logo */}
-            <div className="flex items-start justify-end mb-8 pb-6 border-b-2 border-[#0F3F5C]">
-              <div className="text-right">
-                <p className="text-2xl font-bold text-[#0F3F5C] mb-1">ENTRADA DE MATERIAL</p>
-                <p className="text-sm text-slate-600">
-                  <span className="font-semibold">Data de emissão:</span><br />
-                  {new Date().toLocaleString('pt-BR', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
-                </p>
+        <div className="overflow-y-auto print-section bg-white flex flex-col h-full font-sans text-black">
+          <div className="p-4 w-full h-full flex flex-col">
+
+            {/* 1. Centered Title */}
+            <h1 className="text-xl md:text-2xl font-bold text-black uppercase text-center mb-6 tracking-wide">
+              CONFERÊNCIA DE MATÉRIA PRIMA - SETOR LAMINAÇÃO
+            </h1>
+
+            {/* 2. Three Boxes Header */}
+            <div className="flex gap-4 mb-6">
+              <div className="flex-1 border-2 border-slate-900 px-2 py-1">
+                <span className="font-bold text-[10px] text-black block">Data:</span>
+                <span className="font-bold text-black text-lg text-center block w-full">
+                  {new Date(reportData.entryDate).toLocaleDateString('pt-BR')}
+                </span>
+              </div>
+              <div className="flex-1 border-2 border-slate-900 px-2 py-1">
+                <span className="font-bold text-[10px] text-black block">Numero da NF:</span>
+                <span className="font-bold text-black text-lg text-center block w-full">
+                  {reportData.nfe}
+                </span>
+              </div>
+              <div className="flex-1 border-2 border-slate-900 px-2 py-1">
+                <span className="font-bold text-[10px] text-black uppercase block">NUMERO DA CONFERÊNCIA</span>
+                <span className="font-bold text-black text-lg text-center block w-full">
+                  {reportData.conferenceNumber}
+                </span>
               </div>
             </div>
 
-            {/* Conference Information */}
-            <div className="bg-gradient-to-r from-[#e6f0f5] to-[#fff3e6] border-l-4 border-[#FF8C00] rounded-lg p-5 mb-6 shadow-sm">
-              <h3 className="text-lg font-bold text-[#0F3F5C] mb-4 flex items-center gap-2">
-                <svg className="w-5 h-5 text-[#FF8C00]" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
-                  <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
-                </svg>
-                Dados da Conferência
-              </h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-white p-3 rounded-lg shadow-sm">
-                  <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Data</p>
-                  <p className="text-sm font-bold text-[#0F3F5C]">{new Date(reportData.entryDate).toLocaleDateString('pt-BR')}</p>
-                </div>
-                <div className="bg-white p-3 rounded-lg shadow-sm">
-                  <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Fornecedor</p>
-                  <p className="text-sm font-bold text-[#0F3F5C]">{reportData.supplier}</p>
-                </div>
-                <div className="bg-white p-3 rounded-lg shadow-sm">
-                  <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Nota Fiscal</p>
-                  <p className="text-sm font-bold text-[#0F3F5C]">{reportData.nfe}</p>
-                </div>
-                <div className="bg-white p-3 rounded-lg shadow-sm">
-                  <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Nº Conferência</p>
-                  <p className="text-sm font-bold text-[#FF8C00]">{reportData.conferenceNumber}</p>
-                </div>
-              </div>
-            </div>
+            {/* 3. Table - Exact Column Order & Style */}
+            <div className="flex-grow">
+              <table className="w-full text-xs text-left border-collapse">
+                <thead className="text-[10px] text-black uppercase font-bold border-y-2 border-slate-900">
+                  <tr>
+                    <th className="px-1 py-1 text-center border-l border-r border-slate-400 w-8">Qnt.</th>
+                    <th className="px-1 py-1 text-center border-r border-slate-400">Lote fornecedor</th>
+                    <th className="px-1 py-1 text-center border-r border-slate-400">Lote interno</th>
+                    <th className="px-1 py-1 text-center border-r border-slate-400 w-16">Bitola(mm)</th>
+                    <th className="px-1 py-1 text-center border-r border-slate-400">FORNECEDOR</th>
+                    <th className="px-1 py-1 text-center border-r border-slate-400">Corrida</th>
+                    <th className="px-1 py-1 text-center border-r border-slate-400 w-24">Peso etiqueta</th>
+                    <th className="px-1 py-1 text-center border-r border-slate-400 w-24">Peso balança</th>
+                    <th className="px-1 py-1 text-center border-r border-slate-400 w-20">DIFERENÇA</th>
+                  </tr>
+                </thead>
+                <tbody className="text-black border-b-2 border-slate-900">
+                  {reportData.lots.map((lot, index) => {
+                    const lotDiff = (lot.scaleWeight || 0) - (lot.labelWeight || 0);
+                    const lotPercent = lot.labelWeight ? (lotDiff / lot.labelWeight) * 100 : 0;
+                    const displaySupplier = lot.supplier || reportData.supplier;
 
-            {/* Items Table */}
-            <div className="mb-6">
-              <h3 className="text-lg font-bold text-[#0F3F5C] mb-4 flex items-center gap-2">
-                <svg className="w-5 h-5 text-[#FF8C00]" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" />
-                </svg>
-                Itens Recebidos
-              </h3>
-              <div className="border border-[#0F3F5C]/20 rounded-lg overflow-hidden shadow-sm">
-                <table className="w-full text-sm text-left">
-                  <thead className="text-xs text-white uppercase bg-gradient-to-r from-[#0F3F5C] to-[#1A5A7D]">
-                    <tr>
-                      <th scope="col" className="px-4 py-3">Lote Interno</th>
-                      <th scope="col" className="px-4 py-3">Lote Fornecedor</th>
-                      <th scope="col" className="px-4 py-3">Corrida</th>
-                      <th scope="col" className="px-4 py-3">Tipo</th>
-                      <th scope="col" className="px-4 py-3">Bitola</th>
-                      <th scope="col" className="px-4 py-3 text-right">Peso Etiqueta (kg)</th>
-                      <th scope="col" className="px-4 py-3 text-right">Peso Balança (kg)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reportData.lots.map((lot, index) => (
-                      <tr key={index} className={`border-b ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50'} hover:bg-[#e6f0f5] transition`}>
-                        <td className="px-4 py-3 font-bold text-[#0F3F5C]">{lot.internalLot}</td>
-                        <td className="px-4 py-3 text-slate-700">{lot.supplierLot}</td>
-                        <td className="px-4 py-3 text-slate-700">{lot.runNumber}</td>
-                        <td className="px-4 py-3 text-slate-700">{lot.materialType}</td>
-                        <td className="px-4 py-3 font-semibold text-slate-900">{lot.bitola}</td>
-                        <td className="px-4 py-3 text-right text-slate-700">{lot.labelWeight.toFixed(2)}</td>
-                        <td className="px-4 py-3 text-right font-bold text-[#FF8C00]">{lot.scaleWeight.toFixed(2)}</td>
+                    return (
+                      <tr key={index} className="border-b border-slate-300">
+                        <td className="px-1 py-1 text-center border-l border-r border-slate-400">{index + 1}</td>
+                        <td className="px-1 py-1 text-center border-r border-slate-400 font-mono">{lot.supplierLot}</td>
+                        <td className="px-1 py-1 text-center border-r border-slate-400 font-mono font-bold">{lot.internalLot}</td>
+                        <td className="px-1 py-1 text-center border-r border-slate-400 font-bold">{lot.bitola}</td>
+                        <td className="px-1 py-1 text-center border-r border-slate-400 uppercase truncate max-w-[120px]" title={displaySupplier}>{displaySupplier}</td>
+                        <td className="px-1 py-1 text-center border-r border-slate-400 font-mono">{lot.runNumber}</td>
+                        <td className="px-1 py-1 text-center border-r border-slate-400 font-medium">{lot.labelWeight.toFixed(0)}</td>
+                        <td className="px-1 py-1 text-center border-r border-slate-400 font-bold">{lot.scaleWeight.toFixed(0)}</td>
+                        <td className="px-1 py-1 text-center border-r border-slate-400 font-bold">
+                          <span className="block">
+                            {lotDiff > 0 ? '+' : ''}{lotDiff.toFixed(0)}
+                          </span>
+                          {lotDiff !== 0 && (
+                            <span className="block text-[9px]">
+                              ({lotPercent > 0 ? '+' : ''}{lotPercent.toFixed(1)}%)
+                            </span>
+                          )}
+                        </td>
                       </tr>
-                    ))}
-                  </tbody>
-                  <tfoot className="bg-[#e6f0f5]">
-                    <tr className="border-t-2 border-[#0F3F5C]">
-                      <th scope="row" colSpan={6} className="px-4 py-3 text-base text-right text-slate-700 font-semibold">Total Etiqueta:</th>
-                      <td className="px-4 py-3 text-base text-right font-bold text-slate-900">{totalLabelWeight.toFixed(2)} kg</td>
-                    </tr>
-                    <tr className="border-t border-slate-300">
-                      <th scope="row" colSpan={6} className="px-4 py-3 text-base text-right text-slate-700 font-semibold">Total Balança:</th>
-                      <td className="px-4 py-3 text-base text-right font-bold text-[#FF8C00]">{totalScaleWeight.toFixed(2)} kg</td>
-                    </tr>
-                    <tr className="border-t-2 border-[#0F3F5C] bg-white">
-                      <th scope="row" colSpan={6} className="px-4 py-3 text-lg text-right font-bold text-[#0F3F5C]">Diferença:</th>
-                      <td className="px-4 py-3 text-right">
-                        <div className={`inline-block px-3 py-1 rounded-lg font-bold text-lg ${difference >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                          {difference >= 0 ? '+' : ''}{difference.toFixed(2)} kg
-                        </div>
-                        <div className={`text-xs mt-1 ${difference >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          ({differencePercentage >= 0 ? '+' : ''}{differencePercentage.toFixed(2)}%)
-                        </div>
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
+                    );
+                  })}
+                </tbody>
+                <tfoot className="font-bold text-black">
+                  {/* Spacer Row */}
+                  <tr>
+                    <td colSpan={9} className="h-4"></td> {/* Added Space */}
+                  </tr>
+                  <tr>
+                    <td colSpan={6} className="px-2 py-2 text-right uppercase text-xs">Total:</td>
+                    <td className="px-1 py-2 text-center text-xs">{totalLabelWeight.toFixed(0)}</td>
+                    <td className="px-1 py-2 text-center text-xs">{totalScaleWeight.toFixed(0)}</td>
+                    <td className="px-1 py-2 text-center text-xs whitespace-nowrap">
+                      <span className="block">
+                        {difference > 0 ? '+' : ''}{difference.toFixed(0)}
+                      </span>
+                      {difference !== 0 && (
+                        <span className="block text-[9px]">
+                          ({differencePercentage > 0 ? '+' : ''}{differencePercentage.toFixed(1)}%)
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
 
-            {/* Footer */}
-            <div className="mt-8 pt-4 border-t-2 border-slate-200 text-center text-sm text-slate-500">
-              <p className="text-xs mt-1">Documento gerado automaticamente • Conferência #{reportData.conferenceNumber}</p>
+            {/* 4. Signatures & Footer */}
+            <div className="mt-8">
+              <div className="mb-4">
+                <span className="font-bold text-xs uppercase text-slate-700 block mb-6">CONFERENTE:</span>
+                <div className="border-b-2 border-slate-900 w-full mb-1"></div>
+              </div>
+              <div className="mb-8">
+                <span className="font-bold text-xs uppercase text-slate-700 block mb-6">ENCARREGADO:</span>
+                <div className="border-b-2 border-slate-900 w-full mb-1"></div>
+              </div>
+
+              <div className="text-center pt-8">
+                <p className="text-xs text-slate-500 font-medium">Sistema de Gestões inteligente MSM</p>
+              </div>
             </div>
           </div>
         </div>
+
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

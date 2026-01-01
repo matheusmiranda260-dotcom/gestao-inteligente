@@ -112,6 +112,7 @@ export interface ConferenceLotData {
     materialType: MaterialType;
     labelWeight: number;
     scaleWeight: number;
+    supplier?: string;
 }
 
 export interface ConferenceData {

@@ -244,7 +244,7 @@ const FinishedConferencesModal: React.FC<FinishedConferencesModalProps> = ({ con
                                                 <td className="p-3 text-center">{conf.lots.length}</td>
                                                 <td className="p-3 text-center">
                                                     <div className="flex justify-center gap-3">
-                                                        <button onClick={() => onShowReport(conf)} className="text-emerald-600 hover:underline text-xs font-semibold flex items-center gap-1" title="Reimprimir Relatório">
+                                                        <button onClick={() => { onShowReport(conf); onClose(); }} className="text-emerald-600 hover:underline text-xs font-semibold flex items-center gap-1" title="Reimprimir Relatório">
                                                             <PrinterIcon className="h-4 w-4" />
                                                             <span>Reimprimir</span>
                                                         </button>
