@@ -1043,8 +1043,8 @@ const MachineControl: React.FC<MachineControlProps> = ({ machineType, setPage, c
                                         </div>
                                     </div>
 
-                                    {/* Progresso de Produção - Promovido para destaque */}
-                                    <div className="bg-white p-6 rounded-2xl shadow-sm relative overflow-hidden group">
+                                    {/* Progresso de Produção - Promovido para destaque - ESCONDIDO NO MOBILE */}
+                                    <div className="bg-white p-6 rounded-2xl shadow-sm relative overflow-hidden group hidden md:block">
                                         <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition">
                                             <ChartBarIcon className="h-16 w-16" />
                                         </div>
@@ -1123,7 +1123,7 @@ const MachineControl: React.FC<MachineControlProps> = ({ machineType, setPage, c
                                     </div>
 
                                     {hasActiveShift && (
-                                        <div className="bg-slate-900 p-6 rounded-2xl shadow-xl shadow-slate-200">
+                                        <div className="bg-slate-900 p-6 rounded-2xl shadow-xl shadow-slate-200 hidden md:block">
                                             <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4 flex items-center justify-between">
                                                 <span>Tempo de Operação</span>
                                                 <ClockIcon className="h-4 w-4 text-slate-600" />
@@ -1142,8 +1142,10 @@ const MachineControl: React.FC<MachineControlProps> = ({ machineType, setPage, c
                                     )}
 
                                     <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm">
-                                        <h3 className="text-lg font-semibold text-slate-700 mb-3">Histórico de Paradas</h3>
-                                        <div className="max-h-48 overflow-y-auto custom-scrollbar">
+                                        <h3 className="text-lg font-bold text-slate-700 mb-6 flex items-center gap-2">
+                                            <ClockIcon className="h-5 w-5 text-amber-500" /> Histórico de Paradas Recentes
+                                        </h3>
+                                        <div className="max-h-[500px] md:max-h-48 overflow-y-auto custom-scrollbar">
                                             {activeOrder.downtimeEvents && activeOrder.downtimeEvents.length > 0 ? (
                                                 <>
                                                     {/* Desktop Table View */}
@@ -1196,8 +1198,8 @@ const MachineControl: React.FC<MachineControlProps> = ({ machineType, setPage, c
                                     </div>
                                 </div>
 
-                                {/* Coluna Direita: Área de Trabalho (Lotes/Pacotes) */}
-                                <div className="lg:col-span-2 space-y-6 relative">
+                                {/* Coluna Direita: Área de Trabalho (Lotes/Pacotes) - ESCONDIDA NO MOBILE PARA FOCO NO STATUS */}
+                                <div className="lg:col-span-2 space-y-6 relative hidden md:block">
                                     {isMachineStopped && (
                                         <div className="absolute inset-0 bg-slate-200/80 backdrop-blur-sm flex items-center justify-center rounded-2xl z-20 border-2 border-slate-300 border-dashed">
                                             <div className="text-center p-8 bg-white rounded-3xl shadow-xl max-w-sm mx-auto animate-fade-in-up">
@@ -1493,7 +1495,15 @@ const MachineControl: React.FC<MachineControlProps> = ({ machineType, setPage, c
 
                                     {/* Centro: Controles Principais (Expanded on mobile) */}
                                     <div className="flex-1 md:flex-none flex items-center justify-center md:w-1/2">
-                                        {isMachineStopped ? (
+                                        {!hasActiveShift ? (
+                                            <button
+                                                onClick={() => startOperatorShift && startOperatorShift(activeOrder.id)}
+                                                className="w-full md:w-auto md:px-14 h-14 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl md:rounded-full font-black text-lg shadow-xl shadow-emerald-200 transition transform active:scale-90 hover:scale-[1.02] flex items-center justify-center gap-3 animate-pulse"
+                                            >
+                                                <PlayIcon className="h-8 w-8" />
+                                                <span className="inline tracking-tight">INICIAR TURNO</span>
+                                            </button>
+                                        ) : isMachineStopped ? (
                                             <button
                                                 onClick={() => logResumeProduction && logResumeProduction(activeOrder.id)}
                                                 className="w-full md:w-auto md:px-14 h-14 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl md:rounded-full font-black text-lg shadow-xl shadow-emerald-200 transition transform active:scale-90 hover:scale-[1.02] flex items-center justify-center gap-3"
@@ -1549,13 +1559,23 @@ const MachineControl: React.FC<MachineControlProps> = ({ machineType, setPage, c
                                             <CheckCircleIcon className="h-7 w-7" />
                                         </button>
 
-                                        {hasActiveShift && (
+                                        {hasActiveShift ? (
                                             <button
                                                 onClick={() => endOperatorShift && endOperatorShift(activeOrder.id)}
-                                                className="p-3.5 text-red-500 hover:bg-red-50/50 rounded-2xl transition active:scale-90"
-                                                title="Encerrar Turno"
+                                                className="p-3.5 text-red-500 hover:bg-red-50/50 rounded-2xl transition active:scale-90 flex flex-col items-center gap-0.5"
+                                                title="Finalizar Turno"
                                             >
                                                 <ClockIcon className="h-7 w-7" />
+                                                <span className="text-[8px] font-black uppercase">Encerrar</span>
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={() => startOperatorShift && startOperatorShift(activeOrder.id)}
+                                                className="p-3.5 text-emerald-600 hover:bg-emerald-50 rounded-2xl transition active:scale-90 flex flex-col items-center gap-0.5"
+                                                title="Iniciar Turno"
+                                            >
+                                                <PlayIcon className="h-7 w-7" />
+                                                <span className="text-[8px] font-black uppercase">Iniciar</span>
                                             </button>
                                         )}
                                     </div>
