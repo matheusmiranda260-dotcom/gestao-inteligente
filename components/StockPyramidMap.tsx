@@ -398,6 +398,11 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                                     </div>
                                                 </div>
 
+                                                {/* Sequential Position Label */}
+                                                <div className="absolute bottom-1 right-2 text-[6px] md:text-[8px] font-bold text-white opacity-40 select-none z-30">
+                                                    L{slot.coords.l}-{slot.coords.p}
+                                                </div>
+
                                                 {movingItem && movingItem.id !== slot.item.id && (
                                                     <div
                                                         className={`absolute inset-0 flex items-center justify-center bg-amber-500/40 ${shapeClass} animate-pulse cursor-pointer z-30 ring-4 ring-amber-400`}
@@ -458,6 +463,11 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                                 <div className={`absolute inset-0 ${shapeClass} border-2 border-dashed ${isSlotActive ? 'border-orange-500' : 'border-slate-500/30'}`}></div>
 
                                                 <div className={`pointer-events-none z-10 ${isSlotActive ? 'font-bold text-2xl text-orange-500 animate-bounce' : 'text-slate-600/50 text-xl'}`}>{isSlotActive ? '⬇' : '+'}</div>
+
+                                                {/* Sequential Position Label (Empty) */}
+                                                <div className="absolute bottom-1 right-2 text-[6px] md:text-[8px] font-bold text-slate-400 opacity-60 select-none z-30">
+                                                    L{slot.coords.l}-{slot.coords.p}
+                                                </div>
                                             </div>
                                         );
                                     }
