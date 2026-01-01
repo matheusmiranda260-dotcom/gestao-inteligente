@@ -385,11 +385,11 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                                 {!isCARow && <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-white/5 via-transparent to-transparent pointer-events-none"></div>}
 
                                                 {/* Content Overlay */}
-                                                <div className="relative z-20 text-center leading-none drop-shadow-md pointer-events-none">
-                                                    <div className="bg-white/90 px-1 rounded-sm text-[8px] sm:text-[9px] md:text-[10px] font-bold text-slate-900 border border-slate-300 mb-0.5 whitespace-nowrap overflow-hidden max-w-[90%] text-ellipsis">
+                                                <div className="relative z-20 text-center leading-none drop-shadow-lg pointer-events-none flex flex-col items-center">
+                                                    <div className="text-[10px] md:text-[12px] font-black text-white mb-1 uppercase tracking-tighter">
                                                         {slot.item.internalLot}
                                                     </div>
-                                                    <div className={`${dims.font} text-white font-mono font-bold tracking-tighter`}>
+                                                    <div className={`${dims.font} text-emerald-200 font-mono font-black border-t border-emerald-500/30 pt-1 mt-0.5`}>
                                                         {(slot.item.remainingQuantity || 0).toFixed(0)}
                                                     </div>
                                                 </div>
