@@ -1,110 +1,13 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import type { Page, MachineType, StockItem, ProductionOrderData, User, PartsRequest, ShiftReport, TrelicaSelectedLots, Ponta, Message } from '../types';
-import { ArrowLeftIcon, PlayIcon, PauseIcon, ClockIcon, WarningIcon, StopIcon, CheckCircleIcon, WrenchScrewdriverIcon, ArchiveIcon, ClipboardListIcon, CogIcon, DocumentReportIcon, ScaleIcon, TrashIcon, ChatBubbleLeftRightIcon, CalculatorIcon, ChartBarIcon, ExclamationIcon, SaveIcon } from './icons';
+import type { Page, MachineType, StockItem, ProductionOrderData, User, PartsRequest, ShiftReport, TrelicaSelectedLots, Ponta } from '../types';
+import { ArrowLeftIcon, PlayIcon, PauseIcon, ClockIcon, WarningIcon, StopIcon, CheckCircleIcon, WrenchScrewdriverIcon, ArchiveIcon, ClipboardListIcon, CogIcon, DocumentReportIcon, ScaleIcon, TrashIcon, CalculatorIcon, ChartBarIcon, ExclamationIcon, SaveIcon } from './icons';
 import PartsRequestModal from './PartsRequestModal';
 import ShiftReportsModal from './ShiftReportsModal';
 import ProductionOrderReport from './ProductionOrderReport';
 import { trelicaModels } from './ProductionOrderTrelica';
 import TrefilaCalculation from './TrefilaCalculation';
 
-const MessagingModal: React.FC<{
-    isOpen: boolean;
-    onClose: () => void;
-    messages: Message[];
-    currentUser: User | null;
-    onSendMessage: (messageText: string) => void;
-}> = ({ isOpen, onClose, messages, currentUser, onSendMessage }) => {
-    const [newMessage, setNewMessage] = useState('');
-    const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        if (isOpen) {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }
-    }, [messages, isOpen]);
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (newMessage.trim()) {
-            onSendMessage(newMessage.trim());
-            setNewMessage('');
-        }
-    };
-
-    if (!isOpen) return null;
-
-    return (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-[100] p-0 sm:p-4">
-            <div className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl w-full max-w-lg h-[90vh] sm:h-[70vh] flex flex-col overflow-hidden animate-slide-up">
-                {/* Header */}
-                <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50/50 backdrop-blur-sm">
-                    <div className="flex items-center gap-3">
-                        <div className="bg-indigo-100 p-2 rounded-xl">
-                            <ChatBubbleLeftRightIcon className="h-6 w-6 text-indigo-600" />
-                        </div>
-                        <div>
-                            <h2 className="text-lg font-bold text-slate-800 leading-tight">Canal de Comunicação</h2>
-                            <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Gestão Direta</p>
-                        </div>
-                    </div>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="p-2 hover:bg-slate-200 rounded-full transition text-slate-400 hover:text-slate-600"
-                    >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                </div>
-
-                {/* Messages Body */}
-                <div className="flex-grow overflow-y-auto px-6 py-4 space-y-4 custom-scrollbar bg-slate-50/30">
-                    {messages.length === 0 ? (
-                        <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
-                            <ChatBubbleLeftRightIcon className="h-16 w-16 mb-2" />
-                            <p className="text-sm">Nenhuma mensagem ainda.<br />Inicie a conversa.</p>
-                        </div>
-                    ) : (
-                        messages.map(msg => (
-                            <div key={msg.id} className={`flex ${msg.senderId === currentUser?.id ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[85%] p-3 rounded-2xl shadow-sm ${msg.senderId === currentUser?.id
-                                    ? 'bg-indigo-600 text-white rounded-tr-none'
-                                    : 'bg-white text-slate-800 rounded-tl-none border border-slate-100'
-                                    }`}>
-                                    {msg.senderId !== currentUser?.id && (
-                                        <p className="text-[10px] font-bold mb-1 uppercase tracking-wider opacity-70">{msg.senderUsername}</p>
-                                    )}
-                                    <p className="text-sm leading-relaxed">{msg.message}</p>
-                                    <p className="text-[10px] text-right mt-1 opacity-60 font-medium">
-                                        {new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                                    </p>
-                                </div>
-                            </div>
-                        ))
-                    )}
-                    <div ref={messagesEndRef} />
-                </div>
-
-                {/* Input Area */}
-                <form onSubmit={handleSubmit} className="p-4 bg-white border-t border-slate-100 flex gap-2 items-center safe-area-bottom">
-                    <input
-                        type="text"
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        placeholder="Escreva sua mensagem..."
-                        className="flex-1 bg-slate-100 border-none rounded-2xl py-3 px-4 text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white transition"
-                    />
-                    <button
-                        type="submit"
-                        disabled={!newMessage.trim()}
-                        className="bg-indigo-600 text-white p-3 rounded-2xl shadow-lg shadow-indigo-200 active:scale-90 transition disabled:opacity-50 disabled:grayscale"
-                    >
-                        <PlayIcon className="h-6 w-6 rotate-[-90deg]" />
-                    </button>
-                </form>
-            </div>
-        </div>
-    );
-};
 
 const IdleActivityLogger: React.FC<{
     onLogActivity: (activity: string) => void;
@@ -455,8 +358,8 @@ interface MachineControlProps {
     users?: User[];
     productionOrders?: ProductionOrderData[];
     shiftReports?: ShiftReport[];
-    messages: Message[];
-    addMessage: (messageText: string, productionOrderId: string, machine: MachineType) => void;
+    logPostProductionActivity?: (activity: string) => void;
+    updateProducedQuantity?: (orderId: string, quantity: number) => void;
     startProductionOrder?: (orderId: string) => void;
     startOperatorShift?: (orderId: string) => void;
     endOperatorShift?: (orderId: string) => void;
@@ -468,8 +371,6 @@ interface MachineControlProps {
     recordPackageWeight?: (orderId: string, packageData: { packageNumber: number; quantity: number; weight: number; }) => void;
     completeProduction?: (orderId: string, finalData: { actualProducedQuantity?: number, pontas?: Ponta[] }) => void;
     addPartsRequest?: (data: Omit<PartsRequest, 'id' | 'date' | 'operator' | 'status' | 'machine' | 'productionOrderId'>) => void;
-    logPostProductionActivity?: (activity: string) => void;
-    updateProducedQuantity?: (orderId: string, quantity: number) => void;
 }
 
 const formatDuration = (ms: number) => {
@@ -499,7 +400,7 @@ const MachineMenuButton: React.FC<{ onClick: () => void; label: string; descript
     </button>
 );
 
-const MachineControl: React.FC<MachineControlProps> = ({ machineType, setPage, currentUser, users = [], stock, productionOrders = [], shiftReports = [], messages, addMessage, startProductionOrder, startOperatorShift, endOperatorShift, logDowntime, logResumeProduction, startLotProcessing, finishLotProcessing, recordLotWeight, recordPackageWeight, completeProduction, addPartsRequest, logPostProductionActivity, updateProducedQuantity }) => {
+const MachineControl: React.FC<MachineControlProps> = ({ machineType, setPage, currentUser, users = [], stock, productionOrders = [], shiftReports = [], startProductionOrder, startOperatorShift, endOperatorShift, logDowntime, logResumeProduction, startLotProcessing, finishLotProcessing, recordLotWeight, recordPackageWeight, completeProduction, addPartsRequest, logPostProductionActivity, updateProducedQuantity }) => {
 
     const [pendingWeights, setPendingWeights] = useState<Map<string, string>>(new Map());
     const [pendingGauges, setPendingGauges] = useState<Map<string, string>>(new Map()); // Novo estado para bitolas
@@ -592,7 +493,7 @@ const MachineControl: React.FC<MachineControlProps> = ({ machineType, setPage, c
     const [showQuantityPrompt, setShowQuantityPrompt] = useState(false);
     const [showPartsRequestModal, setShowPartsRequestModal] = useState(false);
     const [showShiftReportsModal, setShowShiftReportsModal] = useState(false);
-    const [isMessagingModalOpen, setIsMessagingModalOpen] = useState(false);
+
     const [productionReportData, setProductionReportData] = useState<ProductionOrderData | null>(null);
     const [showTrefilaCalculation, setShowTrefilaCalculation] = useState(false);
 
@@ -896,15 +797,7 @@ const MachineControl: React.FC<MachineControlProps> = ({ machineType, setPage, c
                     onCancel={() => setManagerOverrideData(null)}
                 />
             )}
-            {activeOrder && (
-                <MessagingModal
-                    isOpen={isMessagingModalOpen}
-                    onClose={() => setIsMessagingModalOpen(false)}
-                    messages={messages.filter(m => m.productionOrderId === activeOrder.id)}
-                    currentUser={currentUser}
-                    onSendMessage={(messageText) => addMessage(messageText, activeOrder.id, activeOrder.machine)}
-                />
-            )}
+
 
             <header className="flex items-center mb-6 bg-white/60 backdrop-blur-xl -mx-4 sm:-mx-6 md:-mx-8 px-4 sm:px-6 md:px-8 py-4 sticky top-0 z-30 border-b border-slate-100 shadow-sm">
                 <button
@@ -970,13 +863,7 @@ const MachineControl: React.FC<MachineControlProps> = ({ machineType, setPage, c
                             />
                         )}
 
-                        <MachineMenuButton
-                            onClick={() => setIsMessagingModalOpen(true)}
-                            label="Mensagens Gestor"
-                            description="Envie dúvidas ou solicitações para o gestor."
-                            icon={<ChatBubbleLeftRightIcon className="h-6 w-6" />}
-                            disabled={!activeOrder}
-                        />
+
                     </div>
                 </div>
             )}
@@ -1524,13 +1411,7 @@ const MachineControl: React.FC<MachineControlProps> = ({ machineType, setPage, c
 
                                     {/* Direita: Ações Secundárias */}
                                     <div className="flex items-center justify-end gap-1 sm:gap-4 w-auto md:w-1/4">
-                                        <button
-                                            onClick={() => setIsMessagingModalOpen(true)}
-                                            className="p-3.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50/50 rounded-2xl transition relative active:scale-90"
-                                        >
-                                            <ChatBubbleLeftRightIcon className="h-7 w-7" />
-                                            <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-indigo-500 border-2 border-white rounded-full"></span>
-                                        </button>
+
 
                                         <div className="h-8 w-px bg-slate-200/60 hidden md:block"></div>
 

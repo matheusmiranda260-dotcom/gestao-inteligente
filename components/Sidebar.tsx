@@ -167,7 +167,6 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                     <div className="sidebar-category">
                         <div className="sidebar-category-title">{isCollapsed ? '⚙️' : '⚙️ Sistema'}</div>
                         <MenuItem target="userManagement" label="Usuários" icon={UserGroupIcon} />
-                        <MenuItem target="messages" label="Mensagens" icon={ChatBubbleLeftRightIcon} />
                     </div>
                 )}
             </div>

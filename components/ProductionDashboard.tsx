@@ -157,13 +157,13 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
 
             <div className="border p-4 rounded-md">
                 <h3 className="font-semibold text-slate-700 mb-2">Linha do Tempo Recente</h3>
-                <div className="max-h-48 overflow-y-auto pr-2 space-y-3">
+                <div className="max-h-48 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
                     {timelineEvents.slice(0, 10).map((event, index) => (
                         <div key={index} className="flex gap-2 text-xs">
-                            <div className={`w-3 h-3 mt-0.5 rounded-full flex-shrink-0 ${event.type === 'stop' ? 'bg-red-500' : 'bg-[#e6f0f5]0'}`}></div>
+                            <div className={`w-3 h-3 mt-0.5 rounded-full flex-shrink-0 ${event.type === 'stop' ? 'bg-red-500' : 'bg-blue-400'}`}></div>
                             <div>
                                 <span className="font-mono text-slate-500 mr-2">{new Date(event.timestamp).toLocaleTimeString('pt-BR')}</span>
-                                <span className="font-semibold">{event.message}</span>
+                                <span className="font-semibold text-slate-800">{event.message}</span>
                                 {event.details && <span className="text-slate-600">: {event.details}</span>}
                             </div>
                         </div>

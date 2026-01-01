@@ -11,7 +11,6 @@ import {
     PartsRequest,
     ShiftReport,
     ProductionRecord,
-    Message,
     User,
 } from '../types';
 

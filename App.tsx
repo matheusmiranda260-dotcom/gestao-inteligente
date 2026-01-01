@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'; // Refresh Trigger
-import type { Page, User, Employee, StockItem, ConferenceData, ProductionOrderData, TransferRecord, Bitola, MachineType, PartsRequest, ShiftReport, ProductionRecord, TransferredLotInfo, ProcessedLot, DowntimeEvent, OperatorLog, TrelicaSelectedLots, WeighedPackage, FinishedProductItem, Ponta, PontaItem, FinishedGoodsTransferRecord, TransferredFinishedGoodInfo, Message, KaizenProblem } from './types';
+import type { Page, User, Employee, StockItem, ConferenceData, ProductionOrderData, TransferRecord, Bitola, MachineType, PartsRequest, ShiftReport, ProductionRecord, TransferredLotInfo, ProcessedLot, DowntimeEvent, OperatorLog, TrelicaSelectedLots, WeighedPackage, FinishedProductItem, Ponta, PontaItem, FinishedGoodsTransferRecord, TransferredFinishedGoodInfo, KaizenProblem } from './types';
 import Login from './components/Login';
 import MainMenu from './components/MainMenu';
 import StockControl from './components/StockControl';
@@ -17,7 +17,7 @@ import SparePartsManager from './components/SparePartsManager';
 import ContinuousImprovement from './components/ContinuousImprovement';
 import WorkInstructions from './components/WorkInstructions';
 import PeopleManagement from './components/PeopleManagement';
-import MessageCenter from './components/MessageCenter';
+
 import StockInventory from './components/StockInventory';
 import StockTransfer from './components/StockTransfer';
 import { supabase } from './supabaseClient';
@@ -46,11 +46,11 @@ const App: React.FC = () => {
     const [shiftReports, setShiftReports] = useState<ShiftReport[]>([]);
     const [trefilaProduction, setTrefilaProduction] = useState<ProductionRecord[]>([]);
     const [trelicaProduction, setTrelicaProduction] = useState<ProductionRecord[]>([]);
-    const [messages, setMessages] = useState<Message[]>([]);
+
     const [pendingKaizenCount, setPendingKaizenCount] = useState(0);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-    const unreadMessagesCount = useMemo(() => messages.filter(m => !m.isRead).length, [messages]);
+
 
     useEffect(() => {
         if (currentUser?.employeeId) {
@@ -77,7 +77,7 @@ const App: React.FC = () => {
                 const [
                     fetchedUsers, fetchedEmployees, fetchedStock, fetchedConferences, fetchedTransfers,
                     fetchedOrders, fetchedFinishedGoods, fetchedPontas, fetchedFGTransfers,
-                    fetchedParts, fetchedReports, fetchedProductionRecords, fetchedMessages
+                    fetchedParts, fetchedReports, fetchedProductionRecords
                 ] = await Promise.all([
                     fetchTable<User>('app_users'),
                     fetchTable<Employee>('employees'),
@@ -90,8 +90,7 @@ const App: React.FC = () => {
                     fetchTable<FinishedGoodsTransferRecord>('finished_goods_transfers'),
                     fetchTable<PartsRequest>('parts_requests'),
                     fetchTable<ShiftReport>('shift_reports'),
-                    fetchTable<ProductionRecord>('production_records'),
-                    fetchTable<Message>('messages')
+                    fetchTable<ProductionRecord>('production_records')
                 ]);
 
                 setUsers(fetchedUsers);
@@ -110,7 +109,7 @@ const App: React.FC = () => {
                 setTrefilaProduction(fetchedProductionRecords.filter(r => r.machine === 'Trefila'));
                 setTrelicaProduction(fetchedProductionRecords.filter(r => r.machine === 'Treliça'));
 
-                setMessages(fetchedMessages);
+
             } catch (error) {
                 console.error("Failed to load data from Supabase", error);
                 showNotification("Erro ao carregar dados do servidor.", 'error');
@@ -140,7 +139,6 @@ const App: React.FC = () => {
         setShiftReports,
         setTrefilaProduction,
         setTrelicaProduction,
-        setMessages,
     }), []);
 
     useAllRealtimeSubscriptions(realtimeSetters, !!currentUser);
@@ -254,39 +252,7 @@ const App: React.FC = () => {
         setPage('login');
     };
 
-    // Messaging System
-    const addMessage = async (messageText: string, productionOrderId: string, machine: MachineType) => {
-        if (!currentUser) return;
-        const newMessage: Message = {
-            id: generateId('msg'),
-            timestamp: new Date().toISOString(),
-            productionOrderId,
-            machine,
-            senderId: currentUser.id,
-            senderUsername: currentUser.username,
-            message: messageText,
-            isRead: false,
-        };
-        try {
-            const savedMessage = await insertItem<Message>('messages', newMessage);
-            setMessages(prev => [...prev, savedMessage].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()));
-        } catch (error) {
-            showNotification('Erro ao enviar mensagem.', 'error');
-        }
-    };
 
-    const markAllMessagesAsRead = async () => {
-        setMessages(prev => prev.map(m => ({ ...m, isRead: true })));
-
-        try {
-            const unreadMessages = messages.filter(m => !m.isRead);
-            for (const msg of unreadMessages) {
-                await updateItem('messages', msg.id, { isRead: true });
-            }
-        } catch (error) {
-            console.error("Failed to mark messages as read", error);
-        }
-    };
 
     // User Management
     const addUser = async (data: { username: string; password: string; permissions: Partial<Record<Page, boolean>>; employeeId?: string }) => {
@@ -1566,12 +1532,12 @@ const App: React.FC = () => {
             startProductionOrder, startOperatorShift, endOperatorShift, logDowntime,
             logResumeProduction, startLotProcessing, finishLotProcessing, recordLotWeight,
             addPartsRequest, logPostProductionActivity, completeProduction, recordPackageWeight,
-            updateProducedQuantity, messages, addMessage, users
+            updateProducedQuantity, users
         };
 
         switch (page) {
             case 'login': return <Login onLogin={handleLogin} error={notification?.type === 'error' ? notification.message : null} />;
-            case 'menu': return <MainMenu setPage={setPage} onLogout={handleLogout} currentUser={currentUser} messages={messages} markAllMessagesAsRead={markAllMessagesAsRead} addMessage={addMessage} />;
+            case 'menu': return <MainMenu setPage={setPage} onLogout={handleLogout} currentUser={currentUser} />;
             case 'stock': return <StockControl stock={stock} conferences={conferences} transfers={transfers} setPage={setPage} addConference={addConference} deleteStockItem={deleteStockItem} updateStockItem={(item) => updateStockItem(item.id, item)} createTransfer={createTransfer} editConference={editConference} deleteConference={deleteConference} productionOrders={productionOrders} initialView="list" />;
             case 'stock_map': return <StockControl stock={stock} conferences={conferences} transfers={transfers} setPage={setPage} addConference={addConference} deleteStockItem={deleteStockItem} updateStockItem={(item) => updateStockItem(item.id, item)} createTransfer={createTransfer} editConference={editConference} deleteConference={deleteConference} productionOrders={productionOrders} initialView="map" />;
             case 'stock_add': return <StockControl stock={stock} conferences={conferences} transfers={transfers} setPage={setPage} addConference={addConference} deleteStockItem={deleteStockItem} updateStockItem={(item) => updateStockItem(item.id, item)} createTransfer={createTransfer} editConference={editConference} deleteConference={deleteConference} productionOrders={productionOrders} initialView="add" />;
@@ -1590,7 +1556,7 @@ const App: React.FC = () => {
             case 'continuousImprovement': return <ContinuousImprovement setPage={setPage} />;
             case 'workInstructions': return <WorkInstructions setPage={setPage} />;
             case 'peopleManagement': return <PeopleManagement setPage={setPage} currentUser={currentUser} />;
-            case 'messages': return <MessageCenter messages={messages} currentUser={currentUser} addMessage={addMessage} markAllMessagesAsRead={markAllMessagesAsRead} />;
+
             default: return <Login onLogin={handleLogin} error={null} />;
         }
     };

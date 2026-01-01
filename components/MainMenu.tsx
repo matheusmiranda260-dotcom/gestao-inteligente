@@ -1,111 +1,17 @@
 import React, { useState, useMemo } from 'react';
-import type { Page, User, Message, MachineType } from '../types';
+import type { Page, User } from '../types';
 import { UserGroupIcon, ArchiveIcon, CogIcon, ClipboardListIcon, ChartBarIcon, ChatBubbleLeftRightIcon, WrenchScrewdriverIcon, AdjustmentsIcon, DocumentTextIcon, ExclamationIcon } from './icons';
 import MSMLogo from './MSMLogo';
 import { fetchTable } from '../services/supabaseService';
 import type { KaizenProblem } from '../types';
 
-const ManagerMessagesModal: React.FC<{
-    isOpen: boolean;
-    onClose: () => void;
-    messages: Message[];
-    currentUser: User | null;
-    addMessage: (messageText: string, productionOrderId: string, machine: MachineType) => void;
-}> = ({ isOpen, onClose, messages, currentUser, addMessage }) => {
-    const [replyMessages, setReplyMessages] = useState<Record<string, string>>({});
 
-    const groupedMessages = useMemo(() => {
-        return messages.reduce((acc, msg) => {
-            const key = msg.productionOrderId;
-            if (!acc[key]) {
-                acc[key] = {
-                    orderId: msg.productionOrderId,
-                    machine: msg.machine,
-                    messages: [],
-                };
-            }
-            acc[key].messages.push(msg);
-            return acc;
-        }, {} as Record<string, { orderId: string; machine: MachineType; messages: Message[] }>);
-    }, [messages]);
-
-    const sortedGroups = useMemo(() => {
-        type MessageGroup = { orderId: string; machine: MachineType; messages: Message[] };
-        // FIX: Explicitly type the parameters of the sort callback function to prevent them from being inferred as 'unknown'.
-        // Fix: Explicitly type the sort callback parameters to avoid type inference issues.
-        return Object.values(groupedMessages).sort((a: MessageGroup, b: MessageGroup) => {
-            const lastMsgA = a.messages[a.messages.length - 1];
-            const lastMsgB = b.messages[b.messages.length - 1];
-            return new Date(lastMsgB.timestamp).getTime() - new Date(lastMsgA.timestamp).getTime();
-        });
-    }, [groupedMessages]);
-
-    const handleReplyChange = (orderId: string, text: string) => {
-        setReplyMessages(prev => ({ ...prev, [orderId]: text }));
-    };
-
-    const handleReply = (e: React.FormEvent, orderId: string, machine: MachineType) => {
-        e.preventDefault();
-        const messageText = replyMessages[orderId];
-        if (messageText && messageText.trim() && currentUser) {
-            addMessage(messageText.trim(), orderId, machine);
-            setReplyMessages(prev => ({ ...prev, [orderId]: '' }));
-        }
-    };
-
-    if (!isOpen) return null;
-
-    return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="glass-dark p-6 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-white/10">
-                <h2 className="text-2xl font-bold text-white mb-4 border-b border-white/10 pb-4">Central de Mensagens do Gestor</h2>
-                <div className="flex-grow overflow-y-auto pr-2 space-y-4">
-                    {sortedGroups.length > 0 ? sortedGroups.map(group => (
-                        <div key={group.orderId} className="bg-white/5 p-4 rounded-lg border border-white/5">
-                            <h3 className="font-semibold text-[#00E5FF]">Ordem: {group.orderId} ({group.machine})</h3>
-                            <div className="mt-2 space-y-2 text-sm max-h-48 overflow-y-auto">
-                                {group.messages.map(msg => (
-                                    <div key={msg.id} className={`p-3 rounded-lg border ${msg.senderId === currentUser?.id ? 'bg-[#0A2A3D] border-[#00E5FF]/30' : 'bg-white/5 border-white/10'}`}>
-                                        <div className="flex justify-between items-baseline">
-                                            <span className={`font-bold ${msg.senderId === currentUser?.id ? 'text-[#00E5FF]' : 'text-slate-300'}`}>{msg.senderUsername}</span>
-                                            <span className="text-xs text-slate-500">{new Date(msg.timestamp).toLocaleString('pt-BR')}</span>
-                                        </div>
-                                        <p className="text-slate-200 mt-1">{msg.message}</p>
-                                    </div>
-                                ))}
-                            </div>
-                            <form onSubmit={(e) => handleReply(e, group.orderId, group.machine)} className="flex gap-2 mt-2 pt-2 border-t border-white/10">
-                                <input
-                                    type="text"
-                                    value={replyMessages[group.orderId] || ''}
-                                    onChange={(e) => handleReplyChange(group.orderId, e.target.value)}
-                                    className="flex-grow p-2 bg-black/20 border border-white/10 rounded-md text-sm text-white focus:border-[#00E5FF] outline-none"
-                                    placeholder="Digite sua resposta..."
-                                    required
-                                />
-                                <button type="submit" className="bg-[#00E5FF] text-black font-bold py-2 px-4 rounded-md hover:bg-[#00BCD4] text-sm transition-colors">Enviar</button>
-                            </form>
-                        </div>
-                    )) : (
-                        <p className="text-center text-slate-500 py-10">Nenhuma mensagem recebida.</p>
-                    )}
-                </div>
-                <div className="flex justify-end pt-4 mt-auto border-t border-white/10">
-                    <button type="button" onClick={onClose} className="bg-white/10 hover:bg-white/20 text-white font-bold py-2 px-4 rounded-lg transition border border-white/5">Fechar</button>
-                </div>
-            </div>
-        </div>
-    );
-};
 
 
 interface MainMenuProps {
     setPage: (page: Page) => void;
     onLogout: () => void;
     currentUser: User | null;
-    messages: Message[];
-    markAllMessagesAsRead: () => void;
-    addMessage: (messageText: string, productionOrderId: string, machine: MachineType) => void;
 }
 
 const MenuButton: React.FC<{ onClick: () => void; label: string; description: string; icon: React.ReactNode; notificationCount?: number; color?: 'cyan' | 'blue' | 'purple' | 'teal' | 'indigo' }> = ({ onClick, label, description, icon, notificationCount, color = 'blue' }) => {
@@ -150,11 +56,10 @@ const MenuButton: React.FC<{ onClick: () => void; label: string; description: st
 };
 
 
-const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser, messages, markAllMessagesAsRead, addMessage }) => {
-    const [isManagerModalOpen, setIsManagerModalOpen] = useState(false);
+const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser }) => {
     const [pendingKaizenCount, setPendingKaizenCount] = useState(0);
 
-    const unreadCount = useMemo(() => messages.filter(m => !m.isRead).length, [messages]);
+
 
     React.useEffect(() => {
         if (currentUser?.employeeId) {
@@ -175,10 +80,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser, mes
         }
     }, [currentUser]);
 
-    const handleOpenManagerMessages = () => {
-        markAllMessagesAsRead();
-        setIsManagerModalOpen(true);
-    };
+
 
     const hasPermission = (page: Page): boolean => {
         if (!currentUser) return false;
@@ -195,13 +97,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser, mes
 
     return (
         <div className="min-h-screen p-6 sm:p-8 md:p-12 bg-[#F8FAFC]">
-            <ManagerMessagesModal
-                isOpen={isManagerModalOpen}
-                onClose={() => setIsManagerModalOpen(false)}
-                messages={messages}
-                currentUser={currentUser}
-                addMessage={addMessage}
-            />
+
 
             <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
                 <div>
@@ -364,16 +260,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser, mes
                         <h2>Gestão & Ferramentas</h2>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-                        {isGestor && (
-                            <MenuButton
-                                onClick={handleOpenManagerMessages}
-                                label="Central de Mensagens"
-                                description="Comunicação com operadores de produção."
-                                icon={<ChatBubbleLeftRightIcon />}
-                                notificationCount={unreadCount}
-                                color="blue"
-                            />
-                        )}
+
                         {hasPermission('reports') && (
                             <MenuButton
                                 onClick={() => setPage('reports')}

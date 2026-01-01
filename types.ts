@@ -1,14 +1,3 @@
-export interface Message {
-    id: string;
-    timestamp: string; // ISO string
-    productionOrderId: string;
-    machine: MachineType;
-    senderId: string;
-    senderUsername: string;
-    message: string;
-    isRead: boolean;
-}
-
 // types.ts
 
 export interface TrelicaSelectedLots {
@@ -26,7 +15,7 @@ export interface TrelicaSelectedLots {
     allSenozoideRight?: string[];
 }
 
-export type Page = 'login' | 'menu' | 'stock' | 'stock_map' | 'stock_add' | 'stock_inventory' | 'stock_transfer' | 'machineSelection' | 'trefila' | 'trelica' | 'productionOrder' | 'productionOrderTrelica' | 'reports' | 'userManagement' | 'productionDashboard' | 'finishedGoods' | 'partsManager' | 'continuousImprovement' | 'workInstructions' | 'peopleManagement' | 'messages';
+export type Page = 'login' | 'menu' | 'stock' | 'stock_map' | 'stock_add' | 'stock_inventory' | 'stock_transfer' | 'machineSelection' | 'trefila' | 'trelica' | 'productionOrder' | 'productionOrderTrelica' | 'reports' | 'userManagement' | 'productionDashboard' | 'finishedGoods' | 'partsManager' | 'continuousImprovement' | 'workInstructions' | 'peopleManagement';
 
 export interface InstructionStep {
     id: string;
