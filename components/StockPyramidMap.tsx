@@ -399,7 +399,7 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                                 </div>
 
                                                 {/* Sequential Position Label */}
-                                                <div className="absolute bottom-1 right-2 text-[6px] md:text-[8px] font-bold text-white opacity-40 select-none z-30">
+                                                <div className="absolute bottom-1 right-2 text-[6px] md:text-[8px] font-black text-white opacity-70 select-none z-30">
                                                     L{slot.coords.l}-{slot.coords.p}
                                                 </div>
 
@@ -465,7 +465,7 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                                 <div className={`pointer-events-none z-10 ${isSlotActive ? 'font-bold text-2xl text-orange-500 animate-bounce' : 'text-slate-600/50 text-xl'}`}>{isSlotActive ? '⬇' : '+'}</div>
 
                                                 {/* Sequential Position Label (Empty) */}
-                                                <div className="absolute bottom-1 right-2 text-[6px] md:text-[8px] font-bold text-slate-400 opacity-60 select-none z-30">
+                                                <div className="absolute bottom-1 right-2 text-[6px] md:text-[8.5px] font-black text-slate-600 opacity-80 select-none z-30 uppercase tracking-tighter">
                                                     L{slot.coords.l}-{slot.coords.p}
                                                 </div>
                                             </div>
