@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Page, MachineType, StockItem, ProductionOrderData, User, PartsRequest, ShiftReport, TrelicaSelectedLots, Ponta, Message } from '../types';
-import { ArrowLeftIcon, PlayIcon, PauseIcon, ClockIcon, WarningIcon, StopIcon, CheckCircleIcon, WrenchScrewdriverIcon, ArchiveIcon, ClipboardListIcon, CogIcon, DocumentReportIcon, ScaleIcon, TrashIcon, ChatBubbleLeftRightIcon, CalculatorIcon, ChartBarIcon, ExclamationIcon } from './icons';
+import { ArrowLeftIcon, PlayIcon, PauseIcon, ClockIcon, WarningIcon, StopIcon, CheckCircleIcon, WrenchScrewdriverIcon, ArchiveIcon, ClipboardListIcon, CogIcon, DocumentReportIcon, ScaleIcon, TrashIcon, ChatBubbleLeftRightIcon, CalculatorIcon, ChartBarIcon, ExclamationIcon, SaveIcon } from './icons';
 import PartsRequestModal from './PartsRequestModal';
 import ShiftReportsModal from './ShiftReportsModal';
 import ProductionOrderReport from './ProductionOrderReport';
@@ -28,41 +28,78 @@ const MessagingModal: React.FC<{
         if (newMessage.trim()) {
             onSendMessage(newMessage.trim());
             setNewMessage('');
-            onClose();
         }
     };
 
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-            <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-lg h-[70vh] flex flex-col">
-                <div className="flex justify-between items-center border-b pb-4 mb-4">
-                    <h2 className="text-2xl font-bold text-slate-800">Mensagens para o Gestor</h2>
-                    <button type="button" onClick={onClose} className="text-slate-500 hover:text-slate-800 text-3xl leading-none p-1">&times;</button>
-                </div>
-                <div className="flex-grow overflow-y-auto pr-2 space-y-3">
-                    {messages.map(msg => (
-                        <div key={msg.id} className={`flex ${msg.senderId === currentUser?.id ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-xs lg:max-w-md p-3 rounded-lg ${msg.senderId === currentUser?.id ? 'bg-[#e6f0f5]0 text-white' : 'bg-slate-200 text-slate-800'}`}>
-                                <p className="text-xs font-bold mb-1">{msg.senderUsername}</p>
-                                <p className="text-sm">{msg.message}</p>
-                                <p className="text-xs text-right mt-1 opacity-70">{new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
-                            </div>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-[100] p-0 sm:p-4">
+            <div className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl w-full max-w-lg h-[90vh] sm:h-[70vh] flex flex-col overflow-hidden animate-slide-up">
+                {/* Header */}
+                <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50/50 backdrop-blur-sm">
+                    <div className="flex items-center gap-3">
+                        <div className="bg-indigo-100 p-2 rounded-xl">
+                            <ChatBubbleLeftRightIcon className="h-6 w-6 text-indigo-600" />
                         </div>
-                    ))}
+                        <div>
+                            <h2 className="text-lg font-bold text-slate-800 leading-tight">Canal de Comunicação</h2>
+                            <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Gestão Direta</p>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="p-2 hover:bg-slate-200 rounded-full transition text-slate-400 hover:text-slate-600"
+                    >
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+
+                {/* Messages Body */}
+                <div className="flex-grow overflow-y-auto px-6 py-4 space-y-4 custom-scrollbar bg-slate-50/30">
+                    {messages.length === 0 ? (
+                        <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
+                            <ChatBubbleLeftRightIcon className="h-16 w-16 mb-2" />
+                            <p className="text-sm">Nenhuma mensagem ainda.<br />Inicie a conversa.</p>
+                        </div>
+                    ) : (
+                        messages.map(msg => (
+                            <div key={msg.id} className={`flex ${msg.senderId === currentUser?.id ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-[85%] p-3 rounded-2xl shadow-sm ${msg.senderId === currentUser?.id
+                                    ? 'bg-indigo-600 text-white rounded-tr-none'
+                                    : 'bg-white text-slate-800 rounded-tl-none border border-slate-100'
+                                    }`}>
+                                    {msg.senderId !== currentUser?.id && (
+                                        <p className="text-[10px] font-bold mb-1 uppercase tracking-wider opacity-70">{msg.senderUsername}</p>
+                                    )}
+                                    <p className="text-sm leading-relaxed">{msg.message}</p>
+                                    <p className="text-[10px] text-right mt-1 opacity-60 font-medium">
+                                        {new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                    </p>
+                                </div>
+                            </div>
+                        ))
+                    )}
                     <div ref={messagesEndRef} />
                 </div>
-                <form onSubmit={handleSubmit} className="flex gap-2 mt-4 pt-4 border-t">
+
+                {/* Input Area */}
+                <form onSubmit={handleSubmit} className="p-4 bg-white border-t border-slate-100 flex gap-2 items-center safe-area-bottom">
                     <input
                         type="text"
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
-                        className="flex-grow p-2 border border-slate-300 rounded-md"
-                        placeholder="Digite sua mensagem..."
-                        required
+                        placeholder="Escreva sua mensagem..."
+                        className="flex-1 bg-slate-100 border-none rounded-2xl py-3 px-4 text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white transition"
                     />
-                    <button type="submit" className="bg-slate-700 text-white font-bold py-2 px-4 rounded-md hover:bg-slate-800">Enviar</button>
+                    <button
+                        type="submit"
+                        disabled={!newMessage.trim()}
+                        className="bg-indigo-600 text-white p-3 rounded-2xl shadow-lg shadow-indigo-200 active:scale-90 transition disabled:opacity-50 disabled:grayscale"
+                    >
+                        <PlayIcon className="h-6 w-6 rotate-[-90deg]" />
+                    </button>
                 </form>
             </div>
         </div>
@@ -158,41 +195,60 @@ const DowntimeModal: React.FC<{
         }
     };
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-xl w-full max-w-md">
-                <h2 className="text-2xl font-bold text-slate-800 mb-4">Registrar Parada</h2>
-                <p className="text-slate-600 mb-6">Por favor, informe o motivo da parada da máquina.</p>
-                <div className="space-y-4">
-                    <div>
-                        <label htmlFor="reason-select" className="block text-sm font-medium text-slate-700">Motivo</label>
-                        <select
-                            id="reason-select"
-                            value={reason}
-                            onChange={(e) => setReason(e.target.value)}
-                            className="mt-1 p-2 w-full border border-slate-300 rounded-md bg-white"
-                        >
-                            {downtimeReasons.map(r => <option key={r} value={r}>{r}</option>)}
-                        </select>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+            <form onSubmit={handleSubmit} className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-zoom-in">
+                <div className="p-8">
+                    <div className="bg-amber-100 w-16 h-16 rounded-2xl flex items-center justify-center mb-6">
+                        <PauseIcon className="h-10 w-10 text-amber-600" />
                     </div>
-                    {reason === 'Outros' && (
-                        <div>
-                            <label htmlFor="other-reason" className="block text-sm font-medium text-slate-700">Especifique o motivo</label>
-                            <input
-                                type="text"
-                                id="other-reason"
-                                value={otherReason}
-                                onChange={(e) => setOtherReason(e.target.value)}
-                                className="mt-1 p-2 w-full border border-slate-300 rounded-md"
-                                placeholder="Descreva o motivo da parada"
-                                required
-                                autoFocus
-                            />
+                    <h2 className="text-2xl font-black text-slate-800 mb-2">Pausar Produção</h2>
+                    <p className="text-slate-500 mb-8 leading-relaxed">Qual o motivo da interrupção? Isso nos ajuda a gerenciar a eficiência da planta.</p>
+
+                    <div className="space-y-6">
+                        <div className="space-y-2">
+                            <label htmlFor="reason-select" className="block text-xs font-bold text-slate-400 uppercase tracking-widest">Selecione o Motivo</label>
+                            <select
+                                id="reason-select"
+                                value={reason}
+                                onChange={(e) => setReason(e.target.value)}
+                                className="w-full bg-slate-50 border-2 border-slate-100 p-4 rounded-2xl font-bold text-slate-700 focus:border-amber-500 focus:bg-white transition appearance-none"
+                            >
+                                {downtimeReasons.map(r => <option key={r} value={r}>{r}</option>)}
+                            </select>
                         </div>
-                    )}
+
+                        {reason === 'Outros' && (
+                            <div className="animate-fade-in">
+                                <label htmlFor="other-reason" className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Especifique</label>
+                                <input
+                                    type="text"
+                                    id="other-reason"
+                                    value={otherReason}
+                                    onChange={(e) => setOtherReason(e.target.value)}
+                                    className="w-full bg-slate-50 border-2 border-slate-100 p-4 rounded-2xl font-medium focus:border-amber-500 focus:bg-white transition"
+                                    placeholder="Descreva o motivo"
+                                    required
+                                    autoFocus
+                                />
+                            </div>
+                        )}
+                    </div>
                 </div>
-                <div className="flex justify-end gap-4 mt-8 pt-4 border-t">
-                    <button type="button" onClick={onClose} className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-4 rounded-lg transition">Cancelar</button>
-                    <button type="submit" className="bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700 transition">Confirmar Parada</button>
+
+                <div className="flex gap-3 p-6 bg-slate-50">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="flex-1 bg-white border-2 border-slate-200 text-slate-600 font-bold py-4 rounded-2xl hover:bg-slate-100 transition active:scale-95"
+                    >
+                        CANCELAR
+                    </button>
+                    <button
+                        type="submit"
+                        className="flex-1 bg-amber-500 text-white font-black py-4 rounded-2xl hover:bg-amber-600 shadow-lg shadow-amber-200 transition active:scale-95"
+                    >
+                        CONFIRMAR
+                    </button>
                 </div>
             </form>
         </div>
@@ -431,18 +487,17 @@ const MachineMenuButton: React.FC<{ onClick: () => void; label: string; descript
     <button
         onClick={onClick}
         disabled={disabled}
-        className="bg-white p-6 rounded-xl shadow-sm hover:shadow-lg border border-slate-200 hover:-translate-y-1 transition-all duration-300 text-left w-full flex flex-col justify-between disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+        className={`bg-white p-6 rounded-xl shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 text-left flex items-start gap-4 border-l-4 ${disabled ? 'opacity-50 grayscale border-slate-300' : 'border-slate-800'}`}
     >
+        <div className={`p-3 rounded-lg ${disabled ? 'bg-slate-100' : 'bg-slate-100'}`}>
+            {icon}
+        </div>
         <div>
-            <h3 className="text-xl font-semibold text-slate-800 flex items-center">
-                {icon && <span className="mr-3 text-slate-600">{icon}</span>}
-                {label}
-            </h3>
-            <p className="text-slate-500 mt-1 pl-10 text-sm">{description}</p>
+            <h3 className="text-xl font-bold text-slate-800">{label}</h3>
+            <p className="text-slate-500 mt-1 text-sm leading-relaxed">{description}</p>
         </div>
     </button>
 );
-
 
 const MachineControl: React.FC<MachineControlProps> = ({ machineType, setPage, currentUser, users = [], stock, productionOrders = [], shiftReports = [], messages, addMessage, startProductionOrder, startOperatorShift, endOperatorShift, logDowntime, logResumeProduction, startLotProcessing, finishLotProcessing, recordLotWeight, recordPackageWeight, completeProduction, addPartsRequest, logPostProductionActivity, updateProducedQuantity }) => {
 
@@ -851,11 +906,16 @@ const MachineControl: React.FC<MachineControlProps> = ({ machineType, setPage, c
                 />
             )}
 
-            <header className="flex items-center mb-6">
-                <button onClick={() => view === 'dashboard' ? setPage('menu') : setView('dashboard')} className="mr-4 p-2 rounded-full hover:bg-slate-200 transition">
-                    <ArrowLeftIcon className="h-6 w-6 text-slate-700" />
+            <header className="flex items-center mb-6 bg-white/60 backdrop-blur-xl -mx-4 sm:-mx-6 md:-mx-8 px-4 sm:px-6 md:px-8 py-4 sticky top-0 z-30 border-b border-slate-100 shadow-sm">
+                <button
+                    onClick={() => view === 'dashboard' ? setPage('menu') : setView('dashboard')}
+                    className="mr-4 p-2.5 rounded-2xl bg-white shadow-sm border border-slate-200 hover:bg-slate-50 transition active:scale-95"
+                >
+                    <ArrowLeftIcon className="h-5 w-5 text-slate-700" />
                 </button>
-                <h1 className="text-2xl sm:text-3xl font-bold text-slate-800">{view === 'dashboard' ? machineHeader : viewTitles[view]}</h1>
+                <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight uppercase">
+                    {view === 'dashboard' ? machineHeader : viewTitles[view]}
+                </h1>
             </header>
 
             {view === 'dashboard' && (
@@ -929,48 +989,54 @@ const MachineControl: React.FC<MachineControlProps> = ({ machineType, setPage, c
                                 {/* Coluna Esquerda: Visão Geral e Indicadores */}
                                 <div className="lg:col-span-1 space-y-6">
                                     {/* Card de Status Principal - Novo Design */}
-                                    <div className={`bg-white p-6 rounded-2xl shadow-sm border-l-8 ${isMachineStopped ? 'border-amber-500' : 'border-emerald-500'}`}>
-                                        <div className="flex justify-between items-start mb-4">
+                                    <div className={`bg-white p-4 md:p-6 rounded-2xl shadow-sm border-l-[12px] ${isMachineStopped ? 'border-amber-500' : 'border-emerald-500'} relative overflow-hidden transition-all duration-500`}>
+                                        {!isMachineStopped && (
+                                            <div className="absolute top-0 right-0 h-32 w-32 bg-emerald-50 rounded-full -mr-16 -mt-16 opacity-50 blur-3xl animate-pulse"></div>
+                                        )}
+                                        <div className="flex justify-between items-start mb-6 relative z-10">
                                             <div>
-                                                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Status da Máquina</h3>
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <div className={`h-3 w-3 rounded-full ${isMachineStopped ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500 animate-pulse'}`}></div>
-                                                    <span className={`text-2xl font-bold ${isMachineStopped ? 'text-amber-600' : 'text-emerald-700'}`}>
+                                                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Status do Equipamento</h3>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="relative flex h-4 w-4">
+                                                        {!isMachineStopped && <span className="animate-pulse-glow absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
+                                                        <span className={`relative inline-flex rounded-full h-4 w-4 ${isMachineStopped ? 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.4)]' : 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]'}`}></span>
+                                                    </div>
+                                                    <span className={`text-2xl md:text-3xl font-black tracking-tighter ${isMachineStopped ? 'text-amber-600' : 'text-emerald-700'}`}>
                                                         {isMachineStopped ? 'PARADA' : 'OPERANDO'}
                                                     </span>
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Ordem Atual</h3>
-                                                <p className="text-xl font-bold text-slate-800">{activeOrder.orderNumber}</p>
+                                                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Carga Ativa</h3>
+                                                <p className="text-xl md:text-2xl font-black text-slate-900 tracking-tighter">#{activeOrder.orderNumber}</p>
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-2 gap-4 mt-6 p-4 bg-slate-50 rounded-xl">
+                                        <div className="grid grid-cols-2 gap-3 md:gap-4 mt-6 p-3 md:p-4 bg-slate-50 rounded-xl">
                                             <div>
-                                                <p className="text-xs text-slate-500 mb-1">Operador</p>
-                                                <p className="font-semibold text-slate-700 truncate">{currentOperatorLog?.operator || 'N/A'}</p>
+                                                <p className="text-[10px] md:text-xs text-slate-500 mb-1">Operador</p>
+                                                <p className="text-sm md:text-base font-semibold text-slate-700 truncate">{currentOperatorLog?.operator || 'N/A'}</p>
                                             </div>
                                             <div>
-                                                <p className="text-xs text-slate-500 mb-1">Início Turno</p>
-                                                <p className="font-semibold text-slate-700">{currentOperatorLog ? new Date(currentOperatorLog.startTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</p>
+                                                <p className="text-[10px] md:text-xs text-slate-500 mb-1">Início Turno</p>
+                                                <p className="text-sm md:text-base font-semibold text-slate-700">{currentOperatorLog ? new Date(currentOperatorLog.startTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</p>
                                             </div>
                                             {machineType === 'Trefila' ? (
                                                 <>
                                                     <div>
-                                                        <p className="text-xs text-slate-500 mb-1">Bitola Saída</p>
-                                                        <p className="font-semibold text-slate-700">{activeOrder.targetBitola}</p>
+                                                        <p className="text-[10px] md:text-xs text-slate-500 mb-1">Bitola Saída</p>
+                                                        <p className="text-sm md:text-base font-semibold text-slate-700">{activeOrder.targetBitola}</p>
                                                     </div>
                                                     <div>
-                                                        <p className="text-xs text-slate-500 mb-1">Meta</p>
-                                                        <p className="font-semibold text-slate-700">{activeOrder.totalWeight.toFixed(0)} kg</p>
+                                                        <p className="text-[10px] md:text-xs text-slate-500 mb-1">Meta</p>
+                                                        <p className="text-sm md:text-base font-semibold text-slate-700">{activeOrder.totalWeight.toFixed(0)} kg</p>
                                                     </div>
                                                 </>
                                             ) : (
                                                 <>
                                                     <div className="col-span-2">
-                                                        <p className="text-xs text-slate-500 mb-1">Produto</p>
-                                                        <p className="font-semibold text-slate-700 truncate">{activeOrder.trelicaModel} ({activeOrder.tamanho}m)</p>
+                                                        <p className="text-[10px] md:text-xs text-slate-500 mb-1">Produto</p>
+                                                        <p className="text-sm md:text-base font-semibold text-slate-700 truncate">{activeOrder.trelicaModel} ({activeOrder.tamanho}m)</p>
                                                     </div>
                                                 </>
                                             )}
@@ -978,32 +1044,41 @@ const MachineControl: React.FC<MachineControlProps> = ({ machineType, setPage, c
                                     </div>
 
                                     {/* Progresso de Produção - Promovido para destaque */}
-                                    <div className="bg-white p-6 rounded-2xl shadow-sm">
-                                        <h3 className="text-lg font-bold text-slate-700 mb-4 flex items-center gap-2">
-                                            <ChartBarIcon className="h-5 w-5 text-indigo-500" /> Progresso
+                                    <div className="bg-white p-6 rounded-2xl shadow-sm relative overflow-hidden group">
+                                        <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition">
+                                            <ChartBarIcon className="h-16 w-16" />
+                                        </div>
+
+                                        <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
+                                            Performance de Produção
                                         </h3>
 
                                         {machineType === 'Treliça' ? (
                                             <div className="space-y-6">
                                                 <div className="relative pt-2">
-                                                    <div className="flex items-end justify-between mb-2">
+                                                    <div className="flex items-end justify-between mb-3">
                                                         <div>
-                                                            <span className="text-4xl font-bold text-slate-800">{activeOrder.actualProducedQuantity || 0}</span>
-                                                            <span className="text-lg text-slate-400 font-medium ml-1">/ {activeOrder.quantityToProduce}</span>
+                                                            <span className="text-5xl font-black text-slate-900 tracking-tighter">{activeOrder.actualProducedQuantity || 0}</span>
+                                                            <span className="text-xl text-slate-300 font-bold ml-2">/ {activeOrder.quantityToProduce}</span>
                                                         </div>
-                                                        <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg mb-1">Peças</span>
+                                                        <div className="flex flex-col items-end">
+                                                            <span className="text-[10px] font-black text-indigo-500 uppercase tracking-wider bg-indigo-50 px-2 py-1 rounded-md mb-1">Peças Concluídas</span>
+                                                            <span className="text-xs font-bold text-slate-400">Total Planejado</span>
+                                                        </div>
                                                     </div>
                                                     {(() => {
                                                         const produced = activeOrder.actualProducedQuantity || 0;
                                                         const planned = activeOrder.quantityToProduce || 1;
                                                         const progress = Math.min(100, (produced / planned) * 100);
                                                         return (
-                                                            <div className="w-full bg-slate-100 rounded-full h-6 overflow-hidden">
+                                                            <div className="w-full bg-slate-100 rounded-2xl h-8 overflow-hidden p-1 border border-slate-50">
                                                                 <div
-                                                                    className="bg-gradient-to-r from-indigo-500 to-purple-500 h-6 rounded-full transition-all duration-500 ease-out flex items-center justify-end pr-2 text-white text-xs font-bold"
+                                                                    className="bg-indigo-600 h-full rounded-xl transition-all duration-1000 ease-out flex items-center justify-end pr-3 shadow-lg shadow-indigo-100 relative overflow-hidden"
                                                                     style={{ width: `${progress}%` }}
                                                                 >
-                                                                    {progress > 5 && `${progress.toFixed(0)}%`}
+                                                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer"></div>
+                                                                    {progress > 12 && <span className="text-white text-[10px] font-black uppercase tracking-tighter">{progress.toFixed(0)}%</span>}
                                                                 </div>
                                                             </div>
                                                         );
@@ -1011,63 +1086,109 @@ const MachineControl: React.FC<MachineControlProps> = ({ machineType, setPage, c
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="space-y-4">
+                                            <div className="space-y-6">
                                                 <div className="flex items-center justify-between">
-                                                    <span className="text-slate-500">Peso Produzido</span>
-                                                    <span className="text-2xl font-bold text-slate-800">
-                                                        {(activeOrder.processedLots || []).reduce((acc, lot) => acc + (lot.finalWeight || 0), 0).toFixed(2)} <span className="text-sm text-slate-400">kg</span>
-                                                    </span>
+                                                    <div>
+                                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Produzido</p>
+                                                        <span className="text-4xl font-black text-slate-900 tracking-tighter">
+                                                            {(activeOrder.processedLots || []).reduce((acc, lot) => acc + (lot.finalWeight || 0), 0).toFixed(1)}
+                                                            <span className="text-lg text-slate-300 ml-1">kg</span>
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Meta do Lote</p>
+                                                        <span className="text-xl font-bold text-slate-600 tracking-tight">
+                                                            {activeOrder.totalWeight.toFixed(1)} <span className="text-sm font-medium">kg</span>
+                                                        </span>
+                                                    </div>
                                                 </div>
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-slate-500">Meta Planejada</span>
-                                                    <span className="text-lg font-semibold text-slate-600">
-                                                        {activeOrder.totalWeight.toFixed(2)} kg
-                                                    </span>
+                                                <div className="w-full bg-slate-100 rounded-2xl h-8 overflow-hidden p-1 border border-slate-50">
+                                                    {(() => {
+                                                        const produced = (activeOrder.processedLots || []).reduce((acc, lot) => acc + (lot.finalWeight || 0), 0);
+                                                        const planned = activeOrder.totalWeight || 1;
+                                                        const progress = Math.min(100, (produced / planned) * 100);
+                                                        return (
+                                                            <div
+                                                                className="bg-indigo-600 h-full rounded-xl transition-all duration-1000 ease-out flex items-center justify-end pr-3 shadow-lg shadow-indigo-100 relative overflow-hidden"
+                                                                style={{ width: `${progress}%` }}
+                                                            >
+                                                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer"></div>
+                                                                {progress > 12 && <span className="text-white text-[10px] font-black uppercase tracking-tighter">{progress.toFixed(0)}%</span>}
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </div>
                                             </div>
                                         )}
                                     </div>
 
                                     {hasActiveShift && (
-                                        <div className="bg-white p-6 rounded-2xl shadow-sm">
-                                            <h3 className="text-lg font-semibold text-slate-700 mb-3 flex items-center gap-2"><ClockIcon className="h-5 w-5" /> Status do Turno</h3>
-                                            <div className="space-y-3">
-                                                <div className="w-full bg-slate-200 rounded-full h-3">
-                                                    <div className={`h-3 rounded-full ${shiftStatus.isOvertime ? 'bg-red-500' : 'bg-slate-600'}`} style={{ width: `${shiftStatus.progress}%` }}></div>
+                                        <div className="bg-slate-900 p-6 rounded-2xl shadow-xl shadow-slate-200">
+                                            <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4 flex items-center justify-between">
+                                                <span>Tempo de Operação</span>
+                                                <ClockIcon className="h-4 w-4 text-slate-600" />
+                                            </h3>
+                                            <div className="space-y-4">
+                                                <div className="flex justify-between items-baseline">
+                                                    <p className="font-mono text-white font-black text-3xl tracking-tighter">{shiftStatus.timeStatusText}</p>
+                                                    {shiftStatus.isOvertime && <span className="text-[10px] font-black bg-red-500/20 text-red-500 px-2 py-0.5 rounded-full border border-red-500/30">EXTRA</span>}
                                                 </div>
-                                                <div className="flex justify-between items-center">
-                                                    <p className="font-mono text-slate-800 font-bold text-lg">{shiftStatus.timeStatusText}</p>
-                                                    {shiftStatus.isOvertime && <span className="text-xs font-bold bg-red-100 text-red-600 px-2 py-1 rounded">EXTRA</span>}
+                                                <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                                                    <div className={`h-full transition-all duration-700 ${shiftStatus.isOvertime ? 'bg-red-500' : 'bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]'}`} style={{ width: `${shiftStatus.progress}%` }}></div>
                                                 </div>
+                                                <p className="text-[10px] text-slate-500 font-bold uppercase text-center tracking-widest">Turno: 07:45 - 17:30</p>
                                             </div>
                                         </div>
                                     )}
 
-                                    <div className="bg-white p-6 rounded-2xl shadow-sm">
+                                    <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm">
                                         <h3 className="text-lg font-semibold text-slate-700 mb-3">Histórico de Paradas</h3>
-                                        <div className="max-h-48 overflow-y-auto overflow-x-auto custom-scrollbar">
+                                        <div className="max-h-48 overflow-y-auto custom-scrollbar">
                                             {activeOrder.downtimeEvents && activeOrder.downtimeEvents.length > 0 ? (
-                                                <table className="w-full text-sm min-w-[300px]">
-                                                    <thead className="text-left sticky top-0 bg-white shadow-sm">
-                                                        <tr className="text-xs text-slate-400 uppercase">
-                                                            <th className="p-2 font-semibold whitespace-nowrap">Motivo</th>
-                                                            <th className="p-2 font-semibold whitespace-nowrap text-right">Duração</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-slate-100">
-                                                        {[...activeOrder.downtimeEvents].reverse().slice(0, 5).map((event, index) => { // Show only last 5
+                                                <>
+                                                    {/* Desktop Table View */}
+                                                    <table className="w-full text-sm hidden sm:table">
+                                                        <thead className="text-left sticky top-0 bg-white shadow-sm">
+                                                            <tr className="text-xs text-slate-400 uppercase">
+                                                                <th className="p-2 font-semibold whitespace-nowrap">Motivo</th>
+                                                                <th className="p-2 font-semibold whitespace-nowrap text-right">Duração</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-100">
+                                                            {[...activeOrder.downtimeEvents].reverse().slice(0, 5).map((event, index) => { // Show only last 5
+                                                                const stop = new Date(event.stopTime);
+                                                                const resume = event.resumeTime ? new Date(event.resumeTime) : new Date();
+                                                                const durationMs = resume.getTime() - stop.getTime();
+                                                                return (
+                                                                    <tr key={index}>
+                                                                        <td className="p-2 max-w-[150px] truncate font-medium text-slate-700" title={event.reason}>{event.reason}</td>
+                                                                        <td className="p-2 text-right font-mono text-slate-500 whitespace-nowrap">{formatDuration(durationMs)}</td>
+                                                                    </tr>
+                                                                );
+                                                            })}
+                                                        </tbody>
+                                                    </table>
+
+                                                    {/* Mobile Card View */}
+                                                    <div className="space-y-2 sm:hidden">
+                                                        {[...activeOrder.downtimeEvents].reverse().slice(0, 5).map((event, index) => {
                                                             const stop = new Date(event.stopTime);
                                                             const resume = event.resumeTime ? new Date(event.resumeTime) : new Date();
                                                             const durationMs = resume.getTime() - stop.getTime();
                                                             return (
-                                                                <tr key={index}>
-                                                                    <td className="p-2 max-w-[150px] truncate font-medium text-slate-700" title={event.reason}>{event.reason}</td>
-                                                                    <td className="p-2 text-right font-mono text-slate-500 whitespace-nowrap">{formatDuration(durationMs)}</td>
-                                                                </tr>
+                                                                <div key={index} className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex justify-between items-center">
+                                                                    <div className="overflow-hidden mr-2">
+                                                                        <p className="font-bold text-slate-700 text-sm truncate">{event.reason}</p>
+                                                                        <p className="text-xs text-slate-400 mt-0.5">{stop.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} - {resume.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+                                                                    </div>
+                                                                    <div className="font-mono text-slate-600 font-bold bg-white px-2 py-1 rounded shadow-sm text-xs whitespace-nowrap">
+                                                                        {formatDuration(durationMs)}
+                                                                    </div>
+                                                                </div>
                                                             );
                                                         })}
-                                                    </tbody>
-                                                </table>
+                                                    </div>
+                                                </>
                                             ) : (
                                                 <p className="text-sm text-slate-400 text-center py-4 italic">Sem paradas recentes.</p>
                                             )}
@@ -1156,10 +1277,11 @@ const MachineControl: React.FC<MachineControlProps> = ({ machineType, setPage, c
                                                 </div>
                                             </div>
 
-                                            <div className="bg-white p-6 rounded-2xl shadow-sm">
+                                            <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm">
                                                 <h3 className="text-lg font-bold text-slate-700 mb-4">Lotes Finalizados</h3>
                                                 <div className="overflow-x-auto max-h-80">
-                                                    <table className="w-full text-sm">
+                                                    {/* Desktop Table */}
+                                                    <table className="w-full text-sm hidden sm:table">
                                                         <thead className="bg-slate-50 text-left sticky top-0">
                                                             <tr>
                                                                 <th className="p-3 font-semibold rounded-tl-lg">Lote</th>
@@ -1197,19 +1319,60 @@ const MachineControl: React.FC<MachineControlProps> = ({ machineType, setPage, c
                                                             ))}
                                                         </tbody>
                                                     </table>
+
+                                                    {/* Mobile Card List */}
+                                                    <div className="flex flex-col gap-3 sm:hidden">
+                                                        {completedLots.map(lot => (
+                                                            <div key={lot.lotId} className="bg-white border border-slate-200 p-4 rounded-xl shadow-sm flex flex-col gap-3">
+                                                                <div className="flex justify-between items-center">
+                                                                    <span className="font-bold text-slate-700 text-lg">{lot.lotInfo?.internalLot}</span>
+                                                                    {lot.finalWeight !== null && (
+                                                                        <span className="flex items-center gap-1 text-emerald-600 font-bold text-sm bg-emerald-50 px-2 py-1 rounded-lg">
+                                                                            <CheckCircleIcon className="h-4 w-4" /> Salvo
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+
+                                                                <div className="flex gap-2 items-end">
+                                                                    <div className="flex-1">
+                                                                        <label className="text-xs text-slate-400 font-bold uppercase mb-1 block">Peso Final (kg)</label>
+                                                                        {lot.finalWeight === null ? (
+                                                                            <input
+                                                                                type="number"
+                                                                                className="w-full p-3 border-2 border-slate-200 rounded-xl text-lg font-medium focus:border-emerald-500 focus:ring-0"
+                                                                                placeholder="0.00"
+                                                                                value={pendingWeights.get(lot.lotId) || ''}
+                                                                                onChange={e => handlePendingWeightChange(lot.lotId, e.target.value)}
+                                                                            />
+                                                                        ) : (
+                                                                            <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-lg font-bold text-slate-700 text-center">
+                                                                                {lot.finalWeight.toFixed(2)}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                    {lot.finalWeight === null && (
+                                                                        <button onClick={() => handleRecordWeight(lot.lotId)} className="h-[52px] px-4 bg-emerald-600 text-white font-bold rounded-xl shadow-lg shadow-emerald-200 active:scale-95 transition">
+                                                                            <SaveIcon className="h-6 w-6" />
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </>
                                     ) : (
                                         <>
-                                            <div className="bg-white p-6 rounded-2xl shadow-sm">
+                                            <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm">
                                                 <h3 className="text-lg font-bold text-slate-700 mb-4">Registro de Pacotes</h3>
                                                 <p className="text-sm text-slate-500 mb-6 bg-blue-50 p-3 rounded-lg border border-blue-100 flex gap-2">
                                                     <ExclamationIcon className="h-5 w-5 text-blue-500 flex-shrink-0" />
                                                     Pese cada pacote de 200 peças e registre abaixo.
                                                 </p>
-                                                <div className="overflow-auto max-h-[500px] border border-slate-100 rounded-xl">
-                                                    <table className="w-full text-sm">
+                                                <div className="overflow-auto max-h-[500px] md:border border-slate-100 rounded-xl">
+                                                    {/* Desktop Table View */}
+                                                    <table className="w-full text-sm hidden md:table">
                                                         <thead className="bg-slate-50 text-left sticky top-0 z-10">
                                                             <tr>
                                                                 <th className="p-4 font-bold text-slate-600">Pacote #</th>
@@ -1259,6 +1422,53 @@ const MachineControl: React.FC<MachineControlProps> = ({ machineType, setPage, c
                                                             ))}
                                                         </tbody>
                                                     </table>
+
+                                                    {/* Mobile Card View for Packages */}
+                                                    <div className="flex flex-col gap-4 md:hidden pb-4">
+                                                        {trelicaPackages.map(pkg => (
+                                                            <div key={pkg.packageNumber} className={`p-4 rounded-2xl border-2 ${pkg.status === 'Concluído' ? 'bg-slate-50 border-slate-100' : 'bg-white border-indigo-50 shadow-sm'}`}>
+                                                                <div className="flex justify-between items-center mb-3">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="bg-slate-200 text-slate-600 w-8 h-8 flex items-center justify-center rounded-full font-bold text-sm">#{pkg.packageNumber}</span>
+                                                                        <span className="text-slate-500 text-sm">{pkg.quantity} pçs</span>
+                                                                    </div>
+                                                                    {pkg.status === 'Concluído' && (
+                                                                        <div className="flex items-center gap-1 text-emerald-600 font-bold bg-emerald-50 px-2.5 py-1 rounded-lg text-xs uppercase tracking-wide">
+                                                                            <CheckCircleIcon className="h-4 w-4" /> Registrado
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+
+                                                                {pkg.status === 'Concluído' ? (
+                                                                    <div className="flex items-end justify-between">
+                                                                        <span className="text-xs text-slate-400 uppercase font-bold">Peso Registrado</span>
+                                                                        <span className="text-2xl font-mono font-bold text-slate-700">{pkg.weight?.toFixed(2)} <span className="text-sm">kg</span></span>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="flex gap-2 items-end">
+                                                                        <div className="flex-1 relative">
+                                                                            <label className="text-xs text-slate-400 font-bold uppercase mb-1 block">Peso (kg)</label>
+                                                                            <input
+                                                                                type="number"
+                                                                                inputMode="decimal"
+                                                                                step="0.01"
+                                                                                value={pendingPackageWeights.get(pkg.packageNumber) || ''}
+                                                                                onChange={e => handlePendingPackageWeightChange(pkg.packageNumber, e.target.value)}
+                                                                                className="w-full h-12 pl-3 pr-10 border-2 border-slate-200 rounded-xl text-xl font-bold text-slate-800 focus:border-indigo-500 focus:ring-0 transition"
+                                                                                placeholder="0.00"
+                                                                            />
+                                                                        </div>
+                                                                        <button
+                                                                            onClick={() => handleRecordPackageWeight(pkg.packageNumber, pkg.quantity)}
+                                                                            className="h-12 px-5 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-200 active:scale-95 transition flex items-center justify-center"
+                                                                        >
+                                                                            <CheckCircleIcon className="h-6 w-6" />
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </>
@@ -1266,79 +1476,84 @@ const MachineControl: React.FC<MachineControlProps> = ({ machineType, setPage, c
                                 </div>
                             </div>
 
-                            {/* Sticky Action Deck (Spotify Style) */}
-                            <div className="fixed bottom-0 right-0 left-0 md:left-64 bg-white border-t border-slate-200 p-3 sm:p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-40 transition-all duration-300"> {/* Added padding for responsiveness */}
-                                <div className="max-w-[1920px] mx-auto grid grid-cols-12 gap-2 sm:gap-4 items-center">
+                            {/* Sticky Action Deck (Spotify Style) - Revised for Mobile */}
+                            <div className="fixed bottom-0 right-0 left-0 md:left-64 bg-white/80 backdrop-blur-xl border-t border-slate-200/50 px-3 py-2 md:p-4 shadow-[0_-8px_30px_rgb(0,0,0,0.12)] z-40 transition-all duration-500 safe-area-bottom">
+                                <div className="max-w-[1920px] mx-auto flex items-center justify-between gap-3">
 
-                                    {/* Esquerda: Info Rápida (Oculta em mobile muito pequeno se necessário, mas bom manter) */}
-                                    <div className="col-span-3 sm:col-span-3 lg:col-span-2 hidden sm:flex items-center gap-3">
-                                        <div className={`w-2 h-12 rounded-full ${isMachineStopped ? 'bg-amber-500' : 'bg-emerald-500'}`}></div>
-                                        <div>
-                                            <p className="text-xs text-slate-400 uppercase font-bold">Status Atual</p>
-                                            <p className={`font-bold leading-tight ${isMachineStopped ? 'text-amber-600' : 'text-emerald-700'}`}>
-                                                {isMachineStopped ? 'MÁQUINA PARADA' : 'EM PRODUÇÃO'}
+                                    {/* Esquerda: Info Rápida (Desktop only) */}
+                                    <div className="hidden md:flex items-center gap-4 w-1/4">
+                                        <div className={`w-1.5 h-10 rounded-full ${isMachineStopped ? 'bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.5)]' : 'bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.5)]'}`}></div>
+                                        <div className="truncate">
+                                            <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-0.5">Status em Tempo Real</p>
+                                            <p className={`text-sm font-black leading-tight truncate ${isMachineStopped ? 'text-amber-600' : 'text-emerald-700'}`}>
+                                                {isMachineStopped ? 'MÁQUINA PARADA' : 'ESTADO ATIVO'}
                                             </p>
                                         </div>
                                     </div>
 
-                                    {/* Centro: Controles Principais */}
-                                    <div className="col-span-8 sm:col-span-6 lg:col-span-6 flex items-center justify-center gap-4">
+                                    {/* Centro: Controles Principais (Expanded on mobile) */}
+                                    <div className="flex-1 md:flex-none flex items-center justify-center md:w-1/2">
                                         {isMachineStopped ? (
                                             <button
                                                 onClick={() => logResumeProduction && logResumeProduction(activeOrder.id)}
-                                                className="flex-1 max-w-[200px] h-14 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full font-bold text-lg shadow-lg shadow-emerald-200 transition transform active:scale-95 flex items-center justify-center gap-2"
+                                                className="w-full md:w-auto md:px-14 h-14 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl md:rounded-full font-black text-lg shadow-xl shadow-emerald-200 transition transform active:scale-90 hover:scale-[1.02] flex items-center justify-center gap-3"
                                             >
                                                 <PlayIcon className="h-8 w-8" />
-                                                <span className="hidden sm:inline">RETORNAR</span>
+                                                <span className="inline tracking-tight">RETORNAR</span>
                                             </button>
                                         ) : (
                                             <button
                                                 onClick={() => setShowDowntimeModal(true)}
-                                                className="flex-1 max-w-[200px] h-14 bg-amber-500 hover:bg-amber-400 text-white rounded-full font-bold text-lg shadow-lg shadow-amber-200 transition transform active:scale-95 flex items-center justify-center gap-2"
+                                                className="w-full md:w-auto md:px-14 h-14 bg-amber-500 hover:bg-amber-400 text-white rounded-2xl md:rounded-full font-black text-lg shadow-xl shadow-amber-200 transition transform active:scale-90 hover:scale-[1.02] flex items-center justify-center gap-3"
                                             >
                                                 <PauseIcon className="h-8 w-8" />
-                                                <span className="hidden sm:inline">PARAR</span>
+                                                <span className="inline tracking-tight">PARAR MÁQUINA</span>
                                             </button>
                                         )}
                                     </div>
 
                                     {/* Direita: Ações Secundárias */}
-                                    <div className="col-span-4 sm:col-span-3 lg:col-span-4 flex items-center justify-end gap-2 sm:gap-4">
+                                    <div className="flex items-center justify-end gap-1 sm:gap-4 w-auto md:w-1/4">
                                         <button
                                             onClick={() => setIsMessagingModalOpen(true)}
-                                            className="p-3 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition"
-                                            title="Mensagens"
+                                            className="p-3.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50/50 rounded-2xl transition relative active:scale-90"
                                         >
                                             <ChatBubbleLeftRightIcon className="h-7 w-7" />
+                                            <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-indigo-500 border-2 border-white rounded-full"></span>
                                         </button>
-                                        <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
+
+                                        <div className="h-8 w-px bg-slate-200/60 hidden md:block"></div>
+
                                         <button
                                             onClick={() => {
                                                 if (machineType === 'Trefila') handleTrefilaComplete();
                                                 else setShowCompletionModal(true);
                                             }}
                                             disabled={isCompletionDisabled}
-                                            className="hidden sm:flex bg-slate-800 text-white px-4 py-3 rounded-xl font-bold text-sm hover:bg-slate-700 transition items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="hidden md:flex bg-slate-900 text-white px-5 py-3.5 rounded-2xl font-black text-xs hover:bg-slate-800 shadow-lg shadow-slate-200 transition items-center gap-2 disabled:opacity-30 disabled:grayscale active:scale-95"
                                         >
                                             <CheckCircleIcon className="h-5 w-5" />
-                                            <span>FINALIZAR OP</span>
+                                            <span>FECHAR ORDEM</span>
                                         </button>
+
+                                        {/* Mobile Finish Button (Icon Only) */}
                                         <button
                                             onClick={() => {
                                                 if (machineType === 'Trefila') handleTrefilaComplete();
                                                 else setShowCompletionModal(true);
                                             }}
                                             disabled={isCompletionDisabled}
-                                            className="sm:hidden p-3 bg-slate-800 text-white rounded-xl hover:bg-slate-700 transition disabled:opacity-50"
+                                            className="md:hidden p-3.5 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition disabled:opacity-30 active:scale-90 shadow-lg shadow-slate-200"
+                                            title="Finalizar Ordem"
                                         >
-                                            <CheckCircleIcon className="h-6 w-6" />
+                                            <CheckCircleIcon className="h-7 w-7" />
                                         </button>
 
                                         {hasActiveShift && (
                                             <button
                                                 onClick={() => endOperatorShift && endOperatorShift(activeOrder.id)}
-                                                className="p-3 text-red-500 hover:bg-red-50 rounded-xl transition"
-                                                title="Finalizar Turno"
+                                                className="p-3.5 text-red-500 hover:bg-red-50/50 rounded-2xl transition active:scale-90"
+                                                title="Encerrar Turno"
                                             >
                                                 <ClockIcon className="h-7 w-7" />
                                             </button>
