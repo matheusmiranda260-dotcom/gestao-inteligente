@@ -194,7 +194,7 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
 
     return (
         <div
-            className={`flex-1 min-w-full md:min-w-[300px] border-2 rounded-2xl p-4 md:p-6 relative transition-all duration-300 min-h-[50vh] flex flex-col ${isActive ? 'border-emerald-500 bg-emerald-50/80 shadow-xl ring-2 ring-emerald-300' : 'border-dashed border-slate-300 bg-slate-50 opacity-90'}`}
+            className={`flex-1 min-w-full md:min-w-[300px] rounded-3xl p-4 md:p-6 relative transition-all duration-300 min-h-[50vh] flex flex-col ${isActive ? 'bg-white/40 backdrop-blur-sm shadow-xl border-2 border-emerald-500/30' : 'bg-slate-50/50 border-2 border-dashed border-slate-200'}`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={(e) => {
@@ -322,52 +322,16 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                             ${isMenuOpen ? 'z-50 scale-110 ring-4 ring-emerald-400 bg-white shadow-xl' : 'hover:scale-105 active:scale-95'}
                                         `}
                                                 title={`${slot.item.internalLot} - ${slot.item.bitola} - ${(slot.item.remainingQuantity || 0).toFixed(0)}kg`}
-                                                draggable={!isMenuOpen}
+                                                draggable={true}
                                                 onDragStart={(e) => {
                                                     e.dataTransfer.setData('application/json', JSON.stringify(slot.item));
                                                     e.dataTransfer.effectAllowed = 'move';
                                                 }}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    if (isMenuOpen) {
-                                                        setMenuItemId(null);
-                                                    } else {
-                                                        setMenuItemId(slot.item!.id);
-                                                    }
+                                                    if (onItemClick) onItemClick(slot.item!);
                                                 }}
                                             >
-                                                {isMenuOpen && (
-                                                    <div
-                                                        className="absolute z-[100] bottom-full left-1/2 -translate-x-1/2 mb-2 w-32 bg-white rounded-xl shadow-2xl p-1.5 flex flex-col gap-1 border border-slate-100 animate-in slide-in-from-bottom-2 fade-in duration-200 transition-all sm:scale-110 sm:mb-4 sm:w-36"
-                                                        onClick={(e) => e.stopPropagation()}
-                                                    >
-                                                        <div className="text-[10px] sm:text-xs font-black text-center text-slate-400 border-b border-slate-100 pb-1.5 mb-1 tracking-tighter uppercase">
-                                                            Lote {slot.item.internalLot}
-                                                        </div>
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); if (onItemClick) onItemClick(slot.item!); setMenuItemId(null); }}
-                                                            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold px-3 py-2.5 rounded-xl w-full flex items-center justify-between gap-2 transition-all active:scale-95 group"
-                                                        >
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="text-base group-hover:rotate-12 transition-transform">✋</span>
-                                                                <span>Mover Lote</span>
-                                                            </div>
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400"></div>
-                                                        </button>
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); onRemove(slot.item!); setMenuItemId(null); }}
-                                                            className="bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold px-3 py-2.5 rounded-xl w-full flex items-center justify-between gap-2 transition-all active:scale-95 group"
-                                                        >
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="text-base group-hover:shake transition-transform">🗑️</span>
-                                                                <span>Remover</span>
-                                                            </div>
-                                                        </button>
-
-                                                        {/* Arrow */}
-                                                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-[6px] border-transparent border-t-white drop-shadow-sm"></div>
-                                                    </div>
-                                                )}
 
                                                 {/* Standard Coil Content (Always Visible, with z-index separation if menu open) */}
                                                 <div
@@ -446,12 +410,12 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                             >
                                                 {/* Realistic "Shadow" Placeholder */}
                                                 <div
-                                                    className={`absolute inset-0 ${shapeClass} ${isSlotActive ? 'ring-2 ring-orange-500' : ''}`}
+                                                    className={`absolute inset-0 ${shapeClass} ${isSlotActive ? 'ring-4 ring-emerald-400 ring-offset-2 animate-pulse shadow-[0_0_20px_rgba(52,211,153,0.5)]' : ''}`}
                                                     style={{
                                                         background: !isCARow
-                                                            ? 'repeating-radial-gradient(circle at 50% 50%, rgba(0,0,0,0.15) 0, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.25) 3px, rgba(0,0,0,0.35) 4px)'
-                                                            : 'rgba(0,0,0,0.15)',
-                                                        boxShadow: 'inset 0 0 10px rgba(0,0,0,0.2)'
+                                                            ? 'repeating-radial-gradient(circle at 50% 50%, rgba(0,0,0,0.1) 0, rgba(0,0,0,0.1) 2px, rgba(0,0,0,0.15) 3px, rgba(0,0,0,0.2) 4px)'
+                                                            : 'rgba(0,0,0,0.05)',
+                                                        boxShadow: isSlotActive ? 'none' : 'inset 0 0 10px rgba(0,0,0,0.1)'
                                                     }}
                                                 ></div>
 
@@ -549,6 +513,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
     // Stores the coordinates ({ row, l, p }) of the empty slot the user clicked on.
     // When set, the next click on a pending item will fill this exact slot.
     const [activeSlot, setActiveSlot] = useState<{ row: string, l: number, p: number } | null>(null);
+    const [selectedItemMenu, setSelectedItemMenu] = useState<StockItem | null>(null); // New state for Bottom Sheet menu
     const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(true); // For mobile immersive view
 
     // Helper to identify row "type" based on name
@@ -1133,20 +1098,42 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                 {/* Top Tab Bar & Actions */}
                 <div className="bg-white border-b flex items-center gap-1.5 px-2 py-1.5 min-h-[2.5rem] md:min-h-[3.5rem] shrink-0 shadow-sm z-30 h-auto overflow-x-auto no-scrollbar">
 
-                    {/* Pending Items FAB - Clean Mobile View (only visible if header is collapsed) */}
-                    <button
-                        onClick={() => setIsPendingListOpen(true)}
-                        className={`
-                            md:hidden fixed bottom-6 right-6 z-[60] w-14 h-14 rounded-full shadow-2xl flex items-center justify-center transition-all active:scale-95
-                            ${unassignedStock.length > 0 ? 'bg-amber-500 text-white shadow-amber-500/40' : 'bg-slate-700 text-slate-300 shadow-slate-900/40'}
-                            ${!isHeaderCollapsed ? 'scale-0' : 'scale-100'} border-4 border-white
-                        `}
-                    >
-                        {activeSlot ? <span className="text-2xl animate-bounce">⬇</span> : <PlusIcon className="w-8 h-8" />}
-                        <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold w-6 h-6 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
-                            {unassignedStock.length}
-                        </span>
-                    </button>
+                    {/* Global Actions HUB (Replacing Floating Badges) */}
+                    <div className={`md:hidden fixed bottom-6 right-6 z-[60] flex flex-col items-end gap-3 transition-all duration-500 ${!isHeaderCollapsed ? 'scale-0 translate-y-20' : 'scale-100 translate-y-0'}`}>
+                        {itemToMove && (
+                            <button
+                                onClick={() => setItemToMove(null)}
+                                className="bg-white text-rose-600 px-4 py-2 rounded-full shadow-lg font-black text-[10px] uppercase tracking-widest border-2 border-rose-100 flex items-center gap-2 animate-in slide-in-from-right-4"
+                            >
+                                <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                                Cancelar Movimentação
+                            </button>
+                        )}
+
+                        <div className="flex items-center gap-3">
+                            {(itemToMove || activeSlot) && (
+                                <div className="bg-emerald-600 text-white px-4 py-2 rounded-2xl shadow-xl font-bold text-xs animate-in slide-in-from-right-6 flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-white animate-ping"></div>
+                                    <span>{itemToMove ? 'Toque noutra vaga' : 'Selecione um lote'}</span>
+                                </div>
+                            )}
+
+                            <button
+                                onClick={() => setIsPendingListOpen(true)}
+                                className={`
+                                    w-16 h-16 rounded-[2rem] shadow-2xl flex items-center justify-center transition-all active:scale-90 relative
+                                    ${activeSlot || itemToMove ? 'bg-emerald-500 text-white animate-pulse' : (unassignedStock.length > 0 ? 'bg-amber-500 text-white' : 'bg-slate-800 text-slate-300')}
+                                    border-4 border-white
+                                `}
+                            >
+                                {activeSlot && !itemToMove ? <span className="text-3xl animate-bounce">⬇</span> : (itemToMove ? <span className="text-3xl">⇄</span> : <PlusIcon className="w-9 h-9" />)}
+
+                                <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-black w-7 h-7 rounded-full flex items-center justify-center border-2 border-white shadow-md">
+                                    {unassignedStock.length}
+                                </span>
+                            </button>
+                        </div>
+                    </div>
 
                     {/* Row Tabs */}
                     <div className="flex-1 flex overflow-x-auto no-scrollbar items-center gap-2 w-full scroll-smooth py-1">
@@ -1281,13 +1268,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                             </div>
                         )}
                         {isPendingListOpen && <div className="absolute inset-0 bg-black/20 z-30 md:hidden" onClick={() => setIsPendingListOpen(false)}></div>}
-
-                        {activeSlot && (
-                            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-emerald-600 text-white px-6 py-2 rounded-full shadow-lg z-50 animate-bounce cursor-pointer" onClick={() => setActiveSlot(null)}>
-                                <span className="font-bold">Vaga Selecionada: {activeSlot.row}</span>
-                                <span className="text-xs ml-2 opacity-80">(Clique aqui para cancelar)</span>
-                            </div>
-                        )}
+                        {selectedItemMenu && <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-[60] md:hidden" onClick={() => setSelectedItemMenu(null)}></div>}
 
                         {/* Actual Row Render */}
                         {(() => {
@@ -1317,7 +1298,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                                         onRemove={handleRemoveFromRow}
                                         onRemoveRow={() => handleRemoveRow(targetRowName)}
                                         onRenameRow={(newName) => handleRenameRow(targetRowName, newName)}
-                                        onItemClick={(item) => setItemToMove(itemToMove?.id === item.id ? null : item)}
+                                        onItemClick={(item) => setSelectedItemMenu(item)}
                                         onSlotClick={(l, p) => {
                                             setActiveSlot({ row: targetRowName, l, p });
                                             setIsPendingListOpen(true); // Innovation: show list when clicking empty
@@ -1433,6 +1414,69 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                     </div>
                 </div>
             )}
+            {/* Premium Item Actions Bottom Sheet (Mobile) */}
+            <div className={`
+                md:hidden fixed inset-x-0 bottom-0 bg-white rounded-t-[2.5rem] shadow-[0_-10px_40px_rgba(0,0,0,0.15)] z-[70] transition-all duration-500 transform
+                ${selectedItemMenu ? 'translate-y-0' : 'translate-y-full'}
+            `}>
+                <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-4 mb-2"></div>
+
+                {selectedItemMenu && (
+                    <div className="p-8 pt-2">
+                        <div className="flex items-center justify-between mb-8">
+                            <div>
+                                <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest block mb-1">AÇÕES DO LOTE</span>
+                                <h3 className="text-3xl font-black text-slate-800 tracking-tight">Lote {selectedItemMenu.internalLot}</h3>
+                                <p className="text-slate-400 font-bold text-sm">{selectedItemMenu.materialType} • {selectedItemMenu.bitola}mm</p>
+                            </div>
+                            <button onClick={() => setSelectedItemMenu(null)} className="p-3 bg-slate-100 rounded-full text-slate-400">
+                                <XIcon className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-4">
+                            <button
+                                onClick={() => {
+                                    setItemToMove(selectedItemMenu);
+                                    setSelectedItemMenu(null);
+                                }}
+                                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl p-5 flex items-center justify-between shadow-lg shadow-emerald-200 transition-all active:scale-[0.98]"
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center text-2xl">✋</div>
+                                    <div className="text-left">
+                                        <div className="font-black text-lg">Mover Lote</div>
+                                        <div className="text-white/80 text-xs font-bold">Relocar para outra vaga</div>
+                                    </div>
+                                </div>
+                                <div className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center">→</div>
+                            </button>
+
+                            <button
+                                onClick={() => {
+                                    handleRemoveFromRow(selectedItemMenu);
+                                    setSelectedItemMenu(null);
+                                }}
+                                className="w-full bg-white border-2 border-slate-100 hover:border-rose-200 hover:bg-rose-50 text-slate-600 hover:text-rose-600 rounded-2xl p-5 flex items-center justify-between transition-all active:scale-[0.98]"
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 bg-slate-50 group-hover:bg-rose-100 rounded-xl flex items-center justify-center text-2xl">🗑️</div>
+                                    <div className="text-left">
+                                        <div className="font-black text-lg">Remover do Mapa</div>
+                                        <div className="text-slate-400 text-xs font-bold italic">Retornar para lista de pendentes</div>
+                                    </div>
+                                </div>
+                            </button>
+                        </div>
+
+                        <div className="mt-8 text-center">
+                            <button onClick={() => setSelectedItemMenu(null)} className="text-slate-400 font-black text-xs uppercase tracking-widest">Cancelar Operação</button>
+                        </div>
+                    </div>
+                )}
+                <div className="h-10"></div>
+            </div>
+
             {/* Closing divs for main layout */}
         </div>
     );
