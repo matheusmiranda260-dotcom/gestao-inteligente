@@ -252,7 +252,7 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                         <ChartBarIcon className="w-5 h-5 rotate-90" />
                     </button>
 
-                    <div className="flex items-center bg-white rounded-lg border border-slate-200 mr-2 scale-90 origin-right shadow-sm" title="Tamanho da Base (Chão)">
+                    <div className="flex items-center bg-white rounded-lg border border-slate-200 mr-2 md:scale-90 md:origin-right shadow-sm" title="Tamanho da Base (Chão)">
                         <button onClick={(e) => { e.stopPropagation(); updateConfig(Math.max(1, baseSize - 1), maxHeight); }} className="px-3 py-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-l-lg font-bold border-r active:bg-slate-200">-</button>
                         <div className="flex flex-col items-center justify-center w-10 bg-slate-50 px-1 select-none">
                             <span className="text-[8px] uppercase text-slate-400 leading-none mb-0.5">Base</span>
@@ -261,7 +261,7 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                         <button onClick={(e) => { e.stopPropagation(); updateConfig(baseSize + 1, maxHeight); }} className="px-3 py-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-r-lg font-bold border-l active:bg-slate-200">+</button>
                     </div>
 
-                    <div className="flex items-center bg-white rounded-lg border border-slate-200 mr-2 scale-90 origin-right shadow-sm" title="Altura Máxima (Pilha)">
+                    <div className="flex items-center bg-white rounded-lg border border-slate-200 mr-2 md:scale-90 md:origin-right shadow-sm" title="Altura Máxima (Pilha)">
                         <button onClick={(e) => { e.stopPropagation(); updateConfig(baseSize, Math.max(1, maxHeight - 1)); }} className="px-3 py-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-l-lg font-bold border-r active:bg-slate-200">-</button>
                         <div className="flex flex-col items-center justify-center w-10 bg-slate-50 px-1 select-none">
                             <span className="text-[8px] uppercase text-slate-400 leading-none mb-0.5">Alt</span>
@@ -308,7 +308,7 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                     const isRowInteractive = levelSlots.some(s => s.item?.id === menuItemId);
 
                     return (
-                        <div key={levelIndex} className={`flex justify-center z-10 relative ${isCARow ? 'gap-0.5 md:gap-1' : '-space-x-[1px] md:space-x-[2px]'}`} style={{ zIndex: isRowInteractive ? 100 : levelIndex }}>
+                        <div key={levelIndex} className={`flex justify-center z-10 relative ${isCARow ? 'gap-0.5 md:gap-1' : '-space-x-1 md:space-x-1'}`} style={{ zIndex: isRowInteractive ? 100 : levelIndex }}>
                             {levelSlots.map((slot, slotIndex) => {
                                 const isSlotActive = activeSlot && activeSlot.l === slot.coords.l && activeSlot.p === slot.coords.p;
                                 const isMovingThis = movingItem && slot.item && movingItem.id === slot.item.id;
@@ -328,7 +328,7 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                         <div
                                             key={slot.item.id}
                                             className={`
-                                            w-14 h-14 md:w-20 md:h-20 ${shapeClass} flex items-center justify-center relative cursor-pointer transform transition-all shrink-0
+                                            w-[52px] h-[52px] sm:w-16 sm:h-16 md:w-20 md:h-20 ${shapeClass} flex items-center justify-center relative cursor-pointer transform transition-all shrink-0
                                             ${isMovingThis ? 'z-50 scale-110 drop-shadow-2xl' : ''}
                                             ${isMenuOpen ? 'z-50 scale-110 ring-4 ring-emerald-400 bg-white shadow-xl' : 'hover:scale-105 active:scale-95'}
                                         `}
@@ -349,21 +349,21 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                         >
                                             {isMenuOpen && (
                                                 <div
-                                                    className="absolute z-[100] bottom-full left-1/2 -translate-x-1/2 mb-2 w-32 bg-white rounded-xl shadow-2xl p-1.5 flex flex-col gap-1 border border-slate-100 animate-in slide-in-from-bottom-2 fade-in duration-200"
+                                                    className="absolute z-[100] bottom-full left-1/2 -translate-x-1/2 mb-2 w-32 bg-white rounded-xl shadow-2xl p-1.5 flex flex-col gap-1 border border-slate-100 animate-in slide-in-from-bottom-2 fade-in duration-200 transition-all sm:scale-110 sm:mb-4 sm:w-36"
                                                     onClick={(e) => e.stopPropagation()}
                                                 >
-                                                    <div className="text-[10px] font-bold text-center text-slate-500 border-b border-slate-100 pb-1 mb-0.5 overflow-hidden text-ellipsis whitespace-nowrap">
+                                                    <div className="text-[10px] sm:text-xs font-bold text-center text-slate-500 border-b border-slate-100 pb-1 mb-0.5 overflow-hidden text-ellipsis whitespace-nowrap">
                                                         {slot.item.internalLot}
                                                     </div>
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); if (onItemClick) onItemClick(slot.item!); setMenuItemId(null); }}
-                                                        className="bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-1.5 rounded-lg w-full flex items-center justify-center gap-2 transition-colors"
+                                                        className="bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] sm:text-xs font-bold px-2 py-1.5 sm:py-2 rounded-lg w-full flex items-center justify-center gap-2 transition-colors"
                                                     >
                                                         <span className="text-lg leading-none">✋</span> Mover
                                                     </button>
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); onRemove(slot.item!); setMenuItemId(null); }}
-                                                        className="bg-red-50 hover:bg-red-100 text-red-700 text-[10px] font-bold px-2 py-1.5 rounded-lg w-full flex items-center justify-center gap-2 transition-colors"
+                                                        className="bg-red-50 hover:bg-red-100 text-red-700 text-[10px] sm:text-xs font-bold px-2 py-1.5 sm:py-2 rounded-lg w-full flex items-center justify-center gap-2 transition-colors"
                                                     >
                                                         <span className="text-lg leading-none">🗑️</span> Excluir
                                                     </button>
@@ -395,13 +395,13 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
 
                                             {/* Content Overlay */}
                                             <div className="relative z-20 text-center leading-none drop-shadow-md pointer-events-none">
-                                                <div className="bg-white/90 px-1 rounded-sm text-[8px] md:text-[10px] font-bold text-slate-900 border border-slate-300 mb-0.5 whitespace-nowrap overflow-hidden max-w-[40px] md:max-w-[50px] text-ellipsis">
+                                                <div className="bg-white/90 px-1 rounded-sm text-[8px] sm:text-[9px] md:text-[10px] font-bold text-slate-900 border border-slate-300 mb-0.5 whitespace-nowrap overflow-hidden max-w-[44px] sm:max-w-[54px] md:max-w-[64px] text-ellipsis">
                                                     {slot.item.internalLot}
                                                 </div>
-                                                <div className="text-[9px] md:text-xs text-white font-mono font-bold tracking-tighter">
+                                                <div className="text-[10px] sm:text-xs md:text-sm text-white font-mono font-bold tracking-tighter">
                                                     {(slot.item.remainingQuantity || 0).toFixed(0)}
                                                 </div>
-                                                <div className="text-[7px] md:text-[8px] text-emerald-200 mt-0.5">
+                                                <div className="text-[7px] md:text-[9px] text-emerald-200 mt-0.5">
                                                     {slot.item.bitola}mm
                                                 </div>
                                             </div>
@@ -419,7 +419,7 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                         <div
                                             key={`empty-${levelIndex}-${slotIndex}`}
                                             className={`
-                                            w-14 h-14 md:w-20 md:h-20 ${shapeClass} flex items-center justify-center transition-all cursor-pointer z-0 pointer-events-auto shrink-0 relative
+                                            w-[52px] h-[52px] sm:w-16 sm:h-16 md:w-20 md:h-20 ${shapeClass} flex items-center justify-center transition-all cursor-pointer z-0 pointer-events-auto shrink-0 relative
                                             ${isSlotActive
                                                     ? 'scale-105 shadow-[0_0_15px_rgba(255,165,0,0.5)] z-20'
                                                     : 'hover:scale-105 opacity-60 hover:opacity-100'}
@@ -1073,15 +1073,15 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
             {/* New Layout: Top Bar (Tabs) + Main Content (Single Row) */}
             <div className="flex flex-col h-full overflow-hidden bg-slate-50">
                 {/* Top Tab Bar & Actions */}
-                <div className="bg-white border-b flex flex-wrap items-center gap-4 px-4 py-3 min-h-[4rem] shrink-0 shadow-sm z-30 h-auto">
+                <div className="bg-white border-b flex items-center gap-2 px-4 py-2 min-h-[3.5rem] shrink-0 shadow-sm z-30 h-auto">
 
                     {/* Drawer Toggle (Mobile) */}
-                    <button onClick={() => setIsPendingListOpen(!isPendingListOpen)} className="md:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-lg">
+                    <button onClick={() => setIsPendingListOpen(!isPendingListOpen)} className="md:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-lg shrink-0">
                         <ExclamationIcon className="w-6 h-6 text-amber-500" />
                     </button>
 
                     {/* Row Tabs */}
-                    <div className="flex-1 flex flex-wrap items-center gap-2 w-full">
+                    <div className="flex-1 flex overflow-x-auto no-scrollbar items-center gap-2 w-full scroll-smooth py-1">
                         {/* Auto-Generated Rows Only */}
                         {derivedRows.length === 0 && <span className="text-slate-400 text-xs italic whitespace-nowrap">Sem fileiras...</span>}
 
@@ -1112,15 +1112,32 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                 <div className="flex-1 flex overflow-hidden relative">
                     {/* Left Drawer (Pending) - kept distinct */}
                     <div className={`
-                        absolute md:relative z-40 bg-white border-r border-slate-200 shadow-2xl md:shadow-none w-[300px] transition-transform duration-300 h-full flex flex-col shrink-0
+                        absolute md:relative z-40 bg-white border-r border-slate-200 shadow-2xl md:shadow-none w-full sm:w-[320px] md:w-[300px] transition-transform duration-300 h-full flex flex-col shrink-0
                         ${isPendingListOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
                     `}>
                         {/* Drawer Header */}
-                        <div className="p-4 border-b bg-slate-50">
-                            <h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3">
+                        <div className="p-4 border-b bg-slate-50 flex items-center justify-between md:block">
+                            <h3 className="font-bold text-slate-700 flex items-center gap-2 mb-0 md:mb-3">
                                 <ExclamationIcon className="w-5 h-5 text-amber-500" />
                                 Pendentes ({unassignedStock.length})
                             </h3>
+                            <button onClick={() => setIsPendingListOpen(false)} className="md:hidden p-2 hover:bg-slate-200 rounded-lg text-slate-400">
+                                <XIcon className="w-6 h-6" />
+                            </button>
+                        </div>
+                        <div className="p-4 border-b bg-slate-50 md:hidden">
+                            <div className="relative">
+                                <SearchIcon className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar..."
+                                    value={searchTerm}
+                                    onChange={e => setSearchTerm(e.target.value)}
+                                    className="w-full pl-9 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                                />
+                            </div>
+                        </div>
+                        <div className="hidden md:block p-4 border-b bg-slate-50">
                             <div className="relative">
                                 <SearchIcon className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
                                 <input
@@ -1175,12 +1192,13 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
 
                     {/* Main Canvas */}
                     <div
-                        className="flex-1 overflow-auto p-4 md:p-8 flex items-start justify-center relative"
+                        className="flex-1 overflow-auto p-4 md:p-8 flex items-start justify-center relative no-scrollbar"
                         style={{
                             backgroundImage: `linear-gradient(to bottom, rgba(241, 245, 249, 0.85), rgba(241, 245, 249, 0.92)), url(/industrial-bg.png)`,
                             backgroundSize: 'cover',
                             backgroundPosition: 'center',
-                            backgroundAttachment: 'fixed'
+                            backgroundAttachment: 'fixed',
+                            scrollBehavior: 'smooth'
                         }}
                     >
                         {/* Overlay Controls */}
