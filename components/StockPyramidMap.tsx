@@ -79,11 +79,11 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
     // Aggressive Dynamic Sizing to FIT mobile screens
     const dims = useMemo(() => {
         // Base sizes for mobile (<640px) vs desktop
-        if (baseSize <= 6) return { slot: 'w-[62px] h-[62px] sm:w-24 sm:h-24', gap: 'gap-x-3', font: 'text-[11px] sm:text-base' };
-        if (baseSize <= 9) return { slot: 'w-[48px] h-[48px] sm:w-20 sm:h-20', gap: 'gap-x-2', font: 'text-[9px] sm:text-sm' };
-        if (baseSize <= 12) return { slot: 'w-[38px] h-[38px] sm:w-16 sm:h-16', gap: 'gap-x-1.5', font: 'text-[8.5px] sm:text-xs' };
-        if (baseSize <= 15) return { slot: 'w-[30px] h-[30px] sm:w-14 sm:h-14', gap: 'gap-x-1', font: 'text-[7.5px] sm:text-[11px]' };
-        return { slot: 'w-[24px] h-[24px] sm:w-11 sm:h-11', gap: 'gap-x-0.5', font: 'text-[6.5px] sm:text-[9px]' };
+        if (baseSize <= 6) return { slot: 'w-[62px] h-[62px] sm:w-[150px] sm:h-[150px]', gap: 'gap-x-3 sm:gap-x-6', font: 'text-[11px] sm:text-2xl' };
+        if (baseSize <= 9) return { slot: 'w-[48px] h-[48px] sm:w-[110px] sm:h-[110px]', gap: 'gap-x-2 sm:gap-x-4', font: 'text-[9px] sm:text-xl' };
+        if (baseSize <= 12) return { slot: 'w-[38px] h-[38px] sm:w-[85px] sm:h-[85px]', gap: 'gap-x-1.5 sm:gap-x-3', font: 'text-[8.5px] sm:text-lg' };
+        if (baseSize <= 15) return { slot: 'w-[30px] h-[30px] sm:w-[70px] sm:h-[70px]', gap: 'gap-x-1 sm:gap-x-2', font: 'text-[7.5px] sm:text-base' };
+        return { slot: 'w-[24px] h-[24px] sm:w-[55px] sm:h-[55px]', gap: 'gap-x-0.5 sm:gap-x-1.5', font: 'text-[6.5px] sm:text-sm' };
     }, [baseSize]);
 
     const handleSaveName = () => {
@@ -287,7 +287,7 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
 
             {/* Pyramid Render Area */}
             <div className="flex-1 w-full overflow-x-auto no-scrollbar py-12 px-2 flex justify-start md:justify-center items-center">
-                <div className="flex flex-col-reverse items-center min-h-[120px] md:min-h-[150px] transition-all duration-300 gap-y-4 md:gap-y-1 pb-12 w-max"
+                <div className="flex flex-col-reverse items-center min-h-[120px] md:min-h-[150px] transition-all duration-300 gap-y-4 md:gap-y-6 pb-12 w-max"
                     style={{ height: maxHeight < 5 ? 'auto' : undefined }} // Fluid height if small
                 >
                     {builtLevels.map((levelSlots, levelIndex) => {
@@ -1325,7 +1325,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                             const config = rowConfigs.find(rc => rc.rowName === targetRowName);
 
                             return (
-                                <div className="w-full max-w-6xl animate-fadeIn">
+                                <div className="w-full max-w-[98vw] animate-fadeIn">
                                     <PyramidRow
                                         rowName={targetRowName}
                                         items={itemsForThisRow}
