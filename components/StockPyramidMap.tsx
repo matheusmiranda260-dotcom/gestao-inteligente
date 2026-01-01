@@ -75,6 +75,14 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
         if (menuItemId) setMenuItemId(null);
     };
 
+    // Dynamic Sizing based on baseSize to prevent clipping
+    const dims = useMemo(() => {
+        if (baseSize <= 8) return { slot: 'w-[64px] h-[64px] sm:w-20 sm:h-20 md:w-24 md:h-24', gap: 'gap-x-2', font: 'text-[11px] sm:text-sm md:text-base' };
+        if (baseSize <= 12) return { slot: 'w-[58px] h-[58px] sm:w-16 sm:h-16 md:w-20 md:h-20', gap: 'gap-x-1.5', font: 'text-[10px] sm:text-xs md:text-sm' };
+        if (baseSize <= 16) return { slot: 'w-[48px] h-[48px] sm:w-14 sm:h-14 md:w-16 md:h-16', gap: 'gap-x-1', font: 'text-[9px] sm:text-[11px] md:text-xs' };
+        return { slot: 'w-[42px] h-[42px] sm:w-11 sm:h-11 md:w-13 md:h-13', gap: 'gap-x-1', font: 'text-[8px] sm:text-[9px] md:text-[10px]' };
+    }, [baseSize]);
+
     const handleSaveName = () => {
         if (editedName.trim() && editedName !== rowName) {
             onRenameRow(editedName.trim());
@@ -235,11 +243,6 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                         <div>
                             <h3 className={`font-bold text-lg leading-none flex items-center gap-2 ${isActive ? 'text-emerald-800' : 'text-slate-700'}`}>
                                 {rowName}
-                                {!isFinalized && (
-                                    <button onClick={(e) => { e.stopPropagation(); setIsEditingName(true); setEditedName(rowName); }} className="text-slate-400 hover:text-slate-600">
-                                        <PencilIcon className="w-4 h-4" />
-                                    </button>
-                                )}
                             </h3>
                             <span className="text-xs text-slate-500 font-normal">{items.length} itens {isFinalized && <span className="text-emerald-600 font-bold opacity-100 bg-emerald-100 px-1 rounded ml-1">FINALIZADA</span>}</span>
                         </div>
@@ -270,194 +273,179 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                         <button onClick={(e) => { e.stopPropagation(); updateConfig(baseSize, Math.min(5, maxHeight + 1)); }} className={`px-3 py-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-r-lg font-bold border-l active:bg-slate-200 ${maxHeight >= 5 ? 'opacity-50 cursor-not-allowed' : ''}`} disabled={maxHeight >= 5}>+</button>
                     </div>
 
-                    {/* Actions Group */}
+                    {/* Actions Group - Removed for automation */}
                     <div className="flex items-center gap-1">
-                        {isFinalized ? (
-                            <>
-                                <button onClick={(e) => { e.stopPropagation(); onRenameRow(rowName.replace(' [FINALIZADA]', '')); }} className="px-2 py-1 bg-amber-100 text-amber-700 rounded text-xs font-bold hover:bg-amber-200" title="Editar Fileira">
-                                    EDITAR
-                                </button>
-                                <button onClick={(e) => { e.stopPropagation(); onPrintRow(); }} className="px-2 py-1 bg-slate-100 text-slate-700 rounded text-xs font-bold hover:bg-slate-200" title="Imprimir Fileira">
-                                    🖨️
-                                </button>
-                            </>
-                        ) : (
-                            <button onClick={(e) => { e.stopPropagation(); onRenameRow(`${rowName} [FINALIZADA]`); }} className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-xs font-bold hover:bg-emerald-200 whitespace-nowrap" title="Finalizar Fileira">
-                                ✔ OK
-                            </button>
-                        )}
-                        {!isFinalized && (
-                            <button onClick={(e) => {
-                                e.stopPropagation();
-                                onRemoveRow();
-                            }} className="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition ml-1" title="Excluir Fileira"><TrashIcon className="w-4 h-4" /></button>
-                        )}
+                        <button onClick={(e) => { e.stopPropagation(); onPrintRow(); }} className="px-2 py-1 bg-slate-100 text-slate-700 rounded text-xs font-bold hover:bg-slate-200" title="Imprimir Fileira">
+                            🖨️
+                        </button>
                     </div>
                 </div>
             </div>
 
             {/* Pyramid Render Area */}
-            <div className="flex flex-col-reverse items-center min-h-[100px] md:min-h-[150px] transition-all duration-300 md:-space-y-3 pb-2"
-                style={{ height: maxHeight < 5 ? 'auto' : undefined }} // Fluid height if small
-            >
-                {builtLevels.map((levelSlots, levelIndex) => {
-                    // Check if level is within visual max height if needed, but standard logic renders all.
-                    // If we want to hide levels > maxHeight, we can filter.
-                    if (levelIndex >= maxHeight) return null;
+            <div className="flex-1 w-full overflow-x-auto no-scrollbar py-8 px-4 flex justify-center">
+                <div className="flex flex-col-reverse items-center min-h-[120px] md:min-h-[150px] transition-all duration-300 gap-y-1 pb-4 w-max"
+                    style={{ height: maxHeight < 5 ? 'auto' : undefined }} // Fluid height if small
+                >
+                    {builtLevels.map((levelSlots, levelIndex) => {
+                        // Check if level is within visual max height if needed, but standard logic renders all.
+                        // If we want to hide levels > maxHeight, we can filter.
+                        if (levelIndex >= maxHeight) return null;
 
-                    const isRowInteractive = levelSlots.some(s => s.item?.id === menuItemId);
+                        const isRowInteractive = levelSlots.some(s => s.item?.id === menuItemId);
 
-                    return (
-                        <div key={levelIndex} className={`flex justify-center z-10 relative ${isCARow ? 'gap-0.5 md:gap-1' : '-space-x-1 md:space-x-1'}`} style={{ zIndex: isRowInteractive ? 100 : levelIndex }}>
-                            {levelSlots.map((slot, slotIndex) => {
-                                const isSlotActive = activeSlot && activeSlot.l === slot.coords.l && activeSlot.p === slot.coords.p;
-                                const isMovingThis = movingItem && slot.item && movingItem.id === slot.item.id;
-                                const isSwapTarget = movingItem && slot.item && movingItem.id !== slot.item.id;
+                        return (
+                            <div key={levelIndex} className={`flex justify-center z-10 relative ${dims.gap}`} style={{ zIndex: isRowInteractive ? 100 : levelIndex }}>
+                                {levelSlots.map((slot, slotIndex) => {
+                                    const isSlotActive = activeSlot && activeSlot.l === slot.coords.l && activeSlot.p === slot.coords.p;
+                                    const isMovingThis = movingItem && slot.item && movingItem.id === slot.item.id;
+                                    const isSwapTarget = movingItem && slot.item && movingItem.id !== slot.item.id;
 
-                                // Dynamic visually
-                                const coilColor = slot.item?.materialType === 'CA-60' ? 'bg-slate-600' : 'bg-slate-700';
-                                const borderColor = slot.item?.materialType === 'CA-60' ? 'border-slate-500' : 'border-slate-600';
+                                    // Dynamic visually
+                                    const coilColor = slot.item?.materialType === 'CA-60' ? 'bg-slate-600' : 'bg-slate-700';
+                                    const borderColor = slot.item?.materialType === 'CA-60' ? 'border-slate-500' : 'border-slate-600';
 
-                                // Dynamic Shape based on Row Name (CA-60 = Rectangular/Square)
-                                const shapeClass = isCARow ? 'rounded-lg' : 'rounded-full';
+                                    // Dynamic Shape based on Row Name (CA-60 = Rectangular/Square)
+                                    const shapeClass = isCARow ? 'rounded-lg' : 'rounded-full';
 
-                                if (slot.item) {
-                                    const isMenuOpen = menuItemId === slot.item.id;
+                                    if (slot.item) {
+                                        const isMenuOpen = menuItemId === slot.item.id;
 
-                                    return (
-                                        <div
-                                            key={slot.item.id}
-                                            className={`
-                                            w-[52px] h-[52px] sm:w-16 sm:h-16 md:w-20 md:h-20 ${shapeClass} flex items-center justify-center relative cursor-pointer transform transition-all shrink-0
+                                        return (
+                                            <div
+                                                key={slot.item.id}
+                                                className={`
+                                            ${dims.slot} ${shapeClass} flex items-center justify-center relative cursor-pointer transform transition-all shrink-0
                                             ${isMovingThis ? 'z-50 scale-110 drop-shadow-2xl' : ''}
                                             ${isMenuOpen ? 'z-50 scale-110 ring-4 ring-emerald-400 bg-white shadow-xl' : 'hover:scale-105 active:scale-95'}
                                         `}
-                                            title={`${slot.item.internalLot} - ${slot.item.bitola} - ${(slot.item.remainingQuantity || 0).toFixed(0)}kg`}
-                                            draggable={!isMenuOpen}
-                                            onDragStart={(e) => {
-                                                e.dataTransfer.setData('application/json', JSON.stringify(slot.item));
-                                                e.dataTransfer.effectAllowed = 'move';
-                                            }}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (isMenuOpen) {
-                                                    setMenuItemId(null);
-                                                } else {
-                                                    setMenuItemId(slot.item!.id);
-                                                }
-                                            }}
-                                        >
-                                            {isMenuOpen && (
-                                                <div
-                                                    className="absolute z-[100] bottom-full left-1/2 -translate-x-1/2 mb-2 w-32 bg-white rounded-xl shadow-2xl p-1.5 flex flex-col gap-1 border border-slate-100 animate-in slide-in-from-bottom-2 fade-in duration-200 transition-all sm:scale-110 sm:mb-4 sm:w-36"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                >
-                                                    <div className="text-[10px] sm:text-xs font-bold text-center text-slate-500 border-b border-slate-100 pb-1 mb-0.5 overflow-hidden text-ellipsis whitespace-nowrap">
-                                                        {slot.item.internalLot}
+                                                title={`${slot.item.internalLot} - ${slot.item.bitola} - ${(slot.item.remainingQuantity || 0).toFixed(0)}kg`}
+                                                draggable={!isMenuOpen}
+                                                onDragStart={(e) => {
+                                                    e.dataTransfer.setData('application/json', JSON.stringify(slot.item));
+                                                    e.dataTransfer.effectAllowed = 'move';
+                                                }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (isMenuOpen) {
+                                                        setMenuItemId(null);
+                                                    } else {
+                                                        setMenuItemId(slot.item!.id);
+                                                    }
+                                                }}
+                                            >
+                                                {isMenuOpen && (
+                                                    <div
+                                                        className="absolute z-[100] bottom-full left-1/2 -translate-x-1/2 mb-2 w-32 bg-white rounded-xl shadow-2xl p-1.5 flex flex-col gap-1 border border-slate-100 animate-in slide-in-from-bottom-2 fade-in duration-200 transition-all sm:scale-110 sm:mb-4 sm:w-36"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        <div className="text-[10px] sm:text-xs font-bold text-center text-slate-500 border-b border-slate-100 pb-1 mb-0.5 overflow-hidden text-ellipsis whitespace-nowrap">
+                                                            {slot.item.internalLot}
+                                                        </div>
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); if (onItemClick) onItemClick(slot.item!); setMenuItemId(null); }}
+                                                            className="bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] sm:text-xs font-bold px-2 py-1.5 sm:py-2 rounded-lg w-full flex items-center justify-center gap-2 transition-colors"
+                                                        >
+                                                            <span className="text-lg leading-none">✋</span> Mover
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); onRemove(slot.item!); setMenuItemId(null); }}
+                                                            className="bg-red-50 hover:bg-red-100 text-red-700 text-[10px] sm:text-xs font-bold px-2 py-1.5 sm:py-2 rounded-lg w-full flex items-center justify-center gap-2 transition-colors"
+                                                        >
+                                                            <span className="text-lg leading-none">🗑️</span> Excluir
+                                                        </button>
+
+                                                        {/* Arrow */}
+                                                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-[6px] border-transparent border-t-white drop-shadow-sm"></div>
                                                     </div>
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); if (onItemClick) onItemClick(slot.item!); setMenuItemId(null); }}
-                                                        className="bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] sm:text-xs font-bold px-2 py-1.5 sm:py-2 rounded-lg w-full flex items-center justify-center gap-2 transition-colors"
-                                                    >
-                                                        <span className="text-lg leading-none">✋</span> Mover
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); onRemove(slot.item!); setMenuItemId(null); }}
-                                                        className="bg-red-50 hover:bg-red-100 text-red-700 text-[10px] sm:text-xs font-bold px-2 py-1.5 sm:py-2 rounded-lg w-full flex items-center justify-center gap-2 transition-colors"
-                                                    >
-                                                        <span className="text-lg leading-none">🗑️</span> Excluir
-                                                    </button>
+                                                )}
 
-                                                    {/* Arrow */}
-                                                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-[6px] border-transparent border-t-white drop-shadow-sm"></div>
-                                                </div>
-                                            )}
-
-                                            {/* Standard Coil Content (Always Visible, with z-index separation if menu open) */}
-                                            <div
-                                                className={`absolute inset-0 ${shapeClass} 
+                                                {/* Standard Coil Content (Always Visible, with z-index separation if menu open) */}
+                                                <div
+                                                    className={`absolute inset-0 ${shapeClass} 
                                                             ${isCARow ? `border-[6px] md:border-[10px] ${borderColor} ${coilColor}` : ''}
                                                             ${isMovingThis ? 'ring-4 ring-orange-500 z-10' : ''}
                                                             shadow-[2px_2px_5px_rgba(0,0,0,0.5)]
                                                         `}
-                                                style={!isCARow ? {
-                                                    background: 'repeating-radial-gradient(circle at 50% 50%, #475569 0, #475569 2px, #334155 3px, #1e293b 4px)',
-                                                    boxShadow: 'inset 0 0 15px rgba(0,0,0,0.7), 2px 4px 8px rgba(0,0,0,0.6)'
-                                                } : {}}
-                                            ></div>
+                                                    style={!isCARow ? {
+                                                        background: 'repeating-radial-gradient(circle at 50% 50%, #475569 0, #475569 2px, #334155 3px, #1e293b 4px)',
+                                                        boxShadow: 'inset 0 0 15px rgba(0,0,0,0.7), 2px 4px 8px rgba(0,0,0,0.6)'
+                                                    } : {}}
+                                                ></div>
 
-                                            {/* Inner Hole */}
-                                            <div className={`absolute inset-[30%] ${shapeClass} ${!isCARow ? 'bg-black/70 shadow-[inset_0_4px_10px_rgba(0,0,0,1)]' : 'bg-slate-900/40 shadow-inner'} border border-white/5`}></div>
+                                                {/* Inner Hole */}
+                                                <div className={`absolute inset-[30%] ${shapeClass} ${!isCARow ? 'bg-black/70 shadow-[inset_0_4px_10px_rgba(0,0,0,1)]' : 'bg-slate-900/40 shadow-inner'} border border-white/5`}></div>
 
-                                            {/* Glare for Fio Máquina */}
-                                            {!isCARow && <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-white/5 via-transparent to-transparent pointer-events-none"></div>}
-                                            {isCARow && <div className="absolute top-[10%] right-[15%] w-3 h-4 bg-white shadow-sm rotate-12 z-10 opacity-90"></div>}
+                                                {/* Glare for Fio Máquina */}
+                                                {!isCARow && <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-white/5 via-transparent to-transparent pointer-events-none"></div>}
+                                                {isCARow && <div className="absolute top-[10%] right-[15%] w-3 h-4 bg-white shadow-sm rotate-12 z-10 opacity-90"></div>}
 
-                                            {/* Content Overlay */}
-                                            <div className="relative z-20 text-center leading-none drop-shadow-md pointer-events-none">
-                                                <div className="bg-white/90 px-1 rounded-sm text-[8px] sm:text-[9px] md:text-[10px] font-bold text-slate-900 border border-slate-300 mb-0.5 whitespace-nowrap overflow-hidden max-w-[44px] sm:max-w-[54px] md:max-w-[64px] text-ellipsis">
-                                                    {slot.item.internalLot}
+                                                {/* Content Overlay */}
+                                                <div className="relative z-20 text-center leading-none drop-shadow-md pointer-events-none">
+                                                    <div className="bg-white/90 px-1 rounded-sm text-[8px] sm:text-[9px] md:text-[10px] font-bold text-slate-900 border border-slate-300 mb-0.5 whitespace-nowrap overflow-hidden max-w-[44px] sm:max-w-[54px] md:max-w-[64px] text-ellipsis">
+                                                        {slot.item.internalLot}
+                                                    </div>
+                                                    <div className={`${dims.font} text-white font-mono font-bold tracking-tighter`}>
+                                                        {(slot.item.remainingQuantity || 0).toFixed(0)}
+                                                    </div>
+                                                    <div className="text-[7px] md:text-[9px] text-emerald-200 mt-0.5">
+                                                        {slot.item.bitola}mm
+                                                    </div>
                                                 </div>
-                                                <div className="text-[10px] sm:text-xs md:text-sm text-white font-mono font-bold tracking-tighter">
-                                                    {(slot.item.remainingQuantity || 0).toFixed(0)}
-                                                </div>
-                                                <div className="text-[7px] md:text-[9px] text-emerald-200 mt-0.5">
-                                                    {slot.item.bitola}mm
-                                                </div>
+
+                                                {isSwapTarget && (
+                                                    <div className={`absolute inset-0 flex items-center justify-center bg-amber-500/40 ${shapeClass} animate-pulse pointer-events-none z-30 ring-4 ring-amber-400`}>
+                                                        <span className="text-xl font-bold text-white drop-shadow-md">⇄</span>
+                                                    </div>
+                                                )}
                                             </div>
-
-                                            {isSwapTarget && (
-                                                <div className={`absolute inset-0 flex items-center justify-center bg-amber-500/40 ${shapeClass} animate-pulse pointer-events-none z-30 ring-4 ring-amber-400`}>
-                                                    <span className="text-xl font-bold text-white drop-shadow-md">⇄</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                } else {
-                                    // Empty Slot
-                                    return (
-                                        <div
-                                            key={`empty-${levelIndex}-${slotIndex}`}
-                                            className={`
-                                            w-[52px] h-[52px] sm:w-16 sm:h-16 md:w-20 md:h-20 ${shapeClass} flex items-center justify-center transition-all cursor-pointer z-0 pointer-events-auto shrink-0 relative
-                                            ${isSlotActive
-                                                    ? 'scale-105 shadow-[0_0_15px_rgba(255,165,0,0.5)] z-20'
-                                                    : 'hover:scale-105 opacity-60 hover:opacity-100'}
-                                        `}
-                                            onDragOver={handleDragOver}
-                                            onDragLeave={handleDragLeave}
-                                            onDrop={(e) => handleSlotDrop(e, slot.coords.l, slot.coords.p)}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (onSlotClick) onSlotClick(slot.coords.l, slot.coords.p);
-                                            }}
-                                            title={isSlotActive ? 'Vaga SELECIONADA' : `Vazio (L${slot.coords.l}:P${slot.coords.p})`}
-                                        >
-                                            {/* Realistic "Shadow" Placeholder */}
+                                        );
+                                    } else {
+                                        // Empty Slot
+                                        return (
                                             <div
-                                                className={`absolute inset-0 ${shapeClass} ${isSlotActive ? 'ring-2 ring-orange-500' : ''}`}
-                                                style={{
-                                                    background: !isCARow
-                                                        ? 'repeating-radial-gradient(circle at 50% 50%, rgba(0,0,0,0.15) 0, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.25) 3px, rgba(0,0,0,0.35) 4px)'
-                                                        : 'rgba(0,0,0,0.15)',
-                                                    boxShadow: 'inset 0 0 10px rgba(0,0,0,0.2)'
+                                                key={`empty-${levelIndex}-${slotIndex}`}
+                                                className={`
+                                            ${dims.slot} ${shapeClass} flex items-center justify-center transition-all cursor-pointer z-0 pointer-events-auto shrink-0 relative
+                                            ${isSlotActive
+                                                        ? 'scale-105 shadow-[0_0_15px_rgba(255,165,0,0.5)] z-20'
+                                                        : 'hover:scale-105 opacity-60 hover:opacity-100'}
+                                        `}
+                                                onDragOver={handleDragOver}
+                                                onDragLeave={handleDragLeave}
+                                                onDrop={(e) => handleSlotDrop(e, slot.coords.l, slot.coords.p)}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (onSlotClick) onSlotClick(slot.coords.l, slot.coords.p);
                                                 }}
-                                            ></div>
+                                                title={isSlotActive ? 'Vaga SELECIONADA' : `Vazio (L${slot.coords.l}:P${slot.coords.p})`}
+                                            >
+                                                {/* Realistic "Shadow" Placeholder */}
+                                                <div
+                                                    className={`absolute inset-0 ${shapeClass} ${isSlotActive ? 'ring-2 ring-orange-500' : ''}`}
+                                                    style={{
+                                                        background: !isCARow
+                                                            ? 'repeating-radial-gradient(circle at 50% 50%, rgba(0,0,0,0.15) 0, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.25) 3px, rgba(0,0,0,0.35) 4px)'
+                                                            : 'rgba(0,0,0,0.15)',
+                                                        boxShadow: 'inset 0 0 10px rgba(0,0,0,0.2)'
+                                                    }}
+                                                ></div>
 
-                                            {/* Inner Hole Shadow (Fio Máquina Only) */}
-                                            {!isCARow && <div className={`absolute inset-[30%] ${shapeClass} bg-black/10 border border-white/5`}></div>}
+                                                {/* Inner Hole Shadow (Fio Máquina Only) */}
+                                                {!isCARow && <div className={`absolute inset-[30%] ${shapeClass} bg-black/10 border border-white/5`}></div>}
 
-                                            {/* Dashed Outline (Faint) */}
-                                            <div className={`absolute inset-0 ${shapeClass} border-2 border-dashed ${isSlotActive ? 'border-orange-500' : 'border-slate-500/30'}`}></div>
+                                                {/* Dashed Outline (Faint) */}
+                                                <div className={`absolute inset-0 ${shapeClass} border-2 border-dashed ${isSlotActive ? 'border-orange-500' : 'border-slate-500/30'}`}></div>
 
-                                            <div className={`pointer-events-none z-10 ${isSlotActive ? 'font-bold text-2xl text-orange-500 animate-bounce' : 'text-slate-600/50 text-xl'}`}>{isSlotActive ? '⬇' : '+'}</div>
-                                        </div>
-                                    );
-                                }
-                            })}
-                        </div>
-                    );
-                })}
+                                                <div className={`pointer-events-none z-10 ${isSlotActive ? 'font-bold text-2xl text-orange-500 animate-bounce' : 'text-slate-600/50 text-xl'}`}>{isSlotActive ? '⬇' : '+'}</div>
+                                            </div>
+                                        );
+                                    }
+                                })}
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
         </div>
     );
@@ -592,9 +580,9 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
         setNewRowName(suggestion);
     }, [selectedMaterial, selectedBitola, safeStock, extraRows]); // Recalc suggestion when stock changes too
 
+
     // Calculate derivedRows - VISIBLY FILTERED based on context
     const derivedRows = useMemo(() => {
-        // 1. Get ALL rows first (Existing in DB + Manually Added)
         const allRows = new Set<string>();
         safeStock.forEach(s => {
             if (s.location) {
@@ -733,6 +721,18 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
             return true;
         });
     }, [safeStock, extraRows, selectedMaterial, selectedBitola, rowConfigs]);
+
+    // Initial filter sync once derivedRows are ready
+    useEffect(() => {
+        if (derivedRows.length > 0) {
+            // Auto-switch if current row is not in visible set or nothing selected
+            if (!activeRow || !derivedRows.includes(activeRow)) {
+                setActiveRow(derivedRows[0]);
+            }
+        } else {
+            setActiveRow(null);
+        }
+    }, [derivedRows, activeRow]);
 
     const handleAddRow = () => {
         // Use suggestion or manual input
@@ -1075,9 +1075,13 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                 {/* Top Tab Bar & Actions */}
                 <div className="bg-white border-b flex items-center gap-2 px-4 py-2 min-h-[3.5rem] shrink-0 shadow-sm z-30 h-auto">
 
-                    {/* Drawer Toggle (Mobile) */}
-                    <button onClick={() => setIsPendingListOpen(!isPendingListOpen)} className="md:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-lg shrink-0">
-                        <ExclamationIcon className="w-6 h-6 text-amber-500" />
+                    {/* Drawer Toggle (Mobile) - More Prominent */}
+                    <button
+                        onClick={() => setIsPendingListOpen(!isPendingListOpen)}
+                        className={`md:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-full font-bold text-xs transition-all shrink-0 ${unassignedStock.length > 0 ? 'bg-amber-100 text-amber-700 ring-2 ring-amber-300' : 'bg-slate-100 text-slate-500'}`}
+                    >
+                        <ExclamationIcon className="w-4 h-4" />
+                        Lotes ({unassignedStock.length})
                     </button>
 
                     {/* Row Tabs */}
@@ -1218,8 +1222,8 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                                 return (
                                     <div className="flex flex-col items-center justify-center h-full text-slate-400 mt-20">
                                         <ArchiveIcon className="w-24 h-24 mb-4 opacity-50" />
-                                        <h3 className="text-xl font-bold">Nenhuma Fileira Selecionada</h3>
-                                        <p>Crie uma fileira ou selecione uma existente acima.</p>
+                                        <h3 className="text-xl font-bold">Nenhuma Fileira Encontrada</h3>
+                                        <p>Filtre por material e bitola para ver as fileiras sugeridas.</p>
                                     </div>
                                 );
                             }
