@@ -155,7 +155,7 @@ const App: React.FC = () => {
                 // If we have a stored user, direct them to dashboard unless they were already on a specific page
                 // (Using dashboard as safe default)
                 if (page === 'login') {
-                    setPage('productionDashboard');
+                    setPage(user.role === 'gestor' || user.role === 'admin' ? 'productionDashboard' : 'menu');
                 }
             } catch (e) {
                 console.error("Failed to parse stored user", e);
@@ -196,7 +196,7 @@ const App: React.FC = () => {
         };
         setCurrentUser(appUser);
         localStorage.setItem('msm_user', JSON.stringify(appUser));
-        setPage('productionDashboard');
+        setPage(role === 'gestor' ? 'productionDashboard' : 'menu');
     };
 
     const handleLogin = async (username: string, password: string): Promise<void> => {
@@ -219,7 +219,7 @@ const App: React.FC = () => {
                 };
                 setCurrentUser(appUser);
                 localStorage.setItem('msm_user', JSON.stringify(appUser));
-                setPage('productionDashboard');
+                setPage(appUser.role === 'gestor' || appUser.role === 'admin' ? 'productionDashboard' : 'menu');
                 showNotification(`Bem-vindo, ${appUser.username}!`, 'success');
                 return;
             }
