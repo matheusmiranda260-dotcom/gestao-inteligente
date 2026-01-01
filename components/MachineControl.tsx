@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Page, MachineType, StockItem, ProductionOrderData, User, PartsRequest, ShiftReport, TrelicaSelectedLots, Ponta, Message } from '../types';
-import { ArrowLeftIcon, PlayIcon, PauseIcon, ClockIcon, WarningIcon, StopIcon, CheckCircleIcon, WrenchScrewdriverIcon, ArchiveIcon, ClipboardListIcon, CogIcon, DocumentReportIcon, ScaleIcon, TrashIcon, ChatBubbleLeftRightIcon, CalculatorIcon } from './icons';
+import { ArrowLeftIcon, PlayIcon, PauseIcon, ClockIcon, WarningIcon, StopIcon, CheckCircleIcon, WrenchScrewdriverIcon, ArchiveIcon, ClipboardListIcon, CogIcon, DocumentReportIcon, ScaleIcon, TrashIcon, ChatBubbleLeftRightIcon, CalculatorIcon, ChartBarIcon, ExclamationIcon } from './icons';
 import PartsRequestModal from './PartsRequestModal';
 import ShiftReportsModal from './ShiftReportsModal';
 import ProductionOrderReport from './ProductionOrderReport';
@@ -924,364 +924,431 @@ const MachineControl: React.FC<MachineControlProps> = ({ machineType, setPage, c
             {view === 'in_progress' && (
                 <>
                     {activeOrder ? (
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            {/* Coluna Esquerda: Informações e Ações */}
-                            <div className="lg:col-span-1 space-y-6">
-                                <div className="bg-white p-6 rounded-xl shadow-sm">
-                                    <h3 className="text-lg font-semibold text-slate-700 mb-3">Informações da Ordem</h3>
-                                    <div className="space-y-2 text-sm">
-                                        <div className="flex justify-between"><span className="text-slate-500">Nº Ordem:</span><span className="font-bold text-slate-800">{activeOrder.orderNumber}</span></div>
-                                        <div className="flex justify-between"><span className="text-slate-500">Operador:</span><span className="font-bold text-slate-800">{currentOperatorLog?.operator || 'N/A'}</span></div>
-                                        <div className="flex justify-between"><span className="text-slate-500">Início Turno:</span><span className="font-bold text-slate-800">{currentOperatorLog ? new Date(currentOperatorLog.startTime).toLocaleTimeString('pt-BR') : 'N/A'}</span></div>
-                                        {machineType === 'Trefila' ? (
-                                            <>
-                                                <div className="flex justify-between"><span className="text-slate-500">Bitola Saída:</span><span className="font-bold text-slate-800">{activeOrder.targetBitola}</span></div>
-                                                <div className="flex justify-between"><span className="text-slate-500">Peso Total OP:</span><span className="font-bold text-slate-800">{activeOrder.totalWeight.toFixed(2)} kg</span></div>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <div className="flex justify-between"><span className="text-slate-500">Modelo:</span><span className="font-bold text-slate-800">{activeOrder.trelicaModel} ({activeOrder.tamanho} mts)</span></div>
-                                                <div className="flex justify-between"><span className="text-slate-500">Qtd. Planejada:</span><span className="font-bold text-slate-800">{activeOrder.quantityToProduce} pçs</span></div>
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {hasActiveShift && (
-                                    <div className="bg-white p-6 rounded-xl shadow-sm">
-                                        <h3 className="text-lg font-semibold text-slate-700 mb-3 flex items-center gap-2"><ClockIcon className="h-5 w-5" /> Status do Turno</h3>
-                                        <div className="space-y-3">
-                                            <div className="text-center">
-                                                <p className="text-sm text-slate-500">Turno Padrão: 07:45 - 17:30</p>
-                                                {shiftStatus.isOvertime && <p className="text-sm font-bold text-red-500 animate-pulse">HORA EXTRA</p>}
-                                            </div>
-                                            <div className="w-full bg-slate-200 rounded-full h-4">
-                                                <div className={`h-4 rounded-full ${shiftStatus.isOvertime ? 'bg-red-500' : 'bg-slate-600'}`} style={{ width: `${shiftStatus.progress}%` }}></div>
-                                            </div>
-                                            <p className="text-center font-mono text-slate-800 font-semibold">{shiftStatus.timeStatusText}</p>
-                                        </div>
-                                    </div>
-                                )}
-
-
-                                <div className="bg-white p-6 rounded-xl shadow-sm">
-                                    <h3 className="text-lg font-semibold text-slate-700 mb-3">Painel de Ações</h3>
-                                    <div className="space-y-3">
-                                        <div className="flex items-center gap-3">
-                                            <button onClick={() => setShowDowntimeModal(true)} disabled={isMachineStopped} className="flex-1 bg-amber-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-amber-600 transition disabled:bg-amber-300 flex items-center justify-center gap-2">
-                                                <PauseIcon className="h-5 w-5" /> Parar
-                                            </button>
-                                            <button onClick={() => logResumeProduction && logResumeProduction(activeOrder.id)} disabled={!isMachineStopped} className="flex-1 bg-emerald-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-emerald-600 transition disabled:bg-emerald-300 flex items-center justify-center gap-2">
-                                                <PlayIcon className="h-5 w-5" /> Retornar
-                                            </button>
-                                        </div>
-                                        <button
-                                            onClick={() => setIsMessagingModalOpen(true)}
-                                            className="w-full bg-[#0F3F5C] text-white font-bold py-3 px-4 rounded-lg hover:bg-[#0A2A3D] flex items-center justify-center gap-2"
-                                        >
-                                            <ChatBubbleLeftRightIcon className="h-5 w-5" /> Mensagens Gestor
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                if (machineType === 'Trefila') {
-                                                    handleTrefilaComplete();
-                                                } else {
-                                                    setShowCompletionModal(true);
-                                                }
-                                            }}
-                                            disabled={isCompletionDisabled}
-                                            className="w-full bg-emerald-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-emerald-700 flex items-center justify-center gap-2 disabled:bg-slate-400"
-                                        >
-                                            <CheckCircleIcon className="h-5 w-5" /> Finalizar Ordem de Produção
-                                        </button>
-                                        {hasActiveShift ? (
-                                            <button onClick={() => endOperatorShift && endOperatorShift(activeOrder.id)} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition flex items-center justify-center gap-2">
-                                                <ClockIcon className="h-5 w-5" /> Finalizar Meu Turno
-                                            </button>
-                                        ) : (
-                                            <button onClick={() => startOperatorShift && startOperatorShift(activeOrder.id)} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-lg transition flex items-center justify-center gap-2">
-                                                <PlayIcon className="h-5 w-5" /> Iniciar Meu Turno
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="bg-white p-6 rounded-xl shadow-sm">
-                                    <h3 className="text-lg font-semibold text-slate-700 mb-3">Histórico de Paradas</h3>
-                                    <div className="max-h-60 overflow-y-auto">
-                                        {activeOrder.downtimeEvents && activeOrder.downtimeEvents.length > 0 ? (
-                                            <table className="w-full text-sm">
-                                                <thead className="bg-slate-50 text-left sticky top-0">
-                                                    <tr>
-                                                        <th className="p-2 font-semibold">Motivo</th>
-                                                        <th className="p-2 font-semibold">Início</th>
-                                                        <th className="p-2 font-semibold">Fim</th>
-                                                        <th className="p-2 font-semibold text-right">Duração</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y">
-                                                    {[...activeOrder.downtimeEvents].reverse().map((event, index) => {
-                                                        const stop = new Date(event.stopTime);
-                                                        const resume = event.resumeTime ? new Date(event.resumeTime) : new Date();
-                                                        const durationMs = resume.getTime() - stop.getTime();
-                                                        return (
-                                                            <tr key={index}>
-                                                                <td className="p-2">{event.reason}</td>
-                                                                <td className="p-2">{stop.toLocaleTimeString('pt-BR')}</td>
-                                                                <td className="p-2">
-                                                                    {event.resumeTime ? (
-                                                                        new Date(event.resumeTime).toLocaleTimeString('pt-BR')
-                                                                    ) : (
-                                                                        <span className="text-amber-600 font-semibold animate-pulse">Parada</span>
-                                                                    )}
-                                                                </td>
-                                                                <td className="p-2 text-right font-mono">{formatDuration(durationMs)}</td>
-                                                            </tr>
-                                                        );
-                                                    })}
-                                                </tbody>
-                                            </table>
-                                        ) : (
-                                            <p className="text-sm text-slate-500 text-center py-4">Nenhuma parada registrada nesta ordem.</p>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Coluna Direita: Área de Trabalho */}
-                            <div className="lg:col-span-2 space-y-6 relative">
-                                {isMachineStopped && (
-                                    <div className="absolute inset-0 bg-slate-200 bg-opacity-80 backdrop-blur-sm flex items-center justify-center rounded-lg z-20">
-                                        <div className="text-center p-6 bg-white rounded-xl shadow-xl">
-                                            <WarningIcon className="h-12 w-12 mx-auto text-amber-500 mb-2" />
-                                            <h3 className="text-xl font-bold text-slate-800">Máquina Parada</h3>
-                                            <p className="text-slate-600">Clique em "Retornar" no painel de ações para continuar.</p>
-                                        </div>
-                                    </div>
-                                )}
-                                {!hasActiveShift && activeOrder && (
-                                    <div className="absolute inset-0 bg-slate-200 bg-opacity-80 backdrop-blur-sm flex items-center justify-center rounded-lg z-20">
-                                        <div className="text-center p-6 bg-white rounded-xl shadow-xl">
-                                            <PlayIcon className="h-12 w-12 mx-auto text-emerald-500 mb-2" />
-                                            <h3 className="text-xl font-bold text-slate-800">Turno Não Iniciado</h3>
-                                            <p className="text-slate-600">Clique em "Iniciar Meu Turno" no painel para começar a produção.</p>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {machineType === 'Trefila' ? (
-                                    <>
-                                        <div className="bg-white p-6 rounded-xl shadow-sm">
-                                            <h3 className="text-xl font-semibold text-slate-700 mb-4">Produzindo Lote</h3>
-                                            {activeLotProcessingData ? (
-                                                <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
-                                                    <div className="flex justify-between items-start">
-                                                        <div>
-                                                            <h4 className="text-lg font-semibold text-slate-800">Processando Lote (Origem: {activeLotProcessingData.lotInfo.internalLot})</h4>
-                                                            <p className="text-sm text-slate-500">Iniciado às: {new Date(activeLotProcessingData.startTime).toLocaleTimeString('pt-BR')}</p>
-                                                        </div>
-                                                        <button onClick={handleFinishLotProcess} disabled={isMachineStopped || !hasActiveShift} className="bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-700 flex items-center gap-2 disabled:bg-slate-400">
-                                                            <CheckCircleIcon className="h-5 w-5" /> Finalizar Processo
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div className="text-center text-slate-500 py-6 p-4 bg-slate-50 rounded-lg">
-                                                    <p className="font-semibold">Selecione um lote da fila abaixo para iniciar o processo.</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="bg-white p-6 rounded-xl shadow-sm">
-                                            <h3 className="text-lg font-semibold text-slate-700 mb-4">Fila de Lotes (Matéria-Prima)</h3>
-                                            <div className="max-h-48 overflow-auto">
-                                                {waitingLots.length > 0 ? (
-                                                    <table className="w-full text-sm">
-                                                        <thead className="bg-slate-50 text-left sticky top-0">
-                                                            <tr>
-                                                                <th className="p-2 font-semibold">Lote de Origem</th>
-                                                                <th className="p-2 font-semibold text-right">Peso Etiqueta</th>
-                                                                <th className="p-2 font-semibold text-center">Ação</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody className="divide-y">
-                                                            {waitingLots.map(lot => (
-                                                                <tr key={lot.id}>
-                                                                    <td className="p-2 font-medium">{lot.internalLot}</td>
-                                                                    <td className="p-2 text-right">{lot.labelWeight.toFixed(2)} kg</td>
-                                                                    <td className="p-2 text-center">
-                                                                        <button
-                                                                            onClick={() => handleStartProcessingLot(lot.id)}
-                                                                            disabled={!!activeLotProcessingData || isMachineStopped || !hasActiveShift}
-                                                                            className="bg-slate-600 text-white font-bold py-1 px-3 rounded hover:bg-slate-700 text-xs disabled:bg-slate-300 disabled:cursor-not-allowed">
-                                                                            Iniciar Processo
-                                                                        </button>
-                                                                    </td>
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                ) : (
-                                                    <p className="text-center text-slate-500 py-4">Nenhum lote aguardando processamento.</p>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        <div className="bg-white p-6 rounded-xl shadow-sm">
-                                            <h3 className="text-lg font-semibold text-slate-700 mb-4">Lotes Finalizados</h3>
-                                            <div className="max-h-48 overflow-auto">
-                                                {completedLots.length > 0 ? (
-                                                    <table className="w-full text-sm">
-                                                        <thead className="bg-slate-50 text-left sticky top-0">
-                                                            <tr>
-                                                                <th className="p-2 font-semibold">Lote Finalizado (Origem)</th>
-                                                                <th className="p-2 font-semibold text-right">Peso Original</th>
-                                                                <th className="p-2 font-semibold">Peso Final (Balança)</th>
-                                                                <th className="p-2 font-semibold">Bitola Aferida (mm)</th>
-                                                                <th className="p-2 font-semibold text-center">Status</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody className="divide-y">
-                                                            {completedLots.map(lot => (
-                                                                <tr key={lot.lotId}>
-                                                                    <td className="p-2 font-medium">{lot.lotInfo?.internalLot}</td>
-                                                                    <td className="p-2 text-right">{lot.lotInfo?.labelWeight.toFixed(2)} kg</td>
-                                                                    <td className="p-2">
-                                                                        {lot.finalWeight === null ? (
-                                                                            <input
-                                                                                type="number"
-                                                                                step="0.01"
-                                                                                value={pendingWeights.get(lot.lotId) || ''}
-                                                                                onChange={e => handlePendingWeightChange(lot.lotId, e.target.value)}
-                                                                                className="p-1 border rounded w-24"
-                                                                                placeholder="0.00"
-                                                                            />
-                                                                        ) : (
-                                                                            <p className="text-right font-bold text-emerald-800">{lot.finalWeight.toFixed(2)} kg</p>
-                                                                        )}
-                                                                    </td>
-                                                                    <td className="p-2">
-                                                                        {lot.finalWeight === null ? (
-                                                                            <div className="flex items-center gap-2">
-                                                                                <input
-                                                                                    type="number"
-                                                                                    step="0.01"
-                                                                                    value={pendingGauges.get(lot.lotId) || ''}
-                                                                                    onChange={e => handlePendingGaugeChange(lot.lotId, e.target.value)}
-                                                                                    className="p-1 border rounded w-20"
-                                                                                    placeholder="mm"
-                                                                                />
-                                                                                <button onClick={() => handleRecordWeight(lot.lotId)} className="bg-emerald-500 text-white text-xs font-bold py-1 px-2 rounded hover:bg-emerald-600">Salvar</button>
-                                                                            </div>
-                                                                        ) : (
-                                                                            <p className="text-right text-slate-700">{lot.measuredGauge ? `${lot.measuredGauge.toFixed(2)} mm` : '-'}</p>
-                                                                        )}
-                                                                    </td>
-                                                                    <td className="p-2 text-center">
-                                                                        {lot.finalWeight === null ? (
-                                                                            <span className="px-2 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">Aguardando</span>
-                                                                        ) : (
-                                                                            <span className="px-2 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800">Concluído</span>
-                                                                        )}
-                                                                    </td>
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                ) : (
-                                                    <p className="text-center text-slate-500 py-4">Nenhum lote foi concluído nesta ordem.</p>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </>
-                                ) : (
-                                    <>
-                                        <div className="bg-white p-6 rounded-xl shadow-sm">
-                                            <h3 className="text-lg font-semibold text-slate-700 mb-4">Acompanhamento de Produção</h3>
-                                            <div className="space-y-3">
-                                                <div className="flex justify-between items-baseline">
-                                                    <span className="text-slate-600">Peças Produzidas</span>
-                                                    <span className="text-2xl font-bold text-slate-800">
-                                                        {activeOrder.actualProducedQuantity || 0} / {activeOrder.quantityToProduce}
+                        <>
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-32"> {/* Added pb-32 for bottom bar space */}
+                                {/* Coluna Esquerda: Visão Geral e Indicadores */}
+                                <div className="lg:col-span-1 space-y-6">
+                                    {/* Card de Status Principal - Novo Design */}
+                                    <div className={`bg-white p-6 rounded-2xl shadow-sm border-l-8 ${isMachineStopped ? 'border-amber-500' : 'border-emerald-500'}`}>
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div>
+                                                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Status da Máquina</h3>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <div className={`h-3 w-3 rounded-full ${isMachineStopped ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500 animate-pulse'}`}></div>
+                                                    <span className={`text-2xl font-bold ${isMachineStopped ? 'text-amber-600' : 'text-emerald-700'}`}>
+                                                        {isMachineStopped ? 'PARADA' : 'OPERANDO'}
                                                     </span>
                                                 </div>
-                                                <div>
+                                            </div>
+                                            <div className="text-right">
+                                                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Ordem Atual</h3>
+                                                <p className="text-xl font-bold text-slate-800">{activeOrder.orderNumber}</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4 mt-6 p-4 bg-slate-50 rounded-xl">
+                                            <div>
+                                                <p className="text-xs text-slate-500 mb-1">Operador</p>
+                                                <p className="font-semibold text-slate-700 truncate">{currentOperatorLog?.operator || 'N/A'}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-xs text-slate-500 mb-1">Início Turno</p>
+                                                <p className="font-semibold text-slate-700">{currentOperatorLog ? new Date(currentOperatorLog.startTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</p>
+                                            </div>
+                                            {machineType === 'Trefila' ? (
+                                                <>
+                                                    <div>
+                                                        <p className="text-xs text-slate-500 mb-1">Bitola Saída</p>
+                                                        <p className="font-semibold text-slate-700">{activeOrder.targetBitola}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-xs text-slate-500 mb-1">Meta</p>
+                                                        <p className="font-semibold text-slate-700">{activeOrder.totalWeight.toFixed(0)} kg</p>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <div className="col-span-2">
+                                                        <p className="text-xs text-slate-500 mb-1">Produto</p>
+                                                        <p className="font-semibold text-slate-700 truncate">{activeOrder.trelicaModel} ({activeOrder.tamanho}m)</p>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Progresso de Produção - Promovido para destaque */}
+                                    <div className="bg-white p-6 rounded-2xl shadow-sm">
+                                        <h3 className="text-lg font-bold text-slate-700 mb-4 flex items-center gap-2">
+                                            <ChartBarIcon className="h-5 w-5 text-indigo-500" /> Progresso
+                                        </h3>
+
+                                        {machineType === 'Treliça' ? (
+                                            <div className="space-y-6">
+                                                <div className="relative pt-2">
+                                                    <div className="flex items-end justify-between mb-2">
+                                                        <div>
+                                                            <span className="text-4xl font-bold text-slate-800">{activeOrder.actualProducedQuantity || 0}</span>
+                                                            <span className="text-lg text-slate-400 font-medium ml-1">/ {activeOrder.quantityToProduce}</span>
+                                                        </div>
+                                                        <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg mb-1">Peças</span>
+                                                    </div>
                                                     {(() => {
                                                         const produced = activeOrder.actualProducedQuantity || 0;
                                                         const planned = activeOrder.quantityToProduce || 1;
                                                         const progress = Math.min(100, (produced / planned) * 100);
                                                         return (
-                                                            <div className="w-full bg-slate-200 rounded-full h-4">
+                                                            <div className="w-full bg-slate-100 rounded-full h-6 overflow-hidden">
                                                                 <div
-                                                                    className="bg-emerald-500 h-4 rounded-full text-white text-xs flex items-center justify-center font-bold"
+                                                                    className="bg-gradient-to-r from-indigo-500 to-purple-500 h-6 rounded-full transition-all duration-500 ease-out flex items-center justify-end pr-2 text-white text-xs font-bold"
                                                                     style={{ width: `${progress}%` }}
                                                                 >
-                                                                    {progress > 10 && `${progress.toFixed(0)}%`}
+                                                                    {progress > 5 && `${progress.toFixed(0)}%`}
                                                                 </div>
                                                             </div>
                                                         );
                                                     })()}
                                                 </div>
                                             </div>
+                                        ) : (
+                                            <div className="space-y-4">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-slate-500">Peso Produzido</span>
+                                                    <span className="text-2xl font-bold text-slate-800">
+                                                        {(activeOrder.processedLots || []).reduce((acc, lot) => acc + (lot.finalWeight || 0), 0).toFixed(2)} <span className="text-sm text-slate-400">kg</span>
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-slate-500">Meta Planejada</span>
+                                                    <span className="text-lg font-semibold text-slate-600">
+                                                        {activeOrder.totalWeight.toFixed(2)} kg
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {hasActiveShift && (
+                                        <div className="bg-white p-6 rounded-2xl shadow-sm">
+                                            <h3 className="text-lg font-semibold text-slate-700 mb-3 flex items-center gap-2"><ClockIcon className="h-5 w-5" /> Status do Turno</h3>
+                                            <div className="space-y-3">
+                                                <div className="w-full bg-slate-200 rounded-full h-3">
+                                                    <div className={`h-3 rounded-full ${shiftStatus.isOvertime ? 'bg-red-500' : 'bg-slate-600'}`} style={{ width: `${shiftStatus.progress}%` }}></div>
+                                                </div>
+                                                <div className="flex justify-between items-center">
+                                                    <p className="font-mono text-slate-800 font-bold text-lg">{shiftStatus.timeStatusText}</p>
+                                                    {shiftStatus.isOvertime && <span className="text-xs font-bold bg-red-100 text-red-600 px-2 py-1 rounded">EXTRA</span>}
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div className="bg-white p-6 rounded-xl shadow-sm">
-                                            <h3 className="text-lg font-semibold text-slate-700 mb-4">Pacotes de Produção</h3>
-                                            <p className="text-sm text-slate-500 mb-4">A cada 200 peças (ou o restante), realize a pesagem do pacote e registre o valor abaixo.</p>
-                                            <div className="max-h-[60vh] overflow-auto">
-                                                <table className="w-full text-sm">
-                                                    <thead className="bg-slate-50 text-left sticky top-0">
-                                                        <tr>
-                                                            <th className="p-2 font-semibold">Pacote</th>
-                                                            <th className="p-2 font-semibold">Qtd. Peças</th>
-                                                            <th className="p-2 font-semibold">Peso Registrado (kg)</th>
-                                                            <th className="p-2 font-semibold text-center">Status</th>
+                                    )}
+
+                                    <div className="bg-white p-6 rounded-2xl shadow-sm">
+                                        <h3 className="text-lg font-semibold text-slate-700 mb-3">Histórico de Paradas</h3>
+                                        <div className="max-h-48 overflow-y-auto overflow-x-auto custom-scrollbar">
+                                            {activeOrder.downtimeEvents && activeOrder.downtimeEvents.length > 0 ? (
+                                                <table className="w-full text-sm min-w-[300px]">
+                                                    <thead className="text-left sticky top-0 bg-white shadow-sm">
+                                                        <tr className="text-xs text-slate-400 uppercase">
+                                                            <th className="p-2 font-semibold whitespace-nowrap">Motivo</th>
+                                                            <th className="p-2 font-semibold whitespace-nowrap text-right">Duração</th>
                                                         </tr>
                                                     </thead>
-                                                    <tbody className="divide-y">
-                                                        {trelicaPackages.map(pkg => (
-                                                            <tr key={pkg.packageNumber}>
-                                                                <td className="p-2 font-medium">#{pkg.packageNumber}</td>
-                                                                <td className="p-2">{pkg.quantity}</td>
-                                                                <td className="p-2">
-                                                                    {pkg.status === 'Concluído' ? (
-                                                                        <p className="font-bold text-emerald-800">{pkg.weight?.toFixed(2)}</p>
-                                                                    ) : (
-                                                                        <div className="flex items-center gap-2">
+                                                    <tbody className="divide-y divide-slate-100">
+                                                        {[...activeOrder.downtimeEvents].reverse().slice(0, 5).map((event, index) => { // Show only last 5
+                                                            const stop = new Date(event.stopTime);
+                                                            const resume = event.resumeTime ? new Date(event.resumeTime) : new Date();
+                                                            const durationMs = resume.getTime() - stop.getTime();
+                                                            return (
+                                                                <tr key={index}>
+                                                                    <td className="p-2 max-w-[150px] truncate font-medium text-slate-700" title={event.reason}>{event.reason}</td>
+                                                                    <td className="p-2 text-right font-mono text-slate-500 whitespace-nowrap">{formatDuration(durationMs)}</td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            ) : (
+                                                <p className="text-sm text-slate-400 text-center py-4 italic">Sem paradas recentes.</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Coluna Direita: Área de Trabalho (Lotes/Pacotes) */}
+                                <div className="lg:col-span-2 space-y-6 relative">
+                                    {isMachineStopped && (
+                                        <div className="absolute inset-0 bg-slate-200/80 backdrop-blur-sm flex items-center justify-center rounded-2xl z-20 border-2 border-slate-300 border-dashed">
+                                            <div className="text-center p-8 bg-white rounded-3xl shadow-xl max-w-sm mx-auto animate-fade-in-up">
+                                                <div className="bg-amber-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                                                    <PauseIcon className="h-10 w-10 text-amber-600" />
+                                                </div>
+                                                <h3 className="text-2xl font-bold text-slate-800 mb-2">Produção Pausada</h3>
+                                                <p className="text-slate-500 mb-6">A máquina está parada. Utilize o painel inferior para retomar a produção quando estiver pronto.</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {!hasActiveShift && activeOrder && (
+                                        <div className="absolute inset-0 bg-slate-200/90 backdrop-blur-sm flex items-center justify-center rounded-2xl z-20">
+                                            <div className="text-center p-8 bg-white rounded-3xl shadow-xl max-w-md mx-auto">
+                                                <ClockIcon className="h-16 w-16 mx-auto text-slate-300 mb-4" />
+                                                <h3 className="text-2xl font-bold text-slate-800 mb-2">Turno Não Iniciado</h3>
+                                                <p className="text-slate-500 mb-6">Inicie seu turno para liberar os controles da máquina.</p>
+                                                <button onClick={() => startOperatorShift && startOperatorShift(activeOrder.id)} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 px-6 rounded-xl transition text-lg shadow-lg flex items-center justify-center gap-3">
+                                                    <PlayIcon className="h-6 w-6" /> INICIAR MEU TURNO
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {machineType === 'Trefila' ? (
+                                        <>
+                                            <div className="bg-white p-6 rounded-2xl shadow-sm">
+                                                <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                                    <CogIcon className="h-6 w-6 text-slate-400" /> Lote em Processamento
+                                                </h3>
+                                                {activeLotProcessingData ? (
+                                                    <div className="p-6 bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100 rounded-xl">
+                                                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                                            <div>
+                                                                <span className="text-xs font-bold text-indigo-500 bg-indigo-100 px-2 py-1 rounded uppercase tracking-wide">Em Andamento</span>
+                                                                <h4 className="text-2xl font-bold text-slate-800 mt-2">{activeLotProcessingData.lotInfo.internalLot}</h4>
+                                                                <p className="text-sm text-slate-500 flex items-center gap-2 mt-1">
+                                                                    <ClockIcon className="h-4 w-4" /> Iniciado às {new Date(activeLotProcessingData.startTime).toLocaleTimeString('pt-BR')}
+                                                                </p>
+                                                            </div>
+                                                            <button onClick={handleFinishLotProcess} disabled={isMachineStopped || !hasActiveShift} className="w-full md:w-auto bg-indigo-600 text-white font-bold py-3 px-6 rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition flex items-center justify-center gap-2 disabled:bg-slate-300 disabled:shadow-none">
+                                                                <CheckCircleIcon className="h-5 w-5" /> Finalizar Lote
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-center text-slate-400 py-12 p-4 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                                                        <h4 className="font-medium text-lg">Nenhum lote sendo processado</h4>
+                                                        <p className="text-sm mt-1">Selecione um lote da fila abaixo para iniciar.</p>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="bg-white p-6 rounded-2xl shadow-sm">
+                                                <h3 className="text-lg font-bold text-slate-700 mb-4">Fila de Lotes (Matéria-Prima)</h3>
+                                                <div className="overflow-x-auto">
+                                                    {waitingLots.length > 0 ? (
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                            {waitingLots.map(lot => (
+                                                                <div key={lot.id} className="p-4 border border-slate-200 rounded-xl hover:border-indigo-300 hover:shadow-md transition bg-slate-50 group">
+                                                                    <div className="flex justify-between items-start mb-3">
+                                                                        <span className="font-bold text-slate-700 text-lg">{lot.internalLot}</span>
+                                                                        <span className="text-xs bg-white border border-slate-200 px-2 py-1 rounded-md font-mono">{lot.labelWeight.toFixed(1)} kg</span>
+                                                                    </div>
+                                                                    <button
+                                                                        onClick={() => handleStartProcessingLot(lot.id)}
+                                                                        disabled={!!activeLotProcessingData || isMachineStopped || !hasActiveShift}
+                                                                        className="w-full bg-white border-2 border-slate-200 text-slate-600 group-hover:border-indigo-500 group-hover:text-indigo-600 font-bold py-2 px-4 rounded-lg text-sm transition disabled:opacity-50 disabled:cursor-not-allowed">
+                                                                        Processar
+                                                                    </button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <p className="text-center text-slate-500 py-6">Nenhum lote aguardando.</p>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="bg-white p-6 rounded-2xl shadow-sm">
+                                                <h3 className="text-lg font-bold text-slate-700 mb-4">Lotes Finalizados</h3>
+                                                <div className="overflow-x-auto max-h-80">
+                                                    <table className="w-full text-sm">
+                                                        <thead className="bg-slate-50 text-left sticky top-0">
+                                                            <tr>
+                                                                <th className="p-3 font-semibold rounded-tl-lg">Lote</th>
+                                                                <th className="p-3 font-semibold text-right">Peso Final</th>
+                                                                <th className="p-3 font-semibold">Status</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y">
+                                                            {completedLots.map(lot => (
+                                                                <tr key={lot.lotId}>
+                                                                    <td className="p-3 font-medium">{lot.lotInfo?.internalLot}</td>
+                                                                    <td className="p-3">
+                                                                        {lot.finalWeight === null ? (
                                                                             <input
                                                                                 type="number"
-                                                                                step="0.01"
-                                                                                value={pendingPackageWeights.get(pkg.packageNumber) || ''}
-                                                                                onChange={e => handlePendingPackageWeightChange(pkg.packageNumber, e.target.value)}
-                                                                                className="p-1 border rounded w-24"
+                                                                                className="w-full p-2 border rounded-lg text-right"
                                                                                 placeholder="0.00"
+                                                                                value={pendingWeights.get(lot.lotId) || ''}
+                                                                                onChange={e => handlePendingWeightChange(lot.lotId, e.target.value)}
                                                                             />
+                                                                        ) : (
+                                                                            <div className="text-right font-bold text-slate-700">{lot.finalWeight.toFixed(2)} kg</div>
+                                                                        )}
+                                                                    </td>
+                                                                    <td className="p-3 text-center">
+                                                                        {lot.finalWeight === null ? (
+                                                                            <button onClick={() => handleRecordWeight(lot.lotId)} className="bg-emerald-500 text-white text-xs font-bold py-2 px-3 rounded-lg hover:bg-emerald-600 w-full">
+                                                                                Salvar
+                                                                            </button>
+                                                                        ) : (
+                                                                            <CheckCircleIcon className="h-5 w-5 text-emerald-500 mx-auto" />
+                                                                        )}
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="bg-white p-6 rounded-2xl shadow-sm">
+                                                <h3 className="text-lg font-bold text-slate-700 mb-4">Registro de Pacotes</h3>
+                                                <p className="text-sm text-slate-500 mb-6 bg-blue-50 p-3 rounded-lg border border-blue-100 flex gap-2">
+                                                    <ExclamationIcon className="h-5 w-5 text-blue-500 flex-shrink-0" />
+                                                    Pese cada pacote de 200 peças e registre abaixo.
+                                                </p>
+                                                <div className="overflow-auto max-h-[500px] border border-slate-100 rounded-xl">
+                                                    <table className="w-full text-sm">
+                                                        <thead className="bg-slate-50 text-left sticky top-0 z-10">
+                                                            <tr>
+                                                                <th className="p-4 font-bold text-slate-600">Pacote #</th>
+                                                                <th className="p-4 font-bold text-slate-600">Qtd.</th>
+                                                                <th className="p-4 font-bold text-slate-600">Peso (kg)</th>
+                                                                <th className="p-4 font-bold text-slate-600 text-center">Ação</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-100">
+                                                            {trelicaPackages.map(pkg => (
+                                                                <tr key={pkg.packageNumber} className={pkg.status === 'Concluído' ? 'bg-slate-50/50' : 'bg-white'}>
+                                                                    <td className="p-4 font-bold text-slate-700 text-lg">#{pkg.packageNumber}</td>
+                                                                    <td className="p-4 text-slate-600">{pkg.quantity} pçs</td>
+                                                                    <td className="p-4">
+                                                                        {pkg.status === 'Concluído' ? (
+                                                                            <span className="font-mono font-bold text-slate-700 text-lg">{pkg.weight?.toFixed(2)}</span>
+                                                                        ) : (
+                                                                            <div className="relative">
+                                                                                <input
+                                                                                    type="number"
+                                                                                    inputMode="decimal"
+                                                                                    step="0.01"
+                                                                                    value={pendingPackageWeights.get(pkg.packageNumber) || ''}
+                                                                                    onChange={e => handlePendingPackageWeightChange(pkg.packageNumber, e.target.value)}
+                                                                                    className="w-full p-3 border-2 border-slate-200 rounded-xl text-lg font-medium focus:border-indigo-500 focus:ring-0 transition"
+                                                                                    placeholder="0.00"
+                                                                                />
+                                                                                <span className="absolute right-3 top-3.5 text-slate-400 text-sm font-bold">kg</span>
+                                                                            </div>
+                                                                        )}
+                                                                    </td>
+                                                                    <td className="p-4 text-center">
+                                                                        {pkg.status === 'Concluído' ? (
+                                                                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800 uppercase tracking-wide">
+                                                                                OK
+                                                                            </span>
+                                                                        ) : (
                                                                             <button
                                                                                 onClick={() => handleRecordPackageWeight(pkg.packageNumber, pkg.quantity)}
-                                                                                className="bg-emerald-500 text-white text-xs font-bold py-1 px-2 rounded hover:bg-emerald-600"
+                                                                                className="bg-indigo-600 text-white text-sm font-bold py-2 px-4 rounded-xl hover:bg-indigo-700 shadow-md transition w-full"
                                                                             >
                                                                                 Salvar
                                                                             </button>
-                                                                        </div>
-                                                                    )}
-                                                                </td>
-                                                                <td className="p-2 text-center">
-                                                                    {pkg.status === 'Concluído' ? (
-                                                                        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800">Concluído</span>
-                                                                    ) : (
-                                                                        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">Aguardando Pesagem</span>
-                                                                    )}
-                                                                </td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
+                                                                        )}
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
                                             </div>
-                                        </div>
-                                    </>
-                                )}
+                                        </>
+                                    )}
+                                </div>
                             </div>
-                        </div>
+
+                            {/* Sticky Action Deck (Spotify Style) */}
+                            <div className="fixed bottom-0 right-0 left-0 md:left-64 bg-white border-t border-slate-200 p-3 sm:p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-40 transition-all duration-300"> {/* Added padding for responsiveness */}
+                                <div className="max-w-[1920px] mx-auto grid grid-cols-12 gap-2 sm:gap-4 items-center">
+
+                                    {/* Esquerda: Info Rápida (Oculta em mobile muito pequeno se necessário, mas bom manter) */}
+                                    <div className="col-span-3 sm:col-span-3 lg:col-span-2 hidden sm:flex items-center gap-3">
+                                        <div className={`w-2 h-12 rounded-full ${isMachineStopped ? 'bg-amber-500' : 'bg-emerald-500'}`}></div>
+                                        <div>
+                                            <p className="text-xs text-slate-400 uppercase font-bold">Status Atual</p>
+                                            <p className={`font-bold leading-tight ${isMachineStopped ? 'text-amber-600' : 'text-emerald-700'}`}>
+                                                {isMachineStopped ? 'MÁQUINA PARADA' : 'EM PRODUÇÃO'}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Centro: Controles Principais */}
+                                    <div className="col-span-8 sm:col-span-6 lg:col-span-6 flex items-center justify-center gap-4">
+                                        {isMachineStopped ? (
+                                            <button
+                                                onClick={() => logResumeProduction && logResumeProduction(activeOrder.id)}
+                                                className="flex-1 max-w-[200px] h-14 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full font-bold text-lg shadow-lg shadow-emerald-200 transition transform active:scale-95 flex items-center justify-center gap-2"
+                                            >
+                                                <PlayIcon className="h-8 w-8" />
+                                                <span className="hidden sm:inline">RETORNAR</span>
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={() => setShowDowntimeModal(true)}
+                                                className="flex-1 max-w-[200px] h-14 bg-amber-500 hover:bg-amber-400 text-white rounded-full font-bold text-lg shadow-lg shadow-amber-200 transition transform active:scale-95 flex items-center justify-center gap-2"
+                                            >
+                                                <PauseIcon className="h-8 w-8" />
+                                                <span className="hidden sm:inline">PARAR</span>
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* Direita: Ações Secundárias */}
+                                    <div className="col-span-4 sm:col-span-3 lg:col-span-4 flex items-center justify-end gap-2 sm:gap-4">
+                                        <button
+                                            onClick={() => setIsMessagingModalOpen(true)}
+                                            className="p-3 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition"
+                                            title="Mensagens"
+                                        >
+                                            <ChatBubbleLeftRightIcon className="h-7 w-7" />
+                                        </button>
+                                        <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
+                                        <button
+                                            onClick={() => {
+                                                if (machineType === 'Trefila') handleTrefilaComplete();
+                                                else setShowCompletionModal(true);
+                                            }}
+                                            disabled={isCompletionDisabled}
+                                            className="hidden sm:flex bg-slate-800 text-white px-4 py-3 rounded-xl font-bold text-sm hover:bg-slate-700 transition items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <CheckCircleIcon className="h-5 w-5" />
+                                            <span>FINALIZAR OP</span>
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                if (machineType === 'Trefila') handleTrefilaComplete();
+                                                else setShowCompletionModal(true);
+                                            }}
+                                            disabled={isCompletionDisabled}
+                                            className="sm:hidden p-3 bg-slate-800 text-white rounded-xl hover:bg-slate-700 transition disabled:opacity-50"
+                                        >
+                                            <CheckCircleIcon className="h-6 w-6" />
+                                        </button>
+
+                                        {hasActiveShift && (
+                                            <button
+                                                onClick={() => endOperatorShift && endOperatorShift(activeOrder.id)}
+                                                className="p-3 text-red-500 hover:bg-red-50 rounded-xl transition"
+                                                title="Finalizar Turno"
+                                            >
+                                                <ClockIcon className="h-7 w-7" />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </>
                     ) : postProductionOrder ? (
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-24">
                             <div className="lg:col-span-1 space-y-6">
                                 <div className="bg-white p-6 rounded-xl shadow-sm">
                                     <h3 className="text-lg font-semibold text-slate-700 mb-3">Informações do Turno</h3>

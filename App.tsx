@@ -988,6 +988,8 @@ const App: React.FC = () => {
         const order = productionOrders.find(o => o.id === orderId);
         if (!order) return;
 
+        const now = new Date().toISOString();
+
         let operatorLog: OperatorLog | undefined;
         const newLogs = [...(order.operatorLogs || [])];
         let lastLogIndex = -1;
@@ -998,11 +1000,28 @@ const App: React.FC = () => {
             }
         }
         if (lastLogIndex !== -1) {
-            newLogs[lastLogIndex].endTime = new Date().toISOString();
+            newLogs[lastLogIndex].endTime = now;
             operatorLog = newLogs[lastLogIndex];
         }
 
         const updates: Partial<ProductionOrderData> = { operatorLogs: newLogs };
+
+        // Automatically stop machine if it is running
+        const lastDowntime = (order.downtimeEvents && order.downtimeEvents.length > 0)
+            ? order.downtimeEvents[order.downtimeEvents.length - 1]
+            : null;
+
+        const isStopped = lastDowntime && !lastDowntime.resumeTime;
+
+        if (!isStopped) {
+            const newDowntimeEvents = [...(order.downtimeEvents || [])];
+            newDowntimeEvents.push({
+                stopTime: now,
+                resumeTime: null,
+                reason: 'Final de Turno'
+            });
+            updates.downtimeEvents = newDowntimeEvents;
+        }
 
         try {
             const updatedOrder = await updateItem('production_orders', orderId, updates);
