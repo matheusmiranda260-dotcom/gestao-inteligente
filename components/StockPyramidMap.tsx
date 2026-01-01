@@ -381,9 +381,8 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                                 {/* Inner Hole */}
                                                 <div className={`absolute inset-[30%] ${shapeClass} ${!isCARow ? 'bg-black/70 shadow-[inset_0_4px_10px_rgba(0,0,0,1)]' : 'bg-slate-900/40 shadow-inner'} border border-white/5`}></div>
 
-                                                {/* Glare for Fio Máquina */}
+                                                {/* Glare removed */}
                                                 {!isCARow && <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-white/5 via-transparent to-transparent pointer-events-none"></div>}
-                                                {isCARow && <div className="absolute top-[10%] right-[15%] w-3 h-4 bg-white shadow-sm rotate-12 z-10 opacity-90"></div>}
 
                                                 {/* Content Overlay */}
                                                 <div className="relative z-20 text-center leading-none drop-shadow-md pointer-events-none">
@@ -392,9 +391,6 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                                     </div>
                                                     <div className={`${dims.font} text-white font-mono font-bold tracking-tighter`}>
                                                         {(slot.item.remainingQuantity || 0).toFixed(0)}
-                                                    </div>
-                                                    <div className="text-[7px] md:text-[9px] text-emerald-200 mt-0.5">
-                                                        {slot.item.bitola}mm
                                                     </div>
                                                 </div>
 
