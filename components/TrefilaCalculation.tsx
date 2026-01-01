@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { ArrowLeftIcon, SaveIcon, CalculatorIcon, AdjustmentsIcon, TrashIcon, BookOpenIcon, CheckCircleIcon, ExclamationIcon, PrinterIcon } from './icons';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, AreaChart, Area } from 'recharts';
+import { ArrowLeftIcon, SaveIcon, CalculatorIcon, AdjustmentsIcon, TrashIcon, BookOpenIcon, CheckCircleIcon, ExclamationIcon, PrinterIcon, SearchIcon, PlusIcon, ChevronRightIcon } from './icons';
 import { TrefilaRecipe, TrefilaRingStock } from '../types';
 import { insertItem, fetchTable, deleteItem } from '../services/supabaseService';
 import RingStockManager from './RingStockManager';
@@ -18,7 +18,7 @@ interface PassResult {
 
 const RING_DEFS = [
     // Output (Not Last) - CA & RT
-    { name: 'CA 3,55', min: 3.5, max: 3.65, dest: 'output', cond: 'not_last' },
+    { name: 'CA 3,55', min: 3.5, max: 3.99, dest: 'output', cond: 'not_last' }, // Extended to cover gap up to 4.00
     { name: 'CA 4,60', min: 4.55, max: 4.70, dest: 'output', cond: 'not_last' },
     { name: 'CA 5,50', min: 5.45, max: 5.60, dest: 'output', cond: 'not_last' },
     { name: 'RT 0', min: 4.00, max: 4.99, dest: 'output', cond: 'not_last' },
@@ -32,7 +32,7 @@ const RING_DEFS = [
     { name: 'PR 3,80', min: 3.75, max: 3.90, dest: 'output', cond: 'last' },
     { name: 'PR 4,10', min: 4.05, max: 4.20, dest: 'output', cond: 'last' },
     { name: 'PR 4,20', min: 4.15, max: 4.30, dest: 'output', cond: 'last' },
-    { name: 'PR 4,40', min: 4.35, max: 4.50, dest: 'output', cond: 'last' },
+    { name: 'PR 4,40', min: 4.35, max: 4.94, dest: 'output', cond: 'last' }, // Extended heavily to cover gap up to 4.95
     { name: 'PR 5,00', min: 4.95, max: 5.10, dest: 'output', cond: 'last' },
     { name: 'PR 5,50', min: 5.45, max: 5.60, dest: 'output', cond: 'last' },
     { name: 'PR 5,60', min: 5.55, max: 5.70, dest: 'output', cond: 'last' },
@@ -46,7 +46,7 @@ const RING_DEFS = [
     { name: 'RO 3', min: 7.00, max: 7.99, dest: 'entry', cond: 'not_last' },
 
     // Entry (Last) - ROA
-    { name: 'ROA 0', min: 3.49, max: 4.23, dest: 'entry', cond: 'last' },
+    { name: 'ROA 0', min: 3.49, max: 4.59, dest: 'entry', cond: 'last' }, // Extended to meet ROA 1
     { name: 'ROA 1', min: 4.60, max: 5.56, dest: 'entry', cond: 'last' },
     { name: 'ROA 2', min: 5.60, max: 6.00, dest: 'entry', cond: 'last' },
 ];
@@ -100,38 +100,55 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
         }
     };
 
-    // Helper to check stock
-    const checkStock = (ringName: string) => {
-        if (!ringName || ringName === '-') return { available: 0, required: 0, status: 'ok' as const };
+    // Sequential Stock Calculation
+    const stockValidation = React.useMemo(() => {
+        // Clone initial stock to a working map: { 'normalized_model': quantity }
+        const normalize = (s: string) => s ? s.toString().toLowerCase().replace(',', '.').replace(/[\s\-\_]+/g, '').trim() : '';
+        const stockMap: Record<string, number> = {};
 
-        // Safety check and Normalization (remove spaces, lowercase)
-        const normalize = (s: string) => s ? s.toString().toLowerCase().replace(/\s+/g, '').trim() : '';
-        const targetName = normalize(ringName);
-        if (!targetName) return { available: 0, required: 0, status: 'ok' as const };
-
-        // Count total usage of this specific ring name in the current setup
-        let totalUsageCount = 0;
-        if (Array.isArray(passRings)) {
-            passRings.forEach(p => {
-                if (p?.entry && normalize(p.entry) === targetName) totalUsageCount++;
-                if (p?.output && normalize(p.output) === targetName) totalUsageCount++;
+        if (Array.isArray(ringStock)) {
+            ringStock.forEach(r => {
+                if (r?.model) {
+                    const key = normalize(r.model);
+                    stockMap[key] = (stockMap[key] || 0) + (parseInt(String(r.quantity), 10) || 0);
+                }
             });
         }
 
-        const required = totalUsageCount * 3; // "Usamos 3 anéis para cada entrada ou saída"
+        const multiplier = params.type.includes('K-7') ? 3 : 1;
 
-        if (!Array.isArray(ringStock)) return { available: 0, required, status: 'ok' as const };
+        // Calculate status for each pass
+        return passRings.map(pass => {
+            const processRing = (ringName: string) => {
+                if (!ringName || ringName === '-') return { status: 'ok' as const, available: 0, required: 0, remainingAfter: 0 };
 
-        // Sum quantity of ALL matching stock items (handling duplicates)
-        const matchingItems = ringStock.filter(r => r?.name && normalize(r.name) === targetName);
-        const available = matchingItems.reduce((sum, item) => sum + (parseInt(String(item.quantity || 0), 10)), 0);
+                const key = normalize(ringName);
+                const required = multiplier;
+                const availableAtStart = stockMap[key] || 0;
 
-        return {
-            available,
-            required,
-            status: available >= required ? 'ok' as const : 'missing' as const
-        };
-    };
+                let status: 'ok' | 'missing' = 'ok';
+                if (availableAtStart >= required) {
+                    stockMap[key] = availableAtStart - required;
+                } else {
+                    status = 'missing';
+                    // If we don't have enough, we assume we use what we can (conceptually) or just fail.
+                    // For visualization, we just show what was available.
+                    // stockMap[key] = 0; // Consumption logic: if missing, do we consume rest? Let's say yes.
+                }
+
+                return {
+                    status,
+                    available: availableAtStart,
+                    required
+                };
+            };
+
+            return {
+                entry: processRing(pass?.entry),
+                output: processRing(pass?.output)
+            };
+        });
+    }, [passRings, ringStock, params.type]);
 
     // Simulation Logic (Unchanged core logic)
     const runSimulation = (n: number, dIn: number, dOut: number) => {
@@ -246,20 +263,58 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
 
             const getBestRing = (diameter: number, dest: string, cond: string) => {
                 const candidates = RING_DEFS.filter(r => r.dest === dest && r.cond === cond);
+                const normalize = (s: string) => s ? s.toString().toLowerCase().replace(',', '.').replace(/[\s\-\_]+/g, '').trim() : '';
 
-                // 1. Try Exact Range (Sort by narrower range first)
-                const exact = candidates.filter(r => diameter >= r.min && diameter <= r.max);
-                if (exact.length > 0) {
-                    return exact.sort((a, b) => (a.max - a.min) - (b.max - b.min))[0].name;
-                }
+                // Helper to check if a ring model has ANY stock (simple check)
+                const hasStock = (modelName: string) => {
+                    if (!ringStock || ringStock.length === 0) return false;
+                    const target = normalize(modelName);
+                    return ringStock.some(r => r.model && normalize(r.model) === target && r.quantity > 0);
+                };
 
-                // 2. Closest Center
-                if (candidates.length === 0) return '-';
-                return candidates.sort((a, b) => {
-                    const centerA = (a.min + a.max) / 2;
-                    const centerB = (b.min + b.max) / 2;
-                    return Math.abs(centerA - diameter) - Math.abs(centerB - diameter);
-                })[0].name;
+                // Score candidates: Prioritize Stock first, but contained within a reasonable proximity.
+                const scored = candidates.map(r => {
+                    let dist = 0;
+                    if (diameter < r.min) dist = r.min - diameter;      // Too small for ring
+                    else if (diameter > r.max) dist = diameter - r.max; // Too big for ring
+
+                    // Specific logic: Entry rings (RO) act as guides. A guide slightly larger is better than one smaller (jamming).
+                    let physicalClash = false;
+                    if (dest === 'entry' && diameter > r.max) physicalClash = true;
+
+                    const stock = hasStock(r.name);
+
+                    return { ...r, dist, stock, physicalClash };
+                });
+
+                // Filter out impossible matches (Physical clash) unless no other option
+                const possible = scored.filter(x => !x.physicalClash || x.dist < 0.1);
+                const pool = possible.length > 0 ? possible : scored;
+
+                pool.sort((a, b) => {
+                    // 1. Prioritize Stock (if distance is reasonable, e.g. < 1.0mm)
+                    if (a.stock !== b.stock) {
+                        // If A has stock and is reasonably close, prefer it
+                        if (a.stock && a.dist < 1.0) return -1;
+                        if (b.stock && b.dist < 1.0) return 1;
+                    }
+
+                    // 2. Prioritize Distance (Closer is better)
+                    if (Math.abs(a.dist - b.dist) > 0.05) {
+                        return a.dist - b.dist;
+                    }
+
+                    // 3. Prioritize Exact Range (Inside is better than Outside)
+                    const aIn = diameter >= a.min && diameter <= a.max;
+                    const bIn = diameter >= b.min && diameter <= b.max;
+                    if (aIn && !bIn) return -1;
+                    if (!aIn && bIn) return 1;
+
+                    return 0;
+                });
+
+                if (pool.length === 0) return '-';
+                return pool[0].name;
             };
 
             const entryRing = getBestRing(dEntry, 'entry', isLast ? 'last' : 'not_last');
@@ -429,10 +484,135 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                     </div>
                 </div>
 
-                <div className="flex-1 max-w-[1920px] w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start print:block print:p-0">
+                <div className="flex-1 max-w-[1920px] w-full mx-auto p-4 md:p-6 flex flex-col items-start print:block print:p-0">
 
-                    {/* Left Panel: Controls & Recipes - HIDDEN ON PRINT */}
-                    <div className="lg:col-span-3 space-y-6 print:hidden">
+                    {/* Top Header: Parameters & Recipes */}
+                    <div className="w-full bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-6 print:hidden flex flex-col xl:flex-row items-center justify-between gap-6">
+
+                        {/* Left: Calculation Parameters */}
+                        <div className="flex flex-col md:flex-row items-center gap-4 w-full xl:w-auto">
+
+                            {/* Material Type */}
+                            <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-100">
+                                <span className="text-[10px] font-bold text-slate-400 px-2">MATERIAL</span>
+                                <div className="flex">
+                                    <button className="px-3 py-1.5 rounded-lg bg-white text-blue-700 shadow-sm font-bold text-xs">K-7 CA 60</button>
+                                </div>
+                            </div>
+
+                            <div className="h-8 w-px bg-slate-200 hidden md:block"></div>
+
+                            {/* Inputs Group */}
+                            <div className="flex items-center gap-3">
+                                <div className="flex flex-col">
+                                    <label className="text-[10px] font-bold text-slate-400 mb-0.5">ENTRADA</label>
+                                    <select
+                                        value={params.entryDiameter}
+                                        onChange={e => setParams({ ...params, entryDiameter: e.target.value })}
+                                        className="bg-slate-50 border border-slate-200 text-slate-700 text-sm font-bold rounded-lg p-2 outline-none focus:border-blue-500 w-24"
+                                    >
+                                        <option value="8.00">8.00 mm</option>
+                                        <option value="7.00">7.00 mm</option>
+                                        <option value="6.50">6.50 mm</option>
+                                        <option value="6.35">6.35 mm</option>
+                                        <option value="5.50">5.50 mm</option>
+                                    </select>
+                                </div>
+
+                                <div className="text-slate-300">→</div>
+
+                                <div className="flex flex-col">
+                                    <label className="text-[10px] font-bold text-slate-400 mb-0.5">SAÍDA</label>
+                                    <input
+                                        type="number" step="0.01"
+                                        value={params.finalDiameter}
+                                        onChange={e => setParams({ ...params, finalDiameter: e.target.value })}
+                                        className="bg-slate-50 border border-slate-200 text-slate-700 text-sm font-bold rounded-lg p-2 outline-none focus:border-blue-500 w-24"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="h-8 w-px bg-slate-200 hidden md:block"></div>
+
+                            {/* Passes & Calc */}
+                            <div className="flex items-center gap-4">
+                                <div className="flex flex-col w-32">
+                                    <div className="flex justify-between text-[10px] font-bold text-slate-400 mb-0.5">
+                                        <span>PASSES</span>
+                                        <span className="text-blue-600">{params.passes}</span>
+                                    </div>
+                                    <input
+                                        type="range" min="1" max="4" step="1"
+                                        value={params.passes}
+                                        onChange={e => setParams({ ...params, passes: e.target.value })}
+                                        className="h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                    />
+                                </div>
+
+                                <button
+                                    onClick={calculateDistribution}
+                                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-xl shadow-lg shadow-blue-500/20 transition-all active:scale-[0.95] flex items-center gap-2"
+                                >
+                                    <CalculatorIcon className="h-5 w-5" />
+                                    <span>Calcular</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Right: Recipes (Compact) */}
+                        <div className="flex flex-col md:flex-row items-center gap-3 w-full xl:w-auto border-t xl:border-t-0 xl:border-l border-slate-100 pt-4 xl:pt-0 xl:pl-6">
+                            <div className="flex items-center gap-2 w-full md:w-auto">
+                                <div className="relative flex-1 md:w-48">
+                                    <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                    <input
+                                        type="text"
+                                        placeholder="Nome da receita..."
+                                        value={recipeName}
+                                        onChange={e => setRecipeName(e.target.value)}
+                                        className="w-full pl-8 pr-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-emerald-500 outline-none"
+                                    />
+                                </div>
+                                <button
+                                    onClick={handleSaveRecipe}
+                                    disabled={!recipeName}
+                                    className="bg-emerald-500 disabled:opacity-50 hover:bg-emerald-600 text-white p-2 rounded-lg font-bold transition shadow-sm"
+                                    title="Salvar Receita"
+                                >
+                                    <PlusIcon className="h-5 w-5" />
+                                </button>
+                            </div>
+
+                            {/* Saved Recipes Dropdown */}
+                            <div className="relative group z-40">
+                                <button className="flex items-center gap-2 text-slate-600 hover:text-blue-600 font-medium text-sm bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg">
+                                    <span>{savedRecipes.length} Salvas</span>
+                                    <ChevronRightIcon className="h-4 w-4 rotate-90 group-hover:rotate-0 transition-transform" />
+                                </button>
+
+                                {/* Dropdown */}
+                                <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-xl shadow-xl border border-slate-100 hidden group-hover:block p-2 max-h-[300px] overflow-y-auto custom-scrollbar">
+                                    {savedRecipes.length === 0 ? (
+                                        <p className="text-center text-xs text-slate-400 py-4">Nenhuma receita salva.</p>
+                                    ) : (
+                                        savedRecipes.map(r => (
+                                            <div key={r.id} className="flex items-center justify-between p-2 hover:bg-slate-50 rounded-lg cursor-pointer group/item" onClick={() => handleLoadRecipe(r)}>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-bold text-slate-700 truncate">{r.name}</p>
+                                                    <p className="text-[10px] text-slate-400">{r.entryDiameter} → {r.finalDiameter}</p>
+                                                </div>
+                                                <button onClick={(e) => { e.stopPropagation(); handleDeleteRecipe(r.id, e); }} className="text-slate-300 hover:text-red-500 p-1"><TrashIcon className="h-4 w-4" /></button>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    {/* Hiding the old sidebar content completely by removing it or wrapping it in hidden/comment */}
+                    {/* The following div was the sidebar container, now effectively replaced by the content above and ensuring old code is removed */}
+                    <div className="hidden">
 
                         {/* Parameters Card */}
                         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
@@ -577,7 +757,7 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                     </div>
 
                     {/* Right Panel: Results Visualization - Single View - FULL WIDTH ON PRINT */}
-                    <div className="lg:col-span-9 space-y-6 print:col-span-12 print:w-full">
+                    <div className="w-full space-y-6 print:w-full">
                         {results.length === 0 ? (
                             <div className="bg-white p-12 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-slate-400 min-h-[400px]">
                                 <CalculatorIcon className="h-20 w-20 mb-4 opacity-10" />
@@ -591,20 +771,43 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                     <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
                                         <AdjustmentsIcon className="h-32 w-32 text-blue-500" />
                                     </div>
-                                    <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2 relative z-10">
+                                    <h3 className="text-lg font-bold text-slate-800 mb-2 flex items-center gap-2 relative z-10">
                                         <AdjustmentsIcon className="h-5 w-5 text-blue-600" />
-                                        Fluxo de Redução
+                                        Fluxo de Redução & Performance
                                     </h3>
 
-                                    <div className="flex flex-col xl:flex-row print:flex-row items-center justify-center py-8 gap-4 xl:gap-0 print:gap-2 relative z-10 overflow-x-auto">
+                                    {/* Integrated Reduction Chart */}
+                                    <div className="h-[120px] w-full mb-4 relative z-10">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <AreaChart data={results} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                                <defs>
+                                                    <linearGradient id="colorReduction" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.2} />
+                                                        <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
+                                                    </linearGradient>
+                                                </defs>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                                <XAxis dataKey="pass" hide />
+                                                <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} domain={[0, 45]} />
+                                                <Tooltip
+                                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', fontSize: '12px', padding: '8px' }}
+                                                    cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }}
+                                                />
+                                                <ReferenceLine y={29} stroke="#EF4444" strokeDasharray="3 3" />
+                                                <Area type="monotone" dataKey="reduction" stroke="#3B82F6" strokeWidth={2} fillOpacity={1} fill="url(#colorReduction)" />
+                                            </AreaChart>
+                                        </ResponsiveContainer>
+                                    </div>
+
+                                    <div className="flex flex-col xl:flex-row print:flex-row items-center justify-center pt-6 pb-28 gap-1 xl:gap-0 print:gap-2 relative z-10 overflow-x-auto no-scrollbar">
                                         {/* Entry Node */}
-                                        <div className="flex flex-col items-center group relative cursor-default">
-                                            <div className="w-28 h-28 rounded-full bg-slate-800 text-white flex flex-col items-center justify-center shadow-xl border-4 border-slate-50 ring-4 ring-slate-100 z-20 relative overflow-hidden">
+                                        <div className="flex flex-col items-center group relative cursor-default px-1 shrink-0">
+                                            <div className="w-14 h-14 rounded-full bg-slate-800 text-white flex flex-col items-center justify-center shadow-md border-2 border-slate-50 ring-2 ring-slate-100 z-20 relative overflow-hidden">
                                                 <div className="absolute inset-0 bg-gradient-to-br from-slate-700 to-slate-900"></div>
                                                 <div className="relative z-10 flex flex-col items-center">
-                                                    <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Entrada</span>
-                                                    <span className="text-3xl font-black">{params.entryDiameter}</span>
-                                                    <span className="text-[10px] text-slate-400">mm</span>
+                                                    <span className="text-[8px] font-semibold text-slate-300 uppercase tracking-wider mb-0">Entrada</span>
+                                                    <span className="text-base font-black leading-none">{params.entryDiameter}</span>
+                                                    <span className="text-[8px] text-slate-400">mm</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -613,11 +816,11 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                         {results.map((res, i) => (
                                             <React.Fragment key={i}>
                                                 {/* Connector */}
-                                                <div className="flex flex-col items-center justify-center w-24 xl:w-32 print:w-24 relative h-16 xl:h-auto print:h-auto">
-                                                    <div className="absolute top-1/2 left-0 right-0 h-1 bg-slate-200 overflow-hidden rounded-full">
+                                                <div className="flex flex-col items-center justify-center w-24 xl:w-32 print:w-16 relative h-8 xl:h-auto print:h-auto shrink-0">
+                                                    <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-slate-200 overflow-hidden rounded-full">
                                                         <div className="h-full bg-blue-500/20 w-full animate-pulse"></div>
                                                     </div>
-                                                    <div className="relative z-10 bg-white px-3 py-1.5 rounded-xl border border-blue-100 shadow-sm flex flex-col items-center min-w-[80px]">
+                                                    <div className="relative z-10 bg-white px-1.5 py-0.5 rounded-lg border border-blue-100 shadow-sm flex flex-col items-center min-w-[45px]">
                                                         <span className={`text-sm font-bold ${res.reduction > 29 ? 'text-red-500' : 'text-blue-600'}`}>
                                                             -{res.reduction.toFixed(1)}%
                                                         </span>
@@ -626,49 +829,76 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                                 </div>
 
                                                 {/* Machine Node */}
-                                                <div className="flex flex-col items-center relative group">
-                                                    <div className={`w-28 h-28 rounded-3xl flex flex-col items-center justify-center shadow-lg border-4 transition-all duration-300 z-20 relative bg-white
+                                                <div className="flex flex-col items-center relative group px-1 shrink-0">
+                                                    <div className={`w-14 h-14 rounded-xl flex flex-col items-center justify-center shadow-md border-2 transition-all duration-300 z-20 relative bg-white
                                                         ${res.status === 'Alta'
-                                                            ? 'border-red-100 ring-4 ring-red-50 shadow-red-100'
-                                                            : 'border-blue-100 ring-4 ring-blue-50 shadow-blue-100'}`
+                                                            ? 'border-red-100 ring-2 ring-red-50 shadow-red-100'
+                                                            : 'border-blue-100 ring-2 ring-blue-50 shadow-blue-100'}`
                                                     }>
-                                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Passe {res.pass}</span>
-                                                        <span className={`text-3xl font-black ${res.status === 'Alta' ? 'text-red-600' : 'text-slate-700'}`}>
+                                                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-0">Passe {res.pass}</span>
+                                                        <span className={`text-base font-black leading-none ${res.status === 'Alta' ? 'text-red-600' : 'text-slate-700'}`}>
                                                             {res.diameter.toFixed(2)}
                                                         </span>
-                                                        <span className="text-[10px] text-slate-400">mm</span>
+                                                        <span className="text-[8px] text-slate-400">mm</span>
 
                                                         {res.status === 'Alta' && (
-                                                            <div className="absolute -top-3 -right-3 bg-red-500 text-white rounded-full p-1.5 shadow-lg animate-bounce">
-                                                                <ExclamationIcon className="h-4 w-4" />
+                                                            <div className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-lg animate-bounce">
+                                                                <ExclamationIcon className="h-3 w-3" />
                                                             </div>
                                                         )}
                                                     </div>
 
                                                     {/* Ring Input Display */}
-                                                    <div className="absolute -bottom-16 w-32 bg-slate-100 p-2 rounded-lg text-xs font-medium text-slate-600 border border-slate-200 shadow-sm flex flex-col gap-1">
+                                                    <div className="absolute left-1/2 -translate-x-1/2 w-[160px] bg-slate-50 p-1.5 rounded-lg text-[10px] font-medium text-slate-600 border border-slate-200 shadow-sm flex flex-col gap-0.5 z-30 -bottom-24">
                                                         {(() => {
                                                             const entryRing = passRings[i]?.entry;
                                                             const outputRing = passRings[i]?.output;
-                                                            const entryStatus = checkStock(entryRing);
-                                                            const outputStatus = checkStock(outputRing);
+                                                            // Use sequential validation
+                                                            const entryStatus = stockValidation[i]?.entry || { status: 'ok', available: 0, required: 0 };
+                                                            const outputStatus = stockValidation[i]?.output || { status: 'ok', available: 0, required: 0 };
 
                                                             const isEntryOk = entryRing && entryRing !== '-' && entryStatus.status === 'ok';
                                                             const isOutputOk = outputRing && outputRing !== '-' && outputStatus.status === 'ok';
 
                                                             return (
                                                                 <>
-                                                                    <div className={`flex justify-between items-center px-1.5 py-0.5 rounded ${entryStatus.status === 'missing' ? 'text-red-700 bg-red-100' : (isEntryOk ? 'text-emerald-700 bg-emerald-100' : '')}`}>
-                                                                        <span className="opacity-75 mr-1">Ent:</span>
-                                                                        <span className="font-bold">{entryRing || '-'}</span>
-                                                                        {entryStatus.status === 'missing' && <ExclamationIcon className="h-3 w-3 ml-1" />}
-                                                                        {isEntryOk && <CheckCircleIcon className="h-3 w-3 ml-1" />}
+                                                                    <div
+                                                                        className={`flex flex-col px-1.5 py-0.5 rounded border ${!entryRing || entryRing === '-'
+                                                                            ? 'border-transparent text-slate-500'
+                                                                            : entryStatus.status === 'missing'
+                                                                                ? 'bg-red-50 text-red-700 border-red-100'
+                                                                                : 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                                                            }`}>
+                                                                        <div className="flex justify-between items-center w-full">
+                                                                            <span className="opacity-75 mr-1 text-[9px]">Ent:</span>
+                                                                            <span className="font-bold">{params.type.includes('K-7') && entryRing && entryRing !== '-' ? '3x ' : ''}{entryRing || '-'}</span>
+                                                                            {entryStatus.status === 'missing' && entryRing && entryRing !== '-' && <ExclamationIcon className="h-3 w-3 ml-1 text-red-500" />}
+                                                                            {entryStatus.status === 'ok' && entryRing && entryRing !== '-' && <CheckCircleIcon className="h-3 w-3 ml-1 text-emerald-500" />}
+                                                                        </div>
+                                                                        {entryStatus.status === 'missing' && entryRing && entryRing !== '-' && (
+                                                                            <span className="text-[8px] font-medium text-right w-full opacity-80 leading-none mt-0.5">
+                                                                                Est: {entryStatus.available} / Req: {entryStatus.required}
+                                                                            </span>
+                                                                        )}
                                                                     </div>
-                                                                    <div className={`flex justify-between items-center px-1.5 py-0.5 rounded ${outputStatus.status === 'missing' ? 'text-red-700 bg-red-100' : (isOutputOk ? 'text-emerald-700 bg-emerald-100' : '')}`}>
-                                                                        <span className="opacity-75 mr-1">Sai:</span>
-                                                                        <span className="font-bold">{outputRing || '-'}</span>
-                                                                        {outputStatus.status === 'missing' && <ExclamationIcon className="h-3 w-3 ml-1" />}
-                                                                        {isOutputOk && <CheckCircleIcon className="h-3 w-3 ml-1" />}
+                                                                    <div
+                                                                        className={`flex flex-col px-1.5 py-0.5 rounded border ${!outputRing || outputRing === '-'
+                                                                            ? 'border-transparent text-slate-500'
+                                                                            : outputStatus.status === 'missing'
+                                                                                ? 'bg-red-50 text-red-700 border-red-100'
+                                                                                : 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                                                            }`}>
+                                                                        <div className="flex justify-between items-center w-full">
+                                                                            <span className="opacity-75 mr-1 text-[9px]">Sai:</span>
+                                                                            <span className="font-bold">{params.type.includes('K-7') && outputRing && outputRing !== '-' ? '3x ' : ''}{outputRing || '-'}</span>
+                                                                            {outputStatus.status === 'missing' && outputRing && outputRing !== '-' && <ExclamationIcon className="h-3 w-3 ml-1 text-red-500" />}
+                                                                            {outputStatus.status === 'ok' && outputRing && outputRing !== '-' && <CheckCircleIcon className="h-3 w-3 ml-1 text-emerald-500" />}
+                                                                        </div>
+                                                                        {outputStatus.status === 'missing' && outputRing && outputRing !== '-' && (
+                                                                            <span className="text-[8px] font-medium text-right w-full opacity-80 leading-none mt-0.5">
+                                                                                Est: {outputStatus.available} / Req: {outputStatus.required}
+                                                                            </span>
+                                                                        )}
                                                                     </div>
                                                                 </>
                                                             );
@@ -680,41 +910,7 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                     </div>
                                 </div>
 
-                                {/* Section 2: Reduction Chart */}
-                                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                                    <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                        <CalculatorIcon className="h-5 w-5 text-purple-600" />
-                                        Performance de Redução (% de Área)
-                                    </h3>
-                                    <div className="h-[350px] w-full">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <LineChart data={results} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
-                                                <defs>
-                                                    <linearGradient id="colorReduction" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.1} />
-                                                        <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
-                                                    </linearGradient>
-                                                </defs>
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                                <XAxis dataKey="pass" tickLine={false} axisLine={false} tick={{ fill: '#64748B' }} label={{ value: 'Passe (Máquina)', position: 'insideBottom', offset: -5, fill: '#94a3b8' }} />
-                                                <YAxis tickLine={false} axisLine={false} tick={{ fill: '#64748B' }} domain={[0, 45]} />
-                                                <Tooltip
-                                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)', padding: '12px' }}
-                                                    cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }}
-                                                />
-                                                <ReferenceLine y={29} stroke="#EF4444" strokeDasharray="3 3" label={{ position: 'right', value: 'Limite Segurança (29%)', fill: '#EF4444', fontSize: 12 }} />
-                                                <Line
-                                                    type="monotone"
-                                                    dataKey="reduction"
-                                                    stroke="#3B82F6"
-                                                    strokeWidth={3}
-                                                    dot={{ r: 6, fill: '#3B82F6', strokeWidth: 3, stroke: '#fff' }}
-                                                    activeDot={{ r: 8, stroke: '#3B82F6', strokeWidth: 4, fill: '#fff' }}
-                                                />
-                                            </LineChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                </div>
+
 
                                 {/* Section 3: Detailed Table */}
                                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
@@ -729,24 +925,24 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                     </div>
 
                                     <div className="overflow-x-auto rounded-xl border border-slate-200">
-                                        <table className="w-full text-sm text-left border-collapse">
+                                        <table className="w-full text-xs text-left border-collapse">
                                             <thead>
                                                 <tr className="bg-slate-50/80 border-b border-slate-200">
-                                                    <th className="px-6 py-4 font-bold text-slate-600">PASSE</th>
-                                                    <th className="px-6 py-4 font-bold text-slate-600 bg-blue-50/30 border-l border-blue-100">ANEL ENTRADA</th>
-                                                    <th className="px-6 py-4 font-bold text-slate-600 bg-blue-50/30 border-r border-blue-100">ANEL SAÍDA</th>
-                                                    <th className="px-6 py-4 font-bold text-slate-600">DIÂMETRO (mm)</th>
-                                                    <th className="px-6 py-4 font-bold text-slate-600">REDUÇÃO (%)</th>
-                                                    <th className="px-6 py-4 font-bold text-slate-600">STATUS</th>
+                                                    <th className="px-2 py-1.5 font-bold text-slate-600">PASSE</th>
+                                                    <th className="px-2 py-1.5 font-bold text-slate-600 bg-blue-50/30 border-l border-blue-100">ANEL ENTRADA</th>
+                                                    <th className="px-2 py-1.5 font-bold text-slate-600 bg-blue-50/30 border-r border-blue-100">ANEL SAÍDA</th>
+                                                    <th className="px-2 py-1.5 font-bold text-slate-600">DIÂMETRO (mm)</th>
+                                                    <th className="px-2 py-1.5 font-bold text-slate-600">REDUÇÃO (%)</th>
+                                                    <th className="px-2 py-1.5 font-bold text-slate-600">STATUS</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100">
                                                 {results.map((res, i) => (
                                                     <tr key={i} className="hover:bg-slate-50 transition-colors">
-                                                        <td className="px-6 py-4 font-bold text-slate-800">#{res.pass}</td>
-                                                        <td className="px-6 py-4 bg-blue-50/10 border-l border-slate-100">
+                                                        <td className="px-2 py-1.5 font-bold text-slate-800">#{res.pass}</td>
+                                                        <td className="px-2 py-1.5 bg-blue-50/10 border-l border-slate-100">
                                                             <input type="text"
-                                                                className={`w-full bg-transparent border-b border-dashed outline-none text-center transition-colors ${checkStock(passRings[i]?.entry).status === 'missing'
+                                                                className={`w-full bg-transparent border-b border-dashed outline-none text-center transition-colors ${stockValidation[i]?.entry?.status === 'missing'
                                                                     ? 'border-red-400 text-red-600 font-bold bg-red-50'
                                                                     : (passRings[i]?.entry && passRings[i]?.entry !== '-' ? 'border-emerald-400 text-emerald-600 font-bold bg-emerald-50' : 'border-slate-300 focus:border-blue-600')
                                                                     }`}
@@ -755,7 +951,8 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                                                 onChange={e => handleRingChange(i, 'entry', e.target.value)}
                                                             />
                                                             {(() => {
-                                                                const s = checkStock(passRings[i]?.entry);
+                                                                const s = stockValidation[i]?.entry;
+                                                                if (!s) return null;
                                                                 const balance = s.available - s.required;
 
                                                                 if (!passRings[i]?.entry || passRings[i]?.entry === '-') return null;
@@ -777,9 +974,9 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                                                 );
                                                             })()}
                                                         </td>
-                                                        <td className="px-6 py-4 bg-blue-50/10 border-r border-slate-100">
+                                                        <td className="px-2 py-1.5 bg-blue-50/10 border-r border-slate-100">
                                                             <input type="text"
-                                                                className={`w-full bg-transparent border-b border-dashed outline-none text-center font-bold transition-colors ${checkStock(passRings[i]?.output).status === 'missing'
+                                                                className={`w-full bg-transparent border-b border-dashed outline-none text-center font-bold transition-colors ${stockValidation[i]?.output?.status === 'missing'
                                                                     ? 'border-red-400 text-red-600 bg-red-50'
                                                                     : (passRings[i]?.output && passRings[i]?.output !== '-' ? 'border-emerald-400 text-emerald-600 bg-emerald-50' : 'border-slate-300 focus:border-blue-600 text-blue-700')
                                                                     }`}
@@ -788,7 +985,8 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                                                 onChange={e => handleRingChange(i, 'output', e.target.value)}
                                                             />
                                                             {(() => {
-                                                                const s = checkStock(passRings[i]?.output);
+                                                                const s = stockValidation[i]?.output;
+                                                                if (!s) return null;
                                                                 const balance = s.available - s.required;
 
                                                                 if (!passRings[i]?.output || passRings[i]?.output === '-') return null;
@@ -810,25 +1008,25 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                                                                 );
                                                             })()}
                                                         </td>
-                                                        <td className="px-6 py-4">
-                                                            <div className="flex items-center gap-2">
+                                                        <td className="px-3 py-2">
+                                                            <div className="flex items-center gap-1">
                                                                 <input type="number" step="0.01"
-                                                                    className="w-24 bg-slate-100 hover:bg-white focus:bg-white border border-transparent focus:border-blue-300 rounded px-3 py-1.5 text-center font-bold text-slate-700 focus:ring-2 ring-blue-100 outline-none transition-all"
+                                                                    className="w-20 bg-slate-100 hover:bg-white focus:bg-white border border-transparent focus:border-blue-300 rounded px-2 py-1 text-center font-bold text-slate-700 focus:ring-2 ring-blue-100 outline-none transition-all"
                                                                     value={passDiameters[i]}
                                                                     onChange={e => handleDiameterChange(i, e.target.value)}
                                                                 />
-                                                                <span className="text-xs text-slate-400">mm</span>
+                                                                <span className="text-[10px] text-slate-400">mm</span>
                                                             </div>
                                                         </td>
-                                                        <td className="px-6 py-4">
+                                                        <td className="px-3 py-2">
                                                             <span className={`font-mono font-bold ${res.reduction > 29 ? 'text-red-600' : 'text-slate-600'}`}>
                                                                 {res.reduction.toFixed(2)}%
                                                             </span>
                                                         </td>
-                                                        <td className="px-6 py-4">
+                                                        <td className="px-3 py-2">
                                                             {res.status === 'Ok'
-                                                                ? <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold border border-emerald-200"><CheckCircleIcon className="h-3.5 w-3.5" /> Ideal</span>
-                                                                : <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-bold border border-red-200 animate-pulse"><ExclamationIcon className="h-3.5 w-3.5" /> Crítico</span>
+                                                                ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold border border-emerald-200"><CheckCircleIcon className="h-3 w-3" /> Ideal</span>
+                                                                : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[10px] font-bold border border-red-200 animate-pulse"><ExclamationIcon className="h-3 w-3" /> Crítico</span>
                                                             }
                                                         </td>
                                                     </tr>

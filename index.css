@@ -143,6 +143,17 @@ tr:hover td {
   background: transparent;
 }
 
+.no-scrollbar {
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* PRINT STYLES */
 @page {
   size: A4;
