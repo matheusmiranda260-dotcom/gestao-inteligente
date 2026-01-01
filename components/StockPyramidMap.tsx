@@ -78,11 +78,11 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
     // Aggressive Dynamic Sizing to FIT mobile screens
     const dims = useMemo(() => {
         // Base sizes for mobile (<640px) vs desktop
-        if (baseSize <= 6) return { slot: 'w-[48px] h-[48px] sm:w-24 sm:h-24', gap: 'gap-x-1.5', font: 'text-[9px] sm:text-base' };
-        if (baseSize <= 9) return { slot: 'w-[36px] h-[36px] sm:w-20 sm:h-20', gap: 'gap-x-1', font: 'text-[8px] sm:text-sm' };
-        if (baseSize <= 12) return { slot: 'w-[28px] h-[28px] sm:w-16 sm:h-16', gap: 'gap-x-1', font: 'text-[7px] sm:text-xs' };
-        if (baseSize <= 15) return { slot: 'w-[22px] h-[22px] sm:w-14 sm:h-14', gap: 'gap-x-0.5', font: 'text-[6px] sm:text-[11px]' };
-        return { slot: 'w-[18px] h-[18px] sm:w-11 sm:h-11', gap: 'gap-x-0.5', font: 'text-[5px] sm:text-[9px]' };
+        if (baseSize <= 6) return { slot: 'w-[46px] h-[46px] sm:w-24 sm:h-24', gap: 'gap-x-1.5', font: 'text-[9px] sm:text-base' };
+        if (baseSize <= 9) return { slot: 'w-[32px] h-[32px] sm:w-20 sm:h-20', gap: 'gap-x-1', font: 'text-[8px] sm:text-sm' };
+        if (baseSize <= 12) return { slot: 'w-[24px] h-[24px] sm:w-16 sm:h-16', gap: 'gap-x-1', font: 'text-[7px] sm:text-xs' };
+        if (baseSize <= 15) return { slot: 'w-[20px] h-[20px] sm:w-14 sm:h-14', gap: 'gap-x-0.5', font: 'text-[6px] sm:text-[11px]' };
+        return { slot: 'w-[16px] h-[16px] sm:w-11 sm:h-11', gap: 'gap-x-0.5', font: 'text-[5px] sm:text-[9px]' };
     }, [baseSize]);
 
     const handleSaveName = () => {
@@ -194,7 +194,7 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
 
     return (
         <div
-            className={`flex-1 min-w-full md:min-w-[300px] border-2 rounded-xl p-4 relative transition-all duration-300 ${isActive ? 'border-emerald-500 bg-emerald-50 shadow-md ring-2 ring-emerald-300' : 'border-dashed border-slate-300 bg-slate-50 opacity-90'}`}
+            className={`flex-1 min-w-full md:min-w-[300px] border-2 rounded-xl p-2 md:p-4 relative transition-all duration-300 ${isActive ? 'border-emerald-500 bg-emerald-50 shadow-md ring-2 ring-emerald-300' : 'border-dashed border-slate-300 bg-slate-50 opacity-90'}`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={(e) => {
@@ -257,22 +257,22 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                         <ChartBarIcon className="w-5 h-5 rotate-90" />
                     </button>
 
-                    <div className="flex items-center bg-white rounded-lg border border-slate-200 mr-2 md:scale-90 md:origin-right shadow-sm" title="Tamanho da Base (Chão)">
-                        <button onClick={(e) => { e.stopPropagation(); updateConfig(Math.max(1, baseSize - 1), maxHeight); }} className="px-3 py-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-l-lg font-bold border-r active:bg-slate-200">-</button>
-                        <div className="flex flex-col items-center justify-center w-10 bg-slate-50 px-1 select-none">
-                            <span className="text-[8px] uppercase text-slate-400 leading-none mb-0.5">Base</span>
-                            <span className="text-sm font-mono font-bold leading-none text-slate-700">{baseSize}</span>
+                    <div className="flex items-center bg-white rounded-lg border border-slate-200 shadow-sm" title="Tamanho da Base (Chão)">
+                        <button onClick={(e) => { e.stopPropagation(); updateConfig(Math.max(1, baseSize - 1), maxHeight); }} className="px-2 md:px-3 py-1.5 md:py-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-l-lg font-bold border-r active:bg-slate-200">-</button>
+                        <div className="flex flex-col items-center justify-center w-8 md:w-10 bg-slate-50 px-1 select-none">
+                            <span className="text-[7px] md:text-[8px] uppercase text-slate-400 leading-none mb-0.5">Base</span>
+                            <span className="text-xs md:text-sm font-mono font-bold leading-none text-slate-700">{baseSize}</span>
                         </div>
-                        <button onClick={(e) => { e.stopPropagation(); updateConfig(baseSize + 1, maxHeight); }} className="px-3 py-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-r-lg font-bold border-l active:bg-slate-200">+</button>
+                        <button onClick={(e) => { e.stopPropagation(); updateConfig(baseSize + 1, maxHeight); }} className="px-2 md:px-3 py-1.5 md:py-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-r-lg font-bold border-l active:bg-slate-200">+</button>
                     </div>
 
-                    <div className="flex items-center bg-white rounded-lg border border-slate-200 mr-2 md:scale-90 md:origin-right shadow-sm" title="Altura Máxima (Pilha)">
-                        <button onClick={(e) => { e.stopPropagation(); updateConfig(baseSize, Math.max(1, maxHeight - 1)); }} className="px-3 py-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-l-lg font-bold border-r active:bg-slate-200">-</button>
-                        <div className="flex flex-col items-center justify-center w-10 bg-slate-50 px-1 select-none">
-                            <span className="text-[8px] uppercase text-slate-400 leading-none mb-0.5">Alt</span>
-                            <span className="text-sm font-mono font-bold leading-none text-slate-700">{maxHeight}</span>
+                    <div className="flex items-center bg-white rounded-lg border border-slate-200 shadow-sm" title="Altura Máxima (Pilha)">
+                        <button onClick={(e) => { e.stopPropagation(); updateConfig(baseSize, Math.max(1, maxHeight - 1)); }} className="px-2 md:px-3 py-1.5 md:py-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-l-lg font-bold border-r active:bg-slate-200">-</button>
+                        <div className="flex flex-col items-center justify-center w-8 md:w-10 bg-slate-50 px-1 select-none">
+                            <span className="text-[7px] md:text-[8px] uppercase text-slate-400 leading-none mb-0.5">Alt</span>
+                            <span className="text-xs md:text-sm font-mono font-bold leading-none text-slate-700">{maxHeight}</span>
                         </div>
-                        <button onClick={(e) => { e.stopPropagation(); updateConfig(baseSize, Math.min(5, maxHeight + 1)); }} className={`px-3 py-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-r-lg font-bold border-l active:bg-slate-200 ${maxHeight >= 5 ? 'opacity-50 cursor-not-allowed' : ''}`} disabled={maxHeight >= 5}>+</button>
+                        <button onClick={(e) => { e.stopPropagation(); updateConfig(baseSize, Math.min(5, maxHeight + 1)); }} className={`px-2 md:px-3 py-1.5 md:py-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-r-lg font-bold border-l active:bg-slate-200 ${maxHeight >= 5 ? 'opacity-50 cursor-not-allowed' : ''}`} disabled={maxHeight >= 5}>+</button>
                     </div>
 
                     {/* Actions Group - Removed for automation */}
@@ -1257,7 +1257,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
 
                     {/* Main Canvas */}
                     <div
-                        className="flex-1 overflow-auto p-4 md:p-8 flex items-start justify-center relative no-scrollbar"
+                        className="flex-1 overflow-auto p-1.5 md:p-8 flex items-start justify-center relative no-scrollbar"
                         style={{
                             backgroundImage: `linear-gradient(to bottom, rgba(241, 245, 249, 0.85), rgba(241, 245, 249, 0.92)), url(/industrial-bg.png)`,
                             backgroundSize: 'cover',
