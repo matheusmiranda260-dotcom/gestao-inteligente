@@ -80,13 +80,14 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
         slotSize = Math.min(Math.max(slotSize, minSize), maxSize);
 
         // Font size scales with slot size
-        const fontSize = Math.max(slotSize * 0.20, 10); // ~20% of slot size
+        // Font size scales more aggressively with slot size
+        const fontSize = Math.max(slotSize * 0.24, 12); // Maximum legibility scale
 
         return {
             slotSize,
             font: fontSize,
             gap: gapSize,
-            lotTitle: Math.max(fontSize * 0.9, 11),
+            lotTitle: Math.max(fontSize * 0.95, 13), // Bold Lot Title
             border: slotSize > 100 ? 8 : (slotSize > 60 ? 4 : 2)
         };
     }, [containerWidth, baseSize]);
@@ -306,7 +307,7 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
             </div>
 
             {/* Pyramid Render Area */}
-            <div className="flex-1 w-full overflow-x-auto no-scrollbar py-12 px-2 flex justify-start md:justify-center items-center">
+            <div className="flex-1 w-full overflow-x-auto overflow-y-visible no-scrollbar pt-28 pb-12 px-2 flex justify-start md:justify-center items-center">
                 <div className="flex flex-col-reverse items-center min-h-[120px] md:min-h-[150px] transition-all duration-300 gap-y-4 md:gap-y-6 pb-12 w-max"
                     style={{ height: maxHeight < 5 ? 'auto' : undefined }} // Fluid height if small
                 >
@@ -370,7 +371,7 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                                 {/* Desktop Context Menu (Hidden on Mobile) */}
                                                 {isMenuOpen && (
                                                     <div
-                                                        className={`hidden md:flex absolute z-[150] ${levelIndex >= (builtLevels.length - 1) ? 'top-full mt-4' : 'bottom-full mb-4'} left-1/2 -translate-x-1/2 w-44 bg-white rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.4)] p-2.5 flex-col gap-1.5 border border-slate-200 animate-in fade-in zoom-in duration-200`}
+                                                        className={`hidden md:flex absolute z-[150] ${levelIndex === 0 ? 'bottom-full mb-6' : 'top-full mt-6'} left-1/2 -translate-x-1/2 w-48 bg-white rounded-[2rem] shadow-[0_30px_70px_rgba(0,0,0,0.6)] p-3.5 flex-col gap-2 border border-slate-200 animate-in fade-in zoom-in duration-200`}
                                                         onClick={(e) => e.stopPropagation()}
                                                     >
                                                         <div className="text-[11px] font-black text-center text-slate-500 border-b border-slate-100 pb-2 mb-1 tracking-widest uppercase">
@@ -398,10 +399,10 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                                         </button>
 
                                                         {/* Dynamic Arrow Placement */}
-                                                        {levelIndex >= (builtLevels.length - 1) ? (
-                                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-[10px] border-transparent border-b-white"></div>
+                                                        {levelIndex === 0 ? (
+                                                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-[12px] border-transparent border-t-white drop-shadow-xl"></div>
                                                         ) : (
-                                                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-[10px] border-transparent border-t-white"></div>
+                                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-[12px] border-transparent border-b-white drop-shadow-xl"></div>
                                                         )}
                                                     </div>
                                                 )}
@@ -430,12 +431,12 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                                 {!isCARow && <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-white/5 via-transparent to-transparent pointer-events-none"></div>}
 
                                                 {/* Content Overlay */}
-                                                <div className="relative z-20 text-center leading-none drop-shadow-[0_4px_12px_rgba(0,0,0,1)] pointer-events-none flex flex-col items-center bg-black/30 backdrop-blur-[2px] p-1.5 rounded-xl">
-                                                    <div className="font-black text-yellow-300 mb-1 uppercase tracking-tighter filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" style={{ fontSize: `${dims.lotTitle}px` }}>
+                                                <div className="relative z-20 text-center leading-none drop-shadow-[0_4px_20px_rgba(0,0,0,1)] pointer-events-none flex flex-col items-center bg-black/40 backdrop-blur-[4px] p-2.5 rounded-3xl border border-white/10 ring-1 ring-white/5">
+                                                    <div className="font-black text-yellow-300 mb-1 uppercase tracking-tighter filter drop-shadow-[0_4px_6px_rgba(0,0,0,1)]" style={{ fontSize: `${dims.lotTitle}px` }}>
                                                         {slot.item.internalLot}
                                                     </div>
                                                     <div className="text-white font-mono font-black border-t border-white/40 pt-1.5 mt-1" style={{ fontSize: `${dims.font}px` }}>
-                                                        {(slot.item.remainingQuantity || 0).toFixed(0)}
+                                                        {(slot.item.remainingQuantity || 0).toFixed(0)} <span className="text-[0.6em] opacity-80">kg</span>
                                                     </div>
                                                 </div>
 
