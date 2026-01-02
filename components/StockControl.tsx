@@ -717,26 +717,26 @@ const StockControl: React.FC<{
                                     <button onClick={() => setPage('menu')} className="mr-4 p-2 rounded-full hover:bg-slate-200 transition">
                                         <ArrowLeftIcon className="h-6 w-6 text-slate-800" />
                                     </button>
-                                    <h1 className="text-3xl font-bold text-slate-800">Controle de Estoque</h1>
+                                    <h1 className="text-xl md:text-3xl font-bold text-slate-800">Controle de Estoque</h1>
                                 </div>
 
                                 {/* Global Mapping Status */}
-                                <div className="flex flex-wrap gap-4 items-center bg-white px-4 py-3 rounded-xl shadow-sm border border-slate-100">
-                                    <div className="flex flex-col items-center px-4 border-r">
-                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Lotes</span>
-                                        <span className="text-xl font-bold text-slate-700">{totalStockCount}</span>
+                                <div className="flex flex-wrap gap-2 md:gap-4 items-center bg-white px-3 py-2 md:px-4 md:py-3 rounded-xl shadow-sm border border-slate-100">
+                                    <div className="flex flex-col items-center px-2 md:px-4 border-r">
+                                        <span className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider">Lotes</span>
+                                        <span className="text-sm md:text-xl font-bold text-slate-700">{totalStockCount}</span>
                                     </div>
-                                    <div className="flex flex-col items-center px-4 border-r">
-                                        <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Mapeados</span>
-                                        <span className="text-xl font-bold text-emerald-600">{mappedStockCount}</span>
+                                    <div className="flex flex-col items-center px-2 md:px-4 border-r">
+                                        <span className="text-[10px] md:text-xs font-bold text-emerald-600 uppercase tracking-wider">Mapeados</span>
+                                        <span className="text-sm md:text-xl font-bold text-emerald-600">{mappedStockCount}</span>
                                     </div>
-                                    <div className="flex flex-col items-center px-4 border-r">
-                                        <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">Saldo Total</span>
-                                        <span className="text-xl font-bold text-blue-600">{totalRemainingWeight.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} <small className="text-[10px]">kg</small></span>
+                                    <div className="flex flex-col items-center px-2 md:px-4 border-r">
+                                        <span className="text-[10px] md:text-xs font-bold text-blue-600 uppercase tracking-wider">Saldo</span>
+                                        <span className="text-sm md:text-xl font-bold text-blue-600">{totalRemainingWeight.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}<span className="text-[8px] md:text-[10px] ml-0.5">kg</span></span>
                                     </div>
-                                    <div className="flex flex-col items-center px-4">
-                                        <span className="text-xs font-bold text-violet-600 uppercase tracking-wider">Em Produção</span>
-                                        <span className="text-xl font-bold text-violet-600">{inProductionWeight.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} <small className="text-[10px]">kg</small></span>
+                                    <div className="flex flex-col items-center px-2 md:px-4">
+                                        <span className="text-[10px] md:text-xs font-bold text-violet-600 uppercase tracking-wider">Produção</span>
+                                        <span className="text-sm md:text-xl font-bold text-violet-600">{inProductionWeight.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}<span className="text-[8px] md:text-[10px] ml-0.5">kg</span></span>
                                     </div>
                                 </div>
                             </header>

@@ -985,7 +985,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
 
     // Stats for Progress
     const totalCount = relevantStock.length;
-    const mappedCount = relevantStock.filter(s => s.location && s.location.startsWith('Fileira ')).length;
+    const mappedCount = relevantStock.filter(s => !!s.location).length;
     const unmappedCount = totalCount - mappedCount;
     const progressPercentage = totalCount === 0 ? 0 : Math.round((mappedCount / totalCount) * 100);
 
@@ -1053,21 +1053,21 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
             )}
             {/* Main Header */}
             {/* Main Header - Collapsible on Mobile */}
-            <div className={`bg-[#0F3F5C] text-white shadow-md z-30 transition-all duration-300 ${isHeaderCollapsed ? 'p-1.5 md:p-4' : 'p-3 md:p-4'}`}>
+            <div className={`bg-[#0F3F5C] text-white shadow-md z-30 transition-all duration-300 ${isHeaderCollapsed ? 'p-1 md:p-3' : 'p-3 md:p-4'}`}>
                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 md:gap-3">
+                    <div className="flex items-center gap-1.5 md:gap-3">
                         <button onClick={onClose} className="p-1.5 hover:bg-white/10 rounded-full transition text-white/80 hover:text-white">
-                            <ArrowLeftIcon className="w-5 h-5 md:w-6 md:h-6" />
+                            <ArrowLeftIcon className="w-4 h-4 md:w-6 md:h-6" />
                         </button>
                         <div>
-                            <h1 className="text-sm md:text-xl font-bold flex items-center gap-1.5 leading-none">
+                            <h1 className="text-xs md:text-xl font-bold flex items-center gap-1.5 leading-none">
                                 <ArchiveIcon className="w-4 h-4 md:w-6 md:h-6" />
                                 <span className="hidden sm:inline">Mapeamento de Estoque</span>
                                 <span className="sm:hidden">Estoque</span>
                             </h1>
                             <div className="md:hidden flex items-center gap-1.5 mt-0.5 px-0.5">
-                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                                <span className="text-[9px] text-white/60 uppercase font-black tracking-widest">{activeRow}</span>
+                                <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse"></div>
+                                <span className="text-[8px] text-white/60 uppercase font-black tracking-widest">{activeRow}</span>
                             </div>
                         </div>
                     </div>
@@ -1078,7 +1078,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                             onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)}
                             className="md:hidden p-1.5 bg-white/10 rounded-lg text-white"
                         >
-                            <SearchIcon className="w-4 h-4" />
+                            <SearchIcon className="w-3.5 h-3.5" />
                         </button>
 
                         {/* Rotated Landscape Toggle */}
@@ -1134,7 +1134,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
             {/* New Layout: Top Bar (Tabs) + Main Content (Single Row) */}
             <div className="flex flex-col h-full overflow-hidden bg-slate-50">
                 {/* Top Tab Bar & Actions */}
-                <div className="bg-white border-b flex items-center gap-1.5 px-2 py-1.5 min-h-[2.5rem] md:min-h-[3.5rem] shrink-0 shadow-sm z-30 h-auto overflow-x-auto no-scrollbar">
+                <div className="bg-white border-b flex items-center gap-1.5 px-2 py-1 min-h-[2.2rem] md:min-h-[3.5rem] shrink-0 shadow-sm z-30 h-auto overflow-x-auto no-scrollbar">
 
                     {/* Global Actions HUB (Replacing Floating Badges) */}
                     <div className={`md:hidden fixed bottom-6 right-6 z-[60] flex flex-col items-end gap-3 transition-all duration-500 ${!isHeaderCollapsed ? 'scale-0 translate-y-20' : 'scale-100 translate-y-0'}`}>
@@ -1293,16 +1293,21 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                     >
                         {/* Overlay Controls */}
                         {isHeaderCollapsed && (
-                            <div className="md:hidden fixed top-20 left-4 z-40 bg-white/90 backdrop-blur shadow-lg border border-slate-200 rounded-2xl p-3 flex flex-col gap-1 animate-in slide-in-from-left-4 duration-500">
-                                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">MAPA ATIVO</div>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
-                                    <span className="text-sm font-bold text-slate-700">{activeRow}</span>
+                            <div className="md:hidden fixed top-[4.5rem] left-3 z-40 bg-white/95 backdrop-blur shadow-xl border border-emerald-100 rounded-xl p-2.5 flex flex-col gap-1 animate-in slide-in-from-left-4 duration-500 min-w-[120px]">
+                                <div className="flex items-center justify-between mb-0.5">
+                                    <div className="text-[8px] font-black text-emerald-600 uppercase tracking-widest">MAPA ATIVO</div>
+                                    <div className="flex items-center gap-1">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+                                        <span className="text-[10px] font-black text-slate-800">{activeRow}</span>
+                                    </div>
                                 </div>
-                                <div className="mt-2 w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                                    <div className="h-full bg-emerald-500" style={{ width: `${progressPercentage}%` }}></div>
+                                <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
+                                    <div className="h-full bg-emerald-500 transition-all duration-700" style={{ width: `${progressPercentage}%` }}></div>
                                 </div>
-                                <div className="text-[9px] text-slate-400 font-bold mt-0.5">{progressPercentage}% CONCLUÍDO</div>
+                                <div className="flex justify-between items-center mt-0.5">
+                                    <span className="text-[8px] text-slate-400 font-bold uppercase">{progressPercentage}% CONCLUÍDO</span>
+                                    <span className="text-[8px] text-slate-500 font-mono tracking-tighter">{mappedCount}/{totalCount}</span>
+                                </div>
                             </div>
                         )}
                         {isPendingListOpen && <div className="absolute inset-0 bg-black/20 z-30 md:hidden" onClick={() => setIsPendingListOpen(false)}></div>}
