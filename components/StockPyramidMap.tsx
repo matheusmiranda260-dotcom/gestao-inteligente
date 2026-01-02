@@ -1344,29 +1344,67 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                             const itemsForThisRow = useMemo(() => {
                                 if (!isForecastMode) return itemsInRowRaw;
 
-                                // 1. Sort by entry date (NEWEST first)
-                                // This way, when we fill the pyramid from L0 up, the OLDER ones end up at the TOP.
-                                const sorted = [...itemsInRowRaw].sort((a, b) => {
-                                    return new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime();
+                                // 1. Identify all rows that belong to this material/bitola context to distribute stock
+                                const forecastRows = derivedRows.filter(rName => {
+                                    const { isFM, isCA, bitola } = getRowTypeInfo(rName);
+                                    let matchMat = true;
+                                    let matchBit = true;
+                                    if (selectedMaterial === 'Fio Máquina') matchMat = isFM;
+                                    if (selectedMaterial === 'CA-60') matchMat = isCA;
+                                    if (selectedBitola) matchBit = bitola === selectedBitola;
+                                    return matchMat && matchBit;
                                 });
 
-                                // 2. Assign temporary locations for visual rendering
-                                // Using the same pyramid construction logic
+                                const currentRowIdx = forecastRows.indexOf(targetRowName);
+                                if (currentRowIdx === -1) return []; // Fallback
+
+                                // 2. Get ALL candidates correctly (Only Available ones as requested)
+                                const availableStock = relevantStock
+                                    .filter(s => s.status === 'Disponível')
+                                    .sort((a, b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime());
+
+                                // 3. Calculate how many items skip to reach THIS row
                                 const baseSize = config?.baseSize || 7;
+                                const height = config?.maxHeight || (targetRowName.includes('CA') ? 3 : 4);
+
+                                // Helper for capacity calculation
+                                const getCapacity = (base: number, h: number) => {
+                                    let cap = 0;
+                                    for (let i = 0; i < h; i++) {
+                                        const layerSize = base - i;
+                                        if (layerSize > 0) cap += layerSize;
+                                    }
+                                    return cap;
+                                };
+
+                                // Calculate offsets
+                                let itemsToSkip = 0;
+                                for (let i = 0; i < currentRowIdx; i++) {
+                                    const rName = forecastRows[i];
+                                    const rConf = rowConfigs.find(rc => rc.rowName === rName);
+                                    const rBase = rConf?.baseSize || 7;
+                                    const rHeight = rConf?.maxHeight || (rName.includes('CA') ? 3 : 4);
+                                    itemsToSkip += getCapacity(rBase, rHeight);
+                                }
+
+                                const rowCapacity = getCapacity(baseSize, height);
+                                const sorted = availableStock.slice(itemsToSkip, itemsToSkip + rowCapacity);
+
+                                // 4. Assign temporary locations for visual rendering
                                 let currentItemIdx = 0;
                                 let level = 0;
                                 let levelCapacity = baseSize;
 
                                 const results: StockItem[] = [];
-                                const totalItems = sorted.length;
+                                const totalAvailableOfThisType = availableStock.length;
 
-                                while (levelCapacity > 0 && currentItemIdx < sorted.length) {
+                                while (levelCapacity > 0 && currentItemIdx < sorted.length && level < height) {
                                     for (let p = 0; p < levelCapacity; p++) {
                                         if (currentItemIdx < sorted.length) {
                                             const item = sorted[currentItemIdx];
-                                            // The rank is based on Age (Oldest = #1)
-                                            // Since 'sorted' is Newest -> Oldest, the rank is (Total - currentIdx)
-                                            const rank = totalItems - currentItemIdx;
+                                            // Rank is global across all available of this type
+                                            const globalIdx = itemsToSkip + currentItemIdx;
+                                            const rank = totalAvailableOfThisType - globalIdx;
 
                                             results.push({
                                                 ...item,
@@ -1381,7 +1419,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                                 }
 
                                 return results;
-                            }, [itemsInRowRaw, isForecastMode, config]);
+                            }, [relevantStock, isForecastMode, config, targetRowName, derivedRows, rowConfigs, selectedMaterial, selectedBitola]);
 
                             return (
                                 <div className={`w-full max-w-[98vw] animate-fadeIn transition-all duration-500 ${isForecastMode ? 'ring-8 ring-amber-500/20 rounded-[3rem]' : ''}`}>
