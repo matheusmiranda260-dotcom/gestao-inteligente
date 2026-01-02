@@ -794,10 +794,6 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
             setSelectedBitola(bitola as Bitola);
         } else {
             // If row is generic, maybe clear bitola filter? 
-            // Or keep it to allow "Mixed" viewing? 
-            // User wants "When I click row, appear pending lots of respective bitolas".
-            // So if row has NO bitola in name, maybe we shouldn't force filter.
-            // But if it HAS, we MUST force it.
             setSelectedBitola(null);
         }
 
@@ -828,18 +824,23 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
         const currentRowIdx = forecastRows.indexOf(targetRowName);
         if (currentRowIdx === -1) return [];
 
-        // 2. Get ALL candidates correctly (Only Available ones as requested)
-        // Sort: OLDEST first (Priority #1 is the oldest)
+        // 2. Get ALL candidates correctly
+        // Helper to extract numerical part of lot ID for reliable sorting
+        const getLotNum = (lot: string) => {
+            const m = lot.match(/\d+/);
+            return m ? parseInt(m[0]) : 0;
+        };
+
+        // Sort: OLDEST first (Priority #1 is the oldest/smallest number)
         const availableStock = safeStock
             .filter(s => {
                 const matMatch = !selectedMaterial || s.materialType === selectedMaterial;
                 const bitMatch = !selectedBitola || s.bitola === selectedBitola;
                 return s.status === 'Disponível' && matMatch && bitMatch;
             })
-            .sort((a, b) => new Date(a.entryDate).getTime() - new Date(b.entryDate).getTime());
+            .sort((a, b) => getLotNum(a.internalLot) - getLotNum(b.internalLot));
 
         // 3. LOGICA LATERAL: Determine how many items reach THIS specific row
-        // Helper for capacity calculation
         const getCapacity = (base: number, h: number) => {
             let cap = 0;
             for (let i = 0; i < h; i++) {
@@ -866,30 +867,20 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
         const sorted = availableStock.slice(itemsConsumedBeforeThisRow, itemsConsumedBeforeThisRow + rowCapacity);
         if (sorted.length === 0) return [];
 
-        // 4. ASSIGNMENT: Fill Bottom-Up to satisfy physical "Lateral" rule
-        // Determine counts per level starting from ground (L0)
-        let itemsRemainingToPlace = sorted.length;
-        const countsPerLevel: number[] = [];
-        for (let l = 0; l < maxHeight; l++) {
-            const layerCapacity = Math.max(0, baseSize - l);
-            const taking = Math.min(itemsRemainingToPlace, layerCapacity);
-            countsPerLevel[l] = taking;
-            itemsRemainingToPlace -= taking;
-            if (itemsRemainingToPlace <= 0) break;
-        }
-
-        // Now we distribute the items. 
-        // OLDEST items go to the HIGHEST level being used.
+        // 4. ASSIGNMENT: Fill Bottom-Up (Ground First) as per visual drawing (Red 1, 2, 3 at L0)
+        // Global Ranking starts from #1 on the ground.
         const results: StockItem[] = [];
         let itemCursor = 0;
-        const maxUsedLevel = countsPerLevel.length - 1;
 
-        for (let l = maxUsedLevel; l >= 0; l--) {
-            const count = countsPerLevel[l];
-            for (let p = 0; p < count; p++) {
+        // Loop through levels from 0 up to maxHeight-1
+        for (let l = 0; l < maxHeight; l++) {
+            const layerCapacity = Math.max(0, baseSize - l);
+            const countToFill = Math.min(sorted.length - itemCursor, layerCapacity);
+            if (countToFill <= 0) break;
+
+            for (let p = 0; p < countToFill; p++) {
                 const item = sorted[itemCursor];
-                const globalIdx = itemsConsumedBeforeThisRow + itemCursor;
-                const rank = globalIdx + 1;
+                const rank = itemsConsumedBeforeThisRow + itemCursor + 1;
 
                 results.push({
                     ...item,
