@@ -803,6 +803,106 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
 
     }, [activeRow]);
 
+    // PRE-CALCULATE Forecast/FIFO items outside the render loop (FIX HOOK VIOLATION)
+    const itemsForThisRow = useMemo(() => {
+        const targetRowName = activeRow || (derivedRows.length > 0 ? derivedRows[0] : null);
+        if (!targetRowName) return [];
+
+        const itemsInRowRaw = safeStock.filter(s => s.location === targetRowName || (s.location && s.location.startsWith(targetRowName + ':')));
+        const config = rowConfigs.find(rc => rc.rowName === targetRowName);
+
+        if (!isForecastMode) return itemsInRowRaw;
+
+        // FIFO TRANSFORMATION logic
+        // 1. Identify all rows that belong to this material/bitola context to distribute stock
+        const forecastRows = derivedRows.filter(rName => {
+            const { isFM, isCA, bitola } = getRowTypeInfo(rName);
+            let matchMat = true;
+            let matchBit = true;
+            if (selectedMaterial === 'Fio Máquina') matchMat = isFM;
+            if (selectedMaterial === 'CA-60') matchMat = isCA;
+            if (selectedBitola) matchBit = bitola === selectedBitola;
+            return matchMat && matchBit;
+        });
+
+        const currentRowIdx = forecastRows.indexOf(targetRowName);
+        if (currentRowIdx === -1) return [];
+
+        // 2. Get ALL candidates correctly (Only Available ones as requested)
+        // Sort: OLDEST first (Priority #1 is the oldest)
+        const availableStock = safeStock
+            .filter(s => {
+                const matMatch = !selectedMaterial || s.materialType === selectedMaterial;
+                const bitMatch = !selectedBitola || s.bitola === selectedBitola;
+                return s.status === 'Disponível' && matMatch && bitMatch;
+            })
+            .sort((a, b) => new Date(a.entryDate).getTime() - new Date(b.entryDate).getTime());
+
+        // 3. LOGICA LATERAL: Determine how many items reach THIS specific row
+        // Helper for capacity calculation
+        const getCapacity = (base: number, h: number) => {
+            let cap = 0;
+            for (let i = 0; i < h; i++) {
+                const layerSize = base - i;
+                if (layerSize > 0) cap += layerSize;
+            }
+            return cap;
+        };
+
+        let itemsConsumedBeforeThisRow = 0;
+        for (let i = 0; i < currentRowIdx; i++) {
+            const rName = forecastRows[i];
+            const rConf = rowConfigs.find(rc => rc.rowName === rName);
+            const rBase = rConf?.baseSize || 7;
+            const rHeight = rConf?.maxHeight || (rName.includes('CA') ? 3 : 4);
+            itemsConsumedBeforeThisRow += getCapacity(rBase, rHeight);
+        }
+
+        const baseSize = config?.baseSize || 7;
+        const maxHeight = config?.maxHeight || (targetRowName.includes('CA') ? 3 : 4);
+        const rowCapacity = getCapacity(baseSize, maxHeight);
+
+        // Get slice for this row
+        const sorted = availableStock.slice(itemsConsumedBeforeThisRow, itemsConsumedBeforeThisRow + rowCapacity);
+        if (sorted.length === 0) return [];
+
+        // 4. ASSIGNMENT: Fill Bottom-Up to satisfy physical "Lateral" rule
+        // Determine counts per level starting from ground (L0)
+        let itemsRemainingToPlace = sorted.length;
+        const countsPerLevel: number[] = [];
+        for (let l = 0; l < maxHeight; l++) {
+            const layerCapacity = Math.max(0, baseSize - l);
+            const taking = Math.min(itemsRemainingToPlace, layerCapacity);
+            countsPerLevel[l] = taking;
+            itemsRemainingToPlace -= taking;
+            if (itemsRemainingToPlace <= 0) break;
+        }
+
+        // Now we distribute the items. 
+        // OLDEST items go to the HIGHEST level being used.
+        const results: StockItem[] = [];
+        let itemCursor = 0;
+        const maxUsedLevel = countsPerLevel.length - 1;
+
+        for (let l = maxUsedLevel; l >= 0; l--) {
+            const count = countsPerLevel[l];
+            for (let p = 0; p < count; p++) {
+                const item = sorted[itemCursor];
+                const globalIdx = itemsConsumedBeforeThisRow + itemCursor;
+                const rank = globalIdx + 1;
+
+                results.push({
+                    ...item,
+                    internalLot: `[#${rank}] ${item.internalLot}`,
+                    location: `${targetRowName}:L${l}:P${p}`
+                });
+                itemCursor++;
+            }
+        }
+
+        return results;
+    }, [safeStock, activeRow, derivedRows, isForecastMode, rowConfigs, selectedMaterial, selectedBitola]);
+
     const handleDropOnRow = (item: StockItem, rowName: string) => {
         // 1. Strict Validation based on Row Name Convention
         const { isFM, isCA, bitola } = getRowTypeInfo(rowName);
@@ -1337,89 +1437,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                                 );
                             }
 
-                            const itemsInRowRaw = relevantStock.filter(s => s.location === targetRowName || (s.location && s.location.startsWith(targetRowName + ':')));
                             const config = rowConfigs.find(rc => rc.rowName === targetRowName);
-
-                            // FIFO TRANSFORMATION for Forecast Mode
-                            const itemsForThisRow = useMemo(() => {
-                                if (!isForecastMode) return itemsInRowRaw;
-
-                                // 1. Identify all rows that belong to this material/bitola context to distribute stock
-                                const forecastRows = derivedRows.filter(rName => {
-                                    const { isFM, isCA, bitola } = getRowTypeInfo(rName);
-                                    let matchMat = true;
-                                    let matchBit = true;
-                                    if (selectedMaterial === 'Fio Máquina') matchMat = isFM;
-                                    if (selectedMaterial === 'CA-60') matchMat = isCA;
-                                    if (selectedBitola) matchBit = bitola === selectedBitola;
-                                    return matchMat && matchBit;
-                                });
-
-                                const currentRowIdx = forecastRows.indexOf(targetRowName);
-                                if (currentRowIdx === -1) return []; // Fallback
-
-                                // 2. Get ALL candidates correctly (Only Available ones as requested)
-                                // Sort: OLDEST first (Priority #1 is the oldest)
-                                const availableStock = relevantStock
-                                    .filter(s => s.status === 'Disponível')
-                                    .sort((a, b) => new Date(a.entryDate).getTime() - new Date(b.entryDate).getTime());
-
-                                // 3. Calculate how many items skip to reach THIS row
-                                const baseSize = config?.baseSize || 7;
-                                const height = config?.maxHeight || (targetRowName.includes('CA') ? 3 : 4);
-
-                                // Helper for capacity calculation
-                                const getCapacity = (base: number, h: number) => {
-                                    let cap = 0;
-                                    for (let i = 0; i < h; i++) {
-                                        const layerSize = base - i;
-                                        if (layerSize > 0) cap += layerSize;
-                                    }
-                                    return cap;
-                                };
-
-                                // Calculate offsets
-                                let itemsToSkip = 0;
-                                for (let i = 0; i < currentRowIdx; i++) {
-                                    const rName = forecastRows[i];
-                                    const rConf = rowConfigs.find(rc => rc.rowName === rName);
-                                    const rBase = rConf?.baseSize || 7;
-                                    const rHeight = rConf?.maxHeight || (rName.includes('CA') ? 3 : 4);
-                                    itemsToSkip += getCapacity(rBase, rHeight);
-                                }
-
-                                const rowCapacity = getCapacity(baseSize, height);
-                                const sorted = availableStock.slice(itemsToSkip, itemsToSkip + rowCapacity);
-
-                                // 4. Assign temporary locations for visual rendering
-                                // LOGIC: Fill from TOP to BOTTOM so OLDEST (#1) is at the very top.
-                                let currentItemIdx = 0;
-                                const results: StockItem[] = [];
-
-                                // To fill top-to-bottom, we reverse the level loop
-                                // But level 0 is bottom, so we go from (height-1) down to 0.
-                                for (let level = height - 1; level >= 0; level--) {
-                                    const layerSize = baseSize - level;
-                                    if (layerSize <= 0) continue;
-
-                                    for (let p = 0; p < layerSize; p++) {
-                                        if (currentItemIdx < sorted.length) {
-                                            const item = sorted[currentItemIdx];
-                                            const globalIdx = itemsToSkip + currentItemIdx;
-                                            const rank = globalIdx + 1; // #1 is the oldest
-
-                                            results.push({
-                                                ...item,
-                                                internalLot: `[#${rank}] ${item.internalLot}`,
-                                                location: `${targetRowName}:L${level}:P${p}`
-                                            });
-                                            currentItemIdx++;
-                                        }
-                                    }
-                                }
-
-                                return results;
-                            }, [relevantStock, isForecastMode, config, targetRowName, derivedRows, rowConfigs, selectedMaterial, selectedBitola]);
 
                             return (
                                 <div className={`w-full max-w-[98vw] animate-fadeIn transition-all duration-500 ${isForecastMode ? 'ring-8 ring-amber-500/20 rounded-[3rem]' : ''}`}>
