@@ -1359,9 +1359,10 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                                 if (currentRowIdx === -1) return []; // Fallback
 
                                 // 2. Get ALL candidates correctly (Only Available ones as requested)
+                                // Sort: OLDEST first (Priority #1 is the oldest)
                                 const availableStock = relevantStock
                                     .filter(s => s.status === 'Disponível')
-                                    .sort((a, b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime());
+                                    .sort((a, b) => new Date(a.entryDate).getTime() - new Date(b.entryDate).getTime());
 
                                 // 3. Calculate how many items skip to reach THIS row
                                 const baseSize = config?.baseSize || 7;
@@ -1391,20 +1392,21 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                                 const sorted = availableStock.slice(itemsToSkip, itemsToSkip + rowCapacity);
 
                                 // 4. Assign temporary locations for visual rendering
+                                // LOGIC: Fill from TOP to BOTTOM so OLDEST (#1) is at the very top.
                                 let currentItemIdx = 0;
-                                let level = 0;
-                                let levelCapacity = baseSize;
-
                                 const results: StockItem[] = [];
-                                const totalAvailableOfThisType = availableStock.length;
 
-                                while (levelCapacity > 0 && currentItemIdx < sorted.length && level < height) {
-                                    for (let p = 0; p < levelCapacity; p++) {
+                                // To fill top-to-bottom, we reverse the level loop
+                                // But level 0 is bottom, so we go from (height-1) down to 0.
+                                for (let level = height - 1; level >= 0; level--) {
+                                    const layerSize = baseSize - level;
+                                    if (layerSize <= 0) continue;
+
+                                    for (let p = 0; p < layerSize; p++) {
                                         if (currentItemIdx < sorted.length) {
                                             const item = sorted[currentItemIdx];
-                                            // Rank is global across all available of this type
                                             const globalIdx = itemsToSkip + currentItemIdx;
-                                            const rank = totalAvailableOfThisType - globalIdx;
+                                            const rank = globalIdx + 1; // #1 is the oldest
 
                                             results.push({
                                                 ...item,
@@ -1414,8 +1416,6 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                                             currentItemIdx++;
                                         }
                                     }
-                                    level++;
-                                    levelCapacity--;
                                 }
 
                                 return results;
@@ -1449,7 +1449,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                                         activeSlot={activeSlot?.row === targetRowName ? activeSlot : null}
                                         movingItem={isForecastMode ? null : itemToMove}
                                         onPrintRow={() => setPrintRowName(targetRowName)}
-                                        onUpdateConfig={(rn, bs, mh) => !isForecastMode && handleUpdateRowConfig(rn, bs, mh)}
+                                        onUpdateConfig={handleUpdateRowConfig}
                                         onMoveItem={(item) => !isForecastMode && setItemToMove(item)}
                                     />
 
