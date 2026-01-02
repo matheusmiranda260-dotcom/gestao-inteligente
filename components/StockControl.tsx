@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Page, StockItem, ConferenceData, ConferenceLotData, Bitola, MaterialType, TransferRecord, ProductionOrderData } from '../types';
 import { MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions } from '../types';
-import { ArrowLeftIcon, PencilIcon, TrashIcon, WarningIcon, BookOpenIcon, TruckIcon, DocumentReportIcon, PrinterIcon, LockOpenIcon, ClipboardListIcon, ChartBarIcon, XCircleIcon, ArchiveIcon, LocationOffIcon, CheckCircleIcon } from './icons';
+import { ArrowLeftIcon, PencilIcon, TrashIcon, WarningIcon, BookOpenIcon, TruckIcon, DocumentReportIcon, PrinterIcon, LockOpenIcon, ClipboardListIcon, ChartBarIcon, XCircleIcon, ArchiveIcon, LocationOffIcon, CheckCircleIcon, ScaleIcon } from './icons';
 
 // ... (previous imports)
 
@@ -767,14 +767,17 @@ const StockControl: React.FC<{
                                 </div>
                                 {/* Keeping Existing buttons, but REMOVED Finished Conferences Button */}
                                 <div className="flex gap-4">
+                                    <button onClick={() => setPage('stock_inventory')} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition flex items-center gap-2">
+                                        <ScaleIcon className="h-5 w-5" />Inventário Mobile
+                                    </button>
                                     <button onClick={() => setStockDashboardOpen(true)} className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
                                         <ChartBarIcon className="h-5 w-5" />Estatística
                                     </button>
                                     <button onClick={() => setShowInventoryReport(true)} className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
-                                        <PrinterIcon className="h-5 w-5" />Imprimir Inventário
+                                        <PrinterIcon className="h-5 w-5" />Imprimir
                                     </button>
                                     <button onClick={() => setTransferHistoryOpen(true)} className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
-                                        <TruckIcon className="h-5 w-5" />Transferências Feitas
+                                        <TruckIcon className="h-5 w-5" />Histórico Transf.
                                     </button>
                                 </div>
                             </div>
@@ -830,7 +833,46 @@ const StockControl: React.FC<{
                                         <TruckIcon className="h-5 w-5" />Transferir Selecionados ({selectedLotIdsForTransfer.length})
                                     </button>
                                 </div>
-                                <div className="overflow-x-auto">
+
+                                {/* Mobile Cards View */}
+                                <div className="md:hidden divide-y divide-slate-100">
+                                    {filteredStock.map(item => (
+                                        <div key={item.id} className={`p-4 ${item.location ? 'bg-emerald-50/20' : 'bg-white'} space-y-3`}>
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-lg font-black text-slate-900">{item.internalLot}</span>
+                                                        {item.location && <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-200">{item.location}</span>}
+                                                    </div>
+                                                    <p className="text-[10px] text-slate-400 font-bold uppercase">{item.supplierLot} • {item.supplier}</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="text-xl font-black text-slate-900">{item.remainingQuantity.toFixed(2)}<span className="text-[10px] ml-0.5">kg</span></div>
+                                                    <p className="text-[10px] text-slate-400 font-bold">{item.materialType} • {item.bitola}</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div className="flex items-center gap-1">
+                                                    {getStatusBadge(item.status)}
+                                                    {item.productionOrderIds && item.productionOrderIds.length > 0 && (
+                                                        <span className="text-[10px] font-black bg-amber-50 text-amber-700 px-2 py-1 rounded border border-amber-200">
+                                                            {item.productionOrderIds.length} OP(s)
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <button onClick={() => setHistoryLot(item)} className="p-2 bg-slate-100 rounded-lg text-slate-500"><BookOpenIcon className="h-5 w-5" /></button>
+                                                    <button onClick={() => setEditingItem(item)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="p-2 bg-slate-100 rounded-lg text-slate-500 disabled:opacity-30"><PencilIcon className="h-5 w-5" /></button>
+                                                    <button onClick={() => setDeletingItem(item)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="p-2 bg-red-50 rounded-lg text-red-500 disabled:opacity-30"><TrashIcon className="h-5 w-5" /></button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Desktop Table View */}
+                                <div className="hidden md:block overflow-x-auto">
                                     <table className="w-full text-sm text-left">
                                         <thead className="text-xs text-slate-600 uppercase bg-slate-50">
                                             <tr>
@@ -1013,13 +1055,16 @@ const StockControl: React.FC<{
                                             ))}
                                         </tbody>
                                     </table>
-                                    {filteredStock.length === 0 && (
-                                        <div className="text-center text-slate-500 py-16">
-                                            <p className="font-semibold">Nenhum item encontrado.</p>
-                                            <p className="text-sm">Tente ajustar os filtros ou adicione uma nova conferência.</p>
-                                        </div>
-                                    )}
                                 </div>
+                                {filteredStock.length === 0 && (
+                                    <div className="text-center text-slate-500 py-16">
+                                        <div className="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100">
+                                            <ArchiveIcon className="h-10 w-10 text-slate-300" />
+                                        </div>
+                                        <p className="font-bold text-lg">Nenhum lote corresponde aos filtros</p>
+                                        <p className="text-sm">Tente ajustar seus critérios de busca ou filtros.</p>
+                                    </div>
+                                )}
                             </div>
                         </>
                     )}

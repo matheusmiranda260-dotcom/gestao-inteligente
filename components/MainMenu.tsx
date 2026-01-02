@@ -153,6 +153,15 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser }) =
                                     color="blue"
                                 />
                             )}
+                            {hasPermission('stock_inventory') || isGestor ? (
+                                <MenuButton
+                                    onClick={() => setPage('stock_inventory')}
+                                    label="Inventário (Conferência)"
+                                    description="Auditoria física de estoque via celular."
+                                    icon={<ChartBarIcon />}
+                                    color="teal"
+                                />
+                            ) : null}
                         </div>
                     </section>
                 )}
