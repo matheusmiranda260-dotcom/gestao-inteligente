@@ -76,15 +76,15 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
         if (menuItemId) setMenuItemId(null);
     };
 
-    // Aggressive Dynamic Sizing to FIT screen real-estate
+    // Dynamic Sizing Optimized for maximum screen utilization
     const dims = useMemo(() => {
-        // Base sizes for mobile (<640px) vs desktop (sm:)
-        if (baseSize <= 6) return { slot: 'w-[68px] h-[68px] sm:w-[190px] sm:h-[190px]', gap: 'gap-x-4 sm:gap-x-10', font: 'text-[12px] sm:text-3xl' };
-        if (baseSize <= 9) return { slot: 'w-[52px] h-[52px] sm:w-[155px] sm:h-[155px]', gap: 'gap-x-3 sm:gap-x-8', font: 'text-[10px] sm:text-2xl' };
-        if (baseSize <= 12) return { slot: 'w-[42px] h-[42px] sm:w-[130px] sm:h-[130px]', gap: 'gap-x-2 sm:gap-x-6', font: 'text-[9.5px] sm:text-xl' };
-        if (baseSize <= 16) return { slot: 'w-[34px] h-[34px] sm:w-[105px] sm:h-[105px]', gap: 'gap-x-1.5 sm:gap-x-4', font: 'text-[8.5px] sm:text-lg' };
-        if (baseSize <= 20) return { slot: 'w-[30px] h-[30px] sm:w-[90px] sm:h-[90px]', gap: 'gap-x-1 sm:gap-x-3', font: 'text-[7.5px] sm:text-base' };
-        return { slot: 'w-[26px] h-[26px] sm:w-[75px] sm:h-[75px]', gap: 'gap-x-0.5 sm:gap-x-2', font: 'text-[7px] sm:text-sm' };
+        // Reduced gaps to keep items close as requested
+        if (baseSize <= 6) return { slot: 'w-[75px] h-[75px] sm:w-[210px] sm:h-[210px]', gap: 'gap-x-2 sm:gap-x-4', font: 'text-[12px] sm:text-3xl' };
+        if (baseSize <= 9) return { slot: 'w-[58px] h-[58px] sm:w-[170px] sm:h-[170px]', gap: 'gap-x-2 sm:gap-x-3', font: 'text-[10px] sm:text-2xl' };
+        if (baseSize <= 12) return { slot: 'w-[48px] h-[48px] sm:w-[145px] sm:h-[145px]', gap: 'gap-x-1.5 sm:gap-x-2.5', font: 'text-[9.5px] sm:text-xl' };
+        if (baseSize <= 16) return { slot: 'w-[40px] h-[40px] sm:w-[125px] sm:h-[125px]', gap: 'gap-x-1 sm:gap-x-2', font: 'text-[8.5px] sm:text-lg' };
+        if (baseSize <= 22) return { slot: 'w-[32px] h-[32px] sm:w-[105px] sm:h-[105px]', gap: 'gap-x-1 sm:gap-x-1.5', font: 'text-[7.5px] sm:text-base' };
+        return { slot: 'w-[28px] h-[28px] sm:w-[85px] sm:h-[85px]', gap: 'gap-x-0.5 sm:gap-x-1', font: 'text-[7px] sm:text-sm' };
     }, [baseSize]);
 
     const handleSaveName = () => {
@@ -196,7 +196,7 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
 
     return (
         <div
-            className={`flex-1 min-w-full md:min-w-[300px] rounded-3xl p-4 md:p-6 relative transition-all duration-300 min-h-[50vh] flex flex-col ${isActive ? 'bg-white/40 backdrop-blur-sm shadow-xl border-2 border-emerald-500/30' : 'bg-slate-50/50 border-2 border-dashed border-slate-200'}`}
+            className={`flex-1 w-full rounded-[2.5rem] p-4 md:p-8 relative transition-all duration-300 min-h-[60vh] flex flex-col ${isActive ? 'bg-white/60 backdrop-blur-md shadow-2xl border-2 border-emerald-500/30' : 'bg-slate-50/50 border-2 border-dashed border-slate-200 opacity-80'}`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={(e) => {
@@ -305,12 +305,13 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                     const isMovingThis = movingItem && slot.item && movingItem.id === slot.item.id;
                                     const isSwapTarget = movingItem && slot.item && movingItem.id !== slot.item.id;
 
-                                    // Dynamic visually
-                                    const coilColor = slot.item?.materialType === 'CA-60' ? 'bg-slate-600' : 'bg-slate-700';
-                                    const borderColor = slot.item?.materialType === 'CA-60' ? 'border-slate-500' : 'border-slate-600';
+                                    // Premium Industrial Palette
+                                    // Using HSL for better vibrance Control
+                                    const coilColor = slot.item?.materialType === 'CA-60' ? 'bg-[#1e293b]' : 'bg-[#0f172a]';
+                                    const borderColor = slot.item?.materialType === 'CA-60' ? 'border-slate-500' : 'border-cyan-500/50';
 
                                     // Dynamic Shape based on Row Name (CA-60 = Rectangular/Square)
-                                    const shapeClass = isCARow ? 'rounded-lg' : 'rounded-full';
+                                    const shapeClass = isCARow ? 'rounded-2xl' : 'rounded-full';
 
                                     if (slot.item) {
                                         const isMenuOpen = menuItemId === slot.item.id;
@@ -369,13 +370,14 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                                 {/* Standard Coil Content (Always Visible, with z-index separation if menu open) */}
                                                 <div
                                                     className={`absolute inset-0 ${shapeClass} 
-                                                            ${isCARow ? `border-[6px] md:border-[10px] ${borderColor} ${coilColor}` : ''}
-                                                            ${isMovingThis ? 'ring-4 ring-orange-500 z-10' : ''}
-                                                            shadow-[2px_2px_5px_rgba(0,0,0,0.5)]
+                                                            ${isCARow ? `border-[4px] md:border-[8px] ${borderColor} ${coilColor}` : ''}
+                                                            ${isMovingThis ? 'ring-6 ring-amber-500 z-10' : ''}
+                                                            shadow-[0_10px_25px_rgba(0,0,0,0.5)]
                                                         `}
                                                     style={!isCARow ? {
-                                                        background: 'repeating-radial-gradient(circle at 50% 50%, #475569 0, #475569 2px, #334155 3px, #1e293b 4px)',
-                                                        boxShadow: 'inset 0 0 15px rgba(0,0,0,0.7), 2px 4px 8px rgba(0,0,0,0.6)'
+                                                        background: 'repeating-radial-gradient(circle at 50% 50%, #1e293b 0, #1e293b 2px, #0f172a 4px, #020617 8px)',
+                                                        boxShadow: 'inset 0 0 30px rgba(0,0,0,0.8), 0 8px 15px rgba(0,0,0,0.4)',
+                                                        border: '2px solid rgba(6, 182, 212, 0.3)'
                                                     } : {}}
                                                 ></div>
 
@@ -386,11 +388,11 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                                 {!isCARow && <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-white/5 via-transparent to-transparent pointer-events-none"></div>}
 
                                                 {/* Content Overlay */}
-                                                <div className="relative z-20 text-center leading-none drop-shadow-lg pointer-events-none flex flex-col items-center">
-                                                    <div className="text-[10px] md:text-[12px] font-black text-white mb-1 uppercase tracking-tighter">
+                                                <div className="relative z-20 text-center leading-none drop-shadow-[0_2px_4px_rgba(0,0,0,1)] pointer-events-none flex flex-col items-center">
+                                                    <div className="text-[10px] md:text-[14px] font-black text-cyan-200 mb-1 uppercase tracking-tighter filter drop-shadow-sm">
                                                         {slot.item.internalLot}
                                                     </div>
-                                                    <div className={`${dims.font} text-emerald-200 font-mono font-black border-t border-emerald-500/30 pt-1 mt-0.5`}>
+                                                    <div className={`${dims.font} text-white font-mono font-black border-t border-cyan-500/40 pt-1.5 mt-1`}>
                                                         {(slot.item.remainingQuantity || 0).toFixed(0)}
                                                     </div>
                                                 </div>
