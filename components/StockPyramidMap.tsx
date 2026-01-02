@@ -76,14 +76,15 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
         if (menuItemId) setMenuItemId(null);
     };
 
-    // Aggressive Dynamic Sizing to FIT mobile screens
+    // Aggressive Dynamic Sizing to FIT screen real-estate
     const dims = useMemo(() => {
-        // Base sizes for mobile (<640px) vs desktop
-        if (baseSize <= 6) return { slot: 'w-[62px] h-[62px] sm:w-[150px] sm:h-[150px]', gap: 'gap-x-3 sm:gap-x-6', font: 'text-[11px] sm:text-2xl' };
-        if (baseSize <= 9) return { slot: 'w-[48px] h-[48px] sm:w-[110px] sm:h-[110px]', gap: 'gap-x-2 sm:gap-x-4', font: 'text-[9px] sm:text-xl' };
-        if (baseSize <= 12) return { slot: 'w-[38px] h-[38px] sm:w-[85px] sm:h-[85px]', gap: 'gap-x-1.5 sm:gap-x-3', font: 'text-[8.5px] sm:text-lg' };
-        if (baseSize <= 15) return { slot: 'w-[30px] h-[30px] sm:w-[70px] sm:h-[70px]', gap: 'gap-x-1 sm:gap-x-2', font: 'text-[7.5px] sm:text-base' };
-        return { slot: 'w-[24px] h-[24px] sm:w-[55px] sm:h-[55px]', gap: 'gap-x-0.5 sm:gap-x-1.5', font: 'text-[6.5px] sm:text-sm' };
+        // Base sizes for mobile (<640px) vs desktop (sm:)
+        if (baseSize <= 6) return { slot: 'w-[68px] h-[68px] sm:w-[190px] sm:h-[190px]', gap: 'gap-x-4 sm:gap-x-10', font: 'text-[12px] sm:text-3xl' };
+        if (baseSize <= 9) return { slot: 'w-[52px] h-[52px] sm:w-[155px] sm:h-[155px]', gap: 'gap-x-3 sm:gap-x-8', font: 'text-[10px] sm:text-2xl' };
+        if (baseSize <= 12) return { slot: 'w-[42px] h-[42px] sm:w-[130px] sm:h-[130px]', gap: 'gap-x-2 sm:gap-x-6', font: 'text-[9.5px] sm:text-xl' };
+        if (baseSize <= 16) return { slot: 'w-[34px] h-[34px] sm:w-[105px] sm:h-[105px]', gap: 'gap-x-1.5 sm:gap-x-4', font: 'text-[8.5px] sm:text-lg' };
+        if (baseSize <= 20) return { slot: 'w-[30px] h-[30px] sm:w-[90px] sm:h-[90px]', gap: 'gap-x-1 sm:gap-x-3', font: 'text-[7.5px] sm:text-base' };
+        return { slot: 'w-[26px] h-[26px] sm:w-[75px] sm:h-[75px]', gap: 'gap-x-0.5 sm:gap-x-2', font: 'text-[7px] sm:text-sm' };
     }, [baseSize]);
 
     const handleSaveName = () => {
