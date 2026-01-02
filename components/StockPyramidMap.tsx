@@ -431,18 +431,18 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                                 {!isCARow && <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-white/5 via-transparent to-transparent pointer-events-none"></div>}
 
                                                 {/* Content Overlay */}
-                                                <div className="relative z-20 text-center leading-none drop-shadow-[0_4px_20px_rgba(0,0,0,1)] pointer-events-none flex flex-col items-center bg-black/40 backdrop-blur-[4px] p-2.5 rounded-3xl border border-white/10 ring-1 ring-white/5">
-                                                    <div className="font-black text-yellow-300 mb-1 uppercase tracking-tighter filter drop-shadow-[0_4px_6px_rgba(0,0,0,1)]" style={{ fontSize: `${dims.lotTitle}px` }}>
+                                                <div className={`relative z-20 text-center leading-tight drop-shadow-[0_4px_12px_rgba(0,0,0,1)] pointer-events-none flex flex-col items-center justify-center ${shapeClass} bg-black/50 backdrop-blur-[2px] w-[85%] h-[85%] border border-white/5`}>
+                                                    <div className="font-black text-yellow-300 uppercase tracking-tighter filter drop-shadow-[0_2px_4px_rgba(0,0,0,1)]" style={{ fontSize: `${dims.lotTitle}px` }}>
                                                         {slot.item.internalLot}
                                                     </div>
-                                                    <div className="text-white font-mono font-black border-t border-white/40 pt-1.5 mt-1" style={{ fontSize: `${dims.font}px` }}>
-                                                        {(slot.item.remainingQuantity || 0).toFixed(0)} <span className="text-[0.6em] opacity-80">kg</span>
+                                                    <div className="text-white font-mono font-black border-t border-white/20 mt-1 pt-1" style={{ fontSize: `${dims.font}px` }}>
+                                                        {(slot.item.remainingQuantity || 0).toFixed(0)}
                                                     </div>
                                                 </div>
 
                                                 {/* Sequential Position Label */}
-                                                <div className="absolute bottom-1 right-2 font-black text-white opacity-70 select-none z-30" style={{ fontSize: `${dims.lotTitle * 0.6}px` }}>
-                                                    L{slot.coords.l}-{slot.coords.p}
+                                                <div className="absolute top-1 right-2 font-black text-white/40 select-none z-30 uppercase tracking-widest pointer-events-none" style={{ fontSize: `${dims.lotTitle * 0.45}px` }}>
+                                                    #{slot.coords.l}.{slot.coords.p}
                                                 </div>
 
                                                 {movingItem && movingItem.id !== slot.item.id && (
