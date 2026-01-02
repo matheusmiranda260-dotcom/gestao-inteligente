@@ -196,7 +196,7 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
 
     return (
         <div
-            className={`flex-1 w-full rounded-[2.5rem] p-4 md:p-8 relative transition-all duration-300 min-h-[60vh] flex flex-col ${isActive ? 'bg-white/60 backdrop-blur-md shadow-2xl border-2 border-emerald-500/30' : 'bg-slate-50/50 border-2 border-dashed border-slate-200 opacity-80'}`}
+            className={`w-full h-fit min-w-fit rounded-[2.5rem] p-6 md:p-12 relative transition-all duration-300 flex flex-col items-center ${isActive ? 'bg-white/60 backdrop-blur-md shadow-2xl border-2 border-emerald-500/30' : 'bg-slate-50/50 border-2 border-dashed border-slate-200 opacity-80'}`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={(e) => {
@@ -1308,86 +1308,11 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                 </div>
 
                 <div className="flex-1 flex overflow-hidden relative">
-                    {/* Left Drawer (Pending) - Mobile Bottom Sheet Style */}
-                    <div className={`
-                        fixed md:relative inset-x-0 bottom-0 md:top-0 z-[100] md:z-40 bg-white border-t md:border-t-0 md:border-r border-slate-200 shadow-[0_-20px_50px_rgba(0,0,0,0.15)] md:shadow-none w-full sm:w-[320px] md:w-[300px] transition-all duration-500 ease-in-out flex flex-col shrink-0
-                        ${isPendingListOpen ? 'h-[85vh] md:h-full translate-y-0 opacity-100' : 'h-0 md:h-full translate-y-full md:translate-y-0 opacity-0 md:opacity-100'}
-                    `}>
-                        {/* Drawer Drag Handle (Mobile) */}
-                        <div className="md:hidden w-full flex justify-center py-4 bg-slate-50 border-b border-slate-100 cursor-pointer" onClick={() => setIsPendingListOpen(false)}>
-                            <div className="w-16 h-1.5 bg-slate-300 rounded-full shadow-inner"></div>
-                        </div>
 
-                        {/* Drawer Header */}
-                        <div className="p-4 md:p-5 border-b bg-white flex items-center justify-between">
-                            <div>
-                                <h3 className="font-extrabold text-slate-900 flex items-center gap-2 m-0 text-base md:text-lg tracking-tight">
-                                    <ArchiveIcon className="w-5 h-5 text-amber-500" />
-                                    Selecionar Lote
-                                </h3>
-                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">{unassignedStock.length} itens disponíveis</p>
-                            </div>
-                            <button onClick={() => setIsPendingListOpen(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors">
-                                <XIcon className="w-6 h-6" />
-                            </button>
-                        </div>
 
-                        <div className="p-4 border-b bg-white">
-                            <div className="relative">
-                                <SearchIcon className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
-                                <input
-                                    type="text"
-                                    placeholder="Buscar pelo lote..."
-                                    value={searchTerm}
-                                    onChange={e => setSearchTerm(e.target.value)}
-                                    className="w-full pl-9 p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                                />
-                            </div>
-                        </div>
-
-                        {/* List */}
-                        <div className="flex-1 overflow-y-auto p-2 space-y-2 bg-slate-100/50">
-                            {unassignedStock.length === 0 ? (
-                                <div className="text-center p-8 opacity-50">
-                                    <CheckCircleIcon className="w-12 h-12 text-emerald-500 mx-auto mb-2" />
-                                    <p className="text-sm font-bold">Sem pendências</p>
-                                </div>
-                            ) : (
-                                unassignedStock.map(item => (
-                                    <div
-                                        key={item.id}
-                                        draggable
-                                        onDragStart={(e) => {
-                                            e.dataTransfer.setData('application/json', JSON.stringify(item));
-                                            e.dataTransfer.effectAllowed = 'copyMove';
-                                        }}
-                                        onClick={() => {
-                                            if (activeSlot) {
-                                                const loc = `${activeSlot.row}:L${activeSlot.l}:P${activeSlot.p}`;
-                                                handleDropOnRow({ ...item, location: loc }, activeSlot.row);
-                                            } else {
-                                                setItemToMove(itemToMove?.id === item.id ? null : item);
-                                            }
-                                        }}
-                                        className={`bg-white p-3 rounded-lg border shadow-sm cursor-grab hover:shadow-md transition-all ${itemToMove?.id === item.id ? 'border-amber-500 ring-2 ring-amber-200' : 'border-slate-200 hover:border-emerald-400'}`}
-                                    >
-                                        <div className="flex justify-between items-center mb-1">
-                                            <span className="font-bold text-slate-800">{item.internalLot}</span>
-                                            <span className="text-xs bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 font-mono">{item.bitola}</span>
-                                        </div>
-                                        <div className="text-xs text-slate-500 flex justify-between">
-                                            <span>{item.materialType}</span>
-                                            <span className="font-bold">{item.remainingQuantity} kg</span>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Main Canvas */}
+                    {/* Main Canvas Area */}
                     <div
-                        className="flex-1 overflow-auto p-2 md:p-8 flex items-center justify-center relative no-scrollbar"
+                        className="flex-1 overflow-auto p-4 md:p-12 relative flex flex-col items-center no-scrollbar"
                         style={{
                             backgroundImage: `linear-gradient(to bottom, rgba(241, 245, 249, 0.85), rgba(241, 245, 249, 0.92)), url(/industrial-bg.png)`,
                             backgroundSize: 'cover',
@@ -1396,6 +1321,113 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                             scrollBehavior: 'smooth'
                         }}
                     >
+                        {/* Global Actions HUB (Floating Bottom Right) */}
+                        <div className="fixed bottom-8 right-8 z-[70] flex flex-col items-end gap-3 scale-110">
+                            {itemToMove && (
+                                <button
+                                    onClick={() => setItemToMove(null)}
+                                    className="bg-white text-rose-600 px-5 py-2.5 rounded-full shadow-2xl font-black text-xs uppercase tracking-widest border-2 border-rose-100 flex items-center gap-2 animate-bounce"
+                                >
+                                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+                                    Cancelar Movimentação
+                                </button>
+                            )}
+
+                            <button
+                                onClick={() => setIsPendingListOpen(true)}
+                                className={`
+                                    group flex items-center gap-3 bg-slate-900 text-white pl-6 pr-2 py-2 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.3)] hover:scale-105 active:scale-95 transition-all
+                                    ${(activeSlot || itemToMove) ? 'ring-4 ring-emerald-500 animate-pulse' : 'ring-4 ring-white/10'}
+                                `}
+                            >
+                                <span className="font-black text-sm uppercase tracking-widest opacity-90">
+                                    {activeSlot ? 'Confirmar Vaga' : (itemToMove ? 'Soltar Item' : 'Adicionar Lotes')}
+                                </span>
+                                <div className="w-12 h-12 bg-emerald-500 rounded-full flex items-center justify-center shadow-inner relative">
+                                    {activeSlot ? <span className="text-2xl">⬇</span> : (itemToMove ? <span className="text-2xl">⇄</span> : <PlusIcon className="w-7 h-7" />)}
+                                    {unassignedStock.length > 0 && (
+                                        <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-slate-900 shadow-lg">
+                                            {unassignedStock.length}
+                                        </span>
+                                    )}
+                                </div>
+                            </button>
+                        </div>
+
+                        {/* Smart Overlay for Pending List (MODAL STYLE) */}
+                        {isPendingListOpen && (
+                            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-300">
+                                <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-md" onClick={() => setIsPendingListOpen(false)}></div>
+
+                                <div className="relative bg-white w-full max-w-2xl h-[85vh] rounded-[3rem] shadow-2xl overflow-hidden flex flex-col border border-white/20">
+                                    {/* Drawer Header */}
+                                    <div className="p-8 border-b bg-slate-50/50 flex items-center justify-between">
+                                        <div>
+                                            <h3 className="font-black text-slate-900 flex items-center gap-3 m-0 text-2xl tracking-tight">
+                                                <ArchiveIcon className="w-8 h-8 text-amber-500" />
+                                                Selecionar Lote
+                                            </h3>
+                                            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">{unassignedStock.length} itens disponíveis para alocação</p>
+                                        </div>
+                                        <button onClick={() => setIsPendingListOpen(false)} className="w-12 h-12 hover:bg-slate-200 rounded-full text-slate-400 transition-colors flex items-center justify-center">
+                                            <XIcon className="w-8 h-8" />
+                                        </button>
+                                    </div>
+
+                                    <div className="p-6 border-b bg-white">
+                                        <div className="relative">
+                                            <SearchIcon className="w-5 h-5 absolute left-4 top-3.5 text-slate-400" />
+                                            <input
+                                                type="text"
+                                                placeholder="Buscar pelo lote..."
+                                                value={searchTerm}
+                                                onChange={e => setSearchTerm(e.target.value)}
+                                                className="w-full pl-12 p-4 bg-slate-100 border-none rounded-2xl text-lg font-medium focus:ring-4 focus:ring-emerald-500/20 outline-none transition-all"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* List */}
+                                    <div className="flex-1 overflow-y-auto p-6 space-y-3 bg-slate-100/50 no-scrollbar">
+                                        {unassignedStock.length === 0 ? (
+                                            <div className="text-center py-20 opacity-30">
+                                                <CheckCircleIcon className="w-24 h-24 text-emerald-500 mx-auto mb-4" />
+                                                <p className="text-2xl font-black">Tudo organizado!</p>
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                {unassignedStock.map(item => (
+                                                    <div
+                                                        key={item.id}
+                                                        onClick={() => {
+                                                            if (activeSlot) {
+                                                                const loc = `${activeSlot.row}:L${activeSlot.l}:P${activeSlot.p}`;
+                                                                handleDropOnRow({ ...item, location: loc }, activeSlot.row);
+                                                                setIsPendingListOpen(false); // Close on selection for desktop UX
+                                                            } else {
+                                                                setItemToMove(itemToMove?.id === item.id ? null : item);
+                                                                setIsPendingListOpen(false);
+                                                            }
+                                                        }}
+                                                        className={`bg-white p-5 rounded-3xl border-2 shadow-sm cursor-pointer hover:shadow-xl transition-all group ${itemToMove?.id === item.id ? 'border-amber-500 bg-amber-50 shadow-amber-200' : 'border-slate-100 hover:border-emerald-400'}`}
+                                                    >
+                                                        <div className="flex justify-between items-center mb-2">
+                                                            <span className="font-black text-xl text-slate-800 group-hover:text-emerald-700">{item.internalLot}</span>
+                                                            <span className="text-[10px] bg-slate-100 px-2 py-1 rounded-full border border-slate-200 font-black text-slate-500">{item.bitola}mm</span>
+                                                        </div>
+                                                        <div className="text-sm text-slate-500 flex justify-between items-center border-t border-slate-50 pt-3">
+                                                            <span className="font-bold uppercase tracking-tighter">{item.materialType}</span>
+                                                            <span className="font-black text-slate-900 text-lg">{item.remainingQuantity} kg</span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Overlay Controls */}
                         {isHeaderCollapsed && (
                             <div className="md:hidden fixed top-[4.5rem] left-3 z-40 bg-white/95 backdrop-blur shadow-xl border border-emerald-100 rounded-xl p-2.5 flex flex-col gap-1 animate-in slide-in-from-left-4 duration-500 min-w-[120px]">
@@ -1436,9 +1468,12 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                             return (
                                 <div className={`w-full max-w-[98vw] animate-fadeIn transition-all duration-500 ${isForecastMode ? 'ring-8 ring-amber-500/20 rounded-[3rem]' : ''}`}>
                                     {isForecastMode && (
-                                        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-6 bg-amber-500 text-white px-6 py-2 rounded-full font-black text-sm shadow-xl z-50 flex items-center gap-2 animate-bounce">
-                                            <span>✨ MODO PREVISÃO FIFO</span>
-                                            <span className="text-[10px] opacity-80">(Antigos no topo)</span>
+                                        <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-amber-500 text-white px-8 py-3 rounded-full font-black text-sm shadow-[0_15px_35px_rgba(245,158,11,0.4)] z-50 flex items-center gap-3 animate-in slide-in-from-top-4 duration-700">
+                                            <span className="text-xl">✨</span>
+                                            <div className="flex flex-col leading-tight">
+                                                <span className="tracking-widest uppercase">MODO PREVISÃO FIFO</span>
+                                                <span className="text-[9px] opacity-80 font-bold uppercase tracking-widest">Organização por Senioridade de Lote</span>
+                                            </div>
                                         </div>
                                     )}
                                     <PyramidRow
