@@ -553,6 +553,7 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
     const [activeSlot, setActiveSlot] = useState<{ row: string, l: number, p: number } | null>(null);
     const [selectedItemMenu, setSelectedItemMenu] = useState<StockItem | null>(null); // New state for Bottom Sheet menu
     const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(true); // For mobile immersive view
+    const [isForecastMode, setIsForecastMode] = useState(false); // Optimization mode (FIFO)
 
     // Helper to identify row "type" based on name
     const getRowTypeInfo = (rowName: string) => {
@@ -1090,6 +1091,16 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                             <ChartBarIcon className="w-4 h-4 rotate-90" />
                             <span className="hidden sm:inline">{forceLandscape ? 'Normal' : 'Girar'}</span>
                         </button>
+
+                        <button
+                            onClick={() => setIsForecastMode(!isForecastMode)}
+                            className={`p-1.5 rounded-lg font-bold text-[10px] flex items-center gap-1 transition shadow-lg ${isForecastMode ? 'bg-amber-500 text-white animate-pulse ring-2 ring-white/50' : 'bg-white/10 text-white hover:bg-white/20'}`}
+                            title="Previsão de Estoque (FIFO)"
+                        >
+                            <span className="text-sm">✨</span>
+                            <span className="hidden sm:inline">{isForecastMode ? 'Visão Real' : 'Previsão FIFO'}</span>
+                            <span className="sm:hidden">FIFO</span>
+                        </button>
                     </div>
                 </div>
 
@@ -1326,32 +1337,82 @@ const StockPyramidMap: React.FC<StockPyramidMapProps> = ({ stock, onUpdateStockI
                                 );
                             }
 
-                            const itemsForThisRow = relevantStock.filter(s => s.location === targetRowName || (s.location && s.location.startsWith(targetRowName + ':')));
+                            const itemsInRowRaw = relevantStock.filter(s => s.location === targetRowName || (s.location && s.location.startsWith(targetRowName + ':')));
                             const config = rowConfigs.find(rc => rc.rowName === targetRowName);
 
+                            // FIFO TRANSFORMATION for Forecast Mode
+                            const itemsForThisRow = useMemo(() => {
+                                if (!isForecastMode) return itemsInRowRaw;
+
+                                // 1. Sort by entry date (NEWEST first)
+                                // This way, when we fill the pyramid from L0 up, the OLDER ones end up at the TOP.
+                                const sorted = [...itemsInRowRaw].sort((a, b) => {
+                                    return new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime();
+                                });
+
+                                // 2. Assign temporary locations for visual rendering
+                                // Using the same pyramid construction logic
+                                const baseSize = config?.baseSize || 7;
+                                let currentItemIdx = 0;
+                                let level = 0;
+                                let levelCapacity = baseSize;
+
+                                const results: StockItem[] = [];
+                                const totalItems = sorted.length;
+
+                                while (levelCapacity > 0 && currentItemIdx < sorted.length) {
+                                    for (let p = 0; p < levelCapacity; p++) {
+                                        if (currentItemIdx < sorted.length) {
+                                            const item = sorted[currentItemIdx];
+                                            // The rank is based on Age (Oldest = #1)
+                                            // Since 'sorted' is Newest -> Oldest, the rank is (Total - currentIdx)
+                                            const rank = totalItems - currentItemIdx;
+
+                                            results.push({
+                                                ...item,
+                                                internalLot: `[#${rank}] ${item.internalLot}`,
+                                                location: `${targetRowName}:L${level}:P${p}`
+                                            });
+                                            currentItemIdx++;
+                                        }
+                                    }
+                                    level++;
+                                    levelCapacity--;
+                                }
+
+                                return results;
+                            }, [itemsInRowRaw, isForecastMode, config]);
+
                             return (
-                                <div className="w-full max-w-[98vw] animate-fadeIn">
+                                <div className={`w-full max-w-[98vw] animate-fadeIn transition-all duration-500 ${isForecastMode ? 'ring-8 ring-amber-500/20 rounded-[3rem]' : ''}`}>
+                                    {isForecastMode && (
+                                        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-6 bg-amber-500 text-white px-6 py-2 rounded-full font-black text-sm shadow-xl z-50 flex items-center gap-2 animate-bounce">
+                                            <span>✨ MODO PREVISÃO FIFO</span>
+                                            <span className="text-[10px] opacity-80">(Antigos no topo)</span>
+                                        </div>
+                                    )}
                                     <PyramidRow
                                         rowName={targetRowName}
                                         items={itemsForThisRow}
                                         config={config}
                                         isActive={true}
                                         onSetActive={() => { }}
-                                        onDrop={(item) => handleDropOnRow(item, targetRowName)}
-                                        onRemove={handleRemoveFromRow}
-                                        onRemoveRow={() => handleRemoveRow(targetRowName)}
-                                        onRenameRow={(newName) => handleRenameRow(targetRowName, newName)}
-                                        onItemClick={(item) => setSelectedItemMenu(item)}
+                                        onDrop={(item) => !isForecastMode && handleDropOnRow(item, targetRowName)}
+                                        onRemove={(item) => !isForecastMode && handleRemoveFromRow(item)}
+                                        onRemoveRow={() => !isForecastMode && handleRemoveRow(targetRowName)}
+                                        onRenameRow={(newName) => !isForecastMode && handleRenameRow(targetRowName, newName)}
+                                        onItemClick={(item) => !isForecastMode && setSelectedItemMenu(item)}
                                         onSlotClick={(l, p) => {
+                                            if (isForecastMode) return;
                                             setActiveSlot({ row: targetRowName, l, p });
-                                            setIsPendingListOpen(true); // Innovation: show list when clicking empty
+                                            setIsPendingListOpen(true);
                                         }}
                                         onExpand={() => setLandscapeRow(targetRowName)}
                                         activeSlot={activeSlot?.row === targetRowName ? activeSlot : null}
-                                        movingItem={itemToMove}
+                                        movingItem={isForecastMode ? null : itemToMove}
                                         onPrintRow={() => setPrintRowName(targetRowName)}
-                                        onUpdateConfig={handleUpdateRowConfig}
-                                        onMoveItem={(item) => setItemToMove(item)}
+                                        onUpdateConfig={(rn, bs, mh) => !isForecastMode && handleUpdateRowConfig(rn, bs, mh)}
+                                        onMoveItem={(item) => !isForecastMode && setItemToMove(item)}
                                     />
 
                                     {itemsForThisRow.length === 0 && (
