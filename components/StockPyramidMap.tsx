@@ -45,22 +45,58 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
     const [maxHeight, setMaxHeight] = useState(config?.maxHeight || getDefaultHeight(rowName));
     const [isEditingName, setIsEditingName] = useState(false);
     const [editedName, setEditedName] = useState(rowName);
-
     const [menuItemId, setMenuItemId] = useState<string | null>(null);
 
-    // Sync config -> local state when config loads/changes
-    // Also reset defaults if config is null (for virtual rows)
-    React.useEffect(() => {
-        if (config) {
-            setBaseSize(config.baseSize);
-            setMaxHeight(config.maxHeight);
-        } else {
-            setMaxHeight(getDefaultHeight(rowName));
-            setBaseSize(7);
-        }
-    }, [config, rowName]);
+    // Dynamic Sizing Management
+    const containerRef = React.useRef<HTMLDivElement>(null);
+    const [containerWidth, setContainerWidth] = useState(0);
 
-    // Handle Config Updates
+    useEffect(() => {
+        if (!containerRef.current) return;
+        const observer = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                setContainerWidth(entry.contentRect.width);
+            }
+        });
+        observer.observe(containerRef.current);
+        return () => observer.disconnect();
+    }, []);
+
+    // Optimized Dynamic Sizing based on ACTUAL space
+    const dims = useMemo(() => {
+        if (containerWidth === 0) return { slotSize: 100, font: 16, gap: 4 };
+
+        // Available space calculation (Container width - padding - approximate gaps)
+        const padding = window.innerWidth < 768 ? 32 : 96; // p-4 vs p-12
+        const gapSize = baseSize > 15 ? 4 : 8; // gap-x-1 vs gap-x-2
+        const totalGaps = (baseSize - 1) * gapSize;
+        const available = containerWidth - padding - totalGaps;
+
+        let slotSize = Math.floor(available / baseSize);
+
+        // Bounds to prevent too small/too large
+        const minSize = window.innerWidth < 768 ? 28 : 50;
+        const maxSize = window.innerWidth < 768 ? 80 : 250;
+        slotSize = Math.min(Math.max(slotSize, minSize), maxSize);
+
+        // Font size scales with slot size
+        const fontSize = Math.max(slotSize * 0.15, 8); // ~15% of slot size
+
+        return {
+            slotSize,
+            font: fontSize,
+            gap: gapSize,
+            lotTitle: Math.max(fontSize * 0.7, 7),
+            border: slotSize > 100 ? 8 : (slotSize > 60 ? 4 : 2)
+        };
+    }, [containerWidth, baseSize]);
+
+    const isFinalized = rowName.includes('[FINALIZADA]');
+
+    const handleRowClick = () => {
+        if (menuItemId) setMenuItemId(null);
+    };
+
     const updateConfig = (newBase: number, newHeight: number) => {
         setBaseSize(newBase);
         setMaxHeight(newHeight);
@@ -68,24 +104,6 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
             onUpdateConfig(rowName, newBase, newHeight);
         }
     };
-
-    const isFinalized = rowName.includes('[FINALIZADA]');
-
-    // Close menu when clicking outside (on row bg)
-    const handleRowClick = () => {
-        if (menuItemId) setMenuItemId(null);
-    };
-
-    // Dynamic Sizing Optimized for maximum screen utilization
-    const dims = useMemo(() => {
-        // Reduced gaps to keep items close as requested
-        if (baseSize <= 6) return { slot: 'w-[75px] h-[75px] sm:w-[210px] sm:h-[210px]', gap: 'gap-x-2 sm:gap-x-4', font: 'text-[12px] sm:text-3xl' };
-        if (baseSize <= 9) return { slot: 'w-[58px] h-[58px] sm:w-[170px] sm:h-[170px]', gap: 'gap-x-2 sm:gap-x-3', font: 'text-[10px] sm:text-2xl' };
-        if (baseSize <= 12) return { slot: 'w-[48px] h-[48px] sm:w-[145px] sm:h-[145px]', gap: 'gap-x-1.5 sm:gap-x-2.5', font: 'text-[9.5px] sm:text-xl' };
-        if (baseSize <= 16) return { slot: 'w-[40px] h-[40px] sm:w-[125px] sm:h-[125px]', gap: 'gap-x-1 sm:gap-x-2', font: 'text-[8.5px] sm:text-lg' };
-        if (baseSize <= 22) return { slot: 'w-[32px] h-[32px] sm:w-[105px] sm:h-[105px]', gap: 'gap-x-1 sm:gap-x-1.5', font: 'text-[7.5px] sm:text-base' };
-        return { slot: 'w-[28px] h-[28px] sm:w-[85px] sm:h-[85px]', gap: 'gap-x-0.5 sm:gap-x-1', font: 'text-[7px] sm:text-sm' };
-    }, [baseSize]);
 
     const handleSaveName = () => {
         if (editedName.trim() && editedName !== rowName) {
@@ -196,7 +214,8 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
 
     return (
         <div
-            className={`w-full h-fit min-w-fit rounded-[2.5rem] p-6 md:p-12 relative transition-all duration-300 flex flex-col items-center ${isActive ? 'bg-white/60 backdrop-blur-md shadow-2xl border-2 border-emerald-500/30' : 'bg-slate-50/50 border-2 border-dashed border-slate-200 opacity-80'}`}
+            ref={containerRef}
+            className={`w-full rounded-[2.5rem] p-4 md:p-12 relative transition-all duration-300 flex flex-col items-center ${isActive ? 'bg-white/60 backdrop-blur-md shadow-2xl border-2 border-emerald-500/30' : 'bg-slate-50/50 border-2 border-dashed border-slate-200 opacity-80'}`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={(e) => {
@@ -292,14 +311,20 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                     style={{ height: maxHeight < 5 ? 'auto' : undefined }} // Fluid height if small
                 >
                     {builtLevels.map((levelSlots, levelIndex) => {
-                        // Check if level is within visual max height if needed, but standard logic renders all.
-                        // If we want to hide levels > maxHeight, we can filter.
                         if (levelIndex >= maxHeight) return null;
 
                         const isRowInteractive = levelSlots.some(s => s.item?.id === menuItemId);
 
                         return (
-                            <div key={levelIndex} className={`flex justify-center z-10 relative ${dims.gap}`} style={{ zIndex: isRowInteractive ? 100 : levelIndex }}>
+                            <div
+                                key={levelIndex}
+                                className="flex justify-center z-10 relative"
+                                style={{
+                                    zIndex: isRowInteractive ? 100 : levelIndex,
+                                    gap: `${dims.gap}px`,
+                                    marginBottom: `${dims.gap * 2}px`
+                                }}
+                            >
                                 {levelSlots.map((slot, slotIndex) => {
                                     const isSlotActive = activeSlot && activeSlot.l === slot.coords.l && activeSlot.p === slot.coords.p;
                                     const isMovingThis = movingItem && slot.item && movingItem.id === slot.item.id;
@@ -320,10 +345,14 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                             <div
                                                 key={slot.item.id}
                                                 className={`
-                                            ${dims.slot} ${shapeClass} flex items-center justify-center relative cursor-pointer transform transition-all shrink-0
-                                            ${isMovingThis ? 'z-50 scale-110 drop-shadow-2xl' : ''}
-                                            ${isMenuOpen ? 'z-50 scale-110 ring-4 ring-emerald-400 bg-white shadow-xl' : 'hover:scale-105 active:scale-95'}
-                                        `}
+                                                ${shapeClass} flex items-center justify-center relative cursor-pointer transform transition-all shrink-0
+                                                ${isMovingThis ? 'z-50 scale-110 drop-shadow-2xl' : ''}
+                                                ${isMenuOpen ? 'z-50 scale-110 ring-4 ring-emerald-400 bg-white shadow-xl' : 'hover:scale-105 active:scale-95'}
+                                            `}
+                                                style={{
+                                                    width: `${dims.slotSize}px`,
+                                                    height: `${dims.slotSize}px`
+                                                }}
                                                 title={`${slot.item.internalLot} - ${slot.item.bitola} - ${(slot.item.remainingQuantity || 0).toFixed(0)}kg`}
                                                 draggable={true}
                                                 onDragStart={(e) => {
@@ -370,15 +399,18 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                                 {/* Standard Coil Content (Always Visible, with z-index separation if menu open) */}
                                                 <div
                                                     className={`absolute inset-0 ${shapeClass} 
-                                                            ${isCARow ? `border-[4px] md:border-[8px] ${borderColor} ${coilColor}` : ''}
                                                             ${isMovingThis ? 'ring-6 ring-amber-500 z-10' : ''}
                                                             shadow-[0_10px_25px_rgba(0,0,0,0.5)]
                                                         `}
                                                     style={!isCARow ? {
                                                         background: 'repeating-radial-gradient(circle at 50% 50%, #1e293b 0, #1e293b 2px, #0f172a 4px, #020617 8px)',
                                                         boxShadow: 'inset 0 0 30px rgba(0,0,0,0.8), 0 8px 15px rgba(0,0,0,0.4)',
-                                                        border: '2px solid rgba(6, 182, 212, 0.3)'
-                                                    } : {}}
+                                                        border: `${dims.border / 2}px solid rgba(6, 182, 212, 0.3)`
+                                                    } : {
+                                                        border: `${dims.border}px solid`,
+                                                        borderColor: borderColor,
+                                                        backgroundColor: coilColor.replace('bg-', '')
+                                                    }}
                                                 ></div>
 
                                                 {/* Inner Hole */}
@@ -389,16 +421,16 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
 
                                                 {/* Content Overlay */}
                                                 <div className="relative z-20 text-center leading-none drop-shadow-[0_2px_4px_rgba(0,0,0,1)] pointer-events-none flex flex-col items-center">
-                                                    <div className="text-[10px] md:text-[14px] font-black text-cyan-200 mb-1 uppercase tracking-tighter filter drop-shadow-sm">
+                                                    <div className="font-black text-cyan-200 mb-1 uppercase tracking-tighter filter drop-shadow-sm" style={{ fontSize: `${dims.lotTitle}px` }}>
                                                         {slot.item.internalLot}
                                                     </div>
-                                                    <div className={`${dims.font} text-white font-mono font-black border-t border-cyan-500/40 pt-1.5 mt-1`}>
+                                                    <div className="text-white font-mono font-black border-t border-cyan-500/40 pt-1.5 mt-1" style={{ fontSize: `${dims.font}px` }}>
                                                         {(slot.item.remainingQuantity || 0).toFixed(0)}
                                                     </div>
                                                 </div>
 
                                                 {/* Sequential Position Label */}
-                                                <div className="absolute bottom-1 right-2 text-[6px] md:text-[8px] font-black text-white opacity-70 select-none z-30">
+                                                <div className="absolute bottom-1 right-2 font-black text-white opacity-70 select-none z-30" style={{ fontSize: `${dims.lotTitle * 0.6}px` }}>
                                                     L{slot.coords.l}-{slot.coords.p}
                                                 </div>
 
@@ -424,11 +456,15 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                             <div
                                                 key={`empty-${levelIndex}-${slotIndex}`}
                                                 className={`
-                                            ${dims.slot} ${shapeClass} flex items-center justify-center transition-all cursor-pointer z-0 pointer-events-auto shrink-0 relative
-                                            ${isSlotActive
+                                                ${shapeClass} flex items-center justify-center transition-all cursor-pointer z-0 pointer-events-auto shrink-0 relative
+                                                ${isSlotActive
                                                         ? 'scale-105 shadow-[0_0_15px_rgba(255,165,0,0.5)] z-20'
                                                         : 'hover:scale-105 opacity-60 hover:opacity-100'}
-                                        `}
+                                            `}
+                                                style={{
+                                                    width: `${dims.slotSize}px`,
+                                                    height: `${dims.slotSize}px`
+                                                }}
                                                 onDragOver={handleDragOver}
                                                 onDragLeave={handleDragLeave}
                                                 onDrop={(e) => handleSlotDrop(e, slot.coords.l, slot.coords.p)}
@@ -461,10 +497,10 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                                 {/* Dashed Outline (Faint) */}
                                                 <div className={`absolute inset-0 ${shapeClass} border-2 border-dashed ${isSlotActive ? 'border-orange-500' : 'border-slate-500/30'}`}></div>
 
-                                                <div className={`pointer-events-none z-10 ${isSlotActive ? 'font-bold text-2xl text-orange-500 animate-bounce' : 'text-slate-600/50 text-xl'}`}>{isSlotActive ? '⬇' : '+'}</div>
+                                                <div className={`pointer-events-none z-10 ${isSlotActive ? 'font-bold text-orange-500 animate-bounce' : 'text-slate-600/50'}`} style={{ fontSize: `${dims.font * 1.5}px` }}>{isSlotActive ? '⬇' : '+'}</div>
 
                                                 {/* Sequential Position Label (Empty) */}
-                                                <div className="absolute bottom-1 right-2 text-[6px] md:text-[8.5px] font-black text-slate-600 opacity-80 select-none z-30 uppercase tracking-tighter">
+                                                <div className="absolute bottom-1 right-2 font-black text-slate-600 opacity-80 select-none z-30 uppercase tracking-tighter" style={{ fontSize: `${dims.lotTitle * 0.6}px` }}>
                                                     L{slot.coords.l}-{slot.coords.p}
                                                 </div>
                                             </div>
