@@ -80,13 +80,13 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
         slotSize = Math.min(Math.max(slotSize, minSize), maxSize);
 
         // Font size scales with slot size
-        const fontSize = Math.max(slotSize * 0.15, 8); // ~15% of slot size
+        const fontSize = Math.max(slotSize * 0.20, 10); // ~20% of slot size
 
         return {
             slotSize,
             font: fontSize,
             gap: gapSize,
-            lotTitle: Math.max(fontSize * 0.7, 7),
+            lotTitle: Math.max(fontSize * 0.9, 11),
             border: slotSize > 100 ? 8 : (slotSize > 60 ? 4 : 2)
         };
     }, [containerWidth, baseSize]);
@@ -370,29 +370,39 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                                 {/* Desktop Context Menu (Hidden on Mobile) */}
                                                 {isMenuOpen && (
                                                     <div
-                                                        className="hidden md:flex absolute z-[100] bottom-full left-1/2 -translate-x-1/2 mb-4 w-40 bg-white rounded-2xl shadow-2xl p-2 flex-col gap-1.5 border border-slate-100 animate-in slide-in-from-bottom-2 fade-in duration-200"
+                                                        className={`hidden md:flex absolute z-[150] ${levelIndex >= (builtLevels.length - 1) ? 'top-full mt-4' : 'bottom-full mb-4'} left-1/2 -translate-x-1/2 w-44 bg-white rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.4)] p-2.5 flex-col gap-1.5 border border-slate-200 animate-in fade-in zoom-in duration-200`}
                                                         onClick={(e) => e.stopPropagation()}
                                                     >
-                                                        <div className="text-[10px] font-black text-center text-slate-400 border-b border-slate-100 pb-2 mb-1 tracking-wider uppercase">
+                                                        <div className="text-[11px] font-black text-center text-slate-500 border-b border-slate-100 pb-2 mb-1 tracking-widest uppercase">
                                                             LOTE {slot.item.internalLot}
                                                         </div>
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); if (onMoveItem) onMoveItem(slot.item!); setMenuItemId(null); }}
-                                                            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold px-3 py-2.5 rounded-xl w-full flex items-center justify-between transition-all active:scale-95 group"
+                                                            className="bg-sky-50 hover:bg-sky-100 text-sky-700 text-[11px] font-black px-4 py-3 rounded-2xl w-full flex items-center justify-between transition-all active:scale-95"
                                                         >
                                                             <div className="flex items-center gap-2">
                                                                 <span className="text-base">✋</span>
-                                                                <span>Mover Lote</span>
+                                                                <span>MOVER LOTE</span>
                                                             </div>
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400"></div>
+                                                            <div className="w-2 h-2 rounded-full bg-sky-400"></div>
                                                         </button>
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); onRemove(slot.item!); setMenuItemId(null); }}
-                                                            className="bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold px-3 py-2.5 rounded-xl w-full flex items-center justify-between transition-all active:scale-95 group"
+                                                            className="bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-black px-4 py-3 rounded-2xl w-full flex items-center justify-between transition-all active:scale-95"
                                                         >
-                                                            <span>🗑️ Remover</span>
+                                                            <div className="flex items-center gap-2">
+                                                                <span>🗑️</span>
+                                                                <span>REMOVER</span>
+                                                            </div>
+                                                            <div className="w-2 h-2 rounded-full bg-rose-400"></div>
                                                         </button>
-                                                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-[8px] border-transparent border-t-white"></div>
+
+                                                        {/* Dynamic Arrow Placement */}
+                                                        {levelIndex >= (builtLevels.length - 1) ? (
+                                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-[10px] border-transparent border-b-white"></div>
+                                                        ) : (
+                                                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-[10px] border-transparent border-t-white"></div>
+                                                        )}
                                                     </div>
                                                 )}
 
@@ -420,11 +430,11 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                                 {!isCARow && <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-white/5 via-transparent to-transparent pointer-events-none"></div>}
 
                                                 {/* Content Overlay */}
-                                                <div className="relative z-20 text-center leading-none drop-shadow-[0_2px_4px_rgba(0,0,0,1)] pointer-events-none flex flex-col items-center">
-                                                    <div className="font-black text-cyan-200 mb-1 uppercase tracking-tighter filter drop-shadow-sm" style={{ fontSize: `${dims.lotTitle}px` }}>
+                                                <div className="relative z-20 text-center leading-none drop-shadow-[0_4px_12px_rgba(0,0,0,1)] pointer-events-none flex flex-col items-center bg-black/30 backdrop-blur-[2px] p-1.5 rounded-xl">
+                                                    <div className="font-black text-yellow-300 mb-1 uppercase tracking-tighter filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" style={{ fontSize: `${dims.lotTitle}px` }}>
                                                         {slot.item.internalLot}
                                                     </div>
-                                                    <div className="text-white font-mono font-black border-t border-cyan-500/40 pt-1.5 mt-1" style={{ fontSize: `${dims.font}px` }}>
+                                                    <div className="text-white font-mono font-black border-t border-white/40 pt-1.5 mt-1" style={{ fontSize: `${dims.font}px` }}>
                                                         {(slot.item.remainingQuantity || 0).toFixed(0)}
                                                     </div>
                                                 </div>
