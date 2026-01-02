@@ -323,7 +323,7 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                 style={{
                                     zIndex: isRowInteractive ? 100 : levelIndex,
                                     gap: `${dims.gap}px`,
-                                    marginBottom: `${dims.gap * 2}px`
+                                    marginBottom: `${dims.slotSize * 0.2 + 15}px` // Increased margin for bottom labels
                                 }}
                             >
                                 {levelSlots.map((slot, slotIndex) => {
@@ -440,9 +440,9 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
                                                     </div>
                                                 </div>
 
-                                                {/* Sequential Position Label */}
-                                                <div className="absolute top-1 right-2 font-black text-white/40 select-none z-30 uppercase tracking-widest pointer-events-none" style={{ fontSize: `${dims.lotTitle * 0.45}px` }}>
-                                                    #{slot.coords.l}.{slot.coords.p}
+                                                {/* Sequential Position Label (Badge below lot) */}
+                                                <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 font-black text-slate-900 bg-white px-2 py-0.5 rounded-md shadow-sm border border-slate-300 select-none z-40 uppercase tracking-tighter pointer-events-none whitespace-nowrap" style={{ fontSize: `${Math.max(dims.lotTitle * 0.5, 10)}px` }}>
+                                                    L{slot.coords.l}.{slot.coords.p}
                                                 </div>
 
                                                 {movingItem && movingItem.id !== slot.item.id && (
@@ -510,9 +510,9 @@ const PyramidRow: React.FC<PyramidRowProps> = ({ rowName, items, onDrop, onRemov
 
                                                 <div className={`pointer-events-none z-10 ${isSlotActive ? 'font-bold text-orange-500 animate-bounce' : 'text-slate-600/50'}`} style={{ fontSize: `${dims.font * 1.5}px` }}>{isSlotActive ? '⬇' : '+'}</div>
 
-                                                {/* Sequential Position Label (Empty) */}
-                                                <div className="absolute bottom-1 right-2 font-black text-slate-600 opacity-80 select-none z-30 uppercase tracking-tighter" style={{ fontSize: `${dims.lotTitle * 0.6}px` }}>
-                                                    L{slot.coords.l}-{slot.coords.p}
+                                                {/* Sequential Position Label (Empty slot) */}
+                                                <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 font-black text-slate-500 bg-white/80 px-2 py-0.5 rounded-md shadow-sm border border-slate-200 select-none z-30 uppercase tracking-tighter" style={{ fontSize: `${Math.max(dims.lotTitle * 0.5, 10)}px` }}>
+                                                    L{slot.coords.l}.{slot.coords.p}
                                                 </div>
                                             </div>
                                         );
