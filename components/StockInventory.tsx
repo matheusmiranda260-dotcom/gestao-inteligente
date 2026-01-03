@@ -32,7 +32,9 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
     const [auditFilters, setAuditFilters] = useState({ material: '', bitola: '' });
     const [activeSession, setActiveSession] = useState<InventorySession | null>(null);
     const [selectedSessionForReport, setSelectedSessionForReport] = useState<InventorySession | null>(null);
+    const [approvingSession, setApprovingSession] = useState<InventorySession | null>(null);
     const [auditSearch, setAuditSearch] = useState('');
+    const [tempNewLots, setTempNewLots] = useState<StockItem[]>([]);
     const [selectedLot, setSelectedLot] = useState<StockItem | null>(null);
     const [physicalWeight, setPhysicalWeight] = useState<string>('');
     const [auditObservation, setAuditObservation] = useState<string>('');
@@ -226,22 +228,11 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
         const diff = newWeight - selectedLot.remainingQuantity;
 
         try {
-            const historyEntry = {
-                type: 'Inventário (Conferência)',
-                date: new Date().toISOString(),
-                details: {
-                    'Peso Anterior': `${selectedLot.remainingQuantity.toFixed(2)} kg`,
-                    'Peso Informado': `${newWeight.toFixed(2)} kg`,
-                    'Diferença': `${diff.toFixed(2)} kg`
-                }
-            };
-
-            await updateStockItem(selectedLot.id, {
-                remainingQuantity: newWeight,
-                lastAuditDate: new Date().toISOString(),
-                auditObservation: auditObservation || null,
-                history: [...(selectedLot.history || []), historyEntry]
-            });
+            /* 
+               Direct update removed by request. 
+               Stock is only updated when a manager approves the session on desktop.
+            */
+            // await updateStockItem(selectedLot.id, { ... });
 
             setSessionAuditData(prev => {
                 const next = new Map(prev);
@@ -315,32 +306,35 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                 }]
             };
 
-            const saved = await addStockItem(newItem);
-            if (saved) {
-                setSessionAuditData(prev => {
-                    const next = new Map(prev);
-                    next.set(saved.id, {
-                        systemWeight: 0,
-                        physicalWeight: parseFloat(quickAddData.weight),
-                        observation: quickAddData.observation || 'Lote cadastrado rapidamente via Mobile'
-                    });
-                    return next;
-                });
-                // Track checked ID
-                setSessionCheckedIds(prev => new Set(prev).add(saved.id));
+            // NEW: instead of adding to stock in DB, we add to a local temp list
+            // and include in the session audit results.
+            const saved = newItem; // Use newItem as the representative object
+            setTempNewLots(prev => [...prev, newItem]);
 
-                // Update session state in DB for live progress
-                const currentSession = inventorySessions.find(s => s.id === activeSession?.id);
-                if (currentSession) {
-                    updateInventorySession(currentSession.id, {
-                        itemsCount: currentSession.itemsCount + 1,
-                        checkedCount: currentSession.checkedCount + 1
-                    });
-                }
+            setSessionAuditData(prev => {
+                const next = new Map(prev);
+                next.set(saved.id, {
+                    systemWeight: 0,
+                    physicalWeight: parseFloat(quickAddData.weight),
+                    observation: quickAddData.observation || 'Lote cadastrado rapidamente via Mobile'
+                });
+                return next;
+            });
+            // Track checked ID
+            setSessionCheckedIds(prev => new Set(prev).add(saved.id));
+
+            // Update session state in DB for live progress
+            const currentSession = inventorySessions.find(s => s.id === activeSession?.id);
+            if (currentSession) {
+                updateInventorySession(currentSession.id, {
+                    itemsCount: (currentSession.itemsCount || 0) + 1,
+                    checkedCount: (currentSession.checkedCount || 0) + 1
+                });
             }
+
             setAuditStep('list');
             setQuickAddData({ internalLot: '', materialType: '', bitola: '', weight: '', observation: '' });
-            alert('Lote cadastrado com sucesso! Ele já foi incluído nesta conferência.');
+            alert('Lote registrado para conferência! Aguardando aprovação final do gestor.');
         } catch (error) {
             alert('Erro ao cadastrar lote.');
         } finally {
@@ -360,13 +354,14 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
         try {
             // Include ONLY lots checked in THIS session using sessionAuditData for accuracy
             const auditedLots = Array.from(sessionAuditData.entries()).map(([lotId, data]) => {
-                const lot = stock.find(s => s.id === lotId);
+                const lot = stock.find(s => s.id === lotId) || tempNewLots.find(s => s.id === lotId);
                 return {
                     lotId,
                     internalLot: lot?.internalLot || '?',
                     systemWeight: data.systemWeight,
                     physicalWeight: data.physicalWeight,
-                    observation: data.observation
+                    observation: data.observation,
+                    tempLotData: lotId.startsWith('TEMP-') ? lot : null
                 };
             });
 
@@ -403,6 +398,73 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
             setAuditStep('select');
         } catch (error) {
             alert('Erro ao finalizar inventário.');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleApplyChangesToStock = async (session: InventorySession) => {
+        if (!session || isSaving) return;
+
+        const password = prompt("Para aplicar estas alterações ao estoque real, digite a SENHA DE GESTOR:");
+        if (password !== "9630") {
+            alert("Senha incorreta ou operação cancelada. As alterações NÃO foram aplicadas.");
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            for (const lotInfo of session.auditedLots) {
+                const isNew = lotInfo.tempLotData !== null && lotInfo.tempLotData !== undefined;
+
+                if (isNew && lotInfo.tempLotData) {
+                    // Create new lot in DB
+                    const newId = `LOT-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+                    await addStockItem({
+                        ...lotInfo.tempLotData,
+                        id: newId,
+                        remainingQuantity: lotInfo.physicalWeight,
+                        initialQuantity: lotInfo.physicalWeight,
+                        labelWeight: lotInfo.physicalWeight,
+                        lastAuditDate: new Date().toISOString(),
+                        history: [{
+                            type: 'Entrada via Inventário (Aprovado)',
+                            date: new Date().toISOString(),
+                            details: { 'Nota': 'Lote extra encontrado e aprovado no inventário' }
+                        }]
+                    });
+                } else if (lotInfo.lotId && !isNew) {
+                    const diff = lotInfo.physicalWeight - lotInfo.systemWeight;
+                    const currentLot = stock.find(s => s.id === lotInfo.lotId);
+
+                    const historyEntry = {
+                        type: 'Inventário (Aprovado)',
+                        date: new Date().toISOString(),
+                        details: {
+                            'Peso Anterior': `${lotInfo.systemWeight.toFixed(2)} kg`,
+                            'Peso Final': `${lotInfo.physicalWeight.toFixed(2)} kg`,
+                            'Diferença': `${diff.toFixed(2)} kg`,
+                            'Aprovado por': currentUser?.username || 'Gestor'
+                        }
+                    };
+
+                    await updateStockItem(lotInfo.lotId, {
+                        remainingQuantity: lotInfo.physicalWeight,
+                        lastAuditDate: new Date().toISOString(),
+                        auditObservation: lotInfo.observation || null,
+                        history: [...(currentLot?.history || []), historyEntry]
+                    });
+                }
+            }
+
+            // Mark session as applied
+            await updateInventorySession(session.id, { appliedToStock: true });
+
+            alert('Estoque atualizado com sucesso conforme o relatório aprovado!');
+            setApprovingSession(null);
+        } catch (error) {
+            console.error(error);
+            alert('Erro ao aplicar algumas alterações no estoque. Verifique os logs.');
         } finally {
             setIsSaving(false);
         }
@@ -1075,7 +1137,21 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                                             <ExclamationTriangleIcon className="w-3.5 h-3.5" />
                                                         </button>
                                                     )}
-                                                    {session.status === 'completed' && (
+                                                    {session.status === 'completed' && !session.appliedToStock && currentUser?.role === 'gestor' && (
+                                                        <button
+                                                            onClick={() => setApprovingSession(session)}
+                                                            className="flex-1 bg-emerald-600 text-white py-1.5 rounded-lg text-[9px] font-black hover:bg-emerald-700 transition-all shadow-md shadow-emerald-200"
+                                                        >
+                                                            APLICAR NO ESTOQUE
+                                                        </button>
+                                                    )}
+                                                    {session.appliedToStock && (
+                                                        <div className="flex-1 bg-emerald-50 text-emerald-600 border border-emerald-100 py-1.5 rounded-lg text-[9px] font-black flex items-center justify-center gap-1 cursor-default">
+                                                            <CheckCircleIcon className="w-3 h-3" />
+                                                            CONCLUÍDO
+                                                        </div>
+                                                    )}
+                                                    {session.status === 'completed' && !session.appliedToStock && (
                                                         <button
                                                             onClick={() => {
                                                                 if (confirm(`Deseja liberar o inventário de ${session.materialType} ${session.bitola} para RE-CONFERÊNCIA?`)) {
@@ -1277,6 +1353,102 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                     />
                 )
             }
+
+            {approvingSession && (
+                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+                    <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+                        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-emerald-50">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-emerald-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-200 text-white">
+                                    <ScaleIcon className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-black text-emerald-900 tracking-tight">Revisar e Aplicar ao Estoque</h3>
+                                    <p className="text-xs font-bold text-emerald-700 uppercase tracking-widest">{approvingSession.materialType} {approvingSession.bitola}</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setApprovingSession(null)} className="p-2 hover:bg-emerald-100 rounded-xl transition-colors text-emerald-900">
+                                <XCircleIcon className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        <div className="p-6 overflow-y-auto space-y-6">
+                            <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-start gap-3">
+                                <ExclamationTriangleIcon className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                                <div className="text-xs text-amber-900 font-bold leading-relaxed">
+                                    Esta ação irá atualizar permanentemente as quantidades no sistema.
+                                    Certifique-se de que os dados abaixo estão corretos antes de autorizar com sua senha.
+                                </div>
+                            </div>
+
+                            <div className="space-y-3">
+                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Resumo das Alterações</h4>
+                                <div className="border border-slate-100 rounded-2xl overflow-hidden">
+                                    <table className="w-full text-left text-xs">
+                                        <thead className="bg-slate-50 text-[10px] uppercase font-black text-slate-500">
+                                            <tr>
+                                                <th className="p-4">Lote</th>
+                                                <th className="p-4 text-right">Anterior</th>
+                                                <th className="p-4 text-right">Novo Peso</th>
+                                                <th className="p-4 text-right">Diferença</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-50">
+                                            {approvingSession.auditedLots
+                                                .filter(lot => Math.abs(lot.physicalWeight - lot.systemWeight) > 0.01 || lot.tempLotData)
+                                                .map(lot => {
+                                                    const diff = lot.physicalWeight - lot.systemWeight;
+                                                    const isNew = !!lot.tempLotData;
+                                                    return (
+                                                        <tr key={lot.lotId} className="hover:bg-slate-50/50 transition-colors">
+                                                            <td className="p-4 font-black text-slate-900">
+                                                                <div className="flex items-center gap-2">
+                                                                    LOT {lot.internalLot}
+                                                                    {isNew && <span className="bg-blue-100 text-blue-600 text-[8px] px-1.5 py-0.5 rounded-md font-black">NOVO</span>}
+                                                                </div>
+                                                            </td>
+                                                            <td className="p-4 text-right text-slate-400 font-bold">{isNew ? '-' : `${lot.systemWeight.toFixed(0)}kg`}</td>
+                                                            <td className="p-4 text-right font-black text-slate-900">{lot.physicalWeight.toFixed(0)}kg</td>
+                                                            <td className={`p-4 text-right font-black ${diff > 0 || isNew ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                                {isNew ? `+${lot.physicalWeight.toFixed(0)}kg` : `${diff > 0 ? '+' : ''}${diff.toFixed(0)}kg`}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            {approvingSession.auditedLots.filter(lot => Math.abs(lot.physicalWeight - lot.systemWeight) > 0.01 || lot.tempLotData).length === 0 && (
+                                                <tr>
+                                                    <td colSpan={4} className="p-8 text-center text-slate-400 italic">Nenhuma alteração de peso detectada.</td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-6 border-t border-slate-100 bg-slate-50 flex gap-3">
+                            <button
+                                onClick={() => setApprovingSession(null)}
+                                className="flex-1 px-4 py-3 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-xs hover:bg-slate-50 transition-all"
+                            >
+                                CANCELAR
+                            </button>
+                            <button
+                                onClick={() => handleApplyChangesToStock(approvingSession)}
+                                disabled={isSaving}
+                                className="flex-[2] px-4 py-3 bg-emerald-600 text-white rounded-2xl font-black text-xs hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 flex items-center justify-center gap-2"
+                            >
+                                {isSaving ? 'PROCESSANDO...' : (
+                                    <>
+                                        <CheckCircleIcon className="w-4 h-4" />
+                                        AUTORIZAR E ATUALIZAR ESTOQUE
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div >
     );
 };

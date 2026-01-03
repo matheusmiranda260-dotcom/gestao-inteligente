@@ -451,7 +451,9 @@ export interface InventorySession {
         systemWeight: number;
         physicalWeight: number;
         observation?: string | null;
+        tempLotData?: any;
     }[];
+    appliedToStock?: boolean;
 }
 
 export interface RowConfig {
