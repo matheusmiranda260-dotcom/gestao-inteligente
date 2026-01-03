@@ -450,8 +450,10 @@ const App: React.FC = () => {
         try {
             const savedItem = await insertItem<StockItem>('stock_items', item);
             setStock(prev => [...prev, savedItem]);
+            return savedItem;
         } catch (error) {
             showNotification('Erro ao adicionar item ao estoque.', 'error');
+            return null;
         }
     };
 

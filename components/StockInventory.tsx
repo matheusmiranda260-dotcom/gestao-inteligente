@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { StockItem, Page, InventorySession, User } from '../types';
 import { MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions } from '../types';
 import { PrinterIcon, ArrowLeftIcon, SearchIcon, FilterIcon, CheckCircleIcon, XCircleIcon, ScaleIcon, SaveIcon, ChevronRightIcon, PlusIcon, ChatBubbleLeftRightIcon, ClockIcon, LockClosedIcon, LockOpenIcon } from './icons';
+import InventorySessionReport from './InventorySessionReport';
 
 interface StockInventoryProps {
     stock: StockItem[];
@@ -29,6 +30,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
     const [auditStep, setAuditStep] = useState<AuditStep>('select');
     const [auditFilters, setAuditFilters] = useState({ material: '', bitola: '' });
     const [activeSession, setActiveSession] = useState<InventorySession | null>(null);
+    const [selectedSessionForReport, setSelectedSessionForReport] = useState<InventorySession | null>(null);
     const [auditSearch, setAuditSearch] = useState('');
     const [selectedLot, setSelectedLot] = useState<StockItem | null>(null);
     const [physicalWeight, setPhysicalWeight] = useState<string>('');
@@ -95,10 +97,10 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
         );
     }, [auditPool, auditSearch]);
 
-    const stats = {
-        total: auditPool.length,
-        checked: auditPool.filter(i => sessionCheckedIds.has(i.id)).length
-    };
+    const stats = useMemo(() => {
+        const checked = auditPool.filter(i => sessionCheckedIds.has(i.id)).length;
+        return { total: auditPool.length, checked };
+    }, [auditPool, sessionCheckedIds]);
 
     const reportStats = useMemo(() => {
         const total = filteredReportStock.length;
@@ -206,11 +208,15 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                 }]
             };
 
-            await addStockItem(newItem);
-            setSessionCheckedIds(prev => new Set(prev).add(newItem.id));
+            const saved = await addStockItem(newItem);
+            if (saved) {
+                setSessionCheckedIds(prev => new Set(prev).add(saved.id));
+            } else {
+                setSessionCheckedIds(prev => new Set(prev).add(newItem.id));
+            }
             setAuditStep('list');
             setQuickAddData({ internalLot: '', materialType: '', bitola: '', weight: '', observation: '' });
-            alert('Lote cadastrado com sucesso! Verifique os detalhes no computador depois.');
+            alert('Lote cadastrado com sucesso! Ele já foi incluído nesta conferência.');
         } catch (error) {
             alert('Erro ao cadastrar lote.');
         } finally {
@@ -228,13 +234,16 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
 
         setIsSaving(true);
         try {
-            const auditedLots = auditPool.filter(item => sessionCheckedIds.has(item.id) || item.lastAuditDate).map(item => ({
-                lotId: item.id,
-                internalLot: item.internalLot,
-                systemWeight: item.remainingQuantity,
-                physicalWeight: item.remainingQuantity, // In a real scenario we'd track the actually entered weight, here we assume it was confirmed
-                observation: item.auditObservation
-            }));
+            // Include ONLY lots checked in THIS session
+            const auditedLots = auditPool
+                .filter(item => sessionCheckedIds.has(item.id))
+                .map(item => ({
+                    lotId: item.id,
+                    internalLot: item.internalLot,
+                    systemWeight: item.supplier === 'CADASTRADO NO INVENTÁRIO' ? 0 : item.remainingQuantity,
+                    physicalWeight: item.remainingQuantity,
+                    observation: item.auditObservation
+                }));
 
             const newSession: InventorySession = {
                 id: `INV-${Date.now()}`,
@@ -245,7 +254,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                 status: 'completed',
                 operator: currentUser?.username || 'Sistema',
                 itemsCount: auditPool.length,
-                checkedCount: sessionCheckedIds.size,
+                checkedCount: auditedLots.length, // More accurate than sessionCheckedIds.size
                 auditedLots
             };
 
@@ -375,7 +384,14 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                     );
                                 })}
                                 <button
-                                    onClick={() => setAuditStep('quick-add')}
+                                    onClick={() => {
+                                        setQuickAddData(prev => ({
+                                            ...prev,
+                                            materialType: auditFilters.material,
+                                            bitola: auditFilters.bitola
+                                        }));
+                                        setAuditStep('quick-add');
+                                    }}
                                     className="w-full p-6 rounded-2xl border-2 border-dashed border-slate-700 text-slate-500 font-bold flex flex-col items-center gap-2 hover:border-blue-500 hover:text-blue-500 transition-all"
                                 >
                                     <PlusIcon className="w-8 h-8" />
@@ -658,11 +674,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
 
                                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <button
-                                        onClick={() => {
-                                            // Handle Printing Report
-                                            alert('Gerando relatório para impressão...');
-                                            window.print();
-                                        }}
+                                        onClick={() => setSelectedSessionForReport(session)}
                                         className="flex-1 bg-white border border-slate-300 text-slate-700 py-2 rounded-lg text-xs font-black flex items-center justify-center gap-1 hover:bg-slate-100"
                                     >
                                         <PrinterIcon className="w-4 h-4" /> IMPRIMIR
@@ -814,6 +826,12 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                     </table>
                 </div>
             </div>
+            {selectedSessionForReport && (
+                <InventorySessionReport
+                    session={selectedSessionForReport}
+                    onClose={() => setSelectedSessionForReport(null)}
+                />
+            )}
         </div>
     );
 };
