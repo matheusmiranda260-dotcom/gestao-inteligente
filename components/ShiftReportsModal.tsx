@@ -234,33 +234,19 @@ const ShiftReportPrintView: React.FC<{ report: ShiftReport, stock: StockItem[], 
         const speedMpm = productiveTime > 0 ? report.totalProducedMeters / (productiveTime / 60000) : 0;
 
         // Historical data for "Atualização da Produção"
-        // Historical data for "Atualização da Produção" - Aggregated by Day
-        const dailyProduction = useMemo(() => {
-            const productionMap: Record<string, { meters: number; weight: number; date: string }> = {};
-            // Deduplicate reports by ID to prevent double counting if the state has duplicates
+        // Historical data for "Atualização da Produção" - Listed by Shift
+        const productionHistory = useMemo(() => {
+            // Deduplicate reports by ID
             const allSourceReports = allReports || [report];
             const uniqueReports = Array.from(new Map(allSourceReports.map(item => [item.id, item])).values());
 
-            uniqueReports
+            return uniqueReports
                 .filter(r => r.orderNumber === report.orderNumber && r.machine !== 'Trefila')
-                .forEach(r => {
-                    // Normalize date to DD/MM/YYYY for grouping
-                    const dateObj = new Date(r.date);
-                    const dateKey = dateObj.toLocaleDateString('pt-BR');
-
-                    if (!productionMap[dateKey]) {
-                        productionMap[dateKey] = { meters: 0, weight: 0, date: r.date };
-                    }
-
-                    productionMap[dateKey].meters += (r.totalProducedMeters || 0);
-                    productionMap[dateKey].weight += (r.totalProducedWeight || 0);
-                });
-
-            return Object.values(productionMap).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                .sort((a, b) => new Date(a.shiftStartTime || a.date).getTime() - new Date(b.shiftStartTime || b.date).getTime());
         }, [allReports, report.orderNumber]);
 
-        const totalHistPieces = dailyProduction.reduce((acc, d) => acc + (d.meters / (tamanhoNum || 6)), 0);
-        const totalHistWeight = dailyProduction.reduce((acc, d) => acc + d.weight, 0);
+        const totalHistPieces = productionHistory.reduce((acc, r) => acc + ((r.totalProducedMeters || 0) / (parseFloat(r.tamanho || '6') || 6)), 0);
+        const totalHistWeight = productionHistory.reduce((acc, r) => acc + (r.totalProducedWeight || 0), 0);
         const avgHistMedia = totalHistPieces > 0 ? totalHistWeight / totalHistPieces : 0;
 
         return (
@@ -411,15 +397,22 @@ const ShiftReportPrintView: React.FC<{ report: ShiftReport, stock: StockItem[], 
                             </tr>
                         </thead>
                         <tbody>
-                            {dailyProduction.map((d, i) => {
-                                const q = d.meters / (tamanhoNum || 6);
-                                const media = q > 0 ? d.weight / q : 0;
+                            {productionHistory.map((r, i) => {
+                                const q = (r.totalProducedMeters || 0) / (parseFloat(r.tamanho || '6') || 6);
+                                const media = q > 0 ? (r.totalProducedWeight || 0) / q : 0;
+
+                                const start = r.shiftStartTime ? new Date(r.shiftStartTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+                                const end = r.shiftEndTime ? new Date(r.shiftEndTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+                                const dateStr = new Date(r.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+
+                                const timeLabel = start && end ? `${dateStr} - ${start} às ${end}` : new Date(r.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+
                                 return (
                                     <tr key={i} className="tabular-nums font-bold">
                                         <td className="p-1.5 text-center w-1/4">{q.toFixed(0)}</td>
-                                        <td className="p-1.5 text-center w-1/4">{d.weight.toFixed(0)}</td>
+                                        <td className="p-1.5 text-center w-1/4">{(r.totalProducedWeight || 0).toFixed(0)}</td>
                                         <td className="p-1.5 text-center w-1/4">{media.toFixed(2)}</td>
-                                        <td className="p-1.5 text-center w-1/4">{new Date(d.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}</td>
+                                        <td className="p-1.5 text-center w-1/4 text-[10px] whitespace-nowrap">{timeLabel}</td>
                                     </tr>
                                 );
                             })}

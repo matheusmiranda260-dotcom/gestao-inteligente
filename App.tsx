@@ -860,6 +860,12 @@ const App: React.FC = () => {
         if (newOrderIndex === -1) return;
 
         const orderToStartData = newOrders[newOrderIndex];
+
+        if (orderToStartData.status === 'in_progress') {
+            showNotification('Ordem já iniciada.', 'warning');
+            return;
+        }
+
         const newOrderMachine = orderToStartData.machine;
 
         // Find and close any existing open shift for this user/machine
@@ -914,6 +920,13 @@ const App: React.FC = () => {
 
         const order = productionOrders.find(o => o.id === orderId);
         if (!order) return;
+
+        // Check if already has open log to prevent duplicates
+        const hasOpenLog = (order.operatorLogs || []).some(log => log.operator === currentUser.username && !log.endTime);
+        if (hasOpenLog) {
+            showNotification('Turno já iniciado.', 'warning');
+            return;
+        }
 
         const updates: Partial<ProductionOrderData> = {
             operatorLogs: [...(order.operatorLogs || []), { operator: currentUser.username, startTime: now, endTime: null }],

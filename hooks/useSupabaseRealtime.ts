@@ -72,11 +72,15 @@ export function useAllRealtimeSubscriptions(setters: RealtimeSetters, enabled: b
                             case 'INSERT':
                                 if (payload.new) {
                                     const newItem = mapToCamelCase(payload.new) as T;
-                                    setter(prev =>
-                                        options?.onInsert
+                                    setter(prev => {
+                                        // Prevent duplicates
+                                        if (prev.some((item: any) => item[idField] === (newItem as any)[idField])) {
+                                            return prev;
+                                        }
+                                        return options?.onInsert
                                             ? options.onInsert(newItem, prev)
-                                            : [...prev, newItem]
-                                    );
+                                            : [...prev, newItem];
+                                    });
                                 }
                                 break;
                             case 'UPDATE':
