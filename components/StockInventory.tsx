@@ -407,7 +407,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
         if (!session || isSaving) return;
 
         const password = prompt("Para aplicar estas alterações ao estoque real, digite a SENHA DE GESTOR:");
-        if (password !== "9630") {
+        if (password !== "070223") {
             alert("Senha incorreta ou operação cancelada. As alterações NÃO foram aplicadas.");
             return;
         }
