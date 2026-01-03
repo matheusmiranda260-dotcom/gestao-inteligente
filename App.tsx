@@ -950,27 +950,58 @@ const App: React.FC = () => {
         const shiftEnd = new Date(operatorLog.endTime);
 
         const shiftDowntimeEvents = (order.downtimeEvents || []).filter(event => {
-            const stop = new Date(event.stopTime);
-            return stop >= shiftStart && stop < shiftEnd;
+            const stopTime = new Date(event.stopTime).getTime();
+            const resumeTime = event.resumeTime ? new Date(event.resumeTime).getTime() : shiftEnd.getTime();
+            const sStart = shiftStart.getTime();
+            const sEnd = shiftEnd.getTime();
+            // Event overlaps with shift if it starts before shift ends AND ends after shift starts
+            return stopTime < sEnd && resumeTime > sStart;
         });
 
         const shiftProcessedLots = (order.processedLots || []).filter(lot => {
-            const end = new Date(lot.endTime);
-            return end >= shiftStart && end < shiftEnd;
+            const lotEndTime = new Date(lot.endTime).getTime();
+            const sStart = shiftStart.getTime();
+            const sEnd = shiftEnd.getTime();
+            return lotEndTime >= sStart && lotEndTime < sEnd;
         });
 
-        const totalProducedWeight = shiftProcessedLots.reduce((sum, lot) => sum + (lot.finalWeight || 0), 0);
+        // Trelica specific: Packages weighed during this shift
+        const shiftPackages = (order.weighedPackages || []).filter(pkg => {
+            const pkgTime = new Date(pkg.timestamp);
+            return pkgTime >= shiftStart && pkgTime < shiftEnd;
+        });
 
-        const totalScrapWeight = 0; // Simplified
-        const scrapPercentage = totalProducedWeight > 0 ? (totalScrapWeight / (totalProducedWeight + totalScrapWeight)) * 100 : 0;
+        // Pontas produced during this shift
+        const orderEndedInShift = order.endTime && new Date(order.endTime) >= shiftStart && new Date(order.endTime) < shiftEnd;
+        const shiftPontas = orderEndedInShift ? (order.pontas || []) : [];
 
-        const weightKg = totalProducedWeight;
-        const bitolaMm = parseFloat(order.targetBitola);
-        const steelDensityKgPerM3 = 7850;
-        const radiusM = (bitolaMm / 1000) / 2;
-        const areaM2 = Math.PI * Math.pow(radiusM, 2);
-        const volumeM3 = weightKg / steelDensityKgPerM3;
-        const totalProducedMeters = volumeM3 / areaM2;
+        let totalProducedWeight = 0;
+        let totalProducedMeters = 0;
+
+        if (order.machine === 'Trefila') {
+            totalProducedWeight = shiftProcessedLots.reduce((sum, lot) => sum + (lot.finalWeight || 0), 0);
+
+            const bitolaMm = parseFloat(order.targetBitola);
+            const steelDensityKgPerM3 = 7850;
+            const radiusM = (bitolaMm / 1000) / 2;
+            const areaM2 = Math.PI * Math.pow(radiusM, 2);
+            const volumeM3 = totalProducedWeight / steelDensityKgPerM3;
+            totalProducedMeters = areaM2 > 0 ? volumeM3 / areaM2 : 0;
+        } else {
+            // Trelica: sum of packages + pontas weights
+            const packageWeight = shiftPackages.reduce((sum, pkg) => sum + (pkg.weight || 0), 0);
+            const pontasWeight = shiftPontas.reduce((sum, p) => sum + (p.totalWeight || 0), 0);
+            totalProducedWeight = packageWeight + pontasWeight;
+
+            const packageMeters = shiftPackages.reduce((sum, pkg) => sum + (pkg.quantity * parseFloat(order.tamanho || '0')), 0);
+            const pontasMeters = shiftPontas.reduce((sum, p) => sum + (p.quantity * p.size), 0);
+            totalProducedMeters = packageMeters + pontasMeters;
+        }
+
+        const totalScrapWeight = orderEndedInShift ? (order.scrapWeight || 0) : 0;
+        const scrapPercentage = (totalProducedWeight + totalScrapWeight) > 0
+            ? (totalScrapWeight / (totalProducedWeight + totalScrapWeight)) * 100
+            : 0;
 
         const report: ShiftReport = {
             id: generateId('shift'),
