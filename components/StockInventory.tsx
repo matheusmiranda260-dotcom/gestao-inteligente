@@ -273,6 +273,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                 await addInventorySession(newSession);
             }
             alert(`Você finalizou inventário de "${auditFilters.material} ${auditFilters.bitola}"`);
+            setSessionCheckedIds(new Set()); // Clear local state
             setAuditStep('select');
         } catch (error) {
             alert('Erro ao finalizar inventário.');
@@ -307,29 +308,51 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
 
                     {/* STEP 1: SELECT MATERIAL & BITOLA */}
                     {auditStep === 'select' && (
-                        <div className="space-y-8">
+                        <div className="space-y-6">
                             <div className="text-center">
-                                <h2 className="text-2xl font-black mb-2">Por onde vamos começar?</h2>
-                                <p className="text-slate-400 text-sm">Filtre o material para facilitar a contagem no pátio.</p>
+                                <h2 className="text-2xl font-black mb-1 text-white">ORDENS DE INVENTÁRIO</h2>
+                                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Selecione uma conferência liberada</p>
                             </div>
 
-                            <div className="space-y-4">
-                                {MaterialOptions.map(m => (
-                                    <div key={m} className="space-y-3">
-                                        <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4">{m}</h3>
-                                        <div className="grid grid-cols-3 gap-2">
-                                            {(m === 'Fio Máquina' ? FioMaquinaBitolaOptions : TrefilaBitolaOptions).map(b => (
-                                                <button
-                                                    key={b}
-                                                    onClick={() => startAudit(m, b)}
-                                                    className="bg-slate-800 hover:bg-slate-700 border border-slate-700 py-4 rounded-2xl font-black text-lg active:scale-95 transition-all"
-                                                >
-                                                    {b}
-                                                </button>
-                                            ))}
-                                        </div>
+                            <div className="space-y-3 pb-20">
+                                {inventorySessions.filter(s => s.status === 'open' || s.status === 're-audit').length === 0 ? (
+                                    <div className="text-center py-20 opacity-40 bg-slate-800/50 rounded-3xl border-2 border-dashed border-slate-700">
+                                        <ClockIcon className="w-16 h-16 mx-auto mb-4 text-slate-600" />
+                                        <p className="font-black text-slate-500 uppercase tracking-widest">Nenhuma Ordem Aberta</p>
+                                        <p className="text-[10px] mt-2">Aguardando comando do gestor...</p>
                                     </div>
-                                ))}
+                                ) : (
+                                    inventorySessions
+                                        .filter(s => s.status === 'open' || s.status === 're-audit')
+                                        .sort((a, b) => b.startDate.localeCompare(a.startDate))
+                                        .map(session => (
+                                            <button
+                                                key={session.id}
+                                                onClick={() => {
+                                                    setActiveSession(session);
+                                                    setAuditFilters({ material: session.materialType, bitola: session.bitola });
+                                                    setAuditStep('list');
+                                                }}
+                                                className={`w-full p-6 p-6 rounded-[2.5rem] border-2 text-left transition-all active:scale-[0.98] relative overflow-hidden ${session.status === 're-audit' ? 'bg-emerald-950/20 border-emerald-500/50 shadow-emerald-900/10 shadow-xl' : 'bg-slate-800 border-slate-700 shadow-xl shadow-black/30'}`}
+                                            >
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <div>
+                                                        <div className={`text-[9px] font-black uppercase tracking-widest mb-1 ${session.status === 're-audit' ? 'text-emerald-400' : 'text-blue-500'}`}>
+                                                            {session.status === 're-audit' ? '💡 RE-CONFERÊNCIA' : session.materialType}
+                                                        </div>
+                                                        <div className="text-3xl font-black text-white tracking-tighter">{session.bitola}</div>
+                                                    </div>
+                                                    <div className="bg-white/5 px-3 py-1.5 rounded-2xl text-[10px] font-black text-slate-400 uppercase border border-white/10">
+                                                        {session.itemsCount} Lotes
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 mt-2">
+                                                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                                                    <span>LIBERADO PARA CONTAGEM</span>
+                                                </div>
+                                            </button>
+                                        ))
+                                )}
                             </div>
                         </div>
                     )}
@@ -670,8 +693,47 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-2 text-[#0F3F5C] font-bold">
                         <ClockIcon className="h-5 w-5" />
-                        <h2>Relatórios de Inventários Finalizados</h2>
+                        <h2>Relatórios e Ciclos de Inventário</h2>
                     </div>
+                    {currentUser?.role === 'gestor' && (
+                        <button
+                            onClick={async () => {
+                                if (!confirm('Deseja iniciar um novo ciclo de inventário? Isso criará ordens de conferência para todos os produtos em estoque.')) return;
+
+                                const pairs = new Set<string>();
+                                stock.forEach(item => {
+                                    if (item.status !== 'Transferido' && item.status !== 'Consumido') {
+                                        pairs.add(`${item.materialType}|${item.bitola}`);
+                                    }
+                                });
+
+                                let createdCount = 0;
+                                for (const pair of pairs) {
+                                    const [m, b] = pair.split('|');
+                                    const exists = inventorySessions.find(s => s.materialType === m && s.bitola === b && (s.status === 'open' || s.status === 're-audit'));
+                                    if (!exists) {
+                                        const newSession: InventorySession = {
+                                            id: `INV-${Date.now()}-${createdCount}`,
+                                            materialType: m as any,
+                                            bitola: b as any,
+                                            startDate: new Date().toISOString(),
+                                            status: 'open',
+                                            operator: 'Pendente',
+                                            itemsCount: stock.filter(i => i.materialType === m && i.bitola === b && i.status !== 'Transferido' && i.status !== 'Consumido').length,
+                                            checkedCount: 0,
+                                            auditedLots: []
+                                        };
+                                        await addInventorySession(newSession);
+                                        createdCount++;
+                                    }
+                                }
+                                alert(`${createdCount} novas ordens de inventário geradas.`);
+                            }}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black px-4 py-2 rounded-lg transition-all"
+                        >
+                            INICIAR CICLO DE INVENTÁRIO
+                        </button>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
