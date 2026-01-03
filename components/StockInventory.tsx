@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { StockItem, Page, InventorySession, User } from '../types';
 import { MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions } from '../types';
-import { PrinterIcon, ArrowLeftIcon, SearchIcon, FilterIcon, CheckCircleIcon, XCircleIcon, ScaleIcon, SaveIcon, ChevronRightIcon, PlusIcon, ChatBubbleLeftRightIcon, ClockIcon, LockClosedIcon, LockOpenIcon } from './icons';
+import { PrinterIcon, ArrowLeftIcon, SearchIcon, FilterIcon, CheckCircleIcon, XCircleIcon, ScaleIcon, SaveIcon, ChevronRightIcon, PlusIcon, ChatBubbleLeftRightIcon, ClockIcon, LockClosedIcon, LockOpenIcon, ExclamationTriangleIcon, ArrowPathIcon } from './icons';
 import InventorySessionReport from './InventorySessionReport';
 
 interface StockInventoryProps {
@@ -1129,73 +1129,98 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {filteredReportStock.map((item, index) => (
-                                <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="px-6 py-4">
-                                        <div className="font-black text-slate-800 text-base">{item.internalLot}</div>
-                                        <div className="text-[10px] text-slate-400 font-bold uppercase">{item.supplierLot}</div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="text-slate-700 font-semibold truncate max-w-[200px]">{item.supplier}</div>
-                                        <div className="text-[10px] text-slate-400">NF: {item.nfe}</div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="text-slate-800 font-black">{item.materialType}</div>
-                                        <div className="text-blue-600 font-black text-lg">{item.bitola}</div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <span className={`px-3 py-1 rounded-lg text-xs font-black whitespace-nowrap ${item.location ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
-                                            {item.location || 'NÃO MAPEADO'}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <div className="text-lg font-black text-[#0F3F5C]">{item.remainingQuantity.toLocaleString('pt-BR')}</div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        {item.auditObservation ? (
-                                            <div className="flex items-start gap-2 bg-blue-50 p-2 rounded-lg border border-blue-100 max-w-[250px]">
-                                                <ChatBubbleLeftRightIcon className="w-4 h-4 text-blue-500 mt-1 shrink-0" />
-                                                <span className="text-xs text-blue-800 font-medium">{item.auditObservation}</span>
-                                            </div>
-                                        ) : (
-                                            <span className="text-slate-300 italic text-xs">Sem observações</span>
-                                        )}
-                                    </td>
-                                    <td className="px-6 py-4 text-center">
-                                        <span className="text-[10px] font-black uppercase px-2 py-1 rounded-md border border-slate-200">
-                                            {item.status}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 bg-[#fff7ed]/30 no-print text-center">
-                                        {(() => {
-                                            const isCheckedInSession = sessionCheckedIds.has(item.id);
-                                            const needsReAudit = inventorySessions.some(s => s.materialType === item.materialType && s.bitola === item.bitola && s.status === 're-audit');
+                            {filteredReportStock.map((item, index) => {
+                                const lastAuditEntry = item.history?.filter(h => h.type.includes('Inventário')).sort((a, b) => b.date.localeCompare(a.date))[0];
+                                const weightDiff = lastAuditEntry ? parseFloat(String(lastAuditEntry.details['Diferença'] || '0')) : 0;
+                                const hasSignificantDiff = Math.abs(weightDiff) > 0.1;
+                                const hasObservation = !!item.auditObservation;
+                                const isCritical = hasSignificantDiff || hasObservation;
 
-                                            if (isCheckedInSession || item.lastAuditDate) {
-                                                return (
-                                                    <div className="flex flex-col items-center">
-                                                        {needsReAudit && !isCheckedInSession ? (
-                                                            <>
-                                                                <XCircleIcon className="h-6 w-6 text-amber-500 mb-0.5 animate-pulse" />
-                                                                <span className="text-[10px] font-black text-amber-700 uppercase">Re-conferir</span>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <CheckCircleIcon className="h-6 w-6 text-emerald-600 mb-0.5" />
-                                                                <span className="text-[10px] font-black text-emerald-700 uppercase">OK</span>
-                                                            </>
-                                                        )}
-                                                        <span className="text-[9px] text-slate-500 font-bold leading-none">
-                                                            {new Date(item.lastAuditDate || new Date()).toLocaleDateString('pt-BR')}
-                                                        </span>
-                                                    </div>
-                                                );
-                                            }
-                                            return <span className="text-slate-300 font-bold">-</span>;
-                                        })()}
-                                    </td>
-                                </tr>
-                            ))}
+                                return (
+                                    <tr key={item.id} className={`hover:bg-slate-50 transition-colors ${isCritical ? 'bg-rose-50/50' : ''}`}>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-3">
+                                                {isCritical && (
+                                                    <div className="flex-shrink-0 w-2 h-10 bg-rose-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(244,63,94,0.4)]" title="Atenção: Inconsistência Detectada" />
+                                                )}
+                                                <div>
+                                                    <div className="font-black text-slate-800 text-base">{item.internalLot}</div>
+                                                    <div className="text-[10px] text-slate-400 font-bold uppercase">{item.supplierLot}</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="text-slate-700 font-semibold truncate max-w-[200px]">{item.supplier}</div>
+                                            <div className="text-[10px] text-slate-400">NF: {item.nfe}</div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="text-slate-800 font-black">{item.materialType}</div>
+                                            <div className="text-blue-600 font-black text-lg">{item.bitola}</div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className={`px-3 py-1 rounded-lg text-xs font-black whitespace-nowrap ${item.location ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
+                                                {item.location || 'NÃO MAPEADO'}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="text-lg font-black text-[#0F3F5C]">{item.remainingQuantity.toLocaleString('pt-BR')}</div>
+                                            {hasSignificantDiff && (
+                                                <div className={`text-[10px] font-black uppercase ${weightDiff > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                    {weightDiff > 0 ? '+' : ''}{weightDiff.toFixed(2)} kg
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {item.auditObservation ? (
+                                                <div className="flex items-start gap-2 bg-rose-100 p-2 rounded-lg border border-rose-200 max-w-[250px] shadow-sm">
+                                                    <ExclamationTriangleIcon className="w-4 h-4 text-rose-600 mt-1 shrink-0" />
+                                                    <span className="text-xs text-rose-900 font-bold">{item.auditObservation}</span>
+                                                </div>
+                                            ) : (
+                                                <span className="text-slate-300 italic text-xs">Sem observações</span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            <span className="text-[10px] font-black uppercase px-2 py-1 rounded-md border border-slate-200">
+                                                {item.status}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 bg-[#fff7ed]/30 no-print text-center">
+                                            {(() => {
+                                                const isCheckedInSession = sessionCheckedIds.has(item.id);
+                                                const needsReAudit = inventorySessions.some(s => s.materialType === item.materialType && s.bitola === item.bitola && s.status === 're-audit');
+
+                                                if (isCheckedInSession || item.lastAuditDate) {
+                                                    return (
+                                                        <div className="flex flex-col items-center">
+                                                            {needsReAudit && !isCheckedInSession ? (
+                                                                <>
+                                                                    <ArrowPathIcon className="h-6 w-6 text-amber-500 mb-0.5 animate-spin-slow" />
+                                                                    <span className="text-[10px] font-black text-amber-700 uppercase">Re-conferir</span>
+                                                                </>
+                                                            ) : isCritical ? (
+                                                                <>
+                                                                    <ExclamationTriangleIcon className="h-6 w-6 text-rose-600 mb-0.5" />
+                                                                    <span className="text-[10px] font-black text-rose-700 uppercase">Divergente</span>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <CheckCircleIcon className="h-6 w-6 text-emerald-600 mb-0.5" />
+                                                                    <span className="text-[10px] font-black text-emerald-700 uppercase">OK</span>
+                                                                </>
+                                                            )}
+                                                            <span className="text-[9px] text-slate-500 font-bold leading-none">
+                                                                {new Date(item.lastAuditDate || new Date()).toLocaleDateString('pt-BR')}
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                }
+                                                return <span className="text-slate-300 font-bold">-</span>;
+                                            })()}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>
