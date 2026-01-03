@@ -12,12 +12,13 @@ interface StockInventoryProps {
     inventorySessions: InventorySession[];
     addInventorySession: (session: InventorySession) => Promise<void>;
     updateInventorySession: (id: string, updates: Partial<InventorySession>) => Promise<void>;
+    deleteInventorySession: (id: string) => Promise<void>;
     currentUser: User | null;
 }
 
 type AuditStep = 'select' | 'list' | 'confirm' | 'quick-add';
 
-const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateStockItem, addStockItem, inventorySessions, addInventorySession, updateInventorySession, currentUser }) => {
+const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateStockItem, addStockItem, inventorySessions, addInventorySession, updateInventorySession, deleteInventorySession, currentUser }) => {
     const [mode, setMode] = useState<'report' | 'audit'>('report');
     const [reportFilters, setReportFilters] = useState({
         searchTerm: '',
@@ -760,9 +761,31 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-2 text-xs text-slate-500 mb-4">
-                                    <ClockIcon className="w-3.5 h-3.5" />
-                                    <span>{session.status === 're-audit' ? 'Liberado para re-auditoria' : `Finalizado em: ${new Date(session.endDate || '').toLocaleDateString('pt-BR')} às ${new Date(session.endDate || '').toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}</span>
+                                <div className="flex justify-between items-start mb-4 text-xs text-slate-500">
+                                    <div className="flex items-center gap-2">
+                                        <ClockIcon className="w-3.5 h-3.5" />
+                                        <span>
+                                            {session.status === 'open'
+                                                ? `Iniciado em: ${new Date(session.startDate).toLocaleDateString('pt-BR')}`
+                                                : session.status === 're-audit'
+                                                    ? 'Liberado para re-auditoria'
+                                                    : `Finalizado em: ${new Date(session.endDate || session.startDate).toLocaleDateString('pt-BR')} às ${new Date(session.endDate || session.startDate).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+                                            }
+                                        </span>
+                                    </div>
+                                    {currentUser?.role === 'gestor' && (
+                                        <button
+                                            onClick={() => {
+                                                if (confirm('Tem certeza que deseja apagar este relatório de inventário?')) {
+                                                    deleteInventorySession(session.id);
+                                                }
+                                            }}
+                                            className="text-rose-400 hover:text-rose-600 p-1 rounded-full hover:bg-rose-50 transition-colors"
+                                            title="Excluir Relatório"
+                                        >
+                                            <XCircleIcon className="w-5 h-5" />
+                                        </button>
+                                    )}
                                 </div>
 
                                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
