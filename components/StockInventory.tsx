@@ -462,9 +462,9 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
 
             alert('Estoque atualizado com sucesso conforme o relatório aprovado!');
             setApprovingSession(null);
-        } catch (error) {
-            console.error(error);
-            alert('Erro ao aplicar algumas alterações no estoque. Verifique os logs.');
+        } catch (error: any) {
+            console.error('Error applying changes:', error);
+            alert(`Erro ao aplicar alterações: ${error.message || 'Erro desconhecido'}`);
         } finally {
             setIsSaving(false);
         }
@@ -1137,19 +1137,22 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                                             <ExclamationTriangleIcon className="w-3.5 h-3.5" />
                                                         </button>
                                                     )}
-                                                    {session.status === 'completed' && !session.appliedToStock && currentUser?.role === 'gestor' && (
-                                                        <button
-                                                            onClick={() => setApprovingSession(session)}
-                                                            className="flex-1 bg-emerald-600 text-white py-1.5 rounded-lg text-[9px] font-black hover:bg-emerald-700 transition-all shadow-md shadow-emerald-200"
-                                                        >
-                                                            APLICAR NO ESTOQUE
-                                                        </button>
-                                                    )}
-                                                    {session.appliedToStock && (
+                                                    {session.appliedToStock ? (
                                                         <div className="flex-1 bg-emerald-50 text-emerald-600 border border-emerald-100 py-1.5 rounded-lg text-[9px] font-black flex items-center justify-center gap-1 cursor-default">
                                                             <CheckCircleIcon className="w-3 h-3" />
                                                             CONCLUÍDO
                                                         </div>
+                                                    ) : (
+                                                        <>
+                                                            {session.status === 'completed' && currentUser?.role === 'gestor' && (
+                                                                <button
+                                                                    onClick={() => setApprovingSession(session)}
+                                                                    className="flex-1 bg-emerald-600 text-white py-1.5 rounded-lg text-[9px] font-black hover:bg-emerald-700 transition-all shadow-md shadow-emerald-200"
+                                                                >
+                                                                    APLICAR NO ESTOQUE
+                                                                </button>
+                                                            )}
+                                                        </>
                                                     )}
                                                     {session.status === 'completed' && !session.appliedToStock && (
                                                         <button
