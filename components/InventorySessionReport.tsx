@@ -118,8 +118,15 @@ const InventorySessionReport: React.FC<InventorySessionReportProps> = ({ session
                                                     )}
                                                 </td>
                                                 <td className="px-2 py-2 italic text-slate-700">
-                                                    {isExtra && <span className="text-amber-800 font-black not-italic text-[10px] block mb-1">⚠️ VERIFICAÇÃO NECESSÁRIA: Lote encontrado no físico porém não estava no sistema.</span>}
-                                                    {lot.observation || '-'}
+                                                    {isExtra && <span className="text-amber-800 font-black not-italic text-[10px] block mb-1 uppercase tracking-tighter">⚠️ VERIFICAÇÃO NECESSÁRIA: Lote encontrado no físico porém não estava no sistema.</span>}
+                                                    {lot.observation ? (
+                                                        <div className="flex items-start gap-1.5 bg-rose-50 p-1.5 rounded border border-rose-100">
+                                                            <ChatBubbleLeftRightIcon className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
+                                                            <span className="text-rose-900 font-bold not-italic text-[11px]">{lot.observation}</span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-slate-300">-</span>
+                                                    )}
                                                 </td>
                                             </tr>
                                         );

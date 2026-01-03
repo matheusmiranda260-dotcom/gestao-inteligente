@@ -847,6 +847,15 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                     <div className="flex items-center gap-2 text-[#0F3F5C] font-bold">
                         <ClockIcon className="h-5 w-5" />
                         <h2>Relatórios e Ciclos de Inventário</h2>
+                        {(() => {
+                            const divergentCount = inventorySessions.filter(s => s.auditedLots.some(lot => Math.abs(lot.systemWeight - lot.physicalWeight) > 0.1 || lot.observation)).length;
+                            return divergentCount > 0 && (
+                                <span className="flex items-center gap-1.5 px-3 py-1 bg-rose-100 text-rose-600 rounded-full text-[10px] font-black animate-bounce shadow-sm">
+                                    <ExclamationTriangleIcon className="w-3.5 h-3.5" />
+                                    {divergentCount} {divergentCount === 1 ? 'DIVERGÊNCIA' : 'DIVERGÊNCIAS'}
+                                </span>
+                            );
+                        })()}
                     </div>
                     {currentUser?.role === 'gestor' && (
                         <div className="flex gap-2">
@@ -994,18 +1003,29 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                                     <h4 className="text-lg font-black text-slate-800 tracking-tighter leading-none">{session.bitola}</h4>
                                                     <span className="text-[8px] font-bold text-slate-400 uppercase">{session.itemsCount} {session.itemsCount === 1 ? 'LOTE' : 'LOTES'}</span>
                                                 </div>
-                                                {currentUser?.role === 'gestor' && (
-                                                    <button
-                                                        onClick={() => {
-                                                            if (confirm('Tem certeza que deseja apagar este relatório de inventário?')) {
-                                                                deleteInventorySession(session.id);
-                                                            }
-                                                        }}
-                                                        className="text-slate-300 hover:text-rose-500 transition-colors p-1"
-                                                    >
-                                                        <XCircleIcon className="w-4 h-4" />
-                                                    </button>
-                                                )}
+                                                <div className="flex items-center gap-1.5">
+                                                    {session.auditedLots.some(lot => Math.abs(lot.systemWeight - lot.physicalWeight) > 0.1 || lot.observation) && (
+                                                        <div
+                                                            className="flex items-center gap-1 px-1.5 py-0.5 bg-rose-500 text-white rounded-md animate-pulse shadow-sm cursor-help"
+                                                            title="ESTA CONFERÊNCIA POSSUI DIVERGÊNCIAS (PESO OU OBSERVAÇÕES)"
+                                                        >
+                                                            <ExclamationTriangleIcon className="w-3 h-3" />
+                                                            <span className="text-[7px] font-black">ALERTA</span>
+                                                        </div>
+                                                    )}
+                                                    {currentUser?.role === 'gestor' && (
+                                                        <button
+                                                            onClick={() => {
+                                                                if (confirm('Tem certeza que deseja apagar este relatório de inventário?')) {
+                                                                    deleteInventorySession(session.id);
+                                                                }
+                                                            }}
+                                                            className="text-slate-300 hover:text-rose-500 transition-colors p-1"
+                                                        >
+                                                            <XCircleIcon className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
 
                                             <div className="space-y-1.5 mt-auto">
@@ -1031,6 +1051,15 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                                     >
                                                         IMPRIMIR
                                                     </button>
+                                                    {session.auditedLots.some(lot => Math.abs(lot.systemWeight - lot.physicalWeight) > 0.1 || lot.observation) && (
+                                                        <button
+                                                            onClick={() => setSelectedSessionForReport(session)}
+                                                            className="px-2 bg-rose-600 text-white rounded-lg animate-pulse hover:bg-rose-700 transition-all shadow-md flex items-center justify-center"
+                                                            title="DIVERGÊNCIA DETECTADA: CLIQUE PARA VER"
+                                                        >
+                                                            <ExclamationTriangleIcon className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
                                                     {session.status === 'completed' && (
                                                         <button
                                                             onClick={() => {
