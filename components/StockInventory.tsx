@@ -48,6 +48,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
 
     // Session state to track what was checked in this audit
     const [sessionCheckedIds, setSessionCheckedIds] = useState<Set<string>>(new Set());
+    const [sessionAuditData, setSessionAuditData] = useState<Map<string, { systemWeight: number, physicalWeight: number, observation: string | null }>>(new Map());
 
     const [auditHistory, setAuditHistory] = useState<{ lot: string, status: 'ok' | 'diff', diff: number }[]>([]);
     const auditInputRef = useRef<HTMLInputElement>(null);
@@ -162,6 +163,15 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                 history: [...(selectedLot.history || []), historyEntry]
             });
 
+            setSessionAuditData(prev => {
+                const next = new Map(prev);
+                next.set(selectedLot.id, {
+                    systemWeight: selectedLot.remainingQuantity,
+                    physicalWeight: newWeight,
+                    observation: auditObservation || null
+                });
+                return next;
+            });
             setSessionCheckedIds(prev => new Set(prev).add(selectedLot.id));
 
             setAuditHistory(prev => [{
@@ -216,6 +226,15 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
 
             const saved = await addStockItem(newItem);
             if (saved) {
+                setSessionAuditData(prev => {
+                    const next = new Map(prev);
+                    next.set(saved.id, {
+                        systemWeight: 0,
+                        physicalWeight: parseFloat(quickAddData.weight),
+                        observation: quickAddData.observation || 'Lote cadastrado rapidamente via Mobile'
+                    });
+                    return next;
+                });
                 setSessionCheckedIds(prev => new Set(prev).add(saved.id));
             } else {
                 setSessionCheckedIds(prev => new Set(prev).add(newItem.id));
@@ -240,16 +259,17 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
 
         setIsSaving(true);
         try {
-            // Include ONLY lots checked in THIS session
-            const auditedLots = auditPool
-                .filter(item => sessionCheckedIds.has(item.id))
-                .map(item => ({
-                    lotId: item.id,
-                    internalLot: item.internalLot,
-                    systemWeight: item.supplier === 'CADASTRADO NO INVENTÁRIO' ? 0 : item.remainingQuantity,
-                    physicalWeight: item.remainingQuantity,
-                    observation: item.auditObservation
-                }));
+            // Include ONLY lots checked in THIS session using sessionAuditData for accuracy
+            const auditedLots = Array.from(sessionAuditData.entries()).map(([lotId, data]) => {
+                const lot = stock.find(s => s.id === lotId);
+                return {
+                    lotId,
+                    internalLot: lot?.internalLot || '?',
+                    systemWeight: data.systemWeight,
+                    physicalWeight: data.physicalWeight,
+                    observation: data.observation
+                };
+            });
 
             // If there's an existing open or re-audit session for this, we update it instead of creating new?
             // For simplicity, let's just mark the old one as completed if we found it.
@@ -275,6 +295,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
             }
             alert(`Você finalizou inventário de "${auditFilters.material} ${auditFilters.bitola}"`);
             setSessionCheckedIds(new Set()); // Clear local state
+            setSessionAuditData(new Map()); // Clear local state
             setAuditStep('select');
         } catch (error) {
             alert('Erro ao finalizar inventário.');

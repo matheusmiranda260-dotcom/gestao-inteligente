@@ -491,9 +491,36 @@ const App: React.FC = () => {
 
     const deleteInventorySession = async (id: string) => {
         try {
+            const session = inventorySessions.find(s => s.id === id);
+            if (session && session.auditedLots && session.auditedLots.length > 0) {
+                for (const audited of session.auditedLots) {
+                    const lot = stock.find(s => s.id === audited.lotId);
+                    if (!lot) continue;
+
+                    if (audited.systemWeight === 0 && lot.supplier === 'CADASTRADO NO INVENTÁRIO') {
+                        // It was a quick-add lot, delete it
+                        await deleteItem('stock_items', audited.lotId);
+                    } else {
+                        // Revert weight and clear audit info
+                        await updateItem<StockItem>('stock_items', audited.lotId, {
+                            remainingQuantity: audited.systemWeight,
+                            lastAuditDate: null,
+                            auditObservation: null
+                        });
+                    }
+                }
+                // Refresh stock state after many potential changes
+                const updatedStock = await fetchTable<StockItem>('stock_items');
+                setStock(updatedStock);
+            }
+
             await deleteItem('inventory_sessions', id);
             setInventorySessions(prev => prev.filter(s => s.id !== id));
-        } catch (error) { showNotification('Erro ao excluir sessão de inventário.', 'error'); }
+            showNotification('Inventário removido e alterações revertidas.', 'success');
+        } catch (error) {
+            console.error(error);
+            showNotification('Erro ao excluir sessão de inventário.', 'error');
+        }
     };
 
     const createTransfer = async (destinationSector: string, lotsToTransfer: Map<string, number>): Promise<TransferRecord | null> => {
