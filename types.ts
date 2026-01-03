@@ -92,6 +92,7 @@ export interface StockItem {
     productionOrderIds?: string[];
     location?: string | null;
     lastAuditDate?: string | null;
+    auditObservation?: string | null;
 }
 
 export interface ConferenceLotData {
@@ -432,6 +433,25 @@ export interface EmployeeDocument {
     type: string;
     url: string;
     createdAt: string;
+}
+
+export interface InventorySession {
+    id: string;
+    materialType: MaterialType;
+    bitola: Bitola;
+    startDate: string;
+    endDate?: string | null;
+    status: 'open' | 'completed';
+    operator: string;
+    itemsCount: number;
+    checkedCount: number;
+    auditedLots: {
+        lotId: string;
+        internalLot: string;
+        systemWeight: number;
+        physicalWeight: number;
+        observation?: string | null;
+    }[];
 }
 
 export interface RowConfig {

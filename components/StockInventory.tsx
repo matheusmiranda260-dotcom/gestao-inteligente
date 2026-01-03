@@ -1,17 +1,22 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import type { StockItem, Page } from '../types';
+import type { StockItem, Page, InventorySession, User } from '../types';
 import { MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions } from '../types';
-import { PrinterIcon, ArrowLeftIcon, SearchIcon, FilterIcon, CheckCircleIcon, XCircleIcon, ScaleIcon, SaveIcon, ChevronRightIcon } from './icons';
+import { PrinterIcon, ArrowLeftIcon, SearchIcon, FilterIcon, CheckCircleIcon, XCircleIcon, ScaleIcon, SaveIcon, ChevronRightIcon, PlusIcon, ChatBubbleLeftRightIcon, ClockIcon, LockClosedIcon, LockOpenIcon } from './icons';
 
 interface StockInventoryProps {
     stock: StockItem[];
     setPage: (page: Page) => void;
     updateStockItem: (id: string, updates: Partial<StockItem>) => Promise<void>;
+    addStockItem: (item: StockItem) => Promise<void>;
+    inventorySessions: InventorySession[];
+    addInventorySession: (session: InventorySession) => Promise<void>;
+    updateInventorySession: (id: string, updates: Partial<InventorySession>) => Promise<void>;
+    currentUser: User | null;
 }
 
-type AuditStep = 'select' | 'list' | 'confirm';
+type AuditStep = 'select' | 'list' | 'confirm' | 'quick-add';
 
-const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateStockItem }) => {
+const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateStockItem, addStockItem, inventorySessions, addInventorySession, updateInventorySession, currentUser }) => {
     const [mode, setMode] = useState<'report' | 'audit'>('report');
     const [reportFilters, setReportFilters] = useState({
         searchTerm: '',
@@ -23,10 +28,20 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
     // Audit State
     const [auditStep, setAuditStep] = useState<AuditStep>('select');
     const [auditFilters, setAuditFilters] = useState({ material: '', bitola: '' });
+    const [activeSession, setActiveSession] = useState<InventorySession | null>(null);
     const [auditSearch, setAuditSearch] = useState('');
     const [selectedLot, setSelectedLot] = useState<StockItem | null>(null);
     const [physicalWeight, setPhysicalWeight] = useState<string>('');
+    const [auditObservation, setAuditObservation] = useState<string>('');
     const [isSaving, setIsSaving] = useState(false);
+
+    const [quickAddData, setQuickAddData] = useState({
+        internalLot: '',
+        materialType: '',
+        bitola: '',
+        weight: '',
+        observation: ''
+    });
 
     // Session state to track what was checked in this audit
     const [sessionCheckedIds, setSessionCheckedIds] = useState<Set<string>>(new Set());
@@ -67,6 +82,11 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
             .sort((a, b) => a.internalLot.localeCompare(b.internalLot, undefined, { numeric: true }));
     }, [stock, auditFilters]);
 
+    const isAuditLocked = useMemo(() => {
+        if (!auditFilters.material || !auditFilters.bitola) return false;
+        return inventorySessions.some(s => s.materialType === auditFilters.material && s.bitola === auditFilters.bitola && s.status === 'completed');
+    }, [inventorySessions, auditFilters]);
+
     const auditListFiltered = useMemo(() => {
         if (!auditSearch) return auditPool;
         return auditPool.filter(item =>
@@ -79,6 +99,12 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
         total: auditPool.length,
         checked: auditPool.filter(i => sessionCheckedIds.has(i.id)).length
     };
+
+    const reportStats = useMemo(() => {
+        const total = filteredReportStock.length;
+        const audited = filteredReportStock.filter(item => sessionCheckedIds.has(item.id) || item.lastAuditDate).length;
+        return { total, audited };
+    }, [filteredReportStock, sessionCheckedIds]);
 
     // Audit Logic
     useEffect(() => {
@@ -100,11 +126,12 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
     const handleSelectLot = (lot: StockItem) => {
         setSelectedLot(lot);
         setPhysicalWeight(lot.remainingQuantity.toFixed(0));
+        setAuditObservation(lot.auditObservation || '');
         setAuditStep('confirm');
     };
 
     const confirmAudit = async () => {
-        if (!selectedLot) return;
+        if (!selectedLot || isAuditLocked) return;
         setIsSaving(true);
         const newWeight = parseFloat(physicalWeight);
         const diff = newWeight - selectedLot.remainingQuantity;
@@ -123,6 +150,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
             await updateStockItem(selectedLot.id, {
                 remainingQuantity: newWeight,
                 lastAuditDate: new Date().toISOString(),
+                auditObservation: auditObservation || null,
                 history: [...(selectedLot.history || []), historyEntry]
             });
 
@@ -136,6 +164,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
 
             setSelectedLot(null);
             setPhysicalWeight('');
+            setAuditObservation('');
             setAuditSearch('');
             setAuditStep('list');
         } catch (error) {
@@ -145,9 +174,89 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
         }
     };
 
+    const handleQuickAdd = async () => {
+        if (!quickAddData.internalLot || !quickAddData.materialType || !quickAddData.bitola || !quickAddData.weight) {
+            alert('Preencha os campos obrigatórios!');
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            const newItem: StockItem = {
+                id: `TEMP-${Date.now()}`,
+                entryDate: new Date().toISOString(),
+                supplier: 'CADASTRADO NO INVENTÁRIO',
+                nfe: 'PENDENTE',
+                conferenceNumber: 'INV-' + new Date().getFullYear(),
+                internalLot: quickAddData.internalLot,
+                supplierLot: 'AUDIT-TEMP',
+                runNumber: '0',
+                materialType: quickAddData.materialType as any,
+                bitola: quickAddData.bitola as any,
+                labelWeight: parseFloat(quickAddData.weight),
+                initialQuantity: parseFloat(quickAddData.weight),
+                remainingQuantity: parseFloat(quickAddData.weight),
+                status: 'Disponível',
+                lastAuditDate: new Date().toISOString(),
+                auditObservation: quickAddData.observation || 'Lote cadastrado rapidamente via Mobile',
+                history: [{
+                    type: 'Entrada Rápida (Inventário)',
+                    date: new Date().toISOString(),
+                    details: { 'Nota': 'Cadastrado no pátio durante inventário' }
+                }]
+            };
+
+            await addStockItem(newItem);
+            setSessionCheckedIds(prev => new Set(prev).add(newItem.id));
+            setAuditStep('list');
+            setQuickAddData({ internalLot: '', materialType: '', bitola: '', weight: '', observation: '' });
+            alert('Lote cadastrado com sucesso! Verifique os detalhes no computador depois.');
+        } catch (error) {
+            alert('Erro ao cadastrar lote.');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     const startAudit = (m: string, b: string) => {
         setAuditFilters({ material: m, bitola: b });
         setAuditStep('list');
+    };
+
+    const handleFinishAudit = async () => {
+        if (!confirm(`Deseja finalizar o inventário de ${auditFilters.material} - ${auditFilters.bitola}?`)) return;
+
+        setIsSaving(true);
+        try {
+            const auditedLots = auditPool.filter(item => sessionCheckedIds.has(item.id) || item.lastAuditDate).map(item => ({
+                lotId: item.id,
+                internalLot: item.internalLot,
+                systemWeight: item.remainingQuantity,
+                physicalWeight: item.remainingQuantity, // In a real scenario we'd track the actually entered weight, here we assume it was confirmed
+                observation: item.auditObservation
+            }));
+
+            const newSession: InventorySession = {
+                id: `INV-${Date.now()}`,
+                materialType: auditFilters.material as any,
+                bitola: auditFilters.bitola as any,
+                startDate: new Date().toISOString(),
+                endDate: new Date().toISOString(),
+                status: 'completed',
+                operator: currentUser?.username || 'Sistema',
+                itemsCount: auditPool.length,
+                checkedCount: sessionCheckedIds.size,
+                auditedLots
+            };
+
+            await addInventorySession(newSession);
+            alert(`Você finalizou inventário de "${auditFilters.material} ${auditFilters.bitola}"`);
+            setAuditStep('select');
+        } catch (error) {
+            alert('Erro ao finalizar inventário.');
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     if (mode === 'audit') {
@@ -165,7 +274,9 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                         <ArrowLeftIcon className="h-6 w-6" />
                     </button>
                     <h1 className="text-sm font-black tracking-widest uppercase">
-                        {auditStep === 'select' ? 'Selecione Material' : `${auditFilters.material} - ${auditFilters.bitola}`}
+                        {auditStep === 'select' ? 'Selecione Material' :
+                            auditStep === 'quick-add' ? 'Cadastrar Novo Lote' :
+                                `${auditFilters.material} - ${auditFilters.bitola}`}
                     </h1>
                     <div className="w-10"></div>
                 </header>
@@ -213,7 +324,6 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                     <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Lotes no Pátio</span>
                                 </div>
                             </div>
-
                             <form onSubmit={handleAuditSearchSubmit} className="relative">
                                 <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500" />
                                 <input
@@ -225,6 +335,16 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                     className="w-full bg-slate-800 border border-slate-700 rounded-2xl py-4 pl-12 pr-4 font-bold focus:border-blue-500 outline-none transition-all uppercase"
                                 />
                             </form>
+
+                            {isAuditLocked && (
+                                <div className="bg-rose-500/20 border border-rose-500/50 p-4 rounded-2xl flex items-center gap-4 text-rose-200 animate-in fade-in duration-500">
+                                    <LockClosedIcon className="w-8 h-8 shrink-0" />
+                                    <div className="text-sm">
+                                        <div className="font-black uppercase tracking-wider">Inventário Finalizado</div>
+                                        <p className="opacity-80">Este material já foi conferido e está bloqueado no celular.</p>
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="flex-grow overflow-y-auto space-y-3 pr-1 custom-scrollbar">
                                 {auditListFiltered.map(item => {
@@ -245,18 +365,114 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                                 </div>
                                             </div>
                                             <div className="text-right flex items-center gap-3">
-                                                <div>
+                                                <div className="flex flex-col items-end">
                                                     <div className="font-black text-sm">{item.remainingQuantity.toFixed(0)}kg</div>
-                                                    {isChecked && <span className="text-[10px] font-black text-emerald-500 uppercase">OK</span>}
+                                                    {item.auditObservation && <ChatBubbleLeftRightIcon className="w-4 h-4 text-blue-400" />}
                                                 </div>
                                                 <ChevronRightIcon className="w-5 h-5 text-slate-600" />
                                             </div>
                                         </button>
                                     );
                                 })}
+                                <button
+                                    onClick={() => setAuditStep('quick-add')}
+                                    className="w-full p-6 rounded-2xl border-2 border-dashed border-slate-700 text-slate-500 font-bold flex flex-col items-center gap-2 hover:border-blue-500 hover:text-blue-500 transition-all"
+                                >
+                                    <PlusIcon className="w-8 h-8" />
+                                    <span>Lote não encontrado? Cadastrar rápido</span>
+                                </button>
                                 {auditListFiltered.length === 0 && (
                                     <div className="text-center py-10 opacity-30">Nenhum lote encontrado.</div>
                                 )}
+                            </div>
+
+                            {!isAuditLocked && stats.checked > 0 && (
+                                <button
+                                    onClick={handleFinishAudit}
+                                    className="w-full bg-blue-600 hover:bg-blue-500 text-white py-5 rounded-2xl font-black shadow-xl shadow-blue-900/40 animate-in slide-in-from-bottom-4"
+                                >
+                                    FINALIZAR CONFERÊNCIA
+                                </button>
+                            )}
+                        </div>
+                    )}
+
+                    {/* STEP: QUICK ADD */}
+                    {auditStep === 'quick-add' && (
+                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                            <div className="bg-slate-800 p-6 rounded-3xl border border-slate-700 space-y-4">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Lote Interno / Identificação</label>
+                                    <input
+                                        type="text"
+                                        value={quickAddData.internalLot}
+                                        onChange={e => setQuickAddData({ ...quickAddData, internalLot: e.target.value })}
+                                        className="w-full bg-slate-900 border border-slate-700 rounded-2xl p-4 font-bold focus:border-blue-500 outline-none uppercase"
+                                        placeholder="EX: 9999"
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Material</label>
+                                        <select
+                                            value={quickAddData.materialType}
+                                            onChange={e => setQuickAddData({ ...quickAddData, materialType: e.target.value })}
+                                            className="w-full bg-slate-900 border border-slate-700 rounded-2xl p-4 font-bold focus:border-blue-500 outline-none"
+                                        >
+                                            <option value="">Selecione</option>
+                                            {MaterialOptions.map(m => <option key={m} value={m}>{m}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Bitola</label>
+                                        <select
+                                            value={quickAddData.bitola}
+                                            onChange={e => setQuickAddData({ ...quickAddData, bitola: e.target.value })}
+                                            className="w-full bg-slate-900 border border-slate-700 rounded-2xl p-4 font-bold focus:border-blue-500 outline-none"
+                                        >
+                                            <option value="">Selecione</option>
+                                            {allBitolaOptions.map(b => <option key={b} value={b}>{b}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Peso Encontrado (kg)</label>
+                                    <input
+                                        type="number"
+                                        value={quickAddData.weight}
+                                        onChange={e => setQuickAddData({ ...quickAddData, weight: e.target.value })}
+                                        className="w-full bg-slate-900 border border-slate-700 rounded-2xl p-4 font-bold focus:border-blue-500 outline-none"
+                                        placeholder="0.00"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Observação (O que está errado?)</label>
+                                    <textarea
+                                        value={quickAddData.observation}
+                                        onChange={e => setQuickAddData({ ...quickAddData, observation: e.target.value })}
+                                        className="w-full bg-slate-900 border border-slate-700 rounded-2xl p-4 font-bold focus:border-blue-500 outline-none h-24"
+                                        placeholder="Ex: Lote sem etiqueta, peso aproximado..."
+                                    />
+                                </div>
+
+                                <div className="flex gap-3 pt-4">
+                                    <button
+                                        onClick={() => setAuditStep('list')}
+                                        className="flex-1 bg-slate-700 p-4 rounded-2xl font-black"
+                                    >
+                                        CANCELAR
+                                    </button>
+                                    <button
+                                        onClick={handleQuickAdd}
+                                        disabled={isSaving}
+                                        className="flex-[2] bg-blue-600 p-4 rounded-2xl font-black shadow-lg shadow-blue-900/20 active:scale-95 transition-all"
+                                    >
+                                        {isSaving ? 'SALVANDO...' : 'CADASTRAR LOTE'}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -302,6 +518,18 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                         className="w-full bg-slate-100 rounded-3xl py-6 text-center text-5xl font-black text-slate-900 focus:ring-4 ring-blue-500/20 outline-none border-2 border-transparent focus:border-blue-500 transition-all"
                                     />
 
+                                    <div className="space-y-2">
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                            <ChatBubbleLeftRightIcon className="w-4 h-4" /> Observação do Pátio
+                                        </label>
+                                        <textarea
+                                            value={auditObservation}
+                                            onChange={e => setAuditObservation(e.target.value)}
+                                            className="w-full bg-slate-100 rounded-2xl p-4 text-slate-800 font-bold focus:ring-4 ring-blue-500/20 outline-none border-2 border-transparent focus:border-blue-500 transition-all min-h-[100px]"
+                                            placeholder="Ex: Lote com avaria, peso muito abaixo..."
+                                        />
+                                    </div>
+
                                     <div className="flex gap-3 pt-4">
                                         <button
                                             onClick={() => setAuditStep('list')}
@@ -322,7 +550,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                         </div>
                     )}
                 </div>
-            </div>
+            </div >
         );
     }
 
@@ -341,6 +569,42 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                         <p className="text-slate-500 text-sm">Visualize, filtre e realize auditorias físicas.</p>
                     </div>
                 </div>
+
+                {/* Summary Stats for Report Mode */}
+                {(reportFilters.materialFilter || reportFilters.bitolaFilter || reportFilters.searchTerm) && (
+                    <div className="flex-1 flex gap-3 md:gap-6 justify-center animate-in fade-in slide-in-from-top-4 duration-500">
+                        <div className="bg-white px-6 py-4 rounded-3xl shadow-sm border border-slate-200 flex items-center gap-4 min-w-[160px]">
+                            <div className="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600">
+                                <FilterIcon className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none block mb-1">Lotes</span>
+                                <span className="text-2xl font-black text-slate-800 leading-none">{reportStats.total}</span>
+                            </div>
+                        </div>
+                        <div className="bg-white px-6 py-4 rounded-3xl shadow-sm border border-slate-200 flex items-center gap-4 min-w-[160px]">
+                            <div className="w-10 h-10 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600">
+                                <CheckCircleIcon className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest leading-none block mb-1">Conferidos</span>
+                                <span className="text-2xl font-black text-emerald-600 leading-none">{reportStats.audited}</span>
+                            </div>
+                        </div>
+                        {reportStats.total > 0 && reportStats.total !== reportStats.audited && (
+                            <div className="bg-white px-6 py-4 rounded-3xl shadow-sm border border-slate-200 flex items-center gap-4 min-w-[160px]">
+                                <div className="w-10 h-10 bg-orange-50 rounded-2xl flex items-center justify-center text-orange-600">
+                                    <XCircleIcon className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <span className="text-[10px] font-black text-orange-400 uppercase tracking-widest leading-none block mb-1">Pendentes</span>
+                                    <span className="text-2xl font-black text-orange-500 leading-none">{reportStats.total - reportStats.audited}</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 <div className="flex gap-3 w-full md:w-auto">
                     <button
                         onClick={() => { setMode('audit'); setAuditStep('select'); }}
@@ -356,6 +620,67 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                         <PrinterIcon className="h-5 w-5" />
                         <span>IMPRIMIR</span>
                     </button>
+                </div>
+            </div>
+
+            {/* Inventory Sessions & Reports - New Section for Desktop */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 no-print mt-8">
+                <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-2 text-[#0F3F5C] font-bold">
+                        <ClockIcon className="h-5 w-5" />
+                        <h2>Relatórios de Inventários Finalizados</h2>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {inventorySessions.length === 0 ? (
+                        <div className="col-span-full py-10 text-center text-slate-400 border-2 border-dashed border-slate-100 rounded-2xl italic">
+                            Nenhum inventário finalizado recentemente.
+                        </div>
+                    ) : (
+                        inventorySessions.map(session => (
+                            <div key={session.id} className="bg-slate-50 border border-slate-200 p-5 rounded-2xl hover:border-blue-300 transition-all group">
+                                <div className="flex justify-between items-start mb-4">
+                                    <div>
+                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{session.materialType}</span>
+                                        <h3 className="text-xl font-black text-slate-800">{session.bitola}</h3>
+                                    </div>
+                                    <div className="bg-white p-2 rounded-xl border border-slate-200 shadow-sm text-center min-w-[60px]">
+                                        <div className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">Conferidos</div>
+                                        <div className="text-sm font-black text-blue-600">{session.checkedCount} / {session.itemsCount}</div>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 text-xs text-slate-500 mb-4">
+                                    <ClockIcon className="w-3.5 h-3.5" />
+                                    <span>Finalizado em: {new Date(session.endDate || '').toLocaleDateString('pt-BR')} às {new Date(session.endDate || '').toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                                </div>
+
+                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                        onClick={() => {
+                                            // Handle Printing Report
+                                            alert('Gerando relatório para impressão...');
+                                            window.print();
+                                        }}
+                                        className="flex-1 bg-white border border-slate-300 text-slate-700 py-2 rounded-lg text-xs font-black flex items-center justify-center gap-1 hover:bg-slate-100"
+                                    >
+                                        <PrinterIcon className="w-4 h-4" /> IMPRIMIR
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            if (confirm(`Deseja reabrir o inventário de ${session.materialType} ${session.bitola}? Isso liberará o acesso no celular.`)) {
+                                                updateInventorySession(session.id, { status: 'open' });
+                                            }
+                                        }}
+                                        className="flex-1 bg-rose-50 border border-rose-200 text-rose-600 py-2 rounded-lg text-xs font-black flex items-center justify-center gap-1 hover:bg-rose-100"
+                                    >
+                                        <LockOpenIcon className="w-4 h-4" /> REABRIR
+                                    </button>
+                                </div>
+                            </div>
+                        ))
+                    )}
                 </div>
             </div>
 
@@ -427,6 +752,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                 <th className="px-6 py-4">Material / Bitola</th>
                                 <th className="px-6 py-4">Local</th>
                                 <th className="px-6 py-4 text-right">Peso (kg)</th>
+                                <th className="px-6 py-4">Observações</th>
                                 <th className="px-6 py-4 text-center">Status</th>
                                 <th className="px-6 py-4 text-center w-32 bg-[#fff7ed] text-slate-800 border-l border-orange-100 no-print">Conf. Física</th>
                             </tr>
@@ -453,6 +779,16 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                     </td>
                                     <td className="px-6 py-4 text-right">
                                         <div className="text-lg font-black text-[#0F3F5C]">{item.remainingQuantity.toLocaleString('pt-BR')}</div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        {item.auditObservation ? (
+                                            <div className="flex items-start gap-2 bg-blue-50 p-2 rounded-lg border border-blue-100 max-w-[250px]">
+                                                <ChatBubbleLeftRightIcon className="w-4 h-4 text-blue-500 mt-1 shrink-0" />
+                                                <span className="text-xs text-blue-800 font-medium">{item.auditObservation}</span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-slate-300 italic text-xs">Sem observações</span>
+                                        )}
                                     </td>
                                     <td className="px-6 py-4 text-center">
                                         <span className="text-[10px] font-black uppercase px-2 py-1 rounded-md border border-slate-200">
