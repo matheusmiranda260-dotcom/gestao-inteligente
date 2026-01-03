@@ -402,6 +402,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                         onClick={() => {
                             if (auditStep === 'confirm') setAuditStep('list');
                             else if (auditStep === 'list') setAuditStep('select');
+                            else if (auditStep === 'select' && auditFilters.material) setAuditFilters({ ...auditFilters, material: '' });
                             else setMode('report');
                         }}
                         className="p-2 bg-slate-800 rounded-full"
@@ -409,7 +410,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                         <ArrowLeftIcon className="h-6 w-6" />
                     </button>
                     <h1 className="text-sm font-black tracking-widest uppercase">
-                        {auditStep === 'select' ? 'Selecione Material' :
+                        {auditStep === 'select' ? (auditFilters.material || 'Selecione Material') :
                             auditStep === 'quick-add' ? 'Cadastrar Novo Lote' :
                                 `${auditFilters.material} - ${auditFilters.bitola}`}
                     </h1>
@@ -427,40 +428,69 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                             </div>
 
                             <div className="space-y-3 pb-20">
-                                {activeSessions.length === 0 ? (
-                                    <div className="text-center py-20 opacity-40 bg-slate-800/50 rounded-3xl border-2 border-dashed border-slate-700">
-                                        <ClockIcon className="w-16 h-16 mx-auto mb-4 text-slate-600" />
-                                        <p className="font-black text-slate-500 uppercase tracking-widest">Nenhuma Ordem Aberta</p>
-                                        <p className="text-[10px] mt-2">Aguardando comando do gestor...</p>
+                                {auditFilters.material === '' ? (
+                                    <div className="grid grid-cols-1 gap-4">
+                                        {[...MaterialOptions].map(m => {
+                                            const count = activeSessions.filter(s => s.materialType === m).length;
+                                            return (
+                                                <button
+                                                    key={m}
+                                                    onClick={() => setAuditFilters({ ...auditFilters, material: m as any })}
+                                                    className={`w-full p-8 rounded-[2.5rem] bg-slate-800 border-2 border-slate-700 shadow-xl shadow-black/30 text-left transition-all active:scale-[0.98] group relative overflow-hidden ${count > 0 ? 'border-blue-500/30' : 'opacity-80'}`}
+                                                >
+                                                    <div className="relative z-10">
+                                                        <div className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1 group-active:text-blue-400">Selecionar Categoria</div>
+                                                        <div className="text-3xl font-black text-white tracking-tighter">{m}</div>
+                                                        <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 mt-2">
+                                                            <div className={`w-1.5 h-1.5 rounded-full ${count > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-600'}`}></div>
+                                                            <span>{count} Ordens Abertas</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="absolute right-[-10%] bottom-[-20%] opacity-10 group-hover:scale-110 transition-transform duration-500">
+                                                        <div className="text-8xl font-black text-white italic select-none">{m.charAt(0)}</div>
+                                                    </div>
+                                                </button>
+                                            );
+                                        })}
                                     </div>
                                 ) : (
-                                    activeSessions.map(session => (
-                                        <button
-                                            key={session.id}
-                                            onClick={() => {
-                                                setActiveSession(session);
-                                                setAuditFilters({ material: session.materialType, bitola: session.bitola });
-                                                setAuditStep('list');
-                                            }}
-                                            className={`w-full p-6 rounded-[2.5rem] border-2 text-left transition-all active:scale-[0.98] relative overflow-hidden ${session.status === 're-audit' ? 'bg-emerald-950/20 border-emerald-500/50 shadow-emerald-900/10 shadow-xl' : 'bg-slate-800 border-slate-700 shadow-xl shadow-black/30'}`}
-                                        >
-                                            <div className="flex justify-between items-start mb-2">
-                                                <div>
-                                                    <div className={`text-[9px] font-black uppercase tracking-widest mb-1 ${session.status === 're-audit' ? 'text-emerald-400' : 'text-blue-500'}`}>
-                                                        {session.status === 're-audit' ? '💡 RE-CONFERÊNCIA' : session.materialType}
+                                    activeSessions.filter(s => s.materialType === auditFilters.material).length === 0 ? (
+                                        <div className="text-center py-20 opacity-40 bg-slate-800/50 rounded-3xl border-2 border-dashed border-slate-700">
+                                            <ClockIcon className="w-16 h-16 mx-auto mb-4 text-slate-600" />
+                                            <p className="font-black text-slate-500 uppercase tracking-widest">Nenhuma Ordem Aberta</p>
+                                            <p className="text-[10px] mt-2">Para {auditFilters.material}</p>
+                                        </div>
+                                    ) : (
+                                        activeSessions
+                                            .filter(s => s.materialType === auditFilters.material)
+                                            .map(session => (
+                                                <button
+                                                    key={session.id}
+                                                    onClick={() => {
+                                                        setActiveSession(session);
+                                                        setAuditFilters({ material: session.materialType, bitola: session.bitola });
+                                                        setAuditStep('list');
+                                                    }}
+                                                    className={`w-full p-6 rounded-[2.5rem] border-2 text-left transition-all active:scale-[0.98] relative overflow-hidden ${session.status === 're-audit' ? 'bg-emerald-950/20 border-emerald-500/50 shadow-emerald-900/10 shadow-xl' : 'bg-slate-800 border-slate-700 shadow-xl shadow-black/30'}`}
+                                                >
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <div>
+                                                            <div className={`text-[9px] font-black uppercase tracking-widest mb-1 ${session.status === 're-audit' ? 'text-emerald-400' : 'text-blue-500'}`}>
+                                                                {session.status === 're-audit' ? '💡 RE-CONFERÊNCIA' : session.materialType}
+                                                            </div>
+                                                            <div className="text-3xl font-black text-white tracking-tighter">{session.bitola}</div>
+                                                        </div>
+                                                        <div className="bg-white/5 px-3 py-1.5 rounded-2xl text-[10px] font-black text-slate-400 uppercase border border-white/10">
+                                                            {session.itemsCount} Lotes
+                                                        </div>
                                                     </div>
-                                                    <div className="text-3xl font-black text-white tracking-tighter">{session.bitola}</div>
-                                                </div>
-                                                <div className="bg-white/5 px-3 py-1.5 rounded-2xl text-[10px] font-black text-slate-400 uppercase border border-white/10">
-                                                    {session.itemsCount} Lotes
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 mt-2">
-                                                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                                                <span>LIBERADO PARA CONTAGEM</span>
-                                            </div>
-                                        </button>
-                                    ))
+                                                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 mt-2">
+                                                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                                                        <span>LIBERADO PARA CONTAGEM</span>
+                                                    </div>
+                                                </button>
+                                            ))
+                                    )
                                 )}
                             </div>
                         </div>
