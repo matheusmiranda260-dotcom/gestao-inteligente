@@ -91,6 +91,7 @@ export interface StockItem {
     history?: HistoryEvent[];
     productionOrderIds?: string[];
     location?: string | null;
+    lastAuditDate?: string | null;
 }
 
 export interface ConferenceLotData {

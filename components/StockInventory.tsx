@@ -122,6 +122,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
 
             await updateStockItem(selectedLot.id, {
                 remainingQuantity: newWeight,
+                lastAuditDate: new Date().toISOString(),
                 history: [...(selectedLot.history || []), historyEntry]
             });
 
@@ -459,10 +460,13 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 bg-[#fff7ed]/30 no-print text-center">
-                                        {sessionCheckedIds.has(item.id) ? (
+                                        {(sessionCheckedIds.has(item.id) || item.lastAuditDate) ? (
                                             <div className="flex flex-col items-center">
-                                                <CheckCircleIcon className="h-6 w-6 text-emerald-600 mb-1" />
+                                                <CheckCircleIcon className="h-6 w-6 text-emerald-600 mb-0.5" />
                                                 <span className="text-[10px] font-black text-emerald-700 uppercase">OK</span>
+                                                <span className="text-[9px] text-slate-500 font-bold leading-none">
+                                                    {new Date(item.lastAuditDate || new Date()).toLocaleDateString('pt-BR')}
+                                                </span>
                                             </div>
                                         ) : (
                                             <span className="text-slate-300 font-bold">-</span>
