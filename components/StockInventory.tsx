@@ -317,16 +317,17 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                     });
                     return next;
                 });
-                setSessionCheckedIds(prev => {
-                    const currentSession = inventorySessions.find(s => s.id === activeSession?.id);
-                    if (currentSession) {
-                        updateInventorySession(currentSession.id, {
-                            itemsCount: currentSession.itemsCount + 1,
-                            checkedCount: currentSession.checkedCount + 1
-                        });
-                    }
-                    return new Set(prev).add(saved.id);
-                });
+                // Track checked ID
+                setSessionCheckedIds(prev => new Set(prev).add(saved.id));
+
+                // Update session state in DB for live progress
+                const currentSession = inventorySessions.find(s => s.id === activeSession?.id);
+                if (currentSession) {
+                    updateInventorySession(currentSession.id, {
+                        itemsCount: currentSession.itemsCount + 1,
+                        checkedCount: currentSession.checkedCount + 1
+                    });
+                }
             }
             setAuditStep('list');
             setQuickAddData({ internalLot: '', materialType: '', bitola: '', weight: '', observation: '' });
@@ -365,6 +366,10 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
             const targetB = normalizeBitola(auditFilters.bitola);
             const existingSession = inventorySessions.find(s => s.materialType === auditFilters.material && normalizeBitola(s.bitola) === targetB && (s.status === 'open' || s.status === 're-audit'));
 
+            // Accurate items count: checked ones + remaining items in pool
+            const uncheckedCount = auditPool.filter(item => !sessionAuditData.has(item.id)).length;
+            const finalItemsCount = auditedLots.length + uncheckedCount;
+
             const newSession: InventorySession = {
                 id: existingSession?.id || `INV-${Date.now()}`,
                 materialType: auditFilters.material as any,
@@ -373,8 +378,8 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                 endDate: new Date().toISOString(),
                 status: 'completed',
                 operator: currentUser?.username || 'Sistema',
-                itemsCount: auditPool.length,
-                checkedCount: auditedLots.length, // More accurate than sessionCheckedIds.size
+                itemsCount: finalItemsCount,
+                checkedCount: auditedLots.length,
                 auditedLots
             };
 
@@ -842,12 +847,9 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
 
                                     setIsSaving(true);
                                     try {
+                                        // 1. Reset all stock audit data
                                         for (const item of stock) {
                                             if (item.supplier === 'CADASTRADO NO INVENTÁRIO') {
-                                                // Using updateStockItem as a proxy for deletion if we don't have deleteStockItem prop directly
-                                                // Actually we do have deleteStockItem in some contexts, but here we can just mark as consumed 
-                                                // or I can call updateStockItem with a specific flag.
-                                                // Better: Use updateStockItem to mark it for deletion or just set status to 'Consumido'.
                                                 await updateStockItem(item.id, { status: 'Consumido' as any });
                                             } else if (item.lastAuditDate || item.auditObservation) {
                                                 await updateStockItem(item.id, {
@@ -856,7 +858,14 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                                 });
                                             }
                                         }
-                                        alert('Sistema limpo com sucesso! Os lotes temporários foram marcados como consumidos e as marcações removidas.');
+
+                                        // 2. Clear open inventory sessions as they are now invalid
+                                        const sessionsToClear = inventorySessions.filter(s => s.status === 'open' || s.status === 're-audit');
+                                        for (const s of sessionsToClear) {
+                                            await deleteInventorySession(s.id);
+                                        }
+
+                                        alert('Sistema limpo com sucesso! Marcações removidas e ordens abertas excluídas.');
                                     } catch (e) {
                                         alert('Erro durante a limpeza.');
                                     } finally {
