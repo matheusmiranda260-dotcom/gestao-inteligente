@@ -131,16 +131,58 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
 
     const groupedSessions = useMemo(() => {
         const groups: Record<string, InventorySession[]> = {};
-        inventorySessions.forEach(session => {
+        const uniqueLatest = new Map<string, InventorySession>();
+
+        // Sort by date so later ones overwrite earlier ones in our map
+        const sorted = [...inventorySessions].sort((a, b) => a.startDate.localeCompare(b.startDate));
+
+        sorted.forEach(session => {
+            const key = `${session.materialType}|${normalizeBitola(session.bitola)}`;
+            uniqueLatest.set(key, session);
+        });
+
+        Array.from(uniqueLatest.values()).forEach(session => {
             if (!groups[session.materialType]) groups[session.materialType] = [];
             groups[session.materialType].push(session);
         });
+
+        // Sort sessions within each material group by bitola
+        Object.keys(groups).forEach(m => {
+            groups[m].sort((a, b) => parseFloat(a.bitola.replace(',', '.')) - parseFloat(b.bitola.replace(',', '.')));
+        });
+
         return groups;
     }, [inventorySessions]);
 
+    const activeSessions = useMemo(() => {
+        const openSessions = inventorySessions.filter(s => s.status === 'open' || s.status === 're-audit');
+        const groups = new Map<string, InventorySession>();
+
+        openSessions.forEach(s => {
+            const key = `${s.materialType}|${normalizeBitola(s.bitola)}`;
+            const existing = groups.get(key);
+            // Keep the most important session (re-audit takes precedence, then most recent)
+            if (!existing || (s.status === 're-audit' && existing.status !== 're-audit') || s.startDate > existing.startDate) {
+                groups.set(key, s);
+            }
+        });
+
+        return Array.from(groups.values()).sort((a, b) => b.startDate.localeCompare(a.startDate));
+    }, [inventorySessions]);
+
     const globalProgress = useMemo(() => {
-        const totalItems = inventorySessions.reduce((acc, s) => acc + s.itemsCount, 0);
-        const totalChecked = inventorySessions.reduce((acc, s) => acc + s.checkedCount, 0);
+        // Only count latest version of each session for progress
+        const uniqueSessions = new Map<string, InventorySession>();
+        inventorySessions.forEach(s => {
+            const key = `${s.materialType}|${normalizeBitola(s.bitola)}`;
+            const existing = uniqueSessions.get(key);
+            if (!existing || s.startDate > existing.startDate) {
+                uniqueSessions.set(key, s);
+            }
+        });
+        const currentSessions = Array.from(uniqueSessions.values());
+        const totalItems = currentSessions.reduce((acc, s) => acc + s.itemsCount, 0);
+        const totalChecked = currentSessions.reduce((acc, s) => acc + s.checkedCount, 0);
         return totalItems > 0 ? Math.round((totalChecked / totalItems) * 100) : 0;
     }, [inventorySessions]);
 
@@ -320,7 +362,8 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
 
             // If there's an existing open or re-audit session for this, we update it instead of creating new?
             // For simplicity, let's just mark the old one as completed if we found it.
-            const existingSession = inventorySessions.find(s => s.materialType === auditFilters.material && s.bitola === auditFilters.bitola && (s.status === 'open' || s.status === 're-audit'));
+            const targetB = normalizeBitola(auditFilters.bitola);
+            const existingSession = inventorySessions.find(s => s.materialType === auditFilters.material && normalizeBitola(s.bitola) === targetB && (s.status === 'open' || s.status === 're-audit'));
 
             const newSession: InventorySession = {
                 id: existingSession?.id || `INV-${Date.now()}`,
@@ -384,43 +427,40 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                             </div>
 
                             <div className="space-y-3 pb-20">
-                                {inventorySessions.filter(s => s.status === 'open' || s.status === 're-audit').length === 0 ? (
+                                {activeSessions.length === 0 ? (
                                     <div className="text-center py-20 opacity-40 bg-slate-800/50 rounded-3xl border-2 border-dashed border-slate-700">
                                         <ClockIcon className="w-16 h-16 mx-auto mb-4 text-slate-600" />
                                         <p className="font-black text-slate-500 uppercase tracking-widest">Nenhuma Ordem Aberta</p>
                                         <p className="text-[10px] mt-2">Aguardando comando do gestor...</p>
                                     </div>
                                 ) : (
-                                    inventorySessions
-                                        .filter(s => s.status === 'open' || s.status === 're-audit')
-                                        .sort((a, b) => b.startDate.localeCompare(a.startDate))
-                                        .map(session => (
-                                            <button
-                                                key={session.id}
-                                                onClick={() => {
-                                                    setActiveSession(session);
-                                                    setAuditFilters({ material: session.materialType, bitola: session.bitola });
-                                                    setAuditStep('list');
-                                                }}
-                                                className={`w-full p-6 p-6 rounded-[2.5rem] border-2 text-left transition-all active:scale-[0.98] relative overflow-hidden ${session.status === 're-audit' ? 'bg-emerald-950/20 border-emerald-500/50 shadow-emerald-900/10 shadow-xl' : 'bg-slate-800 border-slate-700 shadow-xl shadow-black/30'}`}
-                                            >
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <div>
-                                                        <div className={`text-[9px] font-black uppercase tracking-widest mb-1 ${session.status === 're-audit' ? 'text-emerald-400' : 'text-blue-500'}`}>
-                                                            {session.status === 're-audit' ? '💡 RE-CONFERÊNCIA' : session.materialType}
-                                                        </div>
-                                                        <div className="text-3xl font-black text-white tracking-tighter">{session.bitola}</div>
+                                    activeSessions.map(session => (
+                                        <button
+                                            key={session.id}
+                                            onClick={() => {
+                                                setActiveSession(session);
+                                                setAuditFilters({ material: session.materialType, bitola: session.bitola });
+                                                setAuditStep('list');
+                                            }}
+                                            className={`w-full p-6 rounded-[2.5rem] border-2 text-left transition-all active:scale-[0.98] relative overflow-hidden ${session.status === 're-audit' ? 'bg-emerald-950/20 border-emerald-500/50 shadow-emerald-900/10 shadow-xl' : 'bg-slate-800 border-slate-700 shadow-xl shadow-black/30'}`}
+                                        >
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div>
+                                                    <div className={`text-[9px] font-black uppercase tracking-widest mb-1 ${session.status === 're-audit' ? 'text-emerald-400' : 'text-blue-500'}`}>
+                                                        {session.status === 're-audit' ? '💡 RE-CONFERÊNCIA' : session.materialType}
                                                     </div>
-                                                    <div className="bg-white/5 px-3 py-1.5 rounded-2xl text-[10px] font-black text-slate-400 uppercase border border-white/10">
-                                                        {session.itemsCount} Lotes
-                                                    </div>
+                                                    <div className="text-3xl font-black text-white tracking-tighter">{session.bitola}</div>
                                                 </div>
-                                                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 mt-2">
-                                                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                                                    <span>LIBERADO PARA CONTAGEM</span>
+                                                <div className="bg-white/5 px-3 py-1.5 rounded-2xl text-[10px] font-black text-slate-400 uppercase border border-white/10">
+                                                    {session.itemsCount} Lotes
                                                 </div>
-                                            </button>
-                                        ))
+                                            </div>
+                                            <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 mt-2">
+                                                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                                                <span>LIBERADO PARA CONTAGEM</span>
+                                            </div>
+                                        </button>
+                                    ))
                                 )}
                             </div>
                         </div>
