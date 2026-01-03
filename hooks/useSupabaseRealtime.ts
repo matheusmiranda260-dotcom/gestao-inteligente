@@ -4,7 +4,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import type {
     StockItem, ConferenceData, ProductionOrderData, TransferRecord,
     FinishedProductItem, PontaItem, FinishedGoodsTransferRecord,
-    PartsRequest, ShiftReport, ProductionRecord
+    PartsRequest, ShiftReport, ProductionRecord, InventorySession
 } from '../types';
 import { mapToCamelCase } from '../services/supabaseService';
 
@@ -20,6 +20,7 @@ interface RealtimeSetters {
     setShiftReports: React.Dispatch<React.SetStateAction<ShiftReport[]>>;
     setTrefilaProduction: React.Dispatch<React.SetStateAction<ProductionRecord[]>>;
     setTrelicaProduction: React.Dispatch<React.SetStateAction<ProductionRecord[]>>;
+    setInventorySessions: React.Dispatch<React.SetStateAction<InventorySession[]>>;
 }
 
 /**
@@ -161,6 +162,9 @@ export function useAllRealtimeSubscriptions(setters: RealtimeSetters, enabled: b
 
         // Finished Goods Transfers
         createSubscription<FinishedGoodsTransferRecord>('finished_goods_transfers', setters.setFinishedGoodsTransfers);
+
+        // Inventory Sessions
+        createSubscription<InventorySession>('inventory_sessions', setters.setInventorySessions);
 
         // Production Records (Trefila e Treliça)
         const productionRecordsChannel = supabase

@@ -187,7 +187,18 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                 });
                 return next;
             });
-            setSessionCheckedIds(prev => new Set(prev).add(selectedLot.id));
+            setSessionCheckedIds(prev => {
+                const isNew = !prev.has(selectedLot.id);
+                if (isNew) {
+                    const currentSession = inventorySessions.find(s => s.id === activeSession?.id);
+                    if (currentSession) {
+                        updateInventorySession(currentSession.id, {
+                            checkedCount: currentSession.checkedCount + 1
+                        });
+                    }
+                }
+                return new Set(prev).add(selectedLot.id);
+            });
 
             setAuditHistory(prev => [{
                 lot: selectedLot.internalLot,
@@ -250,9 +261,16 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                     });
                     return next;
                 });
-                setSessionCheckedIds(prev => new Set(prev).add(saved.id));
-            } else {
-                setSessionCheckedIds(prev => new Set(prev).add(newItem.id));
+                setSessionCheckedIds(prev => {
+                    const currentSession = inventorySessions.find(s => s.id === activeSession?.id);
+                    if (currentSession) {
+                        updateInventorySession(currentSession.id, {
+                            itemsCount: currentSession.itemsCount + 1,
+                            checkedCount: currentSession.checkedCount + 1
+                        });
+                    }
+                    return new Set(prev).add(saved.id);
+                });
             }
             setAuditStep('list');
             setQuickAddData({ internalLot: '', materialType: '', bitola: '', weight: '', observation: '' });
