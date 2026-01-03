@@ -718,43 +718,76 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                         <h2>Relatórios e Ciclos de Inventário</h2>
                     </div>
                     {currentUser?.role === 'gestor' && (
-                        <button
-                            onClick={async () => {
-                                if (!confirm('Deseja iniciar um novo ciclo de inventário? Isso criará ordens de conferência para todos os produtos em estoque.')) return;
+                        <div className="flex gap-2">
+                            <button
+                                onClick={async () => {
+                                    if (!confirm('ATENÇÃO: Isso removerá TODAS as marcações de conferência (OK verde) e observações de todos os lotes do sistema. Deseja continuar?')) return;
 
-                                const pairs = new Set<string>();
-                                stock.forEach(item => {
-                                    if (item.status !== 'Transferido' && item.status !== 'Consumido') {
-                                        pairs.add(`${item.materialType}|${item.bitola}`);
+                                    setIsSaving(true);
+                                    try {
+                                        for (const item of stock) {
+                                            if (item.supplier === 'CADASTRADO NO INVENTÁRIO') {
+                                                // Using updateStockItem as a proxy for deletion if we don't have deleteStockItem prop directly
+                                                // Actually we do have deleteStockItem in some contexts, but here we can just mark as consumed 
+                                                // or I can call updateStockItem with a specific flag.
+                                                // Better: Use updateStockItem to mark it for deletion or just set status to 'Consumido'.
+                                                await updateStockItem(item.id, { status: 'Consumido' as any });
+                                            } else if (item.lastAuditDate || item.auditObservation) {
+                                                await updateStockItem(item.id, {
+                                                    lastAuditDate: null,
+                                                    auditObservation: null
+                                                });
+                                            }
+                                        }
+                                        alert('Sistema limpo com sucesso! Os lotes temporários foram marcados como consumidos e as marcações removidas.');
+                                    } catch (e) {
+                                        alert('Erro durante a limpeza.');
+                                    } finally {
+                                        setIsSaving(false);
                                     }
-                                });
+                                }}
+                                className="bg-rose-100 hover:bg-rose-200 text-rose-600 text-[10px] font-black px-4 py-2 rounded-lg transition-all"
+                            >
+                                LIMPAR MARCAÇÕES ÓRFÃS
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    if (!confirm('Deseja iniciar um novo ciclo de inventário? Isso criará ordens de conferência para todos os produtos em estoque.')) return;
 
-                                let createdCount = 0;
-                                for (const pair of pairs) {
-                                    const [m, b] = pair.split('|');
-                                    const exists = inventorySessions.find(s => s.materialType === m && s.bitola === b && (s.status === 'open' || s.status === 're-audit'));
-                                    if (!exists) {
-                                        const newSession: InventorySession = {
-                                            id: `INV-${Date.now()}-${createdCount}`,
-                                            materialType: m as any,
-                                            bitola: b as any,
-                                            startDate: new Date().toISOString(),
-                                            status: 'open',
-                                            operator: 'Pendente',
-                                            itemsCount: stock.filter(i => i.materialType === m && i.bitola === b && i.status !== 'Transferido' && i.status !== 'Consumido').length,
-                                            checkedCount: 0,
-                                            auditedLots: []
-                                        };
-                                        await addInventorySession(newSession);
-                                        createdCount++;
+                                    const pairs = new Set<string>();
+                                    stock.forEach(item => {
+                                        if (item.status !== 'Transferido' && item.status !== 'Consumido') {
+                                            pairs.add(`${item.materialType}|${item.bitola}`);
+                                        }
+                                    });
+
+                                    let createdCount = 0;
+                                    for (const pair of pairs) {
+                                        const [m, b] = pair.split('|');
+                                        const exists = inventorySessions.find(s => s.materialType === m && s.bitola === b && (s.status === 'open' || s.status === 're-audit'));
+                                        if (!exists) {
+                                            const newSession: InventorySession = {
+                                                id: `INV-${Date.now()}-${createdCount}`,
+                                                materialType: m as any,
+                                                bitola: b as any,
+                                                startDate: new Date().toISOString(),
+                                                status: 'open',
+                                                operator: 'Pendente',
+                                                itemsCount: stock.filter(i => i.materialType === m && i.bitola === b && i.status !== 'Transferido' && i.status !== 'Consumido').length,
+                                                checkedCount: 0,
+                                                auditedLots: []
+                                            };
+                                            await addInventorySession(newSession);
+                                            createdCount++;
+                                        }
                                     }
-                                }
-                                alert(`${createdCount} novas ordens de inventário geradas.`);
-                            }}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black px-4 py-2 rounded-lg transition-all"
-                        >
-                            INICIAR CICLO DE INVENTÁRIO
-                        </button>
+                                    alert(`${createdCount} novas ordens de inventário geradas.`);
+                                }}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black px-4 py-2 rounded-lg transition-all"
+                            >
+                                INICIAR CICLO DE INVENTÁRIO
+                            </button>
+                        </div>
                     )}
                 </div>
 
@@ -984,13 +1017,15 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                     </table>
                 </div>
             </div>
-            {selectedSessionForReport && (
-                <InventorySessionReport
-                    session={selectedSessionForReport}
-                    onClose={() => setSelectedSessionForReport(null)}
-                />
-            )}
-        </div>
+            {
+                selectedSessionForReport && (
+                    <InventorySessionReport
+                        session={selectedSessionForReport}
+                        onClose={() => setSelectedSessionForReport(null)}
+                    />
+                )
+            }
+        </div >
     );
 };
 
