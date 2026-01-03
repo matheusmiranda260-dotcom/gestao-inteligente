@@ -63,6 +63,15 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
         return s !== 'transferido' && !s.includes('consumido');
     };
 
+    const isInvalidCombination = (material: string, bitola: string) => {
+        const b = normalizeBitola(bitola);
+        const ca60Only = ['3.20', '3.40', '3.80', '4.20', '4.60', '5.00', '5.40', '5.60', '5.80', '6.00'];
+        const fioOnly = ['5.50', '6.50', '7.00'];
+        if (material === 'Fio Máquina' && ca60Only.includes(b)) return true;
+        if (material === 'CA-60' && fioOnly.includes(b)) return true;
+        return false;
+    };
+
     const allBitolaOptions = useMemo(() => {
         const opts = new Set([...FioMaquinaBitolaOptions, ...TrefilaBitolaOptions]);
         return Array.from(opts).map(normalizeBitola).sort();
@@ -843,7 +852,38 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                         <div className="flex gap-2">
                             <button
                                 onClick={async () => {
-                                    if (!confirm('ATENÇÃO: Isso removerá TODAS as marcações de conferência (OK verde) e observações de todos os lotes do sistema. Deseja continuar?')) return;
+                                    const invalids = stock.filter(item => isInvalidCombination(item.materialType, item.bitola));
+                                    if (invalids.length === 0) {
+                                        alert('Nenhuma inconsistência de material/bitola encontrada!');
+                                        return;
+                                    }
+                                    if (!confirm(`Foram encontrados ${invalids.length} lotes com material incorreto para a bitola (ex: Fio Máquina 5.80). Deseja corrigir automaticamente?`)) return;
+
+                                    setIsSaving(true);
+                                    try {
+                                        for (const item of invalids) {
+                                            const b = normalizeBitola(item.bitola);
+                                            const ca60Only = ['3.20', '3.40', '3.80', '4.20', '4.60', '5.00', '5.40', '5.60', '5.80', '6.00'];
+                                            let newMaterial = item.materialType;
+                                            if (ca60Only.includes(b)) newMaterial = 'CA-60';
+                                            else newMaterial = 'Fio Máquina';
+
+                                            await updateStockItem(item.id, { materialType: newMaterial as any });
+                                        }
+                                        alert('Dados saneados com sucesso!');
+                                    } catch (e) {
+                                        alert('Erro ao sanear dados.');
+                                    } finally {
+                                        setIsSaving(false);
+                                    }
+                                }}
+                                className="bg-amber-100 hover:bg-amber-200 text-amber-700 text-[10px] font-black px-4 py-2 rounded-lg transition-all"
+                            >
+                                SANEAR DADOS (BITOLAS)
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    if (!confirm('ATENÇÃO: Isso removerá TODAS as marcações de conferência (OK verde) e deletará TODOS os relatórios de inventário existentes. Deseja continuar?')) return;
 
                                     setIsSaving(true);
                                     try {
@@ -859,13 +899,12 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                             }
                                         }
 
-                                        // 2. Clear open inventory sessions as they are now invalid
-                                        const sessionsToClear = inventorySessions.filter(s => s.status === 'open' || s.status === 're-audit');
-                                        for (const s of sessionsToClear) {
+                                        // 2. Clear ALL inventory sessions
+                                        for (const s of inventorySessions) {
                                             await deleteInventorySession(s.id);
                                         }
 
-                                        alert('Sistema limpo com sucesso! Marcações removidas e ordens abertas excluídas.');
+                                        alert('Sistema limpo com sucesso! Marcações removidas e histórico de inventário apagado.');
                                     } catch (e) {
                                         alert('Erro durante a limpeza.');
                                     } finally {
@@ -953,7 +992,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                             <div className="flex justify-between items-start mb-2">
                                                 <div>
                                                     <h4 className="text-lg font-black text-slate-800 tracking-tighter leading-none">{session.bitola}</h4>
-                                                    <span className="text-[8px] font-bold text-slate-400 uppercase">{session.itemsCount} LOTES</span>
+                                                    <span className="text-[8px] font-bold text-slate-400 uppercase">{session.itemsCount} {session.itemsCount === 1 ? 'LOTE' : 'LOTES'}</span>
                                                 </div>
                                                 {currentUser?.role === 'gestor' && (
                                                     <button
