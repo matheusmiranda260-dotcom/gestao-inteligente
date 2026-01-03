@@ -1254,7 +1254,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                 const weightDiff = lastAuditEntry ? parseFloat(String(lastAuditEntry.details['Diferença'] || '0')) : 0;
                                 const hasSignificantDiff = Math.abs(weightDiff) > 0.1;
                                 const hasObservation = !!item.auditObservation;
-                                const isCritical = hasSignificantDiff || hasObservation;
+                                const isCritical = !!item.lastAuditDate && (hasSignificantDiff || hasObservation);
 
                                 return (
                                     <tr key={item.id} className={`hover:bg-slate-50 transition-colors ${isCritical ? 'bg-rose-50/50' : ''}`}>
