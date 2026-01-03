@@ -19,7 +19,7 @@ interface StockInventoryProps {
 type AuditStep = 'select' | 'list' | 'confirm' | 'quick-add';
 
 const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateStockItem, addStockItem, inventorySessions, addInventorySession, updateInventorySession, deleteInventorySession, currentUser }) => {
-    const [mode, setMode] = useState<'report' | 'audit'>('report');
+    const [mode, setMode] = useState<'report' | 'audit'>(window.innerWidth < 768 ? 'audit' : 'report');
     const [reportFilters, setReportFilters] = useState({
         searchTerm: '',
         statusFilter: '',
@@ -53,7 +53,20 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
     const [auditHistory, setAuditHistory] = useState<{ lot: string, status: 'ok' | 'diff', diff: number }[]>([]);
     const auditInputRef = useRef<HTMLInputElement>(null);
 
-    const allBitolaOptions = useMemo(() => [...new Set([...FioMaquinaBitolaOptions, ...TrefilaBitolaOptions])].sort(), []);
+    const normalizeBitola = (b: string) => {
+        const n = parseFloat(String(b).replace(',', '.'));
+        return isNaN(n) ? String(b) : n.toFixed(2);
+    };
+
+    const isInStock = (item: StockItem) => {
+        const s = (item.status || '').toLowerCase();
+        return s !== 'transferido' && !s.includes('consumido');
+    };
+
+    const allBitolaOptions = useMemo(() => {
+        const opts = new Set([...FioMaquinaBitolaOptions, ...TrefilaBitolaOptions]);
+        return Array.from(opts).map(normalizeBitola).sort();
+    }, []);
 
     // 1. Filtered stock for the main report view
     const filteredReportStock = useMemo(() => {
@@ -80,9 +93,10 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
     // 2. Filtered stock for the current audit session
     const auditPool = useMemo(() => {
         if (!auditFilters.material || !auditFilters.bitola) return [];
+        const targetB = normalizeBitola(auditFilters.bitola);
         return stock
-            .filter(item => item.materialType === auditFilters.material && item.bitola === auditFilters.bitola)
-            .filter(item => item.status !== 'Transferido' && !item.status.includes('Consumido'))
+            .filter(item => item.materialType === auditFilters.material && normalizeBitola(item.bitola) === targetB)
+            .filter(isInStock)
             .sort((a, b) => a.internalLot.localeCompare(b.internalLot, undefined, { numeric: true }));
     }, [stock, auditFilters]);
 
@@ -789,16 +803,17 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
 
                                     const pairs = new Set<string>();
                                     stock.forEach(item => {
-                                        if (item.status !== 'Transferido' && item.status !== 'Consumido') {
-                                            pairs.add(`${item.materialType}|${item.bitola}`);
+                                        if (isInStock(item)) {
+                                            pairs.add(`${item.materialType}|${normalizeBitola(item.bitola)}`);
                                         }
                                     });
 
                                     let createdCount = 0;
                                     for (const pair of pairs) {
                                         const [m, b] = pair.split('|');
-                                        const exists = inventorySessions.find(s => s.materialType === m && s.bitola === b && (s.status === 'open' || s.status === 're-audit'));
+                                        const exists = inventorySessions.find(s => s.materialType === m && normalizeBitola(s.bitola) === b && (s.status === 'open' || s.status === 're-audit'));
                                         if (!exists) {
+                                            const filteredStock = stock.filter(i => i.materialType === m && normalizeBitola(i.bitola) === b && isInStock(i));
                                             const newSession: InventorySession = {
                                                 id: `INV-${Date.now()}-${createdCount}`,
                                                 materialType: m as any,
@@ -806,7 +821,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                                 startDate: new Date().toISOString(),
                                                 status: 'open',
                                                 operator: 'Pendente',
-                                                itemsCount: stock.filter(i => i.materialType === m && i.bitola === b && i.status !== 'Transferido' && i.status !== 'Consumido').length,
+                                                itemsCount: filteredStock.length,
                                                 checkedCount: 0,
                                                 auditedLots: []
                                             };
