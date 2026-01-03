@@ -1250,11 +1250,29 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {filteredReportStock.map((item, index) => {
-                                const lastAuditEntry = item.history?.filter(h => h.type.includes('Inventário')).sort((a, b) => b.date.localeCompare(a.date))[0];
-                                const weightDiff = lastAuditEntry ? parseFloat(String(lastAuditEntry.details['Diferença'] || '0')) : 0;
+                                // 1. Identify if this item was audited in a RECENT session (even if not applied)
+                                const latestSession = inventorySessions
+                                    .filter(s => s.materialType === item.materialType && normalizeBitola(s.bitola) === normalizeBitola(item.bitola))
+                                    .sort((a, b) => (b.endDate || b.startDate).localeCompare(a.endDate || a.startDate))[0];
+
+                                const sessionAudit = latestSession?.auditedLots?.find(l => l.lotId === item.id);
+
+                                // 2. Determine Weight Difference and Observation
+                                let weightDiff = 0;
+                                let observationText = item.auditObservation;
+                                let auditDateToDisplay = item.lastAuditDate;
+
+                                if (sessionAudit) {
+                                    weightDiff = sessionAudit.physicalWeight - sessionAudit.systemWeight;
+                                    observationText = sessionAudit.observation || null;
+                                    auditDateToDisplay = latestSession.endDate || latestSession.startDate;
+                                } else {
+                                    const lastAuditEntry = item.history?.filter(h => h.type.includes('Inventário')).sort((a, b) => b.date.localeCompare(a.date))[0];
+                                    weightDiff = lastAuditEntry ? parseFloat(String(lastAuditEntry.details['Diferença'] || '0')) : 0;
+                                }
+
                                 const hasSignificantDiff = Math.abs(weightDiff) > 0.1;
-                                const hasObservation = !!item.auditObservation;
-                                const isCritical = !!item.lastAuditDate && (hasSignificantDiff || hasObservation);
+                                const isCritical = (!!item.lastAuditDate || !!sessionAudit) && (hasSignificantDiff || !!observationText);
 
                                 return (
                                     <tr key={item.id} className={`hover:bg-slate-50 transition-colors ${isCritical ? 'bg-rose-50/50' : ''}`}>
@@ -1291,10 +1309,10 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                             )}
                                         </td>
                                         <td className="px-6 py-4">
-                                            {item.auditObservation ? (
+                                            {observationText ? (
                                                 <div className="flex items-start gap-2 bg-rose-100 p-2 rounded-lg border border-rose-200 max-w-[250px] shadow-sm">
                                                     <ExclamationTriangleIcon className="w-4 h-4 text-rose-600 mt-1 shrink-0" />
-                                                    <span className="text-xs text-rose-900 font-bold">{item.auditObservation}</span>
+                                                    <span className="text-xs text-rose-900 font-bold">{observationText}</span>
                                                 </div>
                                             ) : (
                                                 <span className="text-slate-300 italic text-xs">Sem observações</span>
@@ -1307,8 +1325,8 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                         </td>
                                         <td className="px-6 py-4 bg-[#fff7ed]/30 no-print text-center">
                                             {(() => {
-                                                const isCheckedInSession = sessionCheckedIds.has(item.id);
-                                                const needsReAudit = inventorySessions.some(s => s.materialType === item.materialType && s.bitola === item.bitola && s.status === 're-audit');
+                                                const isCheckedInSession = sessionCheckedIds.has(item.id) || !!sessionAudit;
+                                                const needsReAudit = inventorySessions.some(s => s.materialType === item.materialType && normalizeBitola(s.bitola) === normalizeBitola(item.bitola) && s.status === 're-audit');
 
                                                 if (isCheckedInSession || item.lastAuditDate) {
                                                     return (
@@ -1330,7 +1348,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                                                 </>
                                                             )}
                                                             <span className="text-[9px] text-slate-500 font-bold leading-none">
-                                                                {new Date(item.lastAuditDate || new Date()).toLocaleDateString('pt-BR')}
+                                                                {new Date(auditDateToDisplay || new Date()).toLocaleDateString('pt-BR')}
                                                             </span>
                                                         </div>
                                                     );
