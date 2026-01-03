@@ -631,28 +631,43 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Material</label>
-                                        <select
-                                            value={quickAddData.materialType}
-                                            onChange={e => setQuickAddData({ ...quickAddData, materialType: e.target.value })}
-                                            className="w-full bg-slate-900 border border-slate-700 rounded-2xl p-4 font-bold focus:border-blue-500 outline-none"
-                                        >
-                                            <option value="">Selecione</option>
-                                            {MaterialOptions.map(m => <option key={m} value={m}>{m}</option>)}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Bitola</label>
-                                        <select
-                                            value={quickAddData.bitola}
-                                            onChange={e => setQuickAddData({ ...quickAddData, bitola: e.target.value })}
-                                            className="w-full bg-slate-900 border border-slate-700 rounded-2xl p-4 font-bold focus:border-blue-500 outline-none"
-                                        >
-                                            <option value="">Selecione</option>
-                                            {allBitolaOptions.map(b => <option key={b} value={b}>{b}</option>)}
-                                        </select>
-                                    </div>
+                                    {auditFilters.material && auditFilters.bitola ? (
+                                        <>
+                                            <div className="bg-slate-900 border border-slate-700/50 rounded-2xl p-4">
+                                                <label className="block text-[8px] font-black text-slate-600 uppercase mb-1">Material</label>
+                                                <div className="font-black text-blue-500">{auditFilters.material}</div>
+                                            </div>
+                                            <div className="bg-slate-900 border border-slate-700/50 rounded-2xl p-4">
+                                                <label className="block text-[8px] font-black text-slate-600 uppercase mb-1">Bitola</label>
+                                                <div className="font-black text-blue-500">{auditFilters.bitola} mm</div>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div>
+                                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Material</label>
+                                                <select
+                                                    value={quickAddData.materialType}
+                                                    onChange={e => setQuickAddData({ ...quickAddData, materialType: e.target.value })}
+                                                    className="w-full bg-slate-900 border border-slate-700 rounded-2xl p-4 font-bold focus:border-blue-500 outline-none"
+                                                >
+                                                    <option value="">Selecione</option>
+                                                    {MaterialOptions.map(m => <option key={m} value={m}>{m}</option>)}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Bitola</label>
+                                                <select
+                                                    value={quickAddData.bitola}
+                                                    onChange={e => setQuickAddData({ ...quickAddData, bitola: e.target.value })}
+                                                    className="w-full bg-slate-900 border border-slate-700 rounded-2xl p-4 font-bold focus:border-blue-500 outline-none"
+                                                >
+                                                    <option value="">Selecione</option>
+                                                    {allBitolaOptions.map(b => <option key={b} value={b}>{b}</option>)}
+                                                </select>
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
 
                                 <div>
