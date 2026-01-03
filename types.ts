@@ -441,7 +441,7 @@ export interface InventorySession {
     bitola: Bitola;
     startDate: string;
     endDate?: string | null;
-    status: 'open' | 'completed';
+    status: 'open' | 'completed' | 're-audit';
     operator: string;
     itemsCount: number;
     checkedCount: number;

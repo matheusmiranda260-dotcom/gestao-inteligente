@@ -89,6 +89,11 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
         return inventorySessions.some(s => s.materialType === auditFilters.material && s.bitola === auditFilters.bitola && s.status === 'completed');
     }, [inventorySessions, auditFilters]);
 
+    const isReAuditActive = useMemo(() => {
+        if (!auditFilters.material || !auditFilters.bitola) return false;
+        return inventorySessions.some(s => s.materialType === auditFilters.material && s.bitola === auditFilters.bitola && s.status === 're-audit');
+    }, [inventorySessions, auditFilters]);
+
     const auditListFiltered = useMemo(() => {
         if (!auditSearch) return auditPool;
         return auditPool.filter(item =>
@@ -245,11 +250,15 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                     observation: item.auditObservation
                 }));
 
+            // If there's an existing open or re-audit session for this, we update it instead of creating new?
+            // For simplicity, let's just mark the old one as completed if we found it.
+            const existingSession = inventorySessions.find(s => s.materialType === auditFilters.material && s.bitola === auditFilters.bitola && (s.status === 'open' || s.status === 're-audit'));
+
             const newSession: InventorySession = {
-                id: `INV-${Date.now()}`,
+                id: existingSession?.id || `INV-${Date.now()}`,
                 materialType: auditFilters.material as any,
                 bitola: auditFilters.bitola as any,
-                startDate: new Date().toISOString(),
+                startDate: existingSession?.startDate || new Date().toISOString(),
                 endDate: new Date().toISOString(),
                 status: 'completed',
                 operator: currentUser?.username || 'Sistema',
@@ -258,7 +267,11 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                 auditedLots
             };
 
-            await addInventorySession(newSession);
+            if (existingSession) {
+                await updateInventorySession(existingSession.id, newSession);
+            } else {
+                await addInventorySession(newSession);
+            }
             alert(`Você finalizou inventário de "${auditFilters.material} ${auditFilters.bitola}"`);
             setAuditStep('select');
         } catch (error) {
@@ -355,6 +368,16 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                 </div>
                             )}
 
+                            {isReAuditActive && (
+                                <div className="bg-emerald-500/20 border border-emerald-500/50 p-4 rounded-2xl flex items-center gap-4 text-emerald-200 animate-in fade-in duration-500">
+                                    <LockOpenIcon className="w-8 h-8 shrink-0" />
+                                    <div className="text-sm">
+                                        <div className="font-black uppercase tracking-wider">Re-Conferência Ativa</div>
+                                        <p className="opacity-80">Lotes liberados para verificação novamente.</p>
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="flex-grow overflow-y-auto space-y-3 pr-1 custom-scrollbar">
                                 {auditListFiltered.map(item => {
                                     const isChecked = sessionCheckedIds.has(item.id);
@@ -365,12 +388,15 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                             className={`w-full p-4 rounded-2xl border flex items-center justify-between transition-all active:scale-[0.98] ${isChecked ? 'bg-emerald-900/20 border-emerald-900/50' : 'bg-slate-800 border-slate-700'}`}
                                         >
                                             <div className="flex items-center gap-4">
-                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-sm ${isChecked ? 'bg-emerald-500 text-white' : 'bg-slate-700 text-slate-300'}`}>
-                                                    {isChecked ? <CheckCircleIcon className="w-6 h-6" /> : item.internalLot.slice(-2)}
+                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-sm ${isChecked ? 'bg-emerald-500 text-white' : isReAuditActive ? 'bg-amber-500 text-white animate-pulse' : 'bg-slate-700 text-slate-300'}`}>
+                                                    {isChecked ? <CheckCircleIcon className="w-6 h-6" /> : isReAuditActive ? '!' : item.internalLot.slice(-2)}
                                                 </div>
                                                 <div className="text-left">
                                                     <div className="font-black text-lg">LOT {item.internalLot}</div>
-                                                    <div className="text-[10px] font-bold text-slate-500 uppercase">{item.location || 'Sem Posição'}</div>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="text-[10px] font-bold text-slate-500 uppercase">{item.location || 'Sem Posição'}</div>
+                                                        {isReAuditActive && !isChecked && <span className="text-[10px] bg-amber-500/20 text-amber-500 px-1.5 py-0.5 rounded font-black uppercase">Re-conferir</span>}
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div className="text-right flex items-center gap-3">
@@ -655,10 +681,15 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                         </div>
                     ) : (
                         inventorySessions.map(session => (
-                            <div key={session.id} className="bg-slate-50 border border-slate-200 p-5 rounded-2xl hover:border-blue-300 transition-all group">
+                            <div key={session.id} className={`${session.status === 're-audit' ? 'bg-emerald-50 border-emerald-200 shadow-emerald-100 shadow-xl' : 'bg-slate-50 border-slate-200'} border p-5 rounded-2xl hover:border-blue-300 transition-all group relative overflow-hidden`}>
+                                {session.status === 're-audit' && (
+                                    <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[8px] font-black px-4 py-1 uppercase tracking-widest rotate-0 origin-top-right">
+                                        RE-CONFERÊNCIA
+                                    </div>
+                                )}
                                 <div className="flex justify-between items-start mb-4">
                                     <div>
-                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{session.materialType}</span>
+                                        <span className={`text-[10px] font-black ${session.status === 're-audit' ? 'text-emerald-500' : 'text-slate-400'} uppercase tracking-widest`}>{session.materialType}</span>
                                         <h3 className="text-xl font-black text-slate-800">{session.bitola}</h3>
                                     </div>
                                     <div className="bg-white p-2 rounded-xl border border-slate-200 shadow-sm text-center min-w-[60px]">
@@ -669,7 +700,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
 
                                 <div className="flex items-center gap-2 text-xs text-slate-500 mb-4">
                                     <ClockIcon className="w-3.5 h-3.5" />
-                                    <span>Finalizado em: {new Date(session.endDate || '').toLocaleDateString('pt-BR')} às {new Date(session.endDate || '').toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                                    <span>{session.status === 're-audit' ? 'Liberado para re-auditoria' : `Finalizado em: ${new Date(session.endDate || '').toLocaleDateString('pt-BR')} às ${new Date(session.endDate || '').toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}</span>
                                 </div>
 
                                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -679,16 +710,22 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                     >
                                         <PrinterIcon className="w-4 h-4" /> IMPRIMIR
                                     </button>
-                                    <button
-                                        onClick={() => {
-                                            if (confirm(`Deseja reabrir o inventário de ${session.materialType} ${session.bitola}? Isso liberará o acesso no celular.`)) {
-                                                updateInventorySession(session.id, { status: 'open' });
-                                            }
-                                        }}
-                                        className="flex-1 bg-rose-50 border border-rose-200 text-rose-600 py-2 rounded-lg text-xs font-black flex items-center justify-center gap-1 hover:bg-rose-100"
-                                    >
-                                        <LockOpenIcon className="w-4 h-4" /> REABRIR
-                                    </button>
+                                    {session.status === 'completed' ? (
+                                        <button
+                                            onClick={() => {
+                                                if (confirm(`Deseja liberar o inventário de ${session.materialType} ${session.bitola} para RE-CONFERÊNCIA?`)) {
+                                                    updateInventorySession(session.id, { status: 're-audit' });
+                                                }
+                                            }}
+                                            className="flex-1 bg-rose-50 border border-rose-200 text-rose-600 py-2 rounded-lg text-xs font-black flex items-center justify-center gap-1 hover:bg-rose-100"
+                                        >
+                                            <LockOpenIcon className="w-4 h-4" /> REABRIR
+                                        </button>
+                                    ) : (
+                                        <div className="flex-1 bg-emerald-50 text-emerald-600 py-2 rounded-lg text-[10px] font-black flex items-center justify-center gap-1 border border-emerald-200">
+                                            Aguardando Celular...
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         ))
@@ -808,17 +845,32 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 bg-[#fff7ed]/30 no-print text-center">
-                                        {(sessionCheckedIds.has(item.id) || item.lastAuditDate) ? (
-                                            <div className="flex flex-col items-center">
-                                                <CheckCircleIcon className="h-6 w-6 text-emerald-600 mb-0.5" />
-                                                <span className="text-[10px] font-black text-emerald-700 uppercase">OK</span>
-                                                <span className="text-[9px] text-slate-500 font-bold leading-none">
-                                                    {new Date(item.lastAuditDate || new Date()).toLocaleDateString('pt-BR')}
-                                                </span>
-                                            </div>
-                                        ) : (
-                                            <span className="text-slate-300 font-bold">-</span>
-                                        )}
+                                        {(() => {
+                                            const isCheckedInSession = sessionCheckedIds.has(item.id);
+                                            const needsReAudit = inventorySessions.some(s => s.materialType === item.materialType && s.bitola === item.bitola && s.status === 're-audit');
+
+                                            if (isCheckedInSession || item.lastAuditDate) {
+                                                return (
+                                                    <div className="flex flex-col items-center">
+                                                        {needsReAudit && !isCheckedInSession ? (
+                                                            <>
+                                                                <XCircleIcon className="h-6 w-6 text-amber-500 mb-0.5 animate-pulse" />
+                                                                <span className="text-[10px] font-black text-amber-700 uppercase">Re-conferir</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <CheckCircleIcon className="h-6 w-6 text-emerald-600 mb-0.5" />
+                                                                <span className="text-[10px] font-black text-emerald-700 uppercase">OK</span>
+                                                            </>
+                                                        )}
+                                                        <span className="text-[9px] text-slate-500 font-bold leading-none">
+                                                            {new Date(item.lastAuditDate || new Date()).toLocaleDateString('pt-BR')}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            }
+                                            return <span className="text-slate-300 font-bold">-</span>;
+                                        })()}
                                     </td>
                                 </tr>
                             ))}
