@@ -337,13 +337,48 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
     const handleMarkNotFound = () => {
         if (!selectedLot) return;
         if (!confirm(`Confirmar que o lote ${selectedLot.internalLot} NÃO foi encontrado fisicamente?`)) return;
-        setPhysicalWeight('0');
-        setAuditObservation('LOTE NÃO ENCONTRADO (FÍSICO)');
-        // We delay confirmAudit slightly to ensure state is set (or just call it with 0/obs directly)
-        setTimeout(() => {
-            const btn = document.getElementById('confirm-audit-btn');
-            if (btn) btn.click();
-        }, 100);
+
+        setIsSaving(true);
+        try {
+            setSessionAuditData(prev => {
+                const next = new Map(prev);
+                next.set(selectedLot.id, {
+                    systemWeight: selectedLot.remainingQuantity,
+                    physicalWeight: 0,
+                    observation: 'LOTE NÃO ENCONTRADO (FÍSICO)',
+                    isNotFound: true
+                });
+                return next;
+            });
+            setSessionCheckedIds(prev => {
+                const isNew = !prev.has(selectedLot.id);
+                if (isNew) {
+                    const currentSession = inventorySessions.find(s => s.id === activeSession?.id);
+                    if (currentSession) {
+                        updateInventorySession(currentSession.id, {
+                            checkedCount: currentSession.checkedCount + 1
+                        });
+                    }
+                }
+                return new Set(prev).add(selectedLot.id);
+            });
+
+            setAuditHistory(prev => [{
+                lot: selectedLot.internalLot,
+                status: 'diff',
+                diff: -selectedLot.remainingQuantity
+            }, ...prev].slice(0, 5));
+
+            setSelectedLot(null);
+            setPhysicalWeight('');
+            setAuditObservation('');
+            setAuditSearch('');
+            setAuditStep('list');
+        } catch (error) {
+            alert('Erro ao marcar lote como não encontrado.');
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const handleQuickAdd = async () => {
@@ -430,9 +465,10 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                 return {
                     lotId,
                     internalLot: lot?.internalLot || '?',
-                    systemWeight: data.systemWeight,
-                    physicalWeight: data.physicalWeight,
-                    observation: data.observation,
+                    systemWeight: (data as any).systemWeight,
+                    physicalWeight: (data as any).physicalWeight,
+                    observation: (data as any).observation,
+                    isNotFound: (data as any).isNotFound || false,
                     tempLotData: lotId.startsWith('TEMP-') ? lot : null
                 };
             });
@@ -1364,15 +1400,16 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
 
                                 if (sessionAudit) {
                                     weightDiff = sessionAudit.physicalWeight - sessionAudit.systemWeight;
-                                    observationText = sessionAudit.observation || null;
+                                    observationText = sessionAudit.observation || (sessionAudit.physicalWeight === 0 && sessionAudit.systemWeight > 0 ? 'LOTE NÃO ENCONTRADO (FÍSICO)' : null);
                                     auditDateToDisplay = latestSession.endDate || latestSession.startDate;
                                 } else {
                                     const lastAuditEntry = item.history?.filter(h => h.type.includes('Inventário')).sort((a, b) => b.date.localeCompare(a.date))[0];
                                     weightDiff = lastAuditEntry ? parseFloat(String(lastAuditEntry.details['Diferença'] || '0')) : 0;
                                 }
 
-                                const hasSignificantDiff = Math.abs(weightDiff) > 0.1;
-                                const isCritical = (!!item.lastAuditDate || !!sessionAudit) && (hasSignificantDiff || !!observationText);
+                                const isNotFound = sessionAudit?.physicalWeight === 0 && sessionAudit?.systemWeight > 0;
+                                const hasSignificantDiff = Math.abs(weightDiff) > 0.1 || isNotFound;
+                                const isCritical = (!!item.lastAuditDate || !!sessionAudit) && (hasSignificantDiff || !!observationText || isNotFound);
 
                                 return (
                                     <tr key={item.id} className={`hover:bg-slate-50 transition-colors ${isCritical ? 'bg-rose-50/50' : ''}`}>
@@ -1401,7 +1438,13 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            <div className="text-lg font-black text-[#0F3F5C]">{item.remainingQuantity.toLocaleString('pt-BR')}</div>
+                                            <div className="text-lg font-black text-[#0F3F5C]">
+                                                {isNotFound ? (
+                                                    <span className="text-rose-600 text-sm">FALTA TOTAL</span>
+                                                ) : (
+                                                    item.remainingQuantity.toLocaleString('pt-BR')
+                                                )}
+                                            </div>
                                             {hasSignificantDiff && (
                                                 <div className={`text-[10px] font-black uppercase ${weightDiff > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                                                     {weightDiff > 0 ? '+' : ''}{weightDiff.toFixed(2)} kg
