@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { StockItem, Page, InventorySession, User } from '../types';
 import { MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions } from '../types';
-import { PrinterIcon, ArrowLeftIcon, SearchIcon, FilterIcon, CheckCircleIcon, XCircleIcon, ScaleIcon, SaveIcon, ChevronRightIcon, PlusIcon, ChatBubbleLeftRightIcon, ClockIcon, LockClosedIcon, LockOpenIcon, ExclamationTriangleIcon, ArrowPathIcon } from './icons';
+import { PrinterIcon, ArrowLeftIcon, SearchIcon, FilterIcon, CheckCircleIcon, XCircleIcon, ScaleIcon, SaveIcon, ChevronRightIcon, PlusIcon, ChatBubbleLeftRightIcon, ClockIcon, LockClosedIcon, LockOpenIcon, ExclamationTriangleIcon, ArrowPathIcon, TrashIcon } from './icons';
 import InventorySessionReport from './InventorySessionReport';
 
 interface StockInventoryProps {
@@ -54,6 +54,68 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
 
     const [auditHistory, setAuditHistory] = useState<{ lot: string, status: 'ok' | 'diff', diff: number }[]>([]);
     const auditInputRef = useRef<HTMLInputElement>(null);
+    const hasRestored = useRef(false);
+
+    // Persistence Logic: Load
+    useEffect(() => {
+        if (hasRestored.current) return;
+        const savedData = localStorage.getItem('current_inventory_audit');
+        if (savedData) {
+            try {
+                const parsed = JSON.parse(savedData);
+                if (parsed.auditStep) setAuditStep(parsed.auditStep);
+                if (parsed.auditFilters) setAuditFilters(parsed.auditFilters);
+                if (parsed.mode) setMode(parsed.mode);
+                if (parsed.tempNewLots) setTempNewLots(parsed.tempNewLots);
+                if (parsed.sessionCheckedIds) setSessionCheckedIds(new Set(parsed.sessionCheckedIds));
+                if (parsed.sessionAuditData) {
+                    setSessionAuditData(new Map(Object.entries(parsed.sessionAuditData)));
+                }
+
+                // If sessions are already loaded, restore activeSession
+                if (parsed.activeSessionId && inventorySessions.length > 0) {
+                    const session = inventorySessions.find(s => s.id === parsed.activeSessionId);
+                    if (session) {
+                        setActiveSession(session);
+                        hasRestored.current = true;
+                    }
+                } else if (!parsed.activeSessionId) {
+                    hasRestored.current = true;
+                }
+            } catch (e) {
+                console.error('Failed to load inventory audit state', e);
+            }
+        } else {
+            hasRestored.current = true;
+        }
+    }, [inventorySessions]);
+
+    // Persistence Logic: Save
+    useEffect(() => {
+        if (!hasRestored.current) return;
+
+        const dataToSave = {
+            auditFilters,
+            auditStep,
+            mode,
+            tempNewLots,
+            sessionCheckedIds: Array.from(sessionCheckedIds),
+            sessionAuditData: Object.fromEntries(sessionAuditData),
+            activeSessionId: activeSession?.id
+        };
+        localStorage.setItem('current_inventory_audit', JSON.stringify(dataToSave));
+    }, [auditFilters, auditStep, mode, tempNewLots, sessionCheckedIds, sessionAuditData, activeSession]);
+
+    const clearAuditProgress = () => {
+        if (!confirm('Deseja limpar todo o progresso (rascunho)? Isso não afetará as ordens de inventário já salvas.')) return;
+        setSessionCheckedIds(new Set());
+        setSessionAuditData(new Map());
+        setTempNewLots([]);
+        setAuditStep('select');
+        setActiveSession(null);
+        setAuditFilters({ material: '', bitola: '' });
+        localStorage.removeItem('current_inventory_audit');
+    };
 
     const normalizeBitola = (b: string) => {
         const n = parseFloat(String(b).replace(',', '.'));
@@ -395,6 +457,8 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
             alert(`Você finalizou inventário de "${auditFilters.material} ${auditFilters.bitola}"`);
             setSessionCheckedIds(new Set()); // Clear local state
             setSessionAuditData(new Map()); // Clear local state
+            setTempNewLots([]);
+            localStorage.removeItem('current_inventory_audit');
             setAuditStep('select');
         } catch (error) {
             alert('Erro ao finalizar inventário.');
@@ -490,7 +554,17 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                             auditStep === 'quick-add' ? 'Cadastrar Novo Lote' :
                                 `${auditFilters.material} - ${auditFilters.bitola}`}
                     </h1>
-                    <div className="w-10"></div>
+                    {stats.checked > 0 ? (
+                        <button
+                            onClick={clearAuditProgress}
+                            className="p-2 bg-rose-500/20 text-rose-500 rounded-full border border-rose-500/30"
+                            title="Limpar Rascunho"
+                        >
+                            <TrashIcon className="h-5 w-5" />
+                        </button>
+                    ) : (
+                        <div className="w-10"></div>
+                    )}
                 </header>
 
                 <div className="w-full max-w-md space-y-6">
