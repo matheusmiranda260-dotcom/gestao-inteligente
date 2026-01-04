@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Page, StockItem, ProductionOrderData, Bitola, StockGauge } from '../types';
+import type { Page, StockItem, ProductionOrderData, Bitola, StockGauge, User } from '../types';
 import { TrefilaBitolaOptions, FioMaquinaBitolaOptions } from '../types';
-import { ArrowLeftIcon, WarningIcon, ClipboardListIcon, PencilIcon, TrashIcon } from './icons';
+import { ArrowLeftIcon, WarningIcon, ClipboardListIcon, PencilIcon, TrashIcon, AdjustmentsIcon } from './icons';
 import ProductionOrderHistoryModal from './ProductionOrderHistoryModal';
 import ProductionOrderReport from './ProductionOrderReport';
 
@@ -14,9 +14,11 @@ interface ProductionOrderProps {
     updateProductionOrder: (orderId: string, data: { orderNumber?: string; targetBitola?: Bitola }) => void;
     deleteProductionOrder: (orderId: string) => void;
     gauges: StockGauge[];
+    currentUser: User | null;
 }
 
-const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, productionOrders, addProductionOrder, showNotification, updateProductionOrder, deleteProductionOrder, gauges }) => {
+const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, productionOrders, addProductionOrder, showNotification, updateProductionOrder, deleteProductionOrder, gauges, currentUser }) => {
+    const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor';
     const [orderNumber, setOrderNumber] = useState('');
 
     const initialTargetBitola = useMemo(() => {
@@ -134,13 +136,24 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
                     </button>
                     <h1 className="text-3xl font-bold text-slate-800">Ordem de Produção - Trefila</h1>
                 </div>
-                <button
-                    onClick={() => setShowHistoryModal(true)}
-                    className="bg-white hover:bg-slate-50 text-slate-700 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2"
-                >
-                    <ClipboardListIcon className="h-5 w-5" />
-                    <span>Ver Ordens Criadas</span>
-                </button>
+                <div className="flex items-center gap-3">
+                    {isGestor && (
+                        <button
+                            type="button"
+                            onClick={() => setPage('gaugesManager')}
+                            className="bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold py-2 px-4 rounded-lg border border-blue-200 shadow-sm transition flex items-center gap-2"
+                        >
+                            <AdjustmentsIcon className="h-5 w-5" />Gerenciar Bitolas
+                        </button>
+                    )}
+                    <button
+                        onClick={() => setShowHistoryModal(true)}
+                        className="bg-white hover:bg-slate-50 text-slate-700 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2"
+                    >
+                        <ClipboardListIcon className="h-5 w-5" />
+                        <span>Ver Ordens Criadas</span>
+                    </button>
+                </div>
             </header>
 
             <form onSubmit={handleSubmit}>

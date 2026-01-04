@@ -139,7 +139,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
 
     const allBitolaOptions = useMemo(() => {
         if (gauges.length > 0) {
-            return [...new Set(gauges.map(g => g.gauge))].sort((a, b) => parseFloat(a) - parseFloat(b));
+            return [...new Set(gauges.map(g => String(g.gauge)))].sort((a, b) => parseFloat(String(a)) - parseFloat(String(b)));
         }
         const opts = new Set([...FioMaquinaBitolaOptions, ...TrefilaBitolaOptions]);
         return Array.from(opts).map(normalizeBitola).sort();

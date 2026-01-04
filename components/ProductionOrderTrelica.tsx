@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Page, StockItem, ProductionOrderData, Bitola, StockGauge } from '../types';
-import { ArrowLeftIcon, WarningIcon, ClipboardListIcon, DocumentReportIcon, CheckCircleIcon } from './icons';
+import type { Page, StockItem, ProductionOrderData, Bitola, StockGauge, User } from '../types';
+import { ArrowLeftIcon, WarningIcon, ClipboardListIcon, DocumentReportIcon, CheckCircleIcon, AdjustmentsIcon } from './icons';
 import ProductionOrderHistoryModal from './ProductionOrderHistoryModal';
 import ProductionOrderReport from './ProductionOrderReport';
 
@@ -37,6 +37,7 @@ interface ProductionOrderTrelicaProps {
     updateProductionOrder: (orderId: string, data: { orderNumber?: string; targetBitola?: Bitola }) => void;
     deleteProductionOrder: (orderId: string) => void;
     gauges: StockGauge[];
+    currentUser: User | null;
 }
 
 const WeightIndicator: React.FC<{ required: number; selected: number; label?: string }> = ({ required, selected, label }) => {
@@ -170,7 +171,8 @@ const MultiLotSelector: React.FC<MultiLotSelectorProps> = ({ label, subLabel, av
     );
 };
 
-const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage, stock, productionOrders, addProductionOrder, showNotification, updateProductionOrder, deleteProductionOrder, gauges }) => {
+const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage, stock, productionOrders, addProductionOrder, showNotification, updateProductionOrder, deleteProductionOrder, gauges, currentUser }) => {
+    const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor';
     const [orderNumber, setOrderNumber] = useState('');
     const [selectedModel, setSelectedModel] = useState<TrelicaModel | null>(null);
     const [quantity, setQuantity] = useState(1);
@@ -518,12 +520,23 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
                         <p className="text-slate-500 font-medium">Configure os parâmetros técnicos e selecione a matéria-prima.</p>
                     </div>
                 </div>
-                <button onClick={() => setShowHistoryModal(true)} className="group glass-card px-6 py-3 rounded-2xl border-indigo-100/50 flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center transition-transform group-hover:scale-110">
-                        <ClipboardListIcon className="h-5 w-5 text-indigo-600" />
-                    </div>
-                    <span className="font-bold text-indigo-900">Histórico de Ordens</span>
-                </button>
+                <div className="flex items-center gap-3">
+                    {isGestor && (
+                        <button
+                            type="button"
+                            onClick={() => setPage('gaugesManager')}
+                            className="bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold py-3 px-6 rounded-2xl border border-blue-200 shadow-sm transition-all flex items-center gap-2"
+                        >
+                            <AdjustmentsIcon className="h-5 w-5" />Gerenciar Bitolas
+                        </button>
+                    )}
+                    <button onClick={() => setShowHistoryModal(true)} className="group glass-card px-6 py-3 rounded-2xl border-indigo-100/50 flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center transition-transform group-hover:scale-110">
+                            <ClipboardListIcon className="h-5 w-5 text-indigo-600" />
+                        </div>
+                        <span className="font-bold text-indigo-900">Histórico de Ordens</span>
+                    </button>
+                </div>
             </header>
             <form onSubmit={handleSubmit}>
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">

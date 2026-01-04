@@ -1,14 +1,7 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import type { Page, StockItem, ConferenceData, ConferenceLotData, Bitola, MaterialType, TransferRecord, ProductionOrderData, StockGauge } from '../types';
+import type { Page, StockItem, ConferenceData, ConferenceLotData, Bitola, MaterialType, TransferRecord, ProductionOrderData, StockGauge, User } from '../types';
 import { MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions } from '../types';
-import { ArrowLeftIcon, PencilIcon, TrashIcon, WarningIcon, BookOpenIcon, TruckIcon, DocumentReportIcon, PrinterIcon, LockOpenIcon, ClipboardListIcon, ChartBarIcon, XCircleIcon, ArchiveIcon, LocationOffIcon, CheckCircleIcon, ScaleIcon } from './icons';
-
-// ... (previous imports)
-
-// Assuming AddConferencePage is further down, I need to apply the change there too.
-// Since the instruction allows replacing the Block, I will target the specific useEffect block in AddConferencePage and the import separately if needed, but the tool only allows one contiguous block or multiple replacements.
-// I will use replace_file_content for the import first.
+import { ArrowLeftIcon, PencilIcon, TrashIcon, WarningIcon, BookOpenIcon, TruckIcon, DocumentReportIcon, PrinterIcon, LockOpenIcon, ClipboardListIcon, ChartBarIcon, XCircleIcon, ArchiveIcon, LocationOffIcon, CheckCircleIcon, ScaleIcon, AdjustmentsIcon } from './icons';
 
 import LotHistoryModal from './LotHistoryModal';
 import FinishedConferencesModal from './FinishedConferencesModal';
@@ -52,7 +45,9 @@ const AddConferencePage: React.FC<{
     onEditConference: (id: string, data: ConferenceData) => void;
     onDeleteConference: (id: string) => void;
     gauges: StockGauge[];
-}> = ({ onClose, onSubmit, stock, onShowReport, conferences, onEditConference, onDeleteConference, gauges }) => {
+    isGestor: boolean;
+    setPage: (page: Page) => void;
+}> = ({ onClose, onSubmit, stock, onShowReport, conferences, onEditConference, onDeleteConference, gauges, isGestor, setPage }) => {
     const [conferenceData, setConferenceData] = useState<Omit<ConferenceData, 'lots'>>({
         entryDate: new Date().toISOString().split('T')[0],
         supplier: '',
@@ -82,7 +77,7 @@ const AddConferencePage: React.FC<{
 
     const allBitolaOptions: Bitola[] = useMemo(() => {
         if (gauges.length > 0) {
-            return [...new Set(gauges.map(g => g.gauge))].sort((a, b) => parseFloat(a) - parseFloat(b));
+            return [...new Set(gauges.map(g => String(g.gauge)))].sort((a, b) => parseFloat(String(a)) - parseFloat(String(b))) as Bitola[];
         }
         return [...new Set([...FioMaquinaBitolaOptions, ...TrefilaBitolaOptions])].sort() as Bitola[];
     }, [gauges]);
@@ -199,211 +194,218 @@ const AddConferencePage: React.FC<{
                             <p className="text-slate-500 text-sm">Registre a entrada de novos materiais no estoque.</p>
                         </div>
                     </div>
-                    <button onClick={() => setHistoryOpen(true)} className="bg-white text-slate-600 hover:text-slate-800 hover:bg-slate-50 font-semibold py-2 px-4 rounded-lg border border-slate-200 shadow-sm transition flex items-center gap-2">
-                        <DocumentReportIcon className="h-5 w-5" />Conferências Finalizadas
-                    </button>
+                    <div className="flex items-center gap-3">
+                        {isGestor && (
+                            <button
+                                type="button"
+                                onClick={() => setPage('gaugesManager')}
+                                className="bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold py-2 px-4 rounded-lg border border-blue-200 shadow-sm transition flex items-center gap-2"
+                            >
+                                <AdjustmentsIcon className="h-5 w-5" />Gerenciar Bitolas
+                            </button>
+                        )}
+                        <button onClick={() => setHistoryOpen(true)} className="bg-white text-slate-600 hover:text-slate-800 hover:bg-slate-50 font-semibold py-2 px-4 rounded-lg border border-slate-200 shadow-sm transition flex items-center gap-2">
+                            <DocumentReportIcon className="h-5 w-5" />Conferências Finalizadas
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <form onSubmit={handleFinalSubmit} className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden flex flex-col h-[calc(100vh-140px)]">
+
+                {/* Header Fields Section */}
+                <div className="p-6 bg-slate-50 border-b border-slate-200">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Data Entrada</label>
+                            <input type="date" value={conferenceData.entryDate} onChange={e => setConferenceData({ ...conferenceData, entryDate: e.target.value })} className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F3F5C] outline-none shadow-sm" required />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Fornecedor</label>
+                            <input type="text" value={conferenceData.supplier} onChange={e => setConferenceData({ ...conferenceData, supplier: e.target.value })} className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F3F5C] outline-none shadow-sm" placeholder="Nome do Fornecedor" required />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nota Fiscal (NFe)</label>
+                            <input type="text" value={conferenceData.nfe} onChange={e => setConferenceData({ ...conferenceData, nfe: e.target.value })} className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F3F5C] outline-none shadow-sm" placeholder="000000" required />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nº Conferência</label>
+                            <input type="text" value={conferenceData.conferenceNumber} onChange={e => setConferenceData({ ...conferenceData, conferenceNumber: e.target.value })} className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F3F5C] outline-none shadow-sm" placeholder="CONF-XXXX" required />
+                        </div>
+                    </div>
                 </div>
 
-                <form onSubmit={handleFinalSubmit} className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden flex flex-col h-[calc(100vh-140px)]">
+                {/* Lots Table/List Section */}
+                <div className="flex-grow overflow-y-auto p-0">
+                    <div className="hidden md:block">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-white border-b sticky top-0 z-10 shadow-sm">
+                                <tr>
+                                    {['Lote Interno', 'Lote Fornecedor', 'Fornecedor', 'Corrida', 'Tipo Material', 'Bitola', 'Peso Etiqueta (kg)', 'Peso Balança (kg)', 'Diferença', 'Ações'].map(h =>
+                                        <th key={h} className="px-4 py-3 font-bold text-slate-600 uppercase text-xs tracking-wider">{h}</th>
+                                    )}
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {lots.map((lot, index) => {
+                                    const diff = (lot.scaleWeight || 0) - (lot.labelWeight || 0);
+                                    const percent = lot.labelWeight ? (diff / lot.labelWeight) * 100 : 0;
+                                    const isSignificant = Math.abs(percent) > 0.5;
+                                    const isNegative = diff < 0;
+                                    const isPositive = diff > 0;
 
-                    {/* Header Fields Section */}
-                    <div className="p-6 bg-slate-50 border-b border-slate-200">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Data Entrada</label>
-                                <input type="date" value={conferenceData.entryDate} onChange={e => setConferenceData({ ...conferenceData, entryDate: e.target.value })} className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F3F5C] outline-none shadow-sm" required />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Fornecedor</label>
-                                <input type="text" value={conferenceData.supplier} onChange={e => setConferenceData({ ...conferenceData, supplier: e.target.value })} className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F3F5C] outline-none shadow-sm" placeholder="Nome do Fornecedor" required />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nota Fiscal (NFe)</label>
-                                <input type="text" value={conferenceData.nfe} onChange={e => setConferenceData({ ...conferenceData, nfe: e.target.value })} className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F3F5C] outline-none shadow-sm" placeholder="000000" required />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nº Conferência</label>
-                                <input type="text" value={conferenceData.conferenceNumber} onChange={e => setConferenceData({ ...conferenceData, conferenceNumber: e.target.value })} className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F3F5C] outline-none shadow-sm" placeholder="CONF-XXXX" required />
-                            </div>
-                        </div>
-                    </div>
+                                    return (
+                                        <tr key={index} className="hover:bg-slate-50 transition-colors">
+                                            <td className="p-3 align-top">
+                                                <input type="text" value={lot.internalLot || ''} onChange={e => handleLotChange(index, 'internalLot', e.target.value)} className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" required placeholder="Lote Interno" />
+                                                {duplicateErrors[index] && <p className="text-red-500 text-[10px] mt-1 font-bold">{duplicateErrors[index]}</p>}
+                                            </td>
+                                            <td className="p-3 align-top"><input type="text" value={lot.supplierLot || ''} onChange={e => handleLotChange(index, 'supplierLot', e.target.value)} className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" required placeholder="Lote Fornec." /></td>
+                                            <td className="p-3 align-top"><input type="text" value={lot.supplier || ''} onChange={e => handleLotChange(index, 'supplier', e.target.value)} className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" placeholder={conferenceData.supplier || "Fornecedor"} /></td>
+                                            <td className="p-3 align-top"><input type="text" value={lot.runNumber || ''} onChange={e => handleLotChange(index, 'runNumber', e.target.value)} className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" required placeholder="Corrida" /></td>
+                                            <td className="p-3 align-top">
+                                                <select value={lot.materialType} onChange={e => handleLotChange(index, 'materialType', e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white outline-none">
+                                                    {MaterialOptions.map(m => <option key={m} value={m}>{m}</option>)}
+                                                </select>
+                                            </td>
+                                            <td className="p-3 align-top">
+                                                <select value={lot.bitola} onChange={e => handleLotChange(index, 'bitola', e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white outline-none">
+                                                    {(gauges.length > 0
+                                                        ? gauges.filter(g => g.material_type === lot.materialType).map(g => g.gauge)
+                                                        : (lot.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : TrefilaBitolaOptions)
+                                                    ).map(b => <option key={b} value={b}>{b}</option>)}
+                                                </select>
+                                            </td>
+                                            <td className="p-3 align-top"><input type="number" step="0.01" value={lot.labelWeight || ''} onChange={e => handleLotChange(index, 'labelWeight', parseFloat(e.target.value))} className="w-24 p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none font-medium" required placeholder="0.00" /></td>
+                                            <td className="p-3 align-top"><input type="number" step="0.01" value={lot.scaleWeight || ''} onChange={e => handleLotChange(index, 'scaleWeight', parseFloat(e.target.value))} className="w-24 p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none font-bold text-emerald-600 bg-emerald-50/50" required placeholder="0.00" /></td>
 
-                    {/* Lots Table/List Section */}
-                    <div className="flex-grow overflow-y-auto p-0">
-                        <div className="hidden md:block">
-                            <table className="w-full text-sm text-left">
-                                <thead className="bg-white border-b sticky top-0 z-10 shadow-sm">
-                                    <tr>
-                                        {['Lote Interno', 'Lote Fornecedor', 'Fornecedor', 'Corrida', 'Tipo Material', 'Bitola', 'Peso Etiqueta (kg)', 'Peso Balança (kg)', 'Diferença', 'Ações'].map(h =>
-                                            <th key={h} className="px-4 py-3 font-bold text-slate-600 uppercase text-xs tracking-wider">{h}</th>
-                                        )}
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {lots.map((lot, index) => {
-                                        const diff = (lot.scaleWeight || 0) - (lot.labelWeight || 0);
-                                        const percent = lot.labelWeight ? (diff / lot.labelWeight) * 100 : 0;
-                                        const isSignificant = Math.abs(percent) > 0.5;
-                                        const isNegative = diff < 0;
-                                        const isPositive = diff > 0;
-
-                                        return (
-                                            <tr key={index} className="hover:bg-slate-50 transition-colors">
-                                                <td className="p-3 align-top">
-                                                    <input type="text" value={lot.internalLot || ''} onChange={e => handleLotChange(index, 'internalLot', e.target.value)} className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" required placeholder="Lote Interno" />
-                                                    {duplicateErrors[index] && <p className="text-red-500 text-[10px] mt-1 font-bold">{duplicateErrors[index]}</p>}
-                                                </td>
-                                                <td className="p-3 align-top"><input type="text" value={lot.supplierLot || ''} onChange={e => handleLotChange(index, 'supplierLot', e.target.value)} className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" required placeholder="Lote Fornec." /></td>
-                                                <td className="p-3 align-top"><input type="text" value={lot.supplier || ''} onChange={e => handleLotChange(index, 'supplier', e.target.value)} className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" placeholder={conferenceData.supplier || "Fornecedor"} /></td>
-                                                <td className="p-3 align-top"><input type="text" value={lot.runNumber || ''} onChange={e => handleLotChange(index, 'runNumber', e.target.value)} className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" required placeholder="Corrida" /></td>
-                                                <td className="p-3 align-top">
-                                                    <select value={lot.materialType} onChange={e => handleLotChange(index, 'materialType', e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white outline-none">
-                                                        {MaterialOptions.map(m => <option key={m} value={m}>{m}</option>)}
-                                                    </select>
-                                                </td>
-                                                <td className="p-3 align-top">
-                                                    <select value={lot.bitola} onChange={e => handleLotChange(index, 'bitola', e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white outline-none">
-                                                        {(gauges.length > 0
-                                                            ? gauges.filter(g => g.material_type === lot.materialType).map(g => g.gauge)
-                                                            : (lot.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : TrefilaBitolaOptions)
-                                                        ).map(b => <option key={b} value={b}>{b}</option>)}
-                                                    </select>
-                                                </td>
-                                                <td className="p-3 align-top"><input type="number" step="0.01" value={lot.labelWeight || ''} onChange={e => handleLotChange(index, 'labelWeight', parseFloat(e.target.value))} className="w-24 p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none font-medium" required placeholder="0.00" /></td>
-                                                <td className="p-3 align-top"><input type="number" step="0.01" value={lot.scaleWeight || ''} onChange={e => handleLotChange(index, 'scaleWeight', parseFloat(e.target.value))} className="w-24 p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none font-bold text-emerald-600 bg-emerald-50/50" required placeholder="0.00" /></td>
-
-                                                {/* Difference Column */}
-                                                <td className="p-3 align-top align-middle">
-                                                    {(lot.labelWeight && lot.scaleWeight) ? (
-                                                        <div className={`flex flex-col text-xs font-bold ${isNegative ? 'text-red-600' : (isPositive ? 'text-emerald-600' : 'text-slate-500')}`}>
-                                                            <span className="flex items-center gap-1">
-                                                                {diff > 0 ? '+' : ''}{diff.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg
-                                                                {(isNegative && isSignificant) && <WarningIcon className="h-4 w-4 text-red-500" />}
-                                                            </span>
-                                                            <span className="opacity-75">
-                                                                ({percent > 0 ? '+' : ''}{percent.toFixed(1)}%)
-                                                            </span>
-                                                        </div>
-                                                    ) : <span className="text-slate-300">-</span>}
-                                                </td>
-
-                                                <td className="p-3 align-top text-center"><button type="button" onClick={() => handleRemoveLot(index)} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"><TrashIcon className="h-5 w-5" /></button></td>
-                                            </tr>
-                                        )
-                                    })}
-                                    {/* Add Button Row inside table */}
-                                    <tr>
-                                        <td colSpan={10} className="p-3 bg-slate-50/50 font-medium">
-                                            <button type="button" onClick={handleAddLot} className="flex items-center gap-2 text-[#0F3F5C] hover:text-[#0A2A3D] font-bold py-2 px-4 rounded-lg border-2 border-dashed border-slate-300 hover:border-[#0F3F5C] transition w-full justify-center">
-                                                <span>+ Adicionar Outro Lote</span>
-                                            </button>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* Mobile List View */}
-                        <div className="md:hidden p-4 space-y-4">
-                            {lots.map((lot, index) => {
-                                const diff = (lot.scaleWeight || 0) - (lot.labelWeight || 0);
-                                const percent = lot.labelWeight ? (diff / lot.labelWeight) * 100 : 0;
-                                const isSignificant = Math.abs(percent) > 0.5;
-                                const isNegative = diff < 0;
-                                const isPositive = diff > 0;
-
-                                return (
-                                    <div key={index} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 relative">
-                                        <div className="absolute top-4 right-4">
-                                            <button type="button" onClick={() => handleRemoveLot(index)} className="text-red-500 bg-red-50 p-2 rounded-lg hover:bg-red-100">
-                                                <TrashIcon className="h-5 w-5" />
-                                            </button>
-                                        </div>
-                                        <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                            <span className="bg-slate-100 text-slate-500 text-xs px-2 py-1 rounded">#{index + 1}</span>
-                                            Lote
-                                        </h3>
-
-                                        <div className="space-y-4">
-                                            <div>
-                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Lote Interno</label>
-                                                <input type="text" value={lot.internalLot || ''} onChange={e => handleLotChange(index, 'internalLot', e.target.value)} className="w-full p-3 border border-slate-300 rounded-lg outline-none" placeholder="Ex: INT-001" />
-                                                {duplicateErrors[index] && <p className="text-red-500 text-xs mt-1 font-bold">{duplicateErrors[index]}</p>}
-                                            </div>
-
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Lote Forn.</label>
-                                                    <input type="text" value={lot.supplierLot || ''} onChange={e => handleLotChange(index, 'supplierLot', e.target.value)} className="w-full p-3 border border-slate-300 rounded-lg outline-none" />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Fornecedor</label>
-                                                    <input type="text" value={lot.supplier || ''} onChange={e => handleLotChange(index, 'supplier', e.target.value)} className="w-full p-3 border border-slate-300 rounded-lg outline-none" placeholder={conferenceData.supplier || "Fornecedor"} />
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Corrida</label>
-                                                <input type="text" value={lot.runNumber || ''} onChange={e => handleLotChange(index, 'runNumber', e.target.value)} className="w-full p-3 border border-slate-300 rounded-lg outline-none" />
-                                            </div>
-
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Material</label>
-                                                    <select value={lot.materialType} onChange={e => handleLotChange(index, 'materialType', e.target.value)} className="w-full p-3 border border-slate-300 rounded-lg bg-white outline-none">
-                                                        {MaterialOptions.map(m => <option key={m} value={m}>{m}</option>)}
-                                                    </select>
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Bitola</label>
-                                                    <select value={lot.bitola} onChange={e => handleLotChange(index, 'bitola', e.target.value)} className="w-full p-3 border border-slate-300 rounded-lg bg-white outline-none">
-                                                        {allBitolaOptions.map(b => <option key={b} value={b}>{b}</option>)}
-                                                    </select>
-                                                </div>
-                                            </div>
-
-                                            <div className="grid grid-cols-2 gap-4 pt-2">
-                                                <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Etiqueta (kg)</label>
-                                                    <input type="number" step="0.01" value={lot.labelWeight || ''} onChange={e => handleLotChange(index, 'labelWeight', parseFloat(e.target.value))} className="w-full p-2 bg-white border border-slate-200 rounded font-bold text-center" placeholder="0.00" />
-                                                </div>
-                                                <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100">
-                                                    <label className="block text-xs font-bold text-emerald-600 uppercase mb-1">Balança (kg)</label>
-                                                    <input type="number" step="0.01" value={lot.scaleWeight || ''} onChange={e => handleLotChange(index, 'scaleWeight', parseFloat(e.target.value))} className="w-full p-2 bg-white border border-emerald-200 rounded font-bold text-center text-emerald-700" placeholder="0.00" />
-                                                </div>
-                                            </div>
-
-                                            {/* Mobile Difference Row */}
-                                            {(lot.labelWeight && lot.scaleWeight) ? (
-                                                <div className={`mt-2 p-3 rounded-lg border flex items-center justify-between ${isNegative ? 'bg-red-50 border-red-200 text-red-800' : (isPositive ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-slate-50 border-slate-200 text-slate-600')}`}>
-                                                    <span className="text-xs font-bold uppercase">Diferença</span>
-                                                    <div className="flex items-center gap-2 font-bold text-sm">
-                                                        <span>{diff > 0 ? '+' : ''}{diff.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg ({diff > 0 ? '+' : ''}{percent.toFixed(1)}%)</span>
-                                                        {(isNegative && isSignificant) && <WarningIcon className="h-5 w-5 text-red-600" />}
+                                            {/* Difference Column */}
+                                            <td className="p-3 align-top align-middle">
+                                                {(lot.labelWeight && lot.scaleWeight) ? (
+                                                    <div className={`flex flex-col text-xs font-bold ${isNegative ? 'text-red-600' : (isPositive ? 'text-emerald-600' : 'text-slate-500')}`}>
+                                                        <span className="flex items-center gap-1">
+                                                            {diff > 0 ? '+' : ''}{diff.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg
+                                                            {(isNegative && isSignificant) && <WarningIcon className="h-4 w-4 text-red-500" />}
+                                                        </span>
+                                                        <span className="opacity-75">
+                                                            ({percent > 0 ? '+' : ''}{percent.toFixed(1)}%)
+                                                        </span>
                                                     </div>
-                                                </div>
-                                            ) : null}
-                                        </div>
-                                    </div>
-                                )
-                            })}
-                            <button type="button" onClick={handleAddLot} className="w-full py-4 bg-white border-2 border-dashed border-slate-300 text-slate-500 hover:text-[#0F3F5C] hover:border-[#0F3F5C] font-bold rounded-xl transition shadow-sm">
-                                + Adicionar Outro Lote
-                            </button>
-                        </div>
+                                                ) : <span className="text-slate-300">-</span>}
+                                            </td>
+
+                                            <td className="p-3 align-top text-center"><button type="button" onClick={() => handleRemoveLot(index)} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"><TrashIcon className="h-5 w-5" /></button></td>
+                                        </tr>
+                                    )
+                                })}
+                                {/* Add Button Row inside table */}
+                                <tr>
+                                    <td colSpan={10} className="p-3 bg-slate-50/50 font-medium">
+                                        <button type="button" onClick={handleAddLot} className="flex items-center gap-2 text-[#0F3F5C] hover:text-[#0A2A3D] font-bold py-2 px-4 rounded-lg border-2 border-dashed border-slate-300 hover:border-[#0F3F5C] transition w-full justify-center">
+                                            <span>+ Adicionar Outro Lote</span>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
 
-                    {/* Footer Actions */}
-                    <div className="p-4 md:p-6 bg-slate-50 border-t border-slate-200 flex flex-col md:flex-row justify-end gap-4">
-                        <button type="button" onClick={onClose} className="px-6 py-3 rounded-lg font-bold text-slate-600 hover:bg-slate-200 transition">
-                            Cancelar Operação
-                        </button>
-                        <button type="submit" className="bg-[#0F3F5C] hover:bg-[#0A2A3D] text-white font-bold py-3 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition flex items-center justify-center gap-2">
-                            <CheckCircleIcon className="h-5 w-5" />
-                            Finalizar e Adicionar ao Estoque
+                    {/* Mobile List View */}
+                    <div className="md:hidden p-4 space-y-4">
+                        {lots.map((lot, index) => {
+                            const diff = (lot.scaleWeight || 0) - (lot.labelWeight || 0);
+                            const percent = lot.labelWeight ? (diff / lot.labelWeight) * 100 : 0;
+                            const isSignificant = Math.abs(percent) > 0.5;
+                            const isNegative = diff < 0;
+                            const isPositive = diff > 0;
+
+                            return (
+                                <div key={index} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 relative">
+                                    <div className="absolute top-4 right-4">
+                                        <button type="button" onClick={() => handleRemoveLot(index)} className="text-red-500 bg-red-50 p-2 rounded-lg hover:bg-red-100">
+                                            <TrashIcon className="h-5 w-5" />
+                                        </button>
+                                    </div>
+                                    <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                        <span className="bg-slate-100 text-slate-500 text-xs px-2 py-1 rounded">#{index + 1}</span>
+                                        Lote
+                                    </h3>
+
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Lote Interno</label>
+                                            <input type="text" value={lot.internalLot || ''} onChange={e => handleLotChange(index, 'internalLot', e.target.value)} className="w-full p-3 border border-slate-300 rounded-lg outline-none" placeholder="Ex: INT-001" />
+                                            {duplicateErrors[index] && <p className="text-red-500 text-xs mt-1 font-bold">{duplicateErrors[index]}</p>}
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Lote Forn.</label>
+                                                <input type="text" value={lot.supplierLot || ''} onChange={e => handleLotChange(index, 'supplierLot', e.target.value)} className="w-full p-3 border border-slate-300 rounded-lg outline-none" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Fornecedor</label>
+                                                <input type="text" value={lot.supplier || ''} onChange={e => handleLotChange(index, 'supplier', e.target.value)} className="w-full p-3 border border-slate-300 rounded-lg outline-none" placeholder={conferenceData.supplier || "Fornecedor"} />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Corrida</label>
+                                            <input type="text" value={lot.runNumber || ''} onChange={e => handleLotChange(index, 'runNumber', e.target.value)} className="w-full p-3 border border-slate-300 rounded-lg outline-none" />
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Material</label>
+                                                <select value={lot.materialType} onChange={e => handleLotChange(index, 'materialType', e.target.value)} className="w-full p-3 border border-slate-300 rounded-lg bg-white outline-none">
+                                                    {MaterialOptions.map(m => <option key={m} value={m}>{m}</option>)}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Bitola</label>
+                                                <select value={lot.bitola} onChange={e => handleLotChange(index, 'bitola', e.target.value)} className="w-full p-3 border border-slate-300 rounded-lg bg-white outline-none">
+                                                    {allBitolaOptions.map(b => <option key={b} value={b}>{b}</option>)}
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4 pt-2">
+                                            <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Etiqueta (kg)</label>
+                                                <input type="number" step="0.01" value={lot.labelWeight || ''} onChange={e => handleLotChange(index, 'labelWeight', parseFloat(e.target.value))} className="w-full p-2 bg-white border border-slate-200 rounded font-bold text-center" placeholder="0.00" />
+                                            </div>
+                                            <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100">
+                                                <label className="block text-xs font-bold text-emerald-600 uppercase mb-1">Balança (kg)</label>
+                                                <input type="number" step="0.01" value={lot.scaleWeight || ''} onChange={e => handleLotChange(index, 'scaleWeight', parseFloat(e.target.value))} className="w-full p-2 bg-white border border-emerald-200 rounded font-bold text-center text-emerald-700" placeholder="0.00" />
+                                            </div>
+                                        </div>
+
+                                        {/* Mobile Difference Row */}
+                                        {(lot.labelWeight && lot.scaleWeight) ? (
+                                            <div className={`mt-2 p-3 rounded-lg border flex items-center justify-between ${isNegative ? 'bg-red-50 border-red-200 text-red-800' : (isPositive ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-slate-50 border-slate-200 text-slate-600')}`}>
+                                                <span className="text-xs font-bold uppercase">Diferença</span>
+                                                <div className="flex items-center gap-2 font-bold text-sm">
+                                                    <span>{diff > 0 ? '+' : ''}{diff.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg ({diff > 0 ? '+' : ''}{percent.toFixed(1)}%)</span>
+                                                    {(isNegative && isSignificant) && <WarningIcon className="h-5 w-5 text-red-600" />}
+                                                </div>
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                </div>
+                            )
+                        })}
+                        <button type="button" onClick={handleAddLot} className="w-full py-4 bg-white border-2 border-dashed border-slate-300 text-slate-500 hover:text-[#0F3F5C] hover:border-[#0F3F5C] font-bold rounded-xl transition shadow-sm">
+                            + Adicionar Outro Lote
                         </button>
                     </div>
-                </form>
-            </div>
+                </div>
+
+                {/* Footer Actions */}
+                <div className="p-4 md:p-6 bg-slate-50 border-t border-slate-200 flex flex-col md:flex-row justify-end gap-4">
+                    <button type="button" onClick={onClose} className="px-6 py-3 rounded-lg font-bold text-slate-600 hover:bg-slate-200 transition">
+                        Cancelar Operação
+                    </button>
+                </div>
+            </form>
         </div>
     );
 };
@@ -547,7 +549,9 @@ const StockControl: React.FC<{
     productionOrders: ProductionOrderData[];
     initialView?: 'list' | 'map' | 'add';
     gauges: StockGauge[];
-}> = ({ stock, conferences, transfers, setPage, addConference, deleteStockItem, updateStockItem, createTransfer, editConference, deleteConference, productionOrders, initialView, gauges }) => {
+    currentUser: User | null;
+}> = ({ stock, conferences, transfers, setPage, addConference, deleteStockItem, updateStockItem, createTransfer, editConference, deleteConference, productionOrders, initialView, gauges, currentUser }) => {
+    const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor';
     const [isAddConferenceModalOpen, setIsAddConferenceModalOpen] = useState(initialView === 'add');
     const [isMultiLotTransferModalOpen, setIsMultiLotTransferModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<StockItem | null>(null);
@@ -585,7 +589,7 @@ const StockControl: React.FC<{
 
     const allBitolaOptions = useMemo(() => {
         if (gauges.length > 0) {
-            return [...new Set(gauges.map(g => g.gauge))].sort((a, b) => parseFloat(a) - parseFloat(b));
+            return [...new Set(gauges.map(g => String(g.gauge)))].sort((a, b) => parseFloat(String(a)) - parseFloat(String(b)));
         }
         return [...new Set([...FioMaquinaBitolaOptions, ...TrefilaBitolaOptions])].sort();
     }, [gauges]);
@@ -728,7 +732,7 @@ const StockControl: React.FC<{
             {conferenceReportData && <ConferenceReport reportData={conferenceReportData} onClose={() => setConferenceReportData(null)} />}
 
             {isAddConferenceModalOpen ? (
-                <AddConferencePage onClose={() => { setIsAddConferenceModalOpen(false); if (initialView === 'add') setPage('stock'); }} onSubmit={handleAddConferenceSubmit} stock={stock} onShowReport={setConferenceReportData} conferences={conferences} onEditConference={editConference} onDeleteConference={deleteConference} gauges={gauges} />
+                <AddConferencePage onClose={() => { setIsAddConferenceModalOpen(false); if (initialView === 'add') setPage('stock'); }} onSubmit={handleAddConferenceSubmit} stock={stock} onShowReport={setConferenceReportData} conferences={conferences} onEditConference={editConference} onDeleteConference={deleteConference} gauges={gauges} isGestor={isGestor} setPage={setPage} />
             ) : (
                 <div className="p-4 sm:p-6 md:p-8 space-y-6">
                     {/* Keeping Modals ... */}
