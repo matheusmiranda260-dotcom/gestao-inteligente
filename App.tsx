@@ -20,7 +20,9 @@ import PeopleManagement from './components/PeopleManagement';
 
 import StockInventory from './components/StockInventory';
 import StockTransfer from './components/StockTransfer';
+import GaugesManager from './components/GaugesManager';
 import { supabase } from './supabaseClient';
+import type { StockGauge } from './types';
 
 import { fetchTable, insertItem, updateItem, deleteItem, deleteItemByColumn, updateItemByColumn } from './services/supabaseService';
 import { useAllRealtimeSubscriptions } from './hooks/useSupabaseRealtime';
@@ -47,6 +49,7 @@ const App: React.FC = () => {
     const [trefilaProduction, setTrefilaProduction] = useState<ProductionRecord[]>([]);
     const [trelicaProduction, setTrelicaProduction] = useState<ProductionRecord[]>([]);
     const [inventorySessions, setInventorySessions] = useState<InventorySession[]>([]);
+    const [gauges, setGauges] = useState<StockGauge[]>([]);
 
     const [pendingKaizenCount, setPendingKaizenCount] = useState(0);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -78,7 +81,7 @@ const App: React.FC = () => {
                 const [
                     fetchedUsers, fetchedEmployees, fetchedStock, fetchedConferences, fetchedTransfers,
                     fetchedOrders, fetchedFinishedGoods, fetchedPontas, fetchedFGTransfers,
-                    fetchedParts, fetchedReports, fetchedProductionRecords, fetchedInvSessions
+                    fetchedParts, fetchedReports, fetchedProductionRecords, fetchedInvSessions, fetchedGauges
                 ] = await Promise.all([
                     fetchTable<User>('app_users'),
                     fetchTable<Employee>('employees'),
@@ -92,7 +95,8 @@ const App: React.FC = () => {
                     fetchTable<PartsRequest>('parts_requests'),
                     fetchTable<ShiftReport>('shift_reports'),
                     fetchTable<ProductionRecord>('production_records'),
-                    fetchTable<InventorySession>('inventory_sessions').catch(() => [])
+                    fetchTable<InventorySession>('inventory_sessions').catch(() => []),
+                    fetchTable<StockGauge>('stock_gauges').catch(() => [])
                 ]);
 
                 setUsers(fetchedUsers);
@@ -107,6 +111,7 @@ const App: React.FC = () => {
                 setPartsRequests(fetchedParts);
                 setShiftReports(fetchedReports);
                 setInventorySessions(fetchedInvSessions);
+                setGauges(fetchedGauges || []);
 
                 // Split production records
                 setTrefilaProduction(fetchedProductionRecords.filter(r => r.machine === 'Trefila'));
@@ -143,6 +148,7 @@ const App: React.FC = () => {
         setTrefilaProduction,
         setTrelicaProduction,
         setInventorySessions,
+        setGauges,
     }), []);
 
     useAllRealtimeSubscriptions(realtimeSetters, !!currentUser);
@@ -295,6 +301,26 @@ const App: React.FC = () => {
             showNotification('Usuário removido com sucesso!', 'success');
         } catch (error) {
             showNotification('Erro ao remover usuário.', 'error');
+        }
+    };
+
+    const addGauge = async (data: Omit<StockGauge, 'id'>) => {
+        try {
+            const saved = await insertItem<StockGauge>('stock_gauges', data as any);
+            setGauges(prev => [...prev, saved]);
+            showNotification('Bitola cadastrada com sucesso!', 'success');
+        } catch (error) {
+            showNotification('Erro ao cadastrar bitola.', 'error');
+        }
+    };
+
+    const deleteGauge = async (id: string) => {
+        try {
+            await deleteItem('stock_gauges', id);
+            setGauges(prev => prev.filter(g => g.id !== id));
+            showNotification('Bitola removida com sucesso!', 'success');
+        } catch (error) {
+            showNotification('Erro ao remover bitola.', 'error');
         }
     };
 
@@ -1636,16 +1662,16 @@ const App: React.FC = () => {
         switch (page) {
             case 'login': return <Login onLogin={handleLogin} error={notification?.type === 'error' ? notification.message : null} />;
             case 'menu': return <MainMenu setPage={setPage} onLogout={handleLogout} currentUser={currentUser} />;
-            case 'stock': return <StockControl stock={stock} conferences={conferences} transfers={transfers} setPage={setPage} addConference={addConference} deleteStockItem={deleteStockItem} updateStockItem={(item) => updateStockItem(item.id, item)} createTransfer={createTransfer} editConference={editConference} deleteConference={deleteConference} productionOrders={productionOrders} initialView="list" />;
-            case 'stock_map': return <StockControl stock={stock} conferences={conferences} transfers={transfers} setPage={setPage} addConference={addConference} deleteStockItem={deleteStockItem} updateStockItem={(item) => updateStockItem(item.id, item)} createTransfer={createTransfer} editConference={editConference} deleteConference={deleteConference} productionOrders={productionOrders} initialView="map" />;
-            case 'stock_add': return <StockControl stock={stock} conferences={conferences} transfers={transfers} setPage={setPage} addConference={addConference} deleteStockItem={deleteStockItem} updateStockItem={(item) => updateStockItem(item.id, item)} createTransfer={createTransfer} editConference={editConference} deleteConference={deleteConference} productionOrders={productionOrders} initialView="add" />;
-            case 'stock_inventory': return <StockInventory stock={stock} setPage={setPage} updateStockItem={updateStockItem} addStockItem={addStockItem} inventorySessions={inventorySessions} addInventorySession={addInventorySession} updateInventorySession={updateInventorySession} deleteInventorySession={deleteInventorySession} currentUser={currentUser} />;
+            case 'stock': return <StockControl stock={stock} conferences={conferences} transfers={transfers} setPage={setPage} addConference={addConference} deleteStockItem={deleteStockItem} updateStockItem={(item) => updateStockItem(item.id, item)} createTransfer={createTransfer} editConference={editConference} deleteConference={deleteConference} productionOrders={productionOrders} initialView="list" gauges={gauges} />;
+            case 'stock_map': return <StockControl stock={stock} conferences={conferences} transfers={transfers} setPage={setPage} addConference={addConference} deleteStockItem={deleteStockItem} updateStockItem={(item) => updateStockItem(item.id, item)} createTransfer={createTransfer} editConference={editConference} deleteConference={deleteConference} productionOrders={productionOrders} initialView="map" gauges={gauges} />;
+            case 'stock_add': return <StockControl stock={stock} conferences={conferences} transfers={transfers} setPage={setPage} addConference={addConference} deleteStockItem={deleteStockItem} updateStockItem={(item) => updateStockItem(item.id, item)} createTransfer={createTransfer} editConference={editConference} deleteConference={deleteConference} productionOrders={productionOrders} initialView="add" gauges={gauges} />;
+            case 'stock_inventory': return <StockInventory stock={stock} setPage={setPage} updateStockItem={updateStockItem} addStockItem={addStockItem} inventorySessions={inventorySessions} addInventorySession={addInventorySession} updateInventorySession={updateInventorySession} deleteInventorySession={deleteInventorySession} currentUser={currentUser} gauges={gauges} />;
             case 'stock_transfer': return <StockTransfer stock={stock} transfers={transfers} setPage={setPage} createTransfer={createTransfer} />;
             case 'trefila': return <MachineControl machineType="Trefila" {...mcProps} />;
             case 'trelica': return <MachineControl machineType="Treliça" {...mcProps} />;
             case 'machineSelection': return <MachineSelection setPage={setPage} />;
-            case 'productionOrder': return <ProductionOrder setPage={setPage} stock={stock} productionOrders={productionOrders} addProductionOrder={addProductionOrder} showNotification={showNotification} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} />;
-            case 'productionOrderTrelica': return <ProductionOrderTrelica setPage={setPage} stock={stock} productionOrders={productionOrders} addProductionOrder={addProductionOrder} showNotification={showNotification} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} />;
+            case 'productionOrder': return <ProductionOrder setPage={setPage} stock={stock} productionOrders={productionOrders} addProductionOrder={addProductionOrder} showNotification={showNotification} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} gauges={gauges} />;
+            case 'productionOrderTrelica': return <ProductionOrderTrelica setPage={setPage} stock={stock} productionOrders={productionOrders} addProductionOrder={addProductionOrder} showNotification={showNotification} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} gauges={gauges} />;
             case 'productionDashboard': return <ProductionDashboard setPage={setPage} productionOrders={productionOrders} stock={stock} currentUser={currentUser} />;
             case 'reports': return <Reports setPage={setPage} stock={stock} trefilaProduction={trefilaProduction} trelicaProduction={trelicaProduction} />;
             case 'userManagement': return <UserManagement users={users} employees={employees} addUser={addUser} updateUser={updateUser} deleteUser={deleteUser} setPage={setPage} />;
@@ -1654,6 +1680,7 @@ const App: React.FC = () => {
             case 'continuousImprovement': return <ContinuousImprovement setPage={setPage} />;
             case 'workInstructions': return <WorkInstructions setPage={setPage} />;
             case 'peopleManagement': return <PeopleManagement setPage={setPage} currentUser={currentUser} />;
+            case 'gaugesManager': return <GaugesManager gauges={gauges} onClose={() => setPage('menu')} onAdd={addGauge} onDelete={deleteGauge} />;
 
             default: return <Login onLogin={handleLogin} error={null} />;
         }

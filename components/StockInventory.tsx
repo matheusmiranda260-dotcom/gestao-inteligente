@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import type { StockItem, Page, InventorySession, User } from '../types';
+import type { StockItem, Page, InventorySession, User, StockGauge, Bitola } from '../types';
 import { MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions } from '../types';
 import { PrinterIcon, ArrowLeftIcon, SearchIcon, FilterIcon, CheckCircleIcon, XCircleIcon, ScaleIcon, SaveIcon, ChevronRightIcon, PlusIcon, ChatBubbleLeftRightIcon, ClockIcon, LockClosedIcon, LockOpenIcon, ExclamationTriangleIcon, ArrowPathIcon, TrashIcon } from './icons';
 import InventorySessionReport from './InventorySessionReport';
@@ -14,11 +14,12 @@ interface StockInventoryProps {
     updateInventorySession: (id: string, updates: Partial<InventorySession>) => Promise<void>;
     deleteInventorySession: (id: string) => Promise<void>;
     currentUser: User | null;
+    gauges: StockGauge[];
 }
 
 type AuditStep = 'select' | 'list' | 'confirm' | 'quick-add';
 
-const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateStockItem, addStockItem, inventorySessions, addInventorySession, updateInventorySession, deleteInventorySession, currentUser }) => {
+const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateStockItem, addStockItem, inventorySessions, addInventorySession, updateInventorySession, deleteInventorySession, currentUser, gauges }) => {
     const [mode, setMode] = useState<'report' | 'audit'>(window.innerWidth < 768 ? 'audit' : 'report');
     const [reportFilters, setReportFilters] = useState({
         searchTerm: '',
@@ -137,9 +138,12 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
     };
 
     const allBitolaOptions = useMemo(() => {
+        if (gauges.length > 0) {
+            return [...new Set(gauges.map(g => g.gauge))].sort((a, b) => parseFloat(a) - parseFloat(b));
+        }
         const opts = new Set([...FioMaquinaBitolaOptions, ...TrefilaBitolaOptions]);
         return Array.from(opts).map(normalizeBitola).sort();
-    }, []);
+    }, [gauges]);
 
     // 1. Filtered stock for the main report view
     const filteredReportStock = useMemo(() => {
@@ -799,7 +803,10 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                                     className="w-full bg-slate-900 text-white border border-slate-700 rounded-2xl p-4 font-bold focus:border-blue-500 outline-none !bg-slate-900"
                                                 >
                                                     <option value="" className="bg-slate-900 text-white">Selecione</option>
-                                                    {allBitolaOptions.map(b => <option key={b} value={b} className="bg-slate-900 text-white">{b}</option>)}
+                                                    {(gauges.length > 0
+                                                        ? gauges.filter(g => g.material_type === quickAddData.materialType).map(g => g.gauge)
+                                                        : (quickAddData.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : TrefilaBitolaOptions)
+                                                    ).map(b => <option key={b} value={b} className="bg-slate-900 text-white">{b}</option>)}
                                                 </select>
                                             </div>
                                         </>

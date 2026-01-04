@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Page, StockItem, ProductionOrderData, Bitola } from '../types';
+import type { Page, StockItem, ProductionOrderData, Bitola, StockGauge } from '../types';
 import { ArrowLeftIcon, WarningIcon, ClipboardListIcon, DocumentReportIcon, CheckCircleIcon } from './icons';
 import ProductionOrderHistoryModal from './ProductionOrderHistoryModal';
 import ProductionOrderReport from './ProductionOrderReport';
@@ -36,6 +36,7 @@ interface ProductionOrderTrelicaProps {
     showNotification: (message: string, type: 'success' | 'error') => void;
     updateProductionOrder: (orderId: string, data: { orderNumber?: string; targetBitola?: Bitola }) => void;
     deleteProductionOrder: (orderId: string) => void;
+    gauges: StockGauge[];
 }
 
 const WeightIndicator: React.FC<{ required: number; selected: number; label?: string }> = ({ required, selected, label }) => {
@@ -169,7 +170,7 @@ const MultiLotSelector: React.FC<MultiLotSelectorProps> = ({ label, subLabel, av
     );
 };
 
-const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage, stock, productionOrders, addProductionOrder, showNotification, updateProductionOrder, deleteProductionOrder }) => {
+const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage, stock, productionOrders, addProductionOrder, showNotification, updateProductionOrder, deleteProductionOrder, gauges }) => {
     const [orderNumber, setOrderNumber] = useState('');
     const [selectedModel, setSelectedModel] = useState<TrelicaModel | null>(null);
     const [quantity, setQuantity] = useState(1);

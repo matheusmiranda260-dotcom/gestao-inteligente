@@ -15,7 +15,7 @@ export interface TrelicaSelectedLots {
     allSenozoideRight?: string[];
 }
 
-export type Page = 'login' | 'menu' | 'stock' | 'stock_map' | 'stock_add' | 'stock_inventory' | 'stock_transfer' | 'machineSelection' | 'trefila' | 'trelica' | 'productionOrder' | 'productionOrderTrelica' | 'reports' | 'userManagement' | 'productionDashboard' | 'finishedGoods' | 'partsManager' | 'continuousImprovement' | 'workInstructions' | 'peopleManagement';
+export type Page = 'login' | 'menu' | 'stock' | 'stock_map' | 'stock_add' | 'stock_inventory' | 'stock_transfer' | 'machineSelection' | 'trefila' | 'trelica' | 'productionOrder' | 'productionOrderTrelica' | 'reports' | 'userManagement' | 'productionDashboard' | 'finishedGoods' | 'partsManager' | 'continuousImprovement' | 'workInstructions' | 'peopleManagement' | 'gaugesManager';
 
 export interface InstructionStep {
     id: string;
@@ -62,7 +62,13 @@ export type MachineType = 'Trefila' | 'Treliça';
 
 export const FioMaquinaBitolaOptions = ['8.00', '7.00', '6.50', '6.35', '5.50'] as const;
 export const TrefilaBitolaOptions = ['3.40', '3.80', '4.20', '4.60', '5.00', '5.40', '6.00', '6.35', '3.20', '5.60', '5.80', '8.00', '6.00', '5.00'] as const;
-export type Bitola = typeof FioMaquinaBitolaOptions[number] | typeof TrefilaBitolaOptions[number];
+export type Bitola = string;
+
+export interface StockGauge {
+    id: string;
+    material_type: string;
+    gauge: string;
+}
 
 export const MaterialOptions = ['Fio Máquina', 'CA-60'] as const;
 export type MaterialType = typeof MaterialOptions[number];

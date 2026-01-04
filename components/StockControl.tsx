@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import type { Page, StockItem, ConferenceData, ConferenceLotData, Bitola, MaterialType, TransferRecord, ProductionOrderData } from '../types';
+import type { Page, StockItem, ConferenceData, ConferenceLotData, Bitola, MaterialType, TransferRecord, ProductionOrderData, StockGauge } from '../types';
 import { MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions } from '../types';
 import { ArrowLeftIcon, PencilIcon, TrashIcon, WarningIcon, BookOpenIcon, TruckIcon, DocumentReportIcon, PrinterIcon, LockOpenIcon, ClipboardListIcon, ChartBarIcon, XCircleIcon, ArchiveIcon, LocationOffIcon, CheckCircleIcon, ScaleIcon } from './icons';
 
@@ -51,18 +51,41 @@ const AddConferencePage: React.FC<{
     conferences: ConferenceData[];
     onEditConference: (id: string, data: ConferenceData) => void;
     onDeleteConference: (id: string) => void;
-}> = ({ onClose, onSubmit, stock, onShowReport, conferences, onEditConference, onDeleteConference }) => {
+    gauges: StockGauge[];
+}> = ({ onClose, onSubmit, stock, onShowReport, conferences, onEditConference, onDeleteConference, gauges }) => {
     const [conferenceData, setConferenceData] = useState<Omit<ConferenceData, 'lots'>>({
         entryDate: new Date().toISOString().split('T')[0],
         supplier: '',
         nfe: '',
         conferenceNumber: '',
     });
-    const [lots, setLots] = useState<Partial<ConferenceLotData>[]>([{ internalLot: '', supplierLot: '', runNumber: '', bitola: FioMaquinaBitolaOptions[0], materialType: 'Fio Máquina', labelWeight: 0, scaleWeight: 0, supplier: '' }]);
+
+    // Initial bitola depends on default material
+    const getInitialBitola = (material: string) => {
+        const materialGauges = gauges.filter(g => g.material_type === material).map(g => g.gauge);
+        if (materialGauges.length > 0) return materialGauges[0];
+        return material === 'Fio Máquina' ? FioMaquinaBitolaOptions[0] : TrefilaBitolaOptions[0];
+    };
+
+    const [lots, setLots] = useState<Partial<ConferenceLotData>[]>([{
+        internalLot: '',
+        supplierLot: '',
+        runNumber: '',
+        bitola: getInitialBitola('Fio Máquina'),
+        materialType: 'Fio Máquina',
+        labelWeight: 0,
+        scaleWeight: 0,
+        supplier: ''
+    }]);
     const [duplicateErrors, setDuplicateErrors] = useState<Record<number, string>>({});
     const [historyOpen, setHistoryOpen] = useState(false);
 
-    const allBitolaOptions: Bitola[] = [...new Set([...FioMaquinaBitolaOptions, ...TrefilaBitolaOptions])] as Bitola[];
+    const allBitolaOptions: Bitola[] = useMemo(() => {
+        if (gauges.length > 0) {
+            return [...new Set(gauges.map(g => g.gauge))].sort((a, b) => parseFloat(a) - parseFloat(b));
+        }
+        return [...new Set([...FioMaquinaBitolaOptions, ...TrefilaBitolaOptions])].sort() as Bitola[];
+    }, [gauges]);
 
     const prevSupplierRef = useRef(conferenceData.supplier);
 
@@ -103,7 +126,7 @@ const AddConferencePage: React.FC<{
     const handleAddLot = () => {
         const lastLot = lots.length > 0 ? lots[lots.length - 1] : null;
         const defaultMaterial = lastLot?.materialType || 'Fio Máquina';
-        const defaultBitola = lastLot?.bitola || FioMaquinaBitolaOptions[0];
+        const defaultBitola = lastLot?.bitola || getInitialBitola(defaultMaterial);
 
         setLots([...lots, {
             internalLot: '',
@@ -240,7 +263,10 @@ const AddConferencePage: React.FC<{
                                                 </td>
                                                 <td className="p-3 align-top">
                                                     <select value={lot.bitola} onChange={e => handleLotChange(index, 'bitola', e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white outline-none">
-                                                        {allBitolaOptions.map(b => <option key={b} value={b}>{b}</option>)}
+                                                        {(gauges.length > 0
+                                                            ? gauges.filter(g => g.material_type === lot.materialType).map(g => g.gauge)
+                                                            : (lot.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : TrefilaBitolaOptions)
+                                                        ).map(b => <option key={b} value={b}>{b}</option>)}
                                                     </select>
                                                 </td>
                                                 <td className="p-3 align-top"><input type="number" step="0.01" value={lot.labelWeight || ''} onChange={e => handleLotChange(index, 'labelWeight', parseFloat(e.target.value))} className="w-24 p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none font-medium" required placeholder="0.00" /></td>
@@ -520,7 +546,8 @@ const StockControl: React.FC<{
     deleteConference: (conferenceNumber: string) => void;
     productionOrders: ProductionOrderData[];
     initialView?: 'list' | 'map' | 'add';
-}> = ({ stock, conferences, transfers, setPage, addConference, deleteStockItem, updateStockItem, createTransfer, editConference, deleteConference, productionOrders, initialView }) => {
+    gauges: StockGauge[];
+}> = ({ stock, conferences, transfers, setPage, addConference, deleteStockItem, updateStockItem, createTransfer, editConference, deleteConference, productionOrders, initialView, gauges }) => {
     const [isAddConferenceModalOpen, setIsAddConferenceModalOpen] = useState(initialView === 'add');
     const [isMultiLotTransferModalOpen, setIsMultiLotTransferModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<StockItem | null>(null);
@@ -556,7 +583,12 @@ const StockControl: React.FC<{
     const [bitolaFilter, setBitolaFilter] = useState('');
     const [selectedLotIdsForTransfer, setSelectedLotIdsForTransfer] = useState<string[]>([]);
 
-    const allBitolaOptions = useMemo(() => [...new Set([...FioMaquinaBitolaOptions, ...TrefilaBitolaOptions])].sort(), []);
+    const allBitolaOptions = useMemo(() => {
+        if (gauges.length > 0) {
+            return [...new Set(gauges.map(g => g.gauge))].sort((a, b) => parseFloat(a) - parseFloat(b));
+        }
+        return [...new Set([...FioMaquinaBitolaOptions, ...TrefilaBitolaOptions])].sort();
+    }, [gauges]);
 
     const [mappedFilter, setMappedFilter] = useState<'all' | 'mapped' | 'unmapped'>('all');
 
@@ -696,7 +728,7 @@ const StockControl: React.FC<{
             {conferenceReportData && <ConferenceReport reportData={conferenceReportData} onClose={() => setConferenceReportData(null)} />}
 
             {isAddConferenceModalOpen ? (
-                <AddConferencePage onClose={() => { setIsAddConferenceModalOpen(false); if (initialView === 'add') setPage('stock'); }} onSubmit={handleAddConferenceSubmit} stock={stock} onShowReport={setConferenceReportData} conferences={conferences} onEditConference={editConference} onDeleteConference={deleteConference} />
+                <AddConferencePage onClose={() => { setIsAddConferenceModalOpen(false); if (initialView === 'add') setPage('stock'); }} onSubmit={handleAddConferenceSubmit} stock={stock} onShowReport={setConferenceReportData} conferences={conferences} onEditConference={editConference} onDeleteConference={deleteConference} gauges={gauges} />
             ) : (
                 <div className="p-4 sm:p-6 md:p-8 space-y-6">
                     {/* Keeping Modals ... */}

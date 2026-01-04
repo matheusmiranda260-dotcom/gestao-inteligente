@@ -288,6 +288,15 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser }) =
                                 color="indigo"
                             />
                         )}
+                        {isGestor && (
+                            <MenuButton
+                                onClick={() => setPage('gaugesManager')}
+                                label="Gerenciar Bitolas"
+                                description="Configuração de bitolas de Fio Máquina e CA-60."
+                                icon={<AdjustmentsIcon />}
+                                color="blue"
+                            />
+                        )}
                         {hasPermission('partsManager') && (
                             <MenuButton
                                 onClick={() => setPage('partsManager')}

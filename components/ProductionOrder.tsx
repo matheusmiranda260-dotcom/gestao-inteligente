@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Page, StockItem, ProductionOrderData, Bitola } from '../types';
+import type { Page, StockItem, ProductionOrderData, Bitola, StockGauge } from '../types';
 import { TrefilaBitolaOptions, FioMaquinaBitolaOptions } from '../types';
 import { ArrowLeftIcon, WarningIcon, ClipboardListIcon, PencilIcon, TrashIcon } from './icons';
 import ProductionOrderHistoryModal from './ProductionOrderHistoryModal';
@@ -13,11 +13,22 @@ interface ProductionOrderProps {
     showNotification: (message: string, type: 'success' | 'error') => void;
     updateProductionOrder: (orderId: string, data: { orderNumber?: string; targetBitola?: Bitola }) => void;
     deleteProductionOrder: (orderId: string) => void;
+    gauges: StockGauge[];
 }
 
-const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, productionOrders, addProductionOrder, showNotification, updateProductionOrder, deleteProductionOrder }) => {
+const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, productionOrders, addProductionOrder, showNotification, updateProductionOrder, deleteProductionOrder, gauges }) => {
     const [orderNumber, setOrderNumber] = useState('');
-    const [targetBitola, setTargetBitola] = useState<Bitola>(TrefilaBitolaOptions[0]);
+
+    const initialTargetBitola = useMemo(() => {
+        const trefilaGauges = gauges.filter(g => g.material_type === 'CA-60').map(g => g.gauge);
+        return (trefilaGauges.length > 0 ? trefilaGauges[0] : TrefilaBitolaOptions[0]) as Bitola;
+    }, [gauges]);
+
+    const [targetBitola, setTargetBitola] = useState<Bitola>(initialTargetBitola);
+
+    useEffect(() => {
+        setTargetBitola(initialTargetBitola);
+    }, [initialTargetBitola]);
     const [selectedLotIds, setSelectedLotIds] = useState<string[]>([]);
     const [inputBitolaFilter, setInputBitolaFilter] = useState<Bitola | ''>('');
     const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -159,7 +170,10 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
                                         className="mt-1 p-2 w-full border border-slate-300 rounded-md bg-white"
                                     >
                                         <option value="">Selecione a bitola de entrada</option>
-                                        {FioMaquinaBitolaOptions.map(b => <option key={b} value={b}>{b}</option>)}
+                                        {(gauges.length > 0
+                                            ? gauges.filter(g => g.material_type === 'Fio Máquina').map(g => g.gauge)
+                                            : FioMaquinaBitolaOptions
+                                        ).map(b => <option key={b} value={b}>{b}</option>)}
                                     </select>
                                 </div>
                                 <div>
@@ -170,7 +184,10 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
                                         onChange={(e) => setTargetBitola(e.target.value as Bitola)}
                                         className="mt-1 p-2 w-full border border-slate-300 rounded-md bg-white"
                                     >
-                                        {TrefilaBitolaOptions.map(b => <option key={b} value={b}>{b}</option>)}
+                                        {(gauges.length > 0
+                                            ? gauges.filter(g => g.material_type === 'CA-60').map(g => g.gauge)
+                                            : TrefilaBitolaOptions
+                                        ).map(b => <option key={b} value={b}>{b}</option>)}
                                     </select>
                                 </div>
                             </div>
