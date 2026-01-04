@@ -290,16 +290,10 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
     const confirmAudit = async () => {
         if (!selectedLot || isAuditLocked) return;
         setIsSaving(true);
-        const newWeight = parseFloat(physicalWeight);
+        const newWeight = parseFloat(physicalWeight || '0');
         const diff = newWeight - selectedLot.remainingQuantity;
 
         try {
-            /* 
-               Direct update removed by request. 
-               Stock is only updated when a manager approves the session on desktop.
-            */
-            // await updateStockItem(selectedLot.id, { ... });
-
             setSessionAuditData(prev => {
                 const next = new Map(prev);
                 next.set(selectedLot.id, {
@@ -338,6 +332,18 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
         } finally {
             setIsSaving(false);
         }
+    };
+
+    const handleMarkNotFound = () => {
+        if (!selectedLot) return;
+        if (!confirm(`Confirmar que o lote ${selectedLot.internalLot} NÃO foi encontrado fisicamente?`)) return;
+        setPhysicalWeight('0');
+        setAuditObservation('LOTE NÃO ENCONTRADO (FÍSICO)');
+        // We delay confirmAudit slightly to ensure state is set (or just call it with 0/obs directly)
+        setTimeout(() => {
+            const btn = document.getElementById('confirm-audit-btn');
+            if (btn) btn.click();
+        }, 100);
     };
 
     const handleQuickAdd = async () => {
@@ -906,19 +912,29 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                         />
                                     </div>
 
-                                    <div className="flex gap-3 pt-4">
+                                    <div className="flex flex-col gap-3 pt-4">
+                                        <div className="flex gap-3">
+                                            <button
+                                                onClick={() => setAuditStep('list')}
+                                                className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-600 py-5 rounded-3xl font-black transition-all"
+                                            >
+                                                VOLTAR
+                                            </button>
+                                            <button
+                                                id="confirm-audit-btn"
+                                                onClick={confirmAudit}
+                                                disabled={isSaving || physicalWeight === ''}
+                                                className="flex-[2] bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white py-5 rounded-3xl font-black flex items-center justify-center gap-3 shadow-xl shadow-emerald-900/20 active:scale-95 transition-all"
+                                            >
+                                                {isSaving ? 'SALVANDO...' : <><SaveIcon className="h-6 w-6" /> CONFIRMAR</>}
+                                            </button>
+                                        </div>
                                         <button
-                                            onClick={() => setAuditStep('list')}
-                                            className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-600 py-5 rounded-3xl font-black transition-all"
+                                            onClick={handleMarkNotFound}
+                                            disabled={isSaving}
+                                            className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 border-2 border-rose-200 py-4 rounded-3xl font-black flex items-center justify-center gap-2 transition-all shadow-sm"
                                         >
-                                            VOLTAR
-                                        </button>
-                                        <button
-                                            onClick={confirmAudit}
-                                            disabled={isSaving || !physicalWeight}
-                                            className="flex-[2] bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white py-5 rounded-3xl font-black flex items-center justify-center gap-3 shadow-xl shadow-emerald-900/20 active:scale-95 transition-all"
-                                        >
-                                            {isSaving ? 'SALVANDO...' : <><SaveIcon className="h-6 w-6" /> CONFIRMAR</>}
+                                            <ExclamationTriangleIcon className="h-5 w-5" /> LOTE NÃO ENCONTRADO (FÍSICO)
                                         </button>
                                     </div>
                                 </div>

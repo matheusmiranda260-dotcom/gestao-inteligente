@@ -90,15 +90,21 @@ const InventorySessionReport: React.FC<InventorySessionReportProps> = ({ session
                                         const diff = lot.physicalWeight - lot.systemWeight;
                                         const hasDiff = Math.abs(diff) > 0.01;
                                         const isExtra = lot.systemWeight === 0 && lot.physicalWeight > 0;
+                                        const isNotFound = lot.physicalWeight === 0 && lot.systemWeight > 0;
 
                                         return (
-                                            <tr key={index} className={`border-b border-slate-200 ${isExtra ? 'bg-amber-50' : ''}`}>
+                                            <tr key={index} className={`border-b border-slate-200 ${isExtra ? 'bg-amber-50' : isNotFound ? 'bg-rose-50' : ''}`}>
                                                 <td className="px-2 py-2 border-r border-slate-300 text-center">{index + 1}</td>
                                                 <td className="px-2 py-2 border-r border-slate-300 text-center relative">
                                                     <div className="font-black tracking-wider text-sm">{lot.internalLot}</div>
                                                     {isExtra && (
                                                         <div className="text-[7px] bg-amber-600 text-white font-black px-1 rounded absolute top-0.5 right-0.5 leading-tight no-print">
                                                             NOVO
+                                                        </div>
+                                                    )}
+                                                    {isNotFound && (
+                                                        <div className="text-[7px] bg-rose-600 text-white font-black px-1 rounded absolute top-0.5 right-0.5 leading-tight no-print">
+                                                            NÃO ENCONTRADO
                                                         </div>
                                                     )}
                                                 </td>
@@ -109,18 +115,27 @@ const InventorySessionReport: React.FC<InventorySessionReportProps> = ({ session
                                                         lot.systemWeight.toLocaleString('pt-BR', { minimumFractionDigits: 0 })
                                                     )}
                                                 </td>
-                                                <td className="px-2 py-2 border-r border-slate-300 text-right font-black text-sm">{lot.physicalWeight.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}</td>
+                                                <td className="px-2 py-2 border-r border-slate-300 text-right font-black text-sm">
+                                                    {isNotFound ? (
+                                                        <span className="text-rose-600 uppercase font-black text-[9px]">Lote em Falta</span>
+                                                    ) : (
+                                                        lot.physicalWeight.toLocaleString('pt-BR', { minimumFractionDigits: 0 })
+                                                    )}
+                                                </td>
                                                 <td className={`px-2 py-2 border-r border-slate-300 text-right font-black ${hasDiff ? (diff > 0 ? 'text-emerald-700' : 'text-rose-700') : 'text-slate-400'}`}>
                                                     {isExtra ? (
                                                         <span className="text-amber-700">+{lot.physicalWeight.toFixed(0)}</span>
+                                                    ) : isNotFound ? (
+                                                        <span className="text-rose-700">-{lot.systemWeight.toFixed(0)}</span>
                                                     ) : (
                                                         <>{diff > 0 ? '+' : ''}{diff.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}</>
                                                     )}
                                                 </td>
                                                 <td className="px-2 py-2 italic text-slate-700">
                                                     {isExtra && <span className="text-amber-800 font-black not-italic text-[10px] block mb-1 uppercase tracking-tighter">⚠️ VERIFICAÇÃO NECESSÁRIA: Lote encontrado no físico porém não estava no sistema.</span>}
+                                                    {isNotFound && <span className="text-rose-800 font-black not-italic text-[10px] block mb-1 uppercase tracking-tighter">🚨 ALERTA CRÍTICO: Lote registrado no sistema mas NÃO FOI LOCALIZADO no pátio.</span>}
                                                     {lot.observation ? (
-                                                        <div className="flex items-start gap-1.5 bg-rose-50 p-1.5 rounded border border-rose-100">
+                                                        <div className={`flex items-start gap-1.5 ${isNotFound ? 'bg-rose-100/50' : 'bg-rose-50'} p-1.5 rounded border ${isNotFound ? 'border-rose-200' : 'border-rose-100'}`}>
                                                             <ChatBubbleLeftRightIcon className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
                                                             <span className="text-rose-900 font-bold not-italic text-[11px]">{lot.observation}</span>
                                                         </div>
