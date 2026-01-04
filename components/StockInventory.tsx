@@ -459,28 +459,56 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
 
         setIsSaving(true);
         try {
-            // Include ONLY lots checked in THIS session using sessionAuditData for accuracy
-            const auditedLots = Array.from(sessionAuditData.entries()).map(([lotId, data]) => {
-                const lot = stock.find(s => s.id === lotId) || tempNewLots.find(s => s.id === lotId);
+            // Include ALL items from the audit pool to ensure "Everything" is in the report
+            const poolLots = auditPool.map(item => {
+                const data = sessionAuditData.get(item.id);
+                if (data) {
+                    return {
+                        lotId: item.id,
+                        internalLot: item.internalLot,
+                        systemWeight: (data as any).systemWeight,
+                        physicalWeight: (data as any).physicalWeight,
+                        observation: (data as any).observation,
+                        isNotFound: (data as any).isNotFound || false,
+                    };
+                }
+                // Items that were NOT checked/scanned are marked as Missing (0 weight)
                 return {
-                    lotId,
-                    internalLot: lot?.internalLot || '?',
-                    systemWeight: (data as any).systemWeight,
-                    physicalWeight: (data as any).physicalWeight,
-                    observation: (data as any).observation,
-                    isNotFound: (data as any).isNotFound || false,
-                    tempLotData: lotId.startsWith('TEMP-') ? lot : null
+                    lotId: item.id,
+                    internalLot: item.internalLot,
+                    systemWeight: item.remainingQuantity,
+                    physicalWeight: 0,
+                    observation: 'NÃO LOCALIZADO/CONFERIDO NO PÁTIO',
+                    isNotFound: true
                 };
             });
+
+            // Include temporary lots (quick adds)
+            const tempLots = Array.from(sessionAuditData.entries())
+                .filter(([id]) => id.startsWith('TEMP-'))
+                .map(([lotId, data]) => {
+                    const lot = tempNewLots.find(s => s.id === lotId);
+                    return {
+                        lotId,
+                        internalLot: lot?.internalLot || '?',
+                        systemWeight: (data as any).systemWeight,
+                        physicalWeight: (data as any).physicalWeight,
+                        observation: (data as any).observation,
+                        isNotFound: false,
+                        tempLotData: lotId.startsWith('TEMP-') ? lot : null
+                    };
+                });
+
+            const auditedLots = [...poolLots, ...tempLots];
 
             // If there's an existing open or re-audit session for this, we update it instead of creating new?
             // For simplicity, let's just mark the old one as completed if we found it.
             const targetB = normalizeBitola(auditFilters.bitola);
             const existingSession = inventorySessions.find(s => s.materialType === auditFilters.material && normalizeBitola(s.bitola) === targetB && (s.status === 'open' || s.status === 're-audit'));
 
-            // Accurate items count: checked ones + remaining items in pool
-            const uncheckedCount = auditPool.filter(item => !sessionAuditData.has(item.id)).length;
-            const finalItemsCount = auditedLots.length + uncheckedCount;
+            // Accurate items count
+            const finalItemsCount = auditedLots.length;
+            const finalCheckedCount = Array.from(sessionAuditData.keys()).length;
 
             const newSession: InventorySession = {
                 id: existingSession?.id || `INV-${Date.now()}`,
@@ -491,7 +519,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                 status: 'completed',
                 operator: currentUser?.username || 'Sistema',
                 itemsCount: finalItemsCount,
-                checkedCount: auditedLots.length,
+                checkedCount: finalCheckedCount,
                 auditedLots
             };
 
