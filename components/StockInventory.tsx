@@ -670,7 +670,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                     value={auditSearch}
                                     onChange={e => setAuditSearch(e.target.value)}
                                     placeholder="Buscar Lote..."
-                                    className="w-full bg-slate-800 text-white border border-slate-700 rounded-2xl py-4 pl-12 pr-4 font-bold focus:border-blue-500 outline-none transition-all uppercase"
+                                    className="w-full bg-slate-800 text-yellow-400 !text-yellow-400 border border-slate-700 rounded-2xl py-4 pl-12 pr-4 font-bold focus:border-blue-500 outline-none transition-all uppercase"
                                 />
                             </form>
 
@@ -765,7 +765,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                         type="text"
                                         value={quickAddData.internalLot}
                                         onChange={e => setQuickAddData({ ...quickAddData, internalLot: e.target.value })}
-                                        className="w-full bg-slate-900 text-white border border-slate-700 rounded-2xl p-4 font-bold focus:border-blue-500 outline-none uppercase !bg-slate-900"
+                                        className="w-full bg-slate-900 text-yellow-400 !text-yellow-400 border border-slate-700 rounded-2xl p-4 font-bold focus:border-blue-500 outline-none uppercase !bg-slate-900"
                                         placeholder="EX: 9999"
                                     />
                                 </div>
@@ -819,7 +819,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                         type="number"
                                         value={quickAddData.weight}
                                         onChange={e => setQuickAddData({ ...quickAddData, weight: e.target.value })}
-                                        className="w-full bg-slate-900 text-white border border-slate-700 rounded-2xl p-4 font-bold focus:border-blue-500 outline-none !bg-slate-900"
+                                        className="w-full bg-slate-900 text-yellow-400 !text-yellow-400 border border-slate-700 rounded-2xl p-4 font-bold focus:border-blue-500 outline-none !bg-slate-900"
                                         placeholder="0.00"
                                     />
                                 </div>
@@ -829,7 +829,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                     <textarea
                                         value={quickAddData.observation}
                                         onChange={e => setQuickAddData({ ...quickAddData, observation: e.target.value })}
-                                        className="w-full bg-slate-900 text-white border border-slate-700 rounded-2xl p-4 font-bold focus:border-blue-500 outline-none h-24 !bg-slate-900"
+                                        className="w-full bg-slate-900 text-yellow-400 !text-yellow-400 border border-slate-700 rounded-2xl p-4 font-bold focus:border-blue-500 outline-none h-24 !bg-slate-900"
                                         placeholder="Ex: Lote sem etiqueta, peso aproximado..."
                                     />
                                 </div>
