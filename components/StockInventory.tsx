@@ -666,7 +666,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                     value={auditSearch}
                                     onChange={e => setAuditSearch(e.target.value)}
                                     placeholder="Buscar Lote..."
-                                    className="w-full bg-slate-800 border border-slate-700 rounded-2xl py-4 pl-12 pr-4 font-bold focus:border-blue-500 outline-none transition-all uppercase"
+                                    className="w-full bg-slate-800 text-white border border-slate-700 rounded-2xl py-4 pl-12 pr-4 font-bold focus:border-blue-500 outline-none transition-all uppercase"
                                 />
                             </form>
 
@@ -761,7 +761,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                         type="text"
                                         value={quickAddData.internalLot}
                                         onChange={e => setQuickAddData({ ...quickAddData, internalLot: e.target.value })}
-                                        className="w-full bg-slate-900 border border-slate-700 rounded-2xl p-4 font-bold focus:border-blue-500 outline-none uppercase"
+                                        className="w-full bg-slate-900 text-white border border-slate-700 rounded-2xl p-4 font-bold focus:border-blue-500 outline-none uppercase !bg-slate-900"
                                         placeholder="EX: 9999"
                                     />
                                 </div>
@@ -785,10 +785,10 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                                 <select
                                                     value={quickAddData.materialType}
                                                     onChange={e => setQuickAddData({ ...quickAddData, materialType: e.target.value })}
-                                                    className="w-full bg-slate-900 border border-slate-700 rounded-2xl p-4 font-bold focus:border-blue-500 outline-none"
+                                                    className="w-full bg-slate-900 text-white border border-slate-700 rounded-2xl p-4 font-bold focus:border-blue-500 outline-none !bg-slate-900"
                                                 >
-                                                    <option value="">Selecione</option>
-                                                    {MaterialOptions.map(m => <option key={m} value={m}>{m}</option>)}
+                                                    <option value="" className="bg-slate-900 text-white">Selecione</option>
+                                                    {MaterialOptions.map(m => <option key={m} value={m} className="bg-slate-900 text-white">{m}</option>)}
                                                 </select>
                                             </div>
                                             <div>
@@ -796,10 +796,10 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                                 <select
                                                     value={quickAddData.bitola}
                                                     onChange={e => setQuickAddData({ ...quickAddData, bitola: e.target.value })}
-                                                    className="w-full bg-slate-900 border border-slate-700 rounded-2xl p-4 font-bold focus:border-blue-500 outline-none"
+                                                    className="w-full bg-slate-900 text-white border border-slate-700 rounded-2xl p-4 font-bold focus:border-blue-500 outline-none !bg-slate-900"
                                                 >
-                                                    <option value="">Selecione</option>
-                                                    {allBitolaOptions.map(b => <option key={b} value={b}>{b}</option>)}
+                                                    <option value="" className="bg-slate-900 text-white">Selecione</option>
+                                                    {allBitolaOptions.map(b => <option key={b} value={b} className="bg-slate-900 text-white">{b}</option>)}
                                                 </select>
                                             </div>
                                         </>
@@ -812,7 +812,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                         type="number"
                                         value={quickAddData.weight}
                                         onChange={e => setQuickAddData({ ...quickAddData, weight: e.target.value })}
-                                        className="w-full bg-slate-900 border border-slate-700 rounded-2xl p-4 font-bold focus:border-blue-500 outline-none"
+                                        className="w-full bg-slate-900 text-white border border-slate-700 rounded-2xl p-4 font-bold focus:border-blue-500 outline-none !bg-slate-900"
                                         placeholder="0.00"
                                     />
                                 </div>
@@ -822,7 +822,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                     <textarea
                                         value={quickAddData.observation}
                                         onChange={e => setQuickAddData({ ...quickAddData, observation: e.target.value })}
-                                        className="w-full bg-slate-900 border border-slate-700 rounded-2xl p-4 font-bold focus:border-blue-500 outline-none h-24"
+                                        className="w-full bg-slate-900 text-white border border-slate-700 rounded-2xl p-4 font-bold focus:border-blue-500 outline-none h-24 !bg-slate-900"
                                         placeholder="Ex: Lote sem etiqueta, peso aproximado..."
                                     />
                                 </div>
@@ -884,7 +884,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                         inputMode="numeric"
                                         value={physicalWeight}
                                         onChange={e => setPhysicalWeight(e.target.value)}
-                                        className="w-full bg-slate-100 rounded-3xl py-6 text-center text-5xl font-black text-slate-900 focus:ring-4 ring-blue-500/20 outline-none border-2 border-transparent focus:border-blue-500 transition-all"
+                                        className="w-full bg-slate-50 text-slate-900 rounded-3xl py-6 text-center text-5xl font-black focus:ring-4 ring-blue-500/20 outline-none border-2 border-transparent focus:border-blue-500 transition-all !bg-slate-50 !text-slate-900"
                                     />
 
                                     <div className="space-y-2">
@@ -894,7 +894,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                         <textarea
                                             value={auditObservation}
                                             onChange={e => setAuditObservation(e.target.value)}
-                                            className="w-full bg-slate-100 rounded-2xl p-4 text-slate-800 font-bold focus:ring-4 ring-blue-500/20 outline-none border-2 border-transparent focus:border-blue-500 transition-all min-h-[100px]"
+                                            className="w-full bg-slate-50 rounded-2xl p-4 text-slate-800 font-bold focus:ring-4 ring-blue-500/20 outline-none border-2 border-transparent focus:border-blue-500 transition-all min-h-[100px] !bg-slate-50 !text-slate-800"
                                             placeholder="Ex: Lote com avaria, peso muito abaixo..."
                                         />
                                     </div>
