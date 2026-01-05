@@ -1297,19 +1297,17 @@ const StockControl: React.FC<{
                                                             </div>
                                                         )}
                                                     </td>
-                                                    <td className="px-6 py-4 text-center whitespace-nowrap">
-                                                        {getStatusBadge(item.status)}
-                                                        {item.productionOrderIds && item.productionOrderIds.length > 0 && (
-                                                            <div className="flex flex-wrap justify-center gap-1 mt-1">
-                                                                {item.productionOrderIds.map(id => {
-                                                                    const order = productionOrders.find(o => o.id === id);
-                                                                    return (
-                                                                        <span key={id} className="text-[10px] font-bold bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200 shadow-sm" title={`Ordem de Produção: ${order?.orderNumber || id}`}>
-                                                                            {order?.orderNumber || `OP: ${id.split('-').pop()?.toUpperCase()}`}
-                                                                        </span>
-                                                                    );
-                                                                })}
+                                                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                        {item.lastAuditDate ? (
+                                                            <div className="flex flex-col items-center">
+                                                                <CheckCircleIcon className="h-6 w-6 text-emerald-600 mb-0.5" />
+                                                                <span className="text-[10px] font-black text-emerald-700 uppercase leading-none mb-0.5">OK</span>
+                                                                <span className="text-[9px] font-bold text-slate-500 leading-none">
+                                                                    {new Date(item.lastAuditDate).toLocaleDateString('pt-BR')}
+                                                                </span>
                                                             </div>
+                                                        ) : (
+                                                            <span className="text-xs text-slate-400">-</span>
                                                         )}
                                                     </td>
                                                     <td className="px-6 py-4">
