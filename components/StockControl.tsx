@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Page, StockItem, ConferenceData, ConferenceLotData, Bitola, MaterialType, TransferRecord, ProductionOrderData, StockGauge, User } from '../types';
 import { MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions } from '../types';
-import { ArrowLeftIcon, PencilIcon, TrashIcon, WarningIcon, BookOpenIcon, TruckIcon, DocumentReportIcon, PrinterIcon, LockOpenIcon, ClipboardListIcon, ChartBarIcon, XCircleIcon, ArchiveIcon, LocationOffIcon, CheckCircleIcon, ScaleIcon, AdjustmentsIcon } from './icons';
+import { ArrowLeftIcon, PencilIcon, TrashIcon, WarningIcon, BookOpenIcon, TruckIcon, DocumentReportIcon, PrinterIcon, LockOpenIcon, ClipboardListIcon, ChartBarIcon, XCircleIcon, ArchiveIcon, LocationOffIcon, CheckCircleIcon, ScaleIcon, AdjustmentsIcon, SearchIcon, ExclamationIcon } from './icons';
 
 import LotHistoryModal from './LotHistoryModal';
 import FinishedConferencesModal from './FinishedConferencesModal';
@@ -595,6 +595,109 @@ const MultiLotTransferModal: React.FC<{
     );
 };
 
+const DuplicatesModal: React.FC<{
+    stock: StockItem[];
+    onClose: () => void;
+    onDelete: (id: string, lot: string) => void;
+}> = ({ stock, onClose, onDelete }) => {
+    const duplicates = useMemo(() => {
+        const activeStock = stock.filter(s => s.status !== 'Consumido' && !s.status.includes('Consumido'));
+        const grouped = activeStock.reduce((acc, item) => {
+            const key = item.internalLot.trim().toUpperCase();
+            if (!acc[key]) acc[key] = [];
+            acc[key].push(item);
+            return acc;
+        }, {} as Record<string, StockItem[]>);
+
+        return Object.entries(grouped)
+            .filter(([_, items]) => items.length > 1)
+            .map(([lot, items]) => ({ lot, items }));
+    }, [stock]);
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+            <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+                <div className="flex justify-between items-start mb-6">
+                    <div>
+                        <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                            <WarningIcon className="h-8 w-8 text-amber-500" />
+                            Lotes Duplicados Encontrados
+                        </h2>
+                        <p className="text-slate-500 mt-1">
+                            Foram encontrados {duplicates.length} grupos de lotes com o mesmo número interno.
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+                        <XCircleIcon className="h-8 w-8" />
+                    </button>
+                </div>
+
+                <div className="flex-grow overflow-y-auto space-y-6 pr-2">
+                    {duplicates.length === 0 ? (
+                        <div className="text-center py-12 text-slate-400 flex flex-col items-center">
+                            <CheckCircleIcon className="h-16 w-16 text-emerald-100 mb-4" />
+                            <p className="text-lg font-medium text-emerald-600">Nenhuma duplicata encontrada!</p>
+                            <p className="text-sm">Seu estoque está higienizado.</p>
+                        </div>
+                    ) : (
+                        duplicates.map(({ lot, items }) => (
+                            <div key={lot} className="bg-amber-50 border border-amber-200 rounded-xl overflow-hidden">
+                                <div className="bg-amber-100 px-4 py-2 border-b border-amber-200 flex justify-between items-center">
+                                    <h3 className="font-bold text-amber-800">LOTE: {lot}</h3>
+                                    <span className="text-xs font-bold bg-amber-200 text-amber-800 px-2 py-1 rounded-full">{items.length} conflitos</span>
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm text-left">
+                                        <thead className="bg-white/50 text-amber-900">
+                                            <tr>
+                                                <th className="p-3 font-semibold">Material</th>
+                                                <th className="p-3 font-semibold">Bitola</th>
+                                                <th className="p-3 font-semibold">Peso Atual</th>
+                                                <th className="p-3 font-semibold">Status</th>
+                                                <th className="p-3 font-semibold">Entrada</th>
+                                                <th className="p-3 font-semibold text-right">Ação</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-amber-200/50">
+                                            {items.map(item => (
+                                                <tr key={item.id} className="hover:bg-amber-100/50 transition">
+                                                    <td className="p-3">{item.materialType}</td>
+                                                    <td className="p-3 font-bold">{item.bitola}mm</td>
+                                                    <td className="p-3">{item.remainingQuantity?.toFixed(2)} kg</td>
+                                                    <td className="p-3 text-xs">{getStatusBadge(item.status)}</td>
+                                                    <td className="p-3 text-xs text-slate-500">{new Date(item.entryDate).toLocaleDateString()}</td>
+                                                    <td className="p-3 text-right">
+                                                        <button
+                                                            onClick={() => {
+                                                                if (confirm(`Tem certeza que deseja EXCLUIR DEFINITIVAMENTE este lote duplicado (${item.materialType} ${item.bitola})?`)) {
+                                                                    onDelete(item.id, lot);
+                                                                }
+                                                            }}
+                                                            className="text-red-600 hover:text-red-800 hover:bg-red-100 px-3 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ml-auto"
+                                                        >
+                                                            <TrashIcon className="h-4 w-4" /> Excluir
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+
+                <div className="mt-6 pt-4 border-t flex justify-end">
+                    <button onClick={onClose} className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-6 rounded-lg transition">
+                        Fechar
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const StockControl: React.FC<{
     stock: StockItem[];
     conferences: ConferenceData[];
@@ -624,6 +727,7 @@ const StockControl: React.FC<{
     const [transferReportData, setTransferReportData] = useState<TransferRecord | null>(null);
     const [showInventoryReport, setShowInventoryReport] = useState(false);
     const [stockDashboardOpen, setStockDashboardOpen] = useState(false);
+    const [duplicatesModalOpen, setDuplicatesModalOpen] = useState(false);
 
     const [isStockMapOpen, setIsStockMapOpen] = useState(initialView === 'map');
 
@@ -796,6 +900,7 @@ const StockControl: React.FC<{
             ) : (
                 <div className="p-4 sm:p-6 md:p-8 space-y-6">
                     {/* Keeping Modals ... */}
+                    {duplicatesModalOpen && <DuplicatesModal stock={stock} onClose={() => setDuplicatesModalOpen(false)} onDelete={(id) => deleteStockItem(id)} />}
                     {editingItem && <EditStockItemModal item={editingItem} onClose={() => setEditingItem(null)} onSubmit={updateStockItem} />}
                     {isMultiLotTransferModalOpen && <MultiLotTransferModal lots={stock.filter(s => selectedLotIdsForTransfer.includes(s.id))} onClose={() => setIsMultiLotTransferModalOpen(false)} onSubmit={handleTransferSubmit} />}
                     {historyLot && <LotHistoryModal lot={historyLot} onClose={() => setHistoryLot(null)} />}
@@ -932,6 +1037,9 @@ const StockControl: React.FC<{
                                     </button>
                                     <button onClick={() => setTransferHistoryOpen(true)} className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
                                         <TruckIcon className="h-5 w-5" />Histórico Transf.
+                                    </button>
+                                    <button onClick={() => setDuplicatesModalOpen(true)} className="bg-amber-100 hover:bg-amber-200 text-amber-800 font-semibold py-2 px-4 rounded-lg border border-amber-300 transition flex items-center gap-2" title="Procurar Lotes Duplicados">
+                                        <ExclamationIcon className="h-5 w-5" />Duplicatas
                                     </button>
                                 </div>
                             </div>
