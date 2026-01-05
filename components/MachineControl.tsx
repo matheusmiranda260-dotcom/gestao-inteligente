@@ -872,25 +872,6 @@ const MachineControl: React.FC<MachineControlProps> = ({
                             description="Visualize e inicie as próximas ordens de produção na fila."
                             icon={<ClipboardListIcon className="h-6 w-6" />}
                         />
-                        <MachineMenuButton
-                            onClick={() => setView('completed')}
-                            label="Produções Finalizadas"
-                            description="Consulte o histórico de ordens de produção já concluídas."
-                            icon={<ArchiveIcon className="h-6 w-6" />}
-                        />
-                        <MachineMenuButton
-                            onClick={() => setShowShiftReportsModal(true)}
-                            label="Relatórios de Turno"
-                            description="Visualize relatórios detalhados de turnos finalizados."
-                            icon={<DocumentReportIcon className="h-6 w-6" />}
-                        />
-                        <MachineMenuButton
-                            onClick={() => setShowPartsRequestModal(true)}
-                            label="Solicitar Peças"
-                            description="Requisite peças e suprimentos para manutenção da máquina."
-                            icon={<WrenchScrewdriverIcon className="h-6 w-6" />}
-                            disabled={!activeOrder}
-                        />
                         {machineType === 'Trefila' && (
                             <MachineMenuButton
                                 onClick={() => setShowTrefilaCalculation(true)}
