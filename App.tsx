@@ -306,11 +306,13 @@ const App: React.FC = () => {
 
     const addGauge = async (data: Omit<StockGauge, 'id'>) => {
         try {
-            const saved = await insertItem<StockGauge>('stock_gauges', data as any);
+            const newGauge = { ...data, id: generateId('gauge') };
+            const saved = await insertItem<StockGauge>('stock_gauges', newGauge);
             setGauges(prev => [...prev, saved]);
             showNotification('Bitola cadastrada com sucesso!', 'success');
         } catch (error) {
-            showNotification('Erro ao cadastrar bitola.', 'error');
+            console.error(error);
+            showNotification('Erro ao cadastrar bitola. Verifique se a tabela stock_gauges existe.', 'error');
         }
     };
 

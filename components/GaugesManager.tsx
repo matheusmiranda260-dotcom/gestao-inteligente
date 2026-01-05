@@ -19,13 +19,16 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onClose, onAdd, o
 
         // Normalize gauge string (comma to dot)
         const normalized = newGauge.replace(',', '.');
-        if (isNaN(parseFloat(normalized))) {
+        const numberVal = parseFloat(normalized);
+        if (isNaN(numberVal)) {
             alert('Por favor, insira um número válido para a bitola.');
             return;
         }
 
+        const formatted = numberVal.toFixed(2);
+
         // Check if already exists
-        const exists = gauges.some(g => g.material_type === materialType && g.gauge === normalized);
+        const exists = gauges.some(g => g.material_type === materialType && g.gauge === formatted);
         if (exists) {
             alert('Esta bitola já está cadastrada para este material.');
             return;
@@ -33,7 +36,7 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onClose, onAdd, o
 
         onAdd({
             material_type: materialType,
-            gauge: normalized
+            gauge: formatted
         });
         setNewGauge('');
     };
