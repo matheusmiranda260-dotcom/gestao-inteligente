@@ -22,38 +22,46 @@ interface MachineStatusViewProps {
     machineType: MachineType;
     activeOrder: ProductionOrderData | undefined;
     stock: StockItem[];
-    now: Date;
 }
 
-const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, activeOrder, stock, now: localNow }) => {
-    // Determine the most recent timestamp to handle potential clock drift
-    const now = useMemo(() => {
-        if (!activeOrder) return localNow;
+const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, activeOrder, stock }) => {
+    // Local timer to ensure the clock ticks even if parent doesn't re-render
+    const [localNow, setLocalNow] = useState(new Date());
 
-        let maxTimestamp = localNow.getTime();
+    // Persistent drift to align local clock with server timestamps
+    const [stableDrift, setStableDrift] = useState(0);
 
-        // Check Order start
-        if (activeOrder.startTime) {
-            maxTimestamp = Math.max(maxTimestamp, new Date(activeOrder.startTime).getTime());
-        }
+    useEffect(() => {
+        const timerId = setInterval(() => setLocalNow(new Date()), 1000);
+        return () => clearInterval(timerId);
+    }, []);
 
-        // Check Last quantity update
-        if (activeOrder.lastQuantityUpdate) {
-            maxTimestamp = Math.max(maxTimestamp, new Date(activeOrder.lastQuantityUpdate).getTime());
-        }
+    useEffect(() => {
+        if (!activeOrder) return;
 
-        // Check Downtime events
-        (activeOrder.downtimeEvents || []).forEach(event => {
-            maxTimestamp = Math.max(maxTimestamp, new Date(event.stopTime).getTime());
-            if (event.resumeTime) {
-                maxTimestamp = Math.max(maxTimestamp, new Date(event.resumeTime).getTime());
-            }
+        const timestamps = [
+            activeOrder.startTime,
+            activeOrder.lastQuantityUpdate,
+            ...(activeOrder.downtimeEvents || []).map(e => e.stopTime),
+            ...(activeOrder.downtimeEvents || []).map(e => e.resumeTime)
+        ].filter(Boolean) as string[];
+
+        setStableDrift(currentDrift => {
+            let maxDrift = currentDrift;
+            const nowMs = Date.now();
+
+            timestamps.forEach(ts => {
+                const eventMs = new Date(ts).getTime();
+                const drift = eventMs - nowMs;
+                if (drift > maxDrift) {
+                    maxDrift = drift;
+                }
+            });
+            return maxDrift;
         });
+    }, [activeOrder]);
 
-        // If the order has timestamps in the future relative to localNow, 
-        // we use the latest timestamp as our "now" baseline to keep clocks ticking.
-        return new Date(maxTimestamp);
-    }, [activeOrder, localNow]);
+    const now = useMemo(() => new Date(localNow.getTime() + stableDrift), [localNow, stableDrift]);
 
     const machineStatus = useMemo(() => {
         if (!activeOrder) {
@@ -63,7 +71,6 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
         const lastEvent = activeOrder.downtimeEvents?.[(activeOrder.downtimeEvents.length || 0) - 1];
 
         if (lastEvent?.resumeTime === null) {
-            // Check for both exact match and trimmed match to be safe
             const reason = (lastEvent.reason || '').trim();
             if (reason === 'Final de Turno') {
                 return { status: 'Desligada', reason: 'Final de Turno', since: lastEvent.stopTime, durationMs: 0 };
@@ -244,13 +251,6 @@ interface ProductionDashboardProps {
 }
 
 const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, productionOrders, stock, currentUser }) => {
-    const [now, setNow] = useState(new Date());
-
-    useEffect(() => {
-        const timerId = setInterval(() => setNow(new Date()), 1000);
-        return () => clearInterval(timerId);
-    }, []);
-
     const activeTrefilaOrder = useMemo(() =>
         productionOrders.find(o => o.machine === 'Trefila' && o.status === 'in_progress'),
         [productionOrders]);
@@ -266,13 +266,11 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                     machineType="Trefila"
                     activeOrder={activeTrefilaOrder}
                     stock={stock}
-                    now={now}
                 />
                 <MachineStatusView
                     machineType="Treliça"
                     activeOrder={activeTrelicaOrder}
                     stock={stock}
-                    now={now}
                 />
             </div>
         </div>
