@@ -401,9 +401,9 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
         const newLotNum = quickAddData.internalLot.trim().toUpperCase();
 
         // 1. Check in existing Stock
-        const existsInStock = stock.some(s => s.internalLot.toUpperCase() === newLotNum && isInStock(s));
-        if (existsInStock) {
-            alert(`ERRO CRÍTICO: O lote ${newLotNum} JÁ EXISTE no estoque! Não é possível cadastrar duplicatas.`);
+        const existingStockItem = stock.find(s => s.internalLot.toUpperCase() === newLotNum && isInStock(s));
+        if (existingStockItem) {
+            alert(`ERRO CRÍTICO: O lote ${newLotNum} JÁ EXISTE!\n\nDetalhes do conflito:\nMaterial: ${existingStockItem.materialType}\nBitola: ${existingStockItem.bitola}\nStatus: ${existingStockItem.status}\n\nNão é possível cadastrar duplicatas.`);
             return;
         }
 
