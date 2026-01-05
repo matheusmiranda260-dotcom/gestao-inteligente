@@ -457,6 +457,10 @@ const AddConferencePage: React.FC<{
                     <button type="button" onClick={onClose} className="px-6 py-3 rounded-lg font-bold text-slate-600 hover:bg-slate-200 transition">
                         Cancelar Operação
                     </button>
+                    <button type="submit" className="px-8 py-3 bg-[#0F3F5C] hover:bg-[#0A2A3D] text-white rounded-lg font-bold shadow-lg shadow-blue-900/20 transition flex items-center justify-center gap-2">
+                        <CheckCircleIcon className="h-5 w-5" />
+                        Salvar Conferência
+                    </button>
                 </div>
             </form>
         </div>
