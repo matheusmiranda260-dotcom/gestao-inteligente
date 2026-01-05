@@ -1297,6 +1297,21 @@ const StockControl: React.FC<{
                                                             </div>
                                                         )}
                                                     </td>
+                                                    <td className="px-6 py-4 text-center whitespace-nowrap">
+                                                        {getStatusBadge(item.status)}
+                                                        {item.productionOrderIds && item.productionOrderIds.length > 0 && (
+                                                            <div className="flex flex-wrap justify-center gap-1 mt-1">
+                                                                {item.productionOrderIds.map(id => {
+                                                                    const order = productionOrders.find(o => o.id === id);
+                                                                    return (
+                                                                        <span key={id} className="text-[10px] font-bold bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200 shadow-sm" title={`Ordem de Produção: ${order?.orderNumber || id}`}>
+                                                                            {order?.orderNumber || `OP: ${id.split('-').pop()?.toUpperCase()}`}
+                                                                        </span>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        )}
+                                                    </td>
                                                     <td className="px-6 py-4">
                                                         <div className="flex items-center justify-center space-x-2">
                                                             <button onClick={() => setHistoryLot(item)} className="p-1 text-slate-500 hover:text-slate-800" title="Ver Histórico"><BookOpenIcon className="h-5 w-5" /></button>
