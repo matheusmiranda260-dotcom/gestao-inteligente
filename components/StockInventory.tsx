@@ -397,6 +397,23 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
             return;
         }
 
+        // Strict Duplicate Check
+        const newLotNum = quickAddData.internalLot.trim().toUpperCase();
+
+        // 1. Check in existing Stock
+        const existsInStock = stock.some(s => s.internalLot.toUpperCase() === newLotNum && isInStock(s));
+        if (existsInStock) {
+            alert(`ERRO CRÍTICO: O lote ${newLotNum} JÁ EXISTE no estoque! Não é possível cadastrar duplicatas.`);
+            return;
+        }
+
+        // 2. Check in current Temp/QuickAdd list
+        const existsInTemp = tempNewLots.some(s => s.internalLot.toUpperCase() === newLotNum);
+        if (existsInTemp) {
+            alert(`ERRO: Você já adicionou o lote ${newLotNum} nesta sessão de inventário!`);
+            return;
+        }
+
         setIsSaving(true);
         try {
             const newItem: StockItem = {

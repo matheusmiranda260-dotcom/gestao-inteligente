@@ -141,6 +141,37 @@ const AddConferencePage: React.FC<{
     const handleLotChange = (index: number, field: keyof ConferenceLotData, value: string | number) => {
         const newLots = [...lots];
         (newLots[index] as any)[field] = value;
+
+        // Duplicate Check for Internal Lot
+        if (field === 'internalLot') {
+            const lotValue = String(value).trim().toUpperCase();
+            if (lotValue) {
+                // Check against existing stock
+                const existsInStock = stock.some(s => s.internalLot.toUpperCase() === lotValue && s.status !== 'Consumido');
+
+                // Check against other rows in current form
+                const existsInCurrentForm = newLots.some((l, i) => i !== index && (l.internalLot || '').toUpperCase() === lotValue);
+
+                if (existsInStock) {
+                    setDuplicateErrors(prev => ({ ...prev, [index]: 'Lote já existe no estoque!' }));
+                } else if (existsInCurrentForm) {
+                    setDuplicateErrors(prev => ({ ...prev, [index]: 'Lote duplicado nesta lista!' }));
+                } else {
+                    setDuplicateErrors(prev => {
+                        const next = { ...prev };
+                        delete next[index];
+                        return next;
+                    });
+                }
+            } else {
+                setDuplicateErrors(prev => {
+                    const next = { ...prev };
+                    delete next[index];
+                    return next;
+                });
+            }
+        }
+
         setLots(newLots);
     };
 
