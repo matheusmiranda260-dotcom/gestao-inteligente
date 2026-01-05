@@ -131,12 +131,16 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                             <button onClick={() => setPage('trefila_pending')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_pending' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                 📋 Próximas Produções
                             </button>
-                            <button onClick={() => setPage('trefila_completed')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_completed' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                📦 Produções Finalizadas
-                            </button>
-                            <button onClick={() => setPage('trefila_reports')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_reports' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                📊 Relatórios de Turno
-                            </button>
+                            {isGestor && (
+                                <>
+                                    <button onClick={() => setPage('trefila_completed')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_completed' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                        📦 Produções Finalizadas
+                                    </button>
+                                    <button onClick={() => setPage('trefila_reports')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_reports' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                        📊 Relatórios de Turno
+                                    </button>
+                                </>
+                            )}
                         </div>
                     )}
 
@@ -165,12 +169,16 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                             <button onClick={() => setPage('trelica_pending')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelica_pending' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                 📋 Próximas Produções
                             </button>
-                            <button onClick={() => setPage('trelica_completed')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelica_completed' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                📦 Produções Finalizadas
-                            </button>
-                            <button onClick={() => setPage('trelica_reports')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelica_reports' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                📊 Relatórios de Turno
-                            </button>
+                            {isGestor && (
+                                <>
+                                    <button onClick={() => setPage('trelica_completed')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelica_completed' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                        📦 Produções Finalizadas
+                                    </button>
+                                    <button onClick={() => setPage('trelica_reports')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelica_reports' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                        📊 Relatórios de Turno
+                                    </button>
+                                </>
+                            )}
                         </div>
                     )}
 
