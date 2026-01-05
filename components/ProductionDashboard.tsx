@@ -25,7 +25,35 @@ interface MachineStatusViewProps {
     now: Date;
 }
 
-const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, activeOrder, stock, now }) => {
+const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, activeOrder, stock, now: localNow }) => {
+    // Determine the most recent timestamp to handle potential clock drift
+    const now = useMemo(() => {
+        if (!activeOrder) return localNow;
+
+        let maxTimestamp = localNow.getTime();
+
+        // Check Order start
+        if (activeOrder.startTime) {
+            maxTimestamp = Math.max(maxTimestamp, new Date(activeOrder.startTime).getTime());
+        }
+
+        // Check Last quantity update
+        if (activeOrder.lastQuantityUpdate) {
+            maxTimestamp = Math.max(maxTimestamp, new Date(activeOrder.lastQuantityUpdate).getTime());
+        }
+
+        // Check Downtime events
+        (activeOrder.downtimeEvents || []).forEach(event => {
+            maxTimestamp = Math.max(maxTimestamp, new Date(event.stopTime).getTime());
+            if (event.resumeTime) {
+                maxTimestamp = Math.max(maxTimestamp, new Date(event.resumeTime).getTime());
+            }
+        });
+
+        // If the order has timestamps in the future relative to localNow, 
+        // we use the latest timestamp as our "now" baseline to keep clocks ticking.
+        return new Date(maxTimestamp);
+    }, [activeOrder, localNow]);
 
     const machineStatus = useMemo(() => {
         if (!activeOrder) {
@@ -40,11 +68,11 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             if (reason === 'Final de Turno') {
                 return { status: 'Desligada', reason: 'Final de Turno', since: lastEvent.stopTime, durationMs: 0 };
             }
-            const durationMs = now.getTime() - new Date(lastEvent.stopTime).getTime();
+            const durationMs = Math.max(0, now.getTime() - new Date(lastEvent.stopTime).getTime());
             return { status: 'Parada', reason: lastEvent.reason, since: lastEvent.stopTime, durationMs };
         } else {
             const since = lastEvent?.resumeTime || activeOrder.startTime || now.toISOString();
-            const durationMs = now.getTime() - new Date(since).getTime();
+            const durationMs = Math.max(0, now.getTime() - new Date(since).getTime());
             return { status: 'Produzindo', reason: '', since, durationMs };
         }
     }, [activeOrder, now]);
