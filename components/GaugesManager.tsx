@@ -139,9 +139,14 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onClose, onAdd, o
                                         ))}
                                         {gaugesByMaterial[material].length === 0 && (
                                             <div className="col-span-2 py-8 text-center text-slate-400 text-sm border-2 border-dashed border-slate-100 rounded-xl flex flex-col items-center gap-2">
-                                                <span>Nenhuma bitola cadastrada.</span>
-                                                <button onClick={onRestoreDefaults} className="text-blue-600 font-bold hover:underline text-xs">
-                                                    Restaurar Padrões
+                                                <span>As bitolas padrão estão ativas no sistema.</span>
+                                                <span className="text-xs max-w-[250px]">Para editar ou visualizar a lista aqui, carregue os padrões para o banco de dados:</span>
+                                                <button
+                                                    onClick={onRestoreDefaults}
+                                                    className="mt-2 bg-blue-50 text-blue-600 px-4 py-2 rounded-lg font-bold hover:bg-blue-100 transition text-xs flex items-center gap-2"
+                                                >
+                                                    <ArrowPathIcon className="h-4 w-4" />
+                                                    Carregar Padrões
                                                 </button>
                                             </div>
                                         )}
