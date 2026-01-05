@@ -76,11 +76,11 @@ const AddConferencePage: React.FC<{
     const [historyOpen, setHistoryOpen] = useState(false);
 
     const allBitolaOptions: Bitola[] = useMemo(() => {
-        const fmGauges = gauges.filter(g => g.material_type === 'Fio Máquina').map(g => String(g.gauge));
-        const caGauges = gauges.filter(g => g.material_type === 'CA-60').map(g => String(g.gauge));
+        const fmGaugesFromDB = gauges.filter(g => g.material_type === 'Fio Máquina').map(g => String(g.gauge));
+        const caGaugesFromDB = gauges.filter(g => g.material_type === 'CA-60' || g.material_type === 'CA-50' || g.material_type === 'Arame Trefilado').map(g => String(g.gauge));
 
-        const finalFM = fmGauges.length > 0 ? fmGauges : Array.from(FioMaquinaBitolaOptions);
-        const finalCA = caGauges.length > 0 ? caGauges : Array.from(TrefilaBitolaOptions);
+        const finalFM = [...new Set([...FioMaquinaBitolaOptions, ...fmGaugesFromDB])];
+        const finalCA = [...new Set([...TrefilaBitolaOptions, ...caGaugesFromDB])];
 
         return [...new Set([...finalFM, ...finalCA])].sort((a, b) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.'))) as Bitola[];
     }, [gauges]);
@@ -371,9 +371,10 @@ const AddConferencePage: React.FC<{
                                                     className="w-full p-3 border border-slate-300 rounded-lg bg-white outline-none"
                                                 >
                                                     {(() => {
-                                                        const materialGauges = gauges.filter(g => g.material_type === lot.materialType).map(g => g.gauge);
-                                                        const options = materialGauges.length > 0 ? materialGauges : (lot.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : TrefilaBitolaOptions);
-                                                        return options.map(b => <option key={b} value={b}>{b}</option>);
+                                                        const materialGaugesFromDB = gauges.filter(g => g.material_type === lot.materialType).map(g => g.gauge);
+                                                        const defaultOptions = lot.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : TrefilaBitolaOptions;
+                                                        const combinedOptions = [...new Set([...defaultOptions, ...materialGaugesFromDB])].sort((a, b) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')));
+                                                        return combinedOptions.map(b => <option key={b} value={b}>{b}</option>);
                                                     })()}
                                                 </select>
                                             </div>

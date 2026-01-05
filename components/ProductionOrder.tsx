@@ -184,9 +184,9 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
                                     >
                                         <option value="">Selecione a bitola de entrada</option>
                                         {(() => {
-                                            const fmGauges = gauges.filter(g => g.material_type === 'Fio Máquina').map(g => g.gauge);
-                                            const options = fmGauges.length > 0 ? fmGauges : Array.from(FioMaquinaBitolaOptions);
-                                            return options.map(b => <option key={b} value={b}>{b}</option>);
+                                            const materialGaugesFromDB = gauges.filter(g => g.material_type === 'Fio Máquina').map(g => g.gauge);
+                                            const combinedOptions = [...new Set([...FioMaquinaBitolaOptions, ...materialGaugesFromDB])].sort((a, b) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')));
+                                            return combinedOptions.map(b => <option key={b} value={b}>{b}</option>);
                                         })()}
                                     </select>
                                 </div>
@@ -199,9 +199,17 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
                                         className="mt-1 p-2 w-full border border-slate-300 rounded-md bg-white"
                                     >
                                         {(() => {
-                                            const caGauges = gauges.filter(g => g.material_type === 'CA-60').map(g => g.gauge);
-                                            const options = caGauges.length > 0 ? caGauges : Array.from(TrefilaBitolaOptions);
-                                            return options.map(b => <option key={b} value={b}>{b}</option>);
+                                            const materialGaugesFromDB = gauges.filter(g => g.material_type === 'CA-60').map(g => g.gauge);
+                                            const combinedOptions = [...new Set([...TrefilaBitolaOptions, ...materialGaugesFromDB])].sort((a, b) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')));
+
+                                            return combinedOptions
+                                                .filter(b => {
+                                                    if (inputBitolaFilter === '') return true;
+                                                    const inputBitolaNum = parseFloat(inputBitolaFilter.replace(',', '.'));
+                                                    const targetBitolaNum = parseFloat(b.replace(',', '.'));
+                                                    return targetBitolaNum < inputBitolaNum;
+                                                })
+                                                .map(b => <option key={b} value={b}>{b}</option>);
                                         })()}
                                     </select>
                                 </div>
