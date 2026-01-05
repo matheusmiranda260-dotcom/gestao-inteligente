@@ -180,7 +180,10 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
 
     const isAuditLocked = useMemo(() => {
         if (!auditFilters.material || !auditFilters.bitola) return false;
-        return inventorySessions.some(s => s.materialType === auditFilters.material && s.bitola === auditFilters.bitola && s.status === 'completed');
+        const targetB = normalizeBitola(auditFilters.bitola);
+        const hasOpen = inventorySessions.some(s => s.materialType === auditFilters.material && normalizeBitola(s.bitola) === targetB && (s.status === 'open' || s.status === 're-audit'));
+        if (hasOpen) return false;
+        return inventorySessions.some(s => s.materialType === auditFilters.material && normalizeBitola(s.bitola) === targetB && s.status === 'completed' && !s.appliedToStock);
     }, [inventorySessions, auditFilters]);
 
     const isReAuditActive = useMemo(() => {
@@ -209,24 +212,21 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
 
     const groupedSessions = useMemo(() => {
         const groups: Record<string, InventorySession[]> = {};
-        const uniqueLatest = new Map<string, InventorySession>();
 
-        // Sort by date so later ones overwrite earlier ones in our map
-        const sorted = [...inventorySessions].sort((a, b) => a.startDate.localeCompare(b.startDate));
+        // Sort sessions by date (newest first)
+        const sorted = [...inventorySessions].sort((a, b) => (b.endDate || b.startDate).localeCompare(a.endDate || a.startDate));
 
         sorted.forEach(session => {
-            const key = `${session.materialType}|${normalizeBitola(session.bitola)}`;
-            uniqueLatest.set(key, session);
-        });
-
-        Array.from(uniqueLatest.values()).forEach(session => {
             if (!groups[session.materialType]) groups[session.materialType] = [];
             groups[session.materialType].push(session);
         });
 
-        // Sort sessions within each material group by bitola
+        // Sort groups by material name then sessions by bitola
         Object.keys(groups).forEach(m => {
-            groups[m].sort((a, b) => parseFloat(a.bitola.replace(',', '.')) - parseFloat(b.bitola.replace(',', '.')));
+            groups[m].sort((a, b) => {
+                if (a.bitola !== b.bitola) return parseFloat(a.bitola.replace(',', '.')) - parseFloat(b.bitola.replace(',', '.'));
+                return (b.endDate || b.startDate).localeCompare(a.endDate || a.startDate);
+            });
         });
 
         return groups;
@@ -605,7 +605,22 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
             // Mark session as applied
             await updateInventorySession(session.id, { appliedToStock: true });
 
-            alert('Estoque atualizado com sucesso conforme o relatório aprovado!');
+            if (confirm('Estoque atualizado com sucesso conforme o relatório aprovado! Deseja preparar uma NOVA ordem de inventário para este item imediatamente?')) {
+                const newSession: InventorySession = {
+                    id: `INV-${Date.now()}`,
+                    materialType: session.materialType,
+                    bitola: session.bitola,
+                    startDate: new Date().toISOString(),
+                    status: 'open',
+                    operator: 'Pendente',
+                    itemsCount: stock.filter(i => i.materialType === session.materialType && normalizeBitola(i.bitola) === normalizeBitola(session.bitola) && isInStock(i)).length,
+                    checkedCount: 0,
+                    auditedLots: []
+                };
+                await addInventorySession(newSession);
+                alert('Nova ordem de inventário criada e liberada para o celular.');
+            }
+
             setApprovingSession(null);
         } catch (error: any) {
             console.error('Error applying changes:', error);
@@ -1330,9 +1345,35 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                                                 }
                                                             }}
                                                             className="px-2 bg-rose-50 border border-rose-200 text-rose-600 py-1.5 rounded-lg text-[9px] font-black hover:bg-rose-100 transition-all"
-                                                            title="REABRIR"
+                                                            title="RECONFERIR"
                                                         >
                                                             <LockOpenIcon className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
+                                                    {session.appliedToStock && (
+                                                        <button
+                                                            onClick={async () => {
+                                                                if (confirm(`Iniciar NOVO ciclo de inventário para ${session.materialType} ${session.bitola}?`)) {
+                                                                    const count = stock.filter(i => i.materialType === session.materialType && normalizeBitola(i.bitola) === normalizeBitola(session.bitola) && isInStock(i)).length;
+                                                                    const newSession: InventorySession = {
+                                                                        id: `INV-${Date.now()}`,
+                                                                        materialType: session.materialType,
+                                                                        bitola: session.bitola,
+                                                                        startDate: new Date().toISOString(),
+                                                                        status: 'open',
+                                                                        operator: 'Pendente',
+                                                                        itemsCount: count,
+                                                                        checkedCount: 0,
+                                                                        auditedLots: []
+                                                                    };
+                                                                    await addInventorySession(newSession);
+                                                                    alert('Novo inventário liberado para conferência.');
+                                                                }
+                                                            }}
+                                                            className="px-2 bg-blue-50 border border-blue-200 text-blue-600 py-1.5 rounded-lg text-[9px] font-black hover:bg-blue-100 transition-all"
+                                                            title="NOVO INVENTÁRIO"
+                                                        >
+                                                            <PlusIcon className="w-3.5 h-3.5" />
                                                         </button>
                                                     )}
                                                 </div>
