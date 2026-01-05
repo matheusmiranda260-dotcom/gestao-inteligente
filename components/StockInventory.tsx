@@ -181,10 +181,17 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
     const isAuditLocked = useMemo(() => {
         if (!auditFilters.material || !auditFilters.bitola) return false;
         const targetB = normalizeBitola(auditFilters.bitola);
+
+        // If we have a local session active, it shouldn't be locked for us
+        if (activeSession && activeSession.materialType === auditFilters.material && normalizeBitola(activeSession.bitola) === targetB) {
+            return false;
+        }
+
         const hasOpen = inventorySessions.some(s => s.materialType === auditFilters.material && normalizeBitola(s.bitola) === targetB && (s.status === 'open' || s.status === 're-audit'));
         if (hasOpen) return false;
+
         return inventorySessions.some(s => s.materialType === auditFilters.material && normalizeBitola(s.bitola) === targetB && s.status === 'completed' && !s.appliedToStock);
-    }, [inventorySessions, auditFilters]);
+    }, [inventorySessions, auditFilters, activeSession]);
 
     const isReAuditActive = useMemo(() => {
         if (!auditFilters.material || !auditFilters.bitola) return false;
@@ -530,11 +537,24 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                 await addInventorySession(newSession);
             }
             alert(`Você finalizou inventário de "${auditFilters.material} ${auditFilters.bitola}"`);
-            setSessionCheckedIds(new Set()); // Clear local state
-            setSessionAuditData(new Map()); // Clear local state
+
+            // Selective clear: Only remove lots that were audited in THIS session
+            const finishedLotIds = new Set(auditedLots.map(l => l.lotId));
+            setSessionCheckedIds(prev => {
+                const next = new Set(prev);
+                finishedLotIds.forEach(id => next.delete(id));
+                return next;
+            });
+            setSessionAuditData(prev => {
+                const next = new Map(prev);
+                finishedLotIds.forEach(id => next.delete(id));
+                return next;
+            });
+
             setTempNewLots([]);
             localStorage.removeItem('current_inventory_audit');
             setAuditStep('select');
+            setActiveSession(null);
         } catch (error) {
             alert('Erro ao finalizar inventário.');
         } finally {
@@ -1350,7 +1370,8 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                                             <LockOpenIcon className="w-3.5 h-3.5" />
                                                         </button>
                                                     )}
-                                                    {session.appliedToStock && (
+                                                    {/* NEW: Allow starting a new inventory cycle even if the current one is just completed (not applied yet) */}
+                                                    {session.status === 'completed' && !inventorySessions.some(s => s.materialType === session.materialType && normalizeBitola(s.bitola) === normalizeBitola(session.bitola) && (s.status === 'open' || s.status === 're-audit')) && (
                                                         <button
                                                             onClick={async () => {
                                                                 if (confirm(`Iniciar NOVO ciclo de inventário para ${session.materialType} ${session.bitola}?`)) {
