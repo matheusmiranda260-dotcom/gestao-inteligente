@@ -273,10 +273,15 @@ const AddConferencePage: React.FC<{
                                             </td>
                                             <td className="p-3 align-top">
                                                 <select value={lot.bitola} onChange={e => handleLotChange(index, 'bitola', e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white outline-none">
-                                                    {(gauges.length > 0
-                                                        ? gauges.filter(g => g.material_type === lot.materialType).map(g => g.gauge)
-                                                        : (lot.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : TrefilaBitolaOptions)
-                                                    ).map(b => <option key={b} value={b}>{b}</option>)}
+                                                    {(() => {
+                                                        const options = gauges.length > 0
+                                                            ? gauges.filter(g => g.material_type === lot.materialType).map(g => g.gauge)
+                                                            : (lot.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : TrefilaBitolaOptions);
+
+                                                        // Ensure sorting
+                                                        const sorted = [...new Set(options)].sort((a: string, b: string) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')));
+                                                        return sorted.map(b => <option key={b} value={b}>{b}</option>);
+                                                    })()}
                                                 </select>
                                             </td>
                                             <td className="p-3 align-top"><input type="number" step="0.01" value={lot.labelWeight || ''} onChange={e => handleLotChange(index, 'labelWeight', parseFloat(e.target.value))} className="w-24 p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none font-medium" required placeholder="0.00" /></td>
@@ -371,10 +376,12 @@ const AddConferencePage: React.FC<{
                                                     className="w-full p-3 border border-slate-300 rounded-lg bg-white outline-none"
                                                 >
                                                     {(() => {
-                                                        const materialGaugesFromDB = gauges.filter(g => g.material_type === lot.materialType).map(g => g.gauge);
-                                                        const defaultOptions = lot.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : TrefilaBitolaOptions;
-                                                        const combinedOptions = [...new Set([...defaultOptions, ...materialGaugesFromDB])].sort((a, b) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')));
-                                                        return combinedOptions.map(b => <option key={b} value={b}>{b}</option>);
+                                                        const options = gauges.length > 0
+                                                            ? gauges.filter(g => g.material_type === lot.materialType).map(g => g.gauge)
+                                                            : (lot.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : TrefilaBitolaOptions);
+
+                                                        const sorted = [...new Set(options)].sort((a: string, b: string) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')));
+                                                        return sorted.map(b => <option key={b} value={b}>{b}</option>);
                                                     })()}
                                                 </select>
                                             </div>

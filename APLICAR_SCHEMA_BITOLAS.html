@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplicar Schema de Bitolas - Gestão Inteligente</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #0F3F5C 0%, #0a2a3d 100%); min-height: 100vh; padding: 20px; color: #333; }
+        .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 16px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); overflow: hidden; }
+        .header { background: #0F3F5C; color: white; padding: 40px; text-align: center; }
+        .header h1 { font-size: 2rem; margin-bottom: 10px; }
+        .content { padding: 40px; }
+        .step { background: #f8f9fa; border-left: 4px solid #0F3F5C; padding: 25px; margin-bottom: 20px; border-radius: 8px; }
+        .step-number { display: inline-block; background: #0F3F5C; color: white; width: 30px; height: 30px; border-radius: 50%; text-align: center; line-height: 30px; font-weight: bold; margin-right: 15px; }
+        .btn-primary { display: inline-block; background: #0F3F5C; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; margin-top: 10px; border: none; cursor: pointer; transition: opacity 0.2s; }
+        .btn-primary:hover { opacity: 0.9; }
+        .code-block { background: #2d3748; color: #e2e8f0; padding: 20px; border-radius: 8px; margin: 20px 0; overflow-x: auto; font-family: 'Courier New', monospace; white-space: pre-wrap; }
+        .success { background: #d4edda; border-left: 4px solid #28a745; color: #155724; padding: 15px; border-radius: 8px; display: none; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛠️ Correção: Cadastro de Bitolas</h1>
+            <p>Siga os passos abaixo para habilitar o gerenciamento de bitolas</p>
+        </div>
+
+        <div class="content">
+            <div class="step">
+                <span class="step-number">1</span>
+                <strong>Acesse o Supabase</strong>
+                <p>Clique no botão abaixo para abrir o painel do seu banco de dados.</p>
+                <a href="https://app.supabase.com" target="_blank" class="btn-primary">Abrir Supabase Dashboard</a>
+            </div>
+
+            <div class="step">
+                <span class="step-number">2</span>
+                <strong>Abra o Editor SQL</strong>
+                <p>No menu lateral esquerdo do Supabase, clique em <strong>"SQL Editor"</strong> e depois em <strong>"New Query"</strong>.</p>
+            </div>
+
+            <div class="step">
+                <span class="step-number">3</span>
+                <strong>Copie e Execute o Script</strong>
+                <p>Clique "Copiar Script" abaixo, cole no editor do Supabase e clique em "Run" (ou Ctrl+Enter).</p>
+                <button class="btn-primary" onclick="copiarSQL()">📋 Copiar Script SQL</button>
+                <div class="success" id="copiadoMsg">Script copiado para a área de transferência!</div>
+                <div class="code-block" id="sqlScript">-- Carregando script...</div>
+            </div>
+
+            <div class="step">
+                <span class="step-number">4</span>
+                <strong>Verifique</strong>
+                <p>Após executar, recarregue a aplicação "Gestão Inteligente". O erro deve desaparecer e as bitolas padrão devem aparecer.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function carregarSQL() {
+            try {
+                const response = await fetch('supabase_migration_stock_gauges.sql');
+                const sql = await response.text();
+                document.getElementById('sqlScript').textContent = sql;
+            } catch (error) {
+                document.getElementById('sqlScript').textContent = '-- Erro ao carregar arquivo. Por favor, abra o arquivo supabase_migration_stock_gauges.sql manualmente.';
+            }
+        }
+
+        function copiarSQL() {
+            const sql = document.getElementById('sqlScript').textContent;
+            navigator.clipboard.writeText(sql);
+            document.getElementById('copiadoMsg').style.display = 'block';
+            setTimeout(() => document.getElementById('copiadoMsg').style.display = 'none', 4000);
+        }
+
+        carregarSQL();
+    </script>
+</body>
+</html>

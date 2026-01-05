@@ -918,10 +918,12 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                                 >
                                                     <option value="" className="bg-slate-900 text-white">Selecione</option>
                                                     {(() => {
-                                                        const materialGaugesFromDB = gauges.filter(g => g.material_type === quickAddData.materialType).map(g => g.gauge);
-                                                        const defaultOptions = quickAddData.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : TrefilaBitolaOptions;
-                                                        const combinedOptions = [...new Set([...defaultOptions, ...materialGaugesFromDB])].sort((a, b) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')));
-                                                        return combinedOptions.map(b => <option key={b} value={b} className="bg-slate-900 text-white">{b}</option>);
+                                                        const options = gauges.length > 0
+                                                            ? gauges.filter(g => g.material_type === quickAddData.materialType).map(g => g.gauge)
+                                                            : (quickAddData.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : TrefilaBitolaOptions);
+
+                                                        const sorted = [...new Set(options)].sort((a: string, b: string) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')));
+                                                        return sorted.map(b => <option key={b} value={b} className="bg-slate-900 text-white">{b}</option>);
                                                     })()}
                                                 </select>
                                             </div>
