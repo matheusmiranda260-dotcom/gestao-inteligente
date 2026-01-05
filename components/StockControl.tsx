@@ -1148,6 +1148,7 @@ const StockControl: React.FC<{
                                                 <th className="px-6 py-3">Bitola</th>
                                                 <th className="px-6 py-3 text-right">Saldo / Original (kg)</th>
                                                 <th className="px-6 py-3 text-center">Status</th>
+                                                <th className="px-6 py-3 text-center">Inventariado?</th>
                                                 <th className="px-6 py-3 text-center">Ações</th>
                                             </tr>
                                         </thead>
