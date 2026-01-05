@@ -183,10 +183,11 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
                                         className="mt-1 p-2 w-full border border-slate-300 rounded-md bg-white"
                                     >
                                         <option value="">Selecione a bitola de entrada</option>
-                                        {(gauges.length > 0
-                                            ? gauges.filter(g => g.material_type === 'Fio Máquina').map(g => g.gauge)
-                                            : FioMaquinaBitolaOptions
-                                        ).map(b => <option key={b} value={b}>{b}</option>)}
+                                        {(() => {
+                                            const fmGauges = gauges.filter(g => g.material_type === 'Fio Máquina').map(g => g.gauge);
+                                            const options = fmGauges.length > 0 ? fmGauges : Array.from(FioMaquinaBitolaOptions);
+                                            return options.map(b => <option key={b} value={b}>{b}</option>);
+                                        })()}
                                     </select>
                                 </div>
                                 <div>
@@ -197,10 +198,11 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
                                         onChange={(e) => setTargetBitola(e.target.value as Bitola)}
                                         className="mt-1 p-2 w-full border border-slate-300 rounded-md bg-white"
                                     >
-                                        {(gauges.length > 0
-                                            ? gauges.filter(g => g.material_type === 'CA-60').map(g => g.gauge)
-                                            : TrefilaBitolaOptions
-                                        ).map(b => <option key={b} value={b}>{b}</option>)}
+                                        {(() => {
+                                            const caGauges = gauges.filter(g => g.material_type === 'CA-60').map(g => g.gauge);
+                                            const options = caGauges.length > 0 ? caGauges : Array.from(TrefilaBitolaOptions);
+                                            return options.map(b => <option key={b} value={b}>{b}</option>);
+                                        })()}
                                     </select>
                                 </div>
                             </div>

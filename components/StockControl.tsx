@@ -76,10 +76,13 @@ const AddConferencePage: React.FC<{
     const [historyOpen, setHistoryOpen] = useState(false);
 
     const allBitolaOptions: Bitola[] = useMemo(() => {
-        if (gauges.length > 0) {
-            return [...new Set(gauges.map(g => String(g.gauge)))].sort((a, b) => parseFloat(String(a)) - parseFloat(String(b))) as Bitola[];
-        }
-        return [...new Set([...FioMaquinaBitolaOptions, ...TrefilaBitolaOptions])].sort() as Bitola[];
+        const fmGauges = gauges.filter(g => g.material_type === 'Fio Máquina').map(g => String(g.gauge));
+        const caGauges = gauges.filter(g => g.material_type === 'CA-60').map(g => String(g.gauge));
+
+        const finalFM = fmGauges.length > 0 ? fmGauges : Array.from(FioMaquinaBitolaOptions);
+        const finalCA = caGauges.length > 0 ? caGauges : Array.from(TrefilaBitolaOptions);
+
+        return [...new Set([...finalFM, ...finalCA])].sort((a, b) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.'))) as Bitola[];
     }, [gauges]);
 
     const prevSupplierRef = useRef(conferenceData.supplier);
@@ -362,8 +365,16 @@ const AddConferencePage: React.FC<{
                                             </div>
                                             <div>
                                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Bitola</label>
-                                                <select value={lot.bitola} onChange={e => handleLotChange(index, 'bitola', e.target.value)} className="w-full p-3 border border-slate-300 rounded-lg bg-white outline-none">
-                                                    {allBitolaOptions.map(b => <option key={b} value={b}>{b}</option>)}
+                                                <select
+                                                    value={lot.bitola}
+                                                    onChange={e => handleLotChange(index, 'bitola', e.target.value)}
+                                                    className="w-full p-3 border border-slate-300 rounded-lg bg-white outline-none"
+                                                >
+                                                    {(() => {
+                                                        const materialGauges = gauges.filter(g => g.material_type === lot.materialType).map(g => g.gauge);
+                                                        const options = materialGauges.length > 0 ? materialGauges : (lot.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : TrefilaBitolaOptions);
+                                                        return options.map(b => <option key={b} value={b}>{b}</option>);
+                                                    })()}
                                                 </select>
                                             </div>
                                         </div>

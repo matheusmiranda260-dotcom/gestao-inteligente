@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import type { StockItem, Page, TransferRecord, MaterialType, Bitola } from '../types';
+import type { StockItem, Page, TransferRecord, MaterialType, Bitola, StockGauge } from '../types';
 import { MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions } from '../types';
 import { ArrowLeftIcon, TruckIcon, CalculatorIcon, CheckCircleIcon, ExclamationIcon, ClipboardListIcon } from './icons';
 import TransfersHistoryModal from './TransfersHistoryModal';
@@ -10,9 +10,10 @@ interface StockTransferProps {
     transfers: TransferRecord[];
     setPage: (page: Page) => void;
     createTransfer: (destinationSector: string, lotsToTransfer: Map<string, number>) => TransferRecord | null;
+    gauges: StockGauge[];
 }
 
-const StockTransfer: React.FC<StockTransferProps> = ({ stock, transfers, setPage, createTransfer }) => {
+const StockTransfer: React.FC<StockTransferProps> = ({ stock, transfers, setPage, createTransfer, gauges }) => {
     const [destinationSector, setDestinationSector] = useState('Coluna');
 
     interface TransferRequest {
@@ -33,7 +34,15 @@ const StockTransfer: React.FC<StockTransferProps> = ({ stock, transfers, setPage
     const [suggestedLots, setSuggestedLots] = useState<{ requestIndex: number; lot: StockItem; suggestQty: number; selected: boolean }[]>([]);
     const [isSuggestionCalculated, setIsSuggestionCalculated] = useState(false);
 
-    const allBitolaOptions = useMemo(() => [...new Set([...FioMaquinaBitolaOptions, ...TrefilaBitolaOptions])].sort(), []);
+    const allBitolaOptions = useMemo(() => {
+        const fmGauges = gauges.filter(g => g.material_type === 'Fio Máquina').map(g => String(g.gauge));
+        const caGauges = gauges.filter(g => g.material_type === 'CA-60').map(g => String(g.gauge));
+
+        const finalFM = fmGauges.length > 0 ? fmGauges : Array.from(FioMaquinaBitolaOptions);
+        const finalCA = caGauges.length > 0 ? caGauges : Array.from(TrefilaBitolaOptions);
+
+        return [...new Set([...finalFM, ...finalCA])].sort((a, b) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')));
+    }, [gauges]);
 
     const [selectionMode, setSelectionMode] = useState<'full' | 'exact'>('full');
     const [recommendedMode, setRecommendedMode] = useState<'full' | 'exact' | null>(null);
@@ -346,7 +355,11 @@ const StockTransfer: React.FC<StockTransferProps> = ({ stock, transfers, setPage
                                                     disabled={!req.materialType}
                                                 >
                                                     <option value="">Bitola...</option>
-                                                    {allBitolaOptions.map(b => <option key={b} value={b}>{b}</option>)}
+                                                    {(() => {
+                                                        const materialGauges = gauges.filter(g => g.material_type === req.materialType).map(g => g.gauge);
+                                                        const options = materialGauges.length > 0 ? materialGauges : (req.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : TrefilaBitolaOptions);
+                                                        return options.map(b => <option key={b} value={b}>{b}</option>);
+                                                    })()}
                                                 </select>
                                             </div>
                                             <div>

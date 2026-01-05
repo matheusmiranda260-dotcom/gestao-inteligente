@@ -139,11 +139,13 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
     };
 
     const allBitolaOptions = useMemo(() => {
-        if (gauges.length > 0) {
-            return [...new Set(gauges.map(g => String(g.gauge)))].sort((a, b) => parseFloat(String(a)) - parseFloat(String(b)));
-        }
-        const opts = new Set([...FioMaquinaBitolaOptions, ...TrefilaBitolaOptions]);
-        return Array.from(opts).map(normalizeBitola).sort();
+        const fmGauges = gauges.filter(g => g.material_type === 'Fio Máquina').map(g => String(g.gauge));
+        const caGauges = gauges.filter(g => g.material_type === 'CA-60').map(g => String(g.gauge));
+
+        const finalFM = fmGauges.length > 0 ? fmGauges : Array.from(FioMaquinaBitolaOptions);
+        const finalCA = caGauges.length > 0 ? caGauges : Array.from(TrefilaBitolaOptions);
+
+        return [...new Set([...finalFM, ...finalCA])].sort((a, b) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')));
     }, [gauges]);
 
     // 1. Filtered stock for the main report view
@@ -915,10 +917,11 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                                     className="w-full bg-slate-900 text-white border border-slate-700 rounded-2xl p-4 font-bold focus:border-blue-500 outline-none !bg-slate-900"
                                                 >
                                                     <option value="" className="bg-slate-900 text-white">Selecione</option>
-                                                    {(gauges.length > 0
-                                                        ? gauges.filter(g => g.material_type === quickAddData.materialType).map(g => g.gauge)
-                                                        : (quickAddData.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : TrefilaBitolaOptions)
-                                                    ).map(b => <option key={b} value={b} className="bg-slate-900 text-white">{b}</option>)}
+                                                    {(() => {
+                                                        const materialGauges = gauges.filter(g => g.material_type === quickAddData.materialType).map(g => g.gauge);
+                                                        const options = materialGauges.length > 0 ? materialGauges : (quickAddData.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : TrefilaBitolaOptions);
+                                                        return options.map(b => <option key={b} value={b} className="bg-slate-900 text-white">{b}</option>);
+                                                    })()}
                                                 </select>
                                             </div>
                                         </>
