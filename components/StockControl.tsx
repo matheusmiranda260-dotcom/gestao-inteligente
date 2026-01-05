@@ -746,6 +746,64 @@ const StockControl: React.FC<{
 
                     {showInventoryReport && <InventoryReport stock={stock} filters={{ searchTerm, statusFilter, materialFilter, bitolaFilter }} onClose={() => setShowInventoryReport(false)} />}
                     {isStockMapOpen && <StockPyramidMap stock={stock} onUpdateStockItem={updateStockItem} onClose={() => { setIsStockMapOpen(false); if (initialView === 'map') setPage('stock'); }} />}
+
+                    {/* Confirmation Modals */}
+                    {releasingItem && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-md">
+                                <div className="flex items-center gap-3 text-amber-600 mb-4">
+                                    <LockOpenIcon className="h-8 w-8" />
+                                    <h2 className="text-xl font-bold">Liberar Lote Manualmente</h2>
+                                </div>
+                                <p className="text-slate-600 mb-6">
+                                    Deseja alterar o status do lote <span className="font-bold text-slate-800">{releasingItem.internalLot}</span> de <span className="font-bold text-amber-600">"{releasingItem.status}"</span> para <span className="font-bold text-emerald-600">"Disponível"</span>?
+                                    <br /><br />
+                                    Isso removerá qualquer vínculo com Ordens de Produção pendentes.
+                                </p>
+                                <div className="flex justify-end gap-3">
+                                    <button onClick={() => setReleasingItem(null)} className="px-4 py-2 text-slate-500 font-bold hover:bg-slate-50 rounded-lg">Cancelar</button>
+                                    <button onClick={handleRelease} className="px-6 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg shadow-md transition">Confirmar Liberação</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {deletingItem && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-md">
+                                <div className="flex items-center gap-3 text-red-600 mb-4">
+                                    <TrashIcon className="h-8 w-8" />
+                                    <h2 className="text-xl font-bold">Excluir Lote</h2>
+                                </div>
+                                <p className="text-slate-600 mb-6">
+                                    Tem certeza que deseja excluir permanentemente o lote <span className="font-bold text-slate-800">{deletingItem.internalLot}</span>? Esta ação não pode ser desfeita.
+                                </p>
+                                <div className="flex justify-end gap-3">
+                                    <button onClick={() => setDeletingItem(null)} className="px-4 py-2 text-slate-500 font-bold hover:bg-slate-50 rounded-lg">Cancelar</button>
+                                    <button onClick={handleDelete} className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg shadow-md transition">Excluir Permanente</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {unmappingItem && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-md">
+                                <div className="flex items-center gap-3 text-amber-600 mb-4">
+                                    <LocationOffIcon className="h-8 w-8" />
+                                    <h2 className="text-xl font-bold">Remover do Mapa</h2>
+                                </div>
+                                <p className="text-slate-600 mb-6">
+                                    Deseja remover a localização <span className="font-bold text-emerald-600">"{unmappingItem.location}"</span> do lote <span className="font-bold text-slate-800">{unmappingItem.internalLot}</span>? O lote voltará a ficar "Pendente de Mapeamento".
+                                </p>
+                                <div className="flex justify-end gap-3">
+                                    <button onClick={() => setUnmappingItem(null)} className="px-4 py-2 text-slate-500 font-bold hover:bg-slate-50 rounded-lg">Cancelar</button>
+                                    <button onClick={handleUnmap} className="px-6 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg shadow-md transition">Remover Local</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {!isStockMapOpen && (
                         <>
                             <header className="flex items-center justify-between">
