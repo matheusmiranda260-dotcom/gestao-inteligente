@@ -13,13 +13,14 @@ interface StockInventoryProps {
     addInventorySession: (session: InventorySession) => Promise<void>;
     updateInventorySession: (id: string, updates: Partial<InventorySession>) => Promise<void>;
     deleteInventorySession: (id: string) => Promise<void>;
+    deleteStockItem: (id: string) => Promise<void>;
     currentUser: User | null;
     gauges: StockGauge[];
 }
 
 type AuditStep = 'select' | 'list' | 'confirm' | 'quick-add';
 
-const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateStockItem, addStockItem, inventorySessions, addInventorySession, updateInventorySession, deleteInventorySession, currentUser, gauges }) => {
+const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateStockItem, addStockItem, inventorySessions, addInventorySession, updateInventorySession, deleteInventorySession, deleteStockItem, currentUser, gauges }) => {
     const [mode, setMode] = useState<'report' | 'audit'>(window.innerWidth < 768 ? 'audit' : 'report');
     const [reportFilters, setReportFilters] = useState({
         searchTerm: '',
@@ -572,26 +573,32 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                         }]
                     });
                 } else if (lotInfo.lotId && !isNew) {
-                    const diff = lotInfo.physicalWeight - lotInfo.systemWeight;
-                    const currentLot = stock.find(s => s.id === lotInfo.lotId);
+                    // Existing lot
+                    if (lotInfo.physicalWeight === 0) {
+                        // USER REQUEST: Rolls not found in the patio should be EXCLUDED
+                        await deleteStockItem(lotInfo.lotId);
+                    } else {
+                        const diff = lotInfo.physicalWeight - lotInfo.systemWeight;
+                        const currentLot = stock.find(s => s.id === lotInfo.lotId);
 
-                    const historyEntry = {
-                        type: 'Inventário (Aprovado)',
-                        date: new Date().toISOString(),
-                        details: {
-                            'Peso Anterior': `${lotInfo.systemWeight.toFixed(2)} kg`,
-                            'Peso Final': `${lotInfo.physicalWeight.toFixed(2)} kg`,
-                            'Diferença': `${diff.toFixed(2)} kg`,
-                            'Aprovado por': currentUser?.username || 'Gestor'
-                        }
-                    };
+                        const historyEntry = {
+                            type: 'Inventário (Aprovado)',
+                            date: new Date().toISOString(),
+                            details: {
+                                'Peso Anterior': `${lotInfo.systemWeight.toFixed(2)} kg`,
+                                'Peso Final': `${lotInfo.physicalWeight.toFixed(2)} kg`,
+                                'Diferença': `${diff.toFixed(2)} kg`,
+                                'Aprovado por': currentUser?.username || 'Gestor'
+                            }
+                        };
 
-                    await updateStockItem(lotInfo.lotId, {
-                        remainingQuantity: lotInfo.physicalWeight,
-                        lastAuditDate: new Date().toISOString(),
-                        auditObservation: lotInfo.observation || null,
-                        history: [...(currentLot?.history || []), historyEntry]
-                    });
+                        await updateStockItem(lotInfo.lotId, {
+                            remainingQuantity: lotInfo.physicalWeight,
+                            lastAuditDate: new Date().toISOString(),
+                            auditObservation: lotInfo.observation || null,
+                            history: [...(currentLot?.history || []), historyEntry]
+                        });
+                    }
                 }
             }
 
