@@ -15,7 +15,11 @@ export interface TrelicaSelectedLots {
     allSenozoideRight?: string[];
 }
 
-export type Page = 'login' | 'menu' | 'stock' | 'stock_map' | 'stock_add' | 'stock_inventory' | 'stock_transfer' | 'machineSelection' | 'trefila' | 'trelica' | 'productionOrder' | 'productionOrderTrelica' | 'reports' | 'userManagement' | 'productionDashboard' | 'finishedGoods' | 'partsManager' | 'continuousImprovement' | 'workInstructions' | 'peopleManagement' | 'gaugesManager';
+export type Page = 'login' | 'menu' | 'stock' | 'stock_map' | 'stock_add' | 'stock_inventory' | 'stock_transfer' |
+    'trefila' | 'trefila_in_progress' | 'trefila_pending' | 'trefila_completed' | 'trefila_reports' | 'trefila_parts' |
+    'trelica' | 'trelica_in_progress' | 'trelica_pending' | 'trelica_completed' | 'trelica_reports' | 'trelica_parts' |
+    'productionOrder' | 'productionOrderTrelica' | 'reports' | 'userManagement' | 'productionDashboard' |
+    'finishedGoods' | 'partsManager' | 'continuousImprovement' | 'workInstructions' | 'peopleManagement' | 'gaugesManager';
 
 export interface InstructionStep {
     id: string;
@@ -157,6 +161,8 @@ export interface OperatorLog {
     operator: string;
     startTime: string; // ISO string
     endTime?: string | null; // ISO string or null
+    startQuantity?: number;
+    endQuantity?: number;
     postProductionActivities?: {
         timestamp: string; // ISO string
         description: string;
@@ -200,6 +206,7 @@ export interface ProductionOrderData {
     scrapWeight?: number;
     weighedPackages?: WeighedPackage[];
     pontas?: Ponta[];
+    lastQuantityUpdate?: string; // ISO string
 }
 
 export interface FinishedProductItem {
@@ -255,6 +262,7 @@ export interface ShiftReport {
     shiftEndTime: string;
     processedLots: ProcessedLot[];
     downtimeEvents: DowntimeEvent[];
+    totalProducedQuantity: number;
     totalProducedWeight: number;
     totalProducedMeters: number;
     totalScrapWeight: number;

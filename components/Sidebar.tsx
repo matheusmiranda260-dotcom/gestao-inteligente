@@ -11,7 +11,8 @@ import {
     WrenchScrewdriverIcon,
     ChatBubbleLeftRightIcon,
     StarIcon,
-    ChevronRightIcon
+    ChevronRightIcon,
+    DocumentReportIcon
 } from './icons';
 
 interface SidebarProps {
@@ -29,6 +30,18 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
     const toggleMenu = (menu: string) => {
         setExpandedMenus(prev => prev.includes(menu) ? prev.filter(m => m !== menu) : [...prev, menu]);
     };
+
+    React.useEffect(() => {
+        if (['stock', 'stock_map', 'stock_add', 'stock_inventory', 'stock_transfer'].includes(page)) {
+            setExpandedMenus(prev => prev.includes('stock') ? prev : [...prev, 'stock']);
+        } else if (['trefila', 'trefila_in_progress', 'trefila_pending', 'trefila_completed', 'trefila_reports', 'trefila_parts'].includes(page)) {
+            setExpandedMenus(prev => prev.includes('trefila') ? prev : [...prev, 'trefila']);
+        } else if (['trelica', 'trelica_in_progress', 'trelica_pending', 'trelica_completed', 'trelica_reports', 'trelica_parts'].includes(page)) {
+            setExpandedMenus(prev => prev.includes('trelica') ? prev : [...prev, 'trelica']);
+        } else if (['peopleManagement', 'continuousImprovement'].includes(page)) {
+            setExpandedMenus(prev => prev.includes('people') ? prev : [...prev, 'people']);
+        }
+    }, [page]);
 
     const hasPermission = (targetPage: Page): boolean => {
         if (!currentUser) return false;
@@ -92,8 +105,75 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                 {/* PRODUÇÃO */}
                 <div className="sidebar-category">
                     <div className="sidebar-category-title">{isCollapsed ? '🏭' : '🏭 Produção'}</div>
-                    <MenuItem target="trefila" label="Produção – Trefila" icon={CogIcon} />
-                    <MenuItem target="trelica" label="Produção – Treliça" icon={CogIcon} />
+
+                    {/* Trefila Collapsible */}
+                    <button
+                        onClick={() => toggleMenu('trefila')}
+                        className={`sidebar-item ${['trefila', 'trefila_in_progress', 'trefila_pending', 'trefila_completed', 'trefila_reports', 'trefila_parts'].includes(page) ? 'active' : ''} justify-between group`}
+                        title={isCollapsed ? 'Produção – Trefila' : ''}
+                    >
+                        <div className="flex items-center gap-3 overflow-hidden">
+                            <div className="sidebar-item-icon shrink-0">
+                                <CogIcon className="w-full h-full" />
+                            </div>
+                            {!isCollapsed && <span className="sidebar-item-label whitespace-nowrap">Produção – Trefila</span>}
+                        </div>
+                        {!isCollapsed && (
+                            <ChevronRightIcon className={`w-3 h-3 text-slate-500 transition-transform duration-200 ${expandedMenus.includes('trefila') ? 'rotate-90' : ''}`} />
+                        )}
+                    </button>
+
+                    {!isCollapsed && expandedMenus.includes('trefila') && (
+                        <div className="ml-4 pl-4 border-l border-slate-700/50 flex flex-col gap-0.5 mt-1 mb-2 animate-in slide-in-from-left-2 duration-200">
+                            <button onClick={() => setPage('trefila_in_progress')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_in_progress' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                ⚙️ Em Produção
+                            </button>
+                            <button onClick={() => setPage('trefila_pending')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_pending' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                📋 Próximas Produções
+                            </button>
+                            <button onClick={() => setPage('trefila_completed')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_completed' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                📦 Produções Finalizadas
+                            </button>
+                            <button onClick={() => setPage('trefila_reports')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_reports' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                📊 Relatórios de Turno
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Treliça Collapsible */}
+                    <button
+                        onClick={() => toggleMenu('trelica')}
+                        className={`sidebar-item ${['trelica', 'trelica_in_progress', 'trelica_pending', 'trelica_completed', 'trelica_reports', 'trelica_parts'].includes(page) ? 'active' : ''} justify-between group`}
+                        title={isCollapsed ? 'Produção – Treliça' : ''}
+                    >
+                        <div className="flex items-center gap-3 overflow-hidden">
+                            <div className="sidebar-item-icon shrink-0">
+                                <CogIcon className="w-full h-full" />
+                            </div>
+                            {!isCollapsed && <span className="sidebar-item-label whitespace-nowrap">Produção – Treliça</span>}
+                        </div>
+                        {!isCollapsed && (
+                            <ChevronRightIcon className={`w-3 h-3 text-slate-500 transition-transform duration-200 ${expandedMenus.includes('trelica') ? 'rotate-90' : ''}`} />
+                        )}
+                    </button>
+
+                    {!isCollapsed && expandedMenus.includes('trelica') && (
+                        <div className="ml-4 pl-4 border-l border-slate-700/50 flex flex-col gap-0.5 mt-1 mb-2 animate-in slide-in-from-left-2 duration-200">
+                            <button onClick={() => setPage('trelica_in_progress')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelica_in_progress' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                ⚙️ Em Produção
+                            </button>
+                            <button onClick={() => setPage('trelica_pending')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelica_pending' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                📋 Próximas Produções
+                            </button>
+                            <button onClick={() => setPage('trelica_completed')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelica_completed' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                📦 Produções Finalizadas
+                            </button>
+                            <button onClick={() => setPage('trelica_reports')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelica_reports' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                📊 Relatórios de Turno
+                            </button>
+                        </div>
+                    )}
+
                     <MenuItem target="productionOrder" label="Ordens (Trefila)" icon={ClipboardListIcon} />
                     <MenuItem target="productionOrderTrelica" label="Ordens (Treliça)" icon={ClipboardListIcon} />
                 </div>
@@ -150,8 +230,33 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                 {/* PESSOAS */}
                 <div className="sidebar-category">
                     <div className="sidebar-category-title">{isCollapsed ? '👥' : '👥 Pessoas'}</div>
-                    <MenuItem target="peopleManagement" label="Gestão de Pessoas" icon={UserGroupIcon} />
-                    <MenuItem target="continuousImprovement" label="Melhoria Contínua" icon={AdjustmentsIcon} />
+
+                    <button
+                        onClick={() => toggleMenu('people')}
+                        className={`sidebar-item ${['peopleManagement', 'continuousImprovement'].includes(page) ? 'active' : ''} justify-between group`}
+                        title={isCollapsed ? 'Pessoas' : ''}
+                    >
+                        <div className="flex items-center gap-3 overflow-hidden">
+                            <div className="sidebar-item-icon shrink-0">
+                                <UserGroupIcon className="w-full h-full" />
+                            </div>
+                            {!isCollapsed && <span className="sidebar-item-label whitespace-nowrap">Gestão</span>}
+                        </div>
+                        {!isCollapsed && (
+                            <ChevronRightIcon className={`w-3 h-3 text-slate-500 transition-transform duration-200 ${expandedMenus.includes('people') ? 'rotate-90' : ''}`} />
+                        )}
+                    </button>
+
+                    {!isCollapsed && expandedMenus.includes('people') && (
+                        <div className="ml-4 pl-4 border-l border-slate-700/50 flex flex-col gap-0.5 mt-1 mb-2 animate-in slide-in-from-left-2 duration-200">
+                            <button onClick={() => setPage('peopleManagement')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'peopleManagement' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                👥 Gestão de Pessoas
+                            </button>
+                            <button onClick={() => setPage('continuousImprovement')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'continuousImprovement' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                ✨ Melhoria Contínua
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* GESTÃO */}

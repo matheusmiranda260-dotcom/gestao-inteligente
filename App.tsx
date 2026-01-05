@@ -4,7 +4,7 @@ import { FioMaquinaBitolaOptions, TrefilaBitolaOptions } from './types';
 import Login from './components/Login';
 import MainMenu from './components/MainMenu';
 import StockControl from './components/StockControl';
-import MachineControl, { MachineSelection } from './components/MachineControl';
+import MachineControl from './components/MachineControl';
 import ProductionOrder from './components/ProductionOrder';
 import ProductionOrderTrelica from './components/ProductionOrderTrelica';
 import Reports from './components/Reports';
@@ -996,7 +996,12 @@ const App: React.FC = () => {
         }
 
         const updates: Partial<ProductionOrderData> = {
-            operatorLogs: [...(order.operatorLogs || []), { operator: currentUser.username, startTime: now, endTime: null }],
+            operatorLogs: [...(order.operatorLogs || []), {
+                operator: currentUser.username,
+                startTime: now,
+                endTime: null,
+                startQuantity: order.actualProducedQuantity || 0
+            }],
         };
 
         // For Treliça, automatically resume production when shift starts
@@ -1071,17 +1076,34 @@ const App: React.FC = () => {
             // Trelica: sum of packages + pontas weights
             const packageWeight = shiftPackages.reduce((sum, pkg) => sum + (pkg.weight || 0), 0);
             const pontasWeight = shiftPontas.reduce((sum, p) => sum + (p.totalWeight || 0), 0);
-            totalProducedWeight = packageWeight + pontasWeight;
 
             const packageMeters = shiftPackages.reduce((sum, pkg) => sum + (pkg.quantity * parseFloat(order.tamanho || '0')), 0);
             const pontasMeters = shiftPontas.reduce((sum, p) => sum + (p.quantity * p.size), 0);
-            totalProducedMeters = packageMeters + pontasMeters;
+
+            // If no packages weighed but pieces were reported at end of shift
+            const shiftQuantity = (operatorLog.endQuantity || 0) - (operatorLog.startQuantity || 0);
+            if (packageWeight === 0 && shiftQuantity > 0) {
+                const modelInfo = trelicaModels.find(m => m.modelo === order.trelicaModel && m.tamanho === order.tamanho);
+                if (modelInfo) {
+                    const theoreticalPieceWeight = parseFloat(modelInfo.pesoFinal.replace(',', '.'));
+                    totalProducedWeight = (shiftQuantity * theoreticalPieceWeight) + pontasWeight;
+                    totalProducedMeters = (shiftQuantity * parseFloat(order.tamanho || '0')) + pontasMeters;
+                } else {
+                    totalProducedWeight = pontasWeight;
+                    totalProducedMeters = pontasMeters;
+                }
+            } else {
+                totalProducedWeight = packageWeight + pontasWeight;
+                totalProducedMeters = packageMeters + pontasMeters;
+            }
         }
 
         const totalScrapWeight = orderEndedInShift ? (order.scrapWeight || 0) : 0;
         const scrapPercentage = (totalProducedWeight + totalScrapWeight) > 0
             ? (totalScrapWeight / (totalProducedWeight + totalScrapWeight)) * 100
             : 0;
+
+        const totalProducedQuantity = (operatorLog.endQuantity || 0) - (operatorLog.startQuantity || 0);
 
         const report: ShiftReport = {
             id: generateId('shift'),
@@ -1098,6 +1120,7 @@ const App: React.FC = () => {
             shiftEndTime: operatorLog.endTime,
             processedLots: shiftProcessedLots,
             downtimeEvents: shiftDowntimeEvents,
+            totalProducedQuantity,
             totalProducedWeight,
             totalProducedMeters,
             totalScrapWeight,
@@ -1113,7 +1136,7 @@ const App: React.FC = () => {
     };
 
 
-    const endOperatorShift = async (orderId: string) => {
+    const endOperatorShift = async (orderId: string, finalQuantity?: number) => {
         if (!currentUser) return;
 
         const order = productionOrders.find(o => o.id === orderId);
@@ -1132,10 +1155,16 @@ const App: React.FC = () => {
         }
         if (lastLogIndex !== -1) {
             newLogs[lastLogIndex].endTime = now;
+            newLogs[lastLogIndex].endQuantity = finalQuantity !== undefined ? finalQuantity : (order.actualProducedQuantity || 0);
             operatorLog = newLogs[lastLogIndex];
         }
 
         const updates: Partial<ProductionOrderData> = { operatorLogs: newLogs };
+
+        if (finalQuantity !== undefined) {
+            updates.actualProducedQuantity = finalQuantity;
+            updates.lastQuantityUpdate = now;
+        }
 
         // Automatically stop machine if it is running
         const lastDowntime = (order.downtimeEvents && order.downtimeEvents.length > 0)
@@ -1618,8 +1647,12 @@ const App: React.FC = () => {
 
     const updateProducedQuantity = async (orderId: string, quantity: number) => {
         try {
-            await updateItem('production_orders', orderId, { actualProducedQuantity: quantity });
-            setProductionOrders(prev => prev.map(o => o.id === orderId ? { ...o, actualProducedQuantity: quantity } : o));
+            const now = new Date().toISOString();
+            await updateItem('production_orders', orderId, {
+                actualProducedQuantity: quantity,
+                lastQuantityUpdate: now
+            });
+            setProductionOrders(prev => prev.map(o => o.id === orderId ? { ...o, actualProducedQuantity: quantity, lastQuantityUpdate: now } : o));
             showNotification('Contagem de peças atualizada.', 'success');
         } catch (error) { showNotification('Erro ao atualizar contagem.', 'error'); }
     };
@@ -1691,13 +1724,24 @@ const App: React.FC = () => {
         } catch (error) { showNotification('Erro ao excluir.', 'error'); }
     };
 
+    const deleteShiftReport = async (reportId: string) => {
+        if (!confirm('Tem certeza que deseja excluir este relatório de turno?')) return;
+        try {
+            await deleteItem('shift_reports', reportId);
+            setShiftReports(prev => prev.filter(r => r.id !== reportId));
+            showNotification('Relatório excluído com sucesso.', 'success');
+        } catch (error) {
+            showNotification('Erro ao excluir o relatório.', 'error');
+        }
+    };
+
     const renderPage = () => {
         const mcProps = {
             setPage, stock, currentUser, registerProduction, productionOrders, shiftReports,
             startProductionOrder, startOperatorShift, endOperatorShift, logDowntime,
             logResumeProduction, startLotProcessing, finishLotProcessing, recordLotWeight,
             addPartsRequest, logPostProductionActivity, completeProduction, recordPackageWeight,
-            updateProducedQuantity, users
+            updateProducedQuantity, users, deleteShiftReport
         };
 
         switch (page) {
@@ -1708,20 +1752,31 @@ const App: React.FC = () => {
             case 'stock_add': return <StockControl stock={stock} conferences={conferences} transfers={transfers} setPage={setPage} addConference={addConference} deleteStockItem={deleteStockItem} updateStockItem={(item) => updateStockItem(item.id, item)} createTransfer={createTransfer} editConference={editConference} deleteConference={deleteConference} productionOrders={productionOrders} initialView="add" gauges={gauges} currentUser={currentUser} />;
             case 'stock_inventory': return <StockInventory stock={stock} setPage={setPage} updateStockItem={updateStockItem} addStockItem={addStockItem} deleteStockItem={deleteStockItem} inventorySessions={inventorySessions} addInventorySession={addInventorySession} updateInventorySession={updateInventorySession} deleteInventorySession={deleteInventorySession} currentUser={currentUser} gauges={gauges} />;
             case 'stock_transfer': return <StockTransfer stock={stock} transfers={transfers} setPage={setPage} createTransfer={createTransfer} gauges={gauges} />;
-            case 'trefila': return <MachineControl machineType="Trefila" {...mcProps} />;
-            case 'trelica': return <MachineControl machineType="Treliça" {...mcProps} />;
-            case 'machineSelection': return <MachineSelection setPage={setPage} />;
+            case 'trefila': return <MachineControl machineType="Trefila" {...mcProps} initialView="dashboard" initialModal={null} />;
+            case 'trefila_in_progress': return <MachineControl machineType="Trefila" {...mcProps} initialView="in_progress" initialModal={null} />;
+            case 'trefila_pending': return <MachineControl machineType="Trefila" {...mcProps} initialView="pending" initialModal={null} />;
+            case 'trefila_completed': return <MachineControl machineType="Trefila" {...mcProps} initialView="completed" initialModal={null} />;
+            case 'trefila_reports': return <MachineControl machineType="Trefila" {...mcProps} initialView="dashboard" initialModal="reports" />;
+            case 'trefila_parts': return <MachineControl machineType="Trefila" {...mcProps} initialView="dashboard" initialModal="parts" />;
+
+            case 'trelica': return <MachineControl machineType="Treliça" {...mcProps} initialView="dashboard" initialModal={null} />;
+            case 'trelica_in_progress': return <MachineControl machineType="Treliça" {...mcProps} initialView="in_progress" initialModal={null} />;
+            case 'trelica_pending': return <MachineControl machineType="Treliça" {...mcProps} initialView="pending" initialModal={null} />;
+            case 'trelica_completed': return <MachineControl machineType="Treliça" {...mcProps} initialView="completed" initialModal={null} />;
+            case 'trelica_reports': return <MachineControl machineType="Treliça" {...mcProps} initialView="dashboard" initialModal="reports" />;
+            case 'trelica_parts': return <MachineControl machineType="Treliça" {...mcProps} initialView="dashboard" initialModal="parts" />;
+
             case 'productionOrder': return <ProductionOrder setPage={setPage} stock={stock} productionOrders={productionOrders} addProductionOrder={addProductionOrder} showNotification={showNotification} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} gauges={gauges} currentUser={currentUser} />;
             case 'productionOrderTrelica': return <ProductionOrderTrelica setPage={setPage} stock={stock} productionOrders={productionOrders} addProductionOrder={addProductionOrder} showNotification={showNotification} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} gauges={gauges} currentUser={currentUser} />;
             case 'productionDashboard': return <ProductionDashboard setPage={setPage} productionOrders={productionOrders} stock={stock} currentUser={currentUser} />;
             case 'reports': return <Reports setPage={setPage} stock={stock} trefilaProduction={trefilaProduction} trelicaProduction={trelicaProduction} />;
             case 'userManagement': return <UserManagement users={users} employees={employees} addUser={addUser} updateUser={updateUser} deleteUser={deleteUser} setPage={setPage} />;
             case 'finishedGoods': return <FinishedGoods finishedGoods={finishedGoods} pontasStock={pontasStock} setPage={setPage} finishedGoodsTransfers={finishedGoodsTransfers} createFinishedGoodsTransfer={createFinishedGoodsTransfer} onDelete={deleteFinishedGoods} />;
-            case 'partsManager': return <SparePartsManager onBack={() => setPage('menu')} />;
+            case 'partsManager': return <SparePartsManager />;
             case 'continuousImprovement': return <ContinuousImprovement setPage={setPage} />;
             case 'workInstructions': return <WorkInstructions setPage={setPage} />;
             case 'peopleManagement': return <PeopleManagement setPage={setPage} currentUser={currentUser} />;
-            case 'gaugesManager': return <GaugesManager gauges={gauges} onClose={() => setPage('menu')} onAdd={addGauge} onDelete={deleteGauge} onRestoreDefaults={restoreDefaultGauges} />;
+            case 'gaugesManager': return <GaugesManager gauges={gauges} onAdd={addGauge} onDelete={deleteGauge} onRestoreDefaults={restoreDefaultGauges} />;
 
             default: return <Login onLogin={handleLogin} error={null} />;
         }

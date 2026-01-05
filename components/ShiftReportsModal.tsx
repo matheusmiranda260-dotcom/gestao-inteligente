@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { ShiftReport, StockItem } from '../types';
-import { PrinterIcon, DocumentReportIcon, ArchiveIcon, WarningIcon } from './icons';
+import { PrinterIcon, DocumentReportIcon, ArchiveIcon, WarningIcon, TrashIcon } from './icons';
 
 const formatDuration = (ms: number) => {
     if (ms < 0) ms = 0;
@@ -228,8 +228,10 @@ const ShiftReportPrintView: React.FC<{ report: ShiftReport, stock: StockItem[], 
     const isTrelica = report.machine !== 'Trefila';
 
     if (isTrelica) {
-        const tamanhoNum = parseFloat(report.tamanho || '6');
-        const totalPieces = report.totalProducedMeters / (tamanhoNum || 6);
+        const tamanhoNum = parseFloat(report.tamanho || '6') || 6;
+        const totalPieces = report.totalProducedQuantity > 0
+            ? report.totalProducedQuantity
+            : (report.totalProducedMeters / tamanhoNum);
         const timePerPieceMs = totalPieces > 0 ? productiveTime / totalPieces : 0;
         const speedMpm = productiveTime > 0 ? report.totalProducedMeters / (productiveTime / 60000) : 0;
 
@@ -238,14 +240,17 @@ const ShiftReportPrintView: React.FC<{ report: ShiftReport, stock: StockItem[], 
         const productionHistory = useMemo(() => {
             // Deduplicate reports by ID
             const allSourceReports = allReports || [report];
-            const uniqueReports = Array.from(new Map(allSourceReports.map(item => [item.id, item])).values());
+            const uniqueReports = Array.from(new Map(allSourceReports.map(item => [item.id, item])).values()) as ShiftReport[];
 
             return uniqueReports
                 .filter(r => r.orderNumber === report.orderNumber && r.machine !== 'Trefila')
                 .sort((a, b) => new Date(a.shiftStartTime || a.date).getTime() - new Date(b.shiftStartTime || b.date).getTime());
         }, [allReports, report.orderNumber]);
 
-        const totalHistPieces = productionHistory.reduce((acc, r) => acc + ((r.totalProducedMeters || 0) / (parseFloat(r.tamanho || '6') || 6)), 0);
+        const totalHistPieces = productionHistory.reduce((acc, r) => {
+            const qty = r.totalProducedQuantity > 0 ? r.totalProducedQuantity : ((r.totalProducedMeters || 0) / (parseFloat(r.tamanho || '6') || 6));
+            return acc + qty;
+        }, 0);
         const totalHistWeight = productionHistory.reduce((acc, r) => acc + (r.totalProducedWeight || 0), 0);
         const avgHistMedia = totalHistPieces > 0 ? totalHistWeight / totalHistPieces : 0;
 
@@ -398,7 +403,7 @@ const ShiftReportPrintView: React.FC<{ report: ShiftReport, stock: StockItem[], 
                         </thead>
                         <tbody>
                             {productionHistory.map((r, i) => {
-                                const q = (r.totalProducedMeters || 0) / (parseFloat(r.tamanho || '6') || 6);
+                                const q = r.totalProducedQuantity > 0 ? r.totalProducedQuantity : ((r.totalProducedMeters || 0) / (parseFloat(r.tamanho || '6') || 6));
                                 const media = q > 0 ? (r.totalProducedWeight || 0) / q : 0;
 
                                 const start = r.shiftStartTime ? new Date(r.shiftStartTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
@@ -675,9 +680,10 @@ interface ShiftReportsModalProps {
     reports: ShiftReport[];
     stock: StockItem[];
     onClose: () => void;
+    onDelete?: (reportId: string) => void;
 }
 
-const ShiftReportsModal: React.FC<ShiftReportsModalProps> = ({ reports, stock, onClose }) => {
+const ShiftReportsModal: React.FC<ShiftReportsModalProps> = ({ reports, stock, onClose, onDelete }) => {
     const [expandedReportId, setExpandedReportId] = useState<string | null>(null);
     const [printingReport, setPrintingReport] = useState<ShiftReport | null>(null);
 
@@ -698,30 +704,22 @@ const ShiftReportsModal: React.FC<ShiftReportsModalProps> = ({ reports, stock, o
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-40 p-4 print-modal-container">
             <div className="bg-white p-0 rounded-xl shadow-2xl w-full max-w-7xl max-h-[90vh] flex flex-col print-modal-content overflow-hidden">
                 {!printingReport && (
-                    <div className="flex justify-between items-center p-8 border-b border-slate-200 bg-gradient-to-r from-[#0A2A3D] to-[#1A5A7D] no-print">
-                        <div className="flex items-center gap-6">
-                            <div className="w-16 h-16 bg-white/10 backdrop-blur-md rounded-[2rem] flex items-center justify-center border border-white/20 shadow-2xl">
-                                <ArchiveIcon className="w-8 h-8 text-white animate-pulse" />
+                    <div className="flex justify-between items-center p-6 border-b border-slate-200 bg-white no-print">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center border border-indigo-100 shadow-sm">
+                                <DocumentReportIcon className="w-6 h-6 text-indigo-600" />
                             </div>
                             <div>
-                                <h2 className="text-3xl font-black text-white tracking-tight">Intelligence Hub</h2>
-                                <p className="text-indigo-200 font-bold uppercase tracking-[0.2em] text-[10px]">Histórico Analítico de Operação</p>
+                                <h2 className="text-xl font-black text-slate-800 tracking-tight text-center">Relatórios de Turno</h2>
+                                <p className="text-slate-400 font-bold uppercase tracking-[0.1em] text-[9px]">Histórico Analítico de Operação</p>
                             </div>
                         </div>
-                        <div className="flex items-center gap-4">
-                            <button
-                                onClick={() => window.print()}
-                                className="bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 text-white font-black py-3 px-6 rounded-2xl transition-all shadow-xl flex items-center gap-3 active:scale-95 group"
-                                title="Imprimir Lista"
-                            >
-                                <PrinterIcon className="h-5 w-5 text-emerald-400 group-hover:rotate-12 transition-transform" />
-                                <span className="text-sm uppercase tracking-widest">Master List</span>
-                            </button>
+                        <div className="flex items-center gap-3">
                             <button
                                 onClick={onClose}
-                                className="bg-rose-500 hover:bg-rose-600 text-white font-black py-3 px-8 rounded-2xl transition-all shadow-xl shadow-rose-900/20 active:scale-95 text-sm uppercase tracking-widest"
+                                className="bg-slate-100 hover:bg-slate-200 text-slate-600 font-black py-2.5 px-6 rounded-xl transition-all active:scale-95 text-[10px] uppercase tracking-widest"
                             >
-                                Fechar Terminal
+                                Fechar
                             </button>
                         </div>
                     </div>
@@ -730,83 +728,66 @@ const ShiftReportsModal: React.FC<ShiftReportsModalProps> = ({ reports, stock, o
                 <div className={`flex-grow overflow-y-auto bg-white p-6 print-section`}>
                     {!printingReport ? (
                         reports.length > 0 ? (
-                            <div className="bg-white rounded-3xl shadow-sm border-2 border-slate-100 overflow-hidden no-print">
-                                <table className="w-full text-sm text-left">
-                                    <thead className="bg-[#0A2A3D] text-white sticky top-0 z-20">
+                            <div className="overflow-x-auto rounded-xl border border-slate-100 shadow-sm no-print">
+                                <table className="w-full text-sm text-left text-slate-500">
+                                    <thead className="text-xs text-slate-700 uppercase bg-slate-50">
                                         <tr>
-                                            <th className="p-6 font-black uppercase tracking-[0.2em] text-[10px] border-b border-white/10">Data Registro</th>
-                                            <th className="p-6 font-black uppercase tracking-[0.2em] text-[10px] border-b border-white/10">Time Unit / Operador</th>
-                                            <th className="p-6 font-black uppercase tracking-[0.2em] text-[10px] border-b border-white/10">Protocolo OP</th>
-                                            <th className="p-6 font-black uppercase tracking-[0.2em] text-[10px] text-center border-b border-white/10">Hardware</th>
-                                            <th className="p-6 font-black uppercase tracking-[0.2em] text-[10px] text-right border-b border-white/10">Massa Líquida</th>
-                                            <th className="p-6 font-black uppercase tracking-[0.2em] text-[10px] text-right border-b border-white/10">Lotes</th>
-                                            <th className="p-6 font-black uppercase tracking-[0.2em] text-[10px] text-center border-b border-white/10">Ações Analíticas</th>
+                                            <th className="px-6 py-4 font-bold">Data do Turno</th>
+                                            <th className="px-6 py-4 font-bold text-center">Horário</th>
+                                            <th className="px-6 py-4 font-bold">Nº Ordem</th>
+                                            <th className="px-6 py-4 font-bold">Operador</th>
+                                            <th className="px-6 py-4 font-bold">{reports[0]?.machine === 'Trefila' ? 'Bitola' : 'Modelo'}</th>
+                                            <th className="px-6 py-4 font-bold text-right">Peso Produzido (kg)</th>
+                                            <th className="px-6 py-4 font-bold text-center">Ações</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
                                         {reports.map((report) => (
                                             <React.Fragment key={report.id}>
-                                                <tr className={`group hover:bg-indigo-50/50 transition-all duration-300 ${expandedReportId === report.id ? 'bg-indigo-50/70' : ''}`}>
-                                                    <td className="p-6">
-                                                        <div className="flex flex-col gap-1">
-                                                            <span className="font-black text-slate-800 text-lg tabular-nums leading-none">{new Date(report.date).toLocaleDateString('pt-BR')}</span>
-                                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{new Date(report.date).toLocaleDateString('pt-BR', { weekday: 'long' })}</span>
-                                                        </div>
+                                                <tr className={`bg-white hover:bg-slate-50 transition-colors ${expandedReportId === report.id ? 'bg-indigo-50/30' : ''}`}>
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        <span className="font-medium text-slate-900">{new Date(report.date).toLocaleDateString('pt-BR')}</span>
                                                     </td>
-                                                    <td className="p-6">
-                                                        <div className="flex flex-col gap-2">
-                                                            <div className="flex items-center gap-2">
-                                                                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-500 border border-slate-200 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors uppercase">
-                                                                    {report.operator.substring(0, 2)}
-                                                                </div>
-                                                                <span className="font-black text-slate-900 uppercase text-xs tracking-tight">{report.operator}</span>
-                                                            </div>
-                                                            <span className="text-[9px] text-indigo-500 font-black uppercase tracking-widest bg-white px-2.5 py-1 rounded-full border border-indigo-100 shadow-sm w-fit group-hover:bg-indigo-600 group-hover:text-white transition-all">
-                                                                {new Date(report.shiftStartTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} — {new Date(report.shiftEndTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                                                            </span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="p-6">
-                                                        <div className="flex flex-col gap-1">
-                                                            <span className="font-black text-slate-800 tracking-tighter text-base"># {report.orderNumber}</span>
-                                                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Protocolo de Produção</span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="p-6 text-center">
-                                                        <span className={`px-4 py-2 rounded-2xl text-[9px] font-black uppercase tracking-widest shadow-md border-b-4 transition-all ${report.machine === 'Trefila' ? 'bg-blue-600 text-white border-blue-800 shadow-blue-100' : 'bg-orange-500 text-white border-orange-700 shadow-orange-100'}`}>
-                                                            {report.machine === 'Trefila' ? 'Trefila Core' : 'Truss Master'}
+                                                    <td className="px-6 py-4 text-center whitespace-nowrap">
+                                                        <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-md">
+                                                            {new Date(report.shiftStartTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} — {new Date(report.shiftEndTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                                                         </span>
                                                     </td>
-                                                    <td className="p-6 text-right">
-                                                        <div className="flex flex-col items-end gap-1">
-                                                            <span className="font-black text-emerald-600 tabular-nums text-xl transition-transform group-hover:scale-110 origin-right">{report.totalProducedWeight.toFixed(1)}<small className="text-[10px] ml-1 uppercase">kg</small></span>
-                                                            <div className="w-16 h-1 bg-slate-100 rounded-full overflow-hidden">
-                                                                <div className="h-full bg-emerald-500" style={{ width: `${Math.min(100, (report.totalProducedWeight / 500) * 100)}%` }}></div>
-                                                            </div>
-                                                        </div>
+                                                    <td className="px-6 py-4 font-medium text-slate-900">
+                                                        {report.orderNumber}
                                                     </td>
-                                                    <td className="p-6 text-right">
-                                                        <div className="inline-flex flex-col items-end">
-                                                            <span className="bg-slate-900 text-white font-black text-[10px] px-3 py-1.5 rounded-xl border-b-2 border-slate-700 tabular-nums shadow-lg shadow-slate-200 uppercase tracking-widest">
-                                                                {report.processedLots.length} Lotes
-                                                            </span>
-                                                        </div>
+                                                    <td className="px-6 py-4 uppercase text-xs font-semibold">
+                                                        {report.operator}
                                                     </td>
-                                                    <td className="p-6 text-center no-print">
-                                                        <div className="flex items-center justify-center gap-3">
+                                                    <td className="px-6 py-4">
+                                                        {report.machine === 'Trefila' ? `${report.targetBitola} mm` : report.trelicaModel}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <span className="font-bold text-emerald-700">{report.totalProducedWeight.toFixed(2)}</span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        <div className="flex items-center justify-center gap-2">
                                                             <button
                                                                 onClick={() => toggleExpand(report.id)}
-                                                                className={`px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-xl active:scale-95 border-b-4 ${expandedReportId === report.id ? 'bg-[#0A2A3D] text-white border-[#020F18]' : 'bg-white border-2 border-slate-100 text-slate-600 hover:border-indigo-600 hover:text-indigo-600 border-b-slate-200'}`}
+                                                                className={`py-1.5 px-4 rounded-lg text-[10px] font-bold uppercase transition-all ${expandedReportId === report.id ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                                                             >
-                                                                {expandedReportId === report.id ? "Fechar" : "Expandir"}
+                                                                {expandedReportId === report.id ? "Fechar" : "Detalhes"}
                                                             </button>
                                                             <button
                                                                 onClick={() => handlePrintIndividual(report)}
-                                                                className="p-3.5 bg-white border-2 border-slate-100 border-b-slate-200 rounded-2xl hover:border-indigo-600 hover:text-indigo-600 transition-all shadow-xl active:scale-95 group/btn"
-                                                                title="Imprimir Relatório"
+                                                                className="py-1.5 px-4 rounded-lg text-[10px] font-bold uppercase bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition-all"
                                                             >
-                                                                <PrinterIcon className="h-5 w-5 group-hover/btn:rotate-12 transition-transform" />
+                                                                Ver Relatório
                                                             </button>
+                                                            {onDelete && (
+                                                                <button
+                                                                    onClick={() => onDelete(report.id)}
+                                                                    className="p-2 text-slate-300 hover:text-rose-500 transition-colors"
+                                                                    title="Excluir"
+                                                                >
+                                                                    <TrashIcon className="h-4 w-4" />
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>

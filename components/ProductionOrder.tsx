@@ -129,11 +129,8 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
                 />
             )}
 
-            <header className="flex items-center justify-between mb-6">
+            <header className="flex items-center justify-between mb-6 pt-4">
                 <div className="flex items-center">
-                    <button onClick={() => setPage('menu')} className="mr-4 p-2 rounded-full hover:bg-slate-200 transition">
-                        <ArrowLeftIcon className="h-6 w-6 text-slate-700" />
-                    </button>
                     <h1 className="text-3xl font-bold text-slate-800">Ordem de Produção - Trefila</h1>
                 </div>
                 <div className="flex items-center gap-3">

@@ -177,10 +177,7 @@ const WorkInstructions: React.FC<{ setPage: (page: Page) => void }> = ({ setPage
 
     const renderList = () => (
         <div className="bg-[#f2f4f6] min-h-screen flex flex-col">
-            <header className="bg-white p-4 shadow-sm flex items-center justify-between sticky top-0 z-10">
-                <button onClick={() => setPage('menu')} className="p-2 text-slate-600">
-                    <ArrowLeftIcon className="h-6 w-6" />
-                </button>
+            <header className="bg-white p-4 shadow-sm flex items-center justify-between sticky top-0 z-10 pt-4">
                 <h1 className="text-xl font-bold text-slate-800">Instruções de Trabalho</h1>
                 <button onClick={handleCreateNew} className="p-2 bg-blue-600 text-white rounded-lg shadow-sm font-bold flex items-center gap-2 px-4 hover:bg-blue-700">
                     <PlusIcon className="h-5 w-5" />

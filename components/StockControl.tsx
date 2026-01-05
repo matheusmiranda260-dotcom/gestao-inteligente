@@ -610,8 +610,8 @@ const DuplicatesModal: React.FC<{
         }, {} as Record<string, StockItem[]>);
 
         return Object.entries(grouped)
-            .filter(([_, items]) => items.length > 1)
-            .map(([lot, items]) => ({ lot, items }));
+            .filter(([_, items]) => (items as StockItem[]).length > 1)
+            .map(([lot, items]) => ({ lot, items: items as StockItem[] }));
     }, [stock]);
 
     return (
@@ -971,11 +971,8 @@ const StockControl: React.FC<{
 
                     {!isStockMapOpen && (
                         <>
-                            <header className="flex items-center justify-between">
+                            <header className="flex items-center justify-between pt-4">
                                 <div className="flex items-center">
-                                    <button onClick={() => setPage('menu')} className="mr-4 p-2 rounded-full hover:bg-slate-200 transition">
-                                        <ArrowLeftIcon className="h-6 w-6 text-slate-800" />
-                                    </button>
                                     <h1 className="text-xl md:text-3xl font-bold text-slate-800">Controle de Estoque</h1>
                                 </div>
 

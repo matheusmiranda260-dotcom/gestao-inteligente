@@ -277,10 +277,7 @@ const ContinuousImprovement: React.FC<{ setPage: (page: Page) => void }> = ({ se
 
     const renderList = () => (
         <div className="flex flex-col h-full bg-[#f2f4f6] min-h-screen">
-            <header className="bg-white p-4 shadow-sm flex items-center justify-between sticky top-0 z-10">
-                <button onClick={() => setPage('menu')} className="p-2 text-slate-600">
-                    <MenuIconLocal className="h-6 w-6" />
-                </button>
+            <header className="bg-white p-4 shadow-sm flex items-center justify-between sticky top-0 z-10 pt-4">
                 <h1 className="text-lg font-bold text-slate-800">Painel de Problemas</h1>
                 <button onClick={loadProblems} className="p-2 text-slate-600">
                     <SearchIcon className="h-6 w-6" />

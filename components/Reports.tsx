@@ -2,7 +2,6 @@
 import React, { useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, Sector } from 'recharts';
 import type { Page, StockItem, ProductionRecord, MaterialType } from '../types';
-import { ArrowLeftIcon } from './icons';
 
 interface ReportsProps {
     stock: StockItem[];
@@ -70,11 +69,8 @@ const Reports: React.FC<ReportsProps> = ({ stock, trefilaProduction, trelicaProd
 
     return (
         <div className="p-4 sm:p-6 md:p-8 print-modal-container">
-            <header className="flex items-center justify-between mb-6 no-print">
+            <header className="flex items-center justify-between mb-6 no-print pt-4">
                 <div className="flex items-center">
-                    <button onClick={() => setPage('menu')} className="mr-4 p-2 rounded-full hover:bg-slate-200 transition">
-                        <ArrowLeftIcon className="h-6 w-6 text-slate-700" />
-                    </button>
                     <h1 className="text-3xl font-bold text-slate-800">Relatórios e Indicadores</h1>
                 </div>
                 <button

@@ -510,11 +510,8 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
             {showHistoryModal && <ProductionOrderHistoryModal orders={trelicaProductionOrders} stock={stock} onClose={() => setShowHistoryModal(false)} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} onShowReport={order => { setProductionReportData(order); setShowHistoryModal(false); }} />}
             {productionReportData && <ProductionOrderReport reportData={productionReportData} stock={stock} onClose={() => setProductionReportData(null)} />}
 
-            <header className="flex items-center justify-between mb-8">
+            <header className="flex items-center justify-between mb-8 pt-4">
                 <div className="flex items-center">
-                    <button onClick={() => setPage('menu')} className="mr-6 p-3 rounded-2xl bg-white shadow-sm hover:shadow-md hover:bg-slate-50 transition-all border border-slate-100">
-                        <ArrowLeftIcon className="h-6 w-6 text-slate-600" />
-                    </button>
                     <div>
                         <h1 className="text-4xl font-black text-slate-800 tracking-tight">Criação de Treliça</h1>
                         <p className="text-slate-500 font-medium">Configure os parâmetros técnicos e selecione a matéria-prima.</p>

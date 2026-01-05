@@ -99,33 +99,19 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser }) =
         <div className="min-h-screen p-6 sm:p-8 md:p-12 bg-[#F8FAFC]">
 
 
-            <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
-                <div>
-                    <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 mb-2">
-                        <span className="gradient-text">MSM</span> Gestão Inteligente
-                    </h1>
-                    <div className="flex items-center gap-2 text-slate-500 font-medium">
-                        <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                        <p>Bem-vindo, <span className="text-slate-900 font-bold">{currentUser?.username || 'Usuário'}</span></p>
-                        <span className="mx-2 text-slate-300">|</span>
-                        <span className="text-xs px-2 py-0.5 bg-slate-100 rounded-full border border-slate-200">
-                            {currentUser?.role === 'admin' ? 'Administrador' : currentUser?.role === 'gestor' ? 'Gestor' : 'Operador'}
-                        </span>
-                    </div>
+            <div className="mb-8">
+                <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 mb-2">
+                    <span className="gradient-text">MSM</span> Gestão Inteligente
+                </h1>
+                <div className="flex items-center gap-2 text-slate-500 font-medium">
+                    <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                    <p>Bem-vindo, <span className="text-slate-900 font-bold">{currentUser?.username || 'Usuário'}</span></p>
+                    <span className="mx-2 text-slate-300">|</span>
+                    <span className="text-xs px-2 py-0.5 bg-slate-100 rounded-full border border-slate-200">
+                        {currentUser?.role === 'admin' ? 'Administrador' : currentUser?.role === 'gestor' ? 'Gestor' : 'Operador'}
+                    </span>
                 </div>
-
-                <div className="flex items-center gap-4">
-                    <button
-                        onClick={onLogout}
-                        className="px-6 py-2.5 bg-white text-slate-700 font-bold rounded-xl border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm flex items-center gap-2 group"
-                    >
-                        <span>Sair da conta</span>
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-400 group-hover:text-red-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
-                    </button>
-                </div>
-            </header>
+            </div>
 
             <main className="space-y-10">
                 {/* ESTOQUE */}

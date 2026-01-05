@@ -175,10 +175,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
                 </div>
             )}
 
-            <header className="flex items-center mb-6">
-                <button onClick={() => setPage('menu')} className="mr-4 p-2 rounded-full hover:bg-slate-200 transition">
-                    <ArrowLeftIcon className="h-6 w-6 text-slate-700" />
-                </button>
+            <header className="flex items-center mb-6 pt-4">
                 <h1 className="text-3xl font-bold text-slate-800">Gerenciar Usuários</h1>
             </header>
 

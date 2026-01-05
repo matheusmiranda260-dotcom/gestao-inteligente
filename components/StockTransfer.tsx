@@ -239,11 +239,8 @@ const StockTransfer: React.FC<StockTransferProps> = ({ stock, transfers, setPage
 
     return (
         <div className="min-h-screen bg-slate-50 p-4 md:p-8 space-y-6">
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex justify-between items-center mb-6 pt-4">
                 <div className="flex items-center gap-4">
-                    <button onClick={() => setPage('menu')} className="bg-white p-2 rounded-full shadow-sm hover:bg-slate-100 transition text-slate-700">
-                        <ArrowLeftIcon className="h-6 w-6" />
-                    </button>
                     <div>
                         <h1 className="text-3xl font-bold text-slate-800">Transferência Inteligente</h1>
                         <p className="text-slate-500 text-sm">Transferência FIFO multi-material.</p>

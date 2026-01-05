@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Page, ProductionOrderData, StockItem, User, OperatorLog, MachineType } from '../types';
-import { ArrowLeftIcon, WarningIcon, CogIcon, PauseIcon, ClockIcon, CheckCircleIcon, ScaleIcon, PlayIcon, BookOpenIcon } from './icons';
+import { ArrowLeftIcon, WarningIcon, CogIcon, PauseIcon, ClockIcon, CheckCircleIcon, ScaleIcon, PlayIcon, BookOpenIcon, StopIcon } from './icons';
 
 const formatDuration = (ms: number) => {
     if (ms < 0) ms = 0;
@@ -15,6 +15,7 @@ const statusStyles = {
     Produzindo: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-500', icon: <CogIcon className="h-12 w-12 text-green-500 animate-spin" />, title: 'EM PRODUÇÃO' },
     Parada: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-500', icon: <PauseIcon className="h-12 w-12 text-red-500" />, title: 'MÁQUINA PARADA' },
     Ocioso: { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-500', icon: <ClockIcon className="h-12 w-12 text-yellow-500" />, title: 'OCIOSA' },
+    Desligada: { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-500', icon: <StopIcon className="h-12 w-12 text-yellow-500" />, title: 'MÁQUINA DESLIGADA' },
 };
 
 interface MachineStatusViewProps {
@@ -34,6 +35,11 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
         const lastEvent = activeOrder.downtimeEvents?.[(activeOrder.downtimeEvents.length || 0) - 1];
 
         if (lastEvent?.resumeTime === null) {
+            // Check for both exact match and trimmed match to be safe
+            const reason = (lastEvent.reason || '').trim();
+            if (reason === 'Final de Turno') {
+                return { status: 'Desligada', reason: 'Final de Turno', since: lastEvent.stopTime, durationMs: 0 };
+            }
             const durationMs = now.getTime() - new Date(lastEvent.stopTime).getTime();
             return { status: 'Parada', reason: lastEvent.reason, since: lastEvent.stopTime, durationMs };
         } else {
@@ -43,11 +49,12 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
         }
     }, [activeOrder, now]);
 
-    const currentOperator = useMemo(() => {
-        if (!activeOrder?.operatorLogs) return 'N/A';
-        const activeLog = [...activeOrder.operatorLogs].reverse().find(log => !log.endTime);
-        return activeLog?.operator || 'N/A';
+    const currentOperatorLog = useMemo(() => {
+        if (!activeOrder?.operatorLogs) return null;
+        return [...activeOrder.operatorLogs].reverse().find(log => !log.endTime) || null;
     }, [activeOrder]);
+
+    const currentOperator = currentOperatorLog?.operator || 'N/A';
 
     const timelineEvents = useMemo(() => {
         if (!activeOrder) return [];
@@ -142,8 +149,34 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                     </div>
                 ) : (
                     <div>
+                        {machineType === 'Treliça' && (
+                            <div className="mb-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                <div className="flex justify-between items-center mb-1">
+                                    <span className="text-xs font-bold uppercase text-slate-500 tracking-wider">Tempo desde último reporte</span>
+                                    {(() => {
+                                        const lastUpdate = activeOrder.lastQuantityUpdate || activeOrder.startTime;
+                                        if (!lastUpdate) return <span className="text-slate-400">-</span>;
+                                        const diff = now.getTime() - new Date(lastUpdate).getTime();
+                                        const isOverdue = diff > 10 * 60 * 1000; // 10 minutes
+                                        return (
+                                            <span className={`font-mono font-bold ${isOverdue ? 'text-red-500 animate-pulse' : 'text-slate-700'}`}>
+                                                {formatDuration(diff)}
+                                            </span>
+                                        );
+                                    })()}
+                                </div>
+                                <div className="text-xs text-slate-400 text-right">
+                                    Meta: Reportar a cada 10 min
+                                </div>
+                            </div>
+                        )}
                         <div className="flex justify-between items-baseline mb-1">
-                            <span className="text-slate-600">Peças Produzidas</span>
+                            <div className="flex flex-col">
+                                <span className="text-slate-600">Peças Produzidas</span>
+                                {machineType === 'Treliça' && currentOperatorLog && (
+                                    <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">No Turno: {(activeOrder.actualProducedQuantity || 0) - (currentOperatorLog.startQuantity || 0)}</span>
+                                )}
+                            </div>
                             <span className="text-xl font-bold text-slate-800">{producedQuantity} / {plannedQuantity}</span>
                         </div>
                         <div className="w-full bg-slate-200 rounded-full h-4">
@@ -199,15 +232,8 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
         [productionOrders]);
 
     return (
-        <div className="p-4 sm:p-6 md:p-8">
-            <header className="flex items-center mb-6">
-                <button onClick={() => setPage('menu')} className="mr-4 p-2 rounded-full hover:bg-slate-200 transition">
-                    <ArrowLeftIcon className="h-6 w-6 text-slate-700" />
-                </button>
-                <h1 className="text-3xl font-bold text-slate-800">Dashboard de Produção</h1>
-            </header>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4">
                 <MachineStatusView
                     machineType="Trefila"
                     activeOrder={activeTrefilaOrder}

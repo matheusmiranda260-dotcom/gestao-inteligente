@@ -281,11 +281,8 @@ const FinishedGoods: React.FC<FinishedGoodsProps> = ({ finishedGoods, pontasStoc
             {reportData && <FinishedGoodsTransferReport reportData={reportData} onClose={() => setReportData(null)} />}
             {isHistoryOpen && <FinishedGoodsTransfersHistoryModal transfers={finishedGoodsTransfers} onClose={() => setIsHistoryOpen(false)} onShowReport={setReportData} />}
 
-            <header className="flex items-center justify-between">
+            <header className="flex items-center justify-between pt-4">
                 <div className="flex items-center">
-                    <button onClick={() => setPage('menu')} className="mr-4 p-2 rounded-full hover:bg-slate-200 transition">
-                        <ArrowLeftIcon className="h-6 w-6 text-slate-700" />
-                    </button>
                     <h1 className="text-3xl font-bold text-slate-800">Estoque de Produto Acabado (Treliças)</h1>
                 </div>
                 <div className="flex gap-4">

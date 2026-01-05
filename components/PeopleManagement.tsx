@@ -1549,12 +1549,9 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
 
             {/* Simple Add Modal removed, replaced by direct prompt logic */}
 
-            <header className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+            <header className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4 pt-4">
                 <div className="flex items-center justify-between md:justify-start w-full md:w-auto">
                     <div className="flex items-center">
-                        <button onClick={() => setPage('menu')} className="mr-4 p-2 rounded-full hover:bg-slate-200 transition">
-                            <ArrowLeftIcon className="h-6 w-6 text-slate-700" />
-                        </button>
                         <div>
                             <h1 className="text-2xl md:text-3xl font-bold text-slate-800">Gestão de Pessoas</h1>
                             <p className="text-sm md:text-base text-slate-500">Prontuário Digital</p>

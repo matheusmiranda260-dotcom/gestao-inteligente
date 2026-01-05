@@ -4,10 +4,9 @@ import { SparePart, PartUsage } from '../types';
 import { fetchTable, insertItem, updateItem, deleteItem, fetchByColumn, uploadFile } from '../services/supabaseService';
 
 interface SparePartsManagerProps {
-    onBack: () => void;
 }
 
-const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
+const SparePartsManager: React.FC<SparePartsManagerProps> = () => {
     const [parts, setParts] = useState<SparePart[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -204,12 +203,8 @@ const SparePartsManager: React.FC<SparePartsManagerProps> = ({ onBack }) => {
         <div className="min-h-screen bg-slate-50 p-4 sm:p-6 md:p-8">
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 pt-4">
                     <div className="flex items-center gap-4">
-                        <button onClick={onBack} className="group flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all text-slate-600">
-                            <ArrowLeftIcon className="h-5 w-5 group-hover:-translate-x-1 transition-transform" />
-                            <span className="font-semibold">Voltar</span>
-                        </button>
                         <div>
                             <h1 className="text-3xl font-bold text-slate-800">Gerenciador de Peças</h1>
                             <p className="text-slate-500">Controle de estoque de reposição e manutenção</p>

@@ -1082,10 +1082,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
     return (
         <div className="min-h-screen bg-slate-50 p-4 md:p-8 space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 no-print gap-4">
-                <div className="flex items-center gap-4">
-                    <button onClick={() => setPage('menu')} className="bg-white p-2 rounded-full shadow-sm hover:bg-slate-100 transition text-slate-700">
-                        <ArrowLeftIcon className="h-6 w-6" />
-                    </button>
+                <div className="flex items-center gap-4 pt-4">
                     <div>
                         <h1 className="text-3xl font-bold text-slate-800">Inventário de Estoque</h1>
                         <p className="text-slate-500 text-sm">Visualize, filtre e realize auditorias físicas.</p>
