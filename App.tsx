@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'; // Refresh Trigger
 import type { Page, User, Employee, StockItem, ConferenceData, ProductionOrderData, TransferRecord, Bitola, MachineType, PartsRequest, ShiftReport, ProductionRecord, TransferredLotInfo, ProcessedLot, DowntimeEvent, OperatorLog, TrelicaSelectedLots, WeighedPackage, FinishedProductItem, Ponta, PontaItem, FinishedGoodsTransferRecord, TransferredFinishedGoodInfo, KaizenProblem, InventorySession } from './types';
+import { FioMaquinaBitolaOptions, TrefilaBitolaOptions } from './types';
 import Login from './components/Login';
 import MainMenu from './components/MainMenu';
 import StockControl from './components/StockControl';
@@ -323,6 +324,44 @@ const App: React.FC = () => {
             showNotification('Bitola removida com sucesso!', 'success');
         } catch (error) {
             showNotification('Erro ao remover bitola.', 'error');
+        }
+    };
+
+    const restoreDefaultGauges = async () => {
+        if (!confirm('Deseja restaurar as bitolas padrão do sistema? Isso adicionará as bitolas comuns se estiverem faltando.')) return;
+
+        try {
+            const defaults = [
+                ...FioMaquinaBitolaOptions.map(g => ({ material_type: 'Fio Máquina', gauge: g })),
+                ...TrefilaBitolaOptions.map(g => ({ material_type: 'CA-60', gauge: g }))
+            ];
+
+            let addedCount = 0;
+            // Iterate sequentially to avoid race conditions or heavy load
+            for (const item of defaults) {
+                // Check if exists in local state
+                if (gauges.some(g => g.material_type === item.material_type && g.gauge === item.gauge)) continue;
+
+                try {
+                    // Using generateId('gauge') matching addGauge logic
+                    const newGauge = { ...item, id: generateId('gauge') };
+                    const saved = await insertItem<StockGauge>('stock_gauges', newGauge);
+                    setGauges(prev => [...prev, saved]);
+                    addedCount++;
+                } catch (e) {
+                    // Constraint violation likely if parallel usage or race condition, ignore
+                    console.warn('Skipping or error adding gauge', item, e);
+                }
+            }
+
+            if (addedCount > 0) {
+                showNotification(`${addedCount} bitolas padrão restauradas com sucesso!`, 'success');
+            } else {
+                showNotification('Todas as bitolas padrão já estavam cadastradas.', 'info');
+            }
+        } catch (error) {
+            console.error(error);
+            showNotification('Erro ao restaurar bitolas. Verifique se a tabela foi criada.', 'error');
         }
     };
 
@@ -1682,7 +1721,7 @@ const App: React.FC = () => {
             case 'continuousImprovement': return <ContinuousImprovement setPage={setPage} />;
             case 'workInstructions': return <WorkInstructions setPage={setPage} />;
             case 'peopleManagement': return <PeopleManagement setPage={setPage} currentUser={currentUser} />;
-            case 'gaugesManager': return <GaugesManager gauges={gauges} onClose={() => setPage('menu')} onAdd={addGauge} onDelete={deleteGauge} />;
+            case 'gaugesManager': return <GaugesManager gauges={gauges} onClose={() => setPage('menu')} onAdd={addGauge} onDelete={deleteGauge} onRestoreDefaults={restoreDefaultGauges} />;
 
             default: return <Login onLogin={handleLogin} error={null} />;
         }

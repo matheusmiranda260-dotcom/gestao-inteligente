@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
 import type { StockGauge, MaterialType } from '../types';
 import { MaterialOptions } from '../types';
-import { ArrowLeftIcon, TrashIcon, PlusIcon, CheckCircleIcon, ScaleIcon } from './icons';
+import { ArrowLeftIcon, TrashIcon, PlusIcon, CheckCircleIcon, ScaleIcon, ArrowPathIcon } from './icons';
 
 interface GaugesManagerProps {
     gauges: StockGauge[];
     onClose: () => void;
     onAdd: (gauge: Omit<StockGauge, 'id'>) => void;
     onDelete: (id: string) => void;
+    onRestoreDefaults: () => void;
 }
 
-const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onClose, onAdd, onDelete }) => {
+const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onClose, onAdd, onDelete, onRestoreDefaults }) => {
     const [newGauge, setNewGauge] = useState('');
     const [materialType, setMaterialType] = useState<MaterialType>('Fio Máquina');
 
@@ -49,14 +50,23 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onClose, onAdd, o
     return (
         <div className="min-h-screen bg-[#F8FAFC] p-4 md:p-8 animate-fadeIn">
             <div className="max-w-4xl mx-auto space-y-6">
-                <header className="flex items-center gap-4">
-                    <button onClick={onClose} className="bg-white p-2 rounded-full shadow-sm hover:bg-slate-100 transition text-slate-700 border border-slate-200">
-                        <ArrowLeftIcon className="h-6 w-6" />
-                    </button>
-                    <div>
-                        <h1 className="text-3xl font-bold text-slate-800">Gerenciar Bitolas</h1>
-                        <p className="text-slate-500 text-sm">Adicione ou remova as bitolas disponíveis para cada material.</p>
+                <header className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <button onClick={onClose} className="bg-white p-2 rounded-full shadow-sm hover:bg-slate-100 transition text-slate-700 border border-slate-200">
+                            <ArrowLeftIcon className="h-6 w-6" />
+                        </button>
+                        <div>
+                            <h1 className="text-3xl font-bold text-slate-800">Gerenciar Bitolas</h1>
+                            <p className="text-slate-500 text-sm">Adicione ou remova as bitolas disponíveis para cada material.</p>
+                        </div>
                     </div>
+                    <button
+                        onClick={onRestoreDefaults}
+                        className="bg-white text-slate-600 border border-slate-300 hover:bg-slate-50 font-bold py-2 px-4 rounded-xl shadow-sm transition text-sm flex items-center gap-2"
+                    >
+                        <ArrowPathIcon className="h-4 w-4" />
+                        Restaurar Padrões
+                    </button>
                 </header>
 
                 <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
@@ -128,8 +138,11 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onClose, onAdd, o
                                             </div>
                                         ))}
                                         {gaugesByMaterial[material].length === 0 && (
-                                            <div className="col-span-2 py-8 text-center text-slate-400 text-sm border-2 border-dashed border-slate-100 rounded-xl">
-                                                Nenhuma bitola cadastrada.
+                                            <div className="col-span-2 py-8 text-center text-slate-400 text-sm border-2 border-dashed border-slate-100 rounded-xl flex flex-col items-center gap-2">
+                                                <span>Nenhuma bitola cadastrada.</span>
+                                                <button onClick={onRestoreDefaults} className="text-blue-600 font-bold hover:underline text-xs">
+                                                    Restaurar Padrões
+                                                </button>
                                             </div>
                                         )}
                                     </div>
