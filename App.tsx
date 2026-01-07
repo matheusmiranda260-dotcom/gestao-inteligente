@@ -1004,7 +1004,7 @@ const App: React.FC = () => {
             }],
         };
 
-        // For Treliça, automatically resume production when shift starts
+        // For Treliça, check previous stop reason logic
         if (order.machine === 'Treliça') {
             const newEvents = [...(order.downtimeEvents || [])];
             let lastEventIndex = -1;
@@ -1015,9 +1015,15 @@ const App: React.FC = () => {
                 }
             }
             if (lastEventIndex !== -1) {
-                newEvents[lastEventIndex].resumeTime = now;
+                const lastReason = newEvents[lastEventIndex].reason;
+                // Only auto-resume for administrative stops
+                if (lastReason === 'Final de Turno' || lastReason === 'Aguardando Início da Produção') {
+                    newEvents[lastEventIndex].resumeTime = now;
+                    updates.downtimeEvents = newEvents;
+                }
+                // If it's a real stop (e.g. Falta de Energia), we DO NOT resume automatically. 
+                // The machine stays stopped in the new shift until user explicitly resumes.
             }
-            updates.downtimeEvents = newEvents;
         }
 
         try {
