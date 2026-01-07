@@ -176,7 +176,7 @@ const ShiftDetails: React.FC<{ report: ShiftReport, stock: StockItem[], onPrint:
                                                 <div className="text-[10px] text-slate-400 mt-0.5">
                                                     {new Date(event.stopTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                                                     <span className="mx-1">→</span>
-                                                    {event.resumeTime ? new Date(event.resumeTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'Em Aberto'}
+                                                    {event.resumeTime ? new Date(event.resumeTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : new Date(report.shiftEndTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + '*'}
                                                 </div>
                                             </td>
                                             <td className="p-4 text-right">
@@ -326,7 +326,7 @@ const ShiftReportPrintView: React.FC<{ report: ShiftReport, stock: StockItem[], 
                                             {new Date(event.stopTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                                         </td>
                                         <td className="border border-black p-1 text-center font-black text-emerald-600 tabular-nums">
-                                            {event.resumeTime ? new Date(event.resumeTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '-'}
+                                            {event.resumeTime ? new Date(event.resumeTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : new Date(report.shiftEndTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + '*'}
                                         </td>
                                         <td className="border border-black p-1 px-4 italic font-medium text-slate-800 uppercase">
                                             {event.reason}
