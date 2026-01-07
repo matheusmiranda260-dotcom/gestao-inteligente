@@ -239,7 +239,13 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                             {(activeOrder.downtimeEvents || [])
                                 .slice()
                                 .sort((a, b) => new Date(a.stopTime).getTime() - new Date(b.stopTime).getTime())
-                                .filter(event => event.reason !== 'Final de Turno')
+                                .filter(event => {
+                                    if (event.reason === 'Final de Turno') return false;
+                                    if (currentOperatorLog) {
+                                        return new Date(event.stopTime).getTime() >= new Date(currentOperatorLog.startTime).getTime();
+                                    }
+                                    return false;
+                                })
                                 .slice(-5) // Show last 5 events
                                 .map((event, idx) => {
                                     const eventEnd = event.resumeTime || (activeOrder.status === 'completed' ? activeOrder.endTime : null);
