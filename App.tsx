@@ -1040,7 +1040,7 @@ const App: React.FC = () => {
             const sStart = shiftStart.getTime();
             const sEnd = shiftEnd.getTime();
             // Event overlaps with shift if it starts before shift ends AND ends after shift starts
-            return stopTime <= sEnd && resumeTime >= sStart;
+            return stopTime <= sEnd && resumeTime >= sStart && event.reason !== 'Final de Turno';
         });
 
         const shiftProcessedLots = (order.processedLots || []).filter(lot => {

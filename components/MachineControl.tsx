@@ -585,8 +585,14 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
             const todayStr = now.toISOString().split('T')[0];
             if (now >= shiftEnd && lastShiftEndPromptDate !== todayStr) {
-                setShowQuantityPrompt(true);
-                setLastShiftEndPromptDate(todayStr);
+                const shiftStartTime = currentOperatorLog ? new Date(currentOperatorLog.startTime).getTime() : 0;
+                if (shiftStartTime < shiftEnd.getTime()) {
+                    setShowQuantityPrompt(true);
+                    setLastShiftEndPromptDate(todayStr); // Only mark as shown if we actually show it
+                } else {
+                    // Start date is later than shift end (Overtime), so mark as handled to avoid loop
+                    setLastShiftEndPromptDate(todayStr);
+                }
             }
         }
     }, [timer, activeOrder, hasActiveShift, lastShiftEndPromptDate, showQuantityPrompt]);
