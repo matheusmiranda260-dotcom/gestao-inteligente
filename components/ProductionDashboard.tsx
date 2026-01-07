@@ -224,18 +224,63 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             </div>
 
             <div className="border p-4 rounded-md">
-                <h3 className="font-semibold text-slate-700 mb-2">Linha do Tempo Recente</h3>
-                <div className="max-h-48 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
-                    {timelineEvents.slice(0, 10).map((event, index) => (
-                        <div key={index} className="flex gap-2 text-xs">
-                            <div className={`w-3 h-3 mt-0.5 rounded-full flex-shrink-0 ${event.type === 'stop' ? 'bg-red-500' : 'bg-blue-400'}`}></div>
-                            <div>
-                                <span className="font-mono text-slate-500 mr-2">{new Date(event.timestamp).toLocaleTimeString('pt-BR')}</span>
-                                <span className="font-semibold text-slate-800">{event.message}</span>
-                                {event.details && <span className="text-slate-600">: {event.details}</span>}
-                            </div>
-                        </div>
-                    ))}
+                <h3 className="font-semibold text-slate-700 mb-2 underline decoration-slate-300 decoration-2 underline-offset-4">PARADAS E SEUS MOTIVOS:</h3>
+                <div className="overflow-x-auto">
+                    <table className="w-full border-collapse">
+                        <thead>
+                            <tr className="bg-slate-100 text-slate-600 text-xs uppercase font-bold text-left">
+                                <th className="p-2 border border-slate-300">Início</th>
+                                <th className="p-2 border border-slate-300">Fim</th>
+                                <th className="p-2 border border-slate-300">Motivo</th>
+                                <th className="p-2 border border-slate-300 text-right">Duração</th>
+                            </tr>
+                        </thead>
+                        <tbody className="text-sm">
+                            {(activeOrder.downtimeEvents || [])
+                                .slice()
+                                .sort((a, b) => new Date(a.stopTime).getTime() - new Date(b.stopTime).getTime())
+                                .filter(event => event.reason !== 'Final de Turno')
+                                .slice(-5) // Show last 5 events
+                                .map((event, idx) => {
+                                    const eventEnd = event.resumeTime || (activeOrder.status === 'completed' ? activeOrder.endTime : null);
+                                    const duration = eventEnd
+                                        ? new Date(eventEnd).getTime() - new Date(event.stopTime).getTime()
+                                        : now.getTime() - new Date(event.stopTime).getTime();
+
+                                    const isOngoing = !event.resumeTime && activeOrder.status !== 'completed';
+
+                                    return (
+                                        <tr key={idx} className="border-b border-slate-200 hover:bg-slate-50">
+                                            <td className="p-2 border border-slate-300 font-bold text-rose-600 font-mono text-center">
+                                                {new Date(event.stopTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                            </td>
+                                            <td className="p-2 border border-slate-300 font-bold text-emerald-600 font-mono text-center">
+                                                {event.resumeTime
+                                                    ? new Date(event.resumeTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                                                    : (activeOrder.status === 'completed'
+                                                        ? new Date(activeOrder.endTime!).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + '*'
+                                                        : <span className="text-amber-500 text-xs animate-pulse">EM ANDAMENTO</span>
+                                                    )
+                                                }
+                                            </td>
+                                            <td className="p-2 border border-slate-300 italic text-slate-700 uppercase font-bold text-xs">
+                                                {event.reason}
+                                            </td>
+                                            <td className="p-2 border border-slate-300 font-black text-rose-600 font-mono text-right tabular-nums">
+                                                {formatDuration(duration)}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            {(activeOrder.downtimeEvents || []).filter(e => e.reason !== 'Final de Turno').length === 0 && (
+                                <tr>
+                                    <td colSpan={4} className="p-4 text-center text-slate-400 text-sm italic">
+                                        Nenhuma parada registrada recentemente.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
