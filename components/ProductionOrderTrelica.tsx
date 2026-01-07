@@ -89,16 +89,11 @@ const MultiLotSelector: React.FC<MultiLotSelectorProps> = ({ label, subLabel, av
     }, [selectedLots, availableLots]);
 
     const handleActualSelectLot = (lotId: string, isChecked: boolean) => {
-        const lotIndex = availableLots.findIndex(l => l.id === lotId);
-        if (lotIndex === -1) return;
-
-        let newSelectedIds: string[] = [];
+        let newSelectedIds: string[];
         if (isChecked) {
-            const lotsToSelect = availableLots.slice(0, lotIndex + 1).map(l => l.id);
-            newSelectedIds = [...new Set([...selectedLots, ...lotsToSelect])];
+            newSelectedIds = [...selectedLots, lotId];
         } else {
-            const lotsToKeep = availableLots.slice(0, lotIndex).map(l => l.id);
-            newSelectedIds = lotsToKeep;
+            newSelectedIds = selectedLots.filter(id => id !== lotId);
         }
         onSelectionChange(newSelectedIds);
     };
@@ -214,8 +209,20 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
                 if (isSuporteA && !isSuporteB) return -1;
                 if (!isSuporteA && isSuporteB) return 1;
 
-                // Priority 2: Alphanumeric sorting of internal lot (Menor para o maior)
-                return a.internalLot.localeCompare(b.internalLot, undefined, { numeric: true, sensitivity: 'base' });
+                // Priority 2: Use robust numeric sorting on internalLot
+                const numA = parseInt(a.internalLot);
+                const numB = parseInt(b.internalLot);
+
+                if (!isNaN(numA) && !isNaN(numB)) {
+                    return numA - numB;
+                }
+
+                // Fallback to string comparison or entryDate if widely different formats
+                if (a.internalLot !== b.internalLot) {
+                    return a.internalLot.localeCompare(b.internalLot, undefined, { numeric: true });
+                }
+
+                return new Date(a.entryDate).getTime() - new Date(b.entryDate).getTime();
             });
     }, [stock]);
 
