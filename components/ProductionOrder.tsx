@@ -43,7 +43,22 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
             item.remainingQuantity > 0 &&
             (inputBitolaFilter === '' || item.bitola === inputBitolaFilter)
         )
-            .sort((a, b) => new Date(a.entryDate).getTime() - new Date(b.entryDate).getTime());
+            .sort((a, b) => {
+                // Try to parse internalLot as numbers for proper numeric sorting
+                const numA = parseInt(a.internalLot);
+                const numB = parseInt(b.internalLot);
+
+                if (!isNaN(numA) && !isNaN(numB)) {
+                    return numA - numB;
+                }
+
+                // Fallback to string comparison or entryDate if widely different formats
+                if (a.internalLot !== b.internalLot) {
+                    return a.internalLot.localeCompare(b.internalLot, undefined, { numeric: true });
+                }
+
+                return new Date(a.entryDate).getTime() - new Date(b.entryDate).getTime();
+            });
     }, [stock, inputBitolaFilter]);
 
     const handleFilterChange = (value: Bitola | '') => {
@@ -52,18 +67,10 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
     };
 
     const handleSelectLot = (lotId: string, isChecked: boolean) => {
-        const lotIndex = availableLots.findIndex(l => l.id === lotId);
-        if (lotIndex === -1) return;
-
         if (isChecked) {
-            // Enforce ascending order: Select this lot and all previous (older) lots
-            const lotsToSelect = availableLots.slice(0, lotIndex + 1).map(l => l.id);
-            setSelectedLotIds(lotsToSelect);
+            setSelectedLotIds(prev => [...prev, lotId]);
         } else {
-            // Enforce ascending order: Deselect this lot and all subsequent (newer) lots
-            // This effectively keeps only the lots OLDER than the current one
-            const lotsToKeep = availableLots.slice(0, lotIndex).map(l => l.id);
-            setSelectedLotIds(lotsToKeep);
+            setSelectedLotIds(prev => prev.filter(id => id !== lotId));
         }
     };
 
