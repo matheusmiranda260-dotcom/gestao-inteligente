@@ -322,14 +322,14 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
 
             <div className="border p-4 rounded-md">
                 <h3 className="font-semibold text-slate-700 mb-2 underline decoration-slate-300 decoration-2 underline-offset-4">PARADAS E SEUS MOTIVOS:</h3>
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto max-h-64 overflow-y-auto custom-scrollbar">
                     <table className="w-full border-collapse">
                         <thead>
-                            <tr className="bg-slate-100 text-slate-600 text-xs uppercase font-bold text-left">
-                                <th className="p-2 border border-slate-300">Início</th>
-                                <th className="p-2 border border-slate-300">Fim</th>
-                                <th className="p-2 border border-slate-300">Motivo</th>
-                                <th className="p-2 border border-slate-300 text-right">Duração</th>
+                            <tr className="bg-slate-100 text-slate-600 text-xs uppercase font-bold text-left sticky top-0 z-10 shadow-sm">
+                                <th className="p-2 border border-slate-300 bg-slate-100">Início</th>
+                                <th className="p-2 border border-slate-300 bg-slate-100">Fim</th>
+                                <th className="p-2 border border-slate-300 bg-slate-100">Motivo</th>
+                                <th className="p-2 border border-slate-300 text-right bg-slate-100">Duração</th>
                             </tr>
                         </thead>
                         <tbody className="text-sm">
@@ -343,7 +343,6 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                     }
                                     return false;
                                 })
-                                .slice(-5) // Show last 5 events
                                 .map((event, idx) => {
                                     const eventEnd = event.resumeTime || (activeOrder.status === 'completed' ? activeOrder.endTime : null);
                                     const duration = eventEnd
