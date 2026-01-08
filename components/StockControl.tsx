@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Page, StockItem, ConferenceData, ConferenceLotData, Bitola, MaterialType, TransferRecord, ProductionOrderData, StockGauge, User } from '../types';
 import { MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions } from '../types';
-import { ArrowLeftIcon, PencilIcon, TrashIcon, WarningIcon, BookOpenIcon, TruckIcon, DocumentReportIcon, PrinterIcon, LockOpenIcon, ClipboardListIcon, ChartBarIcon, XCircleIcon, ArchiveIcon, LocationOffIcon, CheckCircleIcon, ScaleIcon, AdjustmentsIcon, SearchIcon, ExclamationIcon } from './icons';
+import { ArrowLeftIcon, PencilIcon, TrashIcon, WarningIcon, BookOpenIcon, TruckIcon, DocumentReportIcon, PrinterIcon, LockOpenIcon, ClipboardListIcon, ChartBarIcon, XCircleIcon, ArchiveIcon, LocationOffIcon, CheckCircleIcon, ScaleIcon, AdjustmentsIcon, SearchIcon, ExclamationIcon, CogIcon } from './icons';
 
 import LotHistoryModal from './LotHistoryModal';
 import FinishedConferencesModal from './FinishedConferencesModal';
@@ -38,7 +38,7 @@ const getStatusBadge = (status: StockItem['status']) => {
 
 const AddConferencePage: React.FC<{
     onClose: () => void;
-    onSubmit: (data: ConferenceData) => void;
+    onSubmit: (data: ConferenceData) => Promise<void> | void;
     stock: StockItem[];
     onShowReport: (data: ConferenceData) => void;
     conferences: ConferenceData[];
@@ -54,6 +54,7 @@ const AddConferencePage: React.FC<{
         nfe: '',
         conferenceNumber: '',
     });
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Initial bitola depends on default material
     const getInitialBitola = (material: string) => {
@@ -186,8 +187,9 @@ const AddConferencePage: React.FC<{
         }
     };
 
-    const handleFinalSubmit = (e: React.FormEvent) => {
+    const handleFinalSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (isSubmitting) return;
 
         if (Object.keys(duplicateErrors).length > 0) {
             alert('Corrija os lotes duplicados antes de continuar.');
@@ -210,10 +212,16 @@ const AddConferencePage: React.FC<{
             supplier: lot.supplier || conferenceData.supplier
         }));
 
-        const finalData: ConferenceData = { ...conferenceData, lots: lotsWithSupplier };
-        onSubmit(finalData);
-        onShowReport(finalData);
-        onClose();
+        setIsSubmitting(true);
+        try {
+            const finalData: ConferenceData = { ...conferenceData, lots: lotsWithSupplier };
+            await onSubmit(finalData);
+            onShowReport(finalData);
+            onClose();
+        } catch (error) {
+            console.error("Error submitting conference", error);
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -457,12 +465,21 @@ const AddConferencePage: React.FC<{
 
                 {/* Footer Actions */}
                 <div className="p-4 md:p-6 bg-slate-50 border-t border-slate-200 flex flex-col md:flex-row justify-end gap-4">
-                    <button type="button" onClick={onClose} className="px-6 py-3 rounded-lg font-bold text-slate-600 hover:bg-slate-200 transition">
+                    <button type="button" onClick={onClose} disabled={isSubmitting} className="px-6 py-3 rounded-lg font-bold text-slate-600 hover:bg-slate-200 transition disabled:opacity-50 disabled:cursor-not-allowed">
                         Cancelar Operação
                     </button>
-                    <button type="submit" className="px-8 py-3 bg-[#0F3F5C] hover:bg-[#0A2A3D] text-white rounded-lg font-bold shadow-lg shadow-blue-900/20 transition flex items-center justify-center gap-2">
-                        <CheckCircleIcon className="h-5 w-5" />
-                        Salvar Conferência
+                    <button type="submit" disabled={isSubmitting} className="px-8 py-3 bg-[#0F3F5C] hover:bg-[#0A2A3D] text-white rounded-lg font-bold shadow-lg shadow-blue-900/20 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                        {isSubmitting ? (
+                            <>
+                                <CogIcon className="h-5 w-5 animate-spin" />
+                                Salvando...
+                            </>
+                        ) : (
+                            <>
+                                <CheckCircleIcon className="h-5 w-5" />
+                                Salvar Conferência
+                            </>
+                        )}
                     </button>
                 </div>
             </form>
