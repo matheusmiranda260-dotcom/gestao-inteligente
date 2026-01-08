@@ -22,6 +22,7 @@ import PeopleManagement from './components/PeopleManagement';
 import StockInventory from './components/StockInventory';
 import StockTransfer from './components/StockTransfer';
 import GaugesManager from './components/GaugesManager';
+import TrefilaWeighing from './components/TrefilaWeighing';
 import { supabase } from './supabaseClient';
 import type { StockGauge } from './types';
 
@@ -1586,7 +1587,7 @@ const App: React.FC = () => {
         }
     };
 
-    const recordLotWeight = async (orderId: string, lotId: string, finalWeight: number, measuredGauge?: number) => {
+    const recordLotWeight = async (orderId: string, lotId: string, finalWeight: number | null, measuredGauge?: number) => {
         const order = productionOrders.find(o => o.id === orderId);
         if (!order) return;
         const newProcessedLots = (order.processedLots || []).map(p => p.lotId === lotId ? { ...p, finalWeight, measuredGauge } : p);
@@ -1712,6 +1713,7 @@ const App: React.FC = () => {
             case 'trefila_completed': return <MachineControl machineType="Trefila" {...mcProps} initialView="completed" initialModal={null} />;
             case 'trefila_reports': return <MachineControl machineType="Trefila" {...mcProps} initialView="dashboard" initialModal="reports" />;
             case 'trefila_parts': return <MachineControl machineType="Trefila" {...mcProps} initialView="dashboard" initialModal="parts" />;
+            case 'trefila_weighing': return <TrefilaWeighing productionOrders={productionOrders} stock={stock} recordLotWeight={recordLotWeight} />;
 
             case 'trelica': return <MachineControl machineType="Treliça" {...mcProps} initialView="dashboard" initialModal={null} />;
             case 'trelica_in_progress': return <MachineControl machineType="Treliça" {...mcProps} initialView="in_progress" initialModal={null} />;

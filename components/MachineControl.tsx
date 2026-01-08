@@ -405,7 +405,7 @@ interface MachineControlProps {
     logResumeProduction?: (orderId: string) => void;
     startLotProcessing?: (orderId: string, lotId: string) => void;
     finishLotProcessing?: (orderId: string, lotId: string) => void;
-    recordLotWeight?: (orderId: string, lotId: string, finalWeight: number, measuredGauge?: number) => void;
+    recordLotWeight?: (orderId: string, lotId: string, finalWeight: number | null, measuredGauge?: number) => void;
     recordPackageWeight?: (orderId: string, packageData: { packageNumber: number; quantity: number; weight: number; }) => void;
     completeProduction?: (orderId: string, finalData: { actualProducedQuantity?: number, pontas?: Ponta[] }) => void;
     addPartsRequest?: (data: Omit<PartsRequest, 'id' | 'date' | 'operator' | 'status' | 'machine' | 'productionOrderId'>) => void;
@@ -488,8 +488,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
         const finalWeight = weightStr ? parseFloat(weightStr.replace(',', '.')) : lot.finalWeight;
         const measuredGauge = gaugeStr ? parseFloat(gaugeStr.replace(',', '.')) : lot.measuredGauge;
 
-        // Só prossegue se tivermos pelo menos o peso (novo ou antigo)
-        if (finalWeight !== null && !isNaN(finalWeight)) {
+        // Prossegue se tivermos pelo menos o peso OU se tivermos a bitola aferida
+        if ((finalWeight !== null && !isNaN(finalWeight)) || (measuredGauge !== null && measuredGauge !== undefined && !isNaN(measuredGauge))) {
             recordLotWeight(activeOrder.id, lotId, finalWeight, measuredGauge === null ? undefined : measuredGauge);
 
             // Limpa os estados locais apenas do que foi enviado nos inputs
@@ -1492,16 +1492,9 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                         <td className="p-3 font-bold text-slate-700">{lot.lotInfo?.internalLot}</td>
                                                                         <td className="p-3 text-right text-slate-500 font-medium">{lot.lotInfo?.labelWeight.toFixed(0)} kg</td>
                                                                         <td className="p-3">
-                                                                            {lot.finalWeight === null ? (
-                                                                                <div className="flex items-center gap-1">
-                                                                                    <input
-                                                                                        type="number"
-                                                                                        className="w-full p-2 border-2 border-slate-100 rounded-lg text-right focus:border-indigo-500 bg-slate-50 focus:bg-white transition"
-                                                                                        placeholder="0.00"
-                                                                                        value={pendingWeights.get(lot.lotId) || ''}
-                                                                                        onChange={e => handlePendingWeightChange(lot.lotId, e.target.value)}
-                                                                                    />
-                                                                                    <span className="text-[10px] font-bold text-slate-400">kg</span>
+                                                                            {lot.finalWeight == null ? (
+                                                                                <div className="text-right">
+                                                                                    <span className="text-[10px] font-black text-amber-500 uppercase animate-pulse">Aguardando Auxiliar</span>
                                                                                 </div>
                                                                             ) : (
                                                                                 <div className="text-right font-black text-slate-900">{lot.finalWeight.toFixed(1)} kg</div>
@@ -1583,14 +1576,9 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                         <div className="space-y-1">
                                                                             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Peso Saída (kg)</label>
                                                                             {lot.finalWeight == null ? (
-                                                                                <input
-                                                                                    type="number"
-                                                                                    inputMode="decimal"
-                                                                                    className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-center font-bold focus:border-indigo-500 outline-none transition uppercase"
-                                                                                    placeholder="0.0"
-                                                                                    value={pendingWeights.get(lot.lotId) || ''}
-                                                                                    onChange={e => handlePendingWeightChange(lot.lotId, e.target.value)}
-                                                                                />
+                                                                                <div className="p-3 bg-slate-50 rounded-xl text-center">
+                                                                                    <span className="text-[10px] font-black text-amber-500 uppercase animate-pulse">Aguardando Auxiliar</span>
+                                                                                </div>
                                                                             ) : (
                                                                                 <div className="p-3 bg-slate-50 rounded-xl text-center font-black text-slate-800 text-lg">{lot.finalWeight.toFixed(1)}</div>
                                                                             )}
