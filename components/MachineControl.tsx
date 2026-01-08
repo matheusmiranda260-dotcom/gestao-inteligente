@@ -631,21 +631,56 @@ const MachineControl: React.FC<MachineControlProps> = ({
         return null;
     }, [activeOrder, stock]);
 
-    const isMachineStopped = useMemo(() => {
+    const currentMachineStatus = useMemo(() => {
         if (!activeOrder?.downtimeEvents || activeOrder.downtimeEvents.length === 0) {
-            return false;
+            return 'Produzindo';
         }
         const lastEvent = activeOrder.downtimeEvents[activeOrder.downtimeEvents.length - 1];
 
         if (lastEvent.resumeTime !== null) {
-            return false;
+            return 'Produzindo';
         }
 
-        const automaticIdleReasons = ['Aguardando Início da Produção', 'Troca de Rolo / Preparação'];
+        const prepReasons = ['Aguardando Início da Produção', 'Troca de Rolo / Preparação'];
+        if (prepReasons.includes(lastEvent.reason)) {
+            return 'Preparacao';
+        }
 
-        return !automaticIdleReasons.includes(lastEvent.reason);
+        return 'Parada';
     }, [activeOrder]);
 
+    const isMachineStopped = currentMachineStatus === 'Parada';
+    const statusConfig = {
+        Produzindo: {
+            color: 'emerald',
+            text: 'text-emerald-700',
+            bg: 'bg-emerald-500',
+            border: 'border-emerald-500',
+            glow: 'shadow-[0_0_10px_rgba(16,185,129,0.4)]',
+            pulse: 'from-emerald-50',
+            label: 'OPERANDO'
+        },
+        Preparacao: {
+            color: 'blue',
+            text: 'text-blue-700',
+            bg: 'bg-blue-500',
+            border: 'border-blue-500',
+            glow: 'shadow-[0_0_10px_rgba(59,130,246,0.4)]',
+            pulse: 'from-blue-50',
+            label: 'EM PREPARAÇÃO'
+        },
+        Parada: {
+            color: 'amber',
+            text: 'text-amber-600',
+            bg: 'bg-amber-500',
+            border: 'border-amber-500',
+            glow: 'shadow-[0_0_10px_rgba(245,158,11,0.4)]',
+            pulse: 'from-amber-50',
+            label: 'PARADA'
+        }
+    };
+
+    const statusStyle = statusConfig[currentMachineStatus];
 
     useEffect(() => {
         if (orderForShift) {
@@ -1036,18 +1071,9 @@ const MachineControl: React.FC<MachineControlProps> = ({
                             description="Visualize e inicie as próximas ordens de produção na fila."
                             icon={<ClipboardListIcon className="h-6 w-6" />}
                         />
-                        {machineType === 'Trefila' && (
-                            <MachineMenuButton
-                                onClick={() => setShowTrefilaCalculation(true)}
-                                label="Cálculo de Trefilação"
-                                description="Simulação e otimização de passes de redução."
-                                icon={<CalculatorIcon className="h-6 w-6" />}
-                            />
-                        )}
                     </div>
                 </div>
             )}
-
             {view === 'in_progress' && (
                 <>
                     {activeOrder ? (
@@ -1056,25 +1082,29 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                 {/* Coluna Esquerda: Visão Geral e Indicadores */}
                                 <div className="lg:col-span-1 space-y-6">
                                     {/* Card de Status Principal - Novo Design */}
-                                    <div className={`bg-white p-4 md:p-6 rounded-2xl shadow-sm border-l-[12px] ${isMachineStopped ? 'border-amber-500' : 'border-emerald-500'} relative overflow-hidden transition-all duration-500`}>
-                                        {!isMachineStopped && (
+                                    <div className={`bg-white p-4 md:p-6 rounded-2xl shadow-sm border-l-[12px] ${statusStyle.border} relative overflow-hidden transition-all duration-500`}>
+                                        {currentMachineStatus === 'Produzindo' && (
                                             <div className="absolute top-0 right-0 h-32 w-32 bg-emerald-50 rounded-full -mr-16 -mt-16 opacity-50 blur-3xl animate-pulse"></div>
                                         )}
+                                        {currentMachineStatus === 'Preparacao' && (
+                                            <div className="absolute top-0 right-0 h-32 w-32 bg-blue-50 rounded-full -mr-16 -mt-16 opacity-50 blur-3xl animate-pulse"></div>
+                                        )}
+
                                         <div className="flex justify-between items-start mb-6 relative z-10">
                                             <div>
                                                 <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Status do Equipamento</h3>
                                                 <div className="flex items-center gap-3">
                                                     <div className="relative flex h-4 w-4">
-                                                        {!isMachineStopped && <span className="animate-pulse-glow absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
-                                                        <span className={`relative inline-flex rounded-full h-4 w-4 ${isMachineStopped ? 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.4)]' : 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]'}`}></span>
+                                                        {currentMachineStatus === 'Produzindo' && <span className="animate-pulse-glow absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
+                                                        {currentMachineStatus === 'Preparacao' && <span className="animate-pulse-glow absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>}
+                                                        <span className={`relative inline-flex rounded-full h-4 w-4 ${statusStyle.bg} ${statusStyle.glow}`}></span>
                                                     </div>
-                                                    <span className={`text-2xl md:text-3xl font-black tracking-tighter ${isMachineStopped ? 'text-amber-600' : 'text-emerald-700'}`}>
-                                                        {isMachineStopped ? 'PARADA' : 'OPERANDO'}
+                                                    <span className={`text-2xl md:text-3xl font-black tracking-tighter ${statusStyle.text}`}>
+                                                        {statusStyle.label}
                                                     </span>
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Carga Ativa</h3>
                                                 <p className="text-xl md:text-2xl font-black text-slate-900 tracking-tighter">#{activeOrder.orderNumber}</p>
                                             </div>
                                         </div>
