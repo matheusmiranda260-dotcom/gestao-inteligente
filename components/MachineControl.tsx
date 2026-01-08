@@ -454,6 +454,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
     const [pendingGauges, setPendingGauges] = useState<Map<string, string>>(new Map()); // Novo estado para bitolas
     const [pendingPackageWeights, setPendingPackageWeights] = useState<Map<number, string>>(new Map());
     const [justCompletedOrderId, setJustCompletedOrderId] = useState<string | null>(null);
+    const [mobileTab, setMobileTab] = useState<'monitor' | 'work'>(machineType === 'Treliça' ? 'work' : 'monitor');
     const [managerOverrideData, setManagerOverrideData] = useState<{
         packageNumber: number;
         quantity: number;
@@ -1163,11 +1164,31 @@ const MachineControl: React.FC<MachineControlProps> = ({
             )}
             {view === 'in_progress' && (
                 <>
+                    {/* Mobile Tab Switcher */}
+                    {(activeOrder || postProductionOrder) && (
+                        <div className="flex md:hidden mb-6 bg-slate-100 p-1.5 rounded-2xl border border-slate-200 shadow-inner">
+                            <button
+                                onClick={() => setMobileTab('monitor')}
+                                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all duration-200 ${mobileTab === 'monitor' ? 'bg-white shadow-md text-slate-900 border border-slate-100' : 'text-slate-500'}`}
+                            >
+                                <ChartBarIcon className={`h-4 w-4 ${mobileTab === 'monitor' ? 'text-indigo-500' : 'text-slate-400'}`} />
+                                Monitoramento
+                            </button>
+                            <button
+                                onClick={() => setMobileTab('work')}
+                                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all duration-200 ${mobileTab === 'work' ? 'bg-white shadow-md text-slate-900 border border-slate-100' : 'text-slate-500'}`}
+                            >
+                                <ScaleIcon className={`h-4 w-4 ${mobileTab === 'work' ? 'text-indigo-500' : 'text-slate-400'}`} />
+                                {machineType === 'Trefila' ? 'Pesagem de Lotes' : 'Pesagem de Pacotes'}
+                            </button>
+                        </div>
+                    )}
+
                     {activeOrder ? (
                         <>
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-20 md:pb-8"> {/* Adjusted padding for desktop */}
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-20 md:pb-8">
                                 {/* Coluna Esquerda: Visão Geral e Indicadores */}
-                                <div className="lg:col-span-1 space-y-6">
+                                <div className={`lg:col-span-1 space-y-6 ${mobileTab !== 'monitor' ? 'hidden lg:block' : 'animate-fade-in'}`}>
                                     {/* Card de Status Principal - Novo Design */}
                                     <div className={`bg-white p-4 md:p-6 rounded-2xl shadow-sm border-l-[12px] ${statusStyle.border} relative overflow-hidden transition-all duration-500`}>
                                         {currentMachineStatus === 'Produzindo' && (
@@ -1421,8 +1442,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                     </div>
                                 </div>
 
-                                {/* Coluna Direita: Área de Trabalho (Lotes/Pacotes) - ESCONDIDA NO MOBILE PARA FOCO NO STATUS */}
-                                <div className="lg:col-span-2 space-y-6 relative">
+                                {/* Coluna Direita: Área de Trabalho (Lotes/Pacotes) */}
+                                <div className={`lg:col-span-2 space-y-6 relative ${mobileTab !== 'work' ? 'hidden lg:block' : 'animate-fade-in'}`}>
                                     {isMachineStopped && (
                                         <div className="absolute inset-0 bg-slate-200/80 backdrop-blur-sm flex items-center justify-center rounded-2xl z-20 border-2 border-slate-300 border-dashed">
                                             <div className="text-center p-8 bg-white rounded-3xl shadow-xl max-w-sm mx-auto animate-fade-in-up">
@@ -1866,7 +1887,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                         </>
                     ) : postProductionOrder ? (
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-24">
-                            <div className="lg:col-span-1 space-y-6">
+                            <div className={`lg:col-span-1 space-y-6 ${mobileTab !== 'monitor' ? 'hidden lg:block' : 'animate-fade-in'}`}>
                                 <div className="bg-white p-6 rounded-xl shadow-sm">
                                     <h3 className="text-lg font-semibold text-slate-700 mb-3">Informações do Turno</h3>
                                     <div className="space-y-2 text-sm">
@@ -1894,7 +1915,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                     </div>
                                 )}
                             </div>
-                            <div className="lg:col-span-2 space-y-6">
+                            <div className={`lg:col-span-2 space-y-6 ${mobileTab !== 'work' ? 'hidden lg:block' : 'animate-fade-in'}`}>
                                 <IdleActivityLogger
                                     onLogActivity={(activity) => logPostProductionActivity && logPostProductionActivity(activity)}
                                     activities={[...(currentOperatorLog?.postProductionActivities || [])].reverse()}

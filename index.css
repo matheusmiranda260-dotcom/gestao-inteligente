@@ -250,6 +250,53 @@ tr:hover td {
   /* Firefox */
 }
 
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    zoom: 0.98;
+  }
+
+  to {
+    opacity: 1;
+    zoom: 1;
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+}
+
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
