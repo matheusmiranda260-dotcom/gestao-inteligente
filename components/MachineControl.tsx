@@ -1457,83 +1457,157 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                 <h3 className="text-lg font-bold text-slate-700 mb-4">Lotes Finalizados</h3>
                                                 <div className="overflow-x-auto max-h-80">
                                                     {/* Desktop Table */}
-                                                    <table className="w-full text-sm hidden sm:table">
-                                                        <thead className="bg-slate-50 text-left sticky top-0">
-                                                            <tr>
-                                                                <th className="p-3 font-semibold rounded-tl-lg">Lote</th>
-                                                                <th className="p-3 font-semibold text-right">Peso Final</th>
-                                                                <th className="p-3 font-semibold">Status</th>
+                                                    <table className="w-full text-sm hidden sm:table border-separate border-spacing-0">
+                                                        <thead className="bg-slate-50 text-left sticky top-0 z-10">
+                                                            <tr className="text-[10px] text-slate-400 uppercase tracking-widest">
+                                                                <th className="p-3 font-black border-b border-slate-100">Lote</th>
+                                                                <th className="p-3 font-black border-b border-slate-100 text-right">KG Entrada</th>
+                                                                <th className="p-3 font-black border-b border-slate-100 text-right">KG Saída</th>
+                                                                <th className="p-3 font-black border-b border-slate-100 text-center">Bitola</th>
+                                                                <th className="p-3 font-black border-b border-slate-100 text-center">Status</th>
+                                                                <th className="p-3 font-black border-b border-slate-100">Ação</th>
                                                             </tr>
                                                         </thead>
-                                                        <tbody className="divide-y">
-                                                            {completedLots.map(lot => (
-                                                                <tr key={lot.lotId}>
-                                                                    <td className="p-3 font-medium">{lot.lotInfo?.internalLot}</td>
-                                                                    <td className="p-3">
-                                                                        {lot.finalWeight === null ? (
-                                                                            <input
-                                                                                type="number"
-                                                                                className="w-full p-2 border rounded-lg text-right"
-                                                                                placeholder="0.00"
-                                                                                value={pendingWeights.get(lot.lotId) || ''}
-                                                                                onChange={e => handlePendingWeightChange(lot.lotId, e.target.value)}
-                                                                            />
-                                                                        ) : (
-                                                                            <div className="text-right font-bold text-slate-700">{lot.finalWeight.toFixed(2)} kg</div>
-                                                                        )}
-                                                                    </td>
-                                                                    <td className="p-3 text-center">
-                                                                        {lot.finalWeight === null ? (
-                                                                            <button onClick={() => handleRecordWeight(lot.lotId)} className="bg-emerald-500 text-white text-xs font-bold py-2 px-3 rounded-lg hover:bg-emerald-600 w-full">
-                                                                                Salvar
-                                                                            </button>
-                                                                        ) : (
-                                                                            <CheckCircleIcon className="h-5 w-5 text-emerald-500 mx-auto" />
-                                                                        )}
-                                                                    </td>
-                                                                </tr>
-                                                            ))}
+                                                        <tbody className="divide-y divide-slate-100">
+                                                            {[...completedLots].reverse().map(lot => {
+                                                                const isWaiting = lot.finalWeight === null || lot.measuredGauge === undefined;
+                                                                const waitingMs = isWaiting ? timer.getTime() - new Date(lot.endTime).getTime() : 0;
+
+                                                                return (
+                                                                    <tr key={lot.lotId} className="hover:bg-slate-50/50 transition-colors">
+                                                                        <td className="p-3 font-bold text-slate-700">{lot.lotInfo?.internalLot}</td>
+                                                                        <td className="p-3 text-right text-slate-500 font-medium">{lot.lotInfo?.labelWeight.toFixed(0)} kg</td>
+                                                                        <td className="p-3">
+                                                                            {lot.finalWeight === null ? (
+                                                                                <div className="flex items-center gap-1">
+                                                                                    <input
+                                                                                        type="number"
+                                                                                        className="w-full p-2 border-2 border-slate-100 rounded-lg text-right focus:border-indigo-500 bg-slate-50 focus:bg-white transition"
+                                                                                        placeholder="0.00"
+                                                                                        value={pendingWeights.get(lot.lotId) || ''}
+                                                                                        onChange={e => handlePendingWeightChange(lot.lotId, e.target.value)}
+                                                                                    />
+                                                                                    <span className="text-[10px] font-bold text-slate-400">kg</span>
+                                                                                </div>
+                                                                            ) : (
+                                                                                <div className="text-right font-black text-slate-900">{lot.finalWeight.toFixed(1)} kg</div>
+                                                                            )}
+                                                                        </td>
+                                                                        <td className="p-3">
+                                                                            {lot.measuredGauge === undefined ? (
+                                                                                <div className="flex items-center gap-1">
+                                                                                    <input
+                                                                                        type="number"
+                                                                                        step="0.01"
+                                                                                        className="w-3/4 p-2 border-2 border-slate-100 rounded-lg text-center focus:border-indigo-500 bg-slate-50 focus:bg-white transition"
+                                                                                        placeholder="0.00"
+                                                                                        value={pendingGauges?.get(lot.lotId) || ''}
+                                                                                        onChange={e => handlePendingGaugeChange(lot.lotId, e.target.value)}
+                                                                                    />
+                                                                                    <span className="text-[10px] font-bold text-slate-400">mm</span>
+                                                                                </div>
+                                                                            ) : (
+                                                                                <div className="text-center font-bold text-slate-700">{lot.measuredGauge.toFixed(2)} mm</div>
+                                                                            )}
+                                                                        </td>
+                                                                        <td className="p-3 text-center">
+                                                                            {isWaiting ? (
+                                                                                <div className="flex flex-col items-center">
+                                                                                    <span className="text-[9px] font-black text-amber-600 animate-pulse uppercase leading-none">Aguardando</span>
+                                                                                    <span className="text-[10px] font-mono font-bold text-slate-400 mt-0.5">{formatDuration(waitingMs)}</span>
+                                                                                </div>
+                                                                            ) : (
+                                                                                <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full uppercase">Concluído</span>
+                                                                            )}
+                                                                        </td>
+                                                                        <td className="p-3">
+                                                                            {isWaiting ? (
+                                                                                <button
+                                                                                    onClick={() => handleRecordWeight(lot.lotId)}
+                                                                                    disabled={isMachineStopped || !hasActiveShift}
+                                                                                    className="bg-emerald-500 text-white text-[10px] font-black py-2 px-3 rounded-lg hover:bg-emerald-600 w-full shadow-lg shadow-emerald-100 transition active:scale-95 disabled:opacity-50"
+                                                                                >
+                                                                                    SALVAR
+                                                                                </button>
+                                                                            ) : (
+                                                                                <div className="bg-slate-100 text-slate-400 p-1.5 rounded-lg w-fit mx-auto">
+                                                                                    <CheckCircleIcon className="h-4 w-4" />
+                                                                                </div>
+                                                                            )}
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            })}
                                                         </tbody>
                                                     </table>
 
                                                     {/* Mobile Card List */}
                                                     <div className="flex flex-col gap-3 sm:hidden">
-                                                        {completedLots.map(lot => (
-                                                            <div key={lot.lotId} className="bg-white border border-slate-200 p-4 rounded-xl shadow-sm flex flex-col gap-3">
-                                                                <div className="flex justify-between items-center">
-                                                                    <span className="font-bold text-slate-700 text-lg">{lot.lotInfo?.internalLot}</span>
-                                                                    {lot.finalWeight !== null && (
-                                                                        <span className="flex items-center gap-1 text-emerald-600 font-bold text-sm bg-emerald-50 px-2 py-1 rounded-lg">
-                                                                            <CheckCircleIcon className="h-4 w-4" /> Salvo
-                                                                        </span>
-                                                                    )}
-                                                                </div>
+                                                        {[...completedLots].reverse().map(lot => {
+                                                            const isWaiting = lot.finalWeight === null || lot.measuredGauge === undefined;
+                                                            const waitingMs = isWaiting ? timer.getTime() - new Date(lot.endTime).getTime() : 0;
 
-                                                                <div className="flex gap-2 items-end">
-                                                                    <div className="flex-1">
-                                                                        <label className="text-xs text-slate-400 font-bold uppercase mb-1 block">Peso Final (kg)</label>
-                                                                        {lot.finalWeight === null ? (
-                                                                            <input
-                                                                                type="number"
-                                                                                className="w-full p-3 border-2 border-slate-200 rounded-xl text-lg font-medium focus:border-emerald-500 focus:ring-0"
-                                                                                placeholder="0.00"
-                                                                                value={pendingWeights.get(lot.lotId) || ''}
-                                                                                onChange={e => handlePendingWeightChange(lot.lotId, e.target.value)}
-                                                                            />
-                                                                        ) : (
-                                                                            <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-lg font-bold text-slate-700 text-center">
-                                                                                {lot.finalWeight.toFixed(2)}
+                                                            return (
+                                                                <div key={lot.lotId} className="bg-white border-2 border-slate-100 p-4 rounded-2xl shadow-sm flex flex-col gap-4 relative overflow-hidden">
+                                                                    {!isWaiting && <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[8px] font-black px-3 py-1 rounded-bl-xl uppercase">Concluído</div>}
+
+                                                                    <div className="flex justify-between items-start">
+                                                                        <div>
+                                                                            <h4 className="font-black text-slate-800 text-xl">{lot.lotInfo?.internalLot}</h4>
+                                                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Entrada: {lot.lotInfo?.labelWeight.toFixed(0)} kg</p>
+                                                                        </div>
+                                                                        {isWaiting && (
+                                                                            <div className="text-right">
+                                                                                <span className="text-[8px] font-black text-amber-500 uppercase block leading-none">Aguardando</span>
+                                                                                <span className="text-xs font-mono font-bold text-slate-400">{formatDuration(waitingMs)}</span>
                                                                             </div>
                                                                         )}
                                                                     </div>
-                                                                    {lot.finalWeight === null && (
-                                                                        <button onClick={() => handleRecordWeight(lot.lotId)} className="h-[52px] px-4 bg-emerald-600 text-white font-bold rounded-xl shadow-lg shadow-emerald-200 active:scale-95 transition">
-                                                                            <SaveIcon className="h-6 w-6" />
+
+                                                                    <div className="grid grid-cols-2 gap-3">
+                                                                        <div className="space-y-1">
+                                                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Peso Saída (kg)</label>
+                                                                            {lot.finalWeight === null ? (
+                                                                                <input
+                                                                                    type="number"
+                                                                                    className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-center font-bold focus:border-indigo-500 outline-none transition"
+                                                                                    placeholder="0.0"
+                                                                                    value={pendingWeights.get(lot.lotId) || ''}
+                                                                                    onChange={e => handlePendingWeightChange(lot.lotId, e.target.value)}
+                                                                                />
+                                                                            ) : (
+                                                                                <div className="p-3 bg-slate-50 rounded-xl text-center font-black text-slate-800 text-lg">{lot.finalWeight.toFixed(1)}</div>
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="space-y-1">
+                                                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Bitola (mm)</label>
+                                                                            {lot.measuredGauge === undefined ? (
+                                                                                <input
+                                                                                    type="number"
+                                                                                    step="0.01"
+                                                                                    className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-center font-bold focus:border-indigo-500 outline-none transition"
+                                                                                    placeholder="0.00"
+                                                                                    value={pendingGauges?.get(lot.lotId) || ''}
+                                                                                    onChange={e => handlePendingGaugeChange(lot.lotId, e.target.value)}
+                                                                                />
+                                                                            ) : (
+                                                                                <div className="p-3 bg-slate-50 rounded-xl text-center font-black text-slate-800 text-lg">{lot.measuredGauge.toFixed(2)}</div>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {isWaiting && (
+                                                                        <button
+                                                                            onClick={() => handleRecordWeight(lot.lotId)}
+                                                                            disabled={isMachineStopped || !hasActiveShift}
+                                                                            className="w-full bg-emerald-600 text-white font-black py-4 rounded-xl shadow-lg shadow-emerald-100 active:scale-95 transition disabled:opacity-50"
+                                                                        >
+                                                                            SALVAR PESAGEM E AFERIÇÃO
                                                                         </button>
                                                                     )}
                                                                 </div>
-                                                            </div>
-                                                        ))}
+                                                            );
+                                                        })}
                                                     </div>
                                                 </div>
                                             </div>

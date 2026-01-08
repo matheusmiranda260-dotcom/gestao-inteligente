@@ -377,6 +377,74 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                 )}
             </div>
 
+            {/* Tabela de Lotes Processados - Apenas Trefila */}
+            {machineType === 'Trefila' && (
+                <div className="border p-3 md:p-4 rounded-md">
+                    <h3 className="font-semibold text-slate-700 mb-2 underline decoration-slate-300 decoration-2 underline-offset-4 text-sm md:text-base">LOTES PROCESSADOS:</h3>
+                    <div className="overflow-x-auto max-h-64 overflow-y-auto custom-scrollbar">
+                        <table className="w-full border-collapse min-w-[500px]">
+                            <thead>
+                                <tr className="bg-slate-100 text-slate-600 text-[10px] md:text-xs uppercase font-bold text-left sticky top-0 z-10 shadow-sm">
+                                    <th className="p-2 border border-slate-300 bg-slate-100">Lote</th>
+                                    <th className="p-2 border border-slate-300 bg-slate-100 text-right">KG (Entrada)</th>
+                                    <th className="p-2 border border-slate-300 bg-slate-100 text-right">KG (Saída)</th>
+                                    <th className="p-2 border border-slate-300 bg-slate-100 text-center">Bitola</th>
+                                    <th className="p-2 border border-slate-300 bg-slate-100 text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody className="text-xs md:text-sm">
+                                {(activeOrder.processedLots || [])
+                                    .slice()
+                                    .sort((a, b) => new Date(b.endTime).getTime() - new Date(a.endTime).getTime())
+                                    .filter(lot => {
+                                        if (!currentOperatorLog) return true;
+                                        return new Date(lot.endTime).getTime() >= new Date(currentOperatorLog.startTime).getTime();
+                                    })
+                                    .map((lot, idx) => {
+                                        const lotInfo = stock.find(s => s.id === lot.lotId);
+                                        const isWaiting = lot.finalWeight === null || lot.measuredGauge === undefined;
+                                        const waitingMs = isWaiting ? now.getTime() - new Date(lot.endTime).getTime() : 0;
+
+                                        return (
+                                            <tr key={idx} className="border-b border-slate-200 hover:bg-slate-50 transition-colors">
+                                                <td className="p-2 border border-slate-300 font-bold text-slate-700">
+                                                    {lotInfo?.internalLot || 'N/A'}
+                                                </td>
+                                                <td className="p-2 border border-slate-300 text-right font-medium text-slate-600">
+                                                    {lotInfo?.labelWeight.toFixed(0) || '0'} kg
+                                                </td>
+                                                <td className="p-2 border border-slate-300 text-right font-black text-slate-900">
+                                                    {lot.finalWeight !== null ? `${lot.finalWeight.toFixed(1)} kg` : '-'}
+                                                </td>
+                                                <td className="p-2 border border-slate-300 text-center font-bold text-slate-700">
+                                                    {lot.measuredGauge ? `${lot.measuredGauge.toFixed(2)}mm` : '-'}
+                                                </td>
+                                                <td className="p-2 border border-slate-300 text-center">
+                                                    {isWaiting ? (
+                                                        <div className="flex flex-col items-center">
+                                                            <span className="text-[9px] font-black text-amber-600 animate-pulse uppercase leading-tight">Aguardando Pesagem/Aferição</span>
+                                                            <span className="text-[10px] font-mono font-bold text-slate-400">{formatDuration(waitingMs)}</span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full uppercase">OK</span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                {(activeOrder.processedLots || []).length === 0 && (
+                                    <tr>
+                                        <td colSpan={5} className="p-4 text-center text-slate-400 text-xs md:text-sm italic">
+                                            Nenhum lote processado neste turno.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
             <div className="border p-3 md:p-4 rounded-md">
                 <h3 className="font-semibold text-slate-700 mb-2 underline decoration-slate-300 decoration-2 underline-offset-4 text-sm md:text-base">PARADAS E SEUS MOTIVOS:</h3>
                 <div className="overflow-x-auto max-h-64 overflow-y-auto custom-scrollbar">
