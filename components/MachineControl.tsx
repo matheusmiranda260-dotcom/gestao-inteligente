@@ -1282,7 +1282,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                 </div>
 
                                 {/* Coluna Direita: Área de Trabalho (Lotes/Pacotes) - ESCONDIDA NO MOBILE PARA FOCO NO STATUS */}
-                                <div className="lg:col-span-2 space-y-6 relative hidden md:block">
+                                <div className="lg:col-span-2 space-y-6 relative">
                                     {isMachineStopped && (
                                         <div className="absolute inset-0 bg-slate-200/80 backdrop-blur-sm flex items-center justify-center rounded-2xl z-20 border-2 border-slate-300 border-dashed">
                                             <div className="text-center p-8 bg-white rounded-3xl shadow-xl max-w-sm mx-auto animate-fade-in-up">
