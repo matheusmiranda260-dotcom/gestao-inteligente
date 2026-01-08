@@ -1140,8 +1140,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                         </div>
                                     </div>
 
-                                    {/* Progresso de Produção - Promovido para destaque - ESCONDIDO NO MOBILE */}
-                                    <div className="bg-white p-6 rounded-2xl shadow-sm relative overflow-hidden group hidden md:block">
+                                    {/* Progresso de Produção - Promovido para destaque - VISÍVEL EM TODOS OS DISPOSITIVOS */}
+                                    <div className="bg-white p-6 rounded-2xl shadow-sm relative overflow-hidden group">
                                         <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition">
                                             <ChartBarIcon className="h-16 w-16" />
                                         </div>
@@ -1236,7 +1236,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                     </div>
 
                                     {hasActiveShift && (
-                                        <div className="bg-slate-900 p-6 rounded-2xl shadow-xl shadow-slate-200 hidden md:block">
+                                        <div className="bg-slate-900 p-6 rounded-2xl shadow-xl shadow-slate-200">
                                             <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4 flex items-center justify-between">
                                                 <span>Tempo de Operação</span>
                                                 <ClockIcon className="h-4 w-4 text-slate-600" />
@@ -1266,6 +1266,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                         <thead className="text-left sticky top-0 bg-white shadow-sm">
                                                             <tr className="text-xs text-slate-400 uppercase">
                                                                 <th className="p-2 font-semibold whitespace-nowrap">Motivo</th>
+                                                                <th className="p-2 font-semibold whitespace-nowrap">Início / Fim</th>
                                                                 <th className="p-2 font-semibold whitespace-nowrap text-right">Duração</th>
                                                             </tr>
                                                         </thead>
@@ -1277,6 +1278,9 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                 return (
                                                                     <tr key={index}>
                                                                         <td className="p-2 max-w-[150px] truncate font-medium text-slate-700" title={event.reason}>{event.reason}</td>
+                                                                        <td className="p-2 text-xs text-slate-500 whitespace-nowrap">
+                                                                            {stop.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} - {resume.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                                                        </td>
                                                                         <td className="p-2 text-right font-mono text-slate-500 whitespace-nowrap">{formatDuration(durationMs)}</td>
                                                                     </tr>
                                                                 );
