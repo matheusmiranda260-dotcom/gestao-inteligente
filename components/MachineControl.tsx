@@ -475,19 +475,33 @@ const MachineControl: React.FC<MachineControlProps> = ({
     };
 
     const handleRecordWeight = (lotId: string) => {
+        if (!activeOrder || !recordLotWeight) return;
+
+        // Encontra o lote nos processados para saber o que já foi salvo anteriormente
+        const lot = (activeOrder.processedLots || []).find(p => p.lotId === lotId);
+        if (!lot) return;
+
         const weightStr = pendingWeights.get(lotId);
-        const gaugeStr = pendingGauges.get(lotId); // Pega a bitola aferida
-        if (weightStr) {
-            const weight = parseFloat(weightStr);
-            const gauge = gaugeStr ? parseFloat(gaugeStr) : undefined;
-            if (activeOrder && recordLotWeight && !isNaN(weight) && weight > 0) {
-                recordLotWeight(activeOrder.id, lotId, weight, gauge);
+        const gaugeStr = pendingGauges.get(lotId);
+
+        // Prioridade para o novo valor do input, senão mantém o valor já salvo no banco
+        const finalWeight = weightStr ? parseFloat(weightStr.replace(',', '.')) : lot.finalWeight;
+        const measuredGauge = gaugeStr ? parseFloat(gaugeStr.replace(',', '.')) : lot.measuredGauge;
+
+        // Só prossegue se tivermos pelo menos o peso (novo ou antigo)
+        if (finalWeight !== null && !isNaN(finalWeight)) {
+            recordLotWeight(activeOrder.id, lotId, finalWeight, measuredGauge === null ? undefined : measuredGauge);
+
+            // Limpa os estados locais apenas do que foi enviado nos inputs
+            if (weightStr) {
                 setPendingWeights(prev => {
                     const newMap = new Map(prev);
                     newMap.delete(lotId);
                     return newMap;
                 });
-                setPendingGauges(prev => { // Limpa estado da bitola
+            }
+            if (gaugeStr) {
+                setPendingGauges(prev => {
                     const newMap = new Map(prev);
                     newMap.delete(lotId);
                     return newMap;
