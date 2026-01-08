@@ -1643,8 +1643,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Bitola (mm)</label>
                                                                             {lot.measuredGauge == null ? (
                                                                                 <input
-                                                                                    type="number"
-                                                                                    step="0.01"
+                                                                                    type="text"
                                                                                     inputMode="decimal"
                                                                                     className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-center font-bold focus:border-indigo-500 outline-none transition uppercase"
                                                                                     placeholder="0.00"
@@ -1661,9 +1660,10 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                         <button
                                                                             onClick={() => handleRecordWeight(lot.lotId)}
                                                                             disabled={isMachineStopped || !hasActiveShift}
-                                                                            className="w-full bg-emerald-600 text-white font-black py-4 rounded-xl shadow-lg shadow-emerald-100 active:scale-95 transition disabled:opacity-50"
+                                                                            className="w-full bg-emerald-600 text-white font-black py-4 rounded-xl shadow-lg shadow-emerald-100 active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-2"
                                                                         >
-                                                                            SALVAR PESAGEM E AFERIÇÃO
+                                                                            <CheckCircleIcon className="h-6 w-6" />
+                                                                            SALVAR PESAGEM (OK)
                                                                         </button>
                                                                     )}
                                                                 </div>
@@ -1703,9 +1703,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                         ) : (
                                                                             <div className="relative">
                                                                                 <input
-                                                                                    type="number"
+                                                                                    type="text"
                                                                                     inputMode="decimal"
-                                                                                    step="0.01"
                                                                                     value={pendingPackageWeights.get(pkg.packageNumber) || ''}
                                                                                     onChange={e => handlePendingPackageWeightChange(pkg.packageNumber, e.target.value)}
                                                                                     className="w-full p-3 border-2 border-slate-200 rounded-xl text-lg font-medium focus:border-indigo-500 focus:ring-0 transition"
@@ -1760,9 +1759,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                         <div className="flex-1 relative">
                                                                             <label className="text-xs text-slate-400 font-bold uppercase mb-1 block">Peso (kg)</label>
                                                                             <input
-                                                                                type="number"
+                                                                                type="text"
                                                                                 inputMode="decimal"
-                                                                                step="0.01"
                                                                                 value={pendingPackageWeights.get(pkg.packageNumber) || ''}
                                                                                 onChange={e => handlePendingPackageWeightChange(pkg.packageNumber, e.target.value)}
                                                                                 className="w-full h-12 pl-3 pr-10 border-2 border-slate-200 rounded-xl text-xl font-bold text-slate-800 focus:border-indigo-500 focus:ring-0 transition"
@@ -1771,9 +1769,10 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                         </div>
                                                                         <button
                                                                             onClick={() => handleRecordPackageWeight(pkg.packageNumber, pkg.quantity)}
-                                                                            className="h-12 px-5 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-200 active:scale-95 transition flex items-center justify-center"
+                                                                            className="h-12 px-5 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-200 active:scale-95 transition flex items-center justify-center gap-2"
                                                                         >
                                                                             <CheckCircleIcon className="h-6 w-6" />
+                                                                            <span className="font-bold">OK</span>
                                                                         </button>
                                                                     </div>
                                                                 )}

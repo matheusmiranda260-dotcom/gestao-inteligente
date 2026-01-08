@@ -175,19 +175,20 @@ const TrefilaWeighing: React.FC<TrefilaWeighingProps> = ({ productionOrders, sto
                                             <label className="text-xs font-black text-slate-500 uppercase tracking-widest block ml-1">Peso de Saída (KG)</label>
                                             <div className="flex gap-2">
                                                 <input
-                                                    type="number"
+                                                    type="text"
                                                     inputMode="decimal"
                                                     placeholder="0.0"
-                                                    className="flex-1 p-4 bg-white border-2 border-slate-100 rounded-2xl text-center text-xl font-black focus:border-indigo-500 outline-none transition-all shadow-inner"
+                                                    className="flex-1 min-w-0 p-4 bg-white border-2 border-slate-100 rounded-2xl text-center text-xl font-black focus:border-indigo-500 outline-none transition-all shadow-inner"
                                                     value={pendingWeights.get(item.lot.lotId) || ''}
                                                     onChange={(e) => handleWeightChange(item.lot.lotId, e.target.value)}
                                                 />
                                                 <button
                                                     onClick={() => handleSaveWeight(item.orderId, item.lot.lotId)}
-                                                    className="bg-emerald-500 text-white p-4 rounded-2xl hover:bg-emerald-600 shadow-lg shadow-emerald-100 active:scale-95 transition-all"
+                                                    className="bg-emerald-500 text-white px-6 py-4 rounded-2xl hover:bg-emerald-600 shadow-lg shadow-emerald-100 active:scale-95 transition-all flex items-center gap-2 flex-shrink-0"
                                                     title="Salvar Pesagem"
                                                 >
-                                                    <CheckCircleIcon className="h-8 w-8 text-white" />
+                                                    <CheckCircleIcon className="h-6 w-6 text-white" />
+                                                    <span className="font-black">OK</span>
                                                 </button>
                                             </div>
                                         </div>
