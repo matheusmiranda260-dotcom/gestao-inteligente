@@ -11,20 +11,55 @@ interface UserManagementProps {
     setPage: (page: Page) => void;
 }
 
-const manageablePages: { page: Page; label: string }[] = [
-    { page: 'stock', label: 'Controle de Estoque (Almoxarifado)' },
-    { page: 'finishedGoods', label: 'Estoque Acabado' },
-    { page: 'trefila', label: 'Produção (Trefila)' },
-    { page: 'trelica', label: 'Produção (Treliça)' },
-    { page: 'productionOrder', label: 'Ordem (Trefila)' },
-    { page: 'productionOrderTrelica', label: 'Ordem (Treliça)' },
-    { page: 'productionDashboard', label: 'Dashboard de Produção' },
-    { page: 'reports', label: 'Relatórios' },
-    { page: 'partsManager', label: 'Gerenciador de Peças' },
-    { page: 'continuousImprovement', label: 'Melhoria Contínua' },
-    { page: 'workInstructions', label: 'Instruções de Trabalho' },
-    { page: 'peopleManagement', label: 'Gestão de Pessoas' },
+const permissionCategories = [
+    {
+        title: '📦 Estoque',
+        permissions: [
+            { page: 'stock', label: 'Gestão de Lotes (Visualização)' },
+            { page: 'stock_add', label: 'Adicionar ao Estoque (Conferência)' },
+            { page: 'stock_transfer', label: 'Transferência entre Setores' },
+            { page: 'stock_inventory', label: 'Auditoria de Inventário (Celular)' },
+            { page: 'stock_map', label: 'Mapa de Estoque (Pirâmide)' },
+        ]
+    },
+    {
+        title: '🏭 Produção - Trefila',
+        permissions: [
+            { page: 'trefila_in_progress', label: 'Painel: Em Produção' },
+            { page: 'trefila_weighing', label: 'Pesagem de Rolos' },
+            { page: 'trefila_pending', label: 'Fila: Próximas Produções' },
+            { page: 'trefila_completed', label: 'Histórico: Produções Finalizadas' },
+            { page: 'trefila_reports', label: 'Relatórios de Turno' },
+            { page: 'productionOrder', label: 'Criar Nova Ordem de Produção' },
+        ]
+    },
+    {
+        title: '🏗️ Produção - Treliça',
+        permissions: [
+            { page: 'trelica_in_progress', label: 'Painel: Em Produção' },
+            { page: 'trelica_pending', label: 'Fila: Próximas Produções' },
+            { page: 'trelica_completed', label: 'Histórico: Produções Finalizadas' },
+            { page: 'trelica_reports', label: 'Relatórios de Turno' },
+            { page: 'productionOrderTrelica', label: 'Criar Nova Ordem de Produção' },
+            { page: 'finishedGoods', label: 'Estoque de Produto Acabado' },
+        ]
+    },
+    {
+        title: '📊 Gestão & Sistema',
+        permissions: [
+            { page: 'productionDashboard', label: 'Dashboard Geral de Produção' },
+            { page: 'reports', label: 'Relatórios Gerenciais e KPIs' },
+            { page: 'peopleManagement', label: 'Gestão de Pessoas (RH)' },
+            { page: 'continuousImprovement', label: 'Melhoria Contínua (Kaizen)' },
+            { page: 'workInstructions', label: 'Instruções de Trabalho (POP)' },
+            { page: 'partsManager', label: 'Gerenciador de Peças (Manutenção)' },
+            { page: 'gaugesManager', label: 'Configurações de Bitolas' },
+            { page: 'userManagement', label: 'Controle de Usuários e Acessos' },
+        ]
+    }
 ];
+
+const manageablePages = permissionCategories.flatMap(c => c.permissions.map(p => p.page as Page));
 
 const UserModal: React.FC<{
     user?: User | null;
@@ -105,19 +140,29 @@ const UserModal: React.FC<{
                             placeholder={isEditing ? 'Deixe em branco para não alterar' : ''}
                         />
                     </div>
-                    <div>
-                        <h3 className="text-lg font-semibold text-slate-700 mb-2 border-b pb-2">Permissões de Acesso</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 mt-4">
-                            {manageablePages.map(({ page, label }) => (
-                                <label key={page} className="flex items-center space-x-3 p-2 rounded-md hover:bg-slate-50">
-                                    <input
-                                        type="checkbox"
-                                        checked={!!permissions[page]}
-                                        onChange={(e) => handlePermissionChange(page, e.target.checked)}
-                                        className="h-4 w-4 rounded border-slate-300 text-[#0F3F5C] focus:ring-indigo-500"
-                                    />
-                                    <span className="text-slate-700">{label}</span>
-                                </label>
+                    <div className="mt-6 border-t pt-4">
+                        <h3 className="text-lg font-bold text-slate-800 mb-4 px-1">Permissões de Acesso</h3>
+                        <div className="space-y-6">
+                            {permissionCategories.map((category) => (
+                                <div key={category.title} className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                    <h4 className="text-sm font-black text-indigo-600 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
+                                        {category.title}
+                                    </h4>
+                                    <div className="grid grid-cols-1 gap-2">
+                                        {category.permissions.map(({ page, label }) => (
+                                            <label key={page} className="flex items-center space-x-3 p-2.5 rounded-lg hover:bg-white hover:shadow-sm transition-all cursor-pointer border border-transparent hover:border-slate-200 group">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={!!permissions[page as Page]}
+                                                    onChange={(e) => handlePermissionChange(page as Page, e.target.checked)}
+                                                    className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 transition-all"
+                                                />
+                                                <span className="text-sm font-medium text-slate-700 group-hover:text-slate-900">{label}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
                             ))}
                         </div>
                     </div>
@@ -137,7 +182,8 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [deletingUser, setDeletingUser] = useState<User | null>(null);
 
-    const manageableUsers = users.filter(u => u.role !== 'admin' && u.role !== 'gestor');
+    // Permite gerenciar todos os usuários, mas o admin principal (id: 'admin') pode ter proteção extra se quiser
+    const manageableUsers = users.filter(u => u.username !== 'admin');
 
     const handleAddUser = (data: { username: string; password: string; permissions: Partial<Record<Page, boolean>>; employeeId?: string }) => {
         addUser(data);

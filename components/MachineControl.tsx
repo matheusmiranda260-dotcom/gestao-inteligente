@@ -583,15 +583,27 @@ const MachineControl: React.FC<MachineControlProps> = ({
     };
 
 
-    const [view, setView] = useState<View>('dashboard');
+    const [view, setView] = useState<View>(initialView || 'dashboard');
     const [showDowntimeModal, setShowDowntimeModal] = useState(false);
     const [showCompletionModal, setShowCompletionModal] = useState(false);
     const [showQuantityPrompt, setShowQuantityPrompt] = useState(false);
     const [pendingShiftEnd, setPendingShiftEnd] = useState<string | null>(null);
-    const [showPartsRequestModal, setShowPartsRequestModal] = useState(false);
-    const [showShiftReportsModal, setShowShiftReportsModal] = useState(false);
+    const [showPartsRequestModal, setShowPartsRequestModal] = useState(initialModal === 'parts');
+    const [showShiftReportsModal, setShowShiftReportsModal] = useState(initialModal === 'reports');
     const [lastShiftEndPromptDate, setLastShiftEndPromptDate] = useState<string | null>(null);
     const [showManagerAuthForShiftEnd, setShowManagerAuthForShiftEnd] = useState(false);
+
+    const hasPermission = (targetPage: Page): boolean => {
+        if (!currentUser) return false;
+        // Super-admin and gestores always have access to everything by default
+        if (currentUser.username === 'admin' || currentUser.role === 'admin' || currentUser.role === 'gestor') return true;
+
+        // Dynamic check based on current machine if needed, 
+        // but here we check the specific page passed
+        return !!currentUser.permissions?.[targetPage];
+    };
+
+    const machinePrefix = machineType === 'Trefila' ? 'trefila' : 'trelica';
 
     const [productionReportData, setProductionReportData] = useState<ProductionOrderData | null>(null);
     const [showTrefilaCalculation, setShowTrefilaCalculation] = useState(false);
@@ -707,17 +719,17 @@ const MachineControl: React.FC<MachineControlProps> = ({
     }, [orderForShift]);
 
     useEffect(() => {
-        if (activeOrder && !isMachineStopped && hasActiveShift) {
+        if (machineType === 'Treliça' && activeOrder && !isMachineStopped && hasActiveShift) {
             const interval = setInterval(() => {
                 setShowQuantityPrompt(true);
             }, 10 * 60 * 1000); // 10 minutes
 
             return () => clearInterval(interval);
         }
-    }, [activeOrder, isMachineStopped, hasActiveShift]);
+    }, [activeOrder, isMachineStopped, hasActiveShift, machineType]);
 
     useEffect(() => {
-        if (activeOrder && hasActiveShift && !showQuantityPrompt) {
+        if (machineType === 'Treliça' && activeOrder && hasActiveShift && !showQuantityPrompt) {
             const now = timer;
             const shiftEnd = new Date(now);
             shiftEnd.setHours(17, 30, 0, 0);
@@ -734,7 +746,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                 }
             }
         }
-    }, [timer, activeOrder, hasActiveShift, lastShiftEndPromptDate, showQuantityPrompt]);
+    }, [timer, activeOrder, hasActiveShift, lastShiftEndPromptDate, showQuantityPrompt, machineType]);
 
     useEffect(() => {
         if (justCompletedOrderId) {
@@ -924,10 +936,13 @@ const MachineControl: React.FC<MachineControlProps> = ({
     }
 
     const handleShiftEndRequest = (orderId: string) => {
-        // Only apply restriction for Treliça machine
+        // Only apply quantity prompt for Treliça machine
         if (machineType !== 'Treliça') {
-            setPendingShiftEnd(orderId);
-            setShowQuantityPrompt(true);
+            if (endOperatorShift) {
+                // For Trefila, we just end with current qty (tracking is via processedLots)
+                const orderToEnd = productionOrders.find(o => o.id === orderId);
+                endOperatorShift(orderId, (orderToEnd?.actualProducedQuantity || 0));
+            }
             return;
         }
 
@@ -1109,20 +1124,40 @@ const MachineControl: React.FC<MachineControlProps> = ({
                             </div>
                         </div>
                     )}
-                    <div className="grid grid-cols-2 md:grid-cols-2 gap-4 md:gap-6">
-                        <MachineMenuButton
-                            onClick={() => setView('in_progress')}
-                            label={postProductionOrder ? "Acompanhar" : "Painel Principal"}
-                            description={postProductionOrder ? "Pós-Produção" : "Em Produção"}
-                            icon={<CogIcon className={`h-6 w-6 ${activeOrder ? 'animate-spin' : ''}`} />}
-                            disabled={!activeOrder && !postProductionOrder}
-                        />
-                        <MachineMenuButton
-                            onClick={() => setView('pending')}
-                            label="Fila"
-                            description="Próximos"
-                            icon={<ClipboardListIcon className="h-6 w-6" />}
-                        />
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+                        {hasPermission(machinePrefix === 'trefila' ? 'trefila_in_progress' : 'trelica_in_progress') && (
+                            <MachineMenuButton
+                                onClick={() => setView('in_progress')}
+                                label={postProductionOrder ? "Acompanhar" : "Painel"}
+                                description={postProductionOrder ? "Pós-Produção" : "Em Produção"}
+                                icon={<CogIcon className={`h-6 w-6 ${activeOrder ? 'animate-spin' : ''}`} />}
+                                disabled={!activeOrder && !postProductionOrder}
+                            />
+                        )}
+                        {hasPermission(machinePrefix === 'trefila' ? 'trefila_pending' : 'trelica_pending') && (
+                            <MachineMenuButton
+                                onClick={() => setView('pending')}
+                                label="Fila"
+                                description="Próximos"
+                                icon={<ClipboardListIcon className="h-6 w-6" />}
+                            />
+                        )}
+                        {hasPermission(machinePrefix === 'trefila' ? 'trefila_completed' : 'trelica_completed') && (
+                            <MachineMenuButton
+                                onClick={() => setView('completed')}
+                                label="Histórico"
+                                description="Finalizados"
+                                icon={<ArchiveIcon className="h-6 w-6" />}
+                            />
+                        )}
+                        {hasPermission(machinePrefix === 'trefila' ? 'trefila_reports' : 'trelica_reports') && (
+                            <MachineMenuButton
+                                onClick={() => setShowShiftReportsModal(true)}
+                                label="Turnos"
+                                description="Relatórios"
+                                icon={<DocumentReportIcon className="h-6 w-6" />}
+                            />
+                        )}
                     </div>
                 </div>
             )}

@@ -12,7 +12,8 @@ import {
     ChatBubbleLeftRightIcon,
     StarIcon,
     ChevronRightIcon,
-    DocumentReportIcon
+    DocumentReportIcon,
+    LogoutIcon
 } from './icons';
 
 interface SidebarProps {
@@ -21,9 +22,10 @@ interface SidebarProps {
     currentUser: User | null;
     notificationCount?: number;
     isMobileMenuOpen?: boolean;
+    onLogout?: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificationCount, isMobileMenuOpen }) => {
+const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificationCount, isMobileMenuOpen, onLogout }) => {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [expandedMenus, setExpandedMenus] = useState<string[]>(['stock']); // Default open
 
@@ -45,8 +47,13 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
 
     const hasPermission = (targetPage: Page): boolean => {
         if (!currentUser) return false;
-        if (currentUser.role === 'admin' || currentUser.role === 'gestor') return true;
+        // Super-admin and gestores always have access to everything by default
+        if (currentUser.username === 'admin' || currentUser.role === 'admin' || currentUser.role === 'gestor') return true;
+
+        // Self-management for employees
         if (targetPage === 'peopleManagement' && currentUser.employeeId) return true;
+
+        // Specific permissions check
         return !!currentUser.permissions?.[targetPage];
     };
 
@@ -107,82 +114,100 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                     <div className="sidebar-category-title">{isCollapsed ? '🏭' : '🏭 Produção'}</div>
 
                     {/* Trefila Collapsible */}
-                    <button
-                        onClick={() => toggleMenu('trefila')}
-                        className={`sidebar-item ${['trefila', 'trefila_in_progress', 'trefila_pending', 'trefila_completed', 'trefila_reports', 'trefila_parts'].includes(page) ? 'active' : ''} justify-between group`}
-                        title={isCollapsed ? 'Produção – Trefila' : ''}
-                    >
-                        <div className="flex items-center gap-3 overflow-hidden">
-                            <div className="sidebar-item-icon shrink-0">
-                                <CogIcon className="w-full h-full" />
-                            </div>
-                            {!isCollapsed && <span className="sidebar-item-label whitespace-nowrap">Produção – Trefila</span>}
-                        </div>
-                        {!isCollapsed && (
-                            <ChevronRightIcon className={`w-3 h-3 text-slate-500 transition-transform duration-200 ${expandedMenus.includes('trefila') ? 'rotate-90' : ''}`} />
-                        )}
-                    </button>
+                    {(hasPermission('trefila_in_progress') || hasPermission('trefila_weighing') || hasPermission('trefila_pending') || hasPermission('trefila_completed') || hasPermission('trefila_reports')) && (
+                        <>
+                            <button
+                                onClick={() => toggleMenu('trefila')}
+                                className={`sidebar-item ${['trefila', 'trefila_in_progress', 'trefila_pending', 'trefila_completed', 'trefila_reports', 'trefila_parts'].includes(page) ? 'active' : ''} justify-between group`}
+                                title={isCollapsed ? 'Produção – Trefila' : ''}
+                            >
+                                <div className="flex items-center gap-3 overflow-hidden">
+                                    <div className="sidebar-item-icon shrink-0">
+                                        <CogIcon className="w-full h-full" />
+                                    </div>
+                                    {!isCollapsed && <span className="sidebar-item-label whitespace-nowrap">Produção – Trefila</span>}
+                                </div>
+                                {!isCollapsed && (
+                                    <ChevronRightIcon className={`w-3 h-3 text-slate-500 transition-transform duration-200 ${expandedMenus.includes('trefila') ? 'rotate-90' : ''}`} />
+                                )}
+                            </button>
 
-                    {!isCollapsed && expandedMenus.includes('trefila') && (
-                        <div className="ml-4 pl-4 border-l border-slate-700/50 flex flex-col gap-0.5 mt-1 mb-2 animate-in slide-in-from-left-2 duration-200">
-                            <button onClick={() => setPage('trefila_in_progress')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_in_progress' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                ⚙️ Em Produção
-                            </button>
-                            <button onClick={() => setPage('trefila_weighing')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_weighing' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                ⚖️ Pesagem de Rolos
-                            </button>
-                            <button onClick={() => setPage('trefila_pending')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_pending' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                📋 Próximas Produções
-                            </button>
-                            {isGestor && (
-                                <>
-                                    <button onClick={() => setPage('trefila_completed')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_completed' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                        📦 Produções Finalizadas
-                                    </button>
-                                    <button onClick={() => setPage('trefila_reports')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_reports' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                        📊 Relatórios de Turno
-                                    </button>
-                                </>
+                            {!isCollapsed && expandedMenus.includes('trefila') && (
+                                <div className="ml-4 pl-4 border-l border-slate-700/50 flex flex-col gap-0.5 mt-1 mb-2 animate-in slide-in-from-left-2 duration-200">
+                                    {hasPermission('trefila_in_progress') && (
+                                        <button onClick={() => setPage('trefila_in_progress')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_in_progress' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                            ⚙️ Em Produção
+                                        </button>
+                                    )}
+                                    {hasPermission('trefila_weighing') && (
+                                        <button onClick={() => setPage('trefila_weighing')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_weighing' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                            ⚖️ Pesagem de Rolos
+                                        </button>
+                                    )}
+                                    {hasPermission('trefila_pending') && (
+                                        <button onClick={() => setPage('trefila_pending')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_pending' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                            📋 Próximas Produções
+                                        </button>
+                                    )}
+                                    {hasPermission('trefila_completed') && (
+                                        <button onClick={() => setPage('trefila_completed')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_completed' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                            📦 Produções Finalizadas
+                                        </button>
+                                    )}
+                                    {hasPermission('trefila_reports') && (
+                                        <button onClick={() => setPage('trefila_reports')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_reports' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                            📊 Relatórios de Turno
+                                        </button>
+                                    )}
+                                </div>
                             )}
-                        </div>
+                        </>
                     )}
 
                     {/* Treliça Collapsible */}
-                    <button
-                        onClick={() => toggleMenu('trelica')}
-                        className={`sidebar-item ${['trelica', 'trelica_in_progress', 'trelica_pending', 'trelica_completed', 'trelica_reports', 'trelica_parts'].includes(page) ? 'active' : ''} justify-between group`}
-                        title={isCollapsed ? 'Produção – Treliça' : ''}
-                    >
-                        <div className="flex items-center gap-3 overflow-hidden">
-                            <div className="sidebar-item-icon shrink-0">
-                                <CogIcon className="w-full h-full" />
-                            </div>
-                            {!isCollapsed && <span className="sidebar-item-label whitespace-nowrap">Produção – Treliça</span>}
-                        </div>
-                        {!isCollapsed && (
-                            <ChevronRightIcon className={`w-3 h-3 text-slate-500 transition-transform duration-200 ${expandedMenus.includes('trelica') ? 'rotate-90' : ''}`} />
-                        )}
-                    </button>
+                    {(hasPermission('trelica_in_progress') || hasPermission('trelica_pending') || hasPermission('trelica_completed') || hasPermission('trelica_reports')) && (
+                        <>
+                            <button
+                                onClick={() => toggleMenu('trelica')}
+                                className={`sidebar-item ${['trelica', 'trelica_in_progress', 'trelica_pending', 'trelica_completed', 'trelica_reports', 'trelica_parts'].includes(page) ? 'active' : ''} justify-between group`}
+                                title={isCollapsed ? 'Produção – Treliça' : ''}
+                            >
+                                <div className="flex items-center gap-3 overflow-hidden">
+                                    <div className="sidebar-item-icon shrink-0">
+                                        <CogIcon className="w-full h-full" />
+                                    </div>
+                                    {!isCollapsed && <span className="sidebar-item-label whitespace-nowrap">Produção – Treliça</span>}
+                                </div>
+                                {!isCollapsed && (
+                                    <ChevronRightIcon className={`w-3 h-3 text-slate-500 transition-transform duration-200 ${expandedMenus.includes('trelica') ? 'rotate-90' : ''}`} />
+                                )}
+                            </button>
 
-                    {!isCollapsed && expandedMenus.includes('trelica') && (
-                        <div className="ml-4 pl-4 border-l border-slate-700/50 flex flex-col gap-0.5 mt-1 mb-2 animate-in slide-in-from-left-2 duration-200">
-                            <button onClick={() => setPage('trelica_in_progress')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelica_in_progress' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                ⚙️ Em Produção
-                            </button>
-                            <button onClick={() => setPage('trelica_pending')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelica_pending' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                📋 Próximas Produções
-                            </button>
-                            {isGestor && (
-                                <>
-                                    <button onClick={() => setPage('trelica_completed')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelica_completed' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                        📦 Produções Finalizadas
-                                    </button>
-                                    <button onClick={() => setPage('trelica_reports')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelica_reports' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                        📊 Relatórios de Turno
-                                    </button>
-                                </>
+                            {!isCollapsed && expandedMenus.includes('trelica') && (
+                                <div className="ml-4 pl-4 border-l border-slate-700/50 flex flex-col gap-0.5 mt-1 mb-2 animate-in slide-in-from-left-2 duration-200">
+                                    {hasPermission('trelica_in_progress') && (
+                                        <button onClick={() => setPage('trelica_in_progress')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelica_in_progress' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                            ⚙️ Em Produção
+                                        </button>
+                                    )}
+                                    {hasPermission('trelica_pending') && (
+                                        <button onClick={() => setPage('trelica_pending')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelica_pending' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                            📋 Próximas Produções
+                                        </button>
+                                    )}
+                                    {hasPermission('trelica_completed') && (
+                                        <button onClick={() => setPage('trelica_completed')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelica_completed' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                            📦 Produções Finalizadas
+                                        </button>
+                                    )}
+                                    {hasPermission('trelica_reports') && (
+                                        <button onClick={() => setPage('trelica_reports')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelica_reports' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                            📊 Relatórios de Turno
+                                        </button>
+                                    )}
+                                </div>
                             )}
-                        </div>
+                        </>
                     )}
 
                     <MenuItem target="productionOrder" label="Ordens (Trefila)" icon={ClipboardListIcon} />
@@ -215,21 +240,31 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                             {/* Submenu */}
                             {!isCollapsed && expandedMenus.includes('stock') && (
                                 <div className="ml-4 pl-4 border-l border-slate-700/50 flex flex-col gap-0.5 mt-1 mb-2 animate-in slide-in-from-left-2 duration-200">
-                                    <button onClick={() => setPage('stock_add')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stock_add' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                        + Conferência
-                                    </button>
-                                    <button onClick={() => setPage('stock_map')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stock_map' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                        🗺️ Mapa
-                                    </button>
-                                    <button onClick={() => setPage('stock_transfer')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stock_transfer' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                        ➡️ Transferência
-                                    </button>
-                                    <button onClick={() => setPage('stock_inventory')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stock_inventory' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                        📋 Inventário (Relatório)
-                                    </button>
-                                    <button onClick={() => setPage('stock')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stock' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                        ⚙️ Gestão de Lotes
-                                    </button>
+                                    {hasPermission('stock_add') && (
+                                        <button onClick={() => setPage('stock_add')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stock_add' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                            + Conferência
+                                        </button>
+                                    )}
+                                    {hasPermission('stock_map') && (
+                                        <button onClick={() => setPage('stock_map')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stock_map' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                            🗺️ Mapa
+                                        </button>
+                                    )}
+                                    {hasPermission('stock_transfer') && (
+                                        <button onClick={() => setPage('stock_transfer')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stock_transfer' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                            ➡️ Transferência
+                                        </button>
+                                    )}
+                                    {hasPermission('stock_inventory') && (
+                                        <button onClick={() => setPage('stock_inventory')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stock_inventory' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                            📋 Inventário (Relatório)
+                                        </button>
+                                    )}
+                                    {hasPermission('stock') && (
+                                        <button onClick={() => setPage('stock')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stock' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                            ⚙️ Gestão de Lotes
+                                        </button>
+                                    )}
                                 </div>
                             )}
                         </>
@@ -260,12 +295,16 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
 
                     {!isCollapsed && expandedMenus.includes('people') && (
                         <div className="ml-4 pl-4 border-l border-slate-700/50 flex flex-col gap-0.5 mt-1 mb-2 animate-in slide-in-from-left-2 duration-200">
-                            <button onClick={() => setPage('peopleManagement')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'peopleManagement' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                👥 Gestão de Pessoas
-                            </button>
-                            <button onClick={() => setPage('continuousImprovement')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'continuousImprovement' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                ✨ Melhoria Contínua
-                            </button>
+                            {hasPermission('peopleManagement') && (
+                                <button onClick={() => setPage('peopleManagement')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'peopleManagement' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                    👥 Gestão de Pessoas
+                                </button>
+                            )}
+                            {hasPermission('continuousImprovement') && (
+                                <button onClick={() => setPage('continuousImprovement')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'continuousImprovement' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                    ✨ Melhoria Contínua
+                                </button>
+                            )}
                         </div>
                     )}
                 </div>
@@ -279,12 +318,31 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                 </div>
 
                 {/* SISTEMA */}
-                {isGestor && (
+                {(hasPermission('userManagement') || hasPermission('gaugesManager')) && (
                     <div className="sidebar-category">
                         <div className="sidebar-category-title">{isCollapsed ? '⚙️' : '⚙️ Sistema'}</div>
                         <MenuItem target="userManagement" label="Usuários" icon={UserGroupIcon} />
+                        <MenuItem target="gaugesManager" label="Bitolas" icon={AdjustmentsIcon} />
                     </div>
                 )}
+            </div>
+
+            {/* Logout Button */}
+            <div className="sidebar-footer p-4 border-t border-white/10">
+                <button
+                    onClick={() => {
+                        if (onLogout && confirm('Deseja realmente sair e voltar para a tela de login?')) {
+                            onLogout();
+                        }
+                    }}
+                    className="flex items-center gap-3 w-full p-3 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200 group"
+                    title={isCollapsed ? 'Sair' : ''}
+                >
+                    <div className="sidebar-item-icon shrink-0">
+                        <LogoutIcon className="w-full h-full group-hover:scale-110 transition-transform" />
+                    </div>
+                    {!isCollapsed && <span className="font-bold text-sm uppercase tracking-wider">Sair do Sistema</span>}
+                </button>
             </div>
         </aside>
     );

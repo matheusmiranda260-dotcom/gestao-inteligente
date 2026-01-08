@@ -84,12 +84,13 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser }) =
 
     const hasPermission = (page: Page): boolean => {
         if (!currentUser) return false;
-        if (currentUser.role === 'admin' || currentUser.role === 'gestor') {
-            return true;
-        }
-        if (page === 'peopleManagement' && currentUser.employeeId) {
-            return true;
-        }
+        // Super-admin and gestores always have access to everything by default
+        if (currentUser.username === 'admin' || currentUser.role === 'admin' || currentUser.role === 'gestor') return true;
+
+        // Self-management for employees
+        if (page === 'peopleManagement' && currentUser.employeeId) return true;
+
+        // Specific permissions check
         return !!currentUser.permissions?.[page];
     };
 
@@ -114,16 +115,17 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser }) =
                     </span>
                     <button
                         onClick={onLogout}
-                        className="text-xs font-bold text-slate-400 hover:text-red-600 transition-colors uppercase tracking-wider px-2 py-1"
+                        className="flex items-center gap-2 text-xs font-black text-slate-400 hover:text-red-600 transition-all uppercase tracking-[0.2em] px-4 py-2 bg-slate-100 rounded-xl hover:bg-red-50 border border-slate-200 hover:border-red-100"
                     >
-                        ( Sair )
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                        Sair do Sistema
                     </button>
                 </div>
             </div>
 
             <main className="space-y-10">
                 {/* ESTOQUE */}
-                {(hasPermission('stock') || hasPermission('finishedGoods')) && (
+                {(hasPermission('stock') || hasPermission('finishedGoods') || hasPermission('stock_add') || hasPermission('stock_transfer') || hasPermission('stock_inventory') || hasPermission('stock_map')) && (
                     <section>
                         <div className="section-title">
                             <h2>Estoque</h2>
@@ -138,24 +140,51 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser }) =
                                     color="cyan"
                                 />
                             )}
+                            {hasPermission('stock_add') && (
+                                <MenuButton
+                                    onClick={() => setPage('stock_add')}
+                                    label="Adicionar ao Estoque"
+                                    description="Conferência de entrada de novos lotes."
+                                    icon={<ClipboardListIcon />}
+                                    color="teal"
+                                />
+                            )}
+                            {hasPermission('stock_transfer') && (
+                                <MenuButton
+                                    onClick={() => setPage('stock_transfer')}
+                                    label="Transferência"
+                                    description="Movimentação de lotes entre setores."
+                                    icon={<AdjustmentsIcon />}
+                                    color="indigo"
+                                />
+                            )}
+                            {hasPermission('stock_inventory') && (
+                                <MenuButton
+                                    onClick={() => setPage('stock_inventory')}
+                                    label="Inventário (Conferência)"
+                                    description="Auditoria física de estoque via celular."
+                                    icon={<ChartBarIcon />}
+                                    color="blue"
+                                />
+                            )}
+                            {hasPermission('stock_map') && (
+                                <MenuButton
+                                    onClick={() => setPage('stock_map')}
+                                    label="Mapa de Estoque"
+                                    description="Visualização em pirâmide dos lotes."
+                                    icon={<AdjustmentsIcon />}
+                                    color="cyan"
+                                />
+                            )}
                             {hasPermission('finishedGoods') && (
                                 <MenuButton
                                     onClick={() => setPage('finishedGoods')}
                                     label="Estoque Acabado (Treliça)"
                                     description="Visualização de produtos prontos para expedição."
                                     icon={<ArchiveIcon />}
-                                    color="blue"
-                                />
-                            )}
-                            {hasPermission('stock_inventory') || isGestor ? (
-                                <MenuButton
-                                    onClick={() => setPage('stock_inventory')}
-                                    label="Inventário (Conferência)"
-                                    description="Auditoria física de estoque via celular."
-                                    icon={<ChartBarIcon />}
                                     color="teal"
                                 />
-                            ) : null}
+                            )}
                         </div>
                     </section>
                 )}
@@ -220,42 +249,44 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser }) =
                 )}
 
                 {/* EM PRODUÇÃO */}
-                {(hasPermission('trefila') || hasPermission('trelica') || hasPermission('productionDashboard')) && (
-                    <section>
-                        <div className="section-title">
-                            <h2>Em Produção</h2>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-                            {hasPermission('trefila') && (
-                                <MenuButton
-                                    onClick={() => setPage('trefila')}
-                                    label="Produção (Trefila)"
-                                    description="Painel de operação da máquina trefiladeira."
-                                    icon={<CogIcon />}
-                                    color="cyan"
-                                />
-                            )}
-                            {hasPermission('trelica') && (
-                                <MenuButton
-                                    onClick={() => setPage('trelica')}
-                                    label="Produção (Treliça)"
-                                    description="Painel de operação da máquina de treliça."
-                                    icon={<CogIcon />}
-                                    color="indigo"
-                                />
-                            )}
-                            {hasPermission('productionDashboard') && (
-                                <MenuButton
-                                    onClick={() => setPage('productionDashboard')}
-                                    label="Dashboard"
-                                    description="Monitoramento em tempo real da produção."
-                                    icon={<ChartBarIcon />}
-                                    color="teal"
-                                />
-                            )}
-                        </div>
-                    </section>
-                )}
+                {(hasPermission('trefila_in_progress') || hasPermission('trefila_pending') || hasPermission('trefila_completed') || hasPermission('trefila_reports') ||
+                    hasPermission('trelica_in_progress') || hasPermission('trelica_pending') || hasPermission('trelica_completed') || hasPermission('trelica_reports') ||
+                    hasPermission('productionDashboard')) && (
+                        <section>
+                            <div className="section-title">
+                                <h2>Em Produção</h2>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                                {(hasPermission('trefila_in_progress') || hasPermission('trefila_pending') || hasPermission('trefila_completed') || hasPermission('trefila_reports')) && (
+                                    <MenuButton
+                                        onClick={() => setPage('trefila')}
+                                        label="Produção (Trefila)"
+                                        description="Painel de operação da máquina trefiladeira."
+                                        icon={<CogIcon />}
+                                        color="cyan"
+                                    />
+                                )}
+                                {(hasPermission('trelica_in_progress') || hasPermission('trelica_pending') || hasPermission('trelica_completed') || hasPermission('trelica_reports')) && (
+                                    <MenuButton
+                                        onClick={() => setPage('trelica')}
+                                        label="Produção (Treliça)"
+                                        description="Painel de operação da máquina de treliça."
+                                        icon={<CogIcon />}
+                                        color="indigo"
+                                    />
+                                )}
+                                {hasPermission('productionDashboard') && (
+                                    <MenuButton
+                                        onClick={() => setPage('productionDashboard')}
+                                        label="Dashboard"
+                                        description="Monitoramento em tempo real da produção."
+                                        icon={<ChartBarIcon />}
+                                        color="teal"
+                                    />
+                                )}
+                            </div>
+                        </section>
+                    )}
 
                 {/* GESTÃO & FERRAMENTAS */}
                 <section>
@@ -273,7 +304,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser }) =
                                 color="purple"
                             />
                         )}
-                        {isGestor && (
+                        {hasPermission('userManagement') && (
                             <MenuButton
                                 onClick={() => setPage('userManagement')}
                                 label="Gerenciar Usuários"
@@ -282,7 +313,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser }) =
                                 color="indigo"
                             />
                         )}
-                        {isGestor && (
+                        {hasPermission('gaugesManager') && (
                             <MenuButton
                                 onClick={() => setPage('gaugesManager')}
                                 label="Gerenciar Bitolas"

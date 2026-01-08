@@ -774,6 +774,12 @@ tr:hover td {
     padding: 0 0.75rem;
   }
 
+  .top-bar .flex {
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+  }
+
   h1 {
     font-size: 1.35rem !important;
   }
