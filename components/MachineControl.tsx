@@ -1141,6 +1141,16 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                         {statusStyle.label}
                                                     </span>
                                                 </div>
+                                                {activeLotProcessingData && (
+                                                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                                                        <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded ${currentMachineStatus === 'Produzindo' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>
+                                                            Lote em Processo
+                                                        </span>
+                                                        <span className="text-sm font-bold text-slate-700">
+                                                            {activeLotProcessingData.lotInfo.internalLot} ({activeLotProcessingData.lotInfo.labelWeight.toFixed(0)}kg)
+                                                        </span>
+                                                    </div>
+                                                )}
                                             </div>
                                             <div className="text-right">
                                                 <p className="text-xl md:text-2xl font-black text-slate-900 tracking-tighter">#{activeOrder.orderNumber}</p>

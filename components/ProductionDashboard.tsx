@@ -170,6 +170,14 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     const isAlertActive = machineStatus.status === 'Parada' && machineStatus.durationMs > 30000;
     const currentStyle = statusStyles[machineStatus.status as keyof typeof statusStyles] || statusStyles.Ocioso;
 
+    const activeLotProcessingData = useMemo(() => {
+        if (machineType === 'Trefila' && activeOrder?.activeLotProcessing?.lotId) {
+            const lotInfo = stock.find(s => s.id === activeOrder.activeLotProcessing!.lotId);
+            return lotInfo ? { ...activeOrder.activeLotProcessing, lotInfo } : null;
+        }
+        return null;
+    }, [activeOrder, stock, machineType]);
+
     const { processedLotsCount, totalLotsCount, producedQuantity, plannedQuantity, progress } = useMemo(() => {
         let processedLotsCount = 0, totalLotsCount = 0, producedQuantity = 0, plannedQuantity = 0, progress = 0;
         if (!activeOrder) return { processedLotsCount, totalLotsCount, producedQuantity, plannedQuantity, progress };
@@ -223,6 +231,24 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                         <p className={`text-2xl md:text-3xl font-mono font-bold ${currentStyle.text}`}>{formatDuration(machineStatus.durationMs)}</p>
                     </div>
                 </div>
+
+                {/* Exibição do Lote em Processo (apenas Trefila) */}
+                {activeLotProcessingData && (
+                    <div className="mt-4 pt-4 border-t border-current/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+                        <div className="flex items-center gap-2">
+                            <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded ${machineStatus.status === 'Produzindo' ? 'bg-green-200 text-green-900' : 'bg-slate-200 text-slate-700'}`}>
+                                Lote em Processo
+                            </span>
+                            <span className="text-sm font-bold text-slate-700">
+                                {activeLotProcessingData.lotInfo.internalLot}
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-slate-500">Peso Inicial:</span>
+                            <span className="text-sm font-black text-slate-800">{activeLotProcessingData.lotInfo.labelWeight.toFixed(0)} kg</span>
+                        </div>
+                    </div>
+                )}
             </div>
 
             <div className="border p-3 md:p-4 rounded-md">
