@@ -584,6 +584,11 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
     const handleApplyChangesToStock = async (session: InventorySession) => {
         if (!session || isSaving) return;
 
+        if (session.appliedToStock) {
+            alert('Esta ordem de inventário já foi aplicada ao estoque!');
+            return;
+        }
+
         const password = prompt("Para aplicar estas alterações ao estoque real, digite a SENHA DE GESTOR:");
         if (password !== "070223") {
             alert("Senha incorreta ou operação cancelada. As alterações NÃO foram aplicadas.");
@@ -596,6 +601,13 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                 const isNew = lotInfo.tempLotData !== null && lotInfo.tempLotData !== undefined;
 
                 if (isNew && lotInfo.tempLotData) {
+                    // Safety check: ensure it doesn't already exist in stock
+                    const alreadyExists = stock.some(s => s.internalLot === lotInfo.tempLotData!.internalLot && s.status !== 'Transferido' && !s.status.includes('Consumido'));
+                    if (alreadyExists) {
+                        console.warn(`Lote ${lotInfo.tempLotData.internalLot} já existe no estoque, ignorando duplicação.`);
+                        continue;
+                    }
+
                     // Create new lot in DB
                     const newId = `LOT-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
                     await addStockItem({

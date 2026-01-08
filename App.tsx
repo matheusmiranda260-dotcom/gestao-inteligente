@@ -367,9 +367,14 @@ const App: React.FC = () => {
 
     // Stock Control
     const addConference = async (data: ConferenceData) => {
+        // Prevent duplicate conference number
+        if (conferences.some(c => c.conferenceNumber === data.conferenceNumber)) {
+            showNotification('Esta conferência já foi registrada!', 'error');
+            return;
+        }
+
         try {
-            const savedConference = await insertItem<ConferenceData>('conferences', data);
-            setConferences(prev => [...prev, savedConference]);
+            await insertItem<ConferenceData>('conferences', data);
 
             // Also add stock items from conference
             const newStockItems: StockItem[] = data.lots.map(lot => ({
@@ -400,8 +405,7 @@ const App: React.FC = () => {
             for (const item of newStockItems) {
                 await insertItem<StockItem>('stock_items', item);
             }
-            setStock(prev => [...prev, ...newStockItems]);
-            showNotification('Conferência salva e estoque atualizado com sucesso!', 'success');
+            showNotification('Conferência salva com sucesso!', 'success');
         } catch (error) {
             showNotification('Erro ao salvar conferência.', 'error');
         }
@@ -466,12 +470,6 @@ const App: React.FC = () => {
                 await insertItem<StockItem>('stock_items', item);
             }
 
-            // Refresh data
-            const updatedStock = await fetchTable<StockItem>('stock_items');
-            setStock(updatedStock);
-            const updatedConferences = await fetchTable<ConferenceData>('conferences');
-            setConferences(updatedConferences);
-
             showNotification('Conferência editada com sucesso!', 'success');
         } catch (error: any) {
             console.error('Error editing conference:', error);
@@ -498,14 +496,8 @@ const App: React.FC = () => {
             // Delete all stock items associated with this conference directly from DB
             await deleteItemByColumn('stock_items', 'conference_number', conferenceNumber);
 
-            // Delete conference using conference_number column
+            // Delete conference itself
             await deleteItemByColumn('conferences', 'conference_number', conferenceNumber);
-
-            // Refresh data
-            const updatedStock = await fetchTable<StockItem>('stock_items');
-            setStock(updatedStock);
-            const updatedConferences = await fetchTable<ConferenceData>('conferences');
-            setConferences(updatedConferences);
 
             showNotification('Conferência excluída com sucesso!', 'success');
         } catch (error: any) {
@@ -515,9 +507,7 @@ const App: React.FC = () => {
     };
     const addStockItem = async (item: StockItem) => {
         try {
-            const savedItem = await insertItem<StockItem>('stock_items', item);
-            setStock(prev => [...prev, savedItem]);
-            return savedItem;
+            return await insertItem<StockItem>('stock_items', item);
         } catch (error) {
             showNotification('Erro ao adicionar item ao estoque.', 'error');
             return null;
@@ -526,8 +516,7 @@ const App: React.FC = () => {
 
     const updateStockItem = async (id: string, updates: Partial<StockItem>) => {
         try {
-            const updatedItem = await updateItem<StockItem>('stock_items', id, updates);
-            setStock(prev => prev.map(item => item.id === id ? updatedItem : item));
+            await updateItem<StockItem>('stock_items', id, updates);
         } catch (error) {
             showNotification('Erro ao atualizar item do estoque.', 'error');
         }
@@ -535,7 +524,6 @@ const App: React.FC = () => {
     const deleteStockItem = async (id: string) => {
         try {
             await deleteItem('stock_items', id);
-            setStock(prev => prev.filter(item => item.id !== id));
             showNotification('Lote removido com sucesso!', 'success');
         } catch (error) {
             showNotification('Erro ao remover lote.', 'error');
@@ -544,15 +532,13 @@ const App: React.FC = () => {
 
     const addInventorySession = async (session: InventorySession) => {
         try {
-            const saved = await insertItem<InventorySession>('inventory_sessions', session);
-            setInventorySessions(prev => [...prev, saved]);
+            await insertItem<InventorySession>('inventory_sessions', session);
         } catch (error) { showNotification('Erro ao salvar sessão de inventário.', 'error'); }
     };
 
     const updateInventorySession = async (id: string, updates: Partial<InventorySession>) => {
         try {
-            const updated = await updateItem<InventorySession>('inventory_sessions', id, updates);
-            setInventorySessions(prev => prev.map(s => s.id === id ? updated : s));
+            await updateItem<InventorySession>('inventory_sessions', id, updates);
         } catch (error) { showNotification('Erro ao atualizar sessão de inventário.', 'error'); }
     };
 
@@ -576,13 +562,9 @@ const App: React.FC = () => {
                         });
                     }
                 }
-                // Refresh stock state after many potential changes
-                const updatedStock = await fetchTable<StockItem>('stock_items');
-                setStock(updatedStock);
             }
 
             await deleteItem('inventory_sessions', id);
-            setInventorySessions(prev => prev.filter(s => s.id !== id));
             showNotification('Inventário removido e alterações revertidas.', 'success');
         } catch (error) {
             console.error(error);
@@ -649,16 +631,11 @@ const App: React.FC = () => {
         try {
             // Save transfer record
             const savedTransfer = await insertItem<TransferRecord>('transfers', newTransferRecord);
-            setTransfers(prev => [...prev, savedTransfer]);
 
             // Update stock items
             for (const update of updates) {
                 await updateItem<StockItem>('stock_items', update.id, update.changes);
             }
-
-            // Refresh stock
-            const updatedStock = await fetchTable<StockItem>('stock_items');
-            setStock(updatedStock);
 
             showNotification('Transferência realizada com sucesso!', 'success');
             return savedTransfer;
@@ -767,7 +744,6 @@ const App: React.FC = () => {
 
         try {
             const savedTransfer = await insertItem<FinishedGoodsTransferRecord>('finished_goods_transfers', newTransferRecord);
-            setFinishedGoodsTransfers(prev => [...prev, savedTransfer]);
 
             for (const update of finishedGoodsUpdates) {
                 await updateItem<FinishedProductItem>('finished_goods', update.id, update.changes);
@@ -776,10 +752,6 @@ const App: React.FC = () => {
                 await updateItem<PontaItem>('pontas_stock', update.id, update.changes);
             }
 
-            const updatedFG = await fetchTable<FinishedProductItem>('finished_goods');
-            setFinishedGoods(updatedFG);
-            const updatedPontas = await fetchTable<PontaItem>('pontas_stock');
-            setPontasStock(updatedPontas);
             showNotification('Transferência de produto acabado realizada com sucesso!', 'success');
             return savedTransfer;
         } catch (error) {
@@ -803,7 +775,6 @@ const App: React.FC = () => {
 
         try {
             const savedOrder = await insertItem<ProductionOrderData>('production_orders', newOrder);
-            setProductionOrders(prev => [...prev, savedOrder]);
 
             // Update stock items status
             if (newOrder.machine === 'Trefila') {
@@ -817,8 +788,6 @@ const App: React.FC = () => {
                         });
                     }
                 }
-                const updatedStock = await fetchTable<StockItem>('stock_items');
-                setStock(updatedStock);
             } else if (newOrder.machine === 'Treliça') {
                 const lots = newOrder.selectedLotIds as TrelicaSelectedLots;
                 const lotRoleMap = new Map<string, string>();
@@ -838,10 +807,6 @@ const App: React.FC = () => {
                 assignRole(lots.allSenozoideLeft || lots.senozoide1, 'Senozoide Esq.');
                 assignRole(lots.allSenozoideRight || lots.senozoide2, 'Senozoide Dir.');
 
-                // Fallback for older formats if specific ones are missing but general ones exist
-                if (lots.allInferior) assignRole(lots.allInferior, 'Inferior');
-                if (lots.allSenozoide) assignRole(lots.allSenozoide, 'Senozoide');
-
                 for (const [lotId, role] of lotRoleMap.entries()) {
                     const stockItem = stock.find(s => s.id === lotId);
                     if (stockItem) {
@@ -852,12 +817,11 @@ const App: React.FC = () => {
                         });
                     }
                 }
-                const updatedStock = await fetchTable<StockItem>('stock_items');
-                setStock(updatedStock);
             }
 
             showNotification('Ordem de produção criada com sucesso!', 'success');
         } catch (error) {
+            console.error('Error creating production order:', error);
             showNotification('Erro ao criar ordem de produção.', 'error');
         }
     };
@@ -865,7 +829,6 @@ const App: React.FC = () => {
     const updateProductionOrder = async (orderId: string, updates: Partial<ProductionOrderData>) => {
         try {
             await updateItem('production_orders', orderId, updates);
-            setProductionOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updates } : o));
             showNotification('Ordem de produção atualizada com sucesso!', 'success');
         } catch (error) {
             showNotification('Erro ao atualizar ordem de produção.', 'error');
@@ -905,12 +868,6 @@ const App: React.FC = () => {
             }
 
             await deleteItem('production_orders', orderId);
-            setProductionOrders(prev => prev.filter(o => o.id !== orderId));
-
-            // Refresh stock after updates
-            const updatedStock = await fetchTable<StockItem>('stock_items');
-            setStock(updatedStock);
-
             showNotification('Ordem de produção removida.', 'success');
         } catch (error) {
             showNotification('Erro ao remover ordem de produção.', 'error');
@@ -971,10 +928,7 @@ const App: React.FC = () => {
                 }];
             }
 
-            const updatedOrder = await updateItem('production_orders', orderToStartData.id, updates);
-            newOrders[newOrderIndex] = updatedOrder;
-
-            setProductionOrders(newOrders);
+            await updateItem('production_orders', orderToStartData.id, updates);
             showNotification('Ordem de produção iniciada.', 'success');
         } catch (error) {
             showNotification('Erro ao iniciar ordem de produção.', 'error');
@@ -1027,8 +981,7 @@ const App: React.FC = () => {
         }
 
         try {
-            const updatedOrder = await updateItem('production_orders', orderId, updates);
-            setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
+            await updateItem('production_orders', orderId, updates);
             showNotification('Turno iniciado.', 'success');
         } catch (error) {
             showNotification('Erro ao iniciar turno.', 'error');
@@ -1134,8 +1087,7 @@ const App: React.FC = () => {
         };
 
         try {
-            const savedReport = await insertItem<ShiftReport>('shift_reports', report);
-            setShiftReports(prev => [...prev, savedReport]);
+            await insertItem<ShiftReport>('shift_reports', report);
         } catch (error) {
             showNotification('Erro ao salvar relatório de turno.', 'error');
         }
@@ -1191,7 +1143,6 @@ const App: React.FC = () => {
 
         try {
             const updatedOrder = await updateItem('production_orders', orderId, updates);
-            setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
 
             if (operatorLog) {
                 await generateShiftReport(updatedOrder, operatorLog);
@@ -1223,8 +1174,7 @@ const App: React.FC = () => {
         const updates: Partial<ProductionOrderData> = { downtimeEvents: newEvents };
 
         try {
-            const updatedOrder = await updateItem('production_orders', orderId, updates);
-            setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
+            await updateItem('production_orders', orderId, updates);
             showNotification('Parada registrada.', 'success');
         } catch (error) {
             showNotification('Erro ao registrar parada.', 'error');
@@ -1254,8 +1204,7 @@ const App: React.FC = () => {
         const updates: Partial<ProductionOrderData> = { downtimeEvents: newEvents };
 
         try {
-            const updatedOrder = await updateItem('production_orders', orderId, updates);
-            setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
+            await updateItem('production_orders', orderId, updates);
             showNotification('Produção retomada.', 'success');
         } catch (error) {
             showNotification('Erro ao retomar produção.', 'error');
@@ -1658,7 +1607,6 @@ const App: React.FC = () => {
                 actualProducedQuantity: quantity,
                 lastQuantityUpdate: now
             });
-            setProductionOrders(prev => prev.map(o => o.id === orderId ? { ...o, actualProducedQuantity: quantity, lastQuantityUpdate: now } : o));
             showNotification('Contagem de peças atualizada.', 'success');
         } catch (error) { showNotification('Erro ao atualizar contagem.', 'error'); }
     };
@@ -1669,8 +1617,7 @@ const App: React.FC = () => {
         if (!activeOrder) return;
         const newRequest: PartsRequest = { ...data, id: generateId('part'), date: new Date().toISOString(), operator: currentUser.username, status: 'Pendente', machine: activeOrder.machine, productionOrderId: activeOrder.id };
         try {
-            const savedRequest = await insertItem<PartsRequest>('parts_requests', newRequest);
-            setPartsRequests(prev => [...prev, savedRequest]);
+            await insertItem<PartsRequest>('parts_requests', newRequest);
             showNotification('Solicitação de peças enviada.', 'success');
         } catch (error) { showNotification('Erro ao enviar solicitação.', 'error'); }
     };
@@ -1696,12 +1643,7 @@ const App: React.FC = () => {
                 updatedLog.postProductionActivities.push({ timestamp: new Date().toISOString(), description: activity });
                 logsCopy[logIndex] = updatedLog;
                 try {
-                    const updatedOrder = await updateItem('production_orders', targetOrder.id, { operatorLogs: logsCopy });
-                    setProductionOrders(prev => {
-                        const newOrders = [...prev];
-                        newOrders[targetOrderIndex] = updatedOrder;
-                        return newOrders;
-                    });
+                    await updateItem('production_orders', targetOrder.id, { operatorLogs: logsCopy });
                     showNotification('Atividade registrada.', 'success');
                 } catch (error) { showNotification('Erro ao registrar atividade.', 'error'); }
             }
@@ -1711,9 +1653,7 @@ const App: React.FC = () => {
     const registerProduction = async (machine: MachineType, producedWeight: number) => {
         const newRecord: ProductionRecord = { id: generateId('prod'), date: new Date().toISOString(), machine, producedWeight, consumedLots: [] };
         try {
-            const savedRecord = await insertItem<ProductionRecord>('production_records', newRecord);
-            if (machine === 'Trefila') setTrefilaProduction(prev => [...prev, savedRecord]);
-            else setTrelicaProduction(prev => [...prev, savedRecord]);
+            await insertItem<ProductionRecord>('production_records', newRecord);
             showNotification(`Produção registrada.`, 'success');
         } catch (error) { showNotification('Erro ao registrar produção.', 'error'); }
     };
@@ -1734,7 +1674,6 @@ const App: React.FC = () => {
         if (!confirm('Tem certeza que deseja excluir este relatório de turno?')) return;
         try {
             await deleteItem('shift_reports', reportId);
-            setShiftReports(prev => prev.filter(r => r.id !== reportId));
             showNotification('Relatório excluído com sucesso.', 'success');
         } catch (error) {
             showNotification('Erro ao excluir o relatório.', 'error');
