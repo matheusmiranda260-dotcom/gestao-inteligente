@@ -80,13 +80,15 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
         }
 
         // Filter events that are RELEVANT to the current shift (if active)
-        const relevantEvents = (activeOrder.downtimeEvents || []).filter(e => {
+        const allEvents = [...(activeOrder.downtimeEvents || [])].sort((a, b) => new Date(a.stopTime).getTime() - new Date(b.stopTime).getTime());
+        const relevantEvents = allEvents.filter(e => {
             if (!currentOperatorLog) return true;
             // Include event if it ends after shift start (overlaps) or starts after shift start
             const shiftStart = new Date(currentOperatorLog.startTime).getTime();
             const eventStart = new Date(e.stopTime).getTime();
-            const eventEnd = e.resumeTime ? new Date(e.resumeTime).getTime() : Date.now();
-            return eventEnd > shiftStart;
+            // IMPORTANT: Use synced 'now' instead of 'Date.now()' to avoid filtering out recent events if client clock is behind
+            const eventEnd = e.resumeTime ? new Date(e.resumeTime).getTime() : now.getTime();
+            return eventEnd >= shiftStart;
         });
 
         const lastEvent = relevantEvents.length > 0 ? relevantEvents[relevantEvents.length - 1] : null;

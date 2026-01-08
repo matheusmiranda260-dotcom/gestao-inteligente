@@ -635,7 +635,10 @@ const MachineControl: React.FC<MachineControlProps> = ({
         if (!activeOrder?.downtimeEvents || activeOrder.downtimeEvents.length === 0) {
             return 'Produzindo';
         }
-        const lastEvent = activeOrder.downtimeEvents[activeOrder.downtimeEvents.length - 1];
+
+        // Ensure events are sorted by time to get the true last event
+        const sortedEvents = [...activeOrder.downtimeEvents].sort((a, b) => new Date(a.stopTime).getTime() - new Date(b.stopTime).getTime());
+        const lastEvent = sortedEvents[sortedEvents.length - 1];
 
         if (lastEvent.resumeTime !== null) {
             return 'Produzindo';
