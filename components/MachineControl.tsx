@@ -1078,7 +1078,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                 <>
                     {activeOrder ? (
                         <>
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-32"> {/* Added pb-32 for bottom bar space */}
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-20 md:pb-8"> {/* Adjusted padding for desktop */}
                                 {/* Coluna Esquerda: Visão Geral e Indicadores */}
                                 <div className="lg:col-span-1 space-y-6">
                                     {/* Card de Status Principal - Novo Design */}
@@ -1258,7 +1258,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                         <h3 className="text-lg font-bold text-slate-700 mb-6 flex items-center gap-2">
                                             <ClockIcon className="h-5 w-5 text-amber-500" /> Histórico de Paradas Recentes
                                         </h3>
-                                        <div className="max-h-[500px] md:max-h-48 overflow-y-auto custom-scrollbar">
+                                        <div className="max-h-[500px] md:max-h-80 overflow-y-auto custom-scrollbar">
                                             {activeOrder.downtimeEvents && activeOrder.downtimeEvents.length > 0 ? (
                                                 <>
                                                     {/* Desktop Table View */}
