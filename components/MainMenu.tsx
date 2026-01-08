@@ -218,6 +218,35 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser }) =
                     </section>
                 )}
 
+                {/* GESTÃO DE FÁBRICA */}
+                {(hasPermission('stickyNotes') || hasPermission('productionDashboard')) && (
+                    <section>
+                        <div className="section-title">
+                            <h2>Gestão de Fábrica</h2>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                            {hasPermission('productionDashboard') && (
+                                <MenuButton
+                                    onClick={() => setPage('productionDashboard')}
+                                    label="Painel de Controle"
+                                    description="Visão geral da produção e KPIs em tempo real."
+                                    icon={<ChartBarIcon />}
+                                    color="indigo"
+                                />
+                            )}
+                            {hasPermission('stickyNotes') && (
+                                <MenuButton
+                                    onClick={() => setPage('stickyNotes')}
+                                    label="Quadro de Lembretes"
+                                    description="Post-its digitais para avisos e pendências importantes."
+                                    icon={<ChatBubbleLeftRightIcon />}
+                                    color="purple"
+                                />
+                            )}
+                        </div>
+                    </section>
+                )}
+
                 {/* RH */}
                 {(hasPermission('continuousImprovement') || hasPermission('peopleManagement')) && (
                     <section>

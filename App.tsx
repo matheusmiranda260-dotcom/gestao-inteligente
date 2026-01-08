@@ -23,8 +23,9 @@ import StockInventory from './components/StockInventory';
 import StockTransfer from './components/StockTransfer';
 import GaugesManager from './components/GaugesManager';
 import TrefilaWeighing from './components/TrefilaWeighing';
+import StickyNotes from './components/StickyNotes';
 import { supabase } from './supabaseClient';
-import type { StockGauge } from './types';
+import type { StockGauge, StickyNote } from './types';
 
 import { fetchTable, insertItem, updateItem, deleteItem, deleteItemByColumn, updateItemByColumn } from './services/supabaseService';
 import { useAllRealtimeSubscriptions } from './hooks/useSupabaseRealtime';
@@ -52,6 +53,7 @@ const App: React.FC = () => {
     const [trelicaProduction, setTrelicaProduction] = useState<ProductionRecord[]>([]);
     const [inventorySessions, setInventorySessions] = useState<InventorySession[]>([]);
     const [gauges, setGauges] = useState<StockGauge[]>([]);
+    const [stickyNotes, setStickyNotes] = useState<StickyNote[]>([]);
 
     const [pendingKaizenCount, setPendingKaizenCount] = useState(0);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -83,7 +85,7 @@ const App: React.FC = () => {
                 const [
                     fetchedUsers, fetchedEmployees, fetchedStock, fetchedConferences, fetchedTransfers,
                     fetchedOrders, fetchedFinishedGoods, fetchedPontas, fetchedFGTransfers,
-                    fetchedParts, fetchedReports, fetchedProductionRecords, fetchedInvSessions, fetchedGauges
+                    fetchedParts, fetchedReports, fetchedProductionRecords, fetchedInvSessions, fetchedGauges, fetchedNotes
                 ] = await Promise.all([
                     fetchTable<User>('app_users'),
                     fetchTable<Employee>('employees'),
@@ -98,7 +100,8 @@ const App: React.FC = () => {
                     fetchTable<ShiftReport>('shift_reports'),
                     fetchTable<ProductionRecord>('production_records'),
                     fetchTable<InventorySession>('inventory_sessions').catch(() => []),
-                    fetchTable<StockGauge>('stock_gauges').catch(() => [])
+                    fetchTable<StockGauge>('stock_gauges').catch(() => []),
+                    fetchTable<StickyNote>('sticky_notes').catch(() => [])
                 ]);
 
                 setUsers(fetchedUsers);
@@ -114,6 +117,7 @@ const App: React.FC = () => {
                 setShiftReports(fetchedReports);
                 setInventorySessions(fetchedInvSessions);
                 setGauges(fetchedGauges || []);
+                setStickyNotes(fetchedNotes || []);
 
                 // Split production records
                 setTrefilaProduction(fetchedProductionRecords.filter(r => r.machine === 'Trefila'));
@@ -151,6 +155,7 @@ const App: React.FC = () => {
         setTrelicaProduction,
         setInventorySessions,
         setGauges,
+        setStickyNotes,
     }), []);
 
     useAllRealtimeSubscriptions(realtimeSetters, !!currentUser);
@@ -1648,15 +1653,59 @@ const App: React.FC = () => {
             const logsCopy = [...(targetOrder.operatorLogs || [])];
             const logIndex = logsCopy.findIndex(log => log.operator === currentUser.username && !log.endTime);
             if (logIndex !== -1) {
-                const updatedLog = { ...logsCopy[logIndex] };
-                if (!updatedLog.postProductionActivities) updatedLog.postProductionActivities = [];
-                updatedLog.postProductionActivities.push({ timestamp: new Date().toISOString(), description: activity });
-                logsCopy[logIndex] = updatedLog;
+                const updatedActivities = [...(logsCopy[logIndex].postProductionActivities || []), { timestamp: new Date().toISOString(), description: activity }];
+                logsCopy[logIndex] = { ...logsCopy[logIndex], postProductionActivities: updatedActivities };
                 try {
-                    await updateItem('production_orders', targetOrder.id, { operatorLogs: logsCopy });
+                    const updatedOrder = await updateItem('production_orders', targetOrder.id, { operatorLogs: logsCopy });
+                    setProductionOrders(prev => prev.map(o => o.id === targetOrder.id ? updatedOrder : o));
                     showNotification('Atividade registrada.', 'success');
                 } catch (error) { showNotification('Erro ao registrar atividade.', 'error'); }
             }
+        }
+    };
+
+    const handleAddStickyNote = async (content: string, color: string) => {
+        if (!currentUser) return;
+        const newNote: StickyNote = {
+            id: generateId('note'),
+            content,
+            color,
+            author: currentUser.username,
+            date: new Date().toISOString(),
+            completed: false
+        };
+        try {
+            await insertItem('sticky_notes', newNote);
+            setStickyNotes(prev => [...prev, newNote]); // Update local state after successful DB insert
+        } catch (e) {
+            console.error('Notes error', e);
+            // Fallback to local state if table doesn't exist (for UX)
+            setStickyNotes(prev => [...prev, newNote]);
+            showNotification('Lembrete salvo localmente (Banco offline).', 'warning');
+        }
+    };
+
+    const handleDeleteStickyNote = async (id: string) => {
+        try {
+            await deleteItem('sticky_notes', id);
+            setStickyNotes(prev => prev.filter(n => n.id !== id)); // Update local state after successful DB delete
+        } catch (e) {
+            console.error('Notes error', e);
+            setStickyNotes(prev => prev.filter(n => n.id !== id));
+            showNotification('Erro ao excluir lembrete (Excluído localmente).', 'warning');
+        }
+    };
+
+    const handleToggleStickyNote = async (id: string) => {
+        const note = stickyNotes.find(n => n.id === id);
+        if (!note) return;
+        try {
+            await updateItem('sticky_notes', id, { completed: !note.completed });
+            setStickyNotes(prev => prev.map(n => n.id === id ? { ...n, completed: !n.completed } : n)); // Update local state
+        } catch (e) {
+            console.error('Notes error', e);
+            setStickyNotes(prev => prev.map(n => n.id === id ? { ...n, completed: !n.completed } : n));
+            showNotification('Erro ao atualizar lembrete (Atualizado localmente).', 'warning');
         }
     };
 
@@ -1733,7 +1782,8 @@ const App: React.FC = () => {
             case 'workInstructions': return <WorkInstructions setPage={setPage} />;
             case 'peopleManagement': return <PeopleManagement setPage={setPage} currentUser={currentUser} />;
             case 'gaugesManager': return <GaugesManager gauges={gauges} onAdd={addGauge} onDelete={deleteGauge} onRestoreDefaults={restoreDefaultGauges} />;
-
+            case 'stickyNotes':
+                return <StickyNotes notes={stickyNotes} currentUser={currentUser} onAddNote={handleAddStickyNote} onDeleteNote={handleDeleteStickyNote} onToggleComplete={handleToggleStickyNote} />;
             default: return <Login onLogin={handleLogin} error={null} />;
         }
     };

@@ -107,6 +107,7 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                 <div className="sidebar-category">
                     <div className="sidebar-category-title">{isCollapsed ? '📊' : '📊 Visão Geral'}</div>
                     <MenuItem target="productionDashboard" label="Dashboard" icon={ChartBarIcon} highlight />
+                    <MenuItem target="stickyNotes" label="Lembretes" icon={ClipboardListIcon} />
                 </div>
 
                 {/* PRODUÇÃO */}

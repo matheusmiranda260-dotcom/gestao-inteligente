@@ -19,7 +19,7 @@ export type Page = 'login' | 'menu' | 'stock' | 'stock_map' | 'stock_add' | 'sto
     'trefila' | 'trefila_in_progress' | 'trefila_pending' | 'trefila_completed' | 'trefila_reports' | 'trefila_parts' | 'trefila_weighing' |
     'trelica' | 'trelica_in_progress' | 'trelica_pending' | 'trelica_completed' | 'trelica_reports' | 'trelica_parts' |
     'productionOrder' | 'productionOrderTrelica' | 'reports' | 'userManagement' | 'productionDashboard' |
-    'finishedGoods' | 'partsManager' | 'continuousImprovement' | 'workInstructions' | 'peopleManagement' | 'gaugesManager';
+    'finishedGoods' | 'partsManager' | 'continuousImprovement' | 'workInstructions' | 'peopleManagement' | 'gaugesManager' | 'stickyNotes';
 
 export interface InstructionStep {
     id: string;
@@ -474,4 +474,13 @@ export interface RowConfig {
     rowName: string;
     baseSize: number;
     maxHeight: number;
+}
+
+export interface StickyNote {
+    id: string;
+    content: string;
+    color: string;
+    author: string;
+    date: string;
+    completed?: boolean;
 }
