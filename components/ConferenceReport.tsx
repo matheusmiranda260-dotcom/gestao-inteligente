@@ -71,18 +71,18 @@ const ConferenceReport: React.FC<ConferenceReportProps> = ({ reportData, onClose
 
             {/* 3. Table - Exact Column Order & Style */}
             <div className="flex-grow">
-              <table className="w-full text-xs text-left border-collapse">
-                <thead className="text-[10px] text-black uppercase font-bold border-y-2 border-slate-900">
+              <table className="w-full text-sm text-left border-collapse">
+                <thead className="text-sm text-black uppercase font-black border-y-2 border-slate-900">
                   <tr>
-                    <th className="px-1 py-1 text-center border-l border-r border-slate-400 w-8">Qnt.</th>
-                    <th className="px-1 py-1 text-center border-r border-slate-400">Lote fornecedor</th>
-                    <th className="px-1 py-1 text-center border-r border-slate-400">Lote interno</th>
-                    <th className="px-1 py-1 text-center border-r border-slate-400 w-16">Bitola(mm)</th>
-                    <th className="px-1 py-1 text-center border-r border-slate-400">FORNECEDOR</th>
-                    <th className="px-1 py-1 text-center border-r border-slate-400">Corrida</th>
-                    <th className="px-1 py-1 text-center border-r border-slate-400 w-24">Peso etiqueta</th>
-                    <th className="px-1 py-1 text-center border-r border-slate-400 w-24">Peso balança</th>
-                    <th className="px-1 py-1 text-center border-r border-slate-400 w-20">DIFERENÇA</th>
+                    <th className="px-2 py-2 text-center border-l border-r border-slate-400 w-12">Qnt.</th>
+                    <th className="px-2 py-2 text-center border-r border-slate-400">Lote fornecedor</th>
+                    <th className="px-2 py-2 text-center border-r border-slate-400">Lote interno</th>
+                    <th className="px-2 py-2 text-center border-r border-slate-400 w-24">Bitola(mm)</th>
+                    <th className="px-2 py-2 text-center border-r border-slate-400">FORNECEDOR</th>
+                    <th className="px-2 py-2 text-center border-r border-slate-400">Corrida</th>
+                    <th className="px-2 py-2 text-center border-r border-slate-400 w-32">Peso etiqueta</th>
+                    <th className="px-2 py-2 text-center border-r border-slate-400 w-32">Peso balança</th>
+                    <th className="px-2 py-2 text-center border-r border-slate-400 w-28">DIFERENÇA</th>
                   </tr>
                 </thead>
                 <tbody className="text-black border-b-2 border-slate-900">
@@ -93,20 +93,20 @@ const ConferenceReport: React.FC<ConferenceReportProps> = ({ reportData, onClose
 
                     return (
                       <tr key={index} className="border-b border-slate-300">
-                        <td className="px-1 py-1 text-center border-l border-r border-slate-400">{index + 1}</td>
-                        <td className="px-1 py-1 text-center border-r border-slate-400 font-mono">{lot.supplierLot}</td>
-                        <td className="px-1 py-1 text-center border-r border-slate-400 font-mono font-bold">{lot.internalLot}</td>
-                        <td className="px-1 py-1 text-center border-r border-slate-400 font-bold">{lot.bitola}</td>
-                        <td className="px-1 py-1 text-center border-r border-slate-400 uppercase truncate max-w-[120px]" title={displaySupplier}>{displaySupplier}</td>
-                        <td className="px-1 py-1 text-center border-r border-slate-400 font-mono">{lot.runNumber}</td>
-                        <td className="px-1 py-1 text-center border-r border-slate-400 font-medium">{lot.labelWeight.toFixed(0)}</td>
-                        <td className="px-1 py-1 text-center border-r border-slate-400 font-bold">{lot.scaleWeight.toFixed(0)}</td>
-                        <td className="px-1 py-1 text-center border-r border-slate-400 font-bold">
+                        <td className="px-2 py-2 text-center border-l border-r border-slate-400 font-bold text-base">{index + 1}</td>
+                        <td className="px-2 py-2 text-center border-r border-slate-400 font-mono font-bold text-base">{lot.supplierLot}</td>
+                        <td className="px-2 py-2 text-center border-r border-slate-400 font-black text-lg text-[#0F3F5C]">{lot.internalLot}</td>
+                        <td className="px-2 py-2 text-center border-r border-slate-400 font-black text-lg">{lot.bitola}</td>
+                        <td className="px-2 py-2 text-center border-r border-slate-400 uppercase truncate max-w-[120px] font-bold text-sm" title={displaySupplier}>{displaySupplier}</td>
+                        <td className="px-2 py-2 text-center border-r border-slate-400 font-mono font-bold text-base">{lot.runNumber}</td>
+                        <td className="px-2 py-2 text-center border-r border-slate-400 font-bold text-lg">{lot.labelWeight.toFixed(0)}</td>
+                        <td className="px-2 py-2 text-center border-r border-slate-400 font-black text-lg">{lot.scaleWeight.toFixed(0)}</td>
+                        <td className="px-2 py-2 text-center border-r border-slate-400 font-black text-lg">
                           <span className="block">
                             {lotDiff > 0 ? '+' : ''}{lotDiff.toFixed(0)}
                           </span>
                           {lotDiff !== 0 && (
-                            <span className="block text-[9px]">
+                            <span className="block text-xs">
                               ({lotPercent > 0 ? '+' : ''}{lotPercent.toFixed(1)}%)
                             </span>
                           )}
@@ -120,16 +120,16 @@ const ConferenceReport: React.FC<ConferenceReportProps> = ({ reportData, onClose
                   <tr>
                     <td colSpan={9} className="h-4"></td> {/* Added Space */}
                   </tr>
-                  <tr>
-                    <td colSpan={6} className="px-2 py-2 text-right uppercase text-xs">Total:</td>
-                    <td className="px-1 py-2 text-center text-xs">{totalLabelWeight.toFixed(0)}</td>
-                    <td className="px-1 py-2 text-center text-xs">{totalScaleWeight.toFixed(0)}</td>
-                    <td className="px-1 py-2 text-center text-xs whitespace-nowrap">
+                  <tr className="text-base">
+                    <td colSpan={6} className="px-2 py-2 text-right uppercase font-black text-sm">Total:</td>
+                    <td className="px-2 py-2 text-center font-black">{totalLabelWeight.toFixed(0)}</td>
+                    <td className="px-2 py-2 text-center font-black">{totalScaleWeight.toFixed(0)}</td>
+                    <td className="px-2 py-2 text-center whitespace-nowrap font-black">
                       <span className="block">
                         {difference > 0 ? '+' : ''}{difference.toFixed(0)}
                       </span>
                       {difference !== 0 && (
-                        <span className="block text-[9px]">
+                        <span className="block text-xs">
                           ({differencePercentage > 0 ? '+' : ''}{differencePercentage.toFixed(1)}%)
                         </span>
                       )}

@@ -678,14 +678,14 @@ const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportDat
                                                     <p><strong>Lotes:</strong> {day.lots.length} | <strong>Peso:</strong> {day.totalWeight.toFixed(2)} kg</p>
                                                 </div>
                                             </div>
-                                            <table className="w-full text-sm text-left text-slate-600">
-                                                <thead className="text-xs text-slate-700 uppercase bg-slate-50">
+                                            <table className="w-full text-base text-left text-slate-600">
+                                                <thead className="text-sm font-black text-slate-700 uppercase bg-slate-100 text-center">
                                                     <tr>
-                                                        <th className="px-4 py-2">Lote Interno</th>
-                                                        {reportData.machine?.toLowerCase() === 'trefila' && <th className="px-4 py-2 text-right">Bit. Aferida</th>}
-                                                        <th className="px-4 py-2 text-right">Peso Saída (kg)</th>
-                                                        <th className="px-4 py-2 text-right">Perda (%)</th>
-                                                        <th className="px-4 py-2 text-right">T. Efetivo</th>
+                                                        <th className="px-4 py-3 text-left">Lote Interno</th>
+                                                        {reportData.machine?.toLowerCase() === 'trefila' && <th className="px-4 py-3 text-right">Bit. Aferida</th>}
+                                                        <th className="px-4 py-3 text-right">Peso Saída (kg)</th>
+                                                        <th className="px-4 py-3 text-right">Perda (%)</th>
+                                                        <th className="px-4 py-3 text-right">T. Efetivo</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-100">
@@ -694,11 +694,11 @@ const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportDat
                                                         const lossPercentage = lot.originalWeight > 0 ? (difference / lot.originalWeight) * 100 : 0;
                                                         return (
                                                             <tr key={lot.lotId} className="bg-white hover:bg-slate-50">
-                                                                <td className="px-4 py-2 font-medium text-[#0F3F5C]">{lot.internalLot}</td>
-                                                                {reportData.machine?.toLowerCase() === 'trefila' && <td className="px-4 py-2 text-right text-slate-600">{(lot as any).measuredGauge ? `${(lot as any).measuredGauge.toFixed(2)} mm` : '-'}</td>}
-                                                                <td className="px-4 py-2 text-right font-bold">{lot.finalWeight?.toFixed(2) || 'N/A'}</td>
-                                                                <td className={`px-4 py-2 text-right font-medium ${difference >= 0 ? 'text-red-600' : 'text-green-600'}`}>{lossPercentage.toFixed(2)}%</td>
-                                                                <td className="px-4 py-2 text-right font-mono text-slate-500">{formatDuration(lot.effectiveDurationMs)}</td>
+                                                                <td className="px-4 py-3 font-black text-lg text-[#0F3F5C]">{lot.internalLot}</td>
+                                                                {reportData.machine?.toLowerCase() === 'trefila' && <td className="px-4 py-3 text-right text-slate-600 font-bold">{(lot as any).measuredGauge ? `${(lot as any).measuredGauge.toFixed(2)} mm` : '-'}</td>}
+                                                                <td className="px-4 py-3 text-right font-black text-lg">{lot.finalWeight?.toFixed(2) || 'N/A'}</td>
+                                                                <td className={`px-4 py-3 text-right font-bold text-base ${difference >= 0 ? 'text-red-600' : 'text-green-600'}`}>{lossPercentage.toFixed(2)}%</td>
+                                                                <td className="px-4 py-3 text-right font-mono text-slate-500 font-bold">{formatDuration(lot.effectiveDurationMs)}</td>
                                                             </tr>
                                                         );
                                                     })}
@@ -709,9 +709,9 @@ const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportDat
                                 </div>
                             ) : <p className="text-sm text-slate-500 italic p-4 bg-slate-50 rounded text-center">Nenhum lote processado para esta ordem.</p>}
                             <div className="font-semibold text-white bg-[#0F3F5C] rounded-lg mt-4 p-3 flex justify-between shadow-sm">
-                                <span>Total Geral</span>
-                                <div className="text-right">
-                                    <span>{totalProducedWeight.toFixed(2)} kg</span> / <span className="font-mono">{formatDuration(effectiveTimeMs)}</span>
+                                <span className="text-lg font-bold">Total Geral</span>
+                                <div className="text-right text-lg">
+                                    <span className="font-bold">{totalProducedWeight.toFixed(2)} kg</span> / <span className="font-mono font-bold">{formatDuration(effectiveTimeMs)}</span>
                                 </div>
                             </div>
                         </div>
@@ -724,11 +724,11 @@ const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportDat
                                 Paradas
                             </h3>
                             <div className="border border-slate-200 rounded-lg overflow-hidden shadow-sm">
-                                <table className="w-full text-sm text-left text-slate-600">
-                                    <thead className="text-xs text-white uppercase bg-slate-500">
+                                <table className="w-full text-base text-left text-slate-600">
+                                    <thead className="text-sm font-black text-white uppercase bg-slate-500 text-center">
                                         <tr>
-                                            <th className="px-4 py-2">Motivo</th>
-                                            <th className="px-4 py-2 text-right">Duração</th>
+                                            <th className="px-4 py-3 text-left">Motivo</th>
+                                            <th className="px-4 py-3 text-right">Duração</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -738,16 +738,16 @@ const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportDat
                                             if (duration <= 0) return null;
                                             return (
                                                 <tr key={index} className="bg-white hover:bg-slate-50">
-                                                    <td className="px-4 py-2">{event.reason}</td>
-                                                    <td className="px-4 py-2 text-right font-mono text-slate-700">{formatDuration(duration)}</td>
+                                                    <td className="px-4 py-3 font-bold text-slate-800">{event.reason}</td>
+                                                    <td className="px-4 py-3 text-right font-mono text-slate-700 font-bold">{formatDuration(duration)}</td>
                                                 </tr>
                                             )
                                         })}
                                     </tbody>
-                                    <tfoot className="font-semibold text-[#0F3F5C] bg-slate-100 border-t-2 border-slate-300">
+                                    <tfoot className="font-black text-[#0F3F5C] bg-slate-100 border-t-2 border-slate-300">
                                         <tr>
-                                            <th className="px-4 py-2 text-left">Total Parado</th>
-                                            <th className="px-4 py-2 text-right font-mono">{formatDuration(totalDowntimeMs)}</th>
+                                            <th className="px-4 py-3 text-left text-lg">Total Parado</th>
+                                            <th className="px-4 py-3 text-right font-mono text-lg">{formatDuration(totalDowntimeMs)}</th>
                                         </tr>
                                     </tfoot>
                                 </table>

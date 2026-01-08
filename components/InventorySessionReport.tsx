@@ -74,10 +74,10 @@ const InventorySessionReport: React.FC<InventorySessionReportProps> = ({ session
 
                         {/* 3. Detailed Lots Table */}
                         <div className="flex-grow">
-                            <table className="w-full text-xs text-left border-collapse">
-                                <thead className="text-[10px] text-black uppercase font-bold border-y-2 border-slate-900">
+                            <table className="w-full text-base text-left border-collapse">
+                                <thead className="text-sm text-black uppercase font-black border-y-2 border-slate-900">
                                     <tr>
-                                        <th className="px-2 py-2 border-r border-slate-300 w-10 text-center">#</th>
+                                        <th className="px-2 py-2 border-r border-slate-300 w-12 text-center">#</th>
                                         <th className="px-2 py-2 border-r border-slate-300 w-32 text-center">Lote Interno</th>
                                         <th className="px-2 py-2 border-r border-slate-300 text-right w-32">Peso Sistema (kg)</th>
                                         <th className="px-2 py-2 border-r border-slate-300 text-right w-32">Peso Físico (kg)</th>
@@ -94,35 +94,35 @@ const InventorySessionReport: React.FC<InventorySessionReportProps> = ({ session
 
                                         return (
                                             <tr key={index} className={`border-b border-slate-200 ${isExtra ? 'bg-amber-50' : isNotFound ? 'bg-rose-50' : ''}`}>
-                                                <td className="px-2 py-2 border-r border-slate-300 text-center">{index + 1}</td>
+                                                <td className="px-2 py-2 border-r border-slate-300 text-center text-sm font-bold">{index + 1}</td>
                                                 <td className="px-2 py-2 border-r border-slate-300 text-center relative">
-                                                    <div className="font-black tracking-wider text-sm">{lot.internalLot}</div>
+                                                    <div className="font-black tracking-wider text-lg text-[#0F3F5C]">{lot.internalLot}</div>
                                                     {isExtra && (
-                                                        <div className="text-[7px] bg-amber-600 text-white font-black px-1 rounded absolute top-0.5 right-0.5 leading-tight no-print">
+                                                        <div className="text-[10px] bg-amber-600 text-white font-black px-1.5 py-0.5 rounded absolute top-0.5 right-0.5 leading-tight no-print">
                                                             NOVO
                                                         </div>
                                                     )}
                                                     {isNotFound && (
-                                                        <div className="text-[7px] bg-rose-600 text-white font-black px-1 rounded absolute top-0.5 right-0.5 leading-tight no-print">
+                                                        <div className="text-[10px] bg-rose-600 text-white font-black px-1.5 py-0.5 rounded absolute top-0.5 right-0.5 leading-tight no-print">
                                                             NÃO ENCONTRADO
                                                         </div>
                                                     )}
                                                 </td>
-                                                <td className="px-2 py-2 border-r border-slate-300 text-right font-medium">
+                                                <td className="px-2 py-2 border-r border-slate-300 text-right font-bold text-base">
                                                     {isExtra ? (
-                                                        <span className="text-amber-600 font-black text-[9px] uppercase">LOTE NÃO CADASTRADO</span>
+                                                        <span className="text-amber-600 font-black text-xs uppercase">LOTE NÃO CADASTRADO</span>
                                                     ) : (
                                                         lot.systemWeight.toLocaleString('pt-BR', { minimumFractionDigits: 0 })
                                                     )}
                                                 </td>
-                                                <td className="px-2 py-2 border-r border-slate-300 text-right font-black text-sm">
+                                                <td className="px-2 py-2 border-r border-slate-300 text-right font-black text-lg">
                                                     {isNotFound ? (
-                                                        <span className="text-rose-600 uppercase font-black text-[9px]">Lote em Falta</span>
+                                                        <span className="text-rose-600 uppercase font-black text-xs">Lote em Falta</span>
                                                     ) : (
                                                         lot.physicalWeight.toLocaleString('pt-BR', { minimumFractionDigits: 0 })
                                                     )}
                                                 </td>
-                                                <td className={`px-2 py-2 border-r border-slate-300 text-right font-black ${hasDiff ? (diff > 0 ? 'text-emerald-700' : 'text-rose-700') : 'text-slate-400'}`}>
+                                                <td className={`px-2 py-2 border-r border-slate-300 text-right font-black text-lg ${hasDiff ? (diff > 0 ? 'text-emerald-700' : 'text-rose-700') : 'text-slate-400'}`}>
                                                     {isExtra ? (
                                                         <span className="text-amber-700">+{lot.physicalWeight.toFixed(0)}</span>
                                                     ) : isNotFound ? (
@@ -132,12 +132,12 @@ const InventorySessionReport: React.FC<InventorySessionReportProps> = ({ session
                                                     )}
                                                 </td>
                                                 <td className="px-2 py-2 italic text-slate-700">
-                                                    {isExtra && <span className="text-amber-800 font-black not-italic text-[10px] block mb-1 uppercase tracking-tighter">⚠️ VERIFICAÇÃO NECESSÁRIA: Lote encontrado no físico porém não estava no sistema.</span>}
-                                                    {isNotFound && <span className="text-rose-800 font-black not-italic text-[10px] block mb-1 uppercase tracking-tighter">🚨 ALERTA CRÍTICO: Lote registrado no sistema mas NÃO FOI LOCALIZADO no pátio.</span>}
+                                                    {isExtra && <span className="text-amber-800 font-black not-italic text-xs block mb-1 uppercase tracking-tighter">⚠️ VERIFICAÇÃO NECESSÁRIA: Lote encontrado no físico porém não estava no sistema.</span>}
+                                                    {isNotFound && <span className="text-rose-800 font-black not-italic text-xs block mb-1 uppercase tracking-tighter">🚨 ALERTA CRÍTICO: Lote registrado no sistema mas NÃO FOI LOCALIZADO no pátio.</span>}
                                                     {lot.observation ? (
                                                         <div className={`flex items-start gap-1.5 ${isNotFound ? 'bg-rose-100/50' : 'bg-rose-50'} p-1.5 rounded border ${isNotFound ? 'border-rose-200' : 'border-rose-100'}`}>
-                                                            <ChatBubbleLeftRightIcon className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
-                                                            <span className="text-rose-900 font-bold not-italic text-[11px]">{lot.observation}</span>
+                                                            <ChatBubbleLeftRightIcon className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                                                            <span className="text-rose-900 font-bold not-italic text-sm">{lot.observation}</span>
                                                         </div>
                                                     ) : (
                                                         <span className="text-slate-300">-</span>
@@ -149,10 +149,10 @@ const InventorySessionReport: React.FC<InventorySessionReportProps> = ({ session
                                 </tbody>
                                 <tfoot className="border-t-2 border-slate-900 bg-slate-50 font-black">
                                     <tr>
-                                        <td colSpan={2} className="px-2 py-3 text-right uppercase text-[10px]">Totais da Sessão:</td>
-                                        <td className="px-2 py-3 text-right">{totalSystemWeight.toLocaleString('pt-BR', { minimumFractionDigits: 0 })} kg</td>
-                                        <td className="px-2 py-3 text-right text-sm">{totalPhysicalWeight.toLocaleString('pt-BR', { minimumFractionDigits: 0 })} kg</td>
-                                        <td className={`px-2 py-3 text-right text-sm ${totalDiff > 0 ? 'text-emerald-700' : totalDiff < 0 ? 'text-rose-700' : ''}`}>
+                                        <td colSpan={2} className="px-2 py-3 text-right uppercase text-xs">Totais da Sessão:</td>
+                                        <td className="px-2 py-3 text-right text-base">{totalSystemWeight.toLocaleString('pt-BR', { minimumFractionDigits: 0 })} kg</td>
+                                        <td className="px-2 py-3 text-right text-lg">{totalPhysicalWeight.toLocaleString('pt-BR', { minimumFractionDigits: 0 })} kg</td>
+                                        <td className={`px-2 py-3 text-right text-lg ${totalDiff > 0 ? 'text-emerald-700' : totalDiff < 0 ? 'text-rose-700' : ''}`}>
                                             {totalDiff > 0 ? '+' : ''}{totalDiff.toLocaleString('pt-BR', { minimumFractionDigits: 0 })} kg
                                         </td>
                                         <td></td>

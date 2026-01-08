@@ -87,49 +87,49 @@ const Reports: React.FC<ReportsProps> = ({ stock, trefilaProduction, trelicaProd
             <div className="print-section">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-                        <h3 className="text-slate-500 font-medium">Estoque Total Atual</h3>
-                        <p className="text-3xl font-bold text-slate-800">{totalStock.toFixed(2)} kg</p>
+                        <h3 className="text-slate-600 font-bold text-lg">Estoque Total Atual</h3>
+                        <p className="text-4xl font-black text-slate-900">{totalStock.toFixed(2)} kg</p>
                     </div>
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-                        <h3 className="text-slate-500 font-medium">Produção Trefila (período)</h3>
-                        <p className="text-3xl font-bold text-emerald-600">{productionByMachineData[0].Produção.toFixed(2)} kg</p>
+                        <h3 className="text-slate-600 font-bold text-lg">Produção Trefila (período)</h3>
+                        <p className="text-4xl font-black text-emerald-600">{productionByMachineData[0].Produção.toFixed(2)} kg</p>
                     </div>
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-                        <h3 className="text-slate-500 font-medium">Produção Treliça (período)</h3>
-                        <p className="text-3xl font-bold text-amber-600">{productionByMachineData[1].Produção.toFixed(2)} kg</p>
+                        <h3 className="text-slate-600 font-bold text-lg">Produção Treliça (período)</h3>
+                        <p className="text-4xl font-black text-amber-600">{productionByMachineData[1].Produção.toFixed(2)} kg</p>
                     </div>
                 </div>
 
                 <div className="bg-white p-6 rounded-xl shadow-sm mb-8 border border-slate-100 no-print">
-                    <h2 className="text-xl font-semibold text-slate-700 mb-4">Filtro por Período</h2>
+                    <h2 className="text-2xl font-bold text-slate-800 mb-4">Filtro por Período</h2>
                     <div className="flex items-center gap-4">
                         <div>
-                            <label htmlFor="startDate" className="block text-sm font-medium text-slate-700">Data Inicial</label>
-                            <input type="date" id="startDate" value={startDate} onChange={e => setStartDate(e.target.value)} className="mt-1 p-2 border border-slate-300 rounded" />
+                            <label htmlFor="startDate" className="block text-base font-bold text-slate-700">Data Inicial</label>
+                            <input type="date" id="startDate" value={startDate} onChange={e => setStartDate(e.target.value)} className="mt-1 p-2 border border-slate-300 rounded text-lg text-slate-800 font-medium" />
                         </div>
                         <div>
-                            <label htmlFor="endDate" className="block text-sm font-medium text-slate-700">Data Final</label>
-                            <input type="date" id="endDate" value={endDate} onChange={e => setEndDate(e.target.value)} className="mt-1 p-2 border border-slate-300 rounded" />
+                            <label htmlFor="endDate" className="block text-base font-bold text-slate-700">Data Final</label>
+                            <input type="date" id="endDate" value={endDate} onChange={e => setEndDate(e.target.value)} className="mt-1 p-2 border border-slate-300 rounded text-lg text-slate-800 font-medium" />
                         </div>
                     </div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-                        <h2 className="text-xl font-semibold text-slate-700 mb-4">Produção por Máquina</h2>
+                        <h2 className="text-2xl font-bold text-slate-800 mb-4">Produção por Máquina</h2>
                         <ResponsiveContainer width="100%" height={300}>
                             <BarChart data={productionByMachineData}>
                                 <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="name" />
-                                <YAxis />
-                                <Tooltip formatter={(value: number) => `${value.toFixed(2)} kg`} />
-                                <Legend />
+                                <XAxis dataKey="name" tick={{ fontSize: 14, fontWeight: 'bold' }} />
+                                <YAxis tick={{ fontSize: 12, fontWeight: 'bold' }} />
+                                <Tooltip formatter={(value: number) => `${value.toFixed(2)} kg`} contentStyle={{ fontSize: '14px', fontWeight: 'bold' }} />
+                                <Legend wrapperStyle={{ fontSize: '14px', fontWeight: 'bold' }} />
                                 <Bar dataKey="Produção" fill="#334155" />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-                        <h2 className="text-xl font-semibold text-slate-700 mb-4">Estoque por Fornecedor</h2>
+                        <h2 className="text-2xl font-bold text-slate-800 mb-4">Estoque por Fornecedor</h2>
                         <ResponsiveContainer width="100%" height={300}>
                             <PieChart>
                                 <Pie
@@ -142,6 +142,7 @@ const Reports: React.FC<ReportsProps> = ({ stock, trefilaProduction, trelicaProd
                                     dataKey="value"
                                     nameKey="name"
                                     label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                                    style={{ fontSize: '14px', fontWeight: 'bold' }}
                                 >
                                     {stockBySupplierData.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

@@ -118,29 +118,29 @@ const InventoryReport: React.FC<InventoryReportProps> = ({ stock, filters, onClo
                         </h3>
                         <div className="border border-[#0F3F5C]/20 rounded-lg overflow-hidden shadow-sm">
                             <table className="w-full text-sm text-left border-collapse">
-                                <thead className="text-xs text-white uppercase bg-gradient-to-r from-[#0F3F5C] to-[#1A5A7D]">
+                                <thead className="text-sm font-bold text-white uppercase bg-gradient-to-r from-[#0F3F5C] to-[#1A5A7D]">
                                     <tr>
-                                        <th className="px-2 py-2 border-r border-white/20">Lote Interno</th>
-                                        <th className="px-2 py-2 border-r border-white/20">Material</th>
-                                        <th className="px-2 py-2 border-r border-white/20">Bitola</th>
-                                        <th className="px-2 py-2 border-r border-white/20">Fornecedor</th>
-                                        <th className="px-2 py-2 border-r border-white/20 text-right">Peso Sistema (kg)</th>
-                                        <th className="px-2 py-2 border-r border-white/20 w-32 text-center bg-[#FF8C00]/30">Peso Físico</th>
-                                        <th className="px-2 py-2 border-r border-white/20 w-24 text-center bg-[#FF8C00]/30">Diferença</th>
-                                        <th className="px-2 py-2 w-40 bg-[#FF8C00]/30">Observações</th>
+                                        <th className="px-2 py-3 border-r border-white/20 text-center">Lote Interno</th>
+                                        <th className="px-2 py-3 border-r border-white/20 text-center">Material</th>
+                                        <th className="px-2 py-3 border-r border-white/20 text-center">Bitola</th>
+                                        <th className="px-2 py-3 border-r border-white/20 text-center">Fornecedor</th>
+                                        <th className="px-2 py-3 border-r border-white/20 text-right">Peso Sistema (kg)</th>
+                                        <th className="px-2 py-3 border-r border-white/20 w-32 text-center bg-[#FF8C00]/30 text-white font-black">Peso Físico</th>
+                                        <th className="px-2 py-3 border-r border-white/20 w-24 text-center bg-[#FF8C00]/30 text-white font-black">Diferença</th>
+                                        <th className="px-2 py-3 w-40 bg-[#FF8C00]/30 text-center text-white font-black">Observações</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {filteredStock.map((item, index) => (
                                         <tr key={item.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50'} border-b border-slate-200`}>
-                                            <td className="px-2 py-2 border-r border-slate-200 font-bold text-[#0F3F5C]">{item.internalLot}</td>
-                                            <td className="px-2 py-2 border-r border-slate-200 text-slate-700">{item.materialType}</td>
-                                            <td className="px-2 py-2 border-r border-slate-200 font-semibold text-slate-900">{item.bitola}</td>
-                                            <td className="px-2 py-2 border-r border-slate-200 text-slate-700">{item.supplier}</td>
-                                            <td className="px-2 py-2 border-r border-slate-200 text-right font-bold text-[#FF8C00]">{item.remainingQuantity.toFixed(2)}</td>
-                                            <td className="px-2 py-2 border-r border-slate-200 bg-[#fff3e6]/30"></td>
-                                            <td className="px-2 py-2 border-r border-slate-200 bg-[#fff3e6]/30"></td>
-                                            <td className="px-2 py-2 bg-[#fff3e6]/30"></td>
+                                            <td className="px-2 py-3 border-r border-slate-200 font-black text-lg text-[#0F3F5C] text-center">{item.internalLot}</td>
+                                            <td className="px-2 py-3 border-r border-slate-200 text-slate-700 font-bold text-center text-base">{item.materialType}</td>
+                                            <td className="px-2 py-3 border-r border-slate-200 font-black text-slate-900 text-center text-lg">{item.bitola}</td>
+                                            <td className="px-2 py-3 border-r border-slate-200 text-slate-700 font-bold text-center text-base">{item.supplier}</td>
+                                            <td className="px-2 py-3 border-r border-slate-200 text-right font-black text-xl text-[#FF8C00]">{item.remainingQuantity.toFixed(2)}</td>
+                                            <td className="px-2 py-3 border-r border-slate-200 bg-[#fff3e6]/30"></td>
+                                            <td className="px-2 py-3 border-r border-slate-200 bg-[#fff3e6]/30"></td>
+                                            <td className="px-2 py-3 bg-[#fff3e6]/30"></td>
                                         </tr>
                                     ))}
                                 </tbody>

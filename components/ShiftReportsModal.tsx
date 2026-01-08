@@ -274,15 +274,15 @@ const ShiftReportPrintView: React.FC<{ report: ShiftReport, stock: StockItem[], 
                 <table className="w-full border-collapse border-2 border-black mb-4">
                     <tbody>
                         <tr>
-                            <td className="border border-black p-1.5 font-bold bg-white text-center align-middle">Ordem de produção : <span className="font-black ml-2 tabular-nums">{report.orderNumber}</span></td>
+                            <td className="border border-black p-2 font-bold bg-white text-center align-middle text-base">Ordem de produção : <span className="font-black ml-2 tabular-nums text-xl">{report.orderNumber}</span></td>
                         </tr>
                         <tr>
-                            <td className="border border-black p-1.5 font-bold bg-white text-center align-middle">
-                                Data da produção: <span className="font-medium ml-2 uppercase text-[11px]">{new Date(report.date).toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                            <td className="border border-black p-2 font-bold bg-white text-center align-middle text-base">
+                                Data da produção: <span className="font-bold ml-2 uppercase text-base">{new Date(report.date).toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}</span>
                             </td>
                         </tr>
                         <tr>
-                            <td className="border border-black p-1.5 font-bold bg-white text-center align-middle">Operador/auxiliar: <span className="font-black ml-2 uppercase">{report.operator}</span></td>
+                            <td className="border border-black p-2 font-bold bg-white text-center align-middle text-base">Operador/auxiliar: <span className="font-black ml-2 uppercase text-lg">{report.operator}</span></td>
                         </tr>
                     </tbody>
                 </table>
@@ -291,15 +291,15 @@ const ShiftReportPrintView: React.FC<{ report: ShiftReport, stock: StockItem[], 
                 <table className="w-full border-collapse border-2 border-black mb-6">
                     <tbody>
                         <tr>
-                            <td className="p-2 border-b border-black">
-                                <span className="font-bold">Descrição do produto:</span>
-                                <span className="ml-2 font-black text-lg uppercase">TRELIÇA {report.trelicaModel} {report.tamanho} MTS</span>
+                            <td className="p-3 border-b border-black">
+                                <span className="font-bold text-lg">Descrição do produto:</span>
+                                <span className="ml-2 font-black text-2xl uppercase">TRELIÇA {report.trelicaModel} {report.tamanho} MTS</span>
                             </td>
                         </tr>
                         <tr>
-                            <td className="p-2">
-                                <span className="font-bold">Qnt. De peças produzidas:</span>
-                                <span className="ml-2 font-black text-xl tabular-nums">{totalPieces.toFixed(0)} peças</span>
+                            <td className="p-3">
+                                <span className="font-bold text-lg">Qnt. De peças produzidas:</span>
+                                <span className="ml-2 font-black text-3xl tabular-nums">{totalPieces.toFixed(0)} peças</span>
                             </td>
                         </tr>
                     </tbody>
@@ -307,39 +307,39 @@ const ShiftReportPrintView: React.FC<{ report: ShiftReport, stock: StockItem[], 
 
                 {/* Paradas e Motivos */}
                 <div className="mb-6">
-                    <h2 className="text-center italic font-black text-sm mb-1 underline">PARADAS E SEUS MOTIVOS:</h2>
+                    <h2 className="text-center italic font-black text-base mb-1 underline">PARADAS E SEUS MOTIVOS:</h2>
                     <table className="w-full border-collapse border-2 border-black">
                         <thead>
-                            <tr className="bg-slate-100 text-[10px] font-black">
-                                <th className="border border-black p-1 text-center w-24">INÍCIO</th>
-                                <th className="border border-black p-1 text-center w-24">FIM</th>
-                                <th className="border border-black p-1 px-4">MOTIVO</th>
-                                <th className="border border-black p-1 text-center w-24">DURAÇÃO</th>
+                            <tr className="bg-slate-100 text-sm font-black text-center">
+                                <th className="border border-black p-2 w-32">INÍCIO</th>
+                                <th className="border border-black p-2 w-32">FIM</th>
+                                <th className="border border-black p-2 px-4">MOTIVO</th>
+                                <th className="border border-black p-2 w-32">DURAÇÃO</th>
                             </tr>
                         </thead>
                         <tbody>
                             {sortedEvents.map((event, idx) => {
                                 const duration = new Date(event.resumeTime || report.shiftEndTime).getTime() - new Date(event.stopTime).getTime();
                                 return (
-                                    <tr key={idx} className="text-[11px]">
-                                        <td className="border border-black p-1 text-center font-black text-rose-600 tabular-nums">
+                                    <tr key={idx} className="text-sm">
+                                        <td className="border border-black p-2 text-center font-black text-rose-600 tabular-nums">
                                             {new Date(event.stopTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                                         </td>
-                                        <td className="border border-black p-1 text-center font-black text-emerald-600 tabular-nums">
+                                        <td className="border border-black p-2 text-center font-black text-emerald-600 tabular-nums">
                                             {event.resumeTime ? new Date(event.resumeTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : new Date(report.shiftEndTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + '*'}
                                         </td>
-                                        <td className="border border-black p-1 px-4 italic font-medium text-slate-800 uppercase">
+                                        <td className="border border-black p-2 px-4 italic font-bold text-slate-800 uppercase">
                                             {event.reason}
                                         </td>
-                                        <td className="border border-black p-1 text-center font-black text-rose-600 tabular-nums">
+                                        <td className="border border-black p-2 text-center font-black text-rose-600 tabular-nums">
                                             {formatDuration(duration)}
                                         </td>
                                     </tr>
                                 );
                             })}
                             {sortedEvents.length === 0 && (
-                                <tr className="h-6">
-                                    <td className="border border-black p-1 text-center" colSpan={4}>Nenhuma parada registrada.</td>
+                                <tr className="h-8">
+                                    <td className="border border-black p-2 text-center font-medium italic" colSpan={4}>Nenhuma parada registrada.</td>
                                 </tr>
                             )}
                         </tbody>
@@ -347,58 +347,58 @@ const ShiftReportPrintView: React.FC<{ report: ShiftReport, stock: StockItem[], 
                 </div>
 
                 {/* Estatística do Dia */}
-                <div className="mb-6 border-2 border-black p-4 bg-white">
-                    <h2 className="text-center italic font-black text-sm mb-4 underline">ESTATÍSTICA DO DIA:</h2>
-                    <div className="space-y-1 mx-auto max-w-2xl px-12">
-                        <div className="flex justify-between items-center text-[13px]">
+                <div className="mb-6 border-2 border-black p-6 bg-white">
+                    <h2 className="text-center italic font-black text-lg mb-6 underline">ESTATÍSTICA DO DIA:</h2>
+                    <div className="space-y-2 mx-auto max-w-3xl px-8">
+                        <div className="flex justify-between items-center text-base border-b border-slate-100 pb-1">
                             <span className="font-bold">Horas (Turno trabalhados):</span>
-                            <span className="font-black tabular-nums">{formatDuration(totalDuration)}</span>
+                            <span className="font-black tabular-nums text-xl">{formatDuration(totalDuration)}</span>
                         </div>
-                        <div className="flex justify-between items-center text-[13px]">
+                        <div className="flex justify-between items-center text-base border-b border-slate-100 pb-1">
                             <span className="font-bold text-rose-600">Tempo de maquina (parada) :</span>
                             <div className="flex gap-4 items-center">
-                                <span className="font-black tabular-nums text-rose-600">{formatDuration(totalDowntime)}</span>
-                                <span className="font-black text-rose-600 w-12 text-right">{downtimePercentage.toFixed(1)}%</span>
+                                <span className="font-black tabular-nums text-rose-600 text-xl">{formatDuration(totalDowntime)}</span>
+                                <span className="font-black text-rose-600 w-16 text-right text-lg">{downtimePercentage.toFixed(1)}%</span>
                             </div>
                         </div>
-                        <div className="flex justify-between items-center text-[13px]">
+                        <div className="flex justify-between items-center text-base border-b border-slate-100 pb-1">
                             <span className="font-bold text-emerald-600">Tempo de maquina (Efetivo) :</span>
                             <div className="flex gap-4 items-center">
-                                <span className="font-black tabular-nums text-emerald-600">{formatDuration(productiveTime)}</span>
-                                <span className="font-black text-emerald-600 w-12 text-right">{productivePercentage.toFixed(1)}%</span>
+                                <span className="font-black tabular-nums text-emerald-600 text-xl">{formatDuration(productiveTime)}</span>
+                                <span className="font-black text-emerald-600 w-16 text-right text-lg">{productivePercentage.toFixed(1)}%</span>
                             </div>
                         </div>
-                        <div className="flex justify-between items-center text-[13px]">
+                        <div className="flex justify-between items-center text-base border-b border-slate-100 pb-1">
                             <span className="font-bold">Quant. de peças produzidas:</span>
-                            <span className="font-black tabular-nums">{totalPieces.toFixed(0)} peças de {report.tamanho} metros</span>
+                            <span className="font-black tabular-nums text-xl">{totalPieces.toFixed(0)} peças de {report.tamanho} metros</span>
                         </div>
-                        <div className="flex justify-between items-center text-[13px]">
+                        <div className="flex justify-between items-center text-base border-b border-slate-100 pb-1">
                             <span className="font-bold">Quant. de metros produzidos:</span>
-                            <span className="font-black tabular-nums">{(report.totalProducedMeters || 0).toFixed(0)} metros</span>
+                            <span className="font-black tabular-nums text-xl">{(report.totalProducedMeters || 0).toFixed(0)} metros</span>
                         </div>
-                        <div className="flex justify-between items-center text-[13px]">
+                        <div className="flex justify-between items-center text-base border-b border-slate-100 pb-1">
                             <span className="font-bold">Tempo por peça:</span>
-                            <span className="font-black tabular-nums">{formatDuration(timePerPieceMs)}</span>
+                            <span className="font-black tabular-nums text-xl">{formatDuration(timePerPieceMs)}</span>
                         </div>
-                        <div className="flex justify-between items-center text-[13px]">
+                        <div className="flex justify-between items-center text-base pt-1">
                             <span className="font-bold">Velocidade:</span>
-                            <span className="font-black tabular-nums">{speedMpm.toFixed(1)} metros/ minuto</span>
+                            <span className="font-black tabular-nums text-xl">{speedMpm.toFixed(1)} metros/ minuto</span>
                         </div>
                     </div>
                 </div>
 
                 {/* Atualização da Produção */}
                 <div className="border-2 border-black p-4 bg-white">
-                    <h2 className="text-center italic font-black text-sm mb-2 underline uppercase">ATUALIZAÇÃO DA PRODUÇÃO:</h2>
-                    <p className="text-center font-black mb-4">Qntidade de peças a produzir: {report.quantityToProduce || '-'} treliças</p>
+                    <h2 className="text-center italic font-black text-lg mb-2 underline uppercase">ATUALIZAÇÃO DA PRODUÇÃO:</h2>
+                    <p className="text-center font-black mb-6 text-base">Qntidade de peças a produzir: {report.quantityToProduce || '-'} treliças</p>
 
-                    <table className="w-full border-collapse mx-auto max-w-xl text-[12px] mb-2">
+                    <table className="w-full border-collapse mx-auto max-w-3xl text-sm mb-2">
                         <thead>
-                            <tr className="border-b-2 border-black font-black">
-                                <th className="p-2 text-center w-1/4">Qnt.</th>
-                                <th className="p-2 text-center w-1/4">peso</th>
-                                <th className="p-2 text-center w-1/4">media</th>
-                                <th className="p-2 text-center w-1/4">Data</th>
+                            <tr className="border-b-2 border-black font-black text-base">
+                                <th className="p-3 text-center w-1/4">Qnt.</th>
+                                <th className="p-3 text-center w-1/4">peso</th>
+                                <th className="p-3 text-center w-1/4">media</th>
+                                <th className="p-3 text-center w-1/4">Data</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -413,11 +413,11 @@ const ShiftReportPrintView: React.FC<{ report: ShiftReport, stock: StockItem[], 
                                 const timeLabel = start && end ? `${dateStr} - ${start} às ${end}` : new Date(r.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
 
                                 return (
-                                    <tr key={i} className="tabular-nums font-bold">
-                                        <td className="p-1.5 text-center w-1/4">{q.toFixed(0)}</td>
-                                        <td className="p-1.5 text-center w-1/4">{(r.totalProducedWeight || 0).toFixed(0)}</td>
-                                        <td className="p-1.5 text-center w-1/4">{media.toFixed(2)}</td>
-                                        <td className="p-1.5 text-center w-1/4 text-[10px] whitespace-nowrap">{timeLabel}</td>
+                                    <tr key={i} className="tabular-nums font-bold text-base hover:bg-slate-50">
+                                        <td className="p-2 text-center w-1/4">{q.toFixed(0)}</td>
+                                        <td className="p-2 text-center w-1/4">{(r.totalProducedWeight || 0).toFixed(0)}</td>
+                                        <td className="p-2 text-center w-1/4">{media.toFixed(2)}</td>
+                                        <td className="p-2 text-center w-1/4 text-sm whitespace-nowrap">{timeLabel}</td>
                                     </tr>
                                 );
                             })}
@@ -425,13 +425,13 @@ const ShiftReportPrintView: React.FC<{ report: ShiftReport, stock: StockItem[], 
                     </table>
 
                     {/* Floating Total Row - Separated Table for clean gap */}
-                    <table className="w-full border-collapse mx-auto max-w-xl text-[12px]">
+                    <table className="w-full border-collapse mx-auto max-w-3xl text-sm">
                         <tbody>
-                            <tr className="border-2 border-black font-black tabular-nums bg-slate-50 shadow-sm">
-                                <td className="p-2 text-center w-1/4">{totalHistPieces.toFixed(0)}</td>
-                                <td className="p-2 text-center w-1/4">{totalHistWeight.toFixed(0)}</td>
-                                <td className="p-2 text-center w-1/4">{avgHistMedia.toFixed(2)}</td>
-                                <td className="p-2 text-center italic text-[#002B7F] w-1/4">TOTAL</td>
+                            <tr className="border-2 border-black font-black tabular-nums bg-slate-50 shadow-sm text-lg">
+                                <td className="p-3 text-center w-1/4">{totalHistPieces.toFixed(0)}</td>
+                                <td className="p-3 text-center w-1/4">{totalHistWeight.toFixed(0)}</td>
+                                <td className="p-3 text-center w-1/4">{avgHistMedia.toFixed(2)}</td>
+                                <td className="p-3 text-center italic text-[#002B7F] w-1/4">TOTAL</td>
                             </tr>
                         </tbody>
                     </table>
@@ -729,53 +729,53 @@ const ShiftReportsModal: React.FC<ShiftReportsModalProps> = ({ reports, stock, o
                     {!printingReport ? (
                         reports.length > 0 ? (
                             <div className="overflow-x-auto rounded-xl border border-slate-100 shadow-sm no-print">
-                                <table className="w-full text-sm text-left text-slate-500">
-                                    <thead className="text-xs text-slate-700 uppercase bg-slate-50">
+                                <table className="w-full text-base text-left text-slate-500">
+                                    <thead className="text-sm font-black text-slate-700 uppercase bg-slate-50 text-center">
                                         <tr>
-                                            <th className="px-6 py-4 font-bold">Data do Turno</th>
-                                            <th className="px-6 py-4 font-bold text-center">Horário</th>
-                                            <th className="px-6 py-4 font-bold">Nº Ordem</th>
-                                            <th className="px-6 py-4 font-bold">Operador</th>
-                                            <th className="px-6 py-4 font-bold">{reports[0]?.machine === 'Trefila' ? 'Bitola' : 'Modelo'}</th>
-                                            <th className="px-6 py-4 font-bold text-right">Peso Produzido (kg)</th>
-                                            <th className="px-6 py-4 font-bold text-center">Ações</th>
+                                            <th className="px-6 py-4">Data do Turno</th>
+                                            <th className="px-6 py-4">Horário</th>
+                                            <th className="px-6 py-4">Nº Ordem</th>
+                                            <th className="px-6 py-4">Operador</th>
+                                            <th className="px-6 py-4">{reports[0]?.machine === 'Trefila' ? 'Bitola' : 'Modelo'}</th>
+                                            <th className="px-6 py-4 text-right">Peso Produzido (kg)</th>
+                                            <th className="px-6 py-4">Ações</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
                                         {reports.map((report) => (
                                             <React.Fragment key={report.id}>
                                                 <tr className={`bg-white hover:bg-slate-50 transition-colors ${expandedReportId === report.id ? 'bg-indigo-50/30' : ''}`}>
-                                                    <td className="px-6 py-4 whitespace-nowrap">
-                                                        <span className="font-medium text-slate-900">{new Date(report.date).toLocaleDateString('pt-BR')}</span>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                        <span className="font-bold text-lg text-slate-900">{new Date(report.date).toLocaleDateString('pt-BR')}</span>
                                                     </td>
                                                     <td className="px-6 py-4 text-center whitespace-nowrap">
-                                                        <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-md">
+                                                        <span className="text-xs font-black text-slate-500 bg-slate-100 px-3 py-1.5 rounded-md">
                                                             {new Date(report.shiftStartTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} — {new Date(report.shiftEndTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                                                         </span>
                                                     </td>
-                                                    <td className="px-6 py-4 font-medium text-slate-900">
+                                                    <td className="px-6 py-4 font-black text-lg text-slate-900 text-center">
                                                         {report.orderNumber}
                                                     </td>
-                                                    <td className="px-6 py-4 uppercase text-xs font-semibold">
+                                                    <td className="px-6 py-4 uppercase text-sm font-bold text-center">
                                                         {report.operator}
                                                     </td>
-                                                    <td className="px-6 py-4">
+                                                    <td className="px-6 py-4 text-center font-bold text-slate-700">
                                                         {report.machine === 'Trefila' ? `${report.targetBitola} mm` : report.trelicaModel}
                                                     </td>
                                                     <td className="px-6 py-4 text-right">
-                                                        <span className="font-bold text-emerald-700">{report.totalProducedWeight.toFixed(2)}</span>
+                                                        <span className="font-black text-xl text-emerald-700">{report.totalProducedWeight.toFixed(2)}</span>
                                                     </td>
                                                     <td className="px-6 py-4 text-center">
                                                         <div className="flex items-center justify-center gap-2">
                                                             <button
                                                                 onClick={() => toggleExpand(report.id)}
-                                                                className={`py-1.5 px-4 rounded-lg text-[10px] font-bold uppercase transition-all ${expandedReportId === report.id ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                                                                className={`py-2 px-5 rounded-lg text-xs font-bold uppercase transition-all ${expandedReportId === report.id ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                                                             >
                                                                 {expandedReportId === report.id ? "Fechar" : "Detalhes"}
                                                             </button>
                                                             <button
                                                                 onClick={() => handlePrintIndividual(report)}
-                                                                className="py-1.5 px-4 rounded-lg text-[10px] font-bold uppercase bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition-all"
+                                                                className="py-2 px-5 rounded-lg text-xs font-bold uppercase bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition-all"
                                                             >
                                                                 Ver Relatório
                                                             </button>
@@ -785,7 +785,7 @@ const ShiftReportsModal: React.FC<ShiftReportsModalProps> = ({ reports, stock, o
                                                                     className="p-2 text-slate-300 hover:text-rose-500 transition-colors"
                                                                     title="Excluir"
                                                                 >
-                                                                    <TrashIcon className="h-4 w-4" />
+                                                                    <TrashIcon className="h-5 w-5" />
                                                                 </button>
                                                             )}
                                                         </div>

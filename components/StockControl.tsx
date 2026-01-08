@@ -1133,63 +1133,72 @@ const StockControl: React.FC<{
                                 {/* Desktop Table View */}
                                 <div className="hidden md:block overflow-x-auto">
                                     <table className="w-full text-sm text-left">
-                                        <thead className="text-xs text-slate-600 uppercase bg-slate-50">
+                                        <thead className="text-sm font-black text-slate-700 uppercase bg-slate-100 text-center">
                                             <tr>
-                                                <th className="p-4 w-12"><input type="checkbox" onChange={handleSelectAllForTransfer} checked={filteredStock.length > 0 && selectedLotIdsForTransfer.length === filteredStock.filter(i => i.status === 'Disponível' || i.status === 'Disponível - Suporte Treliça').length} className="h-4 w-4 rounded border-slate-300 text-slate-600 focus:ring-slate-500" /></th>
-                                                <th className="px-6 py-3">Mapeado</th>
-                                                <th className="px-6 py-3">Data Entrada</th>
-                                                <th className="px-6 py-3">Lote Interno</th>
-                                                <th className="px-6 py-3">Lote Fornecedor</th>
-                                                <th className="px-6 py-3">Fornecedor</th>
-                                                <th className="px-6 py-3">Tipo de Material</th>
-                                                <th className="px-6 py-3">Bitola</th>
-                                                <th className="px-6 py-3 text-right">Saldo / Original (kg)</th>
-                                                <th className="px-6 py-3 text-center">Status</th>
-                                                <th className="px-6 py-3 text-center">Inventariado?</th>
-                                                <th className="px-6 py-3 text-center">Ações</th>
+                                                <th className="p-4 w-12"><input type="checkbox" onChange={handleSelectAllForTransfer} checked={filteredStock.length > 0 && selectedLotIdsForTransfer.length === filteredStock.filter(i => i.status === 'Disponível' || i.status === 'Disponível - Suporte Treliça').length} className="h-5 w-5 rounded border-slate-300 text-slate-600 focus:ring-slate-500" /></th>
+                                                <th className="px-6 py-4">Mapeado</th>
+                                                <th className="px-6 py-4">Data Entrada</th>
+                                                <th className="px-6 py-4">Lote Interno</th>
+                                                <th className="px-6 py-4">Lote Fornecedor</th>
+                                                <th className="px-6 py-4">Fornecedor</th>
+                                                <th className="px-6 py-4">Material / Bitola</th>
+                                                <th className="px-6 py-4 text-right">Saldo (kg)</th>
+                                                <th className="px-6 py-4">Status</th>
+                                                <th className="px-6 py-4">Conf. Física</th>
+                                                <th className="px-6 py-4">Ações</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-200">
                                             {filteredStock.map(item => (
                                                 <tr key={item.id} className={`hover:bg-slate-50 ${item.location ? 'bg-emerald-50/30' : 'bg-white'}`}>
-                                                    <td className="p-4">
-                                                        <input type="checkbox" checked={selectedLotIdsForTransfer.includes(item.id)} onChange={() => handleSelectLotForTransfer(item.id)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="h-4 w-4 rounded border-slate-300 text-slate-600 focus:ring-slate-500" />
+                                                    <td className="p-4 text-center">
+                                                        <input type="checkbox" checked={selectedLotIdsForTransfer.includes(item.id)} onChange={() => handleSelectLotForTransfer(item.id)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="h-5 w-5 rounded border-slate-300 text-slate-600 focus:ring-slate-500" />
                                                     </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                    <td className="px-4 py-4 whitespace-nowrap text-center">
                                                         {item.location ? (
                                                             <div className="flex justify-center" title="Mapeado nas fileiras">
-                                                                <div className="bg-emerald-100 text-emerald-600 rounded-full p-1 w-6 h-6 flex items-center justify-center">
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                                                                <div className="bg-emerald-100 text-emerald-600 rounded-full p-2 w-8 h-8 flex items-center justify-center">
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
                                                                         <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
                                                                     </svg>
                                                                 </div>
                                                             </div>
                                                         ) : (
                                                             <div className="flex justify-center" title="Pendente de mapeamento">
-                                                                <div className="bg-slate-100 text-slate-400 rounded-full p-1 w-6 h-6 flex items-center justify-center">
-                                                                    <span className="text-xs font-bold">-</span>
+                                                                <div className="bg-slate-100 text-slate-400 rounded-full p-2 w-8 h-8 flex items-center justify-center">
+                                                                    <span className="text-sm font-bold">-</span>
                                                                 </div>
                                                             </div>
                                                         )}
                                                     </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap">{new Date(item.entryDate).toLocaleDateString('pt-BR')}</td>
-                                                    <td className="px-6 py-4 font-medium text-slate-800 whitespace-nowrap">
-                                                        {item.internalLot}
+                                                    <td className="px-6 py-4 whitespace-nowrap text-center text-base font-bold text-slate-600">{new Date(item.entryDate).toLocaleDateString('pt-BR')}</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                        <span className="text-2xl font-black text-slate-900 block">{item.internalLot}</span>
                                                         {item.location && (
-                                                            <div className="text-[10px] bg-emerald-100 text-emerald-800 px-1 rounded inline-block ml-2 border border-emerald-200">
+                                                            <div className="text-xs font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded inline-block mt-1 border border-emerald-200">
                                                                 {item.location}
                                                             </div>
                                                         )}
                                                     </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap">{item.supplierLot}</td>
-                                                    <td className="px-6 py-4 whitespace-nowrap">{item.supplier}</td>
-                                                    <td className="px-6 py-4 whitespace-nowrap">{item.materialType}</td>
-                                                    <td className="px-6 py-4 whitespace-nowrap font-semibold">{item.bitola}</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                        <span className="text-lg font-bold text-slate-700 block">{item.supplierLot}</span>
+                                                        <span className="text-xs font-semibold text-slate-400">NF: {item.nfe}</span>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                        <span className="text-lg font-bold text-slate-700">{item.supplier}</span>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                        <div className="flex flex-col items-center">
+                                                            <span className="text-lg font-bold text-slate-800">{item.materialType}</span>
+                                                            <span className="text-2xl font-black text-blue-600">{item.bitola}</span>
+                                                        </div>
+                                                    </td>
                                                     <td className="px-6 py-4 text-right whitespace-nowrap">
                                                         <div className="flex flex-col items-end">
-                                                            <span className={`font-bold ${item.remainingQuantity < item.initialQuantity ? 'text-blue-700' : 'text-slate-800'}`}>
+                                                            <span className={`text-2xl font-black ${item.remainingQuantity < item.initialQuantity ? 'text-blue-700' : 'text-slate-800'}`}>
                                                                 {item.remainingQuantity.toFixed(2)}
                                                             </span>
+                                                            <span className="text-xs font-bold text-emerald-600">+{(item.initialQuantity).toFixed(2)} KG</span>
                                                             {item.status === 'Em Produção - Treliça' && (() => {
                                                                 const order = productionOrders.find(o =>
                                                                     o.status !== 'completed' &&
@@ -1272,21 +1281,18 @@ const StockControl: React.FC<{
                                                                 }
                                                                 return null;
                                                             })()}
-                                                            {item.remainingQuantity !== item.initialQuantity && (
-                                                                <span className="text-[10px] text-slate-400 line-through">
-                                                                    De {item.initialQuantity.toFixed(2)}
-                                                                </span>
-                                                            )}
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4 text-center whitespace-nowrap">
-                                                        {getStatusBadge(item.status)}
+                                                        <div className="transform scale-110">
+                                                            {getStatusBadge(item.status)}
+                                                        </div>
                                                         {item.productionOrderIds && item.productionOrderIds.length > 0 && (
-                                                            <div className="flex flex-wrap justify-center gap-1 mt-1">
+                                                            <div className="flex flex-wrap justify-center gap-1 mt-2">
                                                                 {item.productionOrderIds.map(id => {
                                                                     const order = productionOrders.find(o => o.id === id);
                                                                     return (
-                                                                        <span key={id} className="text-[10px] font-bold bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200 shadow-sm" title={`Ordem de Produção: ${order?.orderNumber || id}`}>
+                                                                        <span key={id} className="text-[10px] font-bold bg-amber-50 text-amber-700 px-2 py-1 rounded border border-amber-200 shadow-sm" title={`Ordem de Produção: ${order?.orderNumber || id}`}>
                                                                             {order?.orderNumber || `OP: ${id.split('-').pop()?.toUpperCase()}`}
                                                                         </span>
                                                                     );
@@ -1297,14 +1303,14 @@ const StockControl: React.FC<{
                                                     <td className="px-6 py-4 whitespace-nowrap text-center">
                                                         {item.lastAuditDate ? (
                                                             <div className="flex flex-col items-center">
-                                                                <CheckCircleIcon className="h-6 w-6 text-emerald-600 mb-0.5" />
-                                                                <span className="text-[10px] font-black text-emerald-700 uppercase leading-none mb-0.5">OK</span>
-                                                                <span className="text-[9px] font-bold text-slate-500 leading-none">
+                                                                <CheckCircleIcon className="h-8 w-8 text-emerald-600 mb-0.5" />
+                                                                <span className="text-xs font-black text-emerald-700 uppercase leading-none mb-0.5">OK</span>
+                                                                <span className="text-[10px] font-bold text-slate-500 leading-none">
                                                                     {new Date(item.lastAuditDate).toLocaleDateString('pt-BR')}
                                                                 </span>
                                                             </div>
                                                         ) : (
-                                                            <span className="text-xs text-slate-400">-</span>
+                                                            <span className="text-sm font-bold text-slate-300">-</span>
                                                         )}
                                                     </td>
                                                     <td className="px-6 py-4">
