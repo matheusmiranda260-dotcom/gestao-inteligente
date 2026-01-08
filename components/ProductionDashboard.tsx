@@ -193,30 +193,32 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
 
 
     return (
-        <div className="bg-white p-6 rounded-xl shadow-lg flex flex-col space-y-4">
-            <h2 className="text-2xl font-bold text-slate-800">{machineType}</h2>
+        <div className="bg-white p-4 md:p-6 rounded-xl shadow-lg flex flex-col space-y-4">
+            <h2 className="text-xl md:text-2xl font-bold text-slate-800">{machineType}</h2>
             {isAlertActive && (
-                <div className="bg-red-500 text-white p-2 rounded-md text-center animate-pulse text-sm font-semibold">
+                <div className="bg-red-500 text-white p-2 rounded-md text-center animate-pulse text-xs md:text-sm font-semibold">
                     ALERTA: MÁQUINA PARADA HÁ {formatDuration(machineStatus.durationMs)}
                 </div>
             )}
-            <div className={`p-4 rounded-md border-t-4 ${currentStyle.border} ${currentStyle.bg}`}>
-                <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                        {currentStyle.icon}
+            <div className={`p-3 md:p-4 rounded-md border-t-4 ${currentStyle.border} ${currentStyle.bg}`}>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 md:gap-4">
+                        <div className="shrink-0">
+                            {currentStyle.icon}
+                        </div>
                         <div>
-                            <p className={`text-2xl font-bold ${currentStyle.text}`}>{currentStyle.title}</p>
-                            <p className={`text-md font-semibold ${currentStyle.text}`}>{machineStatus.reason}</p>
+                            <p className={`text-xl md:text-2xl font-bold ${currentStyle.text}`}>{currentStyle.title}</p>
+                            <p className={`text-sm md:text-md font-semibold ${currentStyle.text} break-words`}>{machineStatus.reason}</p>
                         </div>
                     </div>
-                    <div className="text-right">
-                        <p className={`text-3xl font-mono font-bold ${currentStyle.text}`}>{formatDuration(machineStatus.durationMs)}</p>
+                    <div className="text-left md:text-right border-t md:border-t-0 pt-2 md:pt-0 border-current/20">
+                        <p className={`text-2xl md:text-3xl font-mono font-bold ${currentStyle.text}`}>{formatDuration(machineStatus.durationMs)}</p>
                     </div>
                 </div>
             </div>
 
-            <div className="border p-4 rounded-md">
-                <div className="flex justify-between items-start mb-2">
+            <div className="border p-3 md:p-4 rounded-md">
+                <div className="flex flex-col md:flex-row justify-between items-start mb-2 gap-2">
                     <div>
                         <h3 className="font-semibold text-slate-700">Detalhes da Ordem</h3>
                         {currentOperatorLog && (
@@ -225,7 +227,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                             </p>
                         )}
                     </div>
-                    <div className="text-right text-xs">
+                    <div className="w-full md:w-auto mt-2 md:mt-0 text-left md:text-right text-xs">
                         {(() => {
                             const totalTime = shiftDowntime + shiftUptime;
                             const downtimePct = totalTime > 0 ? (shiftDowntime / totalTime) * 100 : 0;
@@ -233,22 +235,26 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
 
                             return (
                                 <>
-                                    <div className="flex gap-2 justify-end mb-1 items-center">
+                                    <div className="flex gap-2 justify-between md:justify-end mb-1 items-center border-b md:border-b-0 pb-1 md:pb-0 border-slate-100">
                                         <span className="text-slate-500 font-medium">Parado:</span>
-                                        <span className="font-bold text-amber-600 font-mono">{formatDuration(shiftDowntime)}</span>
-                                        <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-[10px] font-bold min-w-[3rem] text-center">{downtimePct.toFixed(1)}%</span>
+                                        <div className="flex gap-2 items-center">
+                                            <span className="font-bold text-amber-600 font-mono">{formatDuration(shiftDowntime)}</span>
+                                            <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-[10px] font-bold min-w-[3rem] text-center">{downtimePct.toFixed(1)}%</span>
+                                        </div>
                                     </div>
-                                    <div className="flex gap-2 justify-end items-center">
+                                    <div className="flex gap-2 justify-between md:justify-end items-center">
                                         <span className="text-slate-500 font-medium">Produtivo:</span>
-                                        <span className="font-bold text-emerald-600 font-mono">{formatDuration(shiftUptime)}</span>
-                                        <span className="bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded text-[10px] font-bold min-w-[3rem] text-center">{uptimePct.toFixed(1)}%</span>
+                                        <div className="flex gap-2 items-center">
+                                            <span className="font-bold text-emerald-600 font-mono">{formatDuration(shiftUptime)}</span>
+                                            <span className="bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded text-[10px] font-bold min-w-[3rem] text-center">{uptimePct.toFixed(1)}%</span>
+                                        </div>
                                     </div>
                                 </>
                             );
                         })()}
                     </div>
                 </div>
-                <div className="text-sm space-y-1">
+                <div className="text-sm space-y-1 mt-3 pt-3 border-t border-slate-100">
                     <p><strong>Nº Ordem:</strong> {activeOrder.orderNumber}</p>
                     <p><strong>Operador:</strong> {currentOperator}</p>
                     {machineType === 'Trefila' ? (
@@ -259,22 +265,22 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                 </div>
             </div>
 
-            <div className="border p-4 rounded-md">
+            <div className="border p-3 md:p-4 rounded-md">
                 <h3 className="font-semibold text-slate-700 mb-2">Progresso da Produção</h3>
                 {machineType === 'Trefila' ? (
                     <div className="text-center">
-                        <span className="text-3xl font-bold text-slate-800">{processedLotsCount}</span>
-                        <span className="text-slate-600"> / {totalLotsCount} lotes processados</span>
+                        <span className="text-2xl md:text-3xl font-bold text-slate-800">{processedLotsCount}</span>
+                        <span className="text-sm md:text-base text-slate-600"> / {totalLotsCount} lotes processados</span>
                     </div>
                 ) : (
                     <div>
                         {machineType === 'Treliça' && (
                             <div className="mb-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
-                                <div className="flex justify-between items-center mb-1">
-                                    <span className="text-xs font-bold uppercase text-slate-500 tracking-wider">Tempo desde último reporte</span>
+                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-1 gap-1">
+                                    <span className="text-[10px] md:text-xs font-bold uppercase text-slate-500 tracking-wider">Tempo desde último reporte</span>
                                     {(() => {
                                         if (machineStatus.status === 'Desligada') {
-                                            return <span className="text-slate-400 font-mono font-bold">--:--:--</span>;
+                                            return <span className="text-slate-400 font-mono font-bold text-lg md:text-base">--:--:--</span>;
                                         }
 
                                         const lastUpdate = activeOrder.lastQuantityUpdate || activeOrder.startTime;
@@ -291,28 +297,28 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                         const diff = now.getTime() - baseTime;
                                         const isOverdue = diff > 10 * 60 * 1000; // 10 minutes
                                         return (
-                                            <span className={`font-mono font-bold ${isOverdue ? 'text-red-500 animate-pulse' : 'text-slate-700'}`}>
+                                            <span className={`font-mono font-bold text-lg md:text-base ${isOverdue ? 'text-red-500 animate-pulse' : 'text-slate-700'}`}>
                                                 {formatDuration(diff)}
                                             </span>
                                         );
                                     })()}
                                 </div>
-                                <div className="text-xs text-slate-400 text-right">
+                                <div className="text-[10px] md:text-xs text-slate-400 text-left md:text-right mt-1 md:mt-0">
                                     {machineStatus.status === 'Desligada' ? 'Turno Finalizado' : 'Meta: Reportar a cada 10 min'}
                                 </div>
                             </div>
                         )}
                         <div className="flex justify-between items-baseline mb-1">
                             <div className="flex flex-col">
-                                <span className="text-slate-600">Peças Produzidas</span>
+                                <span className="text-sm md:text-base text-slate-600">Peças Produzidas</span>
                                 {machineType === 'Treliça' && currentOperatorLog && (
                                     <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">No Turno: {(activeOrder.actualProducedQuantity || 0) - (currentOperatorLog.startQuantity || 0)}</span>
                                 )}
                             </div>
-                            <span className="text-xl font-bold text-slate-800">{producedQuantity} / {plannedQuantity}</span>
+                            <span className="text-lg md:text-xl font-bold text-slate-800">{producedQuantity} / {plannedQuantity}</span>
                         </div>
                         <div className="w-full bg-slate-200 rounded-full h-4">
-                            <div className="bg-emerald-500 h-4 rounded-full text-white text-xs flex items-center justify-center font-bold" style={{ width: `${progress}%` }}>
+                            <div className="bg-emerald-500 h-4 rounded-full text-white text-[10px] md:text-xs flex items-center justify-center font-bold" style={{ width: `${progress}%` }}>
                                 {progress > 10 && `${progress.toFixed(0)}%`}
                             </div>
                         </div>
@@ -320,19 +326,19 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                 )}
             </div>
 
-            <div className="border p-4 rounded-md">
-                <h3 className="font-semibold text-slate-700 mb-2 underline decoration-slate-300 decoration-2 underline-offset-4">PARADAS E SEUS MOTIVOS:</h3>
+            <div className="border p-3 md:p-4 rounded-md">
+                <h3 className="font-semibold text-slate-700 mb-2 underline decoration-slate-300 decoration-2 underline-offset-4 text-sm md:text-base">PARADAS E SEUS MOTIVOS:</h3>
                 <div className="overflow-x-auto max-h-64 overflow-y-auto custom-scrollbar">
-                    <table className="w-full border-collapse">
+                    <table className="w-full border-collapse min-w-[300px]">
                         <thead>
-                            <tr className="bg-slate-100 text-slate-600 text-xs uppercase font-bold text-left sticky top-0 z-10 shadow-sm">
+                            <tr className="bg-slate-100 text-slate-600 text-[10px] md:text-xs uppercase font-bold text-left sticky top-0 z-10 shadow-sm">
                                 <th className="p-2 border border-slate-300 bg-slate-100">Início</th>
                                 <th className="p-2 border border-slate-300 bg-slate-100">Fim</th>
                                 <th className="p-2 border border-slate-300 bg-slate-100">Motivo</th>
                                 <th className="p-2 border border-slate-300 text-right bg-slate-100">Duração</th>
                             </tr>
                         </thead>
-                        <tbody className="text-sm">
+                        <tbody className="text-xs md:text-sm">
                             {(activeOrder.downtimeEvents || [])
                                 .slice()
                                 .sort((a, b) => new Date(a.stopTime).getTime() - new Date(b.stopTime).getTime())
@@ -361,11 +367,11 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                                     ? new Date(event.resumeTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
                                                     : (activeOrder.status === 'completed'
                                                         ? new Date(activeOrder.endTime!).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + '*'
-                                                        : <span className="text-amber-500 text-xs animate-pulse">EM ANDAMENTO</span>
+                                                        : <span className="text-amber-500 text-[10px] animate-pulse">EM ANDAMENTO</span>
                                                     )
                                                 }
                                             </td>
-                                            <td className="p-2 border border-slate-300 italic text-slate-700 uppercase font-bold text-xs">
+                                            <td className="p-2 border border-slate-300 italic text-slate-700 uppercase font-bold text-[10px] md:text-xs">
                                                 {event.reason}
                                             </td>
                                             <td className="p-2 border border-slate-300 font-black text-rose-600 font-mono text-right tabular-nums">
@@ -376,7 +382,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                 })}
                             {(activeOrder.downtimeEvents || []).filter(e => e.reason !== 'Final de Turno').length === 0 && (
                                 <tr>
-                                    <td colSpan={4} className="p-4 text-center text-slate-400 text-sm italic">
+                                    <td colSpan={4} className="p-4 text-center text-slate-400 text-xs md:text-sm italic">
                                         Nenhuma parada registrada recentemente.
                                     </td>
                                 </tr>
