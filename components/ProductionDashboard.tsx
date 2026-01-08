@@ -402,7 +402,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                     })
                                     .map((lot, idx) => {
                                         const lotInfo = stock.find(s => s.id === lot.lotId);
-                                        const isWaiting = lot.finalWeight === null || lot.measuredGauge === undefined;
+                                        const isWaiting = lot.finalWeight == null || lot.measuredGauge == null;
                                         const waitingMs = isWaiting ? now.getTime() - new Date(lot.endTime).getTime() : 0;
 
                                         return (

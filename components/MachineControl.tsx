@@ -1494,11 +1494,12 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                             )}
                                                                         </td>
                                                                         <td className="p-3">
-                                                                            {lot.measuredGauge === undefined ? (
+                                                                            {lot.measuredGauge == null ? (
                                                                                 <div className="flex items-center gap-1">
                                                                                     <input
                                                                                         type="number"
                                                                                         step="0.01"
+                                                                                        inputMode="decimal"
                                                                                         className="w-3/4 p-2 border-2 border-slate-100 rounded-lg text-center focus:border-indigo-500 bg-slate-50 focus:bg-white transition"
                                                                                         placeholder="0.00"
                                                                                         value={pendingGauges?.get(lot.lotId) || ''}
@@ -1544,7 +1545,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                     {/* Mobile Card List */}
                                                     <div className="flex flex-col gap-3 sm:hidden">
                                                         {[...completedLots].reverse().map(lot => {
-                                                            const isWaiting = lot.finalWeight === null || lot.measuredGauge === undefined;
+                                                            const isWaiting = lot.finalWeight == null || lot.measuredGauge == null;
                                                             const waitingMs = isWaiting ? timer.getTime() - new Date(lot.endTime).getTime() : 0;
 
                                                             return (
@@ -1567,10 +1568,11 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                     <div className="grid grid-cols-2 gap-3">
                                                                         <div className="space-y-1">
                                                                             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Peso Saída (kg)</label>
-                                                                            {lot.finalWeight === null ? (
+                                                                            {lot.finalWeight == null ? (
                                                                                 <input
                                                                                     type="number"
-                                                                                    className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-center font-bold focus:border-indigo-500 outline-none transition"
+                                                                                    inputMode="decimal"
+                                                                                    className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-center font-bold focus:border-indigo-500 outline-none transition uppercase"
                                                                                     placeholder="0.0"
                                                                                     value={pendingWeights.get(lot.lotId) || ''}
                                                                                     onChange={e => handlePendingWeightChange(lot.lotId, e.target.value)}
@@ -1581,11 +1583,12 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                         </div>
                                                                         <div className="space-y-1">
                                                                             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Bitola (mm)</label>
-                                                                            {lot.measuredGauge === undefined ? (
+                                                                            {lot.measuredGauge == null ? (
                                                                                 <input
                                                                                     type="number"
                                                                                     step="0.01"
-                                                                                    className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-center font-bold focus:border-indigo-500 outline-none transition"
+                                                                                    inputMode="decimal"
+                                                                                    className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-center font-bold focus:border-indigo-500 outline-none transition uppercase"
                                                                                     placeholder="0.00"
                                                                                     value={pendingGauges?.get(lot.lotId) || ''}
                                                                                     onChange={e => handlePendingGaugeChange(lot.lotId, e.target.value)}
