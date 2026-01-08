@@ -1300,7 +1300,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                 <ClockIcon className="h-16 w-16 mx-auto text-slate-300 mb-4" />
                                                 <h3 className="text-2xl font-bold text-slate-800 mb-2">Turno Não Iniciado</h3>
                                                 <p className="text-slate-500 mb-6">Inicie seu turno para liberar os controles da máquina.</p>
-                                                <button onClick={() => startOperatorShift && startOperatorShift(activeOrder.id)} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 px-6 rounded-xl transition text-lg shadow-lg flex items-center justify-center gap-3">
+                                                <button onClick={handleStartShift} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 px-6 rounded-xl transition text-lg shadow-lg flex items-center justify-center gap-3">
                                                     <PlayIcon className="h-6 w-6" /> INICIAR MEU TURNO
                                                 </button>
                                             </div>
@@ -1580,7 +1580,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                     <div className="flex-1 md:flex-none flex items-center justify-center md:w-1/2">
                                         {!hasActiveShift ? (
                                             <button
-                                                onClick={() => startOperatorShift && startOperatorShift(activeOrder.id)}
+                                                onClick={handleStartShift}
                                                 className="w-full md:w-auto md:px-14 h-14 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl md:rounded-full font-black text-lg shadow-xl shadow-emerald-200 transition transform active:scale-90 hover:scale-[1.02] flex items-center justify-center gap-3 animate-pulse"
                                             >
                                                 <PlayIcon className="h-8 w-8" />
@@ -1647,7 +1647,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                             </button>
                                         ) : (
                                             <button
-                                                onClick={() => startOperatorShift && startOperatorShift(activeOrder.id)}
+                                                onClick={handleStartShift}
                                                 className="p-3.5 text-emerald-600 hover:bg-emerald-50 rounded-2xl transition active:scale-90 flex flex-col items-center gap-0.5"
                                                 title="Iniciar Turno"
                                             >
