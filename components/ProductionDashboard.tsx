@@ -264,7 +264,10 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                     <p><strong>Nº Ordem:</strong> {activeOrder.orderNumber}</p>
                     <p><strong>Operador:</strong> {currentOperator}</p>
                     {machineType === 'Trefila' ? (
-                        <p><strong>Produto:</strong> CA-60 {activeOrder.targetBitola}mm</p>
+                        <div className="grid grid-cols-2 gap-2 mt-2">
+                            <p><strong>Produto:</strong> CA-60 {activeOrder.targetBitola}mm</p>
+                            <p className="text-right"><strong>Meta:</strong> {activeOrder.totalWeight.toFixed(0)} kg</p>
+                        </div>
                     ) : (
                         <p><strong>Produto:</strong> {activeOrder.trelicaModel} ({activeOrder.tamanho} mts)</p>
                     )}
@@ -274,9 +277,23 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             <div className="border p-3 md:p-4 rounded-md">
                 <h3 className="font-semibold text-slate-700 mb-2">Progresso da Produção</h3>
                 {machineType === 'Trefila' ? (
-                    <div className="text-center">
-                        <span className="text-2xl md:text-3xl font-bold text-slate-800">{processedLotsCount}</span>
-                        <span className="text-sm md:text-base text-slate-600"> / {totalLotsCount} lotes processados</span>
+                    <div>
+                        <div className="flex justify-between items-baseline mb-1">
+                            <div className="flex flex-col">
+                                <span className="text-sm md:text-base text-slate-600">Lotes Processados</span>
+                                {currentOperatorLog && (
+                                    <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">
+                                        No Turno: {(activeOrder.processedLots || []).filter(l => new Date(l.endTime).getTime() >= new Date(currentOperatorLog.startTime).getTime()).length}
+                                    </span>
+                                )}
+                            </div>
+                            <span className="text-lg md:text-xl font-bold text-slate-800">{processedLotsCount} / {totalLotsCount}</span>
+                        </div>
+                        <div className="w-full bg-slate-200 rounded-full h-4">
+                            <div className="bg-indigo-500 h-4 rounded-full text-white text-[10px] md:text-xs flex items-center justify-center font-bold" style={{ width: `${progress}%` }}>
+                                {progress > 10 && `${progress.toFixed(0)}%`}
+                            </div>
+                        </div>
                     </div>
                 ) : (
                     <div>

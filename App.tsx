@@ -958,25 +958,30 @@ const App: React.FC = () => {
             }],
         };
 
-        // For Treliça, check previous stop reason logic
-        if (order.machine === 'Treliça') {
-            const newEvents = [...(order.downtimeEvents || [])];
-            let lastEventIndex = -1;
-            for (let i = newEvents.length - 1; i >= 0; i--) {
-                if (!newEvents[i].resumeTime) {
-                    lastEventIndex = i;
-                    break;
-                }
+        // Auto-resume for administrative stops
+        const newEvents = [...(order.downtimeEvents || [])];
+        let lastEventIndex = -1;
+        for (let i = newEvents.length - 1; i >= 0; i--) {
+            if (!newEvents[i].resumeTime) {
+                lastEventIndex = i;
+                break;
             }
-            if (lastEventIndex !== -1) {
-                const lastReason = newEvents[lastEventIndex].reason;
-                // Only auto-resume for administrative stops
-                if (lastReason === 'Final de Turno' || lastReason === 'Aguardando Início da Produção') {
-                    newEvents[lastEventIndex].resumeTime = now;
-                    updates.downtimeEvents = newEvents;
+        }
+
+        if (lastEventIndex !== -1) {
+            const lastReason = newEvents[lastEventIndex].reason;
+            if (lastReason === 'Final de Turno' || lastReason === 'Aguardando Início da Produção') {
+                newEvents[lastEventIndex].resumeTime = now;
+                updates.downtimeEvents = newEvents;
+
+                // For Trefila, if no active lot, immediately start "Troca de Rolo" after resuming shift
+                if (order.machine === 'Trefila' && (!order.activeLotProcessing || !order.activeLotProcessing.lotId)) {
+                    newEvents.push({
+                        stopTime: now,
+                        resumeTime: null,
+                        reason: 'Troca de Rolo / Preparação'
+                    });
                 }
-                // If it's a real stop (e.g. Falta de Energia), we DO NOT resume automatically. 
-                // The machine stays stopped in the new shift until user explicitly resumes.
             }
         }
 
@@ -1194,17 +1199,23 @@ const App: React.FC = () => {
                 break;
             }
         }
+
+        // Close any open event
         if (lastEventIndex !== -1) {
             newEvents[lastEventIndex].resumeTime = now;
         }
-        if ((!order.activeLotProcessing || !order.activeLotProcessing.lotId) && order.machine === 'Trefila') {
-            newEvents.push({ stopTime: now, resumeTime: null, reason: 'Troca de Rolo / Preparação' });
+
+        // Trefila requirement: machine must be in "Troca de Rolo" if no lot is active
+        if (order.machine === 'Trefila' && (!order.activeLotProcessing || !order.activeLotProcessing.lotId)) {
+            // Only add if we didn't just close a "Troca de Rolo" now, or if it's the first one
+            const justClosedReason = lastEventIndex !== -1 ? (order.downtimeEvents || [])[lastEventIndex].reason : null;
+            if (justClosedReason !== 'Troca de Rolo / Preparação') {
+                newEvents.push({ stopTime: now, resumeTime: null, reason: 'Troca de Rolo / Preparação' });
+            }
         }
 
-        const updates: Partial<ProductionOrderData> = { downtimeEvents: newEvents };
-
         try {
-            await updateItem('production_orders', orderId, updates);
+            await updateItem('production_orders', orderId, { downtimeEvents: newEvents });
             showNotification('Produção retomada.', 'success');
         } catch (error) {
             showNotification('Erro ao retomar produção.', 'error');
@@ -1234,8 +1245,7 @@ const App: React.FC = () => {
         };
 
         try {
-            const updatedOrder = await updateItem('production_orders', orderId, updates);
-            setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
+            await updateItem('production_orders', orderId, updates);
             showNotification('Processamento de lote iniciado.', 'success');
         } catch (error) {
             showNotification('Erro ao iniciar lote.', 'error');
@@ -1266,8 +1276,7 @@ const App: React.FC = () => {
         };
 
         try {
-            const updatedOrder = await updateItem('production_orders', orderId, updates);
-            setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
+            await updateItem('production_orders', orderId, updates);
             showNotification('Processamento de lote finalizado.', 'success');
         } catch (error) {
             showNotification('Erro ao finalizar lote.', 'error');
@@ -1743,7 +1752,13 @@ const App: React.FC = () => {
                             <button onClick={() => setIsMobileMenuOpen(true)} className="mobile-menu-btn">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
                             </button>
-                            <span className="text-slate-400 text-sm font-medium">MSM / {page.charAt(0).toUpperCase() + page.slice(1)}</span>
+                            <span className="text-slate-400 text-sm font-black uppercase tracking-widest flex items-center gap-2">
+                                <div className="w-1.5 h-1.5 rounded-full bg-slate-400"></div>
+                                {page === 'trefila_in_progress' ? 'Produção Trefila' :
+                                    page === 'trelica_in_progress' ? 'Produção Treliça' :
+                                        page === 'productionDashboard' ? 'Painel de Controle' :
+                                            page.charAt(0).toUpperCase() + page.slice(1).replace('_', ' ')}
+                            </span>
                         </div>
                         <div className="flex items-center gap-6">
                             <div className="flex flex-col items-end">

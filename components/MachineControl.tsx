@@ -1045,7 +1045,11 @@ const MachineControl: React.FC<MachineControlProps> = ({
             )}
 
 
-            {/* Removed redundant internal header because Sidebar and Top Bar provide navigation */}
+            {/* Machine Header for better context on mobile */}
+            <div className="mb-6">
+                <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tighter uppercase">{machineHeader}</h1>
+                <div className="h-1 w-12 bg-indigo-500 rounded-full mt-2"></div>
+            </div>
 
             {view === 'dashboard' && (
                 <div className="space-y-6">
@@ -1057,18 +1061,49 @@ const MachineControl: React.FC<MachineControlProps> = ({
                             </button>
                         </div>
                     )}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {activeOrder && (
+                        <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-2xl shadow-xl text-white mb-6">
+                            <div className="flex justify-between items-start mb-6">
+                                <div>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Ordem Ativa</p>
+                                    <h3 className="text-3xl font-black tracking-tighter">#{activeOrder.orderNumber}</h3>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Status</p>
+                                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${statusStyle.bg} ${statusStyle.text} border ${statusStyle.border}`}>
+                                        {statusStyle.label}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
+                                <div>
+                                    <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">Operador</p>
+                                    <p className="font-bold">{currentOperatorLog?.operator || '---'}</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">Progresso</p>
+                                    <p className="font-bold">
+                                        {machineType === 'Trefila'
+                                            ? `${(activeOrder.processedLots || []).length} / ${(activeOrder.selectedLotIds as string[]).length} Lotes`
+                                            : `${activeOrder.actualProducedQuantity || 0} / ${activeOrder.quantityToProduce} Pçs`
+                                        }
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    <div className="grid grid-cols-2 md:grid-cols-2 gap-4 md:gap-6">
                         <MachineMenuButton
                             onClick={() => setView('in_progress')}
-                            label={postProductionOrder ? "Atividade Pós-Produção" : "Em Produção"}
-                            description={postProductionOrder ? "Registre atividades enquanto aguarda o fim do turno." : "Acompanhe a ordem ativa, registre paradas e processe lotes."}
+                            label={postProductionOrder ? "Acompanhar" : "Painel Principal"}
+                            description={postProductionOrder ? "Pós-Produção" : "Em Produção"}
                             icon={<CogIcon className={`h-6 w-6 ${activeOrder ? 'animate-spin' : ''}`} />}
                             disabled={!activeOrder && !postProductionOrder}
                         />
                         <MachineMenuButton
                             onClick={() => setView('pending')}
-                            label="Próximas Produções"
-                            description="Visualize e inicie as próximas ordens de produção na fila."
+                            label="Fila"
+                            description="Próximos"
                             icon={<ClipboardListIcon className="h-6 w-6" />}
                         />
                     </div>
@@ -1200,19 +1235,28 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                             </div>
                                         ) : (
                                             <div className="space-y-6">
-                                                <div className="flex items-center justify-between">
+                                                <div className="flex items-start justify-between">
                                                     <div>
                                                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Produzido</p>
-                                                        <span className="text-4xl font-black text-slate-900 tracking-tighter">
-                                                            {(activeOrder.processedLots || []).reduce((acc, lot) => acc + (lot.finalWeight || 0), 0).toFixed(1)}
-                                                            <span className="text-lg text-slate-300 ml-1">kg</span>
-                                                        </span>
+                                                        <div className="flex items-baseline gap-1">
+                                                            <span className="text-4xl font-black text-slate-900 tracking-tighter">
+                                                                {(activeOrder.processedLots || []).reduce((acc, lot) => acc + (lot.finalWeight || 0), 0).toFixed(0)}
+                                                            </span>
+                                                            <span className="text-lg text-slate-300">kg</span>
+                                                        </div>
+                                                        {currentOperatorLog && (
+                                                            <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mt-1">
+                                                                No Turno: {(activeOrder.processedLots || []).filter(l => new Date(l.endTime).getTime() >= new Date(currentOperatorLog.startTime).getTime()).length} Lotes
+                                                            </p>
+                                                        )}
                                                     </div>
                                                     <div className="text-right">
-                                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Meta do Lote</p>
-                                                        <span className="text-xl font-bold text-slate-600 tracking-tight">
-                                                            {activeOrder.totalWeight.toFixed(1)} <span className="text-sm font-medium">kg</span>
-                                                        </span>
+                                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Lotes Totais</p>
+                                                        <div className="flex items-baseline justify-end gap-1">
+                                                            <span className="text-2xl font-black text-slate-700 tracking-tighter">{(activeOrder.processedLots || []).length}</span>
+                                                            <span className="text-xs font-bold text-slate-300">/ {(activeOrder.selectedLotIds as string[]).length}</span>
+                                                        </div>
+                                                        <p className="text-[11px] font-bold text-slate-400 mt-1">Meta: {activeOrder.totalWeight.toFixed(0)} kg</p>
                                                     </div>
                                                 </div>
                                                 <div className="w-full bg-slate-100 rounded-2xl h-8 overflow-hidden p-1 border border-slate-50">
