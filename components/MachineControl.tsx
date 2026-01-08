@@ -336,6 +336,58 @@ const ManagerOverrideModal: React.FC<{
     );
 };
 
+const ManagerActionAuthorizationModal: React.FC<{
+    actionDescription: string;
+    onSuccess: () => void;
+    onCancel: () => void;
+    users: User[];
+}> = ({ actionDescription, onSuccess, onCancel, users }) => {
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+        const manager = users.find(u => u.role === 'gestor' && u.password === password);
+        if (manager) {
+            onSuccess();
+        } else {
+            setError('Senha do gestor incorreta ou inválida.');
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[60] p-4">
+            <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-xl w-full max-w-lg">
+                <div className="text-center">
+                    <WarningIcon className="h-16 w-16 mx-auto text-amber-500 mb-4" />
+                    <h2 className="text-2xl font-bold text-slate-800 mb-4">Autorização Necessária</h2>
+                    <p className="text-slate-600 mb-6">
+                        {actionDescription}
+                    </p>
+                    <p className="text-sm font-bold text-slate-700 mb-4">É necessária autorização de um gestor para prosseguir.</p>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-slate-700">Senha do Gestor</label>
+                    <input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="mt-1 p-2 w-full border border-slate-300 rounded-md"
+                        required
+                        autoFocus
+                    />
+                    {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
+                </div>
+                <div className="flex justify-end gap-4 mt-8 pt-4 border-t">
+                    <button type="button" onClick={onCancel} className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-6 rounded-lg transition">Cancelar</button>
+                    <button type="submit" className="bg-amber-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-amber-700 transition">Autorizar</button>
+                </div>
+            </form>
+        </div>
+    );
+};
+
 interface MachineControlProps {
     machineType: MachineType;
     setPage: (page: Page) => void;
@@ -525,6 +577,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
     const [showPartsRequestModal, setShowPartsRequestModal] = useState(false);
     const [showShiftReportsModal, setShowShiftReportsModal] = useState(false);
     const [lastShiftEndPromptDate, setLastShiftEndPromptDate] = useState<string | null>(null);
+    const [showManagerAuthForShiftEnd, setShowManagerAuthForShiftEnd] = useState(false);
 
     const [productionReportData, setProductionReportData] = useState<ProductionOrderData | null>(null);
     const [showTrefilaCalculation, setShowTrefilaCalculation] = useState(false);
@@ -806,6 +859,41 @@ const MachineControl: React.FC<MachineControlProps> = ({
         }
     }
 
+    const handleShiftEndRequest = (orderId: string) => {
+        // Only apply restriction for Treliça machine
+        if (machineType !== 'Treliça') {
+            setPendingShiftEnd(orderId);
+            setShowQuantityPrompt(true);
+            return;
+        }
+
+        if (!currentOperatorLog) {
+            // Should not happen if ending active shift, but fallback
+            setPendingShiftEnd(orderId);
+            setShowQuantityPrompt(true);
+            return;
+        }
+
+        const now = new Date();
+        const shiftEndTime = new Date(now);
+        shiftEndTime.setHours(17, 30, 0, 0);
+
+        // Check if current time is before 17:30
+        if (now < shiftEndTime) {
+            setPendingShiftEnd(orderId);
+            setShowManagerAuthForShiftEnd(true);
+        } else {
+            // After 17:30 (Overtime allowed without password)
+            setPendingShiftEnd(orderId);
+            setShowQuantityPrompt(true);
+        }
+    };
+
+    const handleManagerAuthSuccess = () => {
+        setShowManagerAuthForShiftEnd(false);
+        setShowQuantityPrompt(true);
+    };
+
     const handleUpdateQuantity = (shiftQuantity: number) => {
         const targetOrder = pendingShiftEnd ? (productionOrders.find(o => o.id === pendingShiftEnd)) : activeOrder;
 
@@ -882,6 +970,17 @@ const MachineControl: React.FC<MachineControlProps> = ({
                         setManagerOverrideData(null);
                     }}
                     onCancel={() => setManagerOverrideData(null)}
+                />
+            )}
+            {showManagerAuthForShiftEnd && (
+                <ManagerActionAuthorizationModal
+                    users={users}
+                    actionDescription="O turno encerra às 17:30. É necessária autorização de um gestor para encerrá-lo antecipadamente."
+                    onSuccess={handleManagerAuthSuccess}
+                    onCancel={() => {
+                        setShowManagerAuthForShiftEnd(false);
+                        setPendingShiftEnd(null);
+                    }}
                 />
             )}
 
@@ -1514,10 +1613,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
                                         {hasActiveShift ? (
                                             <button
-                                                onClick={() => {
-                                                    setPendingShiftEnd(activeOrder.id);
-                                                    setShowQuantityPrompt(true);
-                                                }}
+                                                onClick={() => handleShiftEndRequest(activeOrder.id)}
                                                 className="p-3.5 text-red-500 hover:bg-red-50/50 rounded-2xl transition active:scale-90 flex flex-col items-center gap-0.5"
                                                 title="Finalizar Turno"
                                             >
@@ -1561,10 +1657,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                 <div className={`h-4 rounded-full ${shiftStatus.isOvertime ? 'bg-red-500' : 'bg-slate-600'}`} style={{ width: `${shiftStatus.progress}%` }}></div>
                                             </div>
                                             <p className="text-center font-mono text-slate-800 font-semibold">{shiftStatus.timeStatusText}</p>
-                                            <button onClick={() => {
-                                                setPendingShiftEnd(postProductionOrder.id);
-                                                setShowQuantityPrompt(true); // Reusing the same modal, assumes activeOrder might be null but we might need to handle this.
-                                            }} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition flex items-center justify-center gap-2 mt-2">
+                                            <button onClick={() => handleShiftEndRequest(postProductionOrder.id)} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition flex items-center justify-center gap-2 mt-2">
                                                 <ClockIcon className="h-5 w-5" /> Finalizar Meu Turno
                                             </button>
                                         </div>
