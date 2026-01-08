@@ -49,7 +49,7 @@ const WeightIndicator: React.FC<{ required: number; selected: number; label?: st
         <div className="text-right">
             {label && <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{label}</p>}
             <div className="flex items-baseline justify-end gap-2">
-                <span className="text-xs text-slate-500">Target: <strong className="text-slate-700">{required.toFixed(1)}kg</strong></span>
+                <span className="text-xs text-slate-500">Meta: <strong className="text-slate-700">{required.toFixed(1)}kg</strong></span>
                 <span className={`text-lg font-black ${sufficient ? 'text-emerald-600' : 'text-amber-500'}`}>
                     {selected.toFixed(1)} <small className="text-xs font-bold">kg</small>
                 </span>

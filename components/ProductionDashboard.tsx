@@ -61,6 +61,15 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
         });
     }, [activeOrder]);
 
+    const currentOperatorLog = useMemo(() => {
+        if (!activeOrder?.operatorLogs) return null;
+        // Sort by startTime to ensure we get the true latest, then reverse to find the latest open one
+        return [...activeOrder.operatorLogs]
+            .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+            .reverse()
+            .find(log => !log.endTime) || null;
+    }, [activeOrder]);
+
     const now = useMemo(() => new Date(localNow.getTime() + stableDrift), [localNow, stableDrift]);
 
     const machineStatus = useMemo(() => {
@@ -68,9 +77,20 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             return { status: 'Ocioso', reason: 'Nenhuma ordem em produção', since: now.toISOString(), durationMs: 0 };
         }
 
-        const lastEvent = activeOrder.downtimeEvents?.[(activeOrder.downtimeEvents.length || 0) - 1];
+        // Filter events that are RELEVANT to the current shift (if active)
+        const relevantEvents = (activeOrder.downtimeEvents || []).filter(e => {
+            if (!currentOperatorLog) return true;
+            // Include event if it ends after shift start (overlaps) or starts after shift start
+            const shiftStart = new Date(currentOperatorLog.startTime).getTime();
+            const eventStart = new Date(e.stopTime).getTime();
+            const eventEnd = e.resumeTime ? new Date(e.resumeTime).getTime() : Date.now();
+            return eventEnd > shiftStart;
+        });
 
-        if (lastEvent?.resumeTime === null) {
+        const lastEvent = relevantEvents.length > 0 ? relevantEvents[relevantEvents.length - 1] : null;
+
+        if (lastEvent?.resumeTime === null && lastEvent) {
+            // ... existing logic for stopped ...
             const reason = (lastEvent.reason || '').trim();
             if (reason === 'Final de Turno') {
                 return { status: 'Desligada', reason: 'Final de Turno', since: lastEvent.stopTime, durationMs: 0 };
@@ -78,18 +98,51 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             const durationMs = Math.max(0, now.getTime() - new Date(lastEvent.stopTime).getTime());
             return { status: 'Parada', reason: lastEvent.reason, since: lastEvent.stopTime, durationMs };
         } else {
-            const since = lastEvent?.resumeTime || activeOrder.startTime || now.toISOString();
+            // ... existing logic for producing ...
+            // If no relevant downtime events in this shift, defaulting to shift start is safer
+            let since = lastEvent?.resumeTime || activeOrder.startTime || now.toISOString();
+
+            if (currentOperatorLog && currentOperatorLog.startTime) {
+                const shiftStartMs = new Date(currentOperatorLog.startTime).getTime();
+                const machineStartMs = new Date(since).getTime();
+                // If the "machine start" (last resume) is older than my shift, use my shift start
+                // OR if there are NO relevant events, definitely use my shift start
+                if (shiftStartMs > machineStartMs || !lastEvent) {
+                    since = currentOperatorLog.startTime;
+                }
+            }
+
             const durationMs = Math.max(0, now.getTime() - new Date(since).getTime());
             return { status: 'Produzindo', reason: '', since, durationMs };
         }
-    }, [activeOrder, now]);
-
-    const currentOperatorLog = useMemo(() => {
-        if (!activeOrder?.operatorLogs) return null;
-        return [...activeOrder.operatorLogs].reverse().find(log => !log.endTime) || null;
-    }, [activeOrder]);
+    }, [activeOrder, now, currentOperatorLog]);
 
     const currentOperator = currentOperatorLog?.operator || 'N/A';
+
+    const { shiftDowntime, shiftUptime } = useMemo(() => {
+        if (!currentOperatorLog || !currentOperatorLog.startTime) return { shiftDowntime: 0, shiftUptime: 0 };
+
+        const nowMs = now.getTime();
+        const start = new Date(currentOperatorLog.startTime).getTime();
+        const totalShiftDuration = Math.max(0, nowMs - start);
+
+        let downtime = 0;
+        if (activeOrder && activeOrder.downtimeEvents) {
+            downtime = activeOrder.downtimeEvents.reduce((acc, event) => {
+                const stopTime = new Date(event.stopTime).getTime();
+                const resumeTime = event.resumeTime ? new Date(event.resumeTime).getTime() : nowMs;
+                const effectiveStart = Math.max(stopTime, start);
+                const effectiveEnd = Math.min(resumeTime, nowMs);
+                if (effectiveEnd > effectiveStart) {
+                    return acc + (effectiveEnd - effectiveStart);
+                }
+                return acc;
+            }, 0);
+        }
+
+        const uptime = Math.max(0, totalShiftDuration - downtime);
+        return { shiftDowntime: downtime, shiftUptime: uptime };
+    }, [now, currentOperatorLog, activeOrder]);
 
     const timelineEvents = useMemo(() => {
         if (!activeOrder) return [];
@@ -163,7 +216,38 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             </div>
 
             <div className="border p-4 rounded-md">
-                <h3 className="font-semibold text-slate-700 mb-2">Detalhes da Ordem</h3>
+                <div className="flex justify-between items-start mb-2">
+                    <div>
+                        <h3 className="font-semibold text-slate-700">Detalhes da Ordem</h3>
+                        {currentOperatorLog && (
+                            <p className="text-xs text-slate-500 mt-1">
+                                Início Turno: <span className="font-mono font-bold text-slate-700">{new Date(currentOperatorLog.startTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                            </p>
+                        )}
+                    </div>
+                    <div className="text-right text-xs">
+                        {(() => {
+                            const totalTime = shiftDowntime + shiftUptime;
+                            const downtimePct = totalTime > 0 ? (shiftDowntime / totalTime) * 100 : 0;
+                            const uptimePct = totalTime > 0 ? (shiftUptime / totalTime) * 100 : 0;
+
+                            return (
+                                <>
+                                    <div className="flex gap-2 justify-end mb-1 items-center">
+                                        <span className="text-slate-500 font-medium">Parado:</span>
+                                        <span className="font-bold text-amber-600 font-mono">{formatDuration(shiftDowntime)}</span>
+                                        <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-[10px] font-bold min-w-[3rem] text-center">{downtimePct.toFixed(1)}%</span>
+                                    </div>
+                                    <div className="flex gap-2 justify-end items-center">
+                                        <span className="text-slate-500 font-medium">Produtivo:</span>
+                                        <span className="font-bold text-emerald-600 font-mono">{formatDuration(shiftUptime)}</span>
+                                        <span className="bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded text-[10px] font-bold min-w-[3rem] text-center">{uptimePct.toFixed(1)}%</span>
+                                    </div>
+                                </>
+                            );
+                        })()}
+                    </div>
+                </div>
                 <div className="text-sm space-y-1">
                     <p><strong>Nº Ordem:</strong> {activeOrder.orderNumber}</p>
                     <p><strong>Operador:</strong> {currentOperator}</p>
@@ -189,9 +273,22 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                 <div className="flex justify-between items-center mb-1">
                                     <span className="text-xs font-bold uppercase text-slate-500 tracking-wider">Tempo desde último reporte</span>
                                     {(() => {
+                                        if (machineStatus.status === 'Desligada') {
+                                            return <span className="text-slate-400 font-mono font-bold">--:--:--</span>;
+                                        }
+
                                         const lastUpdate = activeOrder.lastQuantityUpdate || activeOrder.startTime;
                                         if (!lastUpdate) return <span className="text-slate-400">-</span>;
-                                        const diff = now.getTime() - new Date(lastUpdate).getTime();
+
+                                        let baseTime = new Date(lastUpdate).getTime();
+                                        if (currentOperatorLog && currentOperatorLog.startTime) {
+                                            const shiftStartMs = new Date(currentOperatorLog.startTime).getTime();
+                                            if (shiftStartMs > baseTime) {
+                                                baseTime = shiftStartMs;
+                                            }
+                                        }
+
+                                        const diff = now.getTime() - baseTime;
                                         const isOverdue = diff > 10 * 60 * 1000; // 10 minutes
                                         return (
                                             <span className={`font-mono font-bold ${isOverdue ? 'text-red-500 animate-pulse' : 'text-slate-700'}`}>
@@ -201,7 +298,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                     })()}
                                 </div>
                                 <div className="text-xs text-slate-400 text-right">
-                                    Meta: Reportar a cada 10 min
+                                    {machineStatus.status === 'Desligada' ? 'Turno Finalizado' : 'Meta: Reportar a cada 10 min'}
                                 </div>
                             </div>
                         )}

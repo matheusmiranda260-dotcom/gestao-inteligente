@@ -716,9 +716,14 @@ const MachineControl: React.FC<MachineControlProps> = ({
         const day = now.getDay();
         const isWeekday = day >= 1 && day <= 5;
 
-        const shiftStart = new Date(now);
-        shiftStart.setHours(7, 45, 0, 0);
+        // Use actual shift start if available, otherwise default to 07:45
+        const actualStart = currentOperatorLog ? new Date(currentOperatorLog.startTime) : null;
+        const defaultStart = new Date(now);
+        defaultStart.setHours(7, 45, 0, 0);
 
+        const shiftStart = actualStart || defaultStart;
+
+        // Target end is 17:30 OR start + duration? Stick to 17:30 for standard shift visual
         const shiftEnd = new Date(now);
         shiftEnd.setHours(17, 30, 0, 0);
 
@@ -733,17 +738,24 @@ const MachineControl: React.FC<MachineControlProps> = ({
         let isOvertime = false;
         let timeStatusText = '';
 
-        if (isWeekday && nowMs >= startMs && nowMs <= endMs) {
-            progress = (elapsedSinceStart / totalShiftDuration) * 100;
-            const remainingMs = endMs - nowMs;
-            timeStatusText = `Faltam ${formatDuration(remainingMs)} para o fim do turno`;
+        if (isWeekday && nowMs <= endMs) {
+            // Normal shift progress
+            if (nowMs < startMs) {
+                timeStatusText = `Turno inicia em ${formatDuration(startMs - nowMs)}`;
+            } else {
+                progress = (elapsedSinceStart / totalShiftDuration) * 100;
+                const remainingMs = endMs - nowMs;
+                timeStatusText = `Faltam ${formatDuration(remainingMs)} para o fim do turno`;
+            }
         } else {
+            // Overtime or Weekend
             progress = 100;
             isOvertime = true;
             if (nowMs > endMs) {
                 timeStatusText = `+${formatDuration(nowMs - endMs)} de hora extra`;
-            } else if (nowMs < startMs) {
-                timeStatusText = `Turno inicia em ${formatDuration(startMs - nowMs)}`;
+            } else {
+                // Should be covered by weekday check, but fallback
+                timeStatusText = 'Hora Extra';
             }
             if (!isWeekday) {
                 timeStatusText = 'Trabalho em fim de semana (Hora Extra)';
@@ -755,7 +767,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
             progress: Math.max(0, Math.min(100, progress)),
             timeStatusText,
         };
-    }, [timer]);
+    }, [timer, currentOperatorLog]);
 
 
     const { waitingLots, completedLots } = useMemo(() => {
@@ -875,15 +887,28 @@ const MachineControl: React.FC<MachineControlProps> = ({
         }
 
         const now = new Date();
-        const shiftEndTime = new Date(now);
-        shiftEndTime.setHours(17, 30, 0, 0);
+        const dayOfWeek = now.getDay(); // 0 = Sunday, 6 = Saturday
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
-        // Check if current time is before 17:30
-        if (now < shiftEndTime) {
+        if (isWeekend) {
+            // Overtime/Weekend shifts are flexible, allow ending anytime
+            setPendingShiftEnd(orderId);
+            setShowQuantityPrompt(true);
+            return;
+        }
+
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
+
+        // Define Core Shift Hours: 07:00 to 17:30 (Weekdays only)
+        // We only require password if attempting to leave EARLY within this window.
+        const isWithinCoreHours = (currentHour > 7 || (currentHour === 7)) && (currentHour < 17 || (currentHour === 17 && currentMinute < 30));
+
+        if (isWithinCoreHours) {
             setPendingShiftEnd(orderId);
             setShowManagerAuthForShiftEnd(true);
         } else {
-            // After 17:30 (Overtime allowed without password)
+            // After 17:30 or Before 07:00
             setPendingShiftEnd(orderId);
             setShowQuantityPrompt(true);
         }

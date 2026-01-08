@@ -107,9 +107,17 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser }) =
                     <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
                     <p>Bem-vindo, <span className="text-slate-900 font-bold">{currentUser?.username || 'Usuário'}</span></p>
                     <span className="mx-2 text-slate-300">|</span>
-                    <span className="text-xs px-2 py-0.5 bg-slate-100 rounded-full border border-slate-200">
+                </div>
+                <div className="mt-2 flex items-center justify-between">
+                    <span className="text-xs px-2 py-0.5 bg-slate-100 rounded-full border border-slate-200 text-slate-500">
                         {currentUser?.role === 'admin' ? 'Administrador' : currentUser?.role === 'gestor' ? 'Gestor' : 'Operador'}
                     </span>
+                    <button
+                        onClick={onLogout}
+                        className="text-xs font-bold text-slate-400 hover:text-red-600 transition-colors uppercase tracking-wider px-2 py-1"
+                    >
+                        ( Sair )
+                    </button>
                 </div>
             </div>
 

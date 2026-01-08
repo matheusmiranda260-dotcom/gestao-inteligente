@@ -522,7 +522,7 @@ const ShiftReportPrintView: React.FC<{ report: ShiftReport, stock: StockItem[], 
                             </div>
                             {report.machine === 'Trefila' ? (
                                 <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Target Gauge</span>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Bitola Alvo</span>
                                     <span className="text-sm font-black text-slate-900 whitespace-nowrap bg-slate-100 px-3 py-1 rounded-full uppercase tracking-tighter">⌀ {report.targetBitola} MM</span>
                                 </div>
                             ) : (
