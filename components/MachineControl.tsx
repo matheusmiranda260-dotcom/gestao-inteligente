@@ -697,15 +697,14 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
     const currentMachineStatus = useMemo(() => {
         if (!activeOrder?.downtimeEvents || activeOrder.downtimeEvents.length === 0) {
-            return 'Produzindo';
+            return hasActiveShift ? 'Produzindo' : 'Desligada';
         }
 
-        // Ensure events are sorted by time to get the true last event
         const sortedEvents = [...activeOrder.downtimeEvents].sort((a, b) => new Date(a.stopTime).getTime() - new Date(b.stopTime).getTime());
         const lastEvent = sortedEvents[sortedEvents.length - 1];
 
         if (lastEvent.resumeTime !== null) {
-            return 'Produzindo';
+            return hasActiveShift ? 'Produzindo' : 'Desligada';
         }
 
         const prepReasons = ['Aguardando Início da Produção', 'Troca de Rolo / Preparação'];
@@ -713,8 +712,12 @@ const MachineControl: React.FC<MachineControlProps> = ({
             return 'Preparacao';
         }
 
+        if (lastEvent.reason === 'Final de Turno' || !hasActiveShift) {
+            return 'Desligada';
+        }
+
         return 'Parada';
-    }, [activeOrder]);
+    }, [activeOrder, hasActiveShift]);
 
     const isMachineStopped = currentMachineStatus === 'Parada';
     const statusConfig = {
@@ -744,6 +747,15 @@ const MachineControl: React.FC<MachineControlProps> = ({
             glow: 'shadow-[0_0_10px_rgba(245,158,11,0.4)]',
             pulse: 'from-amber-50',
             label: 'PARADA'
+        },
+        Desligada: {
+            color: 'slate',
+            text: 'text-slate-600',
+            bg: 'bg-slate-500',
+            border: 'border-slate-500',
+            glow: 'shadow-[0_0_10px_rgba(100,116,139,0.4)]',
+            pulse: 'from-slate-50',
+            label: 'MÁQUINA DESLIGADA'
         }
     };
 

@@ -83,6 +83,11 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
 
         const lastEvent = relevantEvents.length > 0 ? relevantEvents[relevantEvents.length - 1] : null;
 
+        // If there is no active shift (no operator currently logged in), the machine is effectively OFF
+        if (!currentOperatorLog) {
+            return { status: 'Desligada', reason: 'Aguardando Início de Turno', since: lastEvent?.stopTime || activeOrder.startTime!, durationMs: 0 };
+        }
+
         if (lastEvent?.resumeTime === null && lastEvent) {
             const reason = (lastEvent.reason || '').trim();
             const durationMs = Math.max(0, now.getTime() - new Date(lastEvent.stopTime).getTime());
