@@ -1135,29 +1135,31 @@ const App: React.FC = () => {
             updates.lastQuantityUpdate = now;
         }
 
-        // Automatically stop machine if it is running
-        const lastDowntime = (order.downtimeEvents && order.downtimeEvents.length > 0)
-            ? order.downtimeEvents[order.downtimeEvents.length - 1]
-            : null;
+        // Automatically stop machine and mark as Shift End
+        const newDowntimeEvents = [...(order.downtimeEvents || [])];
+        const lastDowntime = newDowntimeEvents.length > 0 ? newDowntimeEvents[newDowntimeEvents.length - 1] : null;
 
-        const isStopped = lastDowntime && !lastDowntime.resumeTime;
-
-        if (!isStopped) {
-            const newDowntimeEvents = [...(order.downtimeEvents || [])];
-            newDowntimeEvents.push({
-                stopTime: now,
-                resumeTime: null,
-                reason: 'Final de Turno'
-            });
-            updates.downtimeEvents = newDowntimeEvents;
+        // Close any existing open event first
+        if (lastDowntime && !lastDowntime.resumeTime) {
+            lastDowntime.resumeTime = now;
         }
 
+        // Always add Final de Turno to signify machine is off between shifts
+        newDowntimeEvents.push({
+            stopTime: now,
+            resumeTime: null,
+            reason: 'Final de Turno'
+        });
+        updates.downtimeEvents = newDowntimeEvents;
+
         try {
-            const updatedOrder = await updateItem('production_orders', orderId, updates);
+            const updatedOrder = await updateItem<ProductionOrderData>('production_orders', orderId, updates);
 
             if (operatorLog) {
                 await generateShiftReport(updatedOrder, operatorLog);
             }
+
+            setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
             showNotification('Turno finalizado.', 'success');
         } catch (error) {
             showNotification('Erro ao finalizar turno.', 'error');

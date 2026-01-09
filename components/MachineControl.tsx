@@ -463,6 +463,19 @@ const MachineControl: React.FC<MachineControlProps> = ({
         upperBound: number;
     } | null>(null);
 
+    // Persistent drift to align local clock with server timestamps
+    const [stableDrift, setStableDrift] = useState(0);
+
+    const [timer, setTimer] = useState(new Date());
+
+    useEffect(() => {
+        const interval = setInterval(() => setTimer(new Date()), 1000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const now = useMemo(() => new Date(timer.getTime() + stableDrift), [timer, stableDrift]);
+
+
     const handlePendingWeightChange = (lotId: string, value: string) => {
         setPendingWeights(prev => new Map(prev).set(lotId, value));
     };
@@ -613,6 +626,31 @@ const MachineControl: React.FC<MachineControlProps> = ({
     const pendingOrders = useMemo(() => productionOrders.filter(o => o.machine === machineType && o.status === 'pending').sort((a, b) => new Date(a.creationDate).getTime() - new Date(b.creationDate).getTime()), [productionOrders, machineType]);
     const completedOrders = useMemo(() => productionOrders.filter(o => o.machine === machineType && o.status === 'completed').sort((a, b) => new Date(b.endTime || 0).getTime() - new Date(a.endTime || 0).getTime()), [productionOrders, machineType]);
 
+    useEffect(() => {
+        if (!activeOrder) return;
+
+        const timestamps = [
+            activeOrder.startTime,
+            activeOrder.lastQuantityUpdate,
+            ...(activeOrder.downtimeEvents || []).map(e => e.stopTime),
+            ...(activeOrder.downtimeEvents || []).map(e => e.resumeTime)
+        ].filter(Boolean) as string[];
+
+        setStableDrift(currentDrift => {
+            let maxDrift = currentDrift;
+            const nowMs = Date.now();
+
+            timestamps.forEach(ts => {
+                const eventMs = new Date(ts).getTime();
+                const drift = eventMs - nowMs;
+                if (drift > maxDrift) {
+                    maxDrift = drift;
+                }
+            });
+            return maxDrift;
+        });
+    }, [activeOrder]);
+
     const postProductionOrder = useMemo(() => {
         if (activeOrder || !currentUser) return null;
 
@@ -648,7 +686,6 @@ const MachineControl: React.FC<MachineControlProps> = ({
         return currentOperatorLog && currentOperatorLog.operator === currentUser?.username && !currentOperatorLog.endTime;
     }, [currentOperatorLog, currentUser]);
 
-    const [timer, setTimer] = useState(new Date());
 
     const activeLotProcessingData = useMemo(() => {
         if (activeOrder?.activeLotProcessing?.lotId) {
@@ -712,12 +749,6 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
     const statusStyle = statusConfig[currentMachineStatus];
 
-    useEffect(() => {
-        if (orderForShift) {
-            const interval = setInterval(() => setTimer(new Date()), 1000);
-            return () => clearInterval(interval);
-        }
-    }, [orderForShift]);
 
     useEffect(() => {
         if (machineType === 'Treliça' && activeOrder && !isMachineStopped && hasActiveShift) {
@@ -731,12 +762,12 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
     useEffect(() => {
         if (machineType === 'Treliça' && activeOrder && hasActiveShift && !showQuantityPrompt) {
-            const now = timer;
-            const shiftEnd = new Date(now);
+            const currentTime = now;
+            const shiftEnd = new Date(currentTime);
             shiftEnd.setHours(17, 30, 0, 0);
 
-            const todayStr = now.toISOString().split('T')[0];
-            if (now >= shiftEnd && lastShiftEndPromptDate !== todayStr) {
+            const todayStr = currentTime.toISOString().split('T')[0];
+            if (currentTime >= shiftEnd && lastShiftEndPromptDate !== todayStr) {
                 const shiftStartTime = currentOperatorLog ? new Date(currentOperatorLog.startTime).getTime() : 0;
                 if (shiftStartTime < shiftEnd.getTime()) {
                     setShowQuantityPrompt(true);
@@ -747,7 +778,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                 }
             }
         }
-    }, [timer, activeOrder, hasActiveShift, lastShiftEndPromptDate, showQuantityPrompt, machineType]);
+    }, [now, activeOrder, hasActiveShift, lastShiftEndPromptDate, showQuantityPrompt, machineType]);
 
     useEffect(() => {
         if (justCompletedOrderId) {
@@ -777,22 +808,22 @@ const MachineControl: React.FC<MachineControlProps> = ({
     }, [initialModal]);
 
     const shiftStatus = useMemo(() => {
-        const now = timer;
-        const day = now.getDay();
+        const currentTime = now;
+        const day = currentTime.getDay();
         const isWeekday = day >= 1 && day <= 5;
 
         // Use actual shift start if available, otherwise default to 07:45
         const actualStart = currentOperatorLog ? new Date(currentOperatorLog.startTime) : null;
-        const defaultStart = new Date(now);
+        const defaultStart = new Date(currentTime);
         defaultStart.setHours(7, 45, 0, 0);
 
         const shiftStart = actualStart || defaultStart;
 
         // Target end is 17:30 OR start + duration? Stick to 17:30 for standard shift visual
-        const shiftEnd = new Date(now);
+        const shiftEnd = new Date(currentTime);
         shiftEnd.setHours(17, 30, 0, 0);
 
-        const nowMs = now.getTime();
+        const nowMs = currentTime.getTime();
         const startMs = shiftStart.getTime();
         const endMs = shiftEnd.getTime();
 
@@ -832,7 +863,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
             progress: Math.max(0, Math.min(100, progress)),
             timeStatusText,
         };
-    }, [timer, currentOperatorLog]);
+    }, [now, currentOperatorLog]);
 
 
     const { waitingLots, completedLots } = useMemo(() => {
@@ -1541,7 +1572,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                         <tbody className="divide-y divide-slate-100">
                                                             {[...completedLots].reverse().map(lot => {
                                                                 const isWaiting = lot.finalWeight === null || lot.measuredGauge === null || lot.measuredGauge === undefined;
-                                                                const waitingMs = isWaiting ? timer.getTime() - new Date(lot.endTime).getTime() : 0;
+                                                                const waitingMs = isWaiting ? now.getTime() - new Date(lot.endTime).getTime() : 0;
 
                                                                 return (
                                                                     <tr key={lot.lotId} className="hover:bg-slate-50/50 transition-colors">
