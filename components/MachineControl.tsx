@@ -607,6 +607,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
     const [showShiftReportsModal, setShowShiftReportsModal] = useState(initialModal === 'reports');
     const [lastShiftEndPromptDate, setLastShiftEndPromptDate] = useState<string | null>(null);
     const [showManagerAuthForShiftEnd, setShowManagerAuthForShiftEnd] = useState(false);
+    const [lastPromptShownAt, setLastPromptShownAt] = useState<number>(0);
 
     const hasPermission = (targetPage: Page): boolean => {
         if (!currentUser) return false;
@@ -772,14 +773,24 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
 
     useEffect(() => {
-        if (machineType === 'Treliça' && activeOrder && !isMachineStopped && hasActiveShift) {
-            const interval = setInterval(() => {
-                setShowQuantityPrompt(true);
-            }, 10 * 60 * 1000); // 10 minutes
+        if (machineType === 'Treliça' && activeOrder && !isMachineStopped && hasActiveShift && !showQuantityPrompt) {
+            const lastUpdate = activeOrder.lastQuantityUpdate || activeOrder.startTime;
+            if (!lastUpdate) return;
 
-            return () => clearInterval(interval);
+            const baseTime = new Date(lastUpdate).getTime();
+            const nowMs = now.getTime();
+            const diff = nowMs - baseTime;
+
+            // Se já passaram 10 min desde o último reporte E 10 min desde o último alerta mostrado nesta sessão
+            const isIntervalElapsed = diff > 10 * 60 * 1000; // 10 minutes
+            const isLastPromptElapsed = nowMs - lastPromptShownAt > 10 * 60 * 1000; // 10 minutes cooldown
+
+            if (isIntervalElapsed && isLastPromptElapsed) {
+                setShowQuantityPrompt(true);
+                setLastPromptShownAt(nowMs);
+            }
         }
-    }, [activeOrder, isMachineStopped, hasActiveShift, machineType]);
+    }, [now, activeOrder, isMachineStopped, hasActiveShift, machineType, showQuantityPrompt, lastPromptShownAt]);
 
     useEffect(() => {
         if (machineType === 'Treliça' && activeOrder && hasActiveShift && !showQuantityPrompt) {
