@@ -715,7 +715,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
             return hasActiveShift ? 'Produzindo' : 'Desligada';
         }
 
-        const prepReasons = ['Aguardando Início da Produção', 'Troca de Rolo / Preparação'];
+        const prepReasons = ['Aguardando Início da Produção', 'Troca de Rolo / Preparação', 'Setup'];
         if (prepReasons.includes(lastEvent.reason)) {
             return 'Preparacao';
         }

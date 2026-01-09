@@ -93,15 +93,15 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             const durationMs = Math.max(0, now.getTime() - new Date(lastEvent.stopTime).getTime());
 
             if (reason === 'Final de Turno') {
-                return { status: 'Desligada', reason: 'Final de Turno', since: lastEvent.stopTime, durationMs: 0 };
+                return { status: 'Desligada', reason: currentOperatorLog ? 'Turno Iniciado' : 'Aguardando Início de Turno', since: lastEvent.stopTime, durationMs: 0 };
             }
-            if (reason === 'Troca de Rolo / Preparação' || reason === 'Aguardando Início da Produção') {
+            if (reason === 'Troca de Rolo / Preparação' || reason === 'Aguardando Início da Produção' || reason === 'Setup') {
                 return { status: 'Preparacao', reason: reason, since: lastEvent.stopTime, durationMs };
             }
 
             return { status: 'Parada', reason: lastEvent.reason, since: lastEvent.stopTime, durationMs };
         } else {
-            // ... existing logic for producing ...
+            // If we have an active shift but no open downtime, it must be producing
             let since = lastEvent?.resumeTime || activeOrder.startTime || now.toISOString();
 
             const durationMs = Math.max(0, now.getTime() - new Date(since).getTime());

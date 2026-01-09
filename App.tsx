@@ -1000,15 +1000,28 @@ const App: React.FC = () => {
             if (lastReason === 'Final de Turno' || lastReason === 'Aguardando Início da Produção') {
                 newEvents[lastEventIndex].resumeTime = now;
                 updates.downtimeEvents = newEvents;
+            }
+        }
 
-                // For Trefila, if no active lot, immediately start "Troca de Rolo" after resuming shift
-                if (order.machine === 'Trefila' && (!order.activeLotProcessing || !order.activeLotProcessing.lotId)) {
-                    newEvents.push({
-                        stopTime: now,
-                        resumeTime: null,
-                        reason: 'Troca de Rolo / Preparação'
-                    });
+        // For Trefila, if no active lot processing, ensure we are in "Troca de Rolo / Preparação"
+        if (order.machine === 'Trefila' && (!order.activeLotProcessing || !order.activeLotProcessing.lotId)) {
+            const currentEvents = updates.downtimeEvents || [...(order.downtimeEvents || [])];
+            const lastEvent = currentEvents.length > 0 ? currentEvents[currentEvents.length - 1] : null;
+
+            // Only push if not already in a preparation state
+            if (!lastEvent || lastEvent.resumeTime !== null || (lastEvent.reason !== 'Troca de Rolo / Preparação' && lastEvent.reason !== 'Setup')) {
+                const updatedEvents = [...currentEvents];
+                // Close previous open event if any (should already be handled but for extra safety)
+                if (updatedEvents.length > 0 && !updatedEvents[updatedEvents.length - 1].resumeTime) {
+                    updatedEvents[updatedEvents.length - 1].resumeTime = now;
                 }
+
+                updatedEvents.push({
+                    stopTime: now,
+                    resumeTime: null,
+                    reason: 'Troca de Rolo / Preparação'
+                });
+                updates.downtimeEvents = updatedEvents;
             }
         }
 
