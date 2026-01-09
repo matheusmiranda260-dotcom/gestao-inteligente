@@ -56,6 +56,7 @@ const downtimeReasons = [
     'Falha no sensor',
     'Quebra fio',
     'Setup',
+    'Lubrificação',
     'Falta de energia',
     'Outros'
 ];
