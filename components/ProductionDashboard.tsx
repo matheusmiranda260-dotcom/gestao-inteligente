@@ -79,17 +79,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             return { status: 'Ocioso', reason: 'Nenhuma ordem em produção', since: now.toISOString(), durationMs: 0 };
         }
 
-        // Filter events that are RELEVANT to the current shift (if active)
-        const allEvents = [...(activeOrder.downtimeEvents || [])].sort((a, b) => new Date(a.stopTime).getTime() - new Date(b.stopTime).getTime());
-        const relevantEvents = allEvents.filter(e => {
-            if (!currentOperatorLog) return true;
-            // Include event if it ends after shift start (overlaps) or starts after shift start
-            const shiftStart = new Date(currentOperatorLog.startTime).getTime();
-            const eventStart = new Date(e.stopTime).getTime();
-            // IMPORTANT: Use synced 'now' instead of 'Date.now()' to avoid filtering out recent events if client clock is behind
-            const eventEnd = e.resumeTime ? new Date(e.resumeTime).getTime() : now.getTime();
-            return eventEnd >= shiftStart;
-        });
+        const relevantEvents = [...(activeOrder.downtimeEvents || [])].sort((a, b) => new Date(a.stopTime).getTime() - new Date(b.stopTime).getTime());
 
         const lastEvent = relevantEvents.length > 0 ? relevantEvents[relevantEvents.length - 1] : null;
 
@@ -107,18 +97,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             return { status: 'Parada', reason: lastEvent.reason, since: lastEvent.stopTime, durationMs };
         } else {
             // ... existing logic for producing ...
-            // If no relevant downtime events in this shift, defaulting to shift start is safer
             let since = lastEvent?.resumeTime || activeOrder.startTime || now.toISOString();
-
-            if (currentOperatorLog && currentOperatorLog.startTime) {
-                const shiftStartMs = new Date(currentOperatorLog.startTime).getTime();
-                const machineStartMs = new Date(since).getTime();
-                // If the "machine start" (last resume) is older than my shift, use my shift start
-                // OR if there are NO relevant events, definitely use my shift start
-                if (shiftStartMs > machineStartMs || !lastEvent) {
-                    since = currentOperatorLog.startTime;
-                }
-            }
 
             const durationMs = Math.max(0, now.getTime() - new Date(since).getTime());
             return { status: 'Produzindo', reason: '', since, durationMs };
@@ -396,13 +375,9 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                 {(activeOrder.processedLots || [])
                                     .slice()
                                     .sort((a, b) => new Date(b.endTime).getTime() - new Date(a.endTime).getTime())
-                                    .filter(lot => {
-                                        if (!currentOperatorLog) return true;
-                                        return new Date(lot.endTime).getTime() >= new Date(currentOperatorLog.startTime).getTime();
-                                    })
                                     .map((lot, idx) => {
                                         const lotInfo = stock.find(s => s.id === lot.lotId);
-                                        const isWaiting = lot.finalWeight == null || lot.measuredGauge == null;
+                                        const isWaiting = lot.finalWeight === null || lot.measuredGauge === null || lot.measuredGauge === undefined;
                                         const waitingMs = isWaiting ? now.getTime() - new Date(lot.endTime).getTime() : 0;
 
                                         return (

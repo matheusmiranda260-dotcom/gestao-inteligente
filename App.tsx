@@ -1593,14 +1593,68 @@ const App: React.FC = () => {
     };
 
     const recordLotWeight = async (orderId: string, lotId: string, finalWeight: number | null, measuredGauge?: number) => {
-        const order = productionOrders.find(o => o.id === orderId);
-        if (!order) return;
-        const newProcessedLots = (order.processedLots || []).map(p => p.lotId === lotId ? { ...p, finalWeight, measuredGauge } : p);
         try {
-            const updatedOrder = await updateItem('production_orders', orderId, { processedLots: newProcessedLots });
-            setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
-            showNotification('Peso do lote registrado.', 'success');
-        } catch (error) { showNotification('Erro ao registrar peso.', 'error'); }
+            // Fetch the latest version of the order to avoid race conditions (overwriting other lot updates)
+            const { data: order, error: fetchError } = await supabase
+                .from('production_orders')
+                .select('*')
+                .eq('id', orderId)
+                .single();
+
+            if (fetchError || !order) {
+                console.error('Error fetching order for weight update:', fetchError);
+                showNotification('Erro ao buscar dados da ordem.', 'error');
+                return;
+            }
+
+            // Map and merge updates - Note: database fields might be snake_case
+            const currentProcessedLots = order.processed_lots || [];
+            const newProcessedLots = currentProcessedLots.map((p: any) => {
+                if (p.lotId === lotId) {
+                    return {
+                        ...p,
+                        finalWeight: finalWeight !== undefined ? finalWeight : p.finalWeight,
+                        measuredGauge: measuredGauge !== undefined ? measuredGauge : p.measuredGauge
+                    };
+                }
+                return p;
+            });
+
+            const { data: updatedOrder, error: updateError } = await supabase
+                .from('production_orders')
+                .update({ processed_lots: newProcessedLots })
+                .eq('id', orderId)
+                .select()
+                .single();
+
+            if (updateError) throw updateError;
+
+            // Mapping back to camelCase for local state if needed (updateItem usually handles this but we did it manually here)
+            const mappedOrder = {
+                ...updatedOrder,
+                orderNumber: updatedOrder.order_number,
+                targetBitola: updatedOrder.target_bitola,
+                selectedLotIds: updatedOrder.selected_lot_ids,
+                creationDate: updatedOrder.creation_date,
+                startTime: updatedOrder.start_time,
+                endTime: updatedOrder.end_time,
+                downtimeEvents: updatedOrder.downtime_events,
+                processedLots: updatedOrder.processed_lots,
+                actualProducedWeight: updatedOrder.actual_produced_weight,
+                operatorLogs: updatedOrder.operator_logs,
+                activeLotProcessing: updatedOrder.active_lot_processing,
+                actualProducedQuantity: updatedOrder.actual_produced_quantity,
+                scrapWeight: updatedOrder.scrap_weight,
+                weighedPackages: updatedOrder.weighed_packages,
+                lastQuantityUpdate: updatedOrder.last_quantity_update
+            } as ProductionOrderData;
+
+            setProductionOrders(prev => prev.map(o => o.id === orderId ? mappedOrder : o));
+            showNotification('Dados do lote salvos com sucesso.', 'success');
+        } catch (error: any) {
+            console.error('Error updating lot weight/gauge:', error);
+            showNotification('Erro ao registrar dados no banco.', 'error');
+        }
     };
 
     const recordPackageWeight = async (orderId: string, packageData: { packageNumber: number; quantity: number; weight: number; }) => {

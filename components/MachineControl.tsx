@@ -1540,7 +1540,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                         </thead>
                                                         <tbody className="divide-y divide-slate-100">
                                                             {[...completedLots].reverse().map(lot => {
-                                                                const isWaiting = lot.finalWeight === null || lot.measuredGauge === undefined;
+                                                                const isWaiting = lot.finalWeight === null || lot.measuredGauge === null || lot.measuredGauge === undefined;
                                                                 const waitingMs = isWaiting ? timer.getTime() - new Date(lot.endTime).getTime() : 0;
 
                                                                 return (
