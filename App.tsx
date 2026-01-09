@@ -27,7 +27,7 @@ import StickyNotes from './components/StickyNotes';
 import { supabase } from './supabaseClient';
 import type { StockGauge, StickyNote } from './types';
 
-import { fetchTable, insertItem, updateItem, deleteItem, deleteItemByColumn, updateItemByColumn } from './services/supabaseService';
+import { fetchTable, insertItem, updateItem, deleteItem, deleteItemByColumn, updateItemByColumn, mapToCamelCase } from './services/supabaseService';
 import { useAllRealtimeSubscriptions } from './hooks/useSupabaseRealtime';
 
 const generateId = (prefix: string) => `${prefix.toUpperCase()}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
@@ -905,6 +905,26 @@ const App: React.FC = () => {
         );
 
         try {
+            // Aggressively close ANY other in_progress orders for this machine
+            // to ensure the dashboard doesn't get stuck on ghost orders
+            const otherInProgressOrders = newOrders.filter(o => o.machine === newOrderMachine && o.status === 'in_progress' && o.id !== orderId);
+
+            for (const otherOrder of otherInProgressOrders) {
+                const closedLogs = (otherOrder.operatorLogs || []).map(log =>
+                    !log.endTime ? { ...log, endTime: now } : log
+                );
+                await updateItem('production_orders', otherOrder.id, {
+                    status: 'completed',
+                    endTime: now,
+                    operatorLogs: closedLogs
+                });
+                // Update local list
+                const idx = newOrders.findIndex(o => o.id === otherOrder.id);
+                if (idx !== -1) {
+                    newOrders[idx] = { ...newOrders[idx], status: 'completed', endTime: now, operatorLogs: closedLogs };
+                }
+            }
+
             if (openShiftOrderIndex !== -1) {
                 const openShiftOrder = { ...newOrders[openShiftOrderIndex] };
                 openShiftOrder.operatorLogs = (openShiftOrder.operatorLogs || []).map(log =>
@@ -948,15 +968,16 @@ const App: React.FC = () => {
         const order = productionOrders.find(o => o.id === orderId);
         if (!order) return;
 
-        // Check if already has open log to prevent duplicates
-        const hasOpenLog = (order.operatorLogs || []).some(log => log.operator === currentUser.username && !log.endTime);
-        if (hasOpenLog) {
-            showNotification('Turno já iniciado.', 'warning');
-            return;
-        }
+        // Close ANY other open logic for this order before starting our own
+        const newLogs = (order.operatorLogs || []).map(log => {
+            if (!log.endTime) {
+                return { ...log, endTime: now, endQuantity: order.actualProducedQuantity || 0 };
+            }
+            return log;
+        });
 
         const updates: Partial<ProductionOrderData> = {
-            operatorLogs: [...(order.operatorLogs || []), {
+            operatorLogs: [...newLogs, {
                 operator: currentUser.username,
                 startTime: now,
                 endTime: null,
@@ -1114,19 +1135,23 @@ const App: React.FC = () => {
         const now = new Date().toISOString();
 
         let operatorLog: OperatorLog | undefined;
-        const newLogs = [...(order.operatorLogs || [])];
-        let lastLogIndex = -1;
-        for (let i = newLogs.length - 1; i >= 0; i--) {
-            if (newLogs[i].operator === currentUser?.username && !newLogs[i].endTime) {
-                lastLogIndex = i;
-                break;
+        // Close ALL open logs for this order to avoid ghost shifts on the dashboard
+        const newLogs = (order.operatorLogs || []).map(log => {
+            if (!log.endTime) {
+                // If it's the current user, we capture it for the report
+                if (log.operator === currentUser?.username) {
+                    operatorLog = {
+                        ...log,
+                        endTime: now,
+                        endQuantity: finalQuantity !== undefined ? finalQuantity : (order.actualProducedQuantity || 0)
+                    };
+                    return operatorLog;
+                }
+                // For others, just close it
+                return { ...log, endTime: now, endQuantity: order.actualProducedQuantity || 0 };
             }
-        }
-        if (lastLogIndex !== -1) {
-            newLogs[lastLogIndex].endTime = now;
-            newLogs[lastLogIndex].endQuantity = finalQuantity !== undefined ? finalQuantity : (order.actualProducedQuantity || 0);
-            operatorLog = newLogs[lastLogIndex];
-        }
+            return log;
+        });
 
         const updates: Partial<ProductionOrderData> = { operatorLogs: newLogs };
 
@@ -1311,6 +1336,13 @@ const App: React.FC = () => {
         if (lastEventIndex !== -1) {
             newEvents[lastEventIndex].resumeTime = now;
         }
+
+        // Close ALL open operator logs when completing the order
+        const newLogs = (orderToComplete.operatorLogs || []).map(log =>
+            !log.endTime ? { ...log, endTime: now, endQuantity: orderToComplete.actualProducedQuantity } : log
+        );
+
+        updates.operatorLogs = newLogs;
 
         if (orderToComplete.machine === 'Trefila') {
             const actualProducedWeight = (orderToComplete.processedLots || []).reduce((sum, lot) => sum + (lot.finalWeight || 0), 0);
@@ -1631,25 +1663,8 @@ const App: React.FC = () => {
 
             if (updateError) throw updateError;
 
-            // Mapping back to camelCase for local state if needed (updateItem usually handles this but we did it manually here)
-            const mappedOrder = {
-                ...updatedOrder,
-                orderNumber: updatedOrder.order_number,
-                targetBitola: updatedOrder.target_bitola,
-                selectedLotIds: updatedOrder.selected_lot_ids,
-                creationDate: updatedOrder.creation_date,
-                startTime: updatedOrder.start_time,
-                endTime: updatedOrder.end_time,
-                downtimeEvents: updatedOrder.downtime_events,
-                processedLots: updatedOrder.processed_lots,
-                actualProducedWeight: updatedOrder.actual_produced_weight,
-                operatorLogs: updatedOrder.operator_logs,
-                activeLotProcessing: updatedOrder.active_lot_processing,
-                actualProducedQuantity: updatedOrder.actual_produced_quantity,
-                scrapWeight: updatedOrder.scrap_weight,
-                weighedPackages: updatedOrder.weighed_packages,
-                lastQuantityUpdate: updatedOrder.last_quantity_update
-            } as ProductionOrderData;
+            // Mapping back to camelCase for local state
+            const mappedOrder = mapToCamelCase(updatedOrder) as ProductionOrderData;
 
             setProductionOrders(prev => prev.map(o => o.id === orderId ? mappedOrder : o));
             showNotification('Dados do lote salvos com sucesso.', 'success');
