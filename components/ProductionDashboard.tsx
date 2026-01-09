@@ -64,12 +64,12 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     }, [activeOrder]);
 
     const currentOperatorLog = useMemo(() => {
-        if (!activeOrder?.operatorLogs) return null;
-        // Sort by startTime to ensure we get the true latest, then reverse to find the latest open one
-        return [...activeOrder.operatorLogs]
-            .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
-            .reverse()
-            .find(log => !log.endTime) || null;
+        if (!activeOrder?.operatorLogs || activeOrder.operatorLogs.length === 0) return null;
+        // Sort by startTime and take the absolute latest log
+        const sorted = [...activeOrder.operatorLogs].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+        const lastLog = sorted[sorted.length - 1];
+        // If the absolute latest log is closed, then nobody is currently working on this machine
+        return lastLog.endTime ? null : lastLog;
     }, [activeOrder]);
 
     const now = useMemo(() => new Date(localNow.getTime() + stableDrift), [localNow, stableDrift]);
@@ -503,13 +503,17 @@ interface ProductionDashboardProps {
 }
 
 const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, productionOrders, stock, currentUser }) => {
-    const activeTrefilaOrder = useMemo(() =>
-        productionOrders.find(o => o.machine === 'Trefila' && o.status === 'in_progress'),
-        [productionOrders]);
+    const activeTrefilaOrder = useMemo(() => {
+        const active = productionOrders.filter(o => o.machine === 'Trefila' && o.status === 'in_progress');
+        if (active.length === 0) return undefined;
+        return active.sort((a, b) => new Date(b.creationDate).getTime() - new Date(a.creationDate).getTime())[0];
+    }, [productionOrders]);
 
-    const activeTrelicaOrder = useMemo(() =>
-        productionOrders.find(o => o.machine === 'Treliça' && o.status === 'in_progress'),
-        [productionOrders]);
+    const activeTrelicaOrder = useMemo(() => {
+        const active = productionOrders.filter(o => o.machine === 'Treliça' && o.status === 'in_progress');
+        if (active.length === 0) return undefined;
+        return active.sort((a, b) => new Date(b.creationDate).getTime() - new Date(a.creationDate).getTime())[0];
+    }, [productionOrders]);
 
     return (
         <div className="space-y-6">

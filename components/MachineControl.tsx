@@ -622,7 +622,11 @@ const MachineControl: React.FC<MachineControlProps> = ({
     const [productionReportData, setProductionReportData] = useState<ProductionOrderData | null>(null);
     const [showTrefilaCalculation, setShowTrefilaCalculation] = useState(false);
 
-    const activeOrder = useMemo(() => productionOrders.find(o => o.machine === machineType && o.status === 'in_progress'), [productionOrders, machineType]);
+    const activeOrder = useMemo(() => {
+        const active = productionOrders.filter(o => o.machine === machineType && o.status === 'in_progress');
+        if (active.length === 0) return undefined;
+        return active.sort((a, b) => new Date(b.creationDate).getTime() - new Date(a.creationDate).getTime())[0];
+    }, [productionOrders, machineType]);
     const pendingOrders = useMemo(() => productionOrders.filter(o => o.machine === machineType && o.status === 'pending').sort((a, b) => new Date(a.creationDate).getTime() - new Date(b.creationDate).getTime()), [productionOrders, machineType]);
     const completedOrders = useMemo(() => productionOrders.filter(o => o.machine === machineType && o.status === 'completed').sort((a, b) => new Date(b.endTime || 0).getTime() - new Date(a.endTime || 0).getTime()), [productionOrders, machineType]);
 
@@ -671,14 +675,18 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
     // FIX: Moved currentOperatorLog and hasActiveShift before their usage in useEffect.
     const currentOperatorLog = useMemo(() => {
-        if (!orderForShift || !orderForShift.operatorLogs || orderForShift.operatorLogs.length === 0) {
-            return null;
-        }
-        const userLogs = orderForShift.operatorLogs.filter(log => log.operator === currentUser?.username);
-        const lastLog = userLogs.length > 0 ? userLogs[userLogs.length - 1] : null;
+        if (!orderForShift || !orderForShift.operatorLogs || orderForShift.operatorLogs.length === 0) return null;
 
-        if (lastLog) return lastLog;
-        return orderForShift.operatorLogs[orderForShift.operatorLogs.length - 1];
+        // 1. First priority: Check if current user has an open log
+        const myOpenLog = orderForShift.operatorLogs.find(l => l.operator === currentUser?.username && !l.endTime);
+        if (myOpenLog) return myOpenLog;
+
+        // 2. Second priority: Check the absolute latest overall log
+        const sorted = [...orderForShift.operatorLogs].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+        const lastOverallLog = sorted[sorted.length - 1];
+
+        // Return the latest log regardless of user (hasActiveShift will handle the current user check)
+        return lastOverallLog;
     }, [orderForShift, currentUser]);
 
 
