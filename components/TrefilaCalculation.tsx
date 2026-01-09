@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, AreaChart, Area } from 'recharts';
 import { ArrowLeftIcon, SaveIcon, CalculatorIcon, AdjustmentsIcon, TrashIcon, BookOpenIcon, CheckCircleIcon, ExclamationIcon, PrinterIcon, SearchIcon, PlusIcon, ChevronRightIcon } from './icons';
-import { TrefilaRecipe, TrefilaRingStock } from '../types';
+import { TrefilaRecipe, TrefilaRingStock, MachineType, ProductionOrderData } from '../types';
 import { insertItem, fetchTable, deleteItem } from '../services/supabaseService';
 import RingStockManager from './RingStockManager';
 
@@ -436,14 +436,11 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose, machin
     };
 
     return (
-        <div id="trefila-print-root" className="fixed inset-0 bg-slate-50 z-[100] overflow-y-auto print:static print:bg-white print:overflow-visible">
+        <div id="trefila-print-root" className="bg-slate-50 print:static print:bg-white print:overflow-visible">
             <div className="min-h-screen flex flex-col print:min-h-0 print:block">
                 {/* Header - HIDDEN ON PRINT */}
                 <div className="bg-white border-b border-slate-200 px-4 md:px-6 py-4 flex items-center justify-between sticky top-0 z-20 shadow-sm print:hidden">
                     <div className="flex items-center gap-3 md:gap-4">
-                        <button onClick={onClose} className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition">
-                            <ArrowLeftIcon className="h-5 w-5" />
-                        </button>
                         <div>
                             <h1 className="text-lg md:text-xl font-bold text-slate-800 flex items-center gap-2">
                                 <CalculatorIcon className="h-6 w-6 text-blue-600 hidden md:block" />
