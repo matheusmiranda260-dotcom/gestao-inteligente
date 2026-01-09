@@ -1837,6 +1837,7 @@ const App: React.FC = () => {
             case 'trefila_reports': return <MachineControl machineType="Trefila" {...mcProps} initialView="dashboard" initialModal="reports" />;
             case 'trefila_parts': return <MachineControl machineType="Trefila" {...mcProps} initialView="dashboard" initialModal="parts" />;
             case 'trefila_weighing': return <TrefilaWeighing productionOrders={productionOrders} stock={stock} recordLotWeight={recordLotWeight} />;
+            case 'trefila_rings': return <MachineControl machineType="Trefila" {...mcProps} initialView="dashboard" initialModal="rings" />;
 
             case 'trelica': return <MachineControl machineType="Treliça" {...mcProps} initialView="dashboard" initialModal={null} />;
             case 'trelica_in_progress': return <MachineControl machineType="Treliça" {...mcProps} initialView="in_progress" initialModal={null} />;

@@ -628,6 +628,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
     }, [machineType]);
     const [showPartsRequestModal, setShowPartsRequestModal] = useState(initialModal === 'parts');
     const [showShiftReportsModal, setShowShiftReportsModal] = useState(initialModal === 'reports');
+    const [showTrefilaCalculation, setShowTrefilaCalculation] = useState(initialModal === 'rings');
     const [lastShiftEndPromptDate, setLastShiftEndPromptDate] = useState<string | null>(null);
     const [showManagerAuthForShiftEnd, setShowManagerAuthForShiftEnd] = useState(false);
     const [lastPromptShownAt, setLastPromptShownAt] = useState<number>(0);
@@ -645,7 +646,6 @@ const MachineControl: React.FC<MachineControlProps> = ({
     const machinePrefix = machineType === 'Trefila' ? 'trefila' : 'trelica';
 
     const [productionReportData, setProductionReportData] = useState<ProductionOrderData | null>(null);
-    const [showTrefilaCalculation, setShowTrefilaCalculation] = useState(false);
 
     const activeOrder = useMemo(() => {
         const active = productionOrders.filter(o => o.machine === machineType && o.status === 'in_progress');
@@ -1026,7 +1026,6 @@ const MachineControl: React.FC<MachineControlProps> = ({
         // Only apply quantity prompt for Treliça machine
         if (machineType !== 'Treliça') {
             if (endOperatorShift) {
-                // For Trefila, we just end with current qty (tracking is via processedLots)
                 const orderToEnd = productionOrders.find(o => o.id === orderId);
                 endOperatorShift(orderId, (orderToEnd?.actualProducedQuantity || 0));
             }
@@ -1243,6 +1242,14 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                 label="Turnos"
                                 description="Relatórios"
                                 icon={<DocumentReportIcon className="h-6 w-6" />}
+                            />
+                        )}
+                        {machineType === 'Trefila' && hasPermission('trefila_rings') && (
+                            <MachineMenuButton
+                                onClick={() => setShowTrefilaCalculation(true)}
+                                label="Simulação"
+                                description="Anéis & K-7"
+                                icon={<CalculatorIcon className="h-6 w-6" />}
                             />
                         )}
                     </div>
@@ -2145,69 +2152,73 @@ const MachineControl: React.FC<MachineControlProps> = ({
                 )
             }
 
-            {showResumePreviousStopModal && previousStopReason && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 animate-scale-in border border-slate-100">
-                        <div className="flex flex-col items-center text-center">
-                            <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mb-4">
-                                <WarningIcon className="h-8 w-8 text-amber-600" />
-                            </div>
-                            <h3 className="text-xl font-bold text-slate-800 mb-2">Máquina Parada!</h3>
-                            <p className="text-slate-600 mb-6">
-                                O turno anterior foi finalizado com a máquina parada pelo motivo: <br />
-                                <span className="font-bold text-rose-600 block mt-1 text-lg">"{previousStopReason}"</span>
-                            </p>
+            {
+                showResumePreviousStopModal && previousStopReason && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                        <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 animate-scale-in border border-slate-100">
+                            <div className="flex flex-col items-center text-center">
+                                <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mb-4">
+                                    <WarningIcon className="h-8 w-8 text-amber-600" />
+                                </div>
+                                <h3 className="text-xl font-bold text-slate-800 mb-2">Máquina Parada!</h3>
+                                <p className="text-slate-600 mb-6">
+                                    O turno anterior foi finalizado com a máquina parada pelo motivo: <br />
+                                    <span className="font-bold text-rose-600 block mt-1 text-lg">"{previousStopReason}"</span>
+                                </p>
 
-                            <div className="flex gap-3 w-full">
-                                <button
-                                    onClick={() => confirmResumePreviousStop(false)}
-                                    className="flex-1 px-4 py-3 bg-rose-100 text-rose-700 font-bold rounded-xl hover:bg-rose-200 transition"
-                                >
-                                    Manter Parada
-                                </button>
-                                <button
-                                    onClick={() => confirmResumePreviousStop(true)}
-                                    className="flex-1 px-4 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-500 shadow-lg shadow-emerald-200 transition"
-                                >
-                                    Retomar Produção
-                                </button>
+                                <div className="flex gap-3 w-full">
+                                    <button
+                                        onClick={() => confirmResumePreviousStop(false)}
+                                        className="flex-1 px-4 py-3 bg-rose-100 text-rose-700 font-bold rounded-xl hover:bg-rose-200 transition"
+                                    >
+                                        Manter Parada
+                                    </button>
+                                    <button
+                                        onClick={() => confirmResumePreviousStop(true)}
+                                        className="flex-1 px-4 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-500 shadow-lg shadow-emerald-200 transition"
+                                    >
+                                        Retomar Produção
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
-            {showResumePreviousStopModal && previousStopReason && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 animate-scale-in border border-slate-100">
-                        <div className="flex flex-col items-center text-center">
-                            <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mb-4">
-                                <WarningIcon className="h-8 w-8 text-amber-600" />
-                            </div>
-                            <h3 className="text-xl font-bold text-slate-800 mb-2">Máquina Parada!</h3>
-                            <p className="text-slate-600 mb-6">
-                                O turno anterior foi finalizado com a máquina parada pelo motivo: <br />
-                                <span className="font-bold text-rose-600 block mt-1 text-lg">"{previousStopReason}"</span>
-                            </p>
+                )
+            }
+            {
+                showResumePreviousStopModal && previousStopReason && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                        <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 animate-scale-in border border-slate-100">
+                            <div className="flex flex-col items-center text-center">
+                                <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mb-4">
+                                    <WarningIcon className="h-8 w-8 text-amber-600" />
+                                </div>
+                                <h3 className="text-xl font-bold text-slate-800 mb-2">Máquina Parada!</h3>
+                                <p className="text-slate-600 mb-6">
+                                    O turno anterior foi finalizado com a máquina parada pelo motivo: <br />
+                                    <span className="font-bold text-rose-600 block mt-1 text-lg">"{previousStopReason}"</span>
+                                </p>
 
-                            <div className="flex gap-3 w-full">
-                                <button
-                                    onClick={() => confirmResumePreviousStop(false)}
-                                    className="flex-1 px-4 py-3 bg-rose-100 text-rose-700 font-bold rounded-xl hover:bg-rose-200 transition"
-                                >
-                                    Manter Parada
-                                </button>
-                                <button
-                                    onClick={() => confirmResumePreviousStop(true)}
-                                    className="flex-1 px-4 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-500 shadow-lg shadow-emerald-200 transition"
-                                >
-                                    Retomar Produção
-                                </button>
+                                <div className="flex gap-3 w-full">
+                                    <button
+                                        onClick={() => confirmResumePreviousStop(false)}
+                                        className="flex-1 px-4 py-3 bg-rose-100 text-rose-700 font-bold rounded-xl hover:bg-rose-200 transition"
+                                    >
+                                        Manter Parada
+                                    </button>
+                                    <button
+                                        onClick={() => confirmResumePreviousStop(true)}
+                                        className="flex-1 px-4 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-500 shadow-lg shadow-emerald-200 transition"
+                                    >
+                                        Retomar Produção
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 };
 

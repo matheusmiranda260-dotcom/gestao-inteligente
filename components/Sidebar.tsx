@@ -36,7 +36,7 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
     React.useEffect(() => {
         if (['stock', 'stock_map', 'stock_add', 'stock_inventory', 'stock_transfer'].includes(page)) {
             setExpandedMenus(prev => prev.includes('stock') ? prev : [...prev, 'stock']);
-        } else if (['trefila', 'trefila_in_progress', 'trefila_pending', 'trefila_completed', 'trefila_reports', 'trefila_parts', 'trefila_weighing'].includes(page)) {
+        } else if (['trefila', 'trefila_in_progress', 'trefila_pending', 'trefila_completed', 'trefila_reports', 'trefila_parts', 'trefila_weighing', 'trefila_rings'].includes(page)) {
             setExpandedMenus(prev => prev.includes('trefila') ? prev : [...prev, 'trefila']);
         } else if (['trelica', 'trelica_in_progress', 'trelica_pending', 'trelica_completed', 'trelica_reports', 'trelica_parts'].includes(page)) {
             setExpandedMenus(prev => prev.includes('trelica') ? prev : [...prev, 'trelica']);
@@ -115,7 +115,7 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                     <div className="sidebar-category-title">{isCollapsed ? '🏭' : '🏭 Produção'}</div>
 
                     {/* Trefila Collapsible */}
-                    {(hasPermission('trefila_in_progress') || hasPermission('trefila_weighing') || hasPermission('trefila_pending') || hasPermission('trefila_completed') || hasPermission('trefila_reports')) && (
+                    {(hasPermission('trefila_in_progress') || hasPermission('trefila_weighing') || hasPermission('trefila_pending') || hasPermission('trefila_completed') || hasPermission('trefila_reports') || hasPermission('trefila_rings')) && (
                         <>
                             <button
                                 onClick={() => toggleMenu('trefila')}
@@ -158,6 +158,11 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                                     {hasPermission('trefila_reports') && (
                                         <button onClick={() => setPage('trefila_reports')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_reports' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             📊 Relatórios de Turno
+                                        </button>
+                                    )}
+                                    {hasPermission('trefila_rings') && (
+                                        <button onClick={() => setPage('trefila_rings')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_rings' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                            💍 Simulação & Anéis
                                         </button>
                                     )}
                                 </div>
