@@ -4,6 +4,7 @@ import { ArrowLeftIcon, PlayIcon, PauseIcon, ClockIcon, WarningIcon, StopIcon, C
 import PartsRequestModal from './PartsRequestModal';
 import ShiftReportsModal from './ShiftReportsModal';
 import ProductionOrderReport from './ProductionOrderReport';
+import { insertItem, deleteItem, updateItem, fetchTable } from '../services/supabaseService';
 import { trelicaModels } from './ProductionOrderTrelica';
 import TrefilaCalculation from './TrefilaCalculation';
 
@@ -442,6 +443,13 @@ const MachineMenuButton: React.FC<{ onClick: () => void; label: string; descript
     </button>
 );
 
+// Trefila Ring Stock Interface (Matches types.ts)
+interface TrefilaRingStock {
+    id: string;
+    model: string;
+    quantity: number;
+}
+
 const MachineControl: React.FC<MachineControlProps> = ({
     machineType, setPage, currentUser, users = [], stock, productionOrders = [],
     shiftReports = [], startProductionOrder, startOperatorShift, endOperatorShift,
@@ -602,7 +610,22 @@ const MachineControl: React.FC<MachineControlProps> = ({
     const [showDowntimeModal, setShowDowntimeModal] = useState(false);
     const [showCompletionModal, setShowCompletionModal] = useState(false);
     const [showQuantityPrompt, setShowQuantityPrompt] = useState(false);
+    const [ringStock, setRingStock] = useState<TrefilaRingStock[]>([]);
     const [pendingShiftEnd, setPendingShiftEnd] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (machineType === 'Trefila') {
+            const loadRingStock = async () => {
+                try {
+                    const data = await fetchTable<TrefilaRingStock>('trefila_rings_stock');
+                    setRingStock(data || []);
+                } catch (e) {
+                    console.error('Error loading ring stock', e);
+                }
+            };
+            loadRingStock();
+        }
+    }, [machineType]);
     const [showPartsRequestModal, setShowPartsRequestModal] = useState(initialModal === 'parts');
     const [showShiftReportsModal, setShowShiftReportsModal] = useState(initialModal === 'reports');
     const [lastShiftEndPromptDate, setLastShiftEndPromptDate] = useState<string | null>(null);
@@ -1081,7 +1104,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
     return (
         <div className="p-4 sm:p-6 md:p-8">
-            {showTrefilaCalculation && <TrefilaCalculation onClose={() => setShowTrefilaCalculation(false)} />}
+            {showTrefilaCalculation && <TrefilaCalculation onClose={() => setShowTrefilaCalculation(false)} machineType={machineType} activeOrder={activeOrder} />}
             {showDowntimeModal && <DowntimeModal onClose={() => setShowDowntimeModal(false)} onSubmit={handleStopMachine} />}
             {showCompletionModal && activeOrder && <CompletionModal order={activeOrder} onClose={() => setShowCompletionModal(false)} onSubmit={handleCompleteProduction} />}
             {showQuantityPrompt && promptOrder && (
@@ -1309,6 +1332,15 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                         <p className="text-[10px] md:text-xs text-slate-500 mb-1">Meta</p>
                                                         <p className="text-sm md:text-base font-semibold text-slate-700">{activeOrder.totalWeight.toFixed(0)} kg</p>
                                                     </div>
+                                                    <div className="col-span-2 pt-2">
+                                                        <button
+                                                            onClick={() => setShowTrefilaCalculation(true)}
+                                                            className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl border border-blue-100 transition-all font-bold text-xs"
+                                                        >
+                                                            <CalculatorIcon className="h-4 w-4" />
+                                                            VER SIMULAÇÃO E GRÁFICOS
+                                                        </button>
+                                                    </div>
                                                 </>
                                             ) : (
                                                 <>
@@ -1320,6 +1352,39 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                             )}
                                         </div>
                                     </div>
+
+                                    {/* Card de Estoque de Anéis (Críticos) - Novo */}
+                                    {machineType === 'Trefila' && ringStock.filter(r => r.quantity < 3).length > 0 && (
+                                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-amber-100 relative overflow-hidden group">
+                                            <div className="absolute top-0 right-0 p-4 opacity-10 text-amber-500">
+                                                <ExclamationIcon className="h-12 w-12" />
+                                            </div>
+                                            <h3 className="text-sm font-black text-amber-600 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                                <ExclamationIcon className="h-4 w-4" />
+                                                Alerta de Estoque (Anéis)
+                                            </h3>
+                                            <div className="space-y-3">
+                                                {ringStock
+                                                    .filter(r => r.quantity < 3)
+                                                    .slice(0, 3)
+                                                    .map(ring => (
+                                                        <div key={ring.id} className="flex justify-between items-center p-3 bg-amber-50 rounded-xl border border-amber-100">
+                                                            <div className="flex flex-col">
+                                                                <span className="font-bold text-slate-700 text-sm">{ring.model}</span>
+                                                                <span className="text-[10px] text-slate-400 uppercase font-black">Necessita Reposição</span>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <span className="text-lg font-black text-amber-600">{ring.quantity}</span>
+                                                                <span className="text-[10px] text-slate-400 uppercase font-black ml-1">un</span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                {ringStock.filter(r => r.quantity < 3).length > 3 && (
+                                                    <p className="text-[10px] text-center text-slate-400 font-bold uppercase tracking-widest">+ {ringStock.filter(r => r.quantity < 3).length - 3} itens com estoque baixo</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {/* Progresso de Produção - Promovido para destaque - VISÍVEL EM TODOS OS DISPOSITIVOS */}
                                     <div className="bg-white p-6 rounded-2xl shadow-sm relative overflow-hidden group">

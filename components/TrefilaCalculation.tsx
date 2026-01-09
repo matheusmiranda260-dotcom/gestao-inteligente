@@ -7,6 +7,8 @@ import RingStockManager from './RingStockManager';
 
 interface TrefilaCalculationProps {
     onClose: () => void;
+    machineType?: MachineType;
+    activeOrder?: ProductionOrderData;
 }
 
 interface PassResult {
@@ -51,7 +53,7 @@ const RING_DEFS = [
     { name: 'ROA 2', min: 5.60, max: 6.00, dest: 'entry', cond: 'last' },
 ];
 
-const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
+const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose, machineType, activeOrder }) => {
     // UI State
     const [isLoading, setIsLoading] = useState(false);
     const [showStockManager, setShowStockManager] = useState(false);
@@ -451,14 +453,16 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose }) => {
                         </div>
                     </div>
                     <div className="flex gap-2">
-                        <button
-                            onClick={() => setShowStockManager(true)}
-                            className="flex items-center gap-2 px-3 md:px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl shadow-sm transition font-bold text-sm"
-                        >
-                            <AdjustmentsIcon className="h-4 w-4" />
-                            <span className="hidden md:inline">Gerenciar Anéis/Fieiras</span>
-                            <span className="md:hidden">Anéis</span>
-                        </button>
+                        {!activeOrder && (
+                            <button
+                                onClick={() => setShowStockManager(true)}
+                                className="flex items-center gap-2 px-3 md:px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl shadow-sm transition font-bold text-sm"
+                            >
+                                <AdjustmentsIcon className="h-4 w-4" />
+                                <span className="hidden md:inline">Gerenciar Anéis/Fieiras</span>
+                                <span className="md:hidden">Anéis</span>
+                            </button>
+                        )}
                     </div>
                 </div>
 
