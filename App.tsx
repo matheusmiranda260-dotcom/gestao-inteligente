@@ -27,7 +27,7 @@ import StickyNotes from './components/StickyNotes';
 import { supabase } from './supabaseClient';
 import type { StockGauge, StickyNote } from './types';
 
-import { fetchTable, insertItem, updateItem, deleteItem, deleteItemByColumn, updateItemByColumn, mapToCamelCase } from './services/supabaseService';
+import { fetchTable, insertItem, updateItem, deleteItem, deleteItemByColumn, updateItemByColumn, mapToCamelCase, fetchByColumn } from './services/supabaseService';
 import { useAllRealtimeSubscriptions } from './hooks/useSupabaseRealtime';
 
 const generateId = (prefix: string) => `${prefix.toUpperCase()}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
@@ -1628,21 +1628,18 @@ const App: React.FC = () => {
 
     const recordLotWeight = async (orderId: string, lotId: string, finalWeight: number | null, measuredGauge?: number) => {
         try {
-            // Fetch the latest version of the order to avoid race conditions (overwriting other lot updates)
-            const { data: order, error: fetchError } = await supabase
-                .from('production_orders')
-                .select('*')
-                .eq('id', orderId)
-                .single();
+            // Fetch the latest version of the order using fetchByColumn which handles camelCase conversion
+            const orders = await fetchByColumn<ProductionOrderData>('production_orders', 'id', orderId);
+            const order = orders[0];
 
-            if (fetchError || !order) {
-                console.error('Error fetching order for weight update:', fetchError);
+            if (!order) {
+                console.error('Order not found for weight update:', orderId);
                 showNotification('Erro ao buscar dados da ordem.', 'error');
                 return;
             }
 
-            // Map and merge updates - Note: database fields might be snake_case
-            const currentProcessedLots = order.processed_lots || [];
+            // Map and merge updates - now 'order' is already in camelCase
+            const currentProcessedLots = order.processedLots || [];
             const newProcessedLots = currentProcessedLots.map((p: any) => {
                 if (p.lotId === lotId) {
                     return {
@@ -1654,19 +1651,12 @@ const App: React.FC = () => {
                 return p;
             });
 
-            const { data: updatedOrder, error: updateError } = await supabase
-                .from('production_orders')
-                .update({ processed_lots: newProcessedLots })
-                .eq('id', orderId)
-                .select()
-                .single();
+            // Use updateItem service which handles snake_case conversion for the database
+            const updatedOrder = await updateItem<ProductionOrderData>('production_orders', orderId, {
+                processedLots: newProcessedLots
+            });
 
-            if (updateError) throw updateError;
-
-            // Mapping back to camelCase for local state
-            const mappedOrder = mapToCamelCase(updatedOrder) as ProductionOrderData;
-
-            setProductionOrders(prev => prev.map(o => o.id === orderId ? mappedOrder : o));
+            setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
             showNotification('Dados do lote salvos com sucesso.', 'success');
         } catch (error: any) {
             console.error('Error updating lot weight/gauge:', error);
