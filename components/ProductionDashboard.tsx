@@ -30,8 +30,12 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     // Local timer to ensure the clock ticks even if parent doesn't re-render
     const [localNow, setLocalNow] = useState(new Date());
 
-    // Persistent drift to align local clock with server timestamps
-    const [stableDrift, setStableDrift] = useState(0);
+    // Persistent drift to align local clock with server timestamps, persisted in localStorage
+    const driftKey = `stableDrift_${machineType}`;
+    const [stableDrift, setStableDrift] = useState(() => {
+        const saved = localStorage.getItem(driftKey);
+        return saved ? parseInt(saved, 10) : 0;
+    });
 
     useEffect(() => {
         const timerId = setInterval(() => setLocalNow(new Date()), 1000);
@@ -55,13 +59,18 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             timestamps.forEach(ts => {
                 const eventMs = new Date(ts).getTime();
                 const drift = eventMs - nowMs;
+                // We only increase the drift to avoid "jumping back" in time
                 if (drift > maxDrift) {
                     maxDrift = drift;
                 }
             });
+
+            if (maxDrift !== currentDrift) {
+                localStorage.setItem(driftKey, maxDrift.toString());
+            }
             return maxDrift;
         });
-    }, [activeOrder]);
+    }, [activeOrder, driftKey]);
 
     const currentOperatorLog = useMemo(() => {
         if (!activeOrder?.operatorLogs || activeOrder.operatorLogs.length === 0) return null;

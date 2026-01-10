@@ -472,8 +472,12 @@ const MachineControl: React.FC<MachineControlProps> = ({
         upperBound: number;
     } | null>(null);
 
-    // Persistent drift to align local clock with server timestamps
-    const [stableDrift, setStableDrift] = useState(0);
+    // Persistent drift to align local clock with server timestamps, persisted in localStorage
+    const driftKey = `stableDrift_${machineType}`;
+    const [stableDrift, setStableDrift] = useState(() => {
+        const saved = localStorage.getItem(driftKey);
+        return saved ? parseInt(saved, 10) : 0;
+    });
 
     const [timer, setTimer] = useState(new Date());
 
@@ -676,9 +680,13 @@ const MachineControl: React.FC<MachineControlProps> = ({
                     maxDrift = drift;
                 }
             });
+
+            if (maxDrift !== currentDrift) {
+                localStorage.setItem(driftKey, maxDrift.toString());
+            }
             return maxDrift;
         });
-    }, [activeOrder]);
+    }, [activeOrder, driftKey]);
 
     const postProductionOrder = useMemo(() => {
         if (activeOrder || !currentUser) return null;
