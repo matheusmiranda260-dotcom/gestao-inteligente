@@ -1962,7 +1962,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
                                     {/* Centro: Controles Principais (Expanded on mobile) */}
                                     <div className="flex-1 md:flex-none flex items-center justify-center md:w-1/2">
-                                        {!hasActiveShift ? (
+                                        {!isAnyActiveShift ? (
                                             <button
                                                 onClick={handleStartShift}
                                                 className="w-full md:w-auto md:px-14 h-14 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl md:rounded-full font-black text-lg shadow-xl shadow-emerald-200 transition transform active:scale-90 hover:scale-[1.02] flex items-center justify-center gap-3 animate-pulse"
@@ -1976,7 +1976,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                 className="w-full md:w-auto md:px-14 h-14 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl md:rounded-full font-black text-lg shadow-xl shadow-emerald-200 transition transform active:scale-90 hover:scale-[1.02] flex items-center justify-center gap-3"
                                             >
                                                 <PlayIcon className="h-8 w-8" />
-                                                <span className="inline tracking-tight">RETORNAR</span>
+                                                <span className="inline tracking-tight text-sm md:text-lg">RETOMAR PRODUÇÃO</span>
                                             </button>
                                         ) : (
                                             <button
