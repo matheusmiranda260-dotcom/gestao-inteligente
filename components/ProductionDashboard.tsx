@@ -401,6 +401,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                     <th className="p-2 border border-slate-300 bg-slate-100 text-right">KG (Entrada)</th>
                                     <th className="p-2 border border-slate-300 bg-slate-100 text-right">KG (Saída)</th>
                                     <th className="p-2 border border-slate-300 bg-slate-100 text-center">Bitola</th>
+                                    <th className="p-2 border border-slate-300 bg-slate-100 text-center">Finalizado</th>
                                     <th className="p-2 border border-slate-300 bg-slate-100 text-center">Status</th>
                                 </tr>
                             </thead>
@@ -426,6 +427,9 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                                 </td>
                                                 <td className="p-2 border border-slate-300 text-center font-bold text-slate-700">
                                                     {lot.measuredGauge ? `${lot.measuredGauge.toFixed(2)}mm` : '-'}
+                                                </td>
+                                                <td className="p-2 border border-slate-300 text-center font-mono text-slate-500 font-bold text-[10px] md:text-xs">
+                                                    {lot.endTime ? new Date(lot.endTime).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}
                                                 </td>
                                                 <td className="p-2 border border-slate-300 text-center">
                                                     {isWaiting ? (
@@ -539,54 +543,61 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
 
     const dailyProduction = useMemo(() => {
         const now = new Date();
-        const curDay = now.getDate();
-        const curMonth = now.getMonth();
-        const curYear = now.getFullYear();
+        const todayStr = now.toLocaleDateString('sv-SE'); // Safe YYYY-MM-DD in local time
 
         const isToday = (dateInput: string | undefined) => {
             if (!dateInput) return false;
-            const d = new Date(dateInput);
-            return d.getDate() === curDay && d.getMonth() === curMonth && d.getFullYear() === curYear;
+            try {
+                // Ensure we get local date for comparison
+                return new Date(dateInput).toLocaleDateString('sv-SE') === todayStr;
+            } catch (e) {
+                return false;
+            }
         };
 
+        // Create a quick lookup map for stock items
+        const stockMap = new Map(stock.map(s => [s.id, s]));
         const processedIds = new Set<string>();
         let trelicaMeters = 0;
         let trefilaWeight = 0;
 
-        // Safety guard for productionOrders
         const orders = Array.isArray(productionOrders) ? productionOrders : [];
 
-        // Process orders in reverse to take latest updates first
+        // Process in reverse to use latest order snapshots
         [...orders].reverse().forEach(order => {
             const id = order.id || `order-${order.orderNumber}-${order.machine}`;
             if (processedIds.has(id)) return;
             processedIds.add(id);
 
-            const machine = (order.machine || '').toLowerCase();
+            const machineLower = (order.machine || '').toLowerCase();
 
-            if (machine.includes('treli')) {
+            if (machineLower.includes('treli')) {
                 const size = parseFloat(String(order.tamanho || '6').replace(',', '.'));
                 (order.operatorLogs || []).forEach(log => {
-                    // Check if the shift started today
                     if (log.startTime && isToday(log.startTime)) {
-                        // Use the exact logic from the machine card: endQty - startQty
                         const endQty = log.endTime ? (log.endQuantity || 0) : (order.actualProducedQuantity || 0);
                         const startQty = log.startQuantity || 0;
                         const producedInTurn = Math.max(0, endQty - startQty);
                         trelicaMeters += (producedInTurn * (size || 6));
                     }
                 });
-            } else if (machine.includes('trefila')) {
+            } else if (machineLower.includes('trefila')) {
                 (order.processedLots || []).forEach(lot => {
                     if (lot.endTime && isToday(lot.endTime)) {
-                        trefilaWeight += (lot.finalWeight || 0);
+                        if (lot.finalWeight !== null) {
+                            trefilaWeight += lot.finalWeight;
+                        } else {
+                            // Use entry weight as estimate for lots finished today but not yet weighed
+                            const entryLot = stockMap.get(lot.lotId) as StockItem;
+                            trefilaWeight += (entryLot?.labelWeight || 0);
+                        }
                     }
                 });
             }
         });
 
         return { trelicaMeters, trefilaWeight };
-    }, [productionOrders]);
+    }, [productionOrders, stock]);
 
     // Calculate pieces and goal for Treliça
     const trelicaDisplayData = useMemo(() => {
