@@ -93,7 +93,15 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             const durationMs = Math.max(0, now.getTime() - new Date(lastEvent.stopTime).getTime());
 
             if (reason === 'Final de Turno') {
-                return { status: 'Desligada', reason: currentOperatorLog ? 'Turno Iniciado' : 'Aguardando Início de Turno', since: lastEvent.stopTime, durationMs: 0 };
+                // If it was stopped for end of shift but we HAVE a current log, it means a new shift has started
+                // We should check if the new shift started AFTER the stop time
+                const shiftStart = new Date(currentOperatorLog.startTime).getTime();
+                const stopTime = new Date(lastEvent.stopTime).getTime();
+
+                if (shiftStart > stopTime) {
+                    return { status: 'Produzindo', reason: '', since: currentOperatorLog.startTime, durationMs: Math.max(0, now.getTime() - shiftStart) };
+                }
+                return { status: 'Desligada', reason: 'Turno Encerrado', since: lastEvent.stopTime, durationMs: 0 };
             }
             if (reason === 'Troca de Rolo / Preparação' || reason === 'Aguardando Início da Produção' || reason === 'Setup') {
                 return { status: 'Preparacao', reason: reason, since: lastEvent.stopTime, durationMs };
