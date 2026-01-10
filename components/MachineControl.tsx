@@ -728,16 +728,21 @@ const MachineControl: React.FC<MachineControlProps> = ({
         return null;
     }, [activeOrder, stock]);
 
+
+    const isAnyActiveShift = useMemo(() => {
+        return !!currentOperatorLog && !currentOperatorLog.endTime;
+    }, [currentOperatorLog]);
+
     const currentMachineStatus = useMemo(() => {
         if (!activeOrder?.downtimeEvents || activeOrder.downtimeEvents.length === 0) {
-            return hasActiveShift ? 'Produzindo' : 'Desligada';
+            return isAnyActiveShift ? 'Produzindo' : 'Desligada';
         }
 
         const sortedEvents = [...activeOrder.downtimeEvents].sort((a, b) => new Date(a.stopTime).getTime() - new Date(b.stopTime).getTime());
         const lastEvent = sortedEvents[sortedEvents.length - 1];
 
         if (lastEvent.resumeTime !== null) {
-            return hasActiveShift ? 'Produzindo' : 'Desligada';
+            return isAnyActiveShift ? 'Produzindo' : 'Desligada';
         }
 
         const prepReasons = ['Aguardando Início da Produção', 'Troca de Rolo / Preparação', 'Setup'];
@@ -745,12 +750,12 @@ const MachineControl: React.FC<MachineControlProps> = ({
             return 'Preparacao';
         }
 
-        if (lastEvent.reason === 'Final de Turno' || !hasActiveShift) {
+        if (lastEvent.reason === 'Final de Turno' || !isAnyActiveShift) {
             return 'Desligada';
         }
 
         return 'Parada';
-    }, [activeOrder, hasActiveShift]);
+    }, [activeOrder, isAnyActiveShift]);
 
     const isMachineStopped = currentMachineStatus === 'Parada';
     const statusConfig = {
@@ -1175,11 +1180,28 @@ const MachineControl: React.FC<MachineControlProps> = ({
             {view === 'dashboard' && (
                 <div className="space-y-6">
                     {activeOrder && !hasActiveShift && (
-                        <div className="bg-white p-6 rounded-xl shadow-sm text-center">
-                            <h3 className="text-xl font-semibold text-slate-800 mb-4">A ordem <span className="font-bold text-slate-600">{activeOrder.orderNumber}</span> está em andamento.</h3>
-                            <button onClick={() => startOperatorShift && startOperatorShift(activeOrder.id)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-lg transition text-lg">
-                                Iniciar Meu Turno
-                            </button>
+                        <div className="bg-white p-6 rounded-xl shadow-sm text-center border-2 border-slate-100">
+                            {isAnyActiveShift ? (
+                                <>
+                                    <h3 className="text-xl font-semibold text-slate-800 mb-2">A ordem <span className="font-bold text-slate-600">{activeOrder.orderNumber}</span> está sendo operada por <span className="text-indigo-600 font-bold uppercase">{currentOperatorLog?.operator}</span>.</h3>
+                                    <p className="text-slate-500 mb-4 text-sm">Você pode acompanhar o progresso em tempo real no painel ou vincular-se se for trabalhar nesta máquina.</p>
+                                    <div className="flex flex-wrap justify-center gap-3">
+                                        <button onClick={() => setView('in_progress')} className="bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 px-6 rounded-lg transition shadow-lg shadow-slate-200">
+                                            Acompanhar Painel
+                                        </button>
+                                        <button onClick={() => startOperatorShift && startOperatorShift(activeOrder.id)} className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold py-2 px-6 rounded-lg border border-emerald-100 transition">
+                                            Iniciar Meu Turno (Auxiliar)
+                                        </button>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <h3 className="text-xl font-semibold text-slate-800 mb-4">A ordem <span className="font-bold text-slate-600">{activeOrder.orderNumber}</span> está aguardando operador.</h3>
+                                    <button onClick={() => startOperatorShift && startOperatorShift(activeOrder.id)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-lg transition text-lg shadow-lg shadow-emerald-100">
+                                        Iniciar Meu Turno
+                                    </button>
+                                </>
+                            )}
                         </div>
                     )}
                     {activeOrder && (
