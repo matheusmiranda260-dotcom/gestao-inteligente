@@ -24,9 +24,12 @@ interface MachineStatusViewProps {
     machineType: MachineType;
     activeOrder: ProductionOrderData | undefined;
     stock: StockItem[];
+    dailyProducedValue: number;
+    dailyGoal: number;
+    goalUnit: string;
 }
 
-const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, activeOrder, stock }) => {
+const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, activeOrder, stock, dailyProducedValue, dailyGoal, goalUnit }) => {
     // Local timer to ensure the clock ticks even if parent doesn't re-render
     const [localNow, setLocalNow] = useState(new Date());
 
@@ -59,7 +62,6 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             timestamps.forEach(ts => {
                 const eventMs = new Date(ts).getTime();
                 const drift = eventMs - nowMs;
-                // We only increase the drift to avoid "jumping back" in time
                 if (drift > maxDrift) {
                     maxDrift = drift;
                 }
@@ -74,10 +76,8 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
 
     const currentOperatorLog = useMemo(() => {
         if (!activeOrder?.operatorLogs || activeOrder.operatorLogs.length === 0) return null;
-        // Sort by startTime and take the absolute latest log
         const sorted = [...activeOrder.operatorLogs].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
         const lastLog = sorted[sorted.length - 1];
-        // If the absolute latest log is closed, then nobody is currently working on this machine
         return lastLog.endTime ? null : lastLog;
     }, [activeOrder]);
 
@@ -89,10 +89,8 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
         }
 
         const relevantEvents = [...(activeOrder.downtimeEvents || [])].sort((a, b) => new Date(a.stopTime).getTime() - new Date(b.stopTime).getTime());
-
         const lastEvent = relevantEvents.length > 0 ? relevantEvents[relevantEvents.length - 1] : null;
 
-        // If there is no active shift (no operator currently logged in), the machine is effectively OFF
         if (!currentOperatorLog) {
             return { status: 'Desligada', reason: 'Aguardando Início de Turno', since: lastEvent?.stopTime || activeOrder.startTime!, durationMs: 0 };
         }
@@ -102,11 +100,8 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             const durationMs = Math.max(0, now.getTime() - new Date(lastEvent.stopTime).getTime());
 
             if (reason === 'Final de Turno') {
-                // If it was stopped for end of shift but we HAVE a current log, it means a new shift has started
-                // We should check if the new shift started AFTER the stop time
                 const shiftStart = new Date(currentOperatorLog.startTime).getTime();
                 const stopTime = new Date(lastEvent.stopTime).getTime();
-
                 if (shiftStart > stopTime) {
                     return { status: 'Produzindo', reason: '', since: currentOperatorLog.startTime, durationMs: Math.max(0, now.getTime() - shiftStart) };
                 }
@@ -118,9 +113,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
 
             return { status: 'Parada', reason: lastEvent.reason, since: lastEvent.stopTime, durationMs };
         } else {
-            // If we have an active shift but no open downtime, it must be producing
             let since = lastEvent?.resumeTime || activeOrder.startTime || now.toISOString();
-
             const durationMs = Math.max(0, now.getTime() - new Date(since).getTime());
             return { status: 'Produzindo', reason: '', since, durationMs };
         }
@@ -152,21 +145,6 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
         const uptime = Math.max(0, totalShiftDuration - downtime);
         return { shiftDowntime: downtime, shiftUptime: uptime };
     }, [now, currentOperatorLog, activeOrder]);
-
-    const timelineEvents = useMemo(() => {
-        if (!activeOrder) return [];
-        let events: { timestamp: string; message: string; details?: string; type: string }[] = [];
-
-        events.push({ timestamp: activeOrder.startTime!, message: `Ordem ${activeOrder.orderNumber} iniciada`, type: 'start' });
-        (activeOrder.downtimeEvents || []).forEach(event => {
-            events.push({ timestamp: event.stopTime, message: 'Máquina Parada', details: event.reason, type: 'stop' });
-            if (event.resumeTime) {
-                events.push({ timestamp: event.resumeTime, message: 'Produção Retomada', type: 'resume' });
-            }
-        });
-
-        return events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-    }, [activeOrder]);
 
     const isAlertActive = machineStatus.status === 'Parada' && machineStatus.durationMs > 30000;
     const currentStyle = statusStyles[machineStatus.status as keyof typeof statusStyles] || statusStyles.Ocioso;
@@ -208,7 +186,6 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
         );
     }
 
-
     return (
         <div className="bg-white p-4 md:p-6 rounded-xl shadow-lg flex flex-col space-y-4">
             <h2 className="text-xl md:text-2xl font-bold text-slate-800">{machineType}</h2>
@@ -233,7 +210,6 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                     </div>
                 </div>
 
-                {/* Exibição do Lote em Processo (apenas Trefila) */}
                 {activeLotProcessingData && (
                     <div className="mt-4 pt-4 border-t border-current/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
                         <div className="flex items-center gap-2">
@@ -250,6 +226,42 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                         </div>
                     </div>
                 )}
+            </div>
+
+            <div className="border p-3 md:p-4 rounded-md">
+                <div className="flex flex-col md:flex-row justify-between items-start mb-2 gap-2">
+                    <div className="w-full">
+                        <div className="flex justify-between items-center mb-1">
+                            <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                                <ScaleIcon className="h-4 w-4 text-indigo-500" /> Meta Diária da Fábrica
+                            </h3>
+                            <span className="text-[10px] font-black bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full uppercase tracking-widest">
+                                {((dailyProducedValue / dailyGoal) * 100).toFixed(0)}%
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <div className="flex-1 h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-50 relative shadow-inner">
+                                <div
+                                    className={`h-full transition-all duration-1000 ease-out flex items-center justify-end pr-2 ${dailyProducedValue >= dailyGoal ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]' : 'bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.3)]'}`}
+                                    style={{ width: `${Math.min(100, (dailyProducedValue / dailyGoal) * 100)}%` }}
+                                >
+                                    {dailyProducedValue >= dailyGoal && <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>}
+                                </div>
+                            </div>
+                            <span className="text-sm font-black text-slate-800 tracking-tighter whitespace-nowrap">
+                                {dailyProducedValue.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} <span className="text-[10px] text-slate-400 font-bold uppercase">{goalUnit}</span>
+                                <span className="text-slate-300 mx-1">/</span>
+                                {dailyGoal.toLocaleString('pt-BR')}
+                            </span>
+                        </div>
+                        {dailyProducedValue >= dailyGoal && (
+                            <div className="mt-2 flex items-center gap-2 text-emerald-600 animate-bounce">
+                                <CheckCircleIcon className="h-4 w-4" />
+                                <span className="text-[10px] font-black uppercase tracking-wider">Meta Batida! Parabéns à equipe! 👏</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
             </div>
 
             <div className="border p-3 md:p-4 rounded-md">
@@ -318,8 +330,8 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                             </div>
                             <span className="text-lg md:text-xl font-bold text-slate-800">{processedLotsCount} / {totalLotsCount}</span>
                         </div>
-                        <div className="w-full bg-slate-200 rounded-full h-4">
-                            <div className="bg-indigo-500 h-4 rounded-full text-white text-[10px] md:text-xs flex items-center justify-center font-bold" style={{ width: `${progress}%` }}>
+                        <div className="w-full bg-slate-200 rounded-full h-4 overflow-hidden shadow-inner relative">
+                            <div className="bg-gradient-to-r from-indigo-500 to-blue-600 h-full rounded-full text-white text-[10px] md:text-xs flex items-center justify-center font-bold transition-all duration-1000 ease-in-out" style={{ width: `${progress}%` }}>
                                 {progress > 10 && `${progress.toFixed(0)}%`}
                             </div>
                         </div>
@@ -369,8 +381,8 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                             </div>
                             <span className="text-lg md:text-xl font-bold text-slate-800">{producedQuantity} / {plannedQuantity}</span>
                         </div>
-                        <div className="w-full bg-slate-200 rounded-full h-4">
-                            <div className="bg-emerald-500 h-4 rounded-full text-white text-[10px] md:text-xs flex items-center justify-center font-bold" style={{ width: `${progress}%` }}>
+                        <div className="w-full bg-slate-200 rounded-full h-4 overflow-hidden shadow-inner relative">
+                            <div className="bg-gradient-to-r from-emerald-500 to-teal-600 h-full rounded-full text-white text-[10px] md:text-xs flex items-center justify-center font-bold transition-all duration-1000 ease-in-out" style={{ width: `${progress}%` }}>
                                 {progress > 10 && `${progress.toFixed(0)}%`}
                             </div>
                         </div>
@@ -378,15 +390,14 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                 )}
             </div>
 
-            {/* Tabela de Lotes Processados - Apenas Trefila */}
             {machineType === 'Trefila' && (
                 <div className="border p-3 md:p-4 rounded-md">
-                    <h3 className="font-semibold text-slate-700 mb-2 underline decoration-slate-300 decoration-2 underline-offset-4 text-sm md:text-base">LOTES PROCESSADOS:</h3>
+                    <h3 className="font-semibold text-slate-700 mb-2 underline decoration-slate-300 decoration-2 underline-offset-4 text-sm md:text-base uppercase tracking-tighter">LOTES PROCESSADOS:</h3>
                     <div className="overflow-x-auto max-h-64 overflow-y-auto custom-scrollbar">
                         <table className="w-full border-collapse min-w-[500px]">
                             <thead>
-                                <tr className="bg-slate-100 text-slate-600 text-[10px] md:text-xs uppercase font-bold text-left sticky top-0 z-10 shadow-sm">
-                                    <th className="p-2 border border-slate-300 bg-slate-100">Lote</th>
+                                <tr className="bg-slate-100 text-slate-600 text-[10px] md:text-xs uppercase font-bold text-left sticky top-0 z-10 shadow-sm leading-none">
+                                    <th className="p-2 border border-slate-300 bg-slate-100 text-center">Lote</th>
                                     <th className="p-2 border border-slate-300 bg-slate-100 text-right">KG (Entrada)</th>
                                     <th className="p-2 border border-slate-300 bg-slate-100 text-right">KG (Saída)</th>
                                     <th className="p-2 border border-slate-300 bg-slate-100 text-center">Bitola</th>
@@ -404,13 +415,13 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
 
                                         return (
                                             <tr key={idx} className="border-b border-slate-200 hover:bg-slate-50 transition-colors">
-                                                <td className="p-2 border border-slate-300 font-bold text-slate-700">
+                                                <td className="p-2 border border-slate-300 font-bold text-slate-700 text-center bg-slate-50/50">
                                                     {lotInfo?.internalLot || 'N/A'}
                                                 </td>
-                                                <td className="p-2 border border-slate-300 text-right font-medium text-slate-600">
+                                                <td className="p-2 border border-slate-300 text-right font-medium text-slate-600 tabular-nums">
                                                     {lotInfo?.labelWeight.toFixed(0) || '0'} kg
                                                 </td>
-                                                <td className="p-2 border border-slate-300 text-right font-black text-slate-900">
+                                                <td className="p-2 border border-slate-300 text-right font-black text-slate-900 tabular-nums bg-slate-50/50">
                                                     {lot.finalWeight !== null ? `${lot.finalWeight.toFixed(1)} kg` : '-'}
                                                 </td>
                                                 <td className="p-2 border border-slate-300 text-center font-bold text-slate-700">
@@ -419,7 +430,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                                 <td className="p-2 border border-slate-300 text-center">
                                                     {isWaiting ? (
                                                         <div className="flex flex-col items-center">
-                                                            <span className="text-[9px] font-black text-amber-600 animate-pulse uppercase leading-tight">Aguardando Pesagem/Aferição</span>
+                                                            <span className="text-[9px] font-black text-amber-600 animate-pulse uppercase leading-none">Ag. Pesagem</span>
                                                             <span className="text-[10px] font-mono font-bold text-slate-400">{formatDuration(waitingMs)}</span>
                                                         </div>
                                                     ) : (
@@ -432,7 +443,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                 {(activeOrder.processedLots || []).length === 0 && (
                                     <tr>
                                         <td colSpan={5} className="p-4 text-center text-slate-400 text-xs md:text-sm italic">
-                                            Nenhum lote processado neste turno.
+                                            Nenhum lote processado.
                                         </td>
                                     </tr>
                                 )}
@@ -443,14 +454,14 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             )}
 
             <div className="border p-3 md:p-4 rounded-md">
-                <h3 className="font-semibold text-slate-700 mb-2 underline decoration-slate-300 decoration-2 underline-offset-4 text-sm md:text-base">PARADAS E SEUS MOTIVOS:</h3>
+                <h3 className="font-semibold text-slate-700 mb-2 underline decoration-slate-300 decoration-2 underline-offset-4 text-sm md:text-base uppercase tracking-tighter">PARADAS E SEUS MOTIVOS:</h3>
                 <div className="overflow-x-auto max-h-64 overflow-y-auto custom-scrollbar">
                     <table className="w-full border-collapse min-w-[300px]">
                         <thead>
-                            <tr className="bg-slate-100 text-slate-600 text-[10px] md:text-xs uppercase font-bold text-left sticky top-0 z-10 shadow-sm">
-                                <th className="p-2 border border-slate-300 bg-slate-100">Início</th>
-                                <th className="p-2 border border-slate-300 bg-slate-100">Fim</th>
-                                <th className="p-2 border border-slate-300 bg-slate-100">Motivo</th>
+                            <tr className="bg-slate-100 text-slate-600 text-[10px] md:text-xs uppercase font-bold text-left sticky top-0 z-10 shadow-sm leading-none">
+                                <th className="p-2 border border-slate-300 bg-slate-100 text-center">Início</th>
+                                <th className="p-2 border border-slate-300 bg-slate-100 text-center">Fim</th>
+                                <th className="p-2 border border-slate-300 bg-slate-100 text-left">Motivo</th>
                                 <th className="p-2 border border-slate-300 text-right bg-slate-100">Duração</th>
                             </tr>
                         </thead>
@@ -471,26 +482,21 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                         ? new Date(eventEnd).getTime() - new Date(event.stopTime).getTime()
                                         : now.getTime() - new Date(event.stopTime).getTime();
 
-                                    const isOngoing = !event.resumeTime && activeOrder.status !== 'completed';
-
                                     return (
-                                        <tr key={idx} className="border-b border-slate-200 hover:bg-slate-50">
-                                            <td className="p-2 border border-slate-300 font-bold text-rose-600 font-mono text-center">
+                                        <tr key={idx} className="border-b border-slate-200 hover:bg-slate-50 transition-colors">
+                                            <td className="p-2 border border-slate-300 font-bold text-rose-600 font-mono text-center tabular-nums bg-rose-50/20">
                                                 {new Date(event.stopTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                                             </td>
-                                            <td className="p-2 border border-slate-300 font-bold text-emerald-600 font-mono text-center">
+                                            <td className="p-2 border border-slate-300 font-bold text-emerald-600 font-mono text-center tabular-nums bg-emerald-50/20">
                                                 {event.resumeTime
                                                     ? new Date(event.resumeTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-                                                    : (activeOrder.status === 'completed'
-                                                        ? new Date(activeOrder.endTime!).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + '*'
-                                                        : <span className="text-amber-500 text-[10px] animate-pulse">EM ANDAMENTO</span>
-                                                    )
+                                                    : <span className="text-amber-500 text-[10px] animate-pulse uppercase font-black">Em Andamento</span>
                                                 }
                                             </td>
-                                            <td className="p-2 border border-slate-300 italic text-slate-700 uppercase font-bold text-[10px] md:text-xs">
+                                            <td className="p-2 border border-slate-300 italic text-slate-700 uppercase font-bold text-[10px] md:text-xs leading-tight">
                                                 {event.reason}
                                             </td>
-                                            <td className="p-2 border border-slate-300 font-black text-rose-600 font-mono text-right tabular-nums">
+                                            <td className="p-2 border border-slate-300 font-black text-rose-600 font-mono text-right tabular-nums bg-rose-50/20">
                                                 {formatDuration(duration)}
                                             </td>
                                         </tr>
@@ -499,7 +505,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                             {(activeOrder.downtimeEvents || []).filter(e => e.reason !== 'Final de Turno').length === 0 && (
                                 <tr>
                                     <td colSpan={4} className="p-4 text-center text-slate-400 text-xs md:text-sm italic">
-                                        Nenhuma parada registrada recentemente.
+                                        Nenhuma parada registrada.
                                     </td>
                                 </tr>
                             )}
@@ -510,7 +516,6 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
         </div>
     );
 };
-
 
 interface ProductionDashboardProps {
     setPage: (page: Page) => void;
@@ -532,6 +537,71 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
         return active.sort((a, b) => new Date(b.creationDate).getTime() - new Date(a.creationDate).getTime())[0];
     }, [productionOrders]);
 
+    const dailyProduction = useMemo(() => {
+        const now = new Date();
+        const curDay = now.getDate();
+        const curMonth = now.getMonth();
+        const curYear = now.getFullYear();
+
+        const isToday = (dateInput: string | undefined) => {
+            if (!dateInput) return false;
+            const d = new Date(dateInput);
+            return d.getDate() === curDay && d.getMonth() === curMonth && d.getFullYear() === curYear;
+        };
+
+        const processedIds = new Set<string>();
+        let trelicaMeters = 0;
+        let trefilaWeight = 0;
+
+        // Safety guard for productionOrders
+        const orders = Array.isArray(productionOrders) ? productionOrders : [];
+
+        // Process orders in reverse to take latest updates first
+        [...orders].reverse().forEach(order => {
+            const id = order.id || `order-${order.orderNumber}-${order.machine}`;
+            if (processedIds.has(id)) return;
+            processedIds.add(id);
+
+            const machine = (order.machine || '').toLowerCase();
+
+            if (machine.includes('treli')) {
+                const size = parseFloat(String(order.tamanho || '6').replace(',', '.'));
+                (order.operatorLogs || []).forEach(log => {
+                    // Check if the shift started today
+                    if (log.startTime && isToday(log.startTime)) {
+                        // Use the exact logic from the machine card: endQty - startQty
+                        const endQty = log.endTime ? (log.endQuantity || 0) : (order.actualProducedQuantity || 0);
+                        const startQty = log.startQuantity || 0;
+                        const producedInTurn = Math.max(0, endQty - startQty);
+                        trelicaMeters += (producedInTurn * (size || 6));
+                    }
+                });
+            } else if (machine.includes('trefila')) {
+                (order.processedLots || []).forEach(lot => {
+                    if (lot.endTime && isToday(lot.endTime)) {
+                        trefilaWeight += (lot.finalWeight || 0);
+                    }
+                });
+            }
+        });
+
+        return { trelicaMeters, trefilaWeight };
+    }, [productionOrders]);
+
+    // Calculate pieces and goal for Treliça
+    const trelicaDisplayData = useMemo(() => {
+        const sizeStr = activeTrelicaOrder ? String(activeTrelicaOrder.tamanho || '6') : '6';
+        const sizeValue = parseFloat(sizeStr.replace(',', '.'));
+        const goal = sizeValue >= 10 ? 350 : 750;
+        const totalPiecesProduced = sizeValue > 0 ? Math.round(dailyProduction.trelicaMeters / sizeValue) : 0;
+
+        return {
+            value: totalPiecesProduced,
+            goal: goal,
+            unit: sizeValue >= 10 ? 'pçs (12m)' : 'pçs (6m)'
+        };
+    }, [activeTrelicaOrder, dailyProduction.trelicaMeters]);
+
     return (
         <div className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4">
@@ -539,11 +609,17 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                     machineType="Trefila"
                     activeOrder={activeTrefilaOrder}
                     stock={stock}
+                    dailyProducedValue={dailyProduction.trefilaWeight}
+                    dailyGoal={16000}
+                    goalUnit="kg"
                 />
                 <MachineStatusView
                     machineType="Treliça"
                     activeOrder={activeTrelicaOrder}
                     stock={stock}
+                    dailyProducedValue={trelicaDisplayData.value}
+                    dailyGoal={trelicaDisplayData.goal}
+                    goalUnit={trelicaDisplayData.unit}
                 />
             </div>
         </div>
