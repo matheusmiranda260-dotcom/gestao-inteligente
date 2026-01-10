@@ -1698,8 +1698,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                             {lot.measuredGauge == null ? (
                                                                                 <div className="flex items-center gap-1">
                                                                                     <input
-                                                                                        type="number"
-                                                                                        step="0.01"
+                                                                                        type="text"
                                                                                         inputMode="decimal"
                                                                                         className="w-3/4 p-2 border-2 border-slate-100 rounded-lg text-center focus:border-indigo-500 bg-slate-50 focus:bg-white transition"
                                                                                         placeholder="0.00"
