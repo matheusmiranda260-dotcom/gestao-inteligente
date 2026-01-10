@@ -1612,25 +1612,28 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
                                 {/* Coluna Direita: Área de Trabalho (Lotes/Pacotes) */}
                                 <div className={`lg:col-span-2 space-y-6 relative ${mobileTab !== 'work' ? 'hidden lg:block' : 'animate-fade-in'}`}>
-                                    {isMachineStopped && (
-                                        <div className="absolute inset-0 bg-slate-200/80 backdrop-blur-sm flex items-center justify-center rounded-2xl z-20 border-2 border-slate-300 border-dashed">
+                                    {isMachineStopped && activeOrder && (
+                                        <div className="absolute inset-0 bg-slate-200/80 backdrop-blur-sm flex items-center justify-center rounded-2xl z-20 border-2 border-slate-300 border-dashed transition-all duration-500">
                                             <div className="text-center p-8 bg-white rounded-3xl shadow-xl max-w-sm mx-auto animate-fade-in-up">
-                                                <div className="bg-amber-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                                                <div className="bg-amber-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-amber-50 shadow-inner">
                                                     <PauseIcon className="h-10 w-10 text-amber-600" />
                                                 </div>
-                                                <h3 className="text-2xl font-bold text-slate-800 mb-2">Produção Pausada</h3>
-                                                <p className="text-slate-500 mb-6">A máquina está parada. Utilize o painel inferior para retomar a produção quando estiver pronto.</p>
+                                                <h3 className="text-2xl font-bold text-slate-800 mb-2 tracking-tight">Produção Pausada</h3>
+                                                <p className="text-slate-500 mb-6 text-sm leading-relaxed font-medium">A máquina está parada. Utilize o painel inferior para retomar a produção quando estiver pronto.</p>
                                             </div>
                                         </div>
                                     )}
-                                    {!hasActiveShift && activeOrder && (
-                                        <div className="absolute inset-0 bg-slate-200/90 backdrop-blur-sm flex items-center justify-center rounded-2xl z-20">
-                                            <div className="text-center p-8 bg-white rounded-3xl shadow-xl max-w-md mx-auto">
-                                                <ClockIcon className="h-16 w-16 mx-auto text-slate-300 mb-4" />
-                                                <h3 className="text-2xl font-bold text-slate-800 mb-2">Turno Não Iniciado</h3>
-                                                <p className="text-slate-500 mb-6">Inicie seu turno para liberar os controles da máquina.</p>
-                                                <button onClick={handleStartShift} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 px-6 rounded-xl transition text-lg shadow-lg flex items-center justify-center gap-3">
-                                                    <PlayIcon className="h-6 w-6" /> INICIAR MEU TURNO
+                                    {!hasActiveShift && !isAnyActiveShift && activeOrder && (
+                                        <div className="absolute inset-0 bg-slate-200/90 backdrop-blur-sm flex items-center justify-center rounded-2xl z-20 transition-all duration-500">
+                                            <div className="text-center p-8 bg-white rounded-3xl shadow-xl max-w-md mx-auto animate-fade-in-up">
+                                                <div className="bg-emerald-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-emerald-50 shadow-inner">
+                                                    <PlayIcon className="h-10 w-10 text-emerald-600" />
+                                                </div>
+                                                <h3 className="text-2xl font-bold text-slate-800 mb-2 tracking-tight">Turno Não Iniciado</h3>
+                                                <p className="text-slate-500 mb-6 text-sm leading-relaxed font-medium">Esta máquina está aguardando um operador. Inicie seu turno para liberar os controles.</p>
+                                                <button onClick={handleStartShift} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 px-6 rounded-2xl transition-all text-lg shadow-xl shadow-emerald-100 flex items-center justify-center gap-3 transform active:scale-95 group">
+                                                    <PlayIcon className="h-7 w-7 group-hover:scale-110 transition-transform" />
+                                                    <span className="tracking-tight uppercase">INICIAR MEU TURNO</span>
                                                 </button>
                                             </div>
                                         </div>
