@@ -191,7 +191,7 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
                                         {(() => {
                                             const materialGaugesFromDB = gauges.filter(g => g.material_type === 'Fio Máquina').map(g => g.gauge);
                                             const combinedOptions = [...new Set([...FioMaquinaBitolaOptions, ...materialGaugesFromDB])].sort((a, b) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')));
-                                            return combinedOptions.map(b => <option key={b} value={b}>{b}</option>);
+                                            return combinedOptions.map(b => <option key={b} value={b}>{b.replace('.', ',')}</option>);
                                         })()}
                                     </select>
                                 </div>
@@ -214,7 +214,7 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
                                                     const targetBitolaNum = parseFloat(b.replace(',', '.'));
                                                     return targetBitolaNum < inputBitolaNum;
                                                 })
-                                                .map(b => <option key={b} value={b}>{b}</option>);
+                                                .map(b => <option key={b} value={b}>{b.replace('.', ',')}</option>);
                                         })()}
                                     </select>
                                 </div>

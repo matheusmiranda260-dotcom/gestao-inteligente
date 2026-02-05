@@ -1819,7 +1819,7 @@ const App: React.FC = () => {
             startProductionOrder, startOperatorShift, endOperatorShift, logDowntime,
             logResumeProduction, startLotProcessing, finishLotProcessing, recordLotWeight,
             addPartsRequest, logPostProductionActivity, completeProduction, recordPackageWeight,
-            updateProducedQuantity, users, deleteShiftReport
+            updateProducedQuantity, users, deleteShiftReport, gauges
         };
 
         switch (page) {

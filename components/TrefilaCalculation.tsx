@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, AreaChart, Area } from 'recharts';
 import { ArrowLeftIcon, SaveIcon, CalculatorIcon, AdjustmentsIcon, TrashIcon, BookOpenIcon, CheckCircleIcon, ExclamationIcon, PrinterIcon, SearchIcon, PlusIcon, ChevronRightIcon } from './icons';
-import { TrefilaRecipe, TrefilaRingStock, MachineType, ProductionOrderData } from '../types';
+import { TrefilaRecipe, TrefilaRingStock, MachineType, ProductionOrderData, StockGauge, FioMaquinaBitolaOptions } from '../types';
 import { insertItem, fetchTable, deleteItem } from '../services/supabaseService';
 import RingStockManager from './RingStockManager';
 
@@ -9,6 +9,7 @@ interface TrefilaCalculationProps {
     onClose: () => void;
     machineType?: MachineType;
     activeOrder?: ProductionOrderData;
+    gauges?: StockGauge[];
 }
 
 interface PassResult {
@@ -53,7 +54,7 @@ const RING_DEFS = [
     { name: 'ROA 2', min: 5.60, max: 6.00, dest: 'entry', cond: 'last' },
 ];
 
-const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose, machineType, activeOrder }) => {
+const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose, machineType, activeOrder, gauges = [] }) => {
     // UI State
     const [isLoading, setIsLoading] = useState(false);
     const [showStockManager, setShowStockManager] = useState(false);
@@ -512,11 +513,13 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose, machin
                                         onChange={e => setParams({ ...params, entryDiameter: e.target.value })}
                                         className="bg-slate-50 border border-slate-200 text-slate-700 text-sm font-bold rounded-lg p-2 outline-none focus:border-blue-500 w-24"
                                     >
-                                        <option value="8.00">8.00 mm</option>
-                                        <option value="7.00">7.00 mm</option>
-                                        <option value="6.50">6.50 mm</option>
-                                        <option value="6.35">6.35 mm</option>
-                                        <option value="5.50">5.50 mm</option>
+                                        {(() => {
+                                            const dbGauges = gauges.filter(g => g.material_type === 'Fio Máquina').map(g => g.gauge);
+                                            const combined = [...new Set([...FioMaquinaBitolaOptions, ...dbGauges])];
+                                            return combined
+                                                .sort((a, b) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')))
+                                                .map(opt => <option key={opt} value={opt}>{opt.replace('.', ',')} mm</option>);
+                                        })()}
                                     </select>
                                 </div>
 

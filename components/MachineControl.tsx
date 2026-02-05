@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import type { Page, MachineType, StockItem, ProductionOrderData, User, PartsRequest, ShiftReport, TrelicaSelectedLots, Ponta } from '../types';
+import type { Page, MachineType, StockItem, ProductionOrderData, User, PartsRequest, ShiftReport, TrelicaSelectedLots, Ponta, StockGauge } from '../types';
 import { ArrowLeftIcon, PlayIcon, PauseIcon, ClockIcon, WarningIcon, StopIcon, CheckCircleIcon, WrenchScrewdriverIcon, ArchiveIcon, ClipboardListIcon, CogIcon, DocumentReportIcon, ScaleIcon, TrashIcon, CalculatorIcon, ChartBarIcon, ExclamationIcon, SaveIcon } from './icons';
 import PartsRequestModal from './PartsRequestModal';
 import ShiftReportsModal from './ShiftReportsModal';
@@ -413,7 +413,8 @@ interface MachineControlProps {
     addPartsRequest?: (data: Omit<PartsRequest, 'id' | 'date' | 'operator' | 'status' | 'machine' | 'productionOrderId'>) => void;
     deleteShiftReport?: (reportId: string) => void;
     initialView?: View;
-    initialModal?: 'reports' | 'parts' | null;
+    initialModal?: 'reports' | 'parts' | 'rings' | null;
+    gauges?: StockGauge[];
 }
 
 const formatDuration = (ms: number) => {
@@ -456,7 +457,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
     logDowntime, logResumeProduction, startLotProcessing, finishLotProcessing,
     recordLotWeight, recordPackageWeight, completeProduction, addPartsRequest,
     logPostProductionActivity, updateProducedQuantity, deleteShiftReport,
-    initialView, initialModal
+    initialView, initialModal, gauges = []
 }) => {
 
     const [pendingWeights, setPendingWeights] = useState<Map<string, string>>(new Map());
@@ -1115,7 +1116,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
     const promptOrder = pendingShiftEnd ? (productionOrders.find(o => o.id === pendingShiftEnd)) : activeOrder;
 
     if (showTrefilaCalculation) {
-        return <TrefilaCalculation onClose={() => setShowTrefilaCalculation(false)} machineType={machineType} activeOrder={activeOrder} />;
+        return <TrefilaCalculation onClose={() => setShowTrefilaCalculation(false)} machineType={machineType} activeOrder={activeOrder} gauges={gauges} />;
     }
 
     return (

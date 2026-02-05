@@ -120,10 +120,10 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                                     <div className="grid grid-cols-2 gap-2">
                                         {gaugesByMaterial[material].map(g => (
                                             <div key={g.id} className="group flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200 hover:border-blue-200 hover:bg-white transition-all">
-                                                <span className="font-bold text-slate-700">{g.gauge} mm</span>
+                                                <span className="font-bold text-slate-700">{g.gauge.replace('.', ',')} mm</span>
                                                 <button
                                                     onClick={() => {
-                                                        if (confirm(`Deseja remover a bitola ${g.gauge} para ${material}?`)) {
+                                                        if (confirm(`Deseja remover a bitola ${g.gauge.replace('.', ',')} para ${material}?`)) {
                                                             onDelete(g.id);
                                                         }
                                                     }}

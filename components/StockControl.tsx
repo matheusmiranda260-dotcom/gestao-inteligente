@@ -316,15 +316,11 @@ const AddConferencePage: React.FC<{
                                             <td className="p-3 align-top">
                                                 <select value={lot.bitola} onChange={e => handleLotChange(index, 'bitola', e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white outline-none">
                                                     {(() => {
-                                                        // Filter gauges for this material
-                                                        const dbGauges = gauges.filter(g => g.material_type === lot.materialType);
-                                                        const options = dbGauges.length > 0
-                                                            ? dbGauges.map(g => g.gauge)
-                                                            : (lot.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : TrefilaBitolaOptions);
-
-                                                        // Ensure sorting
-                                                        const sorted = [...new Set(options)].sort((a: string, b: string) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')));
-                                                        return sorted.map(b => <option key={b} value={b}>{b}</option>);
+                                                        const hardcodedDefaults = lot.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : TrefilaBitolaOptions;
+                                                        const dbGauges = gauges.filter(g => g.material_type === lot.materialType).map(g => g.gauge);
+                                                        const combinedOptions = [...new Set([...hardcodedDefaults, ...dbGauges])];
+                                                        const sorted = combinedOptions.sort((a, b) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')));
+                                                        return sorted.map(b => <option key={b} value={b}>{b.replace('.', ',')}</option>);
                                                     })()}
                                                 </select>
                                             </td>
@@ -420,13 +416,11 @@ const AddConferencePage: React.FC<{
                                                     className="w-full p-3 border border-slate-300 rounded-lg bg-white outline-none"
                                                 >
                                                     {(() => {
-                                                        const dbGauges = gauges.filter(g => g.material_type === lot.materialType);
-                                                        const options = dbGauges.length > 0
-                                                            ? dbGauges.map(g => g.gauge)
-                                                            : (lot.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : TrefilaBitolaOptions);
-
-                                                        const sorted = [...new Set(options)].sort((a: string, b: string) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')));
-                                                        return sorted.map(b => <option key={b} value={b}>{b}</option>);
+                                                        const hardcodedDefaults = lot.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : TrefilaBitolaOptions;
+                                                        const dbGauges = gauges.filter(g => g.material_type === lot.materialType).map(g => g.gauge);
+                                                        const combinedOptions = [...new Set([...hardcodedDefaults, ...dbGauges])];
+                                                        const sorted = combinedOptions.sort((a, b) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')));
+                                                        return sorted.map(b => <option key={b} value={b}>{b.replace('.', ',')}</option>);
                                                     })()}
                                                 </select>
                                             </div>
@@ -769,10 +763,9 @@ const StockControl: React.FC<{
     const [selectedLotIdsForTransfer, setSelectedLotIdsForTransfer] = useState<string[]>([]);
 
     const allBitolaOptions = useMemo(() => {
-        if (gauges.length > 0) {
-            return [...new Set(gauges.map(g => String(g.gauge)))].sort((a, b) => parseFloat(String(a)) - parseFloat(String(b)));
-        }
-        return [...new Set([...FioMaquinaBitolaOptions, ...TrefilaBitolaOptions])].sort();
+        const hardcoded = [...FioMaquinaBitolaOptions, ...TrefilaBitolaOptions];
+        const db = gauges.map(g => String(g.gauge));
+        return [...new Set([...hardcoded, ...db])].sort((a, b) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')));
     }, [gauges]);
 
     const [mappedFilter, setMappedFilter] = useState<'all' | 'mapped' | 'unmapped'>('all');
