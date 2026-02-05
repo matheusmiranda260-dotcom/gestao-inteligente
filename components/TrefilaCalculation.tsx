@@ -514,7 +514,7 @@ const TrefilaCalculation: React.FC<TrefilaCalculationProps> = ({ onClose, machin
                                         className="bg-slate-50 border border-slate-200 text-slate-700 text-sm font-bold rounded-lg p-2 outline-none focus:border-blue-500 w-24"
                                     >
                                         {(() => {
-                                            const dbGauges = gauges.filter(g => g.material_type === 'Fio Máquina').map(g => g.gauge);
+                                            const dbGauges = gauges.filter(g => g.materialType === 'Fio Máquina').map(g => g.gauge);
                                             const combined = [...new Set([...FioMaquinaBitolaOptions, ...dbGauges])];
                                             return combined
                                                 .sort((a, b) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')))

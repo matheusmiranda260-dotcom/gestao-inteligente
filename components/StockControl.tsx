@@ -58,7 +58,7 @@ const AddConferencePage: React.FC<{
 
     // Initial bitola depends on default material
     const getInitialBitola = (material: string) => {
-        const materialGauges = gauges.filter(g => g.material_type === material).map(g => g.gauge);
+        const materialGauges = gauges.filter(g => g.materialType === material).map(g => g.gauge);
         if (materialGauges.length > 0) return materialGauges[0];
         return material === 'Fio Máquina' ? FioMaquinaBitolaOptions[0] : TrefilaBitolaOptions[0];
     };
@@ -77,8 +77,8 @@ const AddConferencePage: React.FC<{
     const [historyOpen, setHistoryOpen] = useState(false);
 
     const allBitolaOptions: Bitola[] = useMemo(() => {
-        const fmGaugesFromDB = gauges.filter(g => g.material_type === 'Fio Máquina').map(g => String(g.gauge));
-        const caGaugesFromDB = gauges.filter(g => g.material_type === 'CA-60' || g.material_type === 'CA-50' || g.material_type === 'Arame Trefilado').map(g => String(g.gauge));
+        const fmGaugesFromDB = gauges.filter(g => g.materialType === 'Fio Máquina').map(g => String(g.gauge));
+        const caGaugesFromDB = gauges.filter(g => g.materialType === 'CA-60' || g.materialType === 'CA-50' || g.materialType === 'Arame Trefilado').map(g => String(g.gauge));
 
         const finalFM = [...new Set([...FioMaquinaBitolaOptions, ...fmGaugesFromDB])];
         const finalCA = [...new Set([...TrefilaBitolaOptions, ...caGaugesFromDB])];
@@ -317,7 +317,7 @@ const AddConferencePage: React.FC<{
                                                 <select value={lot.bitola} onChange={e => handleLotChange(index, 'bitola', e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white outline-none">
                                                     {(() => {
                                                         const hardcodedDefaults = lot.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : TrefilaBitolaOptions;
-                                                        const dbGauges = gauges.filter(g => g.material_type === lot.materialType).map(g => g.gauge);
+                                                        const dbGauges = gauges.filter(g => g.materialType === lot.materialType).map(g => g.gauge);
                                                         const combinedOptions = [...new Set([...hardcodedDefaults, ...dbGauges])];
                                                         const sorted = combinedOptions.sort((a, b) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')));
                                                         return sorted.map(b => <option key={b} value={b}>{b.replace('.', ',')}</option>);
@@ -417,7 +417,7 @@ const AddConferencePage: React.FC<{
                                                 >
                                                     {(() => {
                                                         const hardcodedDefaults = lot.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : TrefilaBitolaOptions;
-                                                        const dbGauges = gauges.filter(g => g.material_type === lot.materialType).map(g => g.gauge);
+                                                        const dbGauges = gauges.filter(g => g.materialType === lot.materialType).map(g => g.gauge);
                                                         const combinedOptions = [...new Set([...hardcodedDefaults, ...dbGauges])];
                                                         const sorted = combinedOptions.sort((a, b) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')));
                                                         return sorted.map(b => <option key={b} value={b}>{b.replace('.', ',')}</option>);

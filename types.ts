@@ -70,7 +70,7 @@ export type Bitola = string;
 
 export interface StockGauge {
     id: string;
-    material_type: string;
+    materialType: string;
     gauge: string;
 }
 

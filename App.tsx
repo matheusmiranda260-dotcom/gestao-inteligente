@@ -338,15 +338,15 @@ const App: React.FC = () => {
 
         try {
             const defaults = [
-                ...FioMaquinaBitolaOptions.map(g => ({ material_type: 'Fio Máquina', gauge: g })),
-                ...TrefilaBitolaOptions.map(g => ({ material_type: 'CA-60', gauge: g }))
+                ...FioMaquinaBitolaOptions.map(g => ({ materialType: 'Fio Máquina', gauge: g })),
+                ...TrefilaBitolaOptions.map(g => ({ materialType: 'CA-60', gauge: g }))
             ];
 
             let addedCount = 0;
             // Iterate sequentially to avoid race conditions or heavy load
             for (const item of defaults) {
                 // Check if exists in local state
-                if (gauges.some(g => g.material_type === item.material_type && g.gauge === item.gauge)) continue;
+                if (gauges.some(g => g.materialType === item.materialType && g.gauge === item.gauge)) continue;
 
                 try {
                     // Using generateId('gauge') matching addGauge logic

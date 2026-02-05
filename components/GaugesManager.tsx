@@ -28,21 +28,21 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
         const formatted = numberVal.toFixed(2);
 
         // Check if already exists
-        const exists = gauges.some(g => g.material_type === materialType && g.gauge === formatted);
+        const exists = gauges.some(g => g.materialType === materialType && g.gauge === formatted);
         if (exists) {
             alert('Esta bitola já está cadastrada para este material.');
             return;
         }
 
         onAdd({
-            material_type: materialType,
+            materialType: materialType,
             gauge: formatted
         });
         setNewGauge('');
     };
 
     const gaugesByMaterial = MaterialOptions.reduce((acc, material) => {
-        acc[material] = gauges.filter(g => g.material_type === material).sort((a, b) => parseFloat(a.gauge) - parseFloat(b.gauge));
+        acc[material] = gauges.filter(g => g.materialType === material).sort((a, b) => parseFloat(a.gauge) - parseFloat(b.gauge));
         return acc;
     }, {} as Record<string, StockGauge[]>);
 

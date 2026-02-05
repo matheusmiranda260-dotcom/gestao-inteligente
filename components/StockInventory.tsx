@@ -139,8 +139,8 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
     };
 
     const allBitolaOptions = useMemo(() => {
-        const fmGaugesFromDB = gauges.filter(g => g.material_type === 'Fio Máquina').map(g => String(g.gauge));
-        const caGaugesFromDB = gauges.filter(g => g.material_type === 'CA-60' || g.material_type === 'CA-50').map(g => String(g.gauge));
+        const fmGaugesFromDB = gauges.filter(g => g.materialType === 'Fio Máquina').map(g => String(g.gauge));
+        const caGaugesFromDB = gauges.filter(g => g.materialType === 'CA-60' || g.materialType === 'CA-50').map(g => String(g.gauge));
 
         const finalFM = [...new Set([...FioMaquinaBitolaOptions, ...fmGaugesFromDB])];
         const finalCA = [...new Set([...TrefilaBitolaOptions, ...caGaugesFromDB])];
@@ -947,7 +947,7 @@ const StockInventory: React.FC<StockInventoryProps> = ({ stock, setPage, updateS
                                                 >
                                                     <option value="" className="bg-slate-900 text-white">Selecione</option>
                                                     {(() => {
-                                                        const dbGauges = gauges.filter(g => g.material_type === quickAddData.materialType);
+                                                        const dbGauges = gauges.filter(g => g.materialType === quickAddData.materialType);
                                                         const options = dbGauges.length > 0
                                                             ? dbGauges.map(g => g.gauge)
                                                             : (quickAddData.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : TrefilaBitolaOptions);
