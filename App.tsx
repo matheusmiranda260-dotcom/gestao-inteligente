@@ -313,8 +313,7 @@ const App: React.FC = () => {
 
     const addGauge = async (data: Omit<StockGauge, 'id'>) => {
         try {
-            const newGauge = { ...data, id: generateId('gauge') };
-            const saved = await insertItem<StockGauge>('stock_gauges', newGauge);
+            const saved = await insertItem<StockGauge>('stock_gauges', data as StockGauge);
             setGauges(prev => [...prev, saved]);
             showNotification('Bitola cadastrada com sucesso!', 'success');
         } catch (error) {
@@ -349,9 +348,7 @@ const App: React.FC = () => {
                 if (gauges.some(g => g.materialType === item.materialType && g.gauge === item.gauge)) continue;
 
                 try {
-                    // Using generateId('gauge') matching addGauge logic
-                    const newGauge = { ...item, id: generateId('gauge') };
-                    const saved = await insertItem<StockGauge>('stock_gauges', newGauge);
+                    const saved = await insertItem<StockGauge>('stock_gauges', item as StockGauge);
                     setGauges(prev => [...prev, saved]);
                     addedCount++;
                 } catch (e) {
