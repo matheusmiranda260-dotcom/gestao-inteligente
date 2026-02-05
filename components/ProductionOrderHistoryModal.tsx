@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Page, StockItem, ProductionOrderData, Bitola } from '../types';
+import type { Page, StockItem, ProductionOrderData, Bitola, User } from '../types';
 import { TrefilaBitolaOptions, FioMaquinaBitolaOptions } from '../types';
 import { ArrowLeftIcon, WarningIcon, ClipboardListIcon, PencilIcon, TrashIcon, DocumentReportIcon } from './icons';
 
@@ -34,7 +34,7 @@ const EditProductionOrderModal: React.FC<{
         onSubmit(order.id, { orderNumber, targetBitola });
         onClose();
     };
-    
+
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-xl w-full max-w-md">
@@ -78,7 +78,9 @@ const ProductionOrderHistoryModal: React.FC<{
     updateProductionOrder: (orderId: string, data: { orderNumber?: string; targetBitola?: Bitola }) => void;
     deleteProductionOrder: (orderId: string) => void;
     onShowReport: (order: ProductionOrderData) => void;
-}> = ({ orders, stock, onClose, updateProductionOrder, deleteProductionOrder, onShowReport }) => {
+    currentUser: User | null;
+}> = ({ orders, stock, onClose, updateProductionOrder, deleteProductionOrder, onShowReport, currentUser }) => {
+    const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor';
     const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
     const [editingOrder, setEditingOrder] = useState<ProductionOrderData | null>(null);
     const [deletingOrder, setDeletingOrder] = useState<ProductionOrderData | null>(null);
@@ -86,16 +88,19 @@ const ProductionOrderHistoryModal: React.FC<{
     const toggleExpand = (orderId: string) => {
         setExpandedOrderId(prevId => (prevId === orderId ? null : orderId));
     };
-    
+
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40 p-4">
             <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-7xl max-h-[90vh] flex flex-col">
                 {editingOrder && <EditProductionOrderModal order={editingOrder} onClose={() => setEditingOrder(null)} onSubmit={updateProductionOrder} />}
                 {deletingOrder && (
-                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                         <div className="bg-white p-8 rounded-xl shadow-xl w-full max-w-md text-center">
                             <WarningIcon className="h-16 w-16 mx-auto text-red-500 mb-4" />
-                            <p className="text-lg text-slate-700 mb-6">Tem certeza que deseja excluir a ordem <strong>{deletingOrder.orderNumber}</strong>? Os lotes associados retornarão ao estoque.</p>
+                            <p className="text-lg text-slate-700 mb-6 flex flex-col gap-2">
+                                <span>Tem certeza que deseja {deletingOrder.status === 'in_progress' ? 'INTERROMPER e EXCLUIR' : 'excluir'} a ordem <strong>{deletingOrder.orderNumber}</strong>?</span>
+                                <span className="text-sm text-slate-500">{deletingOrder.status === 'in_progress' ? 'A produção será interrompida imediatamente e os lotes retornarão ao estoque com o peso atual.' : 'Os lotes associados retornarão ao estoque.'}</span>
+                            </p>
                             <div className="flex justify-center gap-4">
                                 <button onClick={() => setDeletingOrder(null)} className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-6 rounded-lg transition">Cancelar</button>
                                 <button onClick={() => { deleteProductionOrder(deletingOrder.id); setDeletingOrder(null); }} className="bg-red-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-red-700 transition">Confirmar Exclusão</button>
@@ -144,21 +149,23 @@ const ProductionOrderHistoryModal: React.FC<{
                                                     <button onClick={() => toggleExpand(order.id)} className="text-slate-600 hover:underline text-xs font-semibold">
                                                         {expandedOrderId === order.id ? 'Ocultar Lotes' : 'Ver Lotes'}
                                                     </button>
-                                                    {order.status === 'pending' && (
+                                                    {(order.status === 'pending' || (order.status === 'in_progress' && isGestor)) && (
                                                         <>
-                                                            <button 
-                                                                onClick={() => setEditingOrder(order)} 
-                                                                disabled={order.machine !== 'Trefila'}
-                                                                className="p-1 text-slate-500 hover:text-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed" 
-                                                                title={order.machine !== 'Trefila' ? "Edição disponível apenas para Trefila" : "Editar Ordem"}>
-                                                                <PencilIcon className="h-4 w-4"/>
+                                                            <button
+                                                                onClick={() => setEditingOrder(order)}
+                                                                disabled={order.status !== 'pending' || order.machine !== 'Trefila'}
+                                                                className="p-1 text-slate-500 hover:text-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                title={order.status !== 'pending' ? "Edição disponível apenas para ordens pendentes" : order.machine !== 'Trefila' ? "Edição disponível apenas para Trefila" : "Editar Ordem"}>
+                                                                <PencilIcon className="h-4 w-4" />
                                                             </button>
-                                                            <button onClick={() => setDeletingOrder(order)} className="p-1 text-slate-500 hover:text-red-700" title="Excluir Ordem"><TrashIcon className="h-4 w-4"/></button>
+                                                            <button onClick={() => setDeletingOrder(order)} className="p-1 text-slate-500 hover:text-red-700" title={order.status === 'in_progress' ? "Interromper e Excluir Ordem" : "Excluir Ordem"}>
+                                                                <TrashIcon className="h-4 w-4" />
+                                                            </button>
                                                         </>
                                                     )}
                                                     {order.status === 'completed' && (
                                                         <button onClick={() => onShowReport(order)} className="text-emerald-600 hover:underline text-xs font-semibold flex items-center gap-1" title="Ver Relatório">
-                                                            <DocumentReportIcon className="h-4 w-4"/>
+                                                            <DocumentReportIcon className="h-4 w-4" />
                                                             <span>Ver Relatório</span>
                                                         </button>
                                                     )}
@@ -197,7 +204,7 @@ const ProductionOrderHistoryModal: React.FC<{
                                                                 ) : (
                                                                     Object.entries(order.selectedLotIds).map(([key, lotId]) => {
                                                                         const lot = stock.find(s => s.id === lotId);
-                                                                        const labelMap: Record<string, string> = { superior: 'Superior', inferior1: 'Inferior 1', inferior2: 'Inferior 2', senozoide1: 'Senozoide 1', senozoide2: 'Senozoide 2'};
+                                                                        const labelMap: Record<string, string> = { superior: 'Superior', inferior1: 'Inferior 1', inferior2: 'Inferior 2', senozoide1: 'Senozoide 1', senozoide2: 'Senozoide 2' };
                                                                         return (
                                                                             <tr key={key}>
                                                                                 <td className="p-2 font-medium capitalize">{labelMap[key]}</td>

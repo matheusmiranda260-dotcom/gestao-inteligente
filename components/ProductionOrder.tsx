@@ -123,6 +123,7 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
                 onClose={() => setShowHistoryModal(false)}
                 updateProductionOrder={updateProductionOrder}
                 deleteProductionOrder={deleteProductionOrder}
+                currentUser={currentUser}
                 onShowReport={(order) => {
                     setProductionReportData(order);
                     setShowHistoryModal(false);
