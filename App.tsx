@@ -1913,7 +1913,7 @@ const App: React.FC = () => {
             {notification && <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />}
             {currentUser && page !== 'login' && (
                 <>
-                    <div className={`sidebar - overlay ${isMobileMenuOpen ? 'active' : ''} `} onClick={() => setIsMobileMenuOpen(false)} />
+                    <div className={`sidebar-overlay ${isMobileMenuOpen ? 'active' : ''}`} onClick={() => setIsMobileMenuOpen(false)} />
                     <Sidebar page={page} setPage={(p) => { setPage(p); setIsMobileMenuOpen(false); }} currentUser={currentUser} notificationCount={pendingKaizenCount} isMobileMenuOpen={isMobileMenuOpen} onLogout={handleLogout} />
                 </>
             )}
