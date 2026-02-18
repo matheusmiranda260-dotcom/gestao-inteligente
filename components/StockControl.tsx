@@ -1115,199 +1115,95 @@ const StockControl: React.FC<{
 
                         {/* Desktop Table View */}
                         <div className="hidden md:block overflow-x-auto">
-                            <table className="w-full text-sm text-left">
-                                <thead className="text-sm font-black text-slate-700 uppercase bg-slate-100 text-center">
+                            <table className="w-full text-sm text-left border-collapse">
+                                <thead className="text-[10px] font-black text-slate-500 uppercase bg-slate-100/50 border-y border-slate-200">
                                     <tr>
-                                        <th className="p-4 w-12"><input type="checkbox" onChange={handleSelectAllForTransfer} checked={filteredStock.length > 0 && selectedLotIdsForTransfer.length === filteredStock.filter(i => i.status === 'Disponível' || i.status === 'Disponível - Suporte Treliça').length} className="h-5 w-5 rounded border-slate-300 text-slate-600 focus:ring-slate-500" /></th>
-                                        <th className="px-6 py-4">Mapeado</th>
-                                        <th className="px-6 py-4">Data Entrada</th>
-                                        <th className="px-6 py-4">Lote Interno</th>
-                                        <th className="px-6 py-4">Lote Fornecedor</th>
-                                        <th className="px-6 py-4">Fornecedor</th>
-                                        <th className="px-6 py-4">Material / Bitola</th>
-                                        <th className="px-6 py-4 text-right">Etiqueta (kg)</th>
-                                        <th className="px-6 py-4">Status</th>
-                                        <th className="px-6 py-4">Conf. Física</th>
-                                        <th className="px-6 py-4">Ações</th>
+                                        <th className="px-2 py-1.5 w-8 text-center"><input type="checkbox" onChange={handleSelectAllForTransfer} checked={filteredStock.length > 0 && selectedLotIdsForTransfer.length === filteredStock.filter(i => i.status === 'Disponível' || i.status === 'Disponível - Suporte Treliça').length} className="h-3.5 w-3.5 rounded border-slate-300 text-slate-600 focus:ring-slate-500" /></th>
+                                        <th className="px-2 py-1.5 text-center">Data Entrada</th>
+                                        <th className="px-2 py-1.5 text-center">Lote Interno</th>
+                                        <th className="px-2 py-1.5 text-center">Lote Fornecedor</th>
+                                        <th className="px-2 py-1.5 text-center">Fornecedor</th>
+                                        <th className="px-2 py-1.5 text-center">Material / Bitola</th>
+                                        <th className="px-2 py-1.5 text-right">Etiqueta (kg)</th>
+                                        <th className="px-2 py-1.5 text-center">Status</th>
+                                        <th className="px-2 py-1.5 text-center">Conf. Física</th>
+                                        <th className="px-2 py-1.5 text-center">Ações</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-200">
+                                <tbody className="divide-y divide-slate-100">
                                     {filteredStock.map(item => (
-                                        <tr key={item.id} className={`hover:bg-slate-50 ${item.location ? 'bg-emerald-50/30' : 'bg-white'}`}>
-                                            <td className="p-4 text-center">
-                                                <input type="checkbox" checked={selectedLotIdsForTransfer.includes(item.id)} onChange={() => handleSelectLotForTransfer(item.id)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="h-5 w-5 rounded border-slate-300 text-slate-600 focus:ring-slate-500" />
+                                        <tr key={item.id} className={`hover:bg-slate-50 transition-colors ${item.location ? 'bg-emerald-50/10' : 'bg-white'}`}>
+                                            <td className="px-2 py-0.5 text-center">
+                                                <input type="checkbox" checked={selectedLotIdsForTransfer.includes(item.id)} onChange={() => handleSelectLotForTransfer(item.id)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="h-3.5 w-3.5 rounded border-slate-300 text-slate-600 focus:ring-slate-500" />
                                             </td>
-                                            <td className="px-4 py-4 whitespace-nowrap text-center">
-                                                {item.location ? (
-                                                    <div className="flex justify-center" title="Mapeado nas fileiras">
-                                                        <div className="bg-emerald-100 text-emerald-600 rounded-full p-2 w-8 h-8 flex items-center justify-center">
-                                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-                                                                <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
-                                                            </svg>
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    <div className="flex justify-center" title="Pendente de mapeamento">
-                                                        <div className="bg-slate-100 text-slate-400 rounded-full p-2 w-8 h-8 flex items-center justify-center">
-                                                            <span className="text-sm font-bold">-</span>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-center text-base font-bold text-slate-600">{new Date(item.entryDate).toLocaleDateString('pt-BR')}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-center">
-                                                <span className="text-2xl font-black text-slate-900 block">{item.internalLot}</span>
+                                            <td className="px-2 py-0.5 whitespace-nowrap text-center text-[10px] font-bold text-slate-500">{new Date(item.entryDate).toLocaleDateString('pt-BR')}</td>
+                                            <td className="px-2 py-0.5 whitespace-nowrap text-center">
+                                                <span className="text-sm font-black text-slate-900 block leading-tight">{item.internalLot}</span>
                                                 {item.location && (
-                                                    <div className="text-xs font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded inline-block mt-1 border border-emerald-200">
+                                                    <div className="text-[9px] font-bold bg-emerald-50 text-emerald-700 px-1 py-0 rounded inline-block border border-emerald-100 leading-none">
                                                         {item.location}
                                                     </div>
                                                 )}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-center">
-                                                <span className="text-lg font-bold text-slate-700 block">{item.supplierLot}</span>
-                                                <span className="text-xs font-semibold text-slate-400">NF: {item.nfe}</span>
+                                            <td className="px-2 py-0.5 whitespace-nowrap text-center">
+                                                <span className="text-[11px] font-bold text-slate-600 block leading-tight">{item.supplierLot}</span>
+                                                <span className="text-[9px] font-semibold text-slate-400">NF: {item.nfe}</span>
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-center">
-                                                <span className="text-lg font-bold text-slate-700">{item.supplier}</span>
+                                            <td className="px-2 py-0.5 whitespace-nowrap text-center">
+                                                <span className="text-[11px] font-bold text-slate-600">{item.supplier}</span>
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                                            <td className="px-2 py-0.5 whitespace-nowrap text-center">
                                                 <div className="flex flex-col items-center">
-                                                    <span className="text-lg font-bold text-slate-800">{item.materialType}</span>
-                                                    <span className="text-2xl font-black text-blue-600">{item.bitola}</span>
+                                                    <span className="text-[10px] font-bold text-slate-400 leading-none">{item.materialType}</span>
+                                                    <span className="text-sm font-black text-blue-600 leading-tight">{item.bitola}</span>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 text-right whitespace-nowrap">
+                                            <td className="px-2 py-0.5 text-right whitespace-nowrap">
                                                 <div className="flex flex-col items-end">
-                                                    <span className="text-2xl font-black text-slate-800">
+                                                    <span className="text-sm font-black text-slate-800 leading-tight">
                                                         {item.labelWeight.toFixed(2)}
                                                     </span>
-                                                    <span className="text-xs font-bold text-emerald-600">Balança: {(item.initialQuantity).toFixed(2)} KG</span>
-                                                    {item.status === 'Em Produção - Treliça' && (() => {
-                                                        const order = productionOrders.find(o =>
-                                                            o.status !== 'completed' &&
-                                                            (Array.isArray(o.selectedLotIds)
-                                                                ? o.selectedLotIds.includes(item.id)
-                                                                : Object.values(o.selectedLotIds).some(ids => Array.isArray(ids) ? ids.includes(item.id) : ids === item.id))
-                                                        );
-
-                                                        if (order && order.trelicaModel) {
-                                                            const model = trelicaModels.find(m => m.modelo === order.trelicaModel);
-                                                            if (model) {
-                                                                const parse = (s: string) => parseFloat(s.replace(',', '.'));
-                                                                const qty = order.quantityToProduce || 0;
-
-                                                                // Determine which part of the trelica this lot is and its relevant siblings for consumption order
-                                                                const lots = order.selectedLotIds as any;
-                                                                let targetWeight = 0;
-                                                                let relevantLotIds: string[] = [];
-
-                                                                if (lots.allSuperior?.includes(item.id) || lots.superior === item.id) {
-                                                                    targetWeight = parse(model.pesoSuperior) * qty;
-                                                                    relevantLotIds = lots.allSuperior || [lots.superior];
-                                                                } else if (lots.allInferiorLeft?.includes(item.id) || lots.inferior1 === item.id) {
-                                                                    targetWeight = (parse(model.pesoInferior) * qty) / 2;
-                                                                    relevantLotIds = lots.allInferiorLeft || [lots.inferior1];
-                                                                } else if (lots.allInferiorRight?.includes(item.id) || lots.inferior2 === item.id) {
-                                                                    targetWeight = (parse(model.pesoInferior) * qty) / 2;
-                                                                    relevantLotIds = lots.allInferiorRight || [lots.inferior2];
-                                                                } else if (lots.allSenozoideLeft?.includes(item.id) || lots.senozoide1 === item.id) {
-                                                                    targetWeight = (parse(model.pesoSenozoide) * qty) / 2;
-                                                                    relevantLotIds = lots.allSenozoideLeft || [lots.senozoide1];
-                                                                } else if (lots.allSenozoideRight?.includes(item.id) || lots.senozoide2 === item.id) {
-                                                                    targetWeight = (parse(model.pesoSenozoide) * qty) / 2;
-                                                                    relevantLotIds = lots.allSenozoideRight || [lots.senozoide2];
-                                                                }
-
-                                                                if (relevantLotIds.length > 0) {
-                                                                    // Logic must match App.tsx and ProductionOrderTrelica sorting
-                                                                    const sortedRelevantLots = relevantLotIds
-                                                                        .map(id => stock.find(s => s.id === id))
-                                                                        .filter((s): s is StockItem => !!s)
-                                                                        .sort((a, b) => {
-                                                                            // We consider both 'suporte' and current 'em produção' as priority
-                                                                            const isPriorityA = a.status === 'Disponível - Suporte Treliça' || a.status === 'Em Produção - Treliça';
-                                                                            const isPriorityB = b.status === 'Disponível - Suporte Treliça' || b.status === 'Em Produção - Treliça';
-                                                                            if (isPriorityA && !isPriorityB) return -1;
-                                                                            if (!isPriorityA && isPriorityB) return 1;
-                                                                            return a.internalLot.localeCompare(b.internalLot, undefined, { numeric: true, sensitivity: 'base' });
-                                                                        });
-
-                                                                    let remainingRequired = targetWeight;
-                                                                    let predictedBalance = item.remainingQuantity;
-
-                                                                    for (const l of sortedRelevantLots) {
-                                                                        const available = l.remainingQuantity;
-                                                                        const toConsume = Math.min(remainingRequired, available);
-
-                                                                        if (l.id === item.id) {
-                                                                            predictedBalance = Math.max(0, available - toConsume);
-                                                                            break;
-                                                                        }
-
-                                                                        remainingRequired -= toConsume;
-                                                                        if (remainingRequired <= 0) {
-                                                                            predictedBalance = available; // Not reached yet
-                                                                            break;
-                                                                        }
-                                                                    }
-
-                                                                    return (
-                                                                        <div className="flex flex-col items-end mt-1">
-                                                                            <span className="text-[10px] font-black text-amber-600 uppercase tracking-tighter">Irá Sobrar:</span>
-                                                                            <span className={`text-xs font-black px-1 rounded border ${predictedBalance < 0.1 ? 'text-red-600 bg-red-50 border-red-100' : 'text-emerald-600 bg-emerald-50 border-emerald-100'}`}>
-                                                                                {predictedBalance.toFixed(2)}kg
-                                                                            </span>
-                                                                        </div>
-                                                                    );
-                                                                }
-                                                            }
-                                                        }
-                                                        return null;
-                                                    })()}
+                                                    <span className="text-[9px] font-bold text-emerald-600 opacity-60">Balança: {(item.initialQuantity).toFixed(2)} KG</span>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 text-center whitespace-nowrap">
-                                                <div className="transform scale-110">
-                                                    {getStatusBadge(item.status)}
-                                                </div>
-                                                {item.productionOrderIds && item.productionOrderIds.length > 0 && (
-                                                    <div className="flex flex-wrap justify-center gap-1 mt-2">
-                                                        {item.productionOrderIds.map(id => {
-                                                            const order = productionOrders.find(o => o.id === id);
-                                                            return (
-                                                                <span key={id} className="text-[10px] font-bold bg-amber-50 text-amber-700 px-2 py-1 rounded border border-amber-200 shadow-sm" title={`Ordem de Produção: ${order?.orderNumber || id}`}>
-                                                                    {order?.orderNumber || `OP: ${id.split('-').pop()?.toUpperCase()}`}
-                                                                </span>
-                                                            );
-                                                        })}
+                                            <td className="px-2 py-0.5 text-center whitespace-nowrap">
+                                                <div className="inline-flex flex-col items-center">
+                                                    <div className="transform scale-[0.85] origin-center -my-1">
+                                                        {getStatusBadge(item.status)}
                                                     </div>
-                                                )}
+                                                    {item.productionOrderIds && item.productionOrderIds.length > 0 && (
+                                                        <div className="flex flex-wrap justify-center gap-0.5 mt-0.5">
+                                                            {item.productionOrderIds.map(id => {
+                                                                const order = productionOrders.find(o => o.id === id);
+                                                                return (
+                                                                    <span key={id} className="text-[8px] font-bold bg-amber-50 text-amber-600 px-1 py-0 rounded border border-amber-100 leading-none" title={`Ordem: ${order?.orderNumber || id}`}>
+                                                                        {order?.orderNumber || `OP: ${id.split('-').pop()?.toUpperCase()}`}
+                                                                    </span>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                                            <td className="px-2 py-0.5 whitespace-nowrap text-center">
                                                 {item.lastAuditDate ? (
-                                                    <div className="flex flex-col items-center">
-                                                        <CheckCircleIcon className="h-8 w-8 text-emerald-600 mb-0.5" />
-                                                        <span className="text-xs font-black text-emerald-700 uppercase leading-none mb-0.5">OK</span>
-                                                        <span className="text-[10px] font-bold text-slate-500 leading-none">
-                                                            {new Date(item.lastAuditDate).toLocaleDateString('pt-BR')}
-                                                        </span>
+                                                    <div className="flex flex-col items-center leading-none">
+                                                        <CheckCircleIcon className="h-3.5 w-3.5 text-emerald-500" />
+                                                        <span className="text-[8px] font-bold text-emerald-600 uppercase">OK-{new Date(item.lastAuditDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</span>
                                                     </div>
                                                 ) : (
-                                                    <span className="text-sm font-bold text-slate-300">-</span>
+                                                    <span className="text-[10px] font-bold text-slate-200">-</span>
                                                 )}
                                             </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center justify-center space-x-2">
-                                                    <button onClick={() => setHistoryLot(item)} className="p-1 text-slate-500 hover:text-slate-800" title="Ver Histórico"><BookOpenIcon className="h-5 w-5" /></button>
-                                                    <button onClick={() => setEditingItem(item)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="p-1 text-slate-500 hover:text-emerald-700 disabled:opacity-30 disabled:cursor-not-allowed" title="Editar Lote"><PencilIcon className="h-5 w-5" /></button>
-                                                    <button onClick={() => setDeletingItem(item)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="p-1 text-slate-500 hover:text-red-700 disabled:opacity-30 disabled:cursor-not-allowed" title="Excluir Lote"><TrashIcon className="h-5 w-5" /></button>
+                                            <td className="px-2 py-0.5">
+                                                <div className="flex items-center justify-center gap-0.5">
+                                                    <button onClick={() => setHistoryLot(item)} className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition" title="Ver Histórico"><BookOpenIcon className="h-3.5 w-3.5" /></button>
+                                                    <button onClick={() => setEditingItem(item)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition disabled:opacity-20" title="Editar Lote"><PencilIcon className="h-3.5 w-3.5" /></button>
+                                                    <button onClick={() => setDeletingItem(item)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition disabled:opacity-20" title="Excluir Lote"><TrashIcon className="h-3.5 w-3.5" /></button>
                                                     {(item.status.includes('Em Produção') || item.status === 'Disponível - Suporte Treliça') && (
-                                                        <button onClick={() => setReleasingItem(item)} className="p-1 text-amber-500 hover:text-amber-700" title="Liberar Lote Manualmente (Correção)">
-                                                            <LockOpenIcon className="h-5 w-5" />
+                                                        <button onClick={() => setReleasingItem(item)} className="p-1 text-amber-500 hover:bg-amber-50 rounded transition" title="Liberar Lote">
+                                                            <LockOpenIcon className="h-3.5 w-3.5" />
                                                         </button>
-                                                    )}
-                                                    {item.location && (
-                                                        <button onClick={() => setUnmappingItem(item)} className="p-1 text-slate-500 hover:text-amber-600" title="Remover Localização"><LocationOffIcon className="h-5 w-5" /></button>
                                                     )}
                                                 </div>
                                             </td>
