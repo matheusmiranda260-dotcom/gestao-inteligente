@@ -66,49 +66,75 @@ const DowntimeModal: React.FC<{
     onClose: () => void;
     onSubmit: (reason: string) => void;
 }> = ({ onClose, onSubmit }) => {
-    const [reason, setReason] = useState(downtimeReasons[0]);
+    const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
     const [otherReason, setOtherReason] = useState('');
+    const [isOtherActive, setIsOtherActive] = useState(false);
+
+    const toggleReason = (r: string) => {
+        if (r === 'Outros') {
+            setIsOtherActive(!isOtherActive);
+            return;
+        }
+        setSelectedReasons(prev =>
+            prev.includes(r) ? prev.filter(item => item !== r) : [...prev, r]
+        );
+    };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        const finalReason = reason === 'Outros' ? otherReason.trim() : reason;
+        const reasons = [...selectedReasons];
+        if (isOtherActive && otherReason.trim()) {
+            reasons.push(otherReason.trim());
+        }
+
+        const finalReason = reasons.join(' + ');
         if (finalReason) {
             onSubmit(finalReason);
+        } else {
+            alert('Por favor, selecione pelo menos um motivo.');
         }
     };
+
     return (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-            <form onSubmit={handleSubmit} className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-zoom-in">
+            <form onSubmit={handleSubmit} className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-zoom-in">
                 <div className="p-8">
                     <div className="bg-amber-100 w-16 h-16 rounded-2xl flex items-center justify-center mb-6">
                         <PauseIcon className="h-10 w-10 text-amber-600" />
                     </div>
                     <h2 className="text-2xl font-black text-slate-800 mb-2">Pausar Produção</h2>
-                    <p className="text-slate-500 mb-8 leading-relaxed">Qual o motivo da interrupção? Isso nos ajuda a gerenciar a eficiência da planta.</p>
+                    <p className="text-slate-500 mb-8 leading-relaxed">Selecione <strong>um ou mais</strong> motivos para a interrupção.</p>
 
                     <div className="space-y-6">
-                        <div className="space-y-2">
-                            <label htmlFor="reason-select" className="block text-xs font-bold text-slate-400 uppercase tracking-widest">Selecione o Motivo</label>
-                            <select
-                                id="reason-select"
-                                value={reason}
-                                onChange={(e) => setReason(e.target.value)}
-                                className="w-full bg-slate-50 border-2 border-slate-100 p-4 rounded-2xl font-bold text-slate-700 focus:border-amber-500 focus:bg-white transition appearance-none"
-                            >
-                                {downtimeReasons.map(r => <option key={r} value={r}>{r}</option>)}
-                            </select>
+                        <div className="grid grid-cols-2 gap-3">
+                            {downtimeReasons.map(r => {
+                                const isActive = r === 'Outros' ? isOtherActive : selectedReasons.includes(r);
+                                return (
+                                    <button
+                                        key={r}
+                                        type="button"
+                                        onClick={() => toggleReason(r)}
+                                        className={`p-4 rounded-2xl border-2 transition-all text-sm font-bold flex items-center justify-center text-center leading-tight h-full ${isActive
+                                                ? 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-200 scale-[1.02]'
+                                                : 'bg-slate-50 border-slate-100 text-slate-600 hover:border-amber-200'
+                                            }`}
+                                    >
+                                        {r}
+                                    </button>
+                                );
+                            })}
                         </div>
 
-                        {reason === 'Outros' && (
-                            <div className="animate-fade-in">
-                                <label htmlFor="other-reason" className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Especifique</label>
+                        {isOtherActive && (
+                            <div className="animate-fade-in block space-y-2">
+                                <label htmlFor="other-reason" className="block text-xs font-bold text-slate-400 uppercase tracking-widest">Especifique Outro Motivo</label>
                                 <input
                                     type="text"
                                     id="other-reason"
                                     value={otherReason}
                                     onChange={(e) => setOtherReason(e.target.value)}
-                                    className="w-full bg-slate-50 border-2 border-slate-100 p-4 rounded-2xl font-medium focus:border-amber-500 focus:bg-white transition"
-                                    placeholder="Descreva o motivo"
+                                    className="w-full bg-white border-2 border-amber-200 p-4 rounded-2xl font-medium focus:border-amber-500 transition outline-none"
+                                    placeholder="Descreva o motivo..."
                                     required
                                     autoFocus
                                 />
@@ -117,7 +143,7 @@ const DowntimeModal: React.FC<{
                     </div>
                 </div>
 
-                <div className="flex gap-3 p-6 bg-slate-50">
+                <div className="flex gap-3 p-6 bg-slate-50 border-t border-slate-100">
                     <button
                         type="button"
                         onClick={onClose}
@@ -127,9 +153,9 @@ const DowntimeModal: React.FC<{
                     </button>
                     <button
                         type="submit"
-                        className="flex-1 bg-amber-500 text-white font-black py-4 rounded-2xl hover:bg-amber-600 shadow-lg shadow-amber-200 transition active:scale-95"
+                        className="flex-1 bg-slate-800 text-white font-black py-4 rounded-2xl hover:bg-slate-900 shadow-lg shadow-slate-200 transition active:scale-95 flex items-center justify-center gap-2"
                     >
-                        CONFIRMAR
+                        CONFIRMAR PARADA
                     </button>
                 </div>
             </form>
