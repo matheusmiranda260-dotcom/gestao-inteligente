@@ -796,8 +796,8 @@ const StockControl: React.FC<{
     const totalStockCount = stock.length;
     const mappedStockCount = stock.filter(s => !!s.location).length;
     const unmappedStockCount = totalStockCount - mappedStockCount;
-    const totalRemainingWeight = stock.reduce((sum, s) => sum + (s.remainingQuantity || 0), 0);
-    const inProductionWeight = stock.filter(s => s.status.includes('Em Produção')).reduce((sum, s) => sum + (s.remainingQuantity || 0), 0);
+    const totalRemainingWeight = stock.reduce((sum, s) => sum + (s.labelWeight || 0), 0);
+    const inProductionWeight = stock.filter(s => s.status.includes('Em Produção')).reduce((sum, s) => sum + (s.labelWeight || 0), 0);
 
     const handleAddConferenceSubmit = (data: ConferenceData) => {
         addConference(data);
@@ -1116,7 +1116,7 @@ const StockControl: React.FC<{
                                                     <p className="text-[10px] text-slate-400 font-bold uppercase">{item.supplierLot} • {item.supplier}</p>
                                                 </div>
                                                 <div className="text-right">
-                                                    <div className="text-xl font-black text-slate-900">{item.remainingQuantity.toFixed(2)}<span className="text-[10px] ml-0.5">kg</span></div>
+                                                    <div className="text-xl font-black text-slate-900">{item.labelWeight.toFixed(2)}<span className="text-[10px] ml-0.5">kg</span></div>
                                                     <p className="text-[10px] text-slate-400 font-bold">{item.materialType} • {item.bitola}</p>
                                                 </div>
                                             </div>
@@ -1152,7 +1152,7 @@ const StockControl: React.FC<{
                                                 <th className="px-6 py-4">Lote Fornecedor</th>
                                                 <th className="px-6 py-4">Fornecedor</th>
                                                 <th className="px-6 py-4">Material / Bitola</th>
-                                                <th className="px-6 py-4 text-right">Saldo (kg)</th>
+                                                <th className="px-6 py-4 text-right">Etiqueta (kg)</th>
                                                 <th className="px-6 py-4">Status</th>
                                                 <th className="px-6 py-4">Conf. Física</th>
                                                 <th className="px-6 py-4">Ações</th>
@@ -1205,10 +1205,10 @@ const StockControl: React.FC<{
                                                     </td>
                                                     <td className="px-6 py-4 text-right whitespace-nowrap">
                                                         <div className="flex flex-col items-end">
-                                                            <span className={`text-2xl font-black ${item.remainingQuantity < item.initialQuantity ? 'text-blue-700' : 'text-slate-800'}`}>
-                                                                {item.remainingQuantity.toFixed(2)}
+                                                            <span className="text-2xl font-black text-slate-800">
+                                                                {item.labelWeight.toFixed(2)}
                                                             </span>
-                                                            <span className="text-xs font-bold text-emerald-600">+{(item.initialQuantity).toFixed(2)} KG</span>
+                                                            <span className="text-xs font-bold text-emerald-600">Balança: {(item.initialQuantity).toFixed(2)} KG</span>
                                                             {item.status === 'Em Produção - Treliça' && (() => {
                                                                 const order = productionOrders.find(o =>
                                                                     o.status !== 'completed' &&

@@ -374,6 +374,7 @@ export interface OrgPosition {
     id: string;
     orgUnitId: string;
     title: string;
+    description?: string; // Detailed Job Description
     isLeadership: boolean;
     displayOrder: number;
 }

@@ -280,7 +280,9 @@ const EmployeeDetailModal: React.FC<{
     currentUser: User | null;
     readOnly?: boolean;
     initialTab?: 'profile' | 'responsibilities' | 'development' | 'hr' | 'evaluations' | 'documents' | 'tasks';
-}> = ({ employee, onClose, onSave, onDelete, currentUser, readOnly, initialTab = 'profile' }) => {
+    orgUnits?: OrgUnit[];
+    orgPositions?: OrgPosition[];
+}> = ({ employee, onClose, onSave, onDelete, currentUser, readOnly, initialTab = 'profile', orgUnits = [], orgPositions = [] }) => {
     // ... Copy existing implementation or use a placeholder if too long (I'll keep it shortened for this specific file write as the focus is Organograma)
     // To ensure I don't break existing features, I will replicate it or assume it's there. 
     // Given the previous step saw the full file, I will perform a full overwrite including the Modal code to be safe.
@@ -626,6 +628,15 @@ const EmployeeDetailModal: React.FC<{
                         <button onClick={handlePrintProfile} className="text-blue-400 hover:text-blue-600 p-2 rounded-full hover:bg-blue-50 transition" title="Imprimir Ficha">
                             <PrinterIcon className="h-5 w-5" />
                         </button>
+                        {empData.orgPositionId && (
+                            <button
+                                onClick={() => { onClose(); onSave(); /* Signal parent to switch view? We can just tell the user to switch to Org Chart */ alert('Mude para a aba "Organograma" para visualizar este colaborador na hierarquia.'); }}
+                                className="text-amber-500 hover:text-amber-600 p-2 rounded-full hover:bg-amber-50 transition"
+                                title="Localizar no Organograma"
+                            >
+                                <ChartBarIcon className="h-5 w-5" />
+                            </button>
+                        )}
                         {!readOnly && (
                             <button onClick={onDelete} className="text-red-400 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition" title="Excluir Este Funcionário">
                                 <TrashIcon className="h-5 w-5" />
@@ -671,11 +682,60 @@ const EmployeeDetailModal: React.FC<{
                             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                                 <h3 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2">Dados Profissionais</h3>
                                 <div className="space-y-4">
-                                    <div><label className="block text-xs font-semibold text-slate-500 uppercase">Cargo / Função</label><input type="text" disabled={readOnly} className="w-full mt-1 p-2 border rounded-lg disabled:bg-slate-100" value={empData.jobTitle || ''} onChange={e => setEmpData({ ...empData, jobTitle: e.target.value })} placeholder="Ex: Operador Trefila I" /></div>
+                                    {/* Link to Org Chart Position */}
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-500 uppercase">Posição no Organograma (Vínculo Hierárquico)</label>
+                                        <select
+                                            disabled={readOnly}
+                                            className="w-full mt-1 p-2 border rounded-lg disabled:bg-slate-100 bg-blue-50/50 font-bold text-[#0F3F5C]"
+                                            value={empData.orgPositionId || ''}
+                                            onChange={e => {
+                                                const posId = e.target.value;
+                                                const selectedPos = orgPositions.find(p => p.id === posId);
+                                                const selectedUnit = orgUnits.find(u => u.id === selectedPos?.orgUnitId);
+
+                                                setEmpData({
+                                                    ...empData,
+                                                    orgPositionId: posId || undefined,
+                                                    jobTitle: selectedPos?.title || empData.jobTitle,
+                                                    sector: selectedUnit?.name || empData.sector
+                                                });
+                                            }}
+                                        >
+                                            <option value="">Não Vinculado ao Organograma</option>
+                                            {orgUnits.map(unit => (
+                                                <optgroup key={unit.id} label={unit.name}>
+                                                    {orgPositions.filter(p => p.orgUnitId === unit.id).map(p => (
+                                                        <option key={p.id} value={p.id}>{p.title}</option>
+                                                    ))}
+                                                </optgroup>
+                                            ))}
+                                        </select>
+                                        <p className="text-[10px] text-slate-400 mt-1 italic">* Ao selecionar uma posição, o Cargo e Setor serão atualizados automaticamente.</p>
+                                    </div>
+
+                                    {/* Job Description from OrgPosition */}
+                                    {empData.orgPositionId && orgPositions.find(p => p.id === empData.orgPositionId)?.description && (
+                                        <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                                            <label className="block text-xs font-bold text-[#0F3F5C] uppercase mb-1 flex items-center gap-1">
+                                                <DocumentTextIcon className="h-3 w-3" /> Descrição de Cargo (Organograma)
+                                            </label>
+                                            <div className="text-xs text-slate-600 whitespace-pre-wrap italic">
+                                                {orgPositions.find(p => p.id === empData.orgPositionId)?.description}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-500 uppercase">Cargo / Função (Exibição)</label>
+                                        <input type="text" disabled={readOnly} className="w-full mt-1 p-2 border rounded-lg disabled:bg-slate-100" value={empData.jobTitle || ''} onChange={e => setEmpData({ ...empData, jobTitle: e.target.value })} placeholder="Ex: Operador Trefila I" />
+                                    </div>
                                     <MobileFriendlyDateInput label="Data Admissão" value={empData.admissionDate} onChange={v => setEmpData({ ...empData, admissionDate: v })} disabled={readOnly} />
                                     <div className="grid grid-cols-1 gap-4">
-                                        <div><label className="block text-xs font-semibold text-slate-500 uppercase">Setor</label><input type="text" disabled={readOnly} className="w-full mt-1 p-2 border rounded-lg disabled:bg-slate-100" value={empData.sector} onChange={e => setEmpData({ ...empData, sector: e.target.value })} /></div>
-                                        {/* Shift removed */}
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-500 uppercase">Setor (Exibição)</label>
+                                            <input type="text" disabled={readOnly} className="w-full mt-1 p-2 border rounded-lg disabled:bg-slate-100" value={empData.sector} onChange={e => setEmpData({ ...empData, sector: e.target.value })} />
+                                        </div>
                                     </div>
                                     {!readOnly && <div className="pt-4 flex justify-end"><button type="submit" className="bg-[#0F3F5C] text-white font-bold py-2 px-6 rounded-lg hover:bg-[#0A2A3D] transition">Salvar Alterações</button></div>}
                                 </div>
@@ -984,7 +1044,7 @@ const EmployeeDetailModal: React.FC<{
                     )}
                 </div>
             </div>
-        </div>
+        </div >
     );
 };
 
@@ -1002,12 +1062,13 @@ const OrgNode: React.FC<{
     onAddPosition: (unitId: string) => void;
     onDeleteUnit: (id: string) => void;
     onDeletePosition: (id: string) => void;
+    onEditPosition: (posId: string) => void; // New prop
     onAssignEmployee: (posId: string, empId: string) => void;
     onCreateEmployee: (posId: string) => void; // Shortcut to create emp for this position
     onEditEmployee: (employee: Employee) => void; // New prop
     onEditUnit: (id: string, currentName: string) => void;
     evaluations: Evaluation[];
-}> = ({ node, employees, onAddSubUnit, onAddPosition, onDeleteUnit, onDeletePosition, onAssignEmployee, onCreateEmployee, onEditEmployee, onEditUnit, evaluations }) => {
+}> = ({ node, employees, onAddSubUnit, onAddPosition, onDeleteUnit, onDeletePosition, onEditPosition, onAssignEmployee, onCreateEmployee, onEditEmployee, onEditUnit, evaluations }) => {
 
     // Color mapping based on type
     const getNodeColor = (type?: string) => {
@@ -1053,9 +1114,17 @@ const OrgNode: React.FC<{
                         return (
                             <div key={pos.id} className="flex flex-col items-center relative group/pos w-full max-w-[200px]">
                                 {/* Blue Box: Role */}
-                                <div className="bg-[#4a86e8] text-white px-2 py-1 rounded-t-lg shadow-sm font-semibold text-xs w-full text-center border-b border-blue-400 relative truncate" title={pos.title}>
+                                <div
+                                    className="bg-[#4a86e8] text-white px-2 py-1 rounded-t-lg shadow-sm font-semibold text-xs w-full text-center border-b border-blue-400 relative cursor-pointer hover:bg-blue-600 transition truncate"
+                                    title={pos.title}
+                                    onClick={() => onEditPosition(pos.id)}
+                                >
                                     {pos.title}
-                                    <button onClick={() => onDeletePosition(pos.id)} className="absolute top-0.5 right-1 opacity-0 group-hover/pos:opacity-100 text-white hover:text-red-200">
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onDeletePosition(pos.id); }}
+                                        className="absolute top-0.5 right-1 opacity-0 group-hover/pos:opacity-100 text-white hover:text-red-200"
+                                        title="Remover Cargo"
+                                    >
                                         <XIcon className="h-3 w-3" />
                                     </button>
                                 </div>
@@ -1145,6 +1214,7 @@ const OrgNode: React.FC<{
                                     onAddPosition={onAddPosition}
                                     onDeleteUnit={onDeleteUnit}
                                     onDeletePosition={onDeletePosition}
+                                    onEditPosition={onEditPosition}
                                     onAssignEmployee={onAssignEmployee}
                                     onCreateEmployee={onCreateEmployee}
                                     onEditEmployee={onEditEmployee}
@@ -1162,24 +1232,18 @@ const OrgNode: React.FC<{
 
 const OrgChart: React.FC<{
     employees: Employee[];
+    units: OrgUnit[];
+    positions: OrgPosition[];
     reloadData: () => void;
     triggerAddEmployee: (posId?: string, prefillSector?: string) => void;
     triggerEditEmployee: (emp: Employee) => void;
     evaluations: Evaluation[];
-}> = ({ employees, reloadData, triggerAddEmployee, triggerEditEmployee, evaluations }) => {
-    const [units, setUnits] = useState<OrgUnit[]>([]);
-    const [positions, setPositions] = useState<OrgPosition[]>([]);
+}> = ({ employees, units, positions, reloadData, triggerAddEmployee, triggerEditEmployee, evaluations }) => {
     const [tree, setTree] = useState<OrgTreeItem[]>([]);
 
-    useEffect(() => { loadOrgData(); }, [employees]);
-
-    const loadOrgData = async () => {
-        const u = await fetchTable<OrgUnit>('org_units');
-        const p = await fetchTable<OrgPosition>('org_positions');
-        setUnits(u);
-        setPositions(p);
-        setTree(buildTree(u, p));
-    };
+    useEffect(() => {
+        setTree(buildTree(units, positions));
+    }, [employees, units, positions]);
 
     const buildTree = (allUnits: OrgUnit[], allPositions: OrgPosition[]): OrgTreeItem[] => {
         const unitMap = new Map<string, OrgTreeItem>();
@@ -1212,7 +1276,7 @@ const OrgChart: React.FC<{
         const newName = prompt("Novo nome da área:", currentName);
         if (newName && newName !== currentName) {
             await updateItem('org_units', id, { name: newName });
-            loadOrgData();
+            reloadData();
         }
     };
 
@@ -1224,7 +1288,7 @@ const OrgChart: React.FC<{
         const type = name.toLowerCase().includes('maquina') ? 'machine' : (name.toLowerCase().includes('maquinas') ? 'group' : 'department');
 
         await insertItem('org_units', { name, unitType: type, displayOrder: units.length + 1 } as any);
-        loadOrgData();
+        reloadData();
     };
 
     const handleAddSubUnit = async (parentId: string) => {
@@ -1238,36 +1302,32 @@ const OrgChart: React.FC<{
         if (name.toLowerCase().includes('maquina')) type = 'machine';
 
         await insertItem('org_units', { name, unitType: type, parentId, displayOrder: 99 } as any);
-        loadOrgData();
+        reloadData();
     };
 
     const handleAddPosition = async (unitId: string) => {
         const title = prompt("Nome do Cargo/Função:");
         if (!title) return;
         await insertItem('org_positions', { orgUnitId: unitId, title, isLeadership: false } as any);
-        loadOrgData();
+        reloadData();
     };
 
     const handleDeleteUnit = async (id: string) => {
         if (!confirm('Excluir esta área e todos os itens dentro dela?')) return;
         await deleteItem('org_units', id);
-        loadOrgData();
+        reloadData();
     };
 
     const handleDeletePosition = async (id: string) => {
         if (!confirm('Excluir cargo?')) return;
         await deleteItem('org_positions', id);
-        loadOrgData();
+        reloadData();
     };
 
     const handleAssignEmployee = async (positionId: string, employeeId: string) => {
         // 1. Find details to sync
         const targetPos = positions.find(p => p.id === positionId);
         const targetUnit = units.find(u => u.id === targetPos?.orgUnitId);
-
-        // 2. Clear previous position of this employee if any (logic remains similar)
-        // If we are moving an employee, we just update them. 
-        // If we are unassigning (employeeId is empty), we find who WAS there.
 
         if (employeeId) {
             // Sync Job Title and Sector automatically
@@ -1284,6 +1344,27 @@ const OrgChart: React.FC<{
                 await updateItem('employees', occ.id, { orgPositionId: null });
             }
         }
+        reloadData();
+    };
+
+    const handleEditPosition = async (posId: string) => {
+        const pos = positions.find(p => p.id === posId);
+        if (!pos) return;
+
+        const newTitle = prompt("Novo título do cargo:", pos.title);
+        if (newTitle === null) return;
+
+        const newDesc = prompt("Descrição de Cargo / Atribuições:", pos.description || '');
+        if (newDesc === null) return;
+
+        await updateItem('org_positions', posId, { title: newTitle, description: newDesc });
+
+        // Auto-sync all employees linked to this position
+        const occupants = employees.filter(e => e.orgPositionId === posId);
+        for (const occ of occupants) {
+            await updateItem('employees', occ.id, { jobTitle: newTitle });
+        }
+
         reloadData();
     };
 
@@ -1307,6 +1388,7 @@ const OrgChart: React.FC<{
                         onAddPosition={handleAddPosition}
                         onDeleteUnit={handleDeleteUnit}
                         onDeletePosition={handleDeletePosition}
+                        onEditPosition={handleEditPosition}
                         onAssignEmployee={handleAssignEmployee}
                         onCreateEmployee={handleCreateEmployeeForPosition}
                         onEditEmployee={triggerEditEmployee}
@@ -1439,6 +1521,8 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
     const [vacations, setVacations] = useState<EmployeeVacation[]>([]);
     const [selectedEmployee, setSelectedEmployee] = useState<{ emp: Employee, tab?: any } | null>(null);
     const [viewMode, setViewMode] = useState<'dashboard' | 'cards' | 'orgChart'>('dashboard');
+    const [orgUnits, setOrgUnits] = useState<OrgUnit[]>([]);
+    const [orgPositions, setOrgPositions] = useState<OrgPosition[]>([]);
 
     // Employee Form State (Simplified for direct creation)
     const [newEmployeeName, setNewEmployeeName] = useState('');
@@ -1454,17 +1538,19 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
         if (isRestrictedUser) {
             emp = emp.filter(e => e.id === currentUser!.employeeId);
             evals = evals.filter(ev => ev.employeeId === currentUser!.employeeId);
-            // We might want to filter absences/vacations too if they have employeeId, but let's assume UI filters by selectedEmployee anyway.
-            // But for safety, filtering here is good if table view exposes all.
-            // However, the dashboard uses these states.
             abs = abs.filter(a => a.employeeId === currentUser!.employeeId);
             vacs = vacs.filter(v => v.employeeId === currentUser!.employeeId);
         }
+
+        const units = await fetchTable<OrgUnit>('org_units');
+        const pos = await fetchTable<OrgPosition>('org_positions');
 
         setEmployees(emp);
         setEvaluations(evals);
         setAbsences(abs);
         setVacations(vacs);
+        setOrgUnits(units);
+        setOrgPositions(pos);
     };
 
     useEffect(() => {
@@ -1605,19 +1691,40 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
                             onOpenModal={(tab) => setSelectedEmployee({ emp: employees[0], tab })}
                         />
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {employees.map(emp => (
-                                <EmployeeCard
-                                    key={emp.id}
-                                    employee={emp}
-                                    evaluations={evaluations}
-                                    onSelect={() => setSelectedEmployee({ emp })}
-                                    onDelete={() => handleDeleteEmployee(emp.id)}
-                                />
+                        <div className="space-y-12">
+                            {(Object.entries(
+                                employees.reduce((acc, emp) => {
+                                    const sector = emp.sector || 'Geral / Outros';
+                                    if (!acc[sector]) acc[sector] = [];
+                                    acc[sector].push(emp);
+                                    return acc;
+                                }, {} as Record<string, Employee[]>)
+                            ) as [string, Employee[]][]).sort(([a], [b]) => a.localeCompare(b)).map(([sector, sectorEmps]) => (
+                                <div key={sector}>
+                                    <div className="flex items-center justify-between mb-4 border-b border-slate-200 pb-2">
+                                        <div className="flex items-center gap-2">
+                                            <div className="h-8 w-1 bg-[#0F3F5C] rounded-full"></div>
+                                            <h2 className="text-xl font-extrabold text-[#0F3F5C] uppercase tracking-wider">{sector}</h2>
+                                            <span className="bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full text-xs font-bold">{sectorEmps.length}</span>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        {sectorEmps.map(emp => (
+                                            <EmployeeCard
+                                                key={emp.id}
+                                                employee={emp}
+                                                evaluations={evaluations}
+                                                onSelect={() => setSelectedEmployee({ emp })}
+                                                onDelete={() => handleDeleteEmployee(emp.id)}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
                             ))}
                             {employees.length === 0 && (
-                                <div className="col-span-full text-center py-10 text-slate-500">
-                                    Nenhum funcionário cadastrado. Adicione o primeiro!
+                                <div className="col-span-full text-center py-20 bg-white rounded-2xl border-2 border-dashed border-slate-200">
+                                    <UserGroupIcon className="h-12 w-12 text-slate-200 mx-auto mb-4" />
+                                    <p className="text-slate-500 font-medium">Nenhum funcionário cadastrado. Adicione o primeiro!</p>
                                 </div>
                             )}
                         </div>
@@ -1626,6 +1733,8 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
             ) : viewMode === 'orgChart' ? (
                 <OrgChart
                     employees={employees}
+                    units={orgUnits}
+                    positions={orgPositions}
                     evaluations={evaluations}
                     reloadData={loadData}
                     triggerAddEmployee={promptAndCreateEmployee}
@@ -1633,6 +1742,19 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
                 />
             ) : (
                 <DashboardRH employees={employees} absences={absences} vacations={vacations} />
+            )}
+            {selectedEmployee && (
+                <EmployeeDetailModal
+                    employee={selectedEmployee.emp}
+                    currentUser={currentUser}
+                    onClose={() => setSelectedEmployee(null)}
+                    onSave={loadData}
+                    onDelete={() => handleDeleteEmployee(selectedEmployee.emp.id)}
+                    readOnly={isRestrictedUser}
+                    initialTab={selectedEmployee.tab}
+                    orgUnits={orgUnits}
+                    orgPositions={orgPositions}
+                />
             )}
         </div>
     );

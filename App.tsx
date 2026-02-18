@@ -1358,7 +1358,7 @@ const App: React.FC = () => {
             const actualProducedWeight = (orderToComplete.processedLots || []).reduce((sum, lot) => sum + (lot.finalWeight || 0), 0);
             const totalInputWeight = (orderToComplete.processedLots || []).reduce((sum, processedLot) => {
                 const originalLot = stock.find(s => s.id === processedLot.lotId);
-                return sum + (originalLot?.labelWeight || 0);
+                return sum + (originalLot?.initialQuantity || 0);
             }, 0);
             const calculatedScrapWeight = totalInputWeight - actualProducedWeight;
 

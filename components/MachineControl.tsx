@@ -1678,7 +1678,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                 <div key={lot.id} className="p-4 border border-slate-200 rounded-xl hover:border-indigo-300 hover:shadow-md transition bg-slate-50 group">
                                                                     <div className="flex justify-between items-start mb-3">
                                                                         <span className="font-bold text-slate-700 text-lg">{lot.internalLot}</span>
-                                                                        <span className="text-xs bg-white border border-slate-200 px-2 py-1 rounded-md font-mono">{lot.labelWeight.toFixed(1)} kg</span>
+                                                                        <span className="text-xs bg-white border border-slate-200 px-2 py-1 rounded-md font-mono">{lot.initialQuantity.toFixed(1)} kg</span>
                                                                     </div>
                                                                     <button
                                                                         onClick={() => handleStartProcessingLot(lot.id)}
@@ -1718,7 +1718,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                 return (
                                                                     <tr key={lot.lotId} className="hover:bg-slate-50/50 transition-colors">
                                                                         <td className="p-3 font-bold text-slate-700">{lot.lotInfo?.internalLot}</td>
-                                                                        <td className="p-3 text-right text-slate-500 font-medium">{lot.lotInfo?.labelWeight.toFixed(0)} kg</td>
+                                                                        <td className="p-3 text-right text-slate-500 font-medium">{lot.lotInfo?.initialQuantity.toFixed(0)} kg</td>
                                                                         <td className="p-3">
                                                                             {lot.finalWeight == null ? (
                                                                                 <div className="text-right">
@@ -1789,7 +1789,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                     <div className="flex justify-between items-start">
                                                                         <div>
                                                                             <h4 className="font-black text-slate-800 text-xl">{lot.lotInfo?.internalLot}</h4>
-                                                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Entrada: {lot.lotInfo?.labelWeight.toFixed(0)} kg</p>
+                                                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Entrada: {lot.lotInfo?.initialQuantity.toFixed(0)} kg</p>
                                                                         </div>
                                                                         {isWaiting && (
                                                                             <div className="text-right">
