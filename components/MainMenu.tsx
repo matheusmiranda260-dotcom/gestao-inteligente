@@ -125,7 +125,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser }) =
 
             <main className="space-y-10">
                 {/* ESTOQUE */}
-                {(hasPermission('stock') || hasPermission('finishedGoods') || hasPermission('stock_add') || hasPermission('stock_transfer') || hasPermission('stock_inventory') || hasPermission('stock_map')) && (
+                {(hasPermission('stock') || hasPermission('finishedGoods') || hasPermission('stock_add') || hasPermission('stock_transfer') || hasPermission('stock_inventory')) && (
                     <section>
                         <div className="section-title">
                             <h2>Estoque</h2>
@@ -167,15 +167,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser }) =
                                     color="blue"
                                 />
                             )}
-                            {hasPermission('stock_map') && (
-                                <MenuButton
-                                    onClick={() => setPage('stock_map')}
-                                    label="Mapa de Estoque"
-                                    description="Visualização em pirâmide dos lotes."
-                                    icon={<AdjustmentsIcon />}
-                                    color="cyan"
-                                />
-                            )}
+
                             {hasPermission('finishedGoods') && (
                                 <MenuButton
                                     onClick={() => setPage('finishedGoods')}

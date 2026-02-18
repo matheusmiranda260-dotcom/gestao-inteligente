@@ -34,7 +34,7 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
     };
 
     React.useEffect(() => {
-        if (['stock', 'stock_map', 'stock_add', 'stock_inventory', 'stock_transfer'].includes(page)) {
+        if (['stock', 'stock_add', 'stock_inventory', 'stock_transfer'].includes(page)) {
             setExpandedMenus(prev => prev.includes('stock') ? prev : [...prev, 'stock']);
         } else if (['trefila', 'trefila_in_progress', 'trefila_pending', 'trefila_completed', 'trefila_reports', 'trefila_parts', 'trefila_weighing', 'trefila_rings'].includes(page)) {
             setExpandedMenus(prev => prev.includes('trefila') ? prev : [...prev, 'trefila']);
@@ -229,7 +229,7 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                             {/* Collapsible Matéria-prima */}
                             <button
                                 onClick={() => toggleMenu('stock')}
-                                className={`sidebar-item ${['stock', 'stock_map', 'stock_add', 'stock_inventory', 'stock_transfer'].includes(page) ? 'active' : ''} justify-between group`}
+                                className={`sidebar-item ${['stock', 'stock_add', 'stock_inventory', 'stock_transfer'].includes(page) ? 'active' : ''} justify-between group`}
                                 title={isCollapsed ? 'Matéria-prima' : ''}
                             >
                                 <div className="flex items-center gap-3 overflow-hidden">
@@ -249,11 +249,6 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                                     {hasPermission('stock_add') && (
                                         <button onClick={() => setPage('stock_add')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stock_add' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             + Conferência
-                                        </button>
-                                    )}
-                                    {hasPermission('stock_map') && (
-                                        <button onClick={() => setPage('stock_map')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stock_map' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                            🗺️ Mapa
                                         </button>
                                     )}
                                     {hasPermission('stock_transfer') && (

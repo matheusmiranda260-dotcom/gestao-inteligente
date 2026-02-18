@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Correção do Banco de Dados - Gestão Inteligente</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f4f7f9; }
+        .card { background: white; padding: 30px; border-radius: 12px; shadow: 0 4px 6px rgba(0,0,0,0.1); border-top: 5px solid #0F3F5C; }
+        h1 { color: #0F3F5C; margin-top: 0; }
+        h2 { color: #0F3F5C; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 30px; }
+        .step { margin-bottom: 20px; }
+        .step-num { background: #0F3F5C; color: white; width: 25px; height: 25px; display: inline-block; text-align: center; border-radius: 50%; font-weight: bold; margin-right: 10px; }
+        code { background: #f0f0f0; padding: 2px 5px; border-radius: 4px; font-family: monospace; }
+        pre { background: #1a202c; color: #e2e8f0; padding: 20px; border-radius: 8px; overflow-x: auto; font-size: 14px; }
+        .warning { background: #fff3cd; border-left: 5px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px; }
+        .success { background: #d4edda; border-left: 5px solid #28a745; padding: 15px; margin: 20px 0; border-radius: 4px; }
+        .btn { display: inline-block; background: #0F3F5C; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 20px; }
+        .btn:hover { background: #0A2A3D; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>🚀 Correção Geral do Banco de Dados</h1>
+        <p>Identificamos que alguns erros ao salvar dados (Conferências e Ordens de Produção) podem ser causados por <b>colunas faltando</b> ou <b>permissões (RLS) bloqueadas</b> no Supabase.</p>
+
+        <div class="warning">
+            <b>Atenção:</b> Siga estes passos para garantir que seu banco de dados esteja 100% compatível com a nova versão do sistema.
+        </div>
+
+        <h2>Passo a Passo</h2>
+        
+        <div class="step">
+            <span class="step-num">1</span> Acesse o painel do seu projeto no <b>Supabase</b>.
+        </div>
+        
+        <div class="step">
+            <span class="step-num">2</span> No menu lateral esquerdo, clique no ícone <b>SQL Editor</b> (ícone de terminal <code>>_</code>).
+        </div>
+        
+        <div class="step">
+            <span class="step-num">3</span> Clique em <b>"New query"</b> ou <b>"+ New Query"</b>.
+        </div>
+        
+        <div class="step">
+            <span class="step-num">4</span> Copie o conteúdo do arquivo <code>MASTER_FIX_DATABASE.sql</code> que está na pasta do seu projeto e cole no editor.
+        </div>
+
+        <div class="step">
+            <span class="step-num">5</span> Clique no botão <b>RUN</b> (no canto inferior direito).
+        </div>
+
+        <div class="success">
+            <b>Pronto!</b> Após ver a mensagem "Success: Master Fix aplicado", tente salvar a Ordem de Produção ou a Conferência novamente no sistema. Os erros de "Permissions" ou "Column not found" devem ter sumido.
+        </div>
+
+        <h2>O que este script faz?</h2>
+        <ul>
+            <li>Adiciona colunas como <code>label_weight</code> e <code>production_order_ids</code> na tabela de estoque.</li>
+            <li>Libera permissões de <b>Inserção</b> e <b>Exclusão</b> (RLS) que estavam faltando em algumas tabelas.</li>
+            <li>Garante que as tabelas de RH e Relatórios tenham acesso total para o App.</li>
+            <li>Corrige o problema de IDs de Ordens de Produção (UUIDs).</li>
+        </ul>
+
+        <p>Se o problema persistir, por favor, me envie uma foto do erro que aparece no console (F12) do navegador.</p>
+    </div>
+</body>
+</html>

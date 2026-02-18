@@ -377,7 +377,10 @@ const App: React.FC = () => {
         }
 
         try {
-            await insertItem<ConferenceData>('conferences', data);
+            // Filter out 'lots' array before saving to conferences table
+            // This prevents errors if the table doesn't have a JSONB 'lots' column
+            const { lots, ...conferenceHeader } = data;
+            await insertItem<any>('conferences', conferenceHeader);
 
             // Also add stock items from conference
             const newStockItems: StockItem[] = data.lots.map(lot => ({
@@ -441,7 +444,9 @@ const App: React.FC = () => {
             await deleteItemByColumn('stock_items', 'conference_number', conferenceNumber);
 
             // Update conference using conference_number column
-            await updateItemByColumn<ConferenceData>('conferences', 'conference_number', conferenceNumber, updatedData);
+            // Filter out 'lots' array to avoid DB errors
+            const { lots, ...conferenceHeader } = updatedData;
+            await updateItemByColumn<any>('conferences', 'conference_number', conferenceNumber, conferenceHeader);
 
             // Create new stock items
             const newStockItems: StockItem[] = updatedData.lots.map(lot => ({
@@ -764,9 +769,9 @@ const App: React.FC = () => {
     };
 
     const addProductionOrder = async (orderData: Omit<ProductionOrderData, 'id' | 'status' | 'creationDate'>) => {
-        const newOrder: ProductionOrderData = {
+        const newOrder: Partial<ProductionOrderData> = {
             ...orderData,
-            id: generateId('op'),
+            // id is NOT set here to allow insertItem to generate a proper UUID for Supabase
             status: 'pending',
             creationDate: new Date().toISOString(),
             downtimeEvents: [],
@@ -1823,7 +1828,7 @@ const App: React.FC = () => {
             case 'login': return <Login onLogin={handleLogin} error={notification?.type === 'error' ? notification.message : null} />;
             case 'menu': return <MainMenu setPage={setPage} onLogout={handleLogout} currentUser={currentUser} />;
             case 'stock': return <StockControl stock={stock} conferences={conferences} transfers={transfers} setPage={setPage} addConference={addConference} deleteStockItem={deleteStockItem} updateStockItem={(item) => updateStockItem(item.id, item)} createTransfer={createTransfer} editConference={editConference} deleteConference={deleteConference} productionOrders={productionOrders} initialView="list" gauges={gauges} currentUser={currentUser} />;
-            case 'stock_map': return <StockControl stock={stock} conferences={conferences} transfers={transfers} setPage={setPage} addConference={addConference} deleteStockItem={deleteStockItem} updateStockItem={(item) => updateStockItem(item.id, item)} createTransfer={createTransfer} editConference={editConference} deleteConference={deleteConference} productionOrders={productionOrders} initialView="map" gauges={gauges} currentUser={currentUser} />;
+
             case 'stock_add': return <StockControl stock={stock} conferences={conferences} transfers={transfers} setPage={setPage} addConference={addConference} deleteStockItem={deleteStockItem} updateStockItem={(item) => updateStockItem(item.id, item)} createTransfer={createTransfer} editConference={editConference} deleteConference={deleteConference} productionOrders={productionOrders} initialView="add" gauges={gauges} currentUser={currentUser} />;
             case 'stock_inventory': return <StockInventory stock={stock} setPage={setPage} updateStockItem={updateStockItem} addStockItem={addStockItem} deleteStockItem={deleteStockItem} inventorySessions={inventorySessions} addInventorySession={addInventorySession} updateInventorySession={updateInventorySession} deleteInventorySession={deleteInventorySession} currentUser={currentUser} gauges={gauges} />;
             case 'stock_transfer': return <StockTransfer stock={stock} transfers={transfers} setPage={setPage} createTransfer={createTransfer} gauges={gauges} />;

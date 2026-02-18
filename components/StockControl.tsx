@@ -10,7 +10,6 @@ import TransfersHistoryModal from './TransfersHistoryModal';
 import TransferReport from './TransferReport';
 import InventoryReport from './InventoryReport';
 import StockDashboard from './StockDashboard';
-import StockPyramidMap from './StockPyramidMap';
 import { trelicaModels } from './ProductionOrderTrelica';
 
 const normalizeBitola = (bitolaString: string) => parseFloat(bitolaString.replace(',', '.')).toFixed(2);
@@ -740,18 +739,11 @@ const StockControl: React.FC<{
     const [stockDashboardOpen, setStockDashboardOpen] = useState(false);
     const [duplicatesModalOpen, setDuplicatesModalOpen] = useState(false);
 
-    const [isStockMapOpen, setIsStockMapOpen] = useState(initialView === 'map');
-
     useEffect(() => {
         if (initialView === 'add') {
             setIsAddConferenceModalOpen(true);
-            setIsStockMapOpen(false);
-        } else if (initialView === 'map') {
-            setIsStockMapOpen(true);
-            setIsAddConferenceModalOpen(false);
         } else {
             setIsAddConferenceModalOpen(false);
-            setIsStockMapOpen(false);
         }
     }, [initialView]);
     const [unmappingItem, setUnmappingItem] = useState<StockItem | null>(null);
@@ -920,7 +912,6 @@ const StockControl: React.FC<{
                     {transferReportData && <TransferReport reportData={transferReportData} onClose={() => setTransferReportData(null)} />}
 
                     {showInventoryReport && <InventoryReport stock={stock} filters={{ searchTerm, statusFilter, materialFilter, bitolaFilter }} onClose={() => setShowInventoryReport(false)} />}
-                    {isStockMapOpen && <StockPyramidMap stock={stock} onUpdateStockItem={updateStockItem} onClose={() => { setIsStockMapOpen(false); if (initialView === 'map') setPage('stock'); }} />}
 
                     {/* Confirmation Modals */}
                     {releasingItem && (
@@ -966,10 +957,10 @@ const StockControl: React.FC<{
                             <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-md">
                                 <div className="flex items-center gap-3 text-amber-600 mb-4">
                                     <LocationOffIcon className="h-8 w-8" />
-                                    <h2 className="text-xl font-bold">Remover do Mapa</h2>
+                                    <h2 className="text-xl font-bold">Remover Localização</h2>
                                 </div>
                                 <p className="text-slate-600 mb-6">
-                                    Deseja remover a localização <span className="font-bold text-emerald-600">"{unmappingItem.location}"</span> do lote <span className="font-bold text-slate-800">{unmappingItem.internalLot}</span>? O lote voltará a ficar "Pendente de Mapeamento".
+                                    Deseja remover a localização <span className="font-bold text-emerald-600">"{unmappingItem.location}"</span> do lote <span className="font-bold text-slate-800">{unmappingItem.internalLot}</span>?
                                 </p>
                                 <div className="flex justify-end gap-3">
                                     <button onClick={() => setUnmappingItem(null)} className="px-4 py-2 text-slate-500 font-bold hover:bg-slate-50 rounded-lg">Cancelar</button>
@@ -979,384 +970,362 @@ const StockControl: React.FC<{
                         </div>
                     )}
 
-                    {!isStockMapOpen && (
-                        <>
-                            <header className="flex items-center justify-between pt-4">
-                                <div className="flex items-center">
-                                    <h1 className="text-xl md:text-3xl font-bold text-slate-800">Controle de Estoque</h1>
-                                </div>
+                    <header className="flex items-center justify-between pt-4">
+                        <div className="flex items-center">
+                            <h1 className="text-xl md:text-3xl font-bold text-slate-800">Controle de Estoque</h1>
+                        </div>
 
-                                {/* Global Mapping Status */}
-                                <div className="flex flex-wrap gap-2 md:gap-4 items-center bg-white px-3 py-2 md:px-4 md:py-3 rounded-xl shadow-sm border border-slate-100">
-                                    <div className="flex flex-col items-center px-2 md:px-4 border-r">
-                                        <span className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider">Lotes</span>
-                                        <span className="text-sm md:text-xl font-bold text-slate-700">{totalStockCount}</span>
-                                    </div>
-                                    <div className="flex flex-col items-center px-2 md:px-4 border-r">
-                                        <span className="text-[10px] md:text-xs font-bold text-emerald-600 uppercase tracking-wider">Mapeados</span>
-                                        <span className="text-sm md:text-xl font-bold text-emerald-600">{mappedStockCount}</span>
-                                    </div>
-                                    <div className="flex flex-col items-center px-2 md:px-4 border-r">
-                                        <span className="text-[10px] md:text-xs font-bold text-blue-600 uppercase tracking-wider">Saldo</span>
-                                        <span className="text-sm md:text-xl font-bold text-blue-600">{totalRemainingWeight.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}<span className="text-[8px] md:text-[10px] ml-0.5">kg</span></span>
-                                    </div>
-                                    <div className="flex flex-col items-center px-2 md:px-4">
-                                        <span className="text-[10px] md:text-xs font-bold text-violet-600 uppercase tracking-wider">Produção</span>
-                                        <span className="text-sm md:text-xl font-bold text-violet-600">{inProductionWeight.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}<span className="text-[8px] md:text-[10px] ml-0.5">kg</span></span>
-                                    </div>
-                                </div>
-                            </header>
+                        {/* Global Mapping Status */}
+                        <div className="flex flex-wrap gap-2 md:gap-4 items-center bg-white px-3 py-2 md:px-4 md:py-3 rounded-xl shadow-sm border border-slate-100">
+                            <div className="flex flex-col items-center px-2 md:px-4 border-r">
+                                <span className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider">Lotes</span>
+                                <span className="text-sm md:text-xl font-bold text-slate-700">{totalStockCount}</span>
+                            </div>
+                            <div className="flex flex-col items-center px-2 md:px-4 border-r">
+                                <span className="text-[10px] md:text-xs font-bold text-emerald-600 uppercase tracking-wider">Mapeados</span>
+                                <span className="text-sm md:text-xl font-bold text-emerald-600">{mappedStockCount}</span>
+                            </div>
+                            <div className="flex flex-col items-center px-2 md:px-4 border-r">
+                                <span className="text-[10px] md:text-xs font-bold text-blue-600 uppercase tracking-wider">Saldo</span>
+                                <span className="text-sm md:text-xl font-bold text-blue-600">{totalRemainingWeight.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}<span className="text-[8px] md:text-[10px] ml-0.5">kg</span></span>
+                            </div>
+                            <div className="flex flex-col items-center px-2 md:px-4">
+                                <span className="text-[10px] md:text-xs font-bold text-violet-600 uppercase tracking-wider">Produção</span>
+                                <span className="text-sm md:text-xl font-bold text-violet-600">{inProductionWeight.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}<span className="text-[8px] md:text-[10px] ml-0.5">kg</span></span>
+                            </div>
+                        </div>
+                    </header>
 
-                            <div className="bg-white p-6 rounded-xl shadow-sm flex flex-wrap gap-4 items-center justify-between">
-                                <div>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => setIsAddConferenceModalOpen(true)} className="bg-[#0F3F5C] hover:bg-[#0A2A3D] text-white font-bold py-2 px-4 rounded-lg transition text-base">
-                                            + Adicionar Conferência
-                                        </button>
-                                        <div className="relative group">
-                                            <button onClick={() => setIsStockMapOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg transition text-base flex items-center gap-2 shadow-lg relative overflow-hidden">
-                                                <div className="absolute inset-0 bg-white/20 animate-[pulse_2s_infinite]"></div>
-                                                <ArchiveIcon className="w-5 h-5 relative z-10" />
-                                                <span className="relative z-10">MAPA DE ESTOQUE</span>
-                                                {unmappedStockCount > 0 && (
-                                                    <span className="absolute -top-1 -right-1 flex h-4 w-4">
-                                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                                        <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500 text-[10px] text-white items-center justify-center font-bold">!</span>
-                                                    </span>
-                                                )}
-                                            </button>
-                                            <div className="absolute top-full mt-2 w-48 p-2 bg-slate-800 text-white text-xs rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
-                                                Clique para organizar os lotes fisicamente nas fileiras.
+                    <div className="bg-white p-6 rounded-xl shadow-sm flex flex-wrap gap-4 items-center justify-between">
+                        <div>
+                            <div className="flex gap-2">
+                                <button onClick={() => setIsAddConferenceModalOpen(true)} className="bg-[#0F3F5C] hover:bg-[#0A2A3D] text-white font-bold py-2 px-4 rounded-lg transition text-base">
+                                    + Adicionar Conferência
+                                </button>
+                            </div>
+                        </div>
+                        {/* Keeping Existing buttons, but REMOVED Finished Conferences Button */}
+                        <div className="flex gap-4">
+                            <button onClick={() => setPage('stock_inventory')} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition flex items-center gap-2">
+                                <ScaleIcon className="h-5 w-5" />Inventário Mobile
+                            </button>
+                            <button onClick={() => setStockDashboardOpen(true)} className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
+                                <ChartBarIcon className="h-5 w-5" />Estatística
+                            </button>
+                            <button onClick={() => setShowInventoryReport(true)} className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
+                                <PrinterIcon className="h-5 w-5" />Imprimir
+                            </button>
+                            <button onClick={() => setTransferHistoryOpen(true)} className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
+                                <TruckIcon className="h-5 w-5" />Histórico Transf.
+                            </button>
+                            <button onClick={() => setDuplicatesModalOpen(true)} className="bg-amber-100 hover:bg-amber-200 text-amber-800 font-semibold py-2 px-4 rounded-lg border border-amber-300 transition flex items-center gap-2" title="Procurar Lotes Duplicados">
+                                <ExclamationIcon className="h-5 w-5" />Duplicatas
+                            </button>
+                        </div>
+                    </div>
+
+                    {stockDashboardOpen && (
+                        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-7xl max-h-[95vh] overflow-y-auto flex flex-col relative">
+                                <button onClick={() => setStockDashboardOpen(false)} className="absolute top-4 right-4 text-slate-500 hover:text-slate-800">
+                                    <XCircleIcon className="h-8 w-8" />
+                                </button>
+                                <h2 className="text-2xl font-bold text-slate-800 mb-6">Estatísticas do Estoque</h2>
+                                <StockDashboard stock={stock} />
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="bg-white p-6 rounded-xl shadow-sm">
+                        <h2 className="text-xl font-semibold text-slate-800 mb-4">Filtros de Busca</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                            <input type="text" placeholder="Buscar por lote, fornecedor, NFe..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="p-2 border border-slate-300 rounded-md md:col-span-1 text-slate-800" />
+                            <select value={bitolaFilter} onChange={e => setBitolaFilter(e.target.value)} className="p-2 border border-slate-300 rounded-md bg-white text-slate-800">
+                                <option value="">Todas as Bitolas</option>
+                                {allBitolaOptions.map(b => <option key={b} value={b}>{b}</option>)}
+                            </select>
+                            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="p-2 border border-slate-300 rounded-md bg-white text-slate-800">
+                                <option value="">Todos os Status</option>
+                                <option value="Disponível">Disponível</option>
+                                <option value="Disponível - Suporte Treliça">Disponível - Suporte Treliça</option>
+                                <option value="Em Produção">Em Produção</option>
+                                <option value="Em Produção - Treliça">Em Produção - Treliça</option>
+                                <option value="Transferido">Transferido</option>
+                            </select>
+                            {/* Mapped Filter */}
+                            <select value={mappedFilter} onChange={e => setMappedFilter(e.target.value as any)} className="p-2 border border-slate-300 rounded-md bg-white text-slate-800">
+                                <option value="all">Todos (Mapeamento)</option>
+                                <option value="mapped">Mapeados (Com Local)</option>
+                                <option value="unmapped">Não Mapeados (Pendentes)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl shadow-sm">
+                        <div className="p-6 border-b flex justify-between items-center">
+                            <div>
+                                <h2 className="text-xl font-semibold text-slate-800">Lotes em Estoque</h2>
+                                <p className="text-sm text-slate-500">Exibindo {filteredStock.length} de {stock.length} lotes.</p>
+                            </div>
+                            <button
+                                onClick={() => setIsMultiLotTransferModalOpen(true)}
+                                disabled={selectedLotIdsForTransfer.length === 0}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg transition flex items-center gap-2 disabled:bg-slate-400 disabled:cursor-not-allowed"
+                            >
+                                <TruckIcon className="h-5 w-5" />Transferir Selecionados ({selectedLotIdsForTransfer.length})
+                            </button>
+                        </div>
+
+                        {/* Mobile Cards View */}
+                        <div className="md:hidden divide-y divide-slate-100">
+                            {filteredStock.map(item => (
+                                <div key={item.id} className={`p-4 ${item.location ? 'bg-emerald-50/20' : 'bg-white'} space-y-3`}>
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-lg font-black text-slate-900">{item.internalLot}</span>
+                                                {item.location && <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-200">{item.location}</span>}
                                             </div>
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase">{item.supplierLot} • {item.supplier}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-xl font-black text-slate-900">{item.labelWeight.toFixed(2)}<span className="text-[10px] ml-0.5">kg</span></div>
+                                            <p className="text-[10px] text-slate-400 font-bold">{item.materialType} • {item.bitola}</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-1">
+                                            {getStatusBadge(item.status)}
+                                            {item.productionOrderIds && item.productionOrderIds.length > 0 && (
+                                                <span className="text-[10px] font-black bg-amber-50 text-amber-700 px-2 py-1 rounded border border-amber-200">
+                                                    {item.productionOrderIds.length} OP(s)
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => setHistoryLot(item)} className="p-2 bg-slate-100 rounded-lg text-slate-500"><BookOpenIcon className="h-5 w-5" /></button>
+                                            <button onClick={() => setEditingItem(item)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="p-2 bg-slate-100 rounded-lg text-slate-500 disabled:opacity-30"><PencilIcon className="h-5 w-5" /></button>
+                                            <button onClick={() => setDeletingItem(item)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="p-2 bg-red-50 rounded-lg text-red-500 disabled:opacity-30"><TrashIcon className="h-5 w-5" /></button>
                                         </div>
                                     </div>
                                 </div>
-                                {/* Keeping Existing buttons, but REMOVED Finished Conferences Button */}
-                                <div className="flex gap-4">
-                                    <button onClick={() => setPage('stock_inventory')} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition flex items-center gap-2">
-                                        <ScaleIcon className="h-5 w-5" />Inventário Mobile
-                                    </button>
-                                    <button onClick={() => setStockDashboardOpen(true)} className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
-                                        <ChartBarIcon className="h-5 w-5" />Estatística
-                                    </button>
-                                    <button onClick={() => setShowInventoryReport(true)} className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
-                                        <PrinterIcon className="h-5 w-5" />Imprimir
-                                    </button>
-                                    <button onClick={() => setTransferHistoryOpen(true)} className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
-                                        <TruckIcon className="h-5 w-5" />Histórico Transf.
-                                    </button>
-                                    <button onClick={() => setDuplicatesModalOpen(true)} className="bg-amber-100 hover:bg-amber-200 text-amber-800 font-semibold py-2 px-4 rounded-lg border border-amber-300 transition flex items-center gap-2" title="Procurar Lotes Duplicados">
-                                        <ExclamationIcon className="h-5 w-5" />Duplicatas
-                                    </button>
-                                </div>
-                            </div>
+                            ))}
+                        </div>
 
-                            {stockDashboardOpen && (
-                                <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-                                    <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-7xl max-h-[95vh] overflow-y-auto flex flex-col relative">
-                                        <button onClick={() => setStockDashboardOpen(false)} className="absolute top-4 right-4 text-slate-500 hover:text-slate-800">
-                                            <XCircleIcon className="h-8 w-8" />
-                                        </button>
-                                        <h2 className="text-2xl font-bold text-slate-800 mb-6">Estatísticas do Estoque</h2>
-                                        <StockDashboard stock={stock} />
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="bg-white p-6 rounded-xl shadow-sm">
-                                <h2 className="text-xl font-semibold text-slate-800 mb-4">Filtros de Busca</h2>
-                                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                                    <input type="text" placeholder="Buscar por lote, fornecedor, NFe..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="p-2 border border-slate-300 rounded-md md:col-span-1 text-slate-800" />
-                                    <select value={bitolaFilter} onChange={e => setBitolaFilter(e.target.value)} className="p-2 border border-slate-300 rounded-md bg-white text-slate-800">
-                                        <option value="">Todas as Bitolas</option>
-                                        {allBitolaOptions.map(b => <option key={b} value={b}>{b}</option>)}
-                                    </select>
-                                    <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="p-2 border border-slate-300 rounded-md bg-white text-slate-800">
-                                        <option value="">Todos os Status</option>
-                                        <option value="Disponível">Disponível</option>
-                                        <option value="Disponível - Suporte Treliça">Disponível - Suporte Treliça</option>
-                                        <option value="Em Produção">Em Produção</option>
-                                        <option value="Em Produção - Treliça">Em Produção - Treliça</option>
-                                        <option value="Transferido">Transferido</option>
-                                    </select>
-                                    {/* Mapped Filter */}
-                                    <select value={mappedFilter} onChange={e => setMappedFilter(e.target.value as any)} className="p-2 border border-slate-300 rounded-md bg-white text-slate-800">
-                                        <option value="all">Todos (Mapeamento)</option>
-                                        <option value="mapped">Mapeados (Com Local)</option>
-                                        <option value="unmapped">Não Mapeados (Pendentes)</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="bg-white rounded-xl shadow-sm">
-                                <div className="p-6 border-b flex justify-between items-center">
-                                    <div>
-                                        <h2 className="text-xl font-semibold text-slate-800">Lotes em Estoque</h2>
-                                        <p className="text-sm text-slate-500">Exibindo {filteredStock.length} de {stock.length} lotes.</p>
-                                    </div>
-                                    <button
-                                        onClick={() => setIsMultiLotTransferModalOpen(true)}
-                                        disabled={selectedLotIdsForTransfer.length === 0}
-                                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg transition flex items-center gap-2 disabled:bg-slate-400 disabled:cursor-not-allowed"
-                                    >
-                                        <TruckIcon className="h-5 w-5" />Transferir Selecionados ({selectedLotIdsForTransfer.length})
-                                    </button>
-                                </div>
-
-                                {/* Mobile Cards View */}
-                                <div className="md:hidden divide-y divide-slate-100">
+                        {/* Desktop Table View */}
+                        <div className="hidden md:block overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="text-sm font-black text-slate-700 uppercase bg-slate-100 text-center">
+                                    <tr>
+                                        <th className="p-4 w-12"><input type="checkbox" onChange={handleSelectAllForTransfer} checked={filteredStock.length > 0 && selectedLotIdsForTransfer.length === filteredStock.filter(i => i.status === 'Disponível' || i.status === 'Disponível - Suporte Treliça').length} className="h-5 w-5 rounded border-slate-300 text-slate-600 focus:ring-slate-500" /></th>
+                                        <th className="px-6 py-4">Mapeado</th>
+                                        <th className="px-6 py-4">Data Entrada</th>
+                                        <th className="px-6 py-4">Lote Interno</th>
+                                        <th className="px-6 py-4">Lote Fornecedor</th>
+                                        <th className="px-6 py-4">Fornecedor</th>
+                                        <th className="px-6 py-4">Material / Bitola</th>
+                                        <th className="px-6 py-4 text-right">Etiqueta (kg)</th>
+                                        <th className="px-6 py-4">Status</th>
+                                        <th className="px-6 py-4">Conf. Física</th>
+                                        <th className="px-6 py-4">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-200">
                                     {filteredStock.map(item => (
-                                        <div key={item.id} className={`p-4 ${item.location ? 'bg-emerald-50/20' : 'bg-white'} space-y-3`}>
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-lg font-black text-slate-900">{item.internalLot}</span>
-                                                        {item.location && <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-200">{item.location}</span>}
-                                                    </div>
-                                                    <p className="text-[10px] text-slate-400 font-bold uppercase">{item.supplierLot} • {item.supplier}</p>
-                                                </div>
-                                                <div className="text-right">
-                                                    <div className="text-xl font-black text-slate-900">{item.labelWeight.toFixed(2)}<span className="text-[10px] ml-0.5">kg</span></div>
-                                                    <p className="text-[10px] text-slate-400 font-bold">{item.materialType} • {item.bitola}</p>
-                                                </div>
-                                            </div>
-
-                                            <div className="flex items-center justify-between gap-2">
-                                                <div className="flex items-center gap-1">
-                                                    {getStatusBadge(item.status)}
-                                                    {item.productionOrderIds && item.productionOrderIds.length > 0 && (
-                                                        <span className="text-[10px] font-black bg-amber-50 text-amber-700 px-2 py-1 rounded border border-amber-200">
-                                                            {item.productionOrderIds.length} OP(s)
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="flex gap-2">
-                                                    <button onClick={() => setHistoryLot(item)} className="p-2 bg-slate-100 rounded-lg text-slate-500"><BookOpenIcon className="h-5 w-5" /></button>
-                                                    <button onClick={() => setEditingItem(item)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="p-2 bg-slate-100 rounded-lg text-slate-500 disabled:opacity-30"><PencilIcon className="h-5 w-5" /></button>
-                                                    <button onClick={() => setDeletingItem(item)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="p-2 bg-red-50 rounded-lg text-red-500 disabled:opacity-30"><TrashIcon className="h-5 w-5" /></button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                {/* Desktop Table View */}
-                                <div className="hidden md:block overflow-x-auto">
-                                    <table className="w-full text-sm text-left">
-                                        <thead className="text-sm font-black text-slate-700 uppercase bg-slate-100 text-center">
-                                            <tr>
-                                                <th className="p-4 w-12"><input type="checkbox" onChange={handleSelectAllForTransfer} checked={filteredStock.length > 0 && selectedLotIdsForTransfer.length === filteredStock.filter(i => i.status === 'Disponível' || i.status === 'Disponível - Suporte Treliça').length} className="h-5 w-5 rounded border-slate-300 text-slate-600 focus:ring-slate-500" /></th>
-                                                <th className="px-6 py-4">Mapeado</th>
-                                                <th className="px-6 py-4">Data Entrada</th>
-                                                <th className="px-6 py-4">Lote Interno</th>
-                                                <th className="px-6 py-4">Lote Fornecedor</th>
-                                                <th className="px-6 py-4">Fornecedor</th>
-                                                <th className="px-6 py-4">Material / Bitola</th>
-                                                <th className="px-6 py-4 text-right">Etiqueta (kg)</th>
-                                                <th className="px-6 py-4">Status</th>
-                                                <th className="px-6 py-4">Conf. Física</th>
-                                                <th className="px-6 py-4">Ações</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-200">
-                                            {filteredStock.map(item => (
-                                                <tr key={item.id} className={`hover:bg-slate-50 ${item.location ? 'bg-emerald-50/30' : 'bg-white'}`}>
-                                                    <td className="p-4 text-center">
-                                                        <input type="checkbox" checked={selectedLotIdsForTransfer.includes(item.id)} onChange={() => handleSelectLotForTransfer(item.id)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="h-5 w-5 rounded border-slate-300 text-slate-600 focus:ring-slate-500" />
-                                                    </td>
-                                                    <td className="px-4 py-4 whitespace-nowrap text-center">
-                                                        {item.location ? (
-                                                            <div className="flex justify-center" title="Mapeado nas fileiras">
-                                                                <div className="bg-emerald-100 text-emerald-600 rounded-full p-2 w-8 h-8 flex items-center justify-center">
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-                                                                        <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
-                                                                    </svg>
-                                                                </div>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="flex justify-center" title="Pendente de mapeamento">
-                                                                <div className="bg-slate-100 text-slate-400 rounded-full p-2 w-8 h-8 flex items-center justify-center">
-                                                                    <span className="text-sm font-bold">-</span>
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-center text-base font-bold text-slate-600">{new Date(item.entryDate).toLocaleDateString('pt-BR')}</td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                                                        <span className="text-2xl font-black text-slate-900 block">{item.internalLot}</span>
-                                                        {item.location && (
-                                                            <div className="text-xs font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded inline-block mt-1 border border-emerald-200">
-                                                                {item.location}
-                                                            </div>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                                                        <span className="text-lg font-bold text-slate-700 block">{item.supplierLot}</span>
-                                                        <span className="text-xs font-semibold text-slate-400">NF: {item.nfe}</span>
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                                                        <span className="text-lg font-bold text-slate-700">{item.supplier}</span>
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                                                        <div className="flex flex-col items-center">
-                                                            <span className="text-lg font-bold text-slate-800">{item.materialType}</span>
-                                                            <span className="text-2xl font-black text-blue-600">{item.bitola}</span>
+                                        <tr key={item.id} className={`hover:bg-slate-50 ${item.location ? 'bg-emerald-50/30' : 'bg-white'}`}>
+                                            <td className="p-4 text-center">
+                                                <input type="checkbox" checked={selectedLotIdsForTransfer.includes(item.id)} onChange={() => handleSelectLotForTransfer(item.id)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="h-5 w-5 rounded border-slate-300 text-slate-600 focus:ring-slate-500" />
+                                            </td>
+                                            <td className="px-4 py-4 whitespace-nowrap text-center">
+                                                {item.location ? (
+                                                    <div className="flex justify-center" title="Mapeado nas fileiras">
+                                                        <div className="bg-emerald-100 text-emerald-600 rounded-full p-2 w-8 h-8 flex items-center justify-center">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+                                                                <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+                                                            </svg>
                                                         </div>
-                                                    </td>
-                                                    <td className="px-6 py-4 text-right whitespace-nowrap">
-                                                        <div className="flex flex-col items-end">
-                                                            <span className="text-2xl font-black text-slate-800">
-                                                                {item.labelWeight.toFixed(2)}
-                                                            </span>
-                                                            <span className="text-xs font-bold text-emerald-600">Balança: {(item.initialQuantity).toFixed(2)} KG</span>
-                                                            {item.status === 'Em Produção - Treliça' && (() => {
-                                                                const order = productionOrders.find(o =>
-                                                                    o.status !== 'completed' &&
-                                                                    (Array.isArray(o.selectedLotIds)
-                                                                        ? o.selectedLotIds.includes(item.id)
-                                                                        : Object.values(o.selectedLotIds).some(ids => Array.isArray(ids) ? ids.includes(item.id) : ids === item.id))
-                                                                );
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex justify-center" title="Pendente de mapeamento">
+                                                        <div className="bg-slate-100 text-slate-400 rounded-full p-2 w-8 h-8 flex items-center justify-center">
+                                                            <span className="text-sm font-bold">-</span>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center text-base font-bold text-slate-600">{new Date(item.entryDate).toLocaleDateString('pt-BR')}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                <span className="text-2xl font-black text-slate-900 block">{item.internalLot}</span>
+                                                {item.location && (
+                                                    <div className="text-xs font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded inline-block mt-1 border border-emerald-200">
+                                                        {item.location}
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                <span className="text-lg font-bold text-slate-700 block">{item.supplierLot}</span>
+                                                <span className="text-xs font-semibold text-slate-400">NF: {item.nfe}</span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                <span className="text-lg font-bold text-slate-700">{item.supplier}</span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                <div className="flex flex-col items-center">
+                                                    <span className="text-lg font-bold text-slate-800">{item.materialType}</span>
+                                                    <span className="text-2xl font-black text-blue-600">{item.bitola}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-right whitespace-nowrap">
+                                                <div className="flex flex-col items-end">
+                                                    <span className="text-2xl font-black text-slate-800">
+                                                        {item.labelWeight.toFixed(2)}
+                                                    </span>
+                                                    <span className="text-xs font-bold text-emerald-600">Balança: {(item.initialQuantity).toFixed(2)} KG</span>
+                                                    {item.status === 'Em Produção - Treliça' && (() => {
+                                                        const order = productionOrders.find(o =>
+                                                            o.status !== 'completed' &&
+                                                            (Array.isArray(o.selectedLotIds)
+                                                                ? o.selectedLotIds.includes(item.id)
+                                                                : Object.values(o.selectedLotIds).some(ids => Array.isArray(ids) ? ids.includes(item.id) : ids === item.id))
+                                                        );
 
-                                                                if (order && order.trelicaModel) {
-                                                                    const model = trelicaModels.find(m => m.modelo === order.trelicaModel);
-                                                                    if (model) {
-                                                                        const parse = (s: string) => parseFloat(s.replace(',', '.'));
-                                                                        const qty = order.quantityToProduce || 0;
+                                                        if (order && order.trelicaModel) {
+                                                            const model = trelicaModels.find(m => m.modelo === order.trelicaModel);
+                                                            if (model) {
+                                                                const parse = (s: string) => parseFloat(s.replace(',', '.'));
+                                                                const qty = order.quantityToProduce || 0;
 
-                                                                        // Determine which part of the trelica this lot is and its relevant siblings for consumption order
-                                                                        const lots = order.selectedLotIds as any;
-                                                                        let targetWeight = 0;
-                                                                        let relevantLotIds: string[] = [];
+                                                                // Determine which part of the trelica this lot is and its relevant siblings for consumption order
+                                                                const lots = order.selectedLotIds as any;
+                                                                let targetWeight = 0;
+                                                                let relevantLotIds: string[] = [];
 
-                                                                        if (lots.allSuperior?.includes(item.id) || lots.superior === item.id) {
-                                                                            targetWeight = parse(model.pesoSuperior) * qty;
-                                                                            relevantLotIds = lots.allSuperior || [lots.superior];
-                                                                        } else if (lots.allInferiorLeft?.includes(item.id) || lots.inferior1 === item.id) {
-                                                                            targetWeight = (parse(model.pesoInferior) * qty) / 2;
-                                                                            relevantLotIds = lots.allInferiorLeft || [lots.inferior1];
-                                                                        } else if (lots.allInferiorRight?.includes(item.id) || lots.inferior2 === item.id) {
-                                                                            targetWeight = (parse(model.pesoInferior) * qty) / 2;
-                                                                            relevantLotIds = lots.allInferiorRight || [lots.inferior2];
-                                                                        } else if (lots.allSenozoideLeft?.includes(item.id) || lots.senozoide1 === item.id) {
-                                                                            targetWeight = (parse(model.pesoSenozoide) * qty) / 2;
-                                                                            relevantLotIds = lots.allSenozoideLeft || [lots.senozoide1];
-                                                                        } else if (lots.allSenozoideRight?.includes(item.id) || lots.senozoide2 === item.id) {
-                                                                            targetWeight = (parse(model.pesoSenozoide) * qty) / 2;
-                                                                            relevantLotIds = lots.allSenozoideRight || [lots.senozoide2];
+                                                                if (lots.allSuperior?.includes(item.id) || lots.superior === item.id) {
+                                                                    targetWeight = parse(model.pesoSuperior) * qty;
+                                                                    relevantLotIds = lots.allSuperior || [lots.superior];
+                                                                } else if (lots.allInferiorLeft?.includes(item.id) || lots.inferior1 === item.id) {
+                                                                    targetWeight = (parse(model.pesoInferior) * qty) / 2;
+                                                                    relevantLotIds = lots.allInferiorLeft || [lots.inferior1];
+                                                                } else if (lots.allInferiorRight?.includes(item.id) || lots.inferior2 === item.id) {
+                                                                    targetWeight = (parse(model.pesoInferior) * qty) / 2;
+                                                                    relevantLotIds = lots.allInferiorRight || [lots.inferior2];
+                                                                } else if (lots.allSenozoideLeft?.includes(item.id) || lots.senozoide1 === item.id) {
+                                                                    targetWeight = (parse(model.pesoSenozoide) * qty) / 2;
+                                                                    relevantLotIds = lots.allSenozoideLeft || [lots.senozoide1];
+                                                                } else if (lots.allSenozoideRight?.includes(item.id) || lots.senozoide2 === item.id) {
+                                                                    targetWeight = (parse(model.pesoSenozoide) * qty) / 2;
+                                                                    relevantLotIds = lots.allSenozoideRight || [lots.senozoide2];
+                                                                }
+
+                                                                if (relevantLotIds.length > 0) {
+                                                                    // Logic must match App.tsx and ProductionOrderTrelica sorting
+                                                                    const sortedRelevantLots = relevantLotIds
+                                                                        .map(id => stock.find(s => s.id === id))
+                                                                        .filter((s): s is StockItem => !!s)
+                                                                        .sort((a, b) => {
+                                                                            // We consider both 'suporte' and current 'em produção' as priority
+                                                                            const isPriorityA = a.status === 'Disponível - Suporte Treliça' || a.status === 'Em Produção - Treliça';
+                                                                            const isPriorityB = b.status === 'Disponível - Suporte Treliça' || b.status === 'Em Produção - Treliça';
+                                                                            if (isPriorityA && !isPriorityB) return -1;
+                                                                            if (!isPriorityA && isPriorityB) return 1;
+                                                                            return a.internalLot.localeCompare(b.internalLot, undefined, { numeric: true, sensitivity: 'base' });
+                                                                        });
+
+                                                                    let remainingRequired = targetWeight;
+                                                                    let predictedBalance = item.remainingQuantity;
+
+                                                                    for (const l of sortedRelevantLots) {
+                                                                        const available = l.remainingQuantity;
+                                                                        const toConsume = Math.min(remainingRequired, available);
+
+                                                                        if (l.id === item.id) {
+                                                                            predictedBalance = Math.max(0, available - toConsume);
+                                                                            break;
                                                                         }
 
-                                                                        if (relevantLotIds.length > 0) {
-                                                                            // Logic must match App.tsx and ProductionOrderTrelica sorting
-                                                                            const sortedRelevantLots = relevantLotIds
-                                                                                .map(id => stock.find(s => s.id === id))
-                                                                                .filter((s): s is StockItem => !!s)
-                                                                                .sort((a, b) => {
-                                                                                    // We consider both 'suporte' and current 'em produção' as priority
-                                                                                    const isPriorityA = a.status === 'Disponível - Suporte Treliça' || a.status === 'Em Produção - Treliça';
-                                                                                    const isPriorityB = b.status === 'Disponível - Suporte Treliça' || b.status === 'Em Produção - Treliça';
-                                                                                    if (isPriorityA && !isPriorityB) return -1;
-                                                                                    if (!isPriorityA && isPriorityB) return 1;
-                                                                                    return a.internalLot.localeCompare(b.internalLot, undefined, { numeric: true, sensitivity: 'base' });
-                                                                                });
-
-                                                                            let remainingRequired = targetWeight;
-                                                                            let predictedBalance = item.remainingQuantity;
-
-                                                                            for (const l of sortedRelevantLots) {
-                                                                                const available = l.remainingQuantity;
-                                                                                const toConsume = Math.min(remainingRequired, available);
-
-                                                                                if (l.id === item.id) {
-                                                                                    predictedBalance = Math.max(0, available - toConsume);
-                                                                                    break;
-                                                                                }
-
-                                                                                remainingRequired -= toConsume;
-                                                                                if (remainingRequired <= 0) {
-                                                                                    predictedBalance = available; // Not reached yet
-                                                                                    break;
-                                                                                }
-                                                                            }
-
-                                                                            return (
-                                                                                <div className="flex flex-col items-end mt-1">
-                                                                                    <span className="text-[10px] font-black text-amber-600 uppercase tracking-tighter">Irá Sobrar:</span>
-                                                                                    <span className={`text-xs font-black px-1 rounded border ${predictedBalance < 0.1 ? 'text-red-600 bg-red-50 border-red-100' : 'text-emerald-600 bg-emerald-50 border-emerald-100'}`}>
-                                                                                        {predictedBalance.toFixed(2)}kg
-                                                                                    </span>
-                                                                                </div>
-                                                                            );
+                                                                        remainingRequired -= toConsume;
+                                                                        if (remainingRequired <= 0) {
+                                                                            predictedBalance = available; // Not reached yet
+                                                                            break;
                                                                         }
                                                                     }
-                                                                }
-                                                                return null;
-                                                            })()}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-4 text-center whitespace-nowrap">
-                                                        <div className="transform scale-110">
-                                                            {getStatusBadge(item.status)}
-                                                        </div>
-                                                        {item.productionOrderIds && item.productionOrderIds.length > 0 && (
-                                                            <div className="flex flex-wrap justify-center gap-1 mt-2">
-                                                                {item.productionOrderIds.map(id => {
-                                                                    const order = productionOrders.find(o => o.id === id);
+
                                                                     return (
-                                                                        <span key={id} className="text-[10px] font-bold bg-amber-50 text-amber-700 px-2 py-1 rounded border border-amber-200 shadow-sm" title={`Ordem de Produção: ${order?.orderNumber || id}`}>
-                                                                            {order?.orderNumber || `OP: ${id.split('-').pop()?.toUpperCase()}`}
-                                                                        </span>
+                                                                        <div className="flex flex-col items-end mt-1">
+                                                                            <span className="text-[10px] font-black text-amber-600 uppercase tracking-tighter">Irá Sobrar:</span>
+                                                                            <span className={`text-xs font-black px-1 rounded border ${predictedBalance < 0.1 ? 'text-red-600 bg-red-50 border-red-100' : 'text-emerald-600 bg-emerald-50 border-emerald-100'}`}>
+                                                                                {predictedBalance.toFixed(2)}kg
+                                                                            </span>
+                                                                        </div>
                                                                     );
-                                                                })}
-                                                            </div>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                                                        {item.lastAuditDate ? (
-                                                            <div className="flex flex-col items-center">
-                                                                <CheckCircleIcon className="h-8 w-8 text-emerald-600 mb-0.5" />
-                                                                <span className="text-xs font-black text-emerald-700 uppercase leading-none mb-0.5">OK</span>
-                                                                <span className="text-[10px] font-bold text-slate-500 leading-none">
-                                                                    {new Date(item.lastAuditDate).toLocaleDateString('pt-BR')}
+                                                                }
+                                                            }
+                                                        }
+                                                        return null;
+                                                    })()}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-center whitespace-nowrap">
+                                                <div className="transform scale-110">
+                                                    {getStatusBadge(item.status)}
+                                                </div>
+                                                {item.productionOrderIds && item.productionOrderIds.length > 0 && (
+                                                    <div className="flex flex-wrap justify-center gap-1 mt-2">
+                                                        {item.productionOrderIds.map(id => {
+                                                            const order = productionOrders.find(o => o.id === id);
+                                                            return (
+                                                                <span key={id} className="text-[10px] font-bold bg-amber-50 text-amber-700 px-2 py-1 rounded border border-amber-200 shadow-sm" title={`Ordem de Produção: ${order?.orderNumber || id}`}>
+                                                                    {order?.orderNumber || `OP: ${id.split('-').pop()?.toUpperCase()}`}
                                                                 </span>
-                                                            </div>
-                                                        ) : (
-                                                            <span className="text-sm font-bold text-slate-300">-</span>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-6 py-4">
-                                                        <div className="flex items-center justify-center space-x-2">
-                                                            <button onClick={() => setHistoryLot(item)} className="p-1 text-slate-500 hover:text-slate-800" title="Ver Histórico"><BookOpenIcon className="h-5 w-5" /></button>
-                                                            <button onClick={() => setEditingItem(item)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="p-1 text-slate-500 hover:text-emerald-700 disabled:opacity-30 disabled:cursor-not-allowed" title="Editar Lote"><PencilIcon className="h-5 w-5" /></button>
-                                                            <button onClick={() => setDeletingItem(item)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="p-1 text-slate-500 hover:text-red-700 disabled:opacity-30 disabled:cursor-not-allowed" title="Excluir Lote"><TrashIcon className="h-5 w-5" /></button>
-                                                            {(item.status.includes('Em Produção') || item.status === 'Disponível - Suporte Treliça') && (
-                                                                <button onClick={() => setReleasingItem(item)} className="p-1 text-amber-500 hover:text-amber-700" title="Liberar Lote Manualmente (Correção)">
-                                                                    <LockOpenIcon className="h-5 w-5" />
-                                                                </button>
-                                                            )}
-                                                            {item.location && (
-                                                                <button onClick={() => setUnmappingItem(item)} className="p-1 text-slate-500 hover:text-amber-600" title="Remover do Mapa (Resetar Local)">
-                                                                    <LocationOffIcon className="h-5 w-5" />
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                {item.lastAuditDate ? (
+                                                    <div className="flex flex-col items-center">
+                                                        <CheckCircleIcon className="h-8 w-8 text-emerald-600 mb-0.5" />
+                                                        <span className="text-xs font-black text-emerald-700 uppercase leading-none mb-0.5">OK</span>
+                                                        <span className="text-[10px] font-bold text-slate-500 leading-none">
+                                                            {new Date(item.lastAuditDate).toLocaleDateString('pt-BR')}
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-sm font-bold text-slate-300">-</span>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center justify-center space-x-2">
+                                                    <button onClick={() => setHistoryLot(item)} className="p-1 text-slate-500 hover:text-slate-800" title="Ver Histórico"><BookOpenIcon className="h-5 w-5" /></button>
+                                                    <button onClick={() => setEditingItem(item)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="p-1 text-slate-500 hover:text-emerald-700 disabled:opacity-30 disabled:cursor-not-allowed" title="Editar Lote"><PencilIcon className="h-5 w-5" /></button>
+                                                    <button onClick={() => setDeletingItem(item)} disabled={item.status !== 'Disponível' && item.status !== 'Disponível - Suporte Treliça'} className="p-1 text-slate-500 hover:text-red-700 disabled:opacity-30 disabled:cursor-not-allowed" title="Excluir Lote"><TrashIcon className="h-5 w-5" /></button>
+                                                    {(item.status.includes('Em Produção') || item.status === 'Disponível - Suporte Treliça') && (
+                                                        <button onClick={() => setReleasingItem(item)} className="p-1 text-amber-500 hover:text-amber-700" title="Liberar Lote Manualmente (Correção)">
+                                                            <LockOpenIcon className="h-5 w-5" />
+                                                        </button>
+                                                    )}
+                                                    {item.location && (
+                                                        <button onClick={() => setUnmappingItem(item)} className="p-1 text-slate-500 hover:text-amber-600" title="Remover Localização"><LocationOffIcon className="h-5 w-5" /></button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        {filteredStock.length === 0 && (
+                            <div className="text-center text-slate-500 py-16">
+                                <div className="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100">
+                                    <ArchiveIcon className="h-10 w-10 text-slate-300" />
                                 </div>
-                                {filteredStock.length === 0 && (
-                                    <div className="text-center text-slate-500 py-16">
-                                        <div className="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100">
-                                            <ArchiveIcon className="h-10 w-10 text-slate-300" />
-                                        </div>
-                                        <p className="font-bold text-lg">Nenhum lote corresponde aos filtros</p>
-                                        <p className="text-sm">Tente ajustar seus critérios de busca ou filtros.</p>
-                                    </div>
-                                )}
+                                <p className="font-bold text-lg">Nenhum lote corresponde aos filtros</p>
+                                <p className="text-sm">Tente ajustar seus critérios de busca ou filtros.</p>
                             </div>
-                        </>
-                    )}
+                        )}
+                    </div>
                 </div >
             )}
         </>

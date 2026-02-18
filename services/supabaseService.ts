@@ -103,16 +103,16 @@ export const fetchByColumn = async <T>(table: string, column: string, value: str
 /** Insert item with automatic UUID generation for missing id */
 export const insertItem = async <T extends { id?: string }>(
     table: string,
-    item: T
+    item: Partial<T>
 ): Promise<T> => {
     // Ensure an id exists – the DB column is NOT NULL.
-    if (!item.id) {
+    if (!item.id || item.id === '') {
         const generatedId =
             typeof crypto !== 'undefined' && typeof (crypto as any).randomUUID === 'function'
                 ? (crypto as any).randomUUID()
                 : Math.random().toString(36).substring(2, 15);
         // @ts-ignore – we know T has an optional id field.
-        item.id = generatedId;
+        (item as any).id = generatedId;
     }
     const snakeItem = mapToSnakeCase(item);
     console.log(`Inserting into ${table}:`, snakeItem);

@@ -19,7 +19,6 @@ const permissionCategories = [
             { page: 'stock_add', label: 'Adicionar ao Estoque (Conferência)' },
             { page: 'stock_transfer', label: 'Transferência entre Setores' },
             { page: 'stock_inventory', label: 'Auditoria de Inventário (Celular)' },
-            { page: 'stock_map', label: 'Mapa de Estoque (Pirâmide)' },
         ]
     },
     {
