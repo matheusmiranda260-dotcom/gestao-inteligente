@@ -26,6 +26,8 @@ export interface MeetingItem {
     content: string;
     completed: boolean;
     completedAt?: string;
+    assignedTo?: string; // Name or ID of the responsible person
+    category?: string; // e.g., 'Trefila', 'Treliça', 'Peças'
 }
 
 export interface Meeting {

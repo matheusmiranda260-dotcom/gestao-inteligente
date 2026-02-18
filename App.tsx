@@ -160,6 +160,7 @@ const App: React.FC = () => {
         setInventorySessions,
         setGauges,
         setStickyNotes,
+        setMeetings,
     }), []);
 
     useAllRealtimeSubscriptions(realtimeSetters, !!currentUser);
@@ -1784,8 +1785,7 @@ const App: React.FC = () => {
 
     const handleAddMeeting = async (title: string, date: string) => {
         if (!currentUser) return;
-        const newMeeting: Meeting = {
-            id: generateId('meet'),
+        const newMeetingData: Partial<Meeting> = {
             title,
             meetingDate: date,
             createdAt: new Date().toISOString(),
@@ -1793,8 +1793,8 @@ const App: React.FC = () => {
             items: []
         };
         try {
-            await insertItem('meetings', newMeeting);
-            setMeetings(prev => [newMeeting, ...prev]);
+            const savedMeeting = await insertItem<Meeting>('meetings', newMeetingData);
+            setMeetings(prev => [savedMeeting, ...prev]);
             showNotification('Reunião agendada com sucesso!', 'success');
         } catch (e) {
             console.error('Meeting error', e);
@@ -1903,7 +1903,7 @@ const App: React.FC = () => {
             case 'peopleManagement': return <PeopleManagement setPage={setPage} currentUser={currentUser} />;
             case 'gaugesManager': return <GaugesManager gauges={gauges} onAdd={addGauge} onDelete={deleteGauge} onRestoreDefaults={restoreDefaultGauges} />;
             case 'meetingsTasks':
-                return <MeetingsTasks meetings={meetings} currentUser={currentUser} onAddMeeting={handleAddMeeting} onUpdateMeeting={handleUpdateMeeting} onDeleteMeeting={handleDeleteMeeting} />;
+                return <MeetingsTasks meetings={meetings} currentUser={currentUser} employees={employees} onAddMeeting={handleAddMeeting} onUpdateMeeting={handleUpdateMeeting} onDeleteMeeting={handleDeleteMeeting} />;
             default: return <Login onLogin={handleLogin} error={null} />;
         }
     };

@@ -4,7 +4,8 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import type {
     StockItem, ConferenceData, ProductionOrderData, TransferRecord,
     FinishedProductItem, PontaItem, FinishedGoodsTransferRecord,
-    PartsRequest, ShiftReport, ProductionRecord, InventorySession
+    PartsRequest, ShiftReport, ProductionRecord, InventorySession,
+    StickyNote, Meeting
 } from '../types';
 import { mapToCamelCase } from '../services/supabaseService';
 
@@ -21,6 +22,8 @@ interface RealtimeSetters {
     setTrefilaProduction: React.Dispatch<React.SetStateAction<ProductionRecord[]>>;
     setTrelicaProduction: React.Dispatch<React.SetStateAction<ProductionRecord[]>>;
     setInventorySessions: React.Dispatch<React.SetStateAction<InventorySession[]>>;
+    setStickyNotes: React.Dispatch<React.SetStateAction<StickyNote[]>>;
+    setMeetings: React.Dispatch<React.SetStateAction<Meeting[]>>;
 }
 
 /**
@@ -169,6 +172,16 @@ export function useAllRealtimeSubscriptions(setters: RealtimeSetters, enabled: b
 
         // Inventory Sessions
         createSubscription<InventorySession>('inventory_sessions', setters.setInventorySessions);
+
+        // Sticky Notes
+        createSubscription<StickyNote>('sticky_notes', setters.setStickyNotes);
+
+        // Meetings
+        createSubscription<Meeting>('meetings', setters.setMeetings, {
+            onInsert: (item, prev) => [item, ...prev].sort((a, b) =>
+                new Date(b.meetingDate).getTime() - new Date(a.meetingDate).getTime()
+            )
+        });
 
         // Production Records (Trefila e Treliça)
         const productionRecordsChannel = supabase
