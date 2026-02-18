@@ -224,14 +224,7 @@ const App: React.FC = () => {
                 .single();
 
             if (usersFound && usersFound.password === password) {
-                const appUser: User = {
-                    id: usersFound.id,
-                    username: usersFound.username,
-                    password: usersFound.password,
-                    role: usersFound.role,
-                    permissions: usersFound.permissions || {},
-                    employeeId: usersFound.employee_id
-                };
+                const appUser = mapToCamelCase(usersFound) as User;
                 setCurrentUser(appUser);
                 localStorage.setItem('msm_user', JSON.stringify(appUser));
                 setPage(appUser.role === 'gestor' || appUser.role === 'admin' ? 'productionDashboard' : 'menu');
@@ -272,12 +265,12 @@ const App: React.FC = () => {
 
 
     // User Management
-    const addUser = async (data: { username: string; password: string; permissions: Partial<Record<Page, boolean>>; employeeId?: string }) => {
+    const addUser = async (data: { username: string; password: string; permissions: Partial<Record<Page, boolean>>; role: string; employeeId?: string }) => {
         const newUser: User = {
             id: generateId('user'),
             username: data.username,
             password: data.password, // Storing simple password as requested
-            role: 'user',
+            role: (data.role as any) || 'user',
             permissions: data.permissions,
             employeeId: data.employeeId,
         };

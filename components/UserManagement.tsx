@@ -5,7 +5,7 @@ import { ArrowLeftIcon, PencilIcon, TrashIcon, WarningIcon } from './icons';
 interface UserManagementProps {
     users: User[];
     employees: Employee[];
-    addUser: (data: { username: string; password: string; permissions: Partial<Record<Page, boolean>>; employeeId?: string }) => void;
+    addUser: (data: { username: string; password: string; permissions: Partial<Record<Page, boolean>>; role: string; employeeId?: string }) => void;
     updateUser: (userId: string, data: Partial<User>) => void;
     deleteUser: (userId: string) => void;
     setPage: (page: Page) => void;
@@ -71,6 +71,7 @@ const UserModal: React.FC<{
     const [permissions, setPermissions] = useState<Partial<Record<Page, boolean>>>(
         user?.permissions || {}
     );
+    const [role, setRole] = useState(user?.role || 'user');
     const [employeeId, setEmployeeId] = useState(user?.employeeId || '');
     const isEditing = !!user;
 
@@ -85,13 +86,13 @@ const UserModal: React.FC<{
             return;
         }
         if (isEditing) {
-            const dataToSubmit: Partial<User> = { permissions, employeeId };
+            const dataToSubmit: Partial<User> = { permissions, role, employeeId };
             if (password) {
                 dataToSubmit.password = password;
             }
             onSubmit(dataToSubmit);
         } else {
-            onSubmit({ username, password, permissions, employeeId });
+            onSubmit({ username, password, permissions, role, employeeId });
         }
         onClose();
     };
@@ -126,6 +127,20 @@ const UserModal: React.FC<{
                             ))}
                         </select>
                         <p className="text-xs text-slate-500 mt-1">Ao vincular, o usuário verá seu próprio Painel de RH.</p>
+                    </div>
+
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium text-slate-700">Função (Role)</label>
+                        <select
+                            value={role}
+                            onChange={(e) => setRole(e.target.value)}
+                            className="mt-1 p-2 w-full border border-slate-300 rounded-md"
+                        >
+                            <option value="user">Usuário Comum</option>
+                            <option value="gestor">Gestor / Supervisor</option>
+                            <option value="admin">Administrador Total</option>
+                        </select>
+                        <p className="text-[10px] text-slate-500 mt-1">Gestores e Admins possuem acesso total automático.</p>
                     </div>
 
                     <div className="mb-6">
@@ -184,7 +199,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
     // Permite gerenciar todos os usuários, mas o admin principal (id: 'admin') pode ter proteção extra se quiser
     const manageableUsers = users.filter(u => u.username !== 'admin');
 
-    const handleAddUser = (data: { username: string; password: string; permissions: Partial<Record<Page, boolean>>; employeeId?: string }) => {
+    const handleAddUser = (data: { username: string; password: string; permissions: Partial<Record<Page, boolean>>; role: string; employeeId?: string }) => {
         addUser(data);
         setIsModalOpen(false);
     };
