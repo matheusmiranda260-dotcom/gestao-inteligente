@@ -52,6 +52,7 @@ const permissionCategories = [
             { page: 'continuousImprovement', label: 'Melhoria Contínua (Kaizen)' },
             { page: 'workInstructions', label: 'Instruções de Trabalho (POP)' },
             { page: 'partsManager', label: 'Gerenciador de Peças (Manutenção)' },
+            { page: 'meetingsTasks', label: 'Reuniões e Tarefas (Atas)' },
             { page: 'gaugesManager', label: 'Configurações de Bitolas' },
             { page: 'userManagement', label: 'Controle de Usuários e Acessos' },
         ]

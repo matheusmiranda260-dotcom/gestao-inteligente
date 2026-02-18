@@ -19,7 +19,32 @@ export type Page = 'login' | 'menu' | 'stock' | 'stock_add' | 'stock_inventory' 
     'trefila' | 'trefila_in_progress' | 'trefila_pending' | 'trefila_completed' | 'trefila_reports' | 'trefila_parts' | 'trefila_weighing' | 'trefila_rings' |
     'trelica' | 'trelica_in_progress' | 'trelica_pending' | 'trelica_completed' | 'trelica_reports' | 'trelica_parts' |
     'productionOrder' | 'productionOrderTrelica' | 'reports' | 'userManagement' | 'productionDashboard' |
-    'finishedGoods' | 'partsManager' | 'continuousImprovement' | 'workInstructions' | 'peopleManagement' | 'gaugesManager' | 'stickyNotes';
+    'finishedGoods' | 'partsManager' | 'continuousImprovement' | 'workInstructions' | 'peopleManagement' | 'gaugesManager' | 'meetingsTasks';
+
+export interface MeetingItem {
+    id: string;
+    content: string;
+    completed: boolean;
+    completedAt?: string;
+}
+
+export interface Meeting {
+    id: string;
+    title: string;
+    meetingDate: string; // ISO string
+    createdAt: string;
+    author: string;
+    items: MeetingItem[];
+}
+
+export interface StickyNote {
+    id: string;
+    content: string;
+    color: string;
+    author: string;
+    date: string;
+    completed?: boolean;
+}
 
 export interface InstructionStep {
     id: string;

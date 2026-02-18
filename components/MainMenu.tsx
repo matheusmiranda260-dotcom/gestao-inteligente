@@ -211,7 +211,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser }) =
                 )}
 
                 {/* GESTÃO DE FÁBRICA */}
-                {(hasPermission('stickyNotes') || hasPermission('productionDashboard')) && (
+                {(hasPermission('meetingsTasks') || hasPermission('productionDashboard')) && (
                     <section>
                         <div className="section-title">
                             <h2>Gestão de Fábrica</h2>
@@ -226,12 +226,12 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser }) =
                                     color="indigo"
                                 />
                             )}
-                            {hasPermission('stickyNotes') && (
+                            {hasPermission('meetingsTasks') && (
                                 <MenuButton
-                                    onClick={() => setPage('stickyNotes')}
-                                    label="Quadro de Lembretes"
-                                    description="Post-its digitais para avisos e pendências importantes."
-                                    icon={<ChatBubbleLeftRightIcon />}
+                                    onClick={() => setPage('meetingsTasks')}
+                                    label="Reuniões e Tarefas"
+                                    description="Gestão de pautas, atas de reuniões e planos de ação."
+                                    icon={<ClipboardListIcon />}
                                     color="purple"
                                 />
                             )}

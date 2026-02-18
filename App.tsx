@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'; // Refresh Trigger
-import type { Page, User, Employee, StockItem, ConferenceData, ProductionOrderData, TransferRecord, Bitola, MachineType, PartsRequest, ShiftReport, ProductionRecord, TransferredLotInfo, ProcessedLot, DowntimeEvent, OperatorLog, TrelicaSelectedLots, WeighedPackage, FinishedProductItem, Ponta, PontaItem, FinishedGoodsTransferRecord, TransferredFinishedGoodInfo, KaizenProblem, InventorySession } from './types';
+import type { Page, User, Employee, StockItem, ConferenceData, ProductionOrderData, TransferRecord, Bitola, MachineType, PartsRequest, ShiftReport, ProductionRecord, TransferredLotInfo, ProcessedLot, DowntimeEvent, OperatorLog, TrelicaSelectedLots, WeighedPackage, FinishedProductItem, Ponta, PontaItem, FinishedGoodsTransferRecord, TransferredFinishedGoodInfo, KaizenProblem, InventorySession, Meeting, MeetingItem } from './types';
 import { FioMaquinaBitolaOptions, TrefilaBitolaOptions } from './types';
 import Login from './components/Login';
 import MainMenu from './components/MainMenu';
@@ -24,6 +24,7 @@ import StockTransfer from './components/StockTransfer';
 import GaugesManager from './components/GaugesManager';
 import TrefilaWeighing from './components/TrefilaWeighing';
 import StickyNotes from './components/StickyNotes';
+import MeetingsTasks from './components/MeetingsTasks';
 import { supabase } from './supabaseClient';
 import type { StockGauge, StickyNote } from './types';
 
@@ -54,6 +55,7 @@ const App: React.FC = () => {
     const [inventorySessions, setInventorySessions] = useState<InventorySession[]>([]);
     const [gauges, setGauges] = useState<StockGauge[]>([]);
     const [stickyNotes, setStickyNotes] = useState<StickyNote[]>([]);
+    const [meetings, setMeetings] = useState<Meeting[]>([]);
 
     const [pendingKaizenCount, setPendingKaizenCount] = useState(0);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -85,7 +87,7 @@ const App: React.FC = () => {
                 const [
                     fetchedUsers, fetchedEmployees, fetchedStock, fetchedConferences, fetchedTransfers,
                     fetchedOrders, fetchedFinishedGoods, fetchedPontas, fetchedFGTransfers,
-                    fetchedParts, fetchedReports, fetchedProductionRecords, fetchedInvSessions, fetchedGauges, fetchedNotes
+                    fetchedParts, fetchedReports, fetchedProductionRecords, fetchedInvSessions, fetchedGauges, fetchedNotes, fetchedMeetings
                 ] = await Promise.all([
                     fetchTable<User>('app_users'),
                     fetchTable<Employee>('employees'),
@@ -101,7 +103,8 @@ const App: React.FC = () => {
                     fetchTable<ProductionRecord>('production_records'),
                     fetchTable<InventorySession>('inventory_sessions').catch(() => []),
                     fetchTable<StockGauge>('stock_gauges').catch(() => []),
-                    fetchTable<StickyNote>('sticky_notes').catch(() => [])
+                    fetchTable<StickyNote>('sticky_notes').catch(() => []),
+                    fetchTable<Meeting>('meetings').catch(() => [])
                 ]);
 
                 setUsers(fetchedUsers);
@@ -118,6 +121,7 @@ const App: React.FC = () => {
                 setInventorySessions(fetchedInvSessions);
                 setGauges(fetchedGauges || []);
                 setStickyNotes(fetchedNotes || []);
+                setMeetings(fetchedMeetings || []);
 
                 // Split production records
                 setTrefilaProduction(fetchedProductionRecords.filter(r => r.machine === 'Trefila'));
@@ -228,7 +232,7 @@ const App: React.FC = () => {
                 setCurrentUser(appUser);
                 localStorage.setItem('msm_user', JSON.stringify(appUser));
                 setPage(appUser.role === 'gestor' || appUser.role === 'admin' ? 'productionDashboard' : 'menu');
-                showNotification(`Bem-vindo, ${appUser.username}!`, 'success');
+                showNotification(`Bem - vindo, ${appUser.username} !`, 'success');
                 return;
             }
 
@@ -474,7 +478,7 @@ const App: React.FC = () => {
             showNotification('Conferência editada com sucesso!', 'success');
         } catch (error: any) {
             console.error('Error editing conference:', error);
-            showNotification(`Erro ao editar conferência: ${error.message || error}`, 'error');
+            showNotification(`Erro ao editar conferência: ${error.message || error} `, 'error');
         }
     };
 
@@ -503,7 +507,7 @@ const App: React.FC = () => {
             showNotification('Conferência excluída com sucesso!', 'success');
         } catch (error: any) {
             console.error('Error deleting conference:', error);
-            showNotification(`Erro ao excluir conferência: ${error.message || error}`, 'error');
+            showNotification(`Erro ao excluir conferência: ${error.message || error} `, 'error');
         }
     };
     const addStockItem = async (item: StockItem) => {
@@ -589,7 +593,7 @@ const App: React.FC = () => {
                 const newStatus = remaining <= 0 ? 'Transferido' : item.status;
 
                 const newHistory = [...(item.history || []), {
-                    type: `Transferência para ${destinationSector}`,
+                    type: `Transferência para ${destinationSector} `,
                     date: new Date().toISOString(),
                     details: {
                         'Quantidade Transferida': `${transferQty.toFixed(2)} kg`,
@@ -1588,7 +1592,7 @@ const App: React.FC = () => {
                     }
                 });
             } catch (err: any) {
-                showNotification(`Erro no cálculo de treliça: ${err.message}`, 'error');
+                showNotification(`Erro no cálculo de treliça: ${err.message} `, 'error');
                 return;
             }
         }
@@ -1609,7 +1613,7 @@ const App: React.FC = () => {
                 if (finalData.pontas) {
                     const pontasItems: PontaItem[] = finalData.pontas.map(p => ({
                         id: generateId('ponta'), productionDate: now, productionOrderId: orderId, orderNumber: orderToComplete.orderNumber,
-                        productType: 'Ponta de Treliça', model: orderToComplete.trelicaModel!, size: `${p.size}`, quantity: p.quantity, totalWeight: p.totalWeight, status: 'Disponível'
+                        productType: 'Ponta de Treliça', model: orderToComplete.trelicaModel!, size: `${p.size} `, quantity: p.quantity, totalWeight: p.totalWeight, status: 'Disponível'
                     }));
                     for (const pi of pontasItems) await insertItem('pontas_stock', pi);
                     const allPontas = await fetchTable<PontaItem>('pontas_stock');
@@ -1619,7 +1623,7 @@ const App: React.FC = () => {
                 if (weight > 0) {
                     const fg: FinishedProductItem = {
                         id: generateId('fg'), productionDate: now, productionOrderId: orderId, orderNumber: orderToComplete.orderNumber,
-                        productType: 'Treliça', model: orderToComplete.trelicaModel!, size: `${orderToComplete.tamanho!}`, quantity: finalData.actualProducedQuantity || 0,
+                        productType: 'Treliça', model: orderToComplete.trelicaModel!, size: `${orderToComplete.tamanho!} `, quantity: finalData.actualProducedQuantity || 0,
                         totalWeight: weight, status: 'Disponível'
                     };
                     await insertItem('finished_goods', fg);
@@ -1630,7 +1634,7 @@ const App: React.FC = () => {
             showNotification(`Ordem ${orderToComplete.orderNumber} finalizada com sucesso.`, 'success');
         } catch (err: any) {
             console.error('Erro fatal ao finalizar ordem:', err);
-            showNotification(`Erro ao salvar finalização: ${err.message}`, 'error');
+            showNotification(`Erro ao salvar finalização: ${err.message} `, 'error');
         }
     };
 
@@ -1778,6 +1782,52 @@ const App: React.FC = () => {
         }
     };
 
+    const handleAddMeeting = async (title: string, date: string) => {
+        if (!currentUser) return;
+        const newMeeting: Meeting = {
+            id: generateId('meet'),
+            title,
+            meetingDate: date,
+            createdAt: new Date().toISOString(),
+            author: currentUser.username,
+            items: []
+        };
+        try {
+            await insertItem('meetings', newMeeting);
+            setMeetings(prev => [newMeeting, ...prev]);
+            showNotification('Reunião agendada com sucesso!', 'success');
+        } catch (e) {
+            console.error('Meeting error', e);
+            showNotification('Erro ao salvar reunião no banco.', 'error');
+        }
+    };
+
+    const handleUpdateMeeting = async (id: string, updates: Partial<Meeting>) => {
+        try {
+            const meeting = meetings.find(m => m.id === id);
+            if (!meeting) return;
+
+            // Optimistic update
+            setMeetings(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
+
+            await updateItem('meetings', id, updates);
+        } catch (e) {
+            console.error('Meeting update error', e);
+            showNotification('Erro ao atualizar reunião.', 'error');
+        }
+    };
+
+    const handleDeleteMeeting = async (id: string) => {
+        try {
+            await deleteItem('meetings', id);
+            setMeetings(prev => prev.filter(m => m.id !== id));
+            showNotification('Reunião excluída.', 'success');
+        } catch (e) {
+            console.error('Meeting delete error', e);
+            showNotification('Erro ao excluir reunião.', 'error');
+        }
+    };
+
     const registerProduction = async (machine: MachineType, producedWeight: number) => {
         const newRecord: ProductionRecord = { id: generateId('prod'), date: new Date().toISOString(), machine, producedWeight, consumedLots: [] };
         try {
@@ -1852,8 +1902,8 @@ const App: React.FC = () => {
             case 'workInstructions': return <WorkInstructions setPage={setPage} />;
             case 'peopleManagement': return <PeopleManagement setPage={setPage} currentUser={currentUser} />;
             case 'gaugesManager': return <GaugesManager gauges={gauges} onAdd={addGauge} onDelete={deleteGauge} onRestoreDefaults={restoreDefaultGauges} />;
-            case 'stickyNotes':
-                return <StickyNotes notes={stickyNotes} currentUser={currentUser} onAddNote={handleAddStickyNote} onDeleteNote={handleDeleteStickyNote} onToggleComplete={handleToggleStickyNote} />;
+            case 'meetingsTasks':
+                return <MeetingsTasks meetings={meetings} currentUser={currentUser} onAddMeeting={handleAddMeeting} onUpdateMeeting={handleUpdateMeeting} onDeleteMeeting={handleDeleteMeeting} />;
             default: return <Login onLogin={handleLogin} error={null} />;
         }
     };
@@ -1863,7 +1913,7 @@ const App: React.FC = () => {
             {notification && <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />}
             {currentUser && page !== 'login' && (
                 <>
-                    <div className={`sidebar-overlay ${isMobileMenuOpen ? 'active' : ''}`} onClick={() => setIsMobileMenuOpen(false)} />
+                    <div className={`sidebar - overlay ${isMobileMenuOpen ? 'active' : ''} `} onClick={() => setIsMobileMenuOpen(false)} />
                     <Sidebar page={page} setPage={(p) => { setPage(p); setIsMobileMenuOpen(false); }} currentUser={currentUser} notificationCount={pendingKaizenCount} isMobileMenuOpen={isMobileMenuOpen} onLogout={handleLogout} />
                 </>
             )}
