@@ -82,7 +82,7 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
 
     // --- CALCULOS AUTOMATICOS --- //
     const calcBitola = (m: number | null, c: number | null) => (m && c && c > 0) ? Math.sqrt(m / c) * 12.744 : null;
-    const calcRelacao = (r: number | null, a: number | null) => (r && a && a > 0) ? (r / a) : null;
+    const calcRelacao = (r: number | null, e: number | null) => (r && e && e > 0) ? (r / e) : null;
     const calcK7Media = (ent: number | null, sai: number | null) => {
         if (ent === null && sai === null) return null;
         if (ent === null) return sai;
@@ -97,7 +97,7 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
     const esc = parseLocalNum(form.escoamento);
 
     const formBitola = calcBitola(m, c);
-    const formRelacao = calcRelacao(r, a);
+    const formRelacao = calcRelacao(r, esc);
     const formK7Medias = [1, 2, 3, 4].map(i => {
         const ent = parseLocalNum((form as any)[`k7_${i}_entrada`]);
         const sai = parseLocalNum((form as any)[`k7_${i}_saida`]);
@@ -249,7 +249,7 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
                 switch (chartType) {
                     case 'resistencia': v = Number(e.resistencia) || 0; break;
                     case 'alongamento': v = Number(e.alongamento) || 0; break;
-                    case 'relacao': v = calcRelacao(Number(e.resistencia), Number(e.alongamento)) || 0; break;
+                    case 'relacao': v = calcRelacao(Number(e.resistencia), Number(e.escoamento)) || 0; break;
                     case 'bitola': v = calcBitola(Number(e.massa), Number(e.comprimento)) || 0; break;
                 }
                 return { label: e.lote || 'Sem Lote', value: v };
@@ -417,7 +417,7 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
                                         <input type="text" inputMode="decimal" value={form.alongamento} onChange={e => setForm({ ...form, alongamento: e.target.value })} className="w-full p-4 text-center border-2 border-slate-200 rounded-xl text-xl font-bold focus:border-indigo-500 focus:ring-0 transition" placeholder="%" />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-black text-indigo-600 mb-2">⚡ Relação (R/A)</label>
+                                        <label className="block text-sm font-black text-indigo-600 mb-2">⚡ Relação (R/E)</label>
                                         <div className="w-full h-[64px] bg-white border-2 border-indigo-300 rounded-xl flex items-center justify-center shadow-inner">
                                             <span className={`text-2xl font-black transition-colors ${formRelacao === null ? 'text-slate-300' : 'text-indigo-800'}`}>
                                                 {formRelacao !== null ? formRelacao.toFixed(4) : '—'}
@@ -459,7 +459,7 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
                                 <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-5">
                                     <p className="text-xs font-bold text-indigo-500 uppercase tracking-widest mb-1">Relação Auto</p>
                                     <p className="text-4xl font-black text-indigo-700">{formRelacao !== null ? formRelacao.toFixed(2) : '--'}</p>
-                                    <p className="text-[10px] text-indigo-400 mt-2 font-medium">Resist: {form.resistencia} / Along: {form.alongamento}</p>
+                                    <p className="text-[10px] text-indigo-400 mt-2 font-medium">Resist: {form.resistencia} / Esc: {form.escoamento}</p>
                                 </div>
                                 <div className="bg-amber-50 border border-amber-100 rounded-xl p-5">
                                     <p className="text-xs font-bold text-amber-500 uppercase tracking-widest mb-1">Bitola Final Auto</p>
@@ -511,9 +511,9 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
                     { label: 'Análises de Lote', value: entries.length, color: 'indigo' },
                     {
                         label: 'Média Relação',
-                        value: entries.filter(e => calcRelacao(Number(e.resistencia), Number(e.alongamento))).length > 0
-                            ? (entries.reduce((s, e) => s + (calcRelacao(Number(e.resistencia), Number(e.alongamento)) || 0), 0) /
-                                entries.filter(e => calcRelacao(Number(e.resistencia), Number(e.alongamento))).length).toFixed(3)
+                        value: entries.filter(e => calcRelacao(Number(e.resistencia), Number(e.escoamento))).length > 0
+                            ? (entries.reduce((s, e) => s + (calcRelacao(Number(e.resistencia), Number(e.escoamento)) || 0), 0) /
+                                entries.filter(e => calcRelacao(Number(e.resistencia), Number(e.escoamento))).length).toFixed(3)
                             : '—',
                         color: 'blue'
                     },
@@ -550,7 +550,7 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
                         {(['resistencia', 'alongamento', 'relacao', 'bitola'] as const).map(type => {
                             const labels = {
                                 resistencia: 'Resistência (MPa)', alongamento: 'Alongamento (%)',
-                                relacao: 'Relação (Res./Along.)', bitola: 'Bitola Final (mm)'
+                                relacao: 'Relação (Res./Esc.)', bitola: 'Bitola Final (mm)'
                             };
                             return (
                                 <button
@@ -604,7 +604,7 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {filteredEntries.map(entry => {
-                                const rel = calcRelacao(Number(entry.resistencia), Number(entry.alongamento));
+                                const rel = calcRelacao(Number(entry.resistencia), Number(entry.escoamento));
                                 const bit = calcBitola(Number(entry.massa), Number(entry.comprimento));
                                 const k7AvgArr = [
                                     calcK7Media(entry.k7_1_entrada !== null ? Number(entry.k7_1_entrada) : null, entry.k7_1_saida !== null ? Number(entry.k7_1_saida) : null),
