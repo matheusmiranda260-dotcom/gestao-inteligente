@@ -526,6 +526,7 @@ export interface LabAnalysisEntry {
     id: string;
     lote: string;
     fornecedor: string;
+    bitola_mp?: string;
     k7_1_entrada: number | null;
     k7_1_saida: number | null;
     k7_2_entrada: number | null;
