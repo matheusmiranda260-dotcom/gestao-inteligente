@@ -1115,28 +1115,28 @@ const App: React.FC = () => {
             const volumeM3 = totalProducedWeight / steelDensityKgPerM3;
             totalProducedMeters = areaM2 > 0 ? volumeM3 / areaM2 : 0;
         } else {
-            // Trelica: sum of packages + pontas weights
+            // Treliça: sum of packages + pontas weights
             const packageWeight = shiftPackages.reduce((sum, pkg) => sum + (pkg.weight || 0), 0);
             const pontasWeight = shiftPontas.reduce((sum, p) => sum + (p.totalWeight || 0), 0);
-
-            const packageMeters = shiftPackages.reduce((sum, pkg) => sum + (pkg.quantity * parseFloat(order.tamanho || '0')), 0);
             const pontasMeters = shiftPontas.reduce((sum, p) => sum + (p.quantity * p.size), 0);
 
-            // If no packages weighed but pieces were reported at end of shift
+            // Total quantity (pieces) produced in the shift
             const shiftQuantity = (operatorLog.endQuantity || 0) - (operatorLog.startQuantity || 0);
+            const tamanhoMeters = parseFloat(order.tamanho || '0');
+
+            // FIX: Metros = peças produzidas × tamanho da peça (ex: 716 × 6 = 4296m)
+            totalProducedMeters = (shiftQuantity * tamanhoMeters) + pontasMeters;
+
             if (packageWeight === 0 && shiftQuantity > 0) {
                 const modelInfo = trelicaModels.find(m => m.modelo === order.trelicaModel && m.tamanho === order.tamanho);
                 if (modelInfo) {
                     const theoreticalPieceWeight = parseFloat(modelInfo.pesoFinal.replace(',', '.'));
                     totalProducedWeight = (shiftQuantity * theoreticalPieceWeight) + pontasWeight;
-                    totalProducedMeters = (shiftQuantity * parseFloat(order.tamanho || '0')) + pontasMeters;
                 } else {
                     totalProducedWeight = pontasWeight;
-                    totalProducedMeters = pontasMeters;
                 }
             } else {
                 totalProducedWeight = packageWeight + pontasWeight;
-                totalProducedMeters = packageMeters + pontasMeters;
             }
         }
 

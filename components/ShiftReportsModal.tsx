@@ -232,8 +232,10 @@ const ShiftReportPrintView: React.FC<{ report: ShiftReport, stock: StockItem[], 
         const totalPieces = report.totalProducedQuantity > 0
             ? report.totalProducedQuantity
             : (report.totalProducedMeters / tamanhoNum);
+        // FIX: Metros = peças × tamanho da peça (ex: 716 × 6 = 4296m)
+        const correctedMeters = totalPieces * tamanhoNum;
         const timePerPieceMs = totalPieces > 0 ? productiveTime / totalPieces : 0;
-        const speedMpm = productiveTime > 0 ? report.totalProducedMeters / (productiveTime / 60000) : 0;
+        const speedMpm = productiveTime > 0 ? correctedMeters / (productiveTime / 60000) : 0;
 
         // Historical data for "Atualização da Produção"
         // Historical data for "Atualização da Produção" - Listed by Shift
@@ -374,7 +376,7 @@ const ShiftReportPrintView: React.FC<{ report: ShiftReport, stock: StockItem[], 
                         </div>
                         <div className="flex justify-between items-center text-base border-b border-slate-100 pb-1">
                             <span className="font-bold">Quant. de metros produzidos:</span>
-                            <span className="font-black tabular-nums text-xl">{(report.totalProducedMeters || 0).toFixed(0)} metros</span>
+                            <span className="font-black tabular-nums text-xl">{correctedMeters.toFixed(0)} metros</span>
                         </div>
                         <div className="flex justify-between items-center text-base border-b border-slate-100 pb-1">
                             <span className="font-bold">Tempo por peça:</span>
@@ -382,7 +384,7 @@ const ShiftReportPrintView: React.FC<{ report: ShiftReport, stock: StockItem[], 
                         </div>
                         <div className="flex justify-between items-center text-base pt-1">
                             <span className="font-bold">Velocidade:</span>
-                            <span className="font-black tabular-nums text-xl">{speedMpm.toFixed(1)} metros/ minuto</span>
+                            <span className="font-black tabular-nums text-xl">{speedMpm.toFixed(1)} metros/minuto</span>
                         </div>
                     </div>
                 </div>
