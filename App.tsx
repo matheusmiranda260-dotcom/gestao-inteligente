@@ -25,6 +25,7 @@ import GaugesManager from './components/GaugesManager';
 import TrefilaWeighing from './components/TrefilaWeighing';
 import StickyNotes from './components/StickyNotes';
 import MeetingsTasks from './components/MeetingsTasks';
+import Laboratory from './components/Laboratory';
 import { supabase } from './supabaseClient';
 import type { StockGauge, StickyNote } from './types';
 
@@ -2050,6 +2051,7 @@ const App: React.FC = () => {
                     onAddCategory={handleAddMeetingCategory}
                     onDeleteCategory={handleDeleteMeetingCategory}
                 />;
+            case 'laboratory': return <Laboratory setPage={setPage} currentUser={currentUser} />;
             default: return <Login onLogin={handleLogin} error={null} />;
         }
     };

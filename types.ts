@@ -19,7 +19,7 @@ export type Page = 'login' | 'menu' | 'stock' | 'stock_add' | 'stock_inventory' 
     'trefila' | 'trefila_in_progress' | 'trefila_pending' | 'trefila_completed' | 'trefila_reports' | 'trefila_parts' | 'trefila_weighing' | 'trefila_rings' |
     'trelica' | 'trelica_in_progress' | 'trelica_pending' | 'trelica_completed' | 'trelica_reports' | 'trelica_parts' |
     'productionOrder' | 'productionOrderTrelica' | 'reports' | 'userManagement' | 'productionDashboard' |
-    'finishedGoods' | 'partsManager' | 'continuousImprovement' | 'workInstructions' | 'peopleManagement' | 'gaugesManager' | 'meetingsTasks';
+    'finishedGoods' | 'partsManager' | 'continuousImprovement' | 'workInstructions' | 'peopleManagement' | 'gaugesManager' | 'meetingsTasks' | 'laboratory';
 
 export interface MeetingItem {
     id: string;
@@ -520,4 +520,26 @@ export interface StickyNote {
     author: string;
     date: string;
     completed?: boolean;
+}
+
+export interface LabAnalysisEntry {
+    id: string;
+    lote: string;
+    fornecedor: string;
+    k7_1_entrada: number | null;
+    k7_1_saida: number | null;
+    k7_2_entrada: number | null;
+    k7_2_saida: number | null;
+    k7_3_entrada: number | null;
+    k7_3_saida: number | null;
+    k7_4_entrada: number | null;
+    k7_4_saida: number | null;
+    velocidade: number | null;
+    comprimento: number | null;
+    massa: number | null;
+    escoamento: number | null;
+    resistencia: number | null;
+    alongamento: number | null;
+    date: string;
+    operator: string;
 }

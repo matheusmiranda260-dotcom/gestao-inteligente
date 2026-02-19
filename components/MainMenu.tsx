@@ -325,6 +325,15 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser }) =
                                 color="purple"
                             />
                         )}
+                        {hasPermission('laboratory') && (
+                            <MenuButton
+                                onClick={() => setPage('laboratory')}
+                                label="Laboratório 🔬"
+                                description="Análises de qualidade e ensaios de tração."
+                                icon={<ChartBarIcon />}
+                                color="teal"
+                            />
+                        )}
                         {hasPermission('userManagement') && (
                             <MenuButton
                                 onClick={() => setPage('userManagement')}
