@@ -159,5 +159,27 @@ BEGIN
     END IF;
 END $$;
 
--- 8. Mensagem de Sucesso
+-- 8. Tabela meeting_categories (Grupos de Pautas/Gemba)
+CREATE TABLE IF NOT EXISTS public.meeting_categories (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    label TEXT NOT NULL,
+    icon_name TEXT DEFAULT 'ClipboardListIcon',
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.meeting_categories ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Enable all access for all users" ON public.meeting_categories;
+CREATE POLICY "Enable all access for all users" ON public.meeting_categories FOR ALL USING (true) WITH CHECK (true);
+
+-- 9. Tabela meetings (Pautas de Reunião)
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'meetings') THEN
+        ALTER TABLE public.meetings ENABLE ROW LEVEL SECURITY;
+        DROP POLICY IF EXISTS "Enable all access for all users" ON public.meetings;
+        CREATE POLICY "Enable all access for all users" ON public.meetings FOR ALL USING (true) WITH CHECK (true);
+    END IF;
+END $$;
+
+-- 10. Mensagem de Sucesso
 SELECT 'Master Fix aplicado com sucesso!' as status;

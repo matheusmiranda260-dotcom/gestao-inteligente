@@ -5,7 +5,7 @@ import type {
     StockItem, ConferenceData, ProductionOrderData, TransferRecord,
     FinishedProductItem, PontaItem, FinishedGoodsTransferRecord,
     PartsRequest, ShiftReport, ProductionRecord, InventorySession,
-    StickyNote, Meeting
+    StickyNote, Meeting, MeetingCategory
 } from '../types';
 import { mapToCamelCase } from '../services/supabaseService';
 
@@ -24,6 +24,7 @@ interface RealtimeSetters {
     setInventorySessions: React.Dispatch<React.SetStateAction<InventorySession[]>>;
     setStickyNotes: React.Dispatch<React.SetStateAction<StickyNote[]>>;
     setMeetings: React.Dispatch<React.SetStateAction<Meeting[]>>;
+    setMeetingCategories: React.Dispatch<React.SetStateAction<MeetingCategory[]>>;
 }
 
 /**
@@ -182,6 +183,9 @@ export function useAllRealtimeSubscriptions(setters: RealtimeSetters, enabled: b
                 new Date(b.meetingDate).getTime() - new Date(a.meetingDate).getTime()
             )
         });
+
+        // Meeting Categories
+        createSubscription<MeetingCategory>('meeting_categories', setters.setMeetingCategories);
 
         // Production Records (Trefila e Treliça)
         const productionRecordsChannel = supabase

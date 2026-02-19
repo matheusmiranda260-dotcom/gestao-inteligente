@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'; // Refresh Trigger
-import type { Page, User, Employee, StockItem, ConferenceData, ProductionOrderData, TransferRecord, Bitola, MachineType, PartsRequest, ShiftReport, ProductionRecord, TransferredLotInfo, ProcessedLot, DowntimeEvent, OperatorLog, TrelicaSelectedLots, WeighedPackage, FinishedProductItem, Ponta, PontaItem, FinishedGoodsTransferRecord, TransferredFinishedGoodInfo, KaizenProblem, InventorySession, Meeting, MeetingItem } from './types';
+import type { Page, User, Employee, StockItem, ConferenceData, ProductionOrderData, TransferRecord, Bitola, MachineType, PartsRequest, ShiftReport, ProductionRecord, TransferredLotInfo, ProcessedLot, DowntimeEvent, OperatorLog, TrelicaSelectedLots, WeighedPackage, FinishedProductItem, Ponta, PontaItem, FinishedGoodsTransferRecord, TransferredFinishedGoodInfo, KaizenProblem, InventorySession, Meeting, MeetingItem, MeetingCategory } from './types';
 import { FioMaquinaBitolaOptions, TrefilaBitolaOptions } from './types';
 import Login from './components/Login';
 import MainMenu from './components/MainMenu';
@@ -56,6 +56,7 @@ const App: React.FC = () => {
     const [gauges, setGauges] = useState<StockGauge[]>([]);
     const [stickyNotes, setStickyNotes] = useState<StickyNote[]>([]);
     const [meetings, setMeetings] = useState<Meeting[]>([]);
+    const [meetingCategories, setMeetingCategories] = useState<MeetingCategory[]>([]);
 
     const [pendingKaizenCount, setPendingKaizenCount] = useState(0);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -87,7 +88,7 @@ const App: React.FC = () => {
                 const [
                     fetchedUsers, fetchedEmployees, fetchedStock, fetchedConferences, fetchedTransfers,
                     fetchedOrders, fetchedFinishedGoods, fetchedPontas, fetchedFGTransfers,
-                    fetchedParts, fetchedReports, fetchedProductionRecords, fetchedInvSessions, fetchedGauges, fetchedNotes, fetchedMeetings
+                    fetchedParts, fetchedReports, fetchedProductionRecords, fetchedInvSessions, fetchedGauges, fetchedNotes, fetchedMeetings, fetchedCategories
                 ] = await Promise.all([
                     fetchTable<User>('app_users'),
                     fetchTable<Employee>('employees'),
@@ -104,7 +105,8 @@ const App: React.FC = () => {
                     fetchTable<InventorySession>('inventory_sessions').catch(() => []),
                     fetchTable<StockGauge>('stock_gauges').catch(() => []),
                     fetchTable<StickyNote>('sticky_notes').catch(() => []),
-                    fetchTable<Meeting>('meetings').catch(() => [])
+                    fetchTable<Meeting>('meetings').catch(() => []),
+                    fetchTable<MeetingCategory>('meeting_categories').catch(() => [])
                 ]);
 
                 setUsers(fetchedUsers);
@@ -122,6 +124,7 @@ const App: React.FC = () => {
                 setGauges(fetchedGauges || []);
                 setStickyNotes(fetchedNotes || []);
                 setMeetings(fetchedMeetings || []);
+                setMeetingCategories(fetchedCategories || []);
 
                 // Split production records
                 setTrefilaProduction(fetchedProductionRecords.filter(r => r.machine === 'Trefila'));
@@ -143,6 +146,40 @@ const App: React.FC = () => {
         setNotification({ message, type });
     };
 
+    const handleAddMeetingCategory = async (label: string) => {
+        try {
+            const { data, error } = await supabase
+                .from('meeting_categories')
+                .insert([{ label }])
+                .select()
+                .single();
+            if (error) throw error;
+            if (data) {
+                const mapped = mapToCamelCase(data) as MeetingCategory;
+                setMeetingCategories(prev => [...prev, mapped]);
+            }
+            showNotification(`Grupo "${label}" adicionado!`, 'success');
+        } catch (e: any) {
+            console.error('Add category error:', e);
+            showNotification(`Erro ao adicionar grupo: ${e?.message || 'erro desconhecido'}`, 'error');
+        }
+    };
+
+    const handleDeleteMeetingCategory = async (id: string) => {
+        try {
+            const { error } = await supabase
+                .from('meeting_categories')
+                .delete()
+                .eq('id', id);
+            if (error) throw error;
+            setMeetingCategories(prev => prev.filter(c => c.id !== id));
+            showNotification('Grupo removido!', 'success');
+        } catch (e: any) {
+            console.error('Delete category error:', e);
+            showNotification(`Erro ao remover grupo: ${e?.message || 'erro desconhecido'}`, 'error');
+        }
+    };
+
     // Supabase Realtime - Atualiza dados automaticamente quando há mudanças no banco
     // Supabase Realtime - Atualiza dados automaticamente quando há mudanças no banco
     const realtimeSetters = useMemo(() => ({
@@ -161,6 +198,7 @@ const App: React.FC = () => {
         setGauges,
         setStickyNotes,
         setMeetings,
+        setMeetingCategories,
     }), []);
 
     useAllRealtimeSubscriptions(realtimeSetters, !!currentUser);
@@ -233,7 +271,7 @@ const App: React.FC = () => {
                 setCurrentUser(appUser);
                 localStorage.setItem('msm_user', JSON.stringify(appUser));
                 setPage(appUser.role === 'gestor' || appUser.role === 'admin' ? 'productionDashboard' : 'menu');
-                showNotification(`Bem - vindo, ${appUser.username} !`, 'success');
+                showNotification(`Bem-vindo, ${appUser.username}!`, 'success');
                 return;
             }
 
@@ -1903,7 +1941,17 @@ const App: React.FC = () => {
             case 'peopleManagement': return <PeopleManagement setPage={setPage} currentUser={currentUser} />;
             case 'gaugesManager': return <GaugesManager gauges={gauges} onAdd={addGauge} onDelete={deleteGauge} onRestoreDefaults={restoreDefaultGauges} />;
             case 'meetingsTasks':
-                return <MeetingsTasks meetings={meetings} currentUser={currentUser} employees={employees} onAddMeeting={handleAddMeeting} onUpdateMeeting={handleUpdateMeeting} onDeleteMeeting={handleDeleteMeeting} />;
+                return <MeetingsTasks
+                    meetings={meetings}
+                    currentUser={currentUser}
+                    employees={employees}
+                    categories={meetingCategories}
+                    onAddMeeting={handleAddMeeting}
+                    onUpdateMeeting={handleUpdateMeeting}
+                    onDeleteMeeting={handleDeleteMeeting}
+                    onAddCategory={handleAddMeetingCategory}
+                    onDeleteCategory={handleDeleteMeetingCategory}
+                />;
             default: return <Login onLogin={handleLogin} error={null} />;
         }
     };

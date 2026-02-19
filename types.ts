@@ -26,8 +26,17 @@ export interface MeetingItem {
     content: string;
     completed: boolean;
     completedAt?: string;
-    assignedTo?: string; // Name or ID of the responsible person
-    category?: string; // e.g., 'Trefila', 'Treliça', 'Peças'
+    assignedTo?: string;
+    category?: string;
+    pauta?: string;
+    dueDate?: string; // ISO date string for improvement deadline
+}
+
+export interface MeetingCategory {
+    id: string;
+    label: string;
+    icon_name?: string;
+    created_at?: string;
 }
 
 export interface Meeting {
