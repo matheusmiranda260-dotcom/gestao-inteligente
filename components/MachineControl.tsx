@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Page, MachineType, StockItem, ProductionOrderData, User, PartsRequest, ShiftReport, TrelicaSelectedLots, Ponta, StockGauge } from '../types';
-import { ArrowLeftIcon, PlayIcon, PauseIcon, ClockIcon, WarningIcon, StopIcon, CheckCircleIcon, WrenchScrewdriverIcon, ArchiveIcon, ClipboardListIcon, CogIcon, DocumentReportIcon, ScaleIcon, TrashIcon, CalculatorIcon, ChartBarIcon, ExclamationIcon, SaveIcon } from './icons';
+import { ArrowLeftIcon, PlayIcon, PauseIcon, ClockIcon, WarningIcon, StopIcon, CheckCircleIcon, WrenchScrewdriverIcon, ArchiveIcon, ClipboardListIcon, CogIcon, DocumentReportIcon, ScaleIcon, TrashIcon, CalculatorIcon, ChartBarIcon, ExclamationIcon, SaveIcon, XCircleIcon } from './icons';
 import PartsRequestModal from './PartsRequestModal';
 import ShiftReportsModal from './ShiftReportsModal';
 import ProductionOrderReport from './ProductionOrderReport';
@@ -115,8 +115,8 @@ const DowntimeModal: React.FC<{
                                         type="button"
                                         onClick={() => toggleReason(r)}
                                         className={`p-4 rounded-2xl border-2 transition-all text-sm font-bold flex items-center justify-center text-center leading-tight h-full ${isActive
-                                                ? 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-200 scale-[1.02]'
-                                                : 'bg-slate-50 border-slate-100 text-slate-600 hover:border-amber-200'
+                                            ? 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-200 scale-[1.02]'
+                                            : 'bg-slate-50 border-slate-100 text-slate-600 hover:border-amber-200'
                                             }`}
                                     >
                                         {r}
@@ -438,6 +438,7 @@ interface MachineControlProps {
     completeProduction?: (orderId: string, finalData: { actualProducedQuantity?: number, pontas?: Ponta[] }) => void;
     addPartsRequest?: (data: Omit<PartsRequest, 'id' | 'date' | 'operator' | 'status' | 'machine' | 'productionOrderId'>) => void;
     deleteShiftReport?: (reportId: string) => void;
+    cancelProductionOrder?: (orderId: string) => void;
     initialView?: View;
     initialModal?: 'reports' | 'parts' | 'rings' | null;
     gauges?: StockGauge[];
@@ -483,7 +484,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
     logDowntime, logResumeProduction, startLotProcessing, finishLotProcessing,
     recordLotWeight, recordPackageWeight, completeProduction, addPartsRequest,
     logPostProductionActivity, updateProducedQuantity, deleteShiftReport,
-    initialView, initialModal, gauges = []
+    cancelProductionOrder, initialView, initialModal, gauges = []
 }) => {
 
     const [pendingWeights, setPendingWeights] = useState<Map<string, string>>(new Map());
@@ -638,6 +639,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
 
     const [view, setView] = useState<View>(initialView || 'dashboard');
+    const [showCancelConfirmation, setShowCancelConfirmation] = useState(false);
+    const [showCancelManagerAuth, setShowCancelManagerAuth] = useState(false);
     const [showDowntimeModal, setShowDowntimeModal] = useState(false);
     const [showCompletionModal, setShowCompletionModal] = useState(false);
     const [showQuantityPrompt, setShowQuantityPrompt] = useState(false);
@@ -1147,6 +1150,60 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
     return (
         <div className="p-4 sm:p-6 md:p-8">
+            {showCancelConfirmation && activeOrder && (
+                <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[70] p-4">
+                    <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-lg animate-fade-in-up">
+                        <div className="text-center">
+                            <div className="bg-red-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <XCircleIcon className="h-10 w-10 text-red-600" />
+                            </div>
+                            <h2 className="text-2xl font-bold text-slate-800 mb-2">Cancelar Ordem de Produção</h2>
+                            <p className="text-slate-600 mb-2">
+                                Tem certeza que deseja <strong className="text-red-600">CANCELAR</strong> a ordem <strong>#{activeOrder.orderNumber}</strong>?
+                            </p>
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+                                <p className="text-sm text-amber-800 font-medium">
+                                    ⚠️ Esta ação irá interromper a produção e devolver todos os lotes vinculados ao estoque.
+                                    {activeOrder.actualProducedQuantity ? ` Peças já produzidas: ${activeOrder.actualProducedQuantity} pçs.` : ''}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-4 mt-6 pt-4 border-t">
+                            <button
+                                type="button"
+                                onClick={() => setShowCancelConfirmation(false)}
+                                className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2.5 px-6 rounded-lg transition"
+                            >
+                                Voltar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowCancelConfirmation(false);
+                                    setShowCancelManagerAuth(true);
+                                }}
+                                className="bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-6 rounded-lg transition flex items-center gap-2"
+                            >
+                                <XCircleIcon className="h-5 w-5" />
+                                Confirmar Cancelamento
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {showCancelManagerAuth && activeOrder && (
+                <ManagerActionAuthorizationModal
+                    users={users}
+                    actionDescription={`Cancelamento da ordem de produção #${activeOrder.orderNumber}. Os lotes serão devolvidos ao estoque e a produção será interrompida.`}
+                    onSuccess={() => {
+                        setShowCancelManagerAuth(false);
+                        if (cancelProductionOrder) {
+                            cancelProductionOrder(activeOrder.id);
+                        }
+                    }}
+                    onCancel={() => setShowCancelManagerAuth(false)}
+                />
+            )}
             {showDowntimeModal && <DowntimeModal onClose={() => setShowDowntimeModal(false)} onSubmit={handleStopMachine} />}
             {showCompletionModal && activeOrder && <CompletionModal order={activeOrder} onClose={() => setShowCompletionModal(false)} onSubmit={handleCompleteProduction} />}
             {showQuantityPrompt && promptOrder && (
@@ -2075,6 +2132,18 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                             >
                                                 <PlayIcon className="h-7 w-7" />
                                                 <span className="text-[8px] font-black uppercase">Iniciar</span>
+                                            </button>
+                                        )}
+
+                                        {/* Botão Cancelar Ordem */}
+                                        {cancelProductionOrder && (
+                                            <button
+                                                onClick={() => setShowCancelConfirmation(true)}
+                                                className="p-3.5 text-red-400 hover:text-red-600 hover:bg-red-50/50 rounded-2xl transition active:scale-90 flex flex-col items-center gap-0.5"
+                                                title="Cancelar Ordem de Produção"
+                                            >
+                                                <XCircleIcon className="h-7 w-7" />
+                                                <span className="text-[8px] font-black uppercase">Cancelar</span>
                                             </button>
                                         )}
                                     </div>

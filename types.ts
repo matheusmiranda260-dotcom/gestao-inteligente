@@ -229,7 +229,7 @@ export interface ProductionOrderData {
     selectedLotIds: string[] | TrelicaSelectedLots;
     totalWeight: number; // Peso da matéria prima
     plannedOutputWeight?: number; // Peso planejado do produto final (ex: Qtd * Peso Final da Treliça)
-    status: 'pending' | 'in_progress' | 'completed';
+    status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
     creationDate: string; // ISO string
     startTime?: string; // ISO string
     endTime?: string; // ISO string

@@ -918,6 +918,104 @@ const App: React.FC = () => {
         }
     };
 
+    const cancelProductionOrder = async (orderId: string) => {
+        try {
+            const orderToCancel = productionOrders.find(o => o.id === orderId);
+            if (!orderToCancel) return;
+
+            const now = new Date().toISOString();
+
+            // Close all open operator logs
+            const closedLogs = (orderToCancel.operatorLogs || []).map(log =>
+                !log.endTime ? { ...log, endTime: now, endQuantity: orderToCancel.actualProducedQuantity || 0 } : log
+            );
+
+            // Close any open downtime events
+            const closedEvents = [...(orderToCancel.downtimeEvents || [])];
+            for (let i = closedEvents.length - 1; i >= 0; i--) {
+                if (!closedEvents[i].resumeTime) {
+                    closedEvents[i] = { ...closedEvents[i], resumeTime: now };
+                    break;
+                }
+            }
+
+            // Update the order to cancelled
+            await updateItem('production_orders', orderId, {
+                status: 'cancelled',
+                endTime: now,
+                operatorLogs: closedLogs,
+                downtimeEvents: closedEvents,
+            });
+
+            // Collect all lot IDs from the order
+            let lotIds: string[] = [];
+            if (orderToCancel.machine === 'Treliça' && !Array.isArray(orderToCancel.selectedLotIds)) {
+                const lots = orderToCancel.selectedLotIds as TrelicaSelectedLots;
+                if (lots.allSuperior && lots.allInferior && lots.allSenozoide) {
+                    lotIds = [...lots.allSuperior, ...lots.allInferior, ...lots.allSenozoide];
+                } else {
+                    const allIds = [
+                        ...(lots.allSuperior || [lots.superior]),
+                        ...(lots.allInferiorLeft || [lots.inferior1]),
+                        ...(lots.allInferiorRight || [lots.inferior2]),
+                        ...(lots.allSenozoideLeft || [lots.senozoide1]),
+                        ...(lots.allSenozoideRight || [lots.senozoide2]),
+                    ];
+                    lotIds = [...new Set(allIds.filter(Boolean))];
+                }
+            } else {
+                lotIds = Array.isArray(orderToCancel.selectedLotIds)
+                    ? orderToCancel.selectedLotIds
+                    : Object.values(orderToCancel.selectedLotIds).flat().filter(Boolean) as string[];
+            }
+
+            // Return lots to available status
+            for (const lotId of lotIds) {
+                const stockItem = stock.find(s => s.id === lotId);
+                if (stockItem) {
+                    const newProductionOrderIds = (stockItem.productionOrderIds || []).filter(id => id !== orderId);
+                    const hasOtherActive = newProductionOrderIds.some(id => {
+                        const o = productionOrders.find(po => po.id === id);
+                        return o && (o.status === 'pending' || o.status === 'in_progress');
+                    });
+
+                    let newStatus = stockItem.status;
+                    if (!hasOtherActive) {
+                        // If it was being used in treliça production, return to support status
+                        if (stockItem.status === 'Em Produção - Treliça' || stockItem.status === 'Disponível - Suporte Treliça') {
+                            newStatus = 'Disponível - Suporte Treliça';
+                        } else {
+                            newStatus = 'Disponível';
+                        }
+                    }
+
+                    await updateItem<StockItem>('stock_items', lotId, {
+                        status: newStatus,
+                        productionOrderIds: newProductionOrderIds.length > 0 ? newProductionOrderIds : undefined,
+                        history: [...(stockItem.history || []), {
+                            type: 'Ordem Cancelada',
+                            date: now,
+                            details: {
+                                'Ordem': orderToCancel.orderNumber,
+                                'Status Anterior': stockItem.status,
+                                'Status Novo': newStatus,
+                            }
+                        }]
+                    });
+                }
+            }
+
+            // Refresh stock from database
+            const freshStock = await fetchTable<StockItem>('stock_items');
+            setStock(freshStock);
+
+            showNotification(`Ordem ${orderToCancel.orderNumber} cancelada com sucesso. Lotes devolvidos ao estoque.`, 'success');
+        } catch (error) {
+            console.error('Erro ao cancelar ordem:', error);
+            showNotification('Erro ao cancelar ordem de produção.', 'error');
+        }
+    };
+
     // Machine Control Trefila
     const startProductionOrder = async (orderId: string) => {
         if (!currentUser) return;
@@ -1902,7 +2000,7 @@ const App: React.FC = () => {
             startProductionOrder, startOperatorShift, endOperatorShift, logDowntime,
             logResumeProduction, startLotProcessing, finishLotProcessing, recordLotWeight,
             addPartsRequest, logPostProductionActivity, completeProduction, recordPackageWeight,
-            updateProducedQuantity, users, deleteShiftReport, gauges
+            updateProducedQuantity, users, deleteShiftReport, gauges, cancelProductionOrder
         };
 
         switch (page) {
