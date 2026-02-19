@@ -2051,7 +2051,7 @@ const App: React.FC = () => {
                     onAddCategory={handleAddMeetingCategory}
                     onDeleteCategory={handleDeleteMeetingCategory}
                 />;
-            case 'laboratory': return <Laboratory setPage={setPage} currentUser={currentUser} />;
+            case 'laboratory': return <Laboratory setPage={setPage} currentUser={currentUser} gauges={gauges} />;
             default: return <Login onLogin={handleLogin} error={null} />;
         }
     };

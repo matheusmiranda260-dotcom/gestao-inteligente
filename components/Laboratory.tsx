@@ -1,25 +1,28 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import type { Page, User, LabAnalysisEntry } from '../types';
-import { ArrowLeftIcon, PlusIcon, TrashIcon, ChartBarIcon, SaveIcon, SearchIcon, FilterIcon, PrinterIcon, CheckCircleIcon, DocumentReportIcon } from './icons';
+import type { Page, User, LabAnalysisEntry, StockGauge } from '../types';
+import { ArrowLeftIcon, PlusIcon, TrashIcon, ChartBarIcon, SaveIcon, SearchIcon, FilterIcon, CheckCircleIcon, DocumentReportIcon } from './icons';
 import { insertItem, deleteItem, fetchTable } from '../services/supabaseService';
 
 interface LaboratoryProps {
     setPage: (page: Page) => void;
     currentUser: User | null;
+    gauges?: StockGauge[];
 }
 
 const generateId = () => `lab_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
-const FORNECEDORES = ['Arcelor 1008', 'Gerdau 1008', 'Belgo 1008', 'Votorantim 1008'];
-const BITOLAS_MP = ['5.5', '6.5'];
+const FORNECEDORES_PADRAO = ['Arcelor 1008', 'Gerdau 1008', 'Belgo 1008', 'Votorantim 1008'];
 
-const parseLocalNum = (val: string): number | null => {
-    if (!val || val.trim() === '') return null;
+const parseLocalNum = (val: any): number | null => {
+    if (val === null || val === undefined) return null;
+    if (typeof val === 'number') return val;
+    if (typeof val !== 'string') return null;
+    if (val.trim() === '') return null;
     const num = parseFloat(val.replace(',', '.'));
     return isNaN(num) ? null : num;
 };
 
-export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser }) => {
+export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, gauges = [] }) => {
     const [entries, setEntries] = useState<LabAnalysisEntry[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -27,12 +30,27 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser }) 
     const chartCanvasRef = useRef<HTMLCanvasElement>(null);
     const summaryChartRef = useRef<HTMLCanvasElement>(null);
 
+    // Obtém bitolas ativas de "Fio Máquina" ou pega as pedidas pelo usuário caso não tenha na base
+    const dbBitolas = useMemo(() => {
+        const bd = gauges.filter(g => g.materialType === 'Fio Máquina' && g.gauge).map(g => String(g.gauge).replace('.', ',')); // format in comma
+        // Garantir que 8, 5, 6.5, 6.35 estejam se ele pedir
+        const padroes = ['8', '6,5', '6,35', '5'];
+        const combo = Array.from(new Set([...padroes, ...bd]));
+        return combo.sort((a, b) => parseFloat(b.replace(',', '.')) - parseFloat(a.replace(',', '.'))); // sort desc
+    }, [gauges]);
+
+    // Fornecedores Historicos + Padrões
+    const comboFornecedores = useMemo(() => {
+        const historicos = entries.map(e => e.fornecedor).filter(Boolean);
+        return Array.from(new Set([...FORNECEDORES_PADRAO, ...historicos])).sort();
+    }, [entries]);
+
+
     // Wizard State
-    // 0 = List | 1 = Fornecedor | 2 = Setup K7 | 3 = Tração | 4 = Resumo
     const [step, setStep] = useState<0 | 1 | 2 | 3 | 4>(0);
 
     const initialForm = {
-        lote: '', fornecedor: FORNECEDORES[0], bitola_mp: BITOLAS_MP[0],
+        lote: '', fornecedor: '', bitola_mp: '',
         k7_1_entrada: '', k7_1_saida: '',
         k7_2_entrada: '', k7_2_saida: '',
         k7_3_entrada: '', k7_3_saida: '',
@@ -48,7 +66,11 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser }) 
         const load = async () => {
             try {
                 const data = await fetchTable<LabAnalysisEntry>('lab_analysis');
-                setEntries(data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+                setEntries(data.sort((a, b) => {
+                    const d1 = new Date(b.date || 0).getTime();
+                    const d2 = new Date(a.date || 0).getTime();
+                    return (isNaN(d1) ? 0 : d1) - (isNaN(d2) ? 0 : d2);
+                }));
             } catch (e) {
                 console.error('Erro ao carregar análises:', e);
             } finally {
@@ -136,7 +158,7 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser }) 
     const filteredEntries = useMemo(() => {
         if (!searchTerm.trim()) return entries;
         const t = searchTerm.toLowerCase();
-        return entries.filter(e => e.lote.toLowerCase().includes(t) || e.fornecedor.toLowerCase().includes(t));
+        return entries.filter(e => (e.lote || '').toLowerCase().includes(t) || (e.fornecedor || '').toLowerCase().includes(t));
     }, [entries, searchTerm]);
 
     // MAIN CHART RENDER
@@ -225,12 +247,12 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser }) 
             const points = filteredEntries.slice().reverse().map(e => {
                 let v = 0;
                 switch (chartType) {
-                    case 'resistencia': v = e.resistencia || 0; break;
-                    case 'alongamento': v = e.alongamento || 0; break;
-                    case 'relacao': v = calcRelacao(e.resistencia, e.alongamento) || 0; break;
-                    case 'bitola': v = calcBitola(e.massa, e.comprimento) || 0; break;
+                    case 'resistencia': v = Number(e.resistencia) || 0; break;
+                    case 'alongamento': v = Number(e.alongamento) || 0; break;
+                    case 'relacao': v = calcRelacao(Number(e.resistencia), Number(e.alongamento)) || 0; break;
+                    case 'bitola': v = calcBitola(Number(e.massa), Number(e.comprimento)) || 0; break;
                 }
-                return { label: e.lote, value: v };
+                return { label: e.lote || 'Sem Lote', value: v };
             }).filter(d => d.value > 0);
             drawDynamicChart(chartCanvasRef, points, chartType, 'Histórico Geral');
         } else if (step === 4) {
@@ -279,15 +301,23 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser }) 
                                 </div>
                                 <div>
                                     <label className="block text-sm font-bold text-slate-600 mb-2 uppercase tracking-wide">Fornecedor (SAE)</label>
-                                    <select value={form.fornecedor} onChange={e => setForm({ ...form, fornecedor: e.target.value })} className="w-full p-4 border-2 border-slate-200 rounded-xl text-xl font-bold focus:border-indigo-500 focus:ring-0 transition bg-white">
-                                        {FORNECEDORES.map(f => <option key={f} value={f}>{f}</option>)}
-                                    </select>
+                                    <input
+                                        type="text"
+                                        list="fornecedores-lista"
+                                        value={form.fornecedor}
+                                        onChange={e => setForm({ ...form, fornecedor: e.target.value })}
+                                        className="w-full p-4 border-2 border-slate-200 rounded-xl text-xl font-bold focus:border-indigo-500 focus:ring-0 transition bg-white"
+                                        placeholder="Selecione ou digite um novo fornecedor..."
+                                    />
+                                    <datalist id="fornecedores-lista">
+                                        {comboFornecedores.map(f => <option key={f} value={f} />)}
+                                    </datalist>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-bold text-slate-600 mb-2 uppercase tracking-wide">Bitola MP (Matéria Prima)</label>
-                                    <div className="flex gap-4">
-                                        {BITOLAS_MP.map(b => (
-                                            <button key={b} type="button" onClick={() => setForm({ ...form, bitola_mp: b })} className={`flex-1 py-4 text-xl font-bold rounded-xl border-2 transition ${form.bitola_mp === b ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}>
+                                    <div className="flex flex-wrap gap-4">
+                                        {dbBitolas.map(b => (
+                                            <button key={b} type="button" onClick={() => setForm({ ...form, bitola_mp: b })} className={`flex-1 min-w-[100px] py-4 text-xl font-bold rounded-xl border-2 transition ${form.bitola_mp === b ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}>
                                                 {b} mm
                                             </button>
                                         ))}
@@ -481,25 +511,25 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser }) 
                     { label: 'Análises de Lote', value: entries.length, color: 'indigo' },
                     {
                         label: 'Média Relação',
-                        value: entries.filter(e => calcRelacao(e.resistencia, e.alongamento)).length > 0
-                            ? (entries.reduce((s, e) => s + (calcRelacao(e.resistencia, e.alongamento) || 0), 0) /
-                                entries.filter(e => calcRelacao(e.resistencia, e.alongamento)).length).toFixed(3)
+                        value: entries.filter(e => calcRelacao(Number(e.resistencia), Number(e.alongamento))).length > 0
+                            ? (entries.reduce((s, e) => s + (calcRelacao(Number(e.resistencia), Number(e.alongamento)) || 0), 0) /
+                                entries.filter(e => calcRelacao(Number(e.resistencia), Number(e.alongamento))).length).toFixed(3)
                             : '—',
                         color: 'blue'
                     },
                     {
                         label: 'Média Bitola MP 5.5',
-                        value: entries.filter(e => e.massa && e.bitola_mp === '5.5').length > 0
-                            ? (entries.reduce((s, e) => s + (calcBitola(e.massa, e.comprimento) || 0), 0) /
-                                entries.filter(e => e.massa && e.bitola_mp === '5.5').length).toFixed(2)
+                        value: entries.filter(e => (e.massa || Number(e.massa) > 0) && e.bitola_mp === '5.5').length > 0
+                            ? (entries.reduce((s, e) => s + (calcBitola(Number(e.massa), Number(e.comprimento)) || 0), 0) /
+                                entries.filter(e => (e.massa || Number(e.massa) > 0) && e.bitola_mp === '5.5').length).toFixed(2)
                             : '—',
                         color: 'emerald'
                     },
                     {
                         label: 'Média Bitola MP 6.5',
-                        value: entries.filter(e => e.massa && e.bitola_mp === '6.5').length > 0
-                            ? (entries.reduce((s, e) => s + (calcBitola(e.massa, e.comprimento) || 0), 0) /
-                                entries.filter(e => e.massa && e.bitola_mp === '6.5').length).toFixed(2)
+                        value: entries.filter(e => (e.massa || Number(e.massa) > 0) && e.bitola_mp === '6.5').length > 0
+                            ? (entries.reduce((s, e) => s + (calcBitola(Number(e.massa), Number(e.comprimento)) || 0), 0) /
+                                entries.filter(e => (e.massa || Number(e.massa) > 0) && e.bitola_mp === '6.5').length).toFixed(2)
                             : '—',
                         color: 'amber'
                     },
@@ -574,17 +604,17 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser }) 
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {filteredEntries.map(entry => {
-                                const rel = calcRelacao(entry.resistencia, entry.alongamento);
-                                const bit = calcBitola(entry.massa, entry.comprimento);
+                                const rel = calcRelacao(Number(entry.resistencia), Number(entry.alongamento));
+                                const bit = calcBitola(Number(entry.massa), Number(entry.comprimento));
                                 const k7AvgArr = [
-                                    calcK7Media(entry.k7_1_entrada, entry.k7_1_saida),
-                                    calcK7Media(entry.k7_2_entrada, entry.k7_2_saida),
-                                    calcK7Media(entry.k7_3_entrada, entry.k7_3_saida),
-                                    calcK7Media(entry.k7_4_entrada, entry.k7_4_saida),
+                                    calcK7Media(entry.k7_1_entrada !== null ? Number(entry.k7_1_entrada) : null, entry.k7_1_saida !== null ? Number(entry.k7_1_saida) : null),
+                                    calcK7Media(entry.k7_2_entrada !== null ? Number(entry.k7_2_entrada) : null, entry.k7_2_saida !== null ? Number(entry.k7_2_saida) : null),
+                                    calcK7Media(entry.k7_3_entrada !== null ? Number(entry.k7_3_entrada) : null, entry.k7_3_saida !== null ? Number(entry.k7_3_saida) : null),
+                                    calcK7Media(entry.k7_4_entrada !== null ? Number(entry.k7_4_entrada) : null, entry.k7_4_saida !== null ? Number(entry.k7_4_saida) : null),
                                 ].filter(v => v !== null) as number[];
                                 const k7Avg = k7AvgArr.length > 0 ? k7AvgArr.reduce((a, b) => a + b, 0) / k7AvgArr.length : null;
 
-                                const n = (v: number | null) => v !== null ? v.toFixed(2) : <span className="opacity-30">—</span>;
+                                const n = (v: any) => (v !== null && v !== undefined && !isNaN(Number(v))) ? Number(v).toFixed(2) : <span className="opacity-30">—</span>;
 
                                 return (
                                     <tr key={entry.id} className="hover:bg-slate-50">
@@ -603,7 +633,7 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser }) 
                                         <td className="p-2 text-center font-bold text-indigo-500 text-xs border-r border-slate-100">{n(k7Avg)}</td>
 
                                         <td className="p-1 px-2 text-[10px] text-center text-slate-400 font-medium">
-                                            <div className="border-b border-slate-100 pb-0.5 mb-0.5 text-center">{entry.massa ? entry.massa.toFixed(2) : '-'}</div>
+                                            <div className="border-b border-slate-100 pb-0.5 mb-0.5 text-center">{entry.massa ? Number(entry.massa).toFixed(2) : '-'}</div>
                                             <div className="text-center">{entry.comprimento || '-'}</div>
                                         </td>
                                         <td className="p-2 text-center font-black text-amber-700 bg-amber-50">{n(bit)}</td>
