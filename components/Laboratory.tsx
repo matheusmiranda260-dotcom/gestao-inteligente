@@ -89,6 +89,10 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
         if (sai === null) return ent;
         return (ent + sai) / 2;
     };
+    const calcReducaoArea = (ent: number | null, sai: number | null) => {
+        if (!ent || !sai || ent <= 0) return null;
+        return (1 - Math.pow(sai / ent, 2)) * 100;
+    };
 
     const m = parseLocalNum(form.massa);
     const c = parseLocalNum(form.comprimento);
@@ -102,6 +106,11 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
         const ent = parseLocalNum((form as any)[`k7_${i}_entrada`]);
         const sai = parseLocalNum((form as any)[`k7_${i}_saida`]);
         return calcK7Media(ent, sai);
+    });
+    const formK7Reducoes = [1, 2, 3, 4].map(i => {
+        const ent = parseLocalNum((form as any)[`k7_${i}_entrada`]);
+        const sai = parseLocalNum((form as any)[`k7_${i}_saida`]);
+        return calcReducaoArea(ent, sai);
     });
 
     // Validations per step
@@ -353,12 +362,20 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
                                                 <input type="text" inputMode="decimal" value={(form as any)[`k7_${i}_saida`]} onChange={e => setForm({ ...form, [`k7_${i}_saida`]: e.target.value })} className="w-full p-3 border-2 border-slate-200 rounded-xl text-center font-bold focus:border-indigo-500 focus:ring-0 transition" placeholder="—" />
                                             </div>
                                         </div>
-                                        {formK7Medias[i - 1] !== null && (
-                                            <div className="mt-4 bg-indigo-100 rounded-xl py-2 px-1 text-center border border-indigo-200">
-                                                <span className="text-[10px] uppercase font-black tracking-widest text-indigo-500 block">Média</span>
-                                                <span className="text-lg font-black text-indigo-700">{formK7Medias[i - 1]!.toFixed(2)}</span>
-                                            </div>
-                                        )}
+                                        <div className="grid grid-cols-2 gap-2 mt-4">
+                                            {formK7Medias[i - 1] !== null && (
+                                                <div className="bg-indigo-100 rounded-xl py-2 px-1 text-center border border-indigo-200">
+                                                    <span className="text-[10px] uppercase font-black tracking-widest text-indigo-500 block">Média</span>
+                                                    <span className="text-lg font-black text-indigo-700">{formK7Medias[i - 1]!.toFixed(2)}</span>
+                                                </div>
+                                            )}
+                                            {formK7Reducoes[i - 1] !== null && (
+                                                <div className="bg-emerald-100 rounded-xl py-2 px-1 text-center border border-emerald-200">
+                                                    <span className="text-[10px] uppercase font-black tracking-widest text-emerald-600 block">% Redução</span>
+                                                    <span className="text-lg font-black text-emerald-700">{formK7Reducoes[i - 1]!.toFixed(1)}%</span>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -469,8 +486,16 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
                             </div>
 
                             <div className="bg-white border rounded-xl p-4 shadow-sm mb-8">
-                                <div className="relative w-full h-48">
+                                <div className="relative w-full h-48 mb-6">
                                     <canvas ref={summaryChartRef}></canvas>
+                                </div>
+                                <div className="grid grid-cols-4 gap-4 mt-6 border-t border-slate-100 pt-6">
+                                    {[1, 2, 3, 4].map(i => (
+                                        <div key={i} className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-center">
+                                            <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1">% Redução de Área K7-{i}</p>
+                                            <p className="text-xl font-black text-emerald-700">{formK7Reducoes[i - 1] !== null ? `${formK7Reducoes[i - 1]!.toFixed(1)}%` : '--'}</p>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
 
