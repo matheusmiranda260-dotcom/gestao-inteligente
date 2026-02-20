@@ -181,6 +181,24 @@ const FinishedConferencesModal: React.FC<FinishedConferencesModalProps> = ({ con
     const [editingConference, setEditingConference] = useState<ConferenceData | null>(null);
     const [deletingConference, setDeletingConference] = useState<ConferenceData | null>(null);
 
+    // Reconstruct lots from stock_items for conferences that don't have lots populated
+    const conferencesWithLots = conferences.map(conf => {
+        if (conf.lots && conf.lots.length > 0) return conf;
+        // Rebuild lots from stock_items
+        const stockItems = stock.filter(s => s.conferenceNumber === conf.conferenceNumber);
+        const lots: ConferenceLotData[] = stockItems.map(s => ({
+            internalLot: s.internalLot || '',
+            supplierLot: s.supplierLot || '',
+            runNumber: s.runNumber || '',
+            bitola: s.bitola || '',
+            materialType: s.materialType || 'Fio Máquina',
+            labelWeight: Number(s.labelWeight) || 0,
+            scaleWeight: Number(s.initialQuantity || s.remainingQuantity) || 0,
+            supplier: s.supplier || conf.supplier || '',
+        }));
+        return { ...conf, lots };
+    });
+
     const toggleExpand = (conferenceNumber: string) => {
         setExpandedConferenceId(prev => (prev === conferenceNumber ? null : conferenceNumber));
     };
@@ -221,7 +239,7 @@ const FinishedConferencesModal: React.FC<FinishedConferencesModalProps> = ({ con
                         <button onClick={onClose} className="text-slate-500 hover:text-slate-800 text-3xl">&times;</button>
                     </div>
                     <div className="flex-grow overflow-y-auto pr-2">
-                        {conferences.length > 0 ? (
+                        {conferencesWithLots.length > 0 ? (
                             <table className="w-full text-sm">
                                 <thead className="bg-slate-50 text-left sticky top-0">
                                     <tr>
@@ -234,69 +252,76 @@ const FinishedConferencesModal: React.FC<FinishedConferencesModalProps> = ({ con
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
-                                    {conferences.map(conf => (
-                                        <React.Fragment key={conf.conferenceNumber}>
-                                            <tr className="hover:bg-slate-50">
-                                                <td className="p-3">{new Date(conf.entryDate).toLocaleDateString('pt-BR')}</td>
-                                                <td className="p-3 font-medium">{conf.conferenceNumber}</td>
-                                                <td className="p-3">{conf.supplier}</td>
-                                                <td className="p-3">{conf.nfe}</td>
-                                                <td className="p-3 text-center">{conf.lots.length}</td>
-                                                <td className="p-3 text-center">
-                                                    <div className="flex justify-center gap-3">
-                                                        <button onClick={() => { onShowReport(conf); onClose(); }} className="text-emerald-600 hover:underline text-xs font-semibold flex items-center gap-1" title="Reimprimir Relatório">
-                                                            <PrinterIcon className="h-4 w-4" />
-                                                            <span>Reimprimir</span>
-                                                        </button>
-                                                        <button onClick={() => handleEdit(conf)} className="text-[#0F3F5C] hover:underline text-xs font-semibold flex items-center gap-1" title="Editar Conferência">
-                                                            <PencilIcon className="h-4 w-4" />
-                                                            <span>Editar</span>
-                                                        </button>
-                                                        <button onClick={() => setDeletingConference(conf)} className="text-red-600 hover:underline text-xs font-semibold flex items-center gap-1" title="Excluir Conferência">
-                                                            <TrashIcon className="h-4 w-4" />
-                                                            <span>Excluir</span>
-                                                        </button>
-                                                        <button onClick={() => toggleExpand(conf.conferenceNumber)} className="text-slate-600 hover:underline text-xs font-semibold">
-                                                            {expandedConferenceId === conf.conferenceNumber ? 'Ocultar' : 'Ver Lotes'}
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                            {expandedConferenceId === conf.conferenceNumber && (
-                                                <tr className="bg-slate-50">
-                                                    <td colSpan={6} className="p-4">
-                                                        <h4 className="font-semibold text-slate-700 mb-2 pl-2">Lotes da Conferência: {conf.conferenceNumber}</h4>
-                                                        <div className="overflow-x-auto border rounded-md bg-white">
-                                                            <table className="min-w-full text-xs">
-                                                                <thead className="bg-slate-100">
-                                                                    <tr>
-                                                                        <th className="p-2 text-left font-semibold">Lote Interno</th>
-                                                                        <th className="p-2 text-left font-semibold">Lote Fornecedor</th>
-                                                                        <th className="p-2 text-left font-semibold">Tipo de Material</th>
-                                                                        <th className="p-2 text-left font-semibold">Bitola</th>
-                                                                        <th className="p-2 text-right font-semibold">Peso Etiqueta (kg)</th>
-                                                                        <th className="p-2 text-right font-semibold">Peso Balança (kg)</th>
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody>
-                                                                    {conf.lots.map((lot, i) => (
-                                                                        <tr key={i}>
-                                                                            <td className="p-2">{lot.internalLot}</td>
-                                                                            <td className="p-2">{lot.supplierLot}</td>
-                                                                            <td className="p-2">{lot.materialType}</td>
-                                                                            <td className="p-2">{lot.bitola}</td>
-                                                                            <td className="p-2 text-right">{lot.labelWeight.toFixed(2)}</td>
-                                                                            <td className="p-2 text-right font-bold">{lot.scaleWeight.toFixed(2)}</td>
-                                                                        </tr>
-                                                                    ))}
-                                                                </tbody>
-                                                            </table>
+                                    {conferencesWithLots.map(conf => {
+                                        const lots = conf.lots || [];
+                                        return (
+                                            <React.Fragment key={conf.conferenceNumber}>
+                                                <tr className="hover:bg-slate-50">
+                                                    <td className="p-3">{new Date(conf.entryDate).toLocaleDateString('pt-BR')}</td>
+                                                    <td className="p-3 font-medium">{conf.conferenceNumber}</td>
+                                                    <td className="p-3">{conf.supplier}</td>
+                                                    <td className="p-3">{conf.nfe}</td>
+                                                    <td className="p-3 text-center">{lots.length}</td>
+                                                    <td className="p-3 text-center">
+                                                        <div className="flex justify-center gap-3">
+                                                            <button onClick={() => { onShowReport(conf); onClose(); }} className="text-emerald-600 hover:underline text-xs font-semibold flex items-center gap-1" title="Reimprimir Relatório">
+                                                                <PrinterIcon className="h-4 w-4" />
+                                                                <span>Reimprimir</span>
+                                                            </button>
+                                                            <button onClick={() => handleEdit(conf)} className="text-[#0F3F5C] hover:underline text-xs font-semibold flex items-center gap-1" title="Editar Conferência">
+                                                                <PencilIcon className="h-4 w-4" />
+                                                                <span>Editar</span>
+                                                            </button>
+                                                            <button onClick={() => setDeletingConference(conf)} className="text-red-600 hover:underline text-xs font-semibold flex items-center gap-1" title="Excluir Conferência">
+                                                                <TrashIcon className="h-4 w-4" />
+                                                                <span>Excluir</span>
+                                                            </button>
+                                                            <button onClick={() => toggleExpand(conf.conferenceNumber)} className="text-slate-600 hover:underline text-xs font-semibold">
+                                                                {expandedConferenceId === conf.conferenceNumber ? 'Ocultar' : 'Ver Lotes'}
+                                                            </button>
                                                         </div>
                                                     </td>
                                                 </tr>
-                                            )}
-                                        </React.Fragment>
-                                    ))}
+                                                {expandedConferenceId === conf.conferenceNumber && (
+                                                    <tr className="bg-slate-50">
+                                                        <td colSpan={6} className="p-4">
+                                                            <h4 className="font-semibold text-slate-700 mb-2 pl-2">Lotes da Conferência: {conf.conferenceNumber}</h4>
+                                                            {lots.length > 0 ? (
+                                                                <div className="overflow-x-auto border rounded-md bg-white">
+                                                                    <table className="min-w-full text-xs">
+                                                                        <thead className="bg-slate-100">
+                                                                            <tr>
+                                                                                <th className="p-2 text-left font-semibold">Lote Interno</th>
+                                                                                <th className="p-2 text-left font-semibold">Lote Fornecedor</th>
+                                                                                <th className="p-2 text-left font-semibold">Tipo de Material</th>
+                                                                                <th className="p-2 text-left font-semibold">Bitola</th>
+                                                                                <th className="p-2 text-right font-semibold">Peso Etiqueta (kg)</th>
+                                                                                <th className="p-2 text-right font-semibold">Peso Balança (kg)</th>
+                                                                            </tr>
+                                                                        </thead>
+                                                                        <tbody>
+                                                                            {lots.map((lot, i) => (
+                                                                                <tr key={i}>
+                                                                                    <td className="p-2">{lot.internalLot}</td>
+                                                                                    <td className="p-2">{lot.supplierLot}</td>
+                                                                                    <td className="p-2">{lot.materialType}</td>
+                                                                                    <td className="p-2">{lot.bitola}</td>
+                                                                                    <td className="p-2 text-right">{(Number(lot.labelWeight) || 0).toFixed(2)}</td>
+                                                                                    <td className="p-2 text-right font-bold">{(Number(lot.scaleWeight) || 0).toFixed(2)}</td>
+                                                                                </tr>
+                                                                            ))}
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+                                                            ) : (
+                                                                <p className="text-sm text-slate-400 pl-2">Nenhum lote encontrado para esta conferência.</p>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </React.Fragment>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         ) : (

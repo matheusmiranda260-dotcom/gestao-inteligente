@@ -9,8 +9,13 @@ interface ConferenceReportProps {
 }
 
 const ConferenceReport: React.FC<ConferenceReportProps> = ({ reportData, onClose }) => {
-  const totalLabelWeight = reportData.lots.reduce((acc, lot) => acc + lot.labelWeight, 0);
-  const totalScaleWeight = reportData.lots.reduce((acc, lot) => acc + lot.scaleWeight, 0);
+  const safeLots = (reportData.lots || []).map(lot => ({
+    ...lot,
+    labelWeight: Number(lot.labelWeight) || 0,
+    scaleWeight: Number(lot.scaleWeight) || 0,
+  }));
+  const totalLabelWeight = safeLots.reduce((acc, lot) => acc + lot.labelWeight, 0);
+  const totalScaleWeight = safeLots.reduce((acc, lot) => acc + lot.scaleWeight, 0);
   const difference = totalScaleWeight - totalLabelWeight;
   const differencePercentage = totalLabelWeight > 0 ? ((difference / totalLabelWeight) * 100) : 0;
 
@@ -86,8 +91,8 @@ const ConferenceReport: React.FC<ConferenceReportProps> = ({ reportData, onClose
                   </tr>
                 </thead>
                 <tbody className="text-black border-b-2 border-slate-900">
-                  {reportData.lots.map((lot, index) => {
-                    const lotDiff = (lot.scaleWeight || 0) - (lot.labelWeight || 0);
+                  {safeLots.map((lot, index) => {
+                    const lotDiff = lot.scaleWeight - lot.labelWeight;
                     const lotPercent = lot.labelWeight ? (lotDiff / lot.labelWeight) * 100 : 0;
                     const displaySupplier = lot.supplier || reportData.supplier;
 

@@ -466,16 +466,11 @@ const App: React.FC = () => {
             // Get all stock items from this conference
             const conferenceStockItems = stock.filter(item => item.conferenceNumber === conferenceNumber);
 
-            // Check if any lot is in use (not Disponível or Disponível - Suporte Treliça)
-            const lotsInUse = conferenceStockItems.filter(item =>
-                item.status !== 'Disponível' &&
-                item.status !== 'Disponível - Suporte Treliça'
-            );
-
-            if (lotsInUse.length > 0) {
-                showNotification('Não é possível editar: alguns lotes estão em uso na produção.', 'error');
-                return;
-            }
+            // Build a map of existing lot states to preserve status info where possible
+            const existingLotMap = new Map<string, StockItem>();
+            conferenceStockItems.forEach(item => {
+                existingLotMap.set(`${item.internalLot.trim().toLowerCase()}|${item.supplierLot.trim().toLowerCase()}`, item);
+            });
 
             // Delete all old stock items associated with this conference directly from DB
             await deleteItemByColumn('stock_items', 'conference_number', conferenceNumber);
@@ -485,31 +480,40 @@ const App: React.FC = () => {
             const { lots, ...conferenceHeader } = updatedData;
             await updateItemByColumn<any>('conferences', 'conference_number', conferenceNumber, conferenceHeader);
 
-            // Create new stock items
-            const newStockItems: StockItem[] = updatedData.lots.map(lot => ({
-                id: generateId('STOCK'),
-                entryDate: updatedData.entryDate,
-                supplier: updatedData.supplier,
-                nfe: updatedData.nfe,
-                conferenceNumber: updatedData.conferenceNumber,
-                internalLot: lot.internalLot,
-                supplierLot: lot.supplierLot,
-                runNumber: lot.runNumber,
-                materialType: lot.materialType,
-                bitola: lot.bitola,
-                labelWeight: lot.labelWeight,
-                initialQuantity: lot.scaleWeight,
-                remainingQuantity: lot.scaleWeight,
-                status: 'Disponível',
-                history: [{
-                    type: 'Entrada (Editada)',
-                    date: new Date().toISOString(),
-                    details: {
-                        action: 'Conferência Editada',
-                        weight: lot.scaleWeight
-                    }
-                }]
-            }));
+            // Create new stock items, preserving status of lots that existed before
+            const newStockItems: StockItem[] = updatedData.lots.map(lot => {
+                const key = `${lot.internalLot.trim().toLowerCase()}|${lot.supplierLot.trim().toLowerCase()}`;
+                const existingItem = existingLotMap.get(key);
+
+                return {
+                    id: existingItem?.id || generateId('STOCK'),
+                    entryDate: updatedData.entryDate,
+                    supplier: lot.supplier || updatedData.supplier,
+                    nfe: updatedData.nfe,
+                    conferenceNumber: updatedData.conferenceNumber,
+                    internalLot: lot.internalLot,
+                    supplierLot: lot.supplierLot,
+                    runNumber: lot.runNumber,
+                    materialType: lot.materialType,
+                    bitola: lot.bitola,
+                    labelWeight: lot.labelWeight,
+                    initialQuantity: lot.scaleWeight,
+                    remainingQuantity: existingItem?.remainingQuantity ?? lot.scaleWeight,
+                    status: existingItem?.status ?? 'Disponível',
+                    history: [...(existingItem?.history || []), {
+                        type: 'Entrada (Editada)',
+                        date: new Date().toISOString(),
+                        details: {
+                            action: 'Conferência Editada',
+                            weight: lot.scaleWeight
+                        }
+                    }],
+                    productionOrderIds: existingItem?.productionOrderIds,
+                    location: existingItem?.location,
+                    lastAuditDate: existingItem?.lastAuditDate,
+                    auditObservation: existingItem?.auditObservation,
+                };
+            });
 
             for (const item of newStockItems) {
                 await insertItem<StockItem>('stock_items', item);
