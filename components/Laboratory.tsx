@@ -107,10 +107,16 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
         const sai = parseLocalNum((form as any)[`k7_${i}_saida`]);
         return calcK7Media(ent, sai);
     });
-    const formK7Reducoes = [1, 2, 3, 4].map(i => {
-        const ent = parseLocalNum((form as any)[`k7_${i}_entrada`]);
-        const sai = parseLocalNum((form as any)[`k7_${i}_saida`]);
-        return calcReducaoArea(ent, sai);
+    // Calcula redução de área entre estágios: K7-1 usa bitola MP, K7-2+ usa média do K7 anterior
+    const bitolaMP = parseLocalNum(form.bitola_mp);
+    const formK7Reducoes = [0, 1, 2, 3].map(i => {
+        const currentMedia = formK7Medias[i];
+        if (currentMedia === null) return null;
+        // Para o 1º K7, o diâmetro de referência é a bitola da matéria prima
+        // Para os demais, é a média do K7 anterior
+        const prevDiameter = i === 0 ? bitolaMP : formK7Medias[i - 1];
+        if (prevDiameter === null || prevDiameter <= 0) return null;
+        return (1 - Math.pow(currentMedia / prevDiameter, 2)) * 100;
     });
 
     // Validations per step
@@ -373,6 +379,7 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
                                                 <div className="bg-emerald-100 rounded-xl py-2 px-1 text-center border border-emerald-200">
                                                     <span className="text-[10px] uppercase font-black tracking-widest text-emerald-600 block">% Redução</span>
                                                     <span className="text-lg font-black text-emerald-700">{formK7Reducoes[i - 1]!.toFixed(1)}%</span>
+                                                    <span className="text-[8px] text-emerald-500 block font-bold">{i === 1 ? `vs MP ${form.bitola_mp}` : `vs K7-${i - 1}`}</span>
                                                 </div>
                                             )}
                                         </div>
@@ -490,12 +497,16 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
                                     <canvas ref={summaryChartRef}></canvas>
                                 </div>
                                 <div className="grid grid-cols-4 gap-4 mt-6 border-t border-slate-100 pt-6">
-                                    {[1, 2, 3, 4].map(i => (
-                                        <div key={i} className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-center">
-                                            <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1">% Redução de Área K7-{i}</p>
-                                            <p className="text-xl font-black text-emerald-700">{formK7Reducoes[i - 1] !== null ? `${formK7Reducoes[i - 1]!.toFixed(1)}%` : '--'}</p>
-                                        </div>
-                                    ))}
+                                    {[1, 2, 3, 4].map(i => {
+                                        const refLabel = i === 1 ? `MP ${form.bitola_mp}mm → K7-${i}` : `K7-${i - 1} → K7-${i}`;
+                                        return (
+                                            <div key={i} className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-center">
+                                                <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1">% Redução K7-{i}</p>
+                                                <p className="text-xl font-black text-emerald-700">{formK7Reducoes[i - 1] !== null ? `${formK7Reducoes[i - 1]!.toFixed(1)}%` : '--'}</p>
+                                                <p className="text-[9px] text-emerald-500 mt-1 font-medium">{refLabel}</p>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
 
