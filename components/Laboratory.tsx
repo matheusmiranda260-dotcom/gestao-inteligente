@@ -29,6 +29,7 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
     const [chartType, setChartType] = useState<'resistencia' | 'alongamento' | 'relacao' | 'bitola'>('resistencia');
     const chartCanvasRef = useRef<HTMLCanvasElement>(null);
     const summaryChartRef = useRef<HTMLCanvasElement>(null);
+    const step2FlowChartRef = useRef<HTMLCanvasElement>(null);
 
     // Obtém bitolas ativas de "Fio Máquina" ou pega as pedidas pelo usuário caso não tenha na base
     const dbBitolas = useMemo(() => {
@@ -257,6 +258,155 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
         ctx.fillText(chartTitle, padL, 15);
     };
 
+    // Draw the reduction flow chart for Step 2
+    const drawReductionFlowChart = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        ctx.scale(dpr, dpr);
+        const W = rect.width;
+        const H = rect.height;
+        ctx.clearRect(0, 0, W, H);
+
+        // Build data points: MP + K7 averages
+        const mpVal = bitolaMP;
+        const stages: { label: string; value: number | null; reduction: number | null }[] = [
+            { label: 'MP', value: mpVal, reduction: null },
+            ...formK7Medias.map((avg, i) => ({
+                label: `K7-${i + 1}`,
+                value: avg,
+                reduction: formK7Reducoes[i]
+            }))
+        ];
+
+        // Filter to only stages that have values
+        const activeStages = stages.filter(s => s.value !== null && s.value > 0);
+
+        if (activeStages.length < 2) {
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '14px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('Preencha os valores dos K7 para visualizar o fluxo', W / 2, H / 2);
+            return;
+        }
+
+        const padL = 30, padR = 30, padT = 45, padB = 30;
+        const chartW = W - padL - padR;
+        const chartH = H - padT - padB;
+
+        // Title
+        ctx.fillStyle = '#1e293b';
+        ctx.font = 'bold 13px Inter, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('Fluxo de Redução — Diâmetro (mm)', padL, 18);
+
+        const values = activeStages.map(s => s.value as number);
+        const maxVal = Math.max(...values) * 1.12;
+        const minVal = Math.max(0, Math.min(...values) * 0.85);
+        const range = maxVal - minVal || 1;
+
+        // Grid lines
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 4; i++) {
+            const y = padT + (chartH / 4) * i;
+            ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
+            const val = maxVal - (range / 4) * i;
+            ctx.fillStyle = '#94a3b8'; ctx.font = '9px sans-serif'; ctx.textAlign = 'right';
+            ctx.fillText(val.toFixed(1), padL - 6, y + 3);
+        }
+
+        // Calculate positions
+        const positions = activeStages.map((s, i) => {
+            const x = padL + (activeStages.length > 1 ? (chartW / (activeStages.length - 1)) * i : chartW / 2);
+            const y = padT + chartH - (((s.value as number) - minVal) / range) * chartH;
+            return { x, y, ...s };
+        });
+
+        // Draw gradient area fill
+        const gradient = ctx.createLinearGradient(0, padT, 0, padT + chartH);
+        gradient.addColorStop(0, 'rgba(99, 102, 241, 0.15)');
+        gradient.addColorStop(1, 'rgba(99, 102, 241, 0.02)');
+        ctx.beginPath();
+        positions.forEach((p, i) => {
+            if (i === 0) ctx.moveTo(p.x, p.y);
+            else ctx.lineTo(p.x, p.y);
+        });
+        ctx.lineTo(positions[positions.length - 1].x, padT + chartH);
+        ctx.lineTo(positions[0].x, padT + chartH);
+        ctx.closePath();
+        ctx.fillStyle = gradient;
+        ctx.fill();
+
+        // Draw connecting lines
+        ctx.beginPath();
+        ctx.strokeStyle = '#6366f1';
+        ctx.lineWidth = 3;
+        ctx.lineJoin = 'round';
+        positions.forEach((p, i) => {
+            if (i === 0) ctx.moveTo(p.x, p.y);
+            else ctx.lineTo(p.x, p.y);
+        });
+        ctx.stroke();
+
+        // Draw reduction % between stages
+        for (let i = 1; i < positions.length; i++) {
+            const prev = positions[i - 1];
+            const curr = positions[i];
+            const reduction = curr.reduction;
+            if (reduction === null) continue;
+
+            const midX = (prev.x + curr.x) / 2;
+            const midY = Math.min(prev.y, curr.y) - 18;
+
+            // Badge background
+            const text = `${reduction > 0 ? '-' : '+'}${Math.abs(reduction).toFixed(1)}%`;
+            ctx.font = 'bold 10px Inter, sans-serif';
+            const tw = ctx.measureText(text).width;
+            const bw = tw + 10, bh = 18;
+            const bx = midX - bw / 2, by = midY - bh / 2;
+
+            ctx.fillStyle = reduction > 0 ? '#dcfce7' : '#fee2e2';
+            ctx.strokeStyle = reduction > 0 ? '#86efac' : '#fca5a5';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.roundRect(bx, by, bw, bh, 4);
+            ctx.fill(); ctx.stroke();
+
+            ctx.fillStyle = reduction > 0 ? '#15803d' : '#dc2626';
+            ctx.textAlign = 'center';
+            ctx.fillText(text, midX, midY + 4);
+        }
+
+        // Draw nodes
+        positions.forEach((p, i) => {
+            // Node circle
+            const isMP = p.label === 'MP';
+            const nodeRadius = isMP ? 8 : 7;
+            ctx.beginPath(); ctx.arc(p.x, p.y, nodeRadius, 0, Math.PI * 2);
+            ctx.fillStyle = isMP ? '#f59e0b' : '#6366f1';
+            ctx.fill();
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.stroke();
+
+            // Value above
+            ctx.fillStyle = '#1e293b';
+            ctx.font = 'bold 13px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText((p.value as number).toFixed(2), p.x, p.y - 14);
+
+            // Label below
+            ctx.fillStyle = isMP ? '#b45309' : '#4338ca';
+            ctx.font = 'bold 11px Inter, sans-serif';
+            ctx.fillText(p.label, p.x, padT + chartH + 16);
+        });
+    };
+
     useEffect(() => {
         if (step === 0 && filteredEntries.length > 0) {
             const points = filteredEntries.slice().reverse().map(e => {
@@ -270,12 +420,15 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
                 return { label: e.lote || 'Sem Lote', value: v };
             }).filter(d => d.value > 0);
             drawDynamicChart(chartCanvasRef, points, chartType, 'Histórico Geral');
+        } else if (step === 2) {
+            // Live reduction flow chart
+            drawReductionFlowChart(step2FlowChartRef);
         } else if (step === 4) {
             // Summary K7 Chart
             const pt = [1, 2, 3, 4].map(i => ({ label: `K7 ${i}`, value: formK7Medias[i - 1] || 0 })).filter(k => k.value > 0);
             drawDynamicChart(summaryChartRef, pt, 'default', 'Médias de Cassetes (Setup)');
         }
-    }, [step, filteredEntries, chartType, formK7Medias]);
+    }, [step, filteredEntries, chartType, formK7Medias, bitolaMP, formK7Reducoes]);
 
 
     if (isLoading) return <div className="p-10 text-center text-slate-500 font-bold">Carregando...</div>;
@@ -385,6 +538,13 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
                                         </div>
                                     </div>
                                 ))}
+                            </div>
+
+                            {/* Live Reduction Flow Chart */}
+                            <div className="bg-white rounded-2xl border-2 border-slate-100 p-4 shadow-sm mb-6">
+                                <div className="relative w-full" style={{ height: 220 }}>
+                                    <canvas ref={step2FlowChartRef} className="w-full h-full" style={{ width: '100%', height: '100%' }} />
+                                </div>
                             </div>
 
                             <div className="w-1/3 mb-4">
