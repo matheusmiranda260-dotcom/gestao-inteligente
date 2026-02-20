@@ -296,7 +296,7 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
             return;
         }
 
-        const padL = 30, padR = 30, padT = 45, padB = 30;
+        const padL = 50, padR = 30, padT = 45, padB = 30;
         const chartW = W - padL - padR;
         const chartH = H - padT - padB;
 
@@ -307,19 +307,24 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
         ctx.fillText('Fluxo de Redução — Diâmetro (mm)', padL, 18);
 
         const values = activeStages.map(s => s.value as number);
-        const maxVal = Math.max(...values) * 1.12;
-        const minVal = Math.max(0, Math.min(...values) * 0.85);
+        // Tight scale for high sensitivity - only 2% padding
+        const dataMax = Math.max(...values);
+        const dataMin = Math.min(...values);
+        const dataRange = dataMax - dataMin || 0.5;
+        const maxVal = dataMax + dataRange * 0.08;
+        const minVal = Math.max(0, dataMin - dataRange * 0.08);
         const range = maxVal - minVal || 1;
 
-        // Grid lines
+        // More grid lines for precision (8 divisions)
+        const gridLines = 8;
         ctx.strokeStyle = '#e2e8f0';
         ctx.lineWidth = 1;
-        for (let i = 0; i <= 4; i++) {
-            const y = padT + (chartH / 4) * i;
+        for (let i = 0; i <= gridLines; i++) {
+            const y = padT + (chartH / gridLines) * i;
             ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
-            const val = maxVal - (range / 4) * i;
-            ctx.fillStyle = '#94a3b8'; ctx.font = '9px sans-serif'; ctx.textAlign = 'right';
-            ctx.fillText(val.toFixed(1), padL - 6, y + 3);
+            const val = maxVal - (range / gridLines) * i;
+            ctx.fillStyle = '#94a3b8'; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
+            ctx.fillText(val.toFixed(2), padL - 6, y + 3);
         }
 
         // Calculate positions
@@ -542,7 +547,7 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
 
                             {/* Live Reduction Flow Chart */}
                             <div className="bg-white rounded-2xl border-2 border-slate-100 p-4 shadow-sm mb-6">
-                                <div className="relative w-full" style={{ height: 220 }}>
+                                <div className="relative w-full" style={{ height: 320 }}>
                                     <canvas ref={step2FlowChartRef} className="w-full h-full" style={{ width: '100%', height: '100%' }} />
                                 </div>
                             </div>
