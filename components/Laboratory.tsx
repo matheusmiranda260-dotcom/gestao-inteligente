@@ -54,6 +54,8 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
 
     const initialForm = {
         lote: '', fornecedor: '', bitola_mp: '',
+        bitola_saida_ideal: '', qtd_k7_ideal: '',
+        k7_1_ideal: '', k7_2_ideal: '', k7_3_ideal: '', k7_4_ideal: '',
         k7_1_entrada: '', k7_1_saida: '',
         k7_2_entrada: '', k7_2_saida: '',
         k7_3_entrada: '', k7_3_saida: '',
@@ -133,6 +135,12 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
             lote: form.lote,
             fornecedor: form.fornecedor,
             bitola_mp: form.bitola_mp,
+            bitola_saida_ideal: form.bitola_saida_ideal,
+            qtd_k7_ideal: form.qtd_k7_ideal,
+            k7_1_ideal: parseLocalNum(form.k7_1_ideal),
+            k7_2_ideal: parseLocalNum(form.k7_2_ideal),
+            k7_3_ideal: parseLocalNum(form.k7_3_ideal),
+            k7_4_ideal: parseLocalNum(form.k7_4_ideal),
             k7_1_entrada: parseLocalNum(form.k7_1_entrada),
             k7_1_saida: parseLocalNum(form.k7_1_saida),
             k7_2_entrada: parseLocalNum(form.k7_2_entrada),
@@ -540,6 +548,35 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
                                         ))}
                                     </div>
                                 </div>
+                                <div className="grid grid-cols-2 gap-6 pt-4 border-t-2 border-slate-100">
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-600 mb-2 uppercase tracking-wide">Bitola de Saída Esperada (ex: CA60)</label>
+                                        <input type="text" value={form.bitola_saida_ideal} onChange={e => setForm({ ...form, bitola_saida_ideal: e.target.value })} className="w-full p-4 border-2 border-slate-200 rounded-xl text-xl font-bold focus:border-indigo-500 focus:ring-0 transition" placeholder="Ex: 3,40" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-600 mb-2 uppercase tracking-wide">Qtd. de Laminadores (K7)</label>
+                                        <select value={form.qtd_k7_ideal} onChange={e => setForm({ ...form, qtd_k7_ideal: e.target.value })} className="w-full p-4 border-2 border-slate-200 rounded-xl text-xl font-bold focus:border-indigo-500 focus:ring-0 transition bg-white">
+                                            <option value="">Selecione...</option>
+                                            <option value="1">1 K7</option>
+                                            <option value="2">2 K7s</option>
+                                            <option value="3">3 K7s</option>
+                                            <option value="4">4 K7s</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                {form.qtd_k7_ideal && (
+                                    <div className="bg-slate-50 p-6 rounded-2xl border-2 border-slate-100 mt-4 animate-fade-in-up">
+                                        <label className="block text-sm font-black text-slate-700 mb-4 uppercase tracking-widest border-b border-slate-200 pb-2">Setup Ideal (Média Esperada em cada K7)</label>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                            {Array.from({ length: parseInt(form.qtd_k7_ideal) || 0 }).map((_, i) => (
+                                                <div key={i}>
+                                                    <label className="block text-xs font-bold text-slate-500 mb-1">Média K7-{i + 1}</label>
+                                                    <input type="text" inputMode="decimal" value={(form as any)[`k7_${i + 1}_ideal`]} onChange={e => setForm({ ...form, [`k7_${i + 1}_ideal`]: e.target.value })} className="w-full p-3 border-2 border-slate-200 rounded-xl text-center font-bold focus:border-indigo-500 transition" placeholder="mm" />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="mt-12 flex justify-end">
@@ -572,9 +609,16 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
                                         </div>
                                         <div className="grid grid-cols-2 gap-2 mt-4">
                                             {formK7Medias[i - 1] !== null && (
-                                                <div className="bg-indigo-100 rounded-xl py-2 px-1 text-center border border-indigo-200">
-                                                    <span className="text-[10px] uppercase font-black tracking-widest text-indigo-500 block">Média</span>
+                                                <div className="bg-indigo-100 rounded-xl py-2 px-1 text-center border border-indigo-200 relative group">
+                                                    <span className="text-[10px] uppercase font-black tracking-widest text-indigo-500 block">Média Real</span>
                                                     <span className="text-lg font-black text-indigo-700">{formK7Medias[i - 1]!.toFixed(2)}</span>
+
+                                                    {/* Desvio do ideal */}
+                                                    {(form as any)[`k7_${i}_ideal`] && (
+                                                        <div className={`mt-1 text-[10px] font-bold ${Math.abs(formK7Medias[i - 1]! - parseLocalNum((form as any)[`k7_${i}_ideal`])!) <= 0.05 ? 'text-emerald-600' : 'text-red-500'}`}>
+                                                            Ideal: {Number((form as any)[`k7_${i}_ideal`].replace(',', '.')).toFixed(2)}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
                                             {formK7Reducoes[i - 1] !== null && (
@@ -743,7 +787,7 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
                         </div>
                     )}
                 </div>
-            </div>
+            </div >
         );
     }
 

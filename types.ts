@@ -543,4 +543,10 @@ export interface LabAnalysisEntry {
     alongamento: number | null;
     date: string;
     operator: string;
+    bitola_saida_ideal?: string | null;
+    qtd_k7_ideal?: string | null;
+    k7_1_ideal?: number | null;
+    k7_2_ideal?: number | null;
+    k7_3_ideal?: number | null;
+    k7_4_ideal?: number | null;
 }
