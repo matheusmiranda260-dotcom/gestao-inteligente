@@ -93,7 +93,7 @@ const generatePDF = (catLabel: string, pautas: { name: string; items: MeetingIte
                 ${ideas.length > 0 ? `
                 <div class="ideas-section">
                     <div class="ideas-header">
-                        💡 Mural de Boas Ideias
+                        💡 Mural de Boas Ideias e Iniciativas
                     </div>
                     <div class="ideas-container">
                         ${ideas.map(idea => `
@@ -712,11 +712,11 @@ const PautaSection: React.FC<{
                         </div>
                     )}
 
-                    {/* Boas Ideias Section */}
+                    {/* Boas Ideias e Iniciativas Section */}
                     <div className="mt-4 pt-4 border-t-2 border-slate-100/60">
                         <h5 className="text-[10px] font-black uppercase tracking-widest text-amber-500 mb-3 flex items-center gap-1.5 px-2">
                             <LightBulbIcon className="h-4 w-4" />
-                            Boas Ideias
+                            Boas Ideias e Iniciativas
                         </h5>
 
                         <div className="bg-amber-50/50 rounded-xl p-3 space-y-2 border border-amber-100/50 mb-3">
