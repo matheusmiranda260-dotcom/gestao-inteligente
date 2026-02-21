@@ -117,6 +117,46 @@ const LabReportModal: React.FC<LabReportModalProps> = ({ reportData, onClose }) 
 
     const aiInsights = generateAiInsight();
 
+    const handleExternalAI = () => {
+        const prompt = `Atue como um Engenheiro Metalúrgico Sênior, especialista em Laminação a Frio e Trefilação de fio máquina (aço baixo carbono). Estou com um problema de qualidade no meu processo.
+
+DADOS DA MATÉRIA PRIMA:
+- Bitola Fio Máquina: ${reportData.bitola_mp}mm
+- Fornecedor: ${reportData.fornecedor || 'Desconhecido'}
+
+SETUP DE REDUÇÃO (SAÍDA DOS CASSETES):
+- K7-1: ${medias[0] || 'N/A'} mm
+- K7-2: ${medias[1] || 'N/A'} mm
+- K7-3: ${medias[2] || 'N/A'} mm
+- K7-4: ${medias[3] || 'N/A'} mm
+
+RESULTADOS DO ENSAIO FÍSICO (Falha):
+- Escoamento: ${reportData.escoamento || 'N/A'} MPa (Mínimo Exigido: 600)
+- Resistência: ${reportData.resistencia || 'N/A'} MPa (Mínimo Exigido: 660)
+- Alongamento: ${reportData.alongamento || 'N/A'}% (Mínimo Exigido: 5%)
+- Relação: ${relacao?.toFixed(3) || 'N/A'} (Mínimo: 1.05)
+
+DIAGNÓSTICO INTERNO NOSSO SINALIZOU:
+${aiInsights.map(i => i.text).join('\n')}
+
+Por favor, faça uma análise aprofundada baseada nos números acima. 
+1. O que pode estar causando essas falhas?
+2. Quais ajustes de máquina (setup/espaçamento/tensão) ou análises na matéria-prima você recomenda para que eu consigo atingir os requisitos mínimos? 
+`;
+
+        navigator.clipboard.writeText(prompt).then(() => {
+            alert("✅ O relatório técnico completo foi copiado para a sua área de transferência!\n\nAgora vamos abrir o ChatGPT. Basta você dar um 'Colar' (Ctrl+V) lá no chat para o assistente te ajudar!");
+            window.open('https://chatgpt.com', '_blank');
+        }).catch(() => {
+            alert("Erro ao copiar. Seu navegador pode ter bloqueado esta ação.");
+        });
+    };
+
+    const handleGoogleSearch = () => {
+        const query = `problemas de laminação a frio fio maquina aço baixo carbono redução escoamento resistencia alongamento longo curto defeito de setup cassete rolos k7`;
+        window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, '_blank');
+    };
+
     // Simple line chart component for the print version
     const ChartComponent = () => {
         const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -340,6 +380,26 @@ const LabReportModal: React.FC<LabReportModalProps> = ({ reportData, onClose }) 
                                     {insight.text}
                                 </p>
                             ))}
+
+                            {/* Botoes de IA Externa - Ocultos na impressao */}
+                            <div className="mt-4 flex gap-3 print:hidden">
+                                {aiInsights.some(i => i.type === 'error') && (
+                                    <>
+                                        <button
+                                            onClick={handleExternalAI}
+                                            className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-xs font-bold transition shadow-sm flex items-center gap-2"
+                                        >
+                                            <span className="text-lg">🤖</span> Consultar OpenAI Especialista
+                                        </button>
+                                        <button
+                                            onClick={handleGoogleSearch}
+                                            className="bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-xs font-bold transition shadow-sm flex items-center gap-2"
+                                        >
+                                            <span className="text-lg">🔍</span> Pesquisar Soluções na Web
+                                        </button>
+                                    </>
+                                )}
+                            </div>
                         </div>
 
                         {/* Spacer para empurrar assinaturas para baixo se houver espaço, mas aqui definimos margin top auto */}
