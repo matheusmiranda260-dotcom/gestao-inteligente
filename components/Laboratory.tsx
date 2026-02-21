@@ -50,7 +50,7 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
 
 
     // Wizard State
-    const [step, setStep] = useState<0 | 1 | 2 | 3 | 4>(0);
+    const [step, setStep] = useState<0 | 1 | 2 | 3 | 4 | 5>(0);
 
     const initialForm = {
         lote: '', fornecedor: '', bitola_mp: '',
@@ -465,7 +465,7 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
     };
 
     useEffect(() => {
-        if (step === 0 && filteredEntries.length > 0) {
+        if (step === 5 && filteredEntries.length > 0) {
             const points = filteredEntries.slice().reverse().map(e => {
                 let v = 0;
                 switch (chartType) {
@@ -493,7 +493,7 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
 
     /* =============== RENDER: WIZARD =============== */
 
-    if (step > 0) {
+    if (step > 0 && step < 5) {
         return (
             <div className="max-w-4xl mx-auto py-8">
                 {/* WIZARD HEADER */}
@@ -791,185 +791,233 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
         );
     }
 
-    /* =============== RENDER: MAIN LIST (STEP 0) =============== */
-    return (
-        <div className="max-w-[1920px] mx-auto space-y-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
-                        <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">🔬</div>
-                        Controle de Laboratório
-                    </h1>
-                    <p className="text-slate-500 text-sm mt-1">Histórico de setup de laminadores e ensaios de tração</p>
+    /* =============== RENDER: MAIN LIST (STEP 5) =============== */
+    if (step === 5) {
+        return (
+            <div className="max-w-[1920px] mx-auto space-y-6 animate-fade-in-up">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div className="flex items-center gap-4">
+                        <button onClick={() => setStep(0)} className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-indigo-600 transition shadow-sm border border-slate-200">
+                            <ArrowLeftIcon className="w-5 h-5" />
+                        </button>
+                        <div>
+                            <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
+                                <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">🔬</div>
+                                Histórico de Laboratório
+                            </h1>
+                            <p className="text-slate-500 text-sm mt-1">Histórico de setup de laminadores e ensaios de tração</p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => setStep(1)}
+                        className="bg-indigo-600 text-white hover:bg-indigo-700 font-bold py-3 px-6 rounded-xl transition-all active:scale-95 flex items-center gap-2 shadow-lg shadow-indigo-200"
+                    >
+                        <PlusIcon className="h-5 w-5" /> Iniciar Nova Análise
+                    </button>
                 </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {[
+                        { label: 'Análises de Lote', value: entries.length, color: 'indigo' },
+                        {
+                            label: 'Média Relação',
+                            value: entries.filter(e => calcRelacao(Number(e.resistencia), Number(e.escoamento))).length > 0
+                                ? (entries.reduce((s, e) => s + (calcRelacao(Number(e.resistencia), Number(e.escoamento)) || 0), 0) /
+                                    entries.filter(e => calcRelacao(Number(e.resistencia), Number(e.escoamento))).length).toFixed(3)
+                                : '—',
+                            color: 'blue'
+                        },
+                        {
+                            label: 'Média Bitola MP 5.5',
+                            value: entries.filter(e => (e.massa || Number(e.massa) > 0) && e.bitola_mp === '5.5').length > 0
+                                ? (entries.reduce((s, e) => s + (calcBitola(Number(e.massa), Number(e.comprimento)) || 0), 0) /
+                                    entries.filter(e => (e.massa || Number(e.massa) > 0) && e.bitola_mp === '5.5').length).toFixed(2)
+                                : '—',
+                            color: 'emerald'
+                        },
+                        {
+                            label: 'Média Bitola MP 6.5',
+                            value: entries.filter(e => (e.massa || Number(e.massa) > 0) && e.bitola_mp === '6.5').length > 0
+                                ? (entries.reduce((s, e) => s + (calcBitola(Number(e.massa), Number(e.comprimento)) || 0), 0) /
+                                    entries.filter(e => (e.massa || Number(e.massa) > 0) && e.bitola_mp === '6.5').length).toFixed(2)
+                                : '—',
+                            color: 'amber'
+                        },
+                    ].map((stat, i) => (
+                        <div key={i} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-50">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{stat.label}</p>
+                            <p className={`text-2xl font-black text-${stat.color}-600 tracking-tighter`}>{stat.value}</p>
+                        </div>
+                    ))}
+                </div>
+
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-50 p-6">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                        <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                            <ChartBarIcon className="h-4 w-4 text-indigo-500" /> Gráfico do Histórico
+                        </h2>
+                        <div className="flex gap-2 flex-wrap">
+                            {(['resistencia', 'alongamento', 'relacao', 'bitola'] as const).map(type => {
+                                const labels = {
+                                    resistencia: 'Resistência (MPa)', alongamento: 'Alongamento (%)',
+                                    relacao: 'Relação (Res./Esc.)', bitola: 'Bitola Final (mm)'
+                                };
+                                return (
+                                    <button
+                                        key={type} onClick={() => setChartType(type)}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${chartType === type ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                                    >
+                                        {labels[type]}
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    </div>
+                    <div className="relative" style={{ height: 300 }}>
+                        <canvas ref={chartCanvasRef} className="w-full h-full" style={{ width: '100%', height: '100%' }} />
+                    </div>
+                </div>
+
+                <div className="flex flex-col md:flex-row items-center gap-4">
+                    <div className="relative flex-1 max-w-md w-full">
+                        <SearchIcon className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input type="text" placeholder="Buscar lote..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:border-indigo-500 focus:ring-0 shadow-sm" />
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-50 overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="bg-slate-900 text-white">
+                                    <th colSpan={3} className="p-2 text-center text-[10px] font-bold uppercase tracking-widest border-r border-slate-700">Identificação</th>
+                                    <th colSpan={9} className="p-2 text-center text-[10px] font-bold uppercase tracking-widest border-r border-slate-700">Setup — Cassetes (K7)</th>
+                                    <th colSpan={7} className="p-2 text-center text-[10px] font-bold uppercase tracking-widest border-r border-slate-700">Análise Físico / Tração</th>
+                                    <th className="p-2 text-center text-[10px] font-bold uppercase tracking-widest" rowSpan={2}>Ações</th>
+                                </tr>
+                                <tr className="bg-slate-800 text-slate-300 text-[10px] uppercase tracking-wider">
+                                    <th className="p-2 font-semibold text-left">Lote</th>
+                                    <th className="p-2 font-semibold">Bitola MP</th>
+                                    <th className="p-2 font-semibold border-r border-slate-700">Fornecedor</th>
+                                    <th className="p-2 font-semibold text-center border-l border-slate-700" colSpan={2}>1°K7</th>
+                                    <th className="p-2 font-semibold text-center" colSpan={2}>2°K7</th>
+                                    <th className="p-2 font-semibold text-center" colSpan={2}>3°K7</th>
+                                    <th className="p-2 font-semibold text-center" colSpan={2}>4°K7</th>
+                                    <th className="p-2 font-semibold text-center border-r border-slate-700">Média</th>
+                                    <th className="p-2 font-semibold text-center mt-1 text-slate-400"><span className="text-[8px] block">Massa</span><span className="text-[8px] block">Comp.</span></th>
+                                    <th className="p-2 font-semibold text-center bg-amber-900/30 text-amber-300">Bitola Final</th>
+                                    <th className="p-2 font-semibold text-center">Esc.</th>
+                                    <th className="p-2 font-semibold text-center">Resist.</th>
+                                    <th className="p-2 font-semibold text-center">Along.</th>
+                                    <th className="p-2 font-semibold text-center bg-indigo-900/30 text-indigo-300 border-r border-slate-700">Relação</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {filteredEntries.map(entry => {
+                                    const rel = calcRelacao(Number(entry.resistencia), Number(entry.escoamento));
+                                    const bit = calcBitola(Number(entry.massa), Number(entry.comprimento));
+                                    const k7AvgArr = [
+                                        calcK7Media(entry.k7_1_entrada !== null ? Number(entry.k7_1_entrada) : null, entry.k7_1_saida !== null ? Number(entry.k7_1_saida) : null),
+                                        calcK7Media(entry.k7_2_entrada !== null ? Number(entry.k7_2_entrada) : null, entry.k7_2_saida !== null ? Number(entry.k7_2_saida) : null),
+                                        calcK7Media(entry.k7_3_entrada !== null ? Number(entry.k7_3_entrada) : null, entry.k7_3_saida !== null ? Number(entry.k7_3_saida) : null),
+                                        calcK7Media(entry.k7_4_entrada !== null ? Number(entry.k7_4_entrada) : null, entry.k7_4_saida !== null ? Number(entry.k7_4_saida) : null),
+                                    ].filter(v => v !== null) as number[];
+                                    const k7Avg = k7AvgArr.length > 0 ? k7AvgArr.reduce((a, b) => a + b, 0) / k7AvgArr.length : null;
+
+                                    const n = (v: any) => (v !== null && v !== undefined && !isNaN(Number(v))) ? Number(v).toFixed(2) : <span className="opacity-30">—</span>;
+
+                                    return (
+                                        <tr key={entry.id} className="hover:bg-slate-50">
+                                            <td className="p-3 font-bold text-slate-800 text-left">{entry.lote}</td>
+                                            <td className="p-3 text-center text-emerald-600 font-bold bg-emerald-50/30">{entry.bitola_mp}</td>
+                                            <td className="p-3 text-xs text-slate-500 border-r border-slate-100">{entry.fornecedor}</td>
+
+                                            <td className="p-1 px-2 text-[11px] text-center text-slate-500 border-l border-slate-100 bg-slate-50/50">{n(entry.k7_1_entrada)}</td>
+                                            <td className="p-1 px-2 text-[11px] text-center text-slate-500 bg-slate-50/50">{n(entry.k7_1_saida)}</td>
+                                            <td className="p-1 px-2 text-[11px] text-center text-slate-500">{n(entry.k7_2_entrada)}</td>
+                                            <td className="p-1 px-2 text-[11px] text-center text-slate-500">{n(entry.k7_2_saida)}</td>
+                                            <td className="p-1 px-2 text-[11px] text-center text-slate-500 bg-slate-50/50">{n(entry.k7_3_entrada)}</td>
+                                            <td className="p-1 px-2 text-[11px] text-center text-slate-500 bg-slate-50/50">{n(entry.k7_3_saida)}</td>
+                                            <td className="p-1 px-2 text-[11px] text-center text-slate-500">{n(entry.k7_4_entrada)}</td>
+                                            <td className="p-1 px-2 text-[11px] text-center text-slate-500">{n(entry.k7_4_saida)}</td>
+                                            <td className="p-2 text-center font-bold text-indigo-500 text-xs border-r border-slate-100">{n(k7Avg)}</td>
+
+                                            <td className="p-1 px-2 text-[10px] text-center text-slate-400 font-medium">
+                                                <div className="border-b border-slate-100 pb-0.5 mb-0.5 text-center">{entry.massa ? Number(entry.massa).toFixed(2) : '-'}</div>
+                                                <div className="text-center">{entry.comprimento || '-'}</div>
+                                            </td>
+                                            <td className="p-2 text-center font-black text-amber-700 bg-amber-50">{n(bit)}</td>
+
+                                            <td className={`p-2 text-center text-[11px] font-bold ${checkAnalysisValue(entry.escoamento, 600).color} ${checkAnalysisValue(entry.escoamento, 600).bg}`}>
+                                                {n(entry.escoamento)} <span className="opacity-70 text-[10px] ml-0.5">{checkAnalysisValue(entry.escoamento, 600).icon}</span>
+                                            </td>
+                                            <td className={`p-2 text-center text-[11px] font-bold border-x border-slate-100 ${checkAnalysisValue(entry.resistencia, 660).color} ${checkAnalysisValue(entry.resistencia, 660).bg}`}>
+                                                {n(entry.resistencia)} <span className="opacity-70 text-[10px] ml-0.5">{checkAnalysisValue(entry.resistencia, 660).icon}</span>
+                                            </td>
+                                            <td className={`p-2 text-center text-[11px] font-bold ${checkAnalysisValue(entry.alongamento, 5).color} ${checkAnalysisValue(entry.alongamento, 5).bg}`}>
+                                                {n(entry.alongamento)} <span className="opacity-70 text-[10px] ml-0.5">{checkAnalysisValue(entry.alongamento, 5).icon}</span>
+                                            </td>
+
+                                            <td className={`p-2 text-center font-black border-r border-slate-100 ${checkAnalysisValue(rel, 1.05).color} ${checkAnalysisValue(rel, 1.05).bg}`}>
+                                                {n(rel)} <span className="text-[12px] opacity-80 ml-0.5">{checkAnalysisValue(rel, 1.05).icon}</span>
+                                            </td>
+
+                                            <td className="p-2 text-center">
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <button onClick={() => setPrintingEntry(entry)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="Imprimir Relatório"><PrinterIcon className="h-4 w-4" /></button>
+                                                    <button onClick={() => handleDelete(entry.id)} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition" title="Excluir"><TrashIcon className="h-4 w-4" /></button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {printingEntry && <LabReportModal reportData={printingEntry} onClose={() => setPrintingEntry(null)} />}
+            </div>
+        );
+    }
+
+    /* =============== RENDER: HOME MENU (STEP 0) =============== */
+    return (
+        <div className="max-w-4xl mx-auto py-12 flex flex-col items-center justify-center min-h-[70vh] animate-fade-in-up">
+            <div className="w-24 h-24 bg-indigo-50 rounded-3xl flex items-center justify-center mb-6 shadow-inner border-4 border-white">
+                <span className="text-5xl">🔬</span>
+            </div>
+            <h1 className="text-3xl md:text-5xl font-black text-slate-800 tracking-tight text-center mb-4">
+                Laboratório & Qualidade
+            </h1>
+            <p className="text-slate-500 text-lg text-center mb-16 max-w-lg font-medium">
+                Escolha uma ação abaixo para gerenciar os setups e análises físicas.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
                 <button
                     onClick={() => setStep(1)}
-                    className="bg-indigo-600 text-white hover:bg-indigo-700 font-bold py-3 px-6 rounded-xl transition-all active:scale-95 flex items-center gap-2 shadow-lg shadow-indigo-200"
+                    className="group bg-white hover:bg-indigo-50 border-2 border-indigo-100 hover:border-indigo-500 rounded-[2rem] p-10 transition-all flex flex-col items-center text-center shadow-sm hover:shadow-xl hover:shadow-indigo-100 relative overflow-hidden"
                 >
-                    <PlusIcon className="h-5 w-5" /> Iniciar Nova Análise
+                    <div className="absolute -top-10 -right-10 w-40 h-40 bg-indigo-50 rounded-full blur-3xl opacity-50 group-hover:bg-indigo-200 transition-colors pointer-events-none"></div>
+                    <div className="w-20 h-20 bg-indigo-600 rounded-2xl flex items-center justify-center text-white mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-indigo-200 relative z-10">
+                        <PlusIcon className="w-10 h-10" />
+                    </div>
+                    <h3 className="text-2xl font-black text-slate-800 mb-3 group-hover:text-indigo-700 relative z-10 transition-colors">Nova Análise</h3>
+                    <p className="text-sm font-semibold text-slate-500 relative z-10">Inserir parâmetros, calcular médias e validar tolerâncias</p>
+                </button>
+
+                <button
+                    onClick={() => setStep(5)}
+                    className="group bg-white hover:bg-emerald-50 border-2 border-emerald-100 hover:border-emerald-500 rounded-[2rem] p-10 transition-all flex flex-col items-center text-center shadow-sm hover:shadow-xl hover:shadow-emerald-100 relative overflow-hidden"
+                >
+                    <div className="absolute -top-10 -right-10 w-40 h-40 bg-emerald-50 rounded-full blur-3xl opacity-50 group-hover:bg-emerald-200 transition-colors pointer-events-none"></div>
+                    <div className="w-20 h-20 bg-emerald-500 rounded-2xl flex items-center justify-center text-white mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-emerald-200 relative z-10">
+                        <DocumentReportIcon className="w-10 h-10" />
+                    </div>
+                    <h3 className="text-2xl font-black text-slate-800 mb-3 group-hover:text-emerald-700 relative z-10 transition-colors">Análises Feitas</h3>
+                    <p className="text-sm font-semibold text-slate-500 relative z-10">Consultar histórico, imprimir relatórios em PDF e excluir registros</p>
                 </button>
             </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[
-                    { label: 'Análises de Lote', value: entries.length, color: 'indigo' },
-                    {
-                        label: 'Média Relação',
-                        value: entries.filter(e => calcRelacao(Number(e.resistencia), Number(e.escoamento))).length > 0
-                            ? (entries.reduce((s, e) => s + (calcRelacao(Number(e.resistencia), Number(e.escoamento)) || 0), 0) /
-                                entries.filter(e => calcRelacao(Number(e.resistencia), Number(e.escoamento))).length).toFixed(3)
-                            : '—',
-                        color: 'blue'
-                    },
-                    {
-                        label: 'Média Bitola MP 5.5',
-                        value: entries.filter(e => (e.massa || Number(e.massa) > 0) && e.bitola_mp === '5.5').length > 0
-                            ? (entries.reduce((s, e) => s + (calcBitola(Number(e.massa), Number(e.comprimento)) || 0), 0) /
-                                entries.filter(e => (e.massa || Number(e.massa) > 0) && e.bitola_mp === '5.5').length).toFixed(2)
-                            : '—',
-                        color: 'emerald'
-                    },
-                    {
-                        label: 'Média Bitola MP 6.5',
-                        value: entries.filter(e => (e.massa || Number(e.massa) > 0) && e.bitola_mp === '6.5').length > 0
-                            ? (entries.reduce((s, e) => s + (calcBitola(Number(e.massa), Number(e.comprimento)) || 0), 0) /
-                                entries.filter(e => (e.massa || Number(e.massa) > 0) && e.bitola_mp === '6.5').length).toFixed(2)
-                            : '—',
-                        color: 'amber'
-                    },
-                ].map((stat, i) => (
-                    <div key={i} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-50">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{stat.label}</p>
-                        <p className={`text-2xl font-black text-${stat.color}-600 tracking-tighter`}>{stat.value}</p>
-                    </div>
-                ))}
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-50 p-6">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-                    <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                        <ChartBarIcon className="h-4 w-4 text-indigo-500" /> Gráfico do Histórico
-                    </h2>
-                    <div className="flex gap-2 flex-wrap">
-                        {(['resistencia', 'alongamento', 'relacao', 'bitola'] as const).map(type => {
-                            const labels = {
-                                resistencia: 'Resistência (MPa)', alongamento: 'Alongamento (%)',
-                                relacao: 'Relação (Res./Esc.)', bitola: 'Bitola Final (mm)'
-                            };
-                            return (
-                                <button
-                                    key={type} onClick={() => setChartType(type)}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${chartType === type ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-                                >
-                                    {labels[type]}
-                                </button>
-                            )
-                        })}
-                    </div>
-                </div>
-                <div className="relative" style={{ height: 300 }}>
-                    <canvas ref={chartCanvasRef} className="w-full h-full" style={{ width: '100%', height: '100%' }} />
-                </div>
-            </div>
-
-            <div className="flex flex-col md:flex-row items-center gap-4">
-                <div className="relative flex-1 max-w-md w-full">
-                    <SearchIcon className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input type="text" placeholder="Buscar lote..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:border-indigo-500 focus:ring-0 shadow-sm" />
-                </div>
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-50 overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                        <thead>
-                            <tr className="bg-slate-900 text-white">
-                                <th colSpan={3} className="p-2 text-center text-[10px] font-bold uppercase tracking-widest border-r border-slate-700">Identificação</th>
-                                <th colSpan={9} className="p-2 text-center text-[10px] font-bold uppercase tracking-widest border-r border-slate-700">Setup — Cassetes (K7)</th>
-                                <th colSpan={7} className="p-2 text-center text-[10px] font-bold uppercase tracking-widest border-r border-slate-700">Análise Físico / Tração</th>
-                                <th className="p-2 text-center text-[10px] font-bold uppercase tracking-widest" rowSpan={2}>Ações</th>
-                            </tr>
-                            <tr className="bg-slate-800 text-slate-300 text-[10px] uppercase tracking-wider">
-                                <th className="p-2 font-semibold text-left">Lote</th>
-                                <th className="p-2 font-semibold">Bitola MP</th>
-                                <th className="p-2 font-semibold border-r border-slate-700">Fornecedor</th>
-                                <th className="p-2 font-semibold text-center border-l border-slate-700" colSpan={2}>1°K7</th>
-                                <th className="p-2 font-semibold text-center" colSpan={2}>2°K7</th>
-                                <th className="p-2 font-semibold text-center" colSpan={2}>3°K7</th>
-                                <th className="p-2 font-semibold text-center" colSpan={2}>4°K7</th>
-                                <th className="p-2 font-semibold text-center border-r border-slate-700">Média</th>
-                                <th className="p-2 font-semibold text-center mt-1 text-slate-400"><span className="text-[8px] block">Massa</span><span className="text-[8px] block">Comp.</span></th>
-                                <th className="p-2 font-semibold text-center bg-amber-900/30 text-amber-300">Bitola Final</th>
-                                <th className="p-2 font-semibold text-center">Esc.</th>
-                                <th className="p-2 font-semibold text-center">Resist.</th>
-                                <th className="p-2 font-semibold text-center">Along.</th>
-                                <th className="p-2 font-semibold text-center bg-indigo-900/30 text-indigo-300 border-r border-slate-700">Relação</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {filteredEntries.map(entry => {
-                                const rel = calcRelacao(Number(entry.resistencia), Number(entry.escoamento));
-                                const bit = calcBitola(Number(entry.massa), Number(entry.comprimento));
-                                const k7AvgArr = [
-                                    calcK7Media(entry.k7_1_entrada !== null ? Number(entry.k7_1_entrada) : null, entry.k7_1_saida !== null ? Number(entry.k7_1_saida) : null),
-                                    calcK7Media(entry.k7_2_entrada !== null ? Number(entry.k7_2_entrada) : null, entry.k7_2_saida !== null ? Number(entry.k7_2_saida) : null),
-                                    calcK7Media(entry.k7_3_entrada !== null ? Number(entry.k7_3_entrada) : null, entry.k7_3_saida !== null ? Number(entry.k7_3_saida) : null),
-                                    calcK7Media(entry.k7_4_entrada !== null ? Number(entry.k7_4_entrada) : null, entry.k7_4_saida !== null ? Number(entry.k7_4_saida) : null),
-                                ].filter(v => v !== null) as number[];
-                                const k7Avg = k7AvgArr.length > 0 ? k7AvgArr.reduce((a, b) => a + b, 0) / k7AvgArr.length : null;
-
-                                const n = (v: any) => (v !== null && v !== undefined && !isNaN(Number(v))) ? Number(v).toFixed(2) : <span className="opacity-30">—</span>;
-
-                                return (
-                                    <tr key={entry.id} className="hover:bg-slate-50">
-                                        <td className="p-3 font-bold text-slate-800 text-left">{entry.lote}</td>
-                                        <td className="p-3 text-center text-emerald-600 font-bold bg-emerald-50/30">{entry.bitola_mp}</td>
-                                        <td className="p-3 text-xs text-slate-500 border-r border-slate-100">{entry.fornecedor}</td>
-
-                                        <td className="p-1 px-2 text-[11px] text-center text-slate-500 border-l border-slate-100 bg-slate-50/50">{n(entry.k7_1_entrada)}</td>
-                                        <td className="p-1 px-2 text-[11px] text-center text-slate-500 bg-slate-50/50">{n(entry.k7_1_saida)}</td>
-                                        <td className="p-1 px-2 text-[11px] text-center text-slate-500">{n(entry.k7_2_entrada)}</td>
-                                        <td className="p-1 px-2 text-[11px] text-center text-slate-500">{n(entry.k7_2_saida)}</td>
-                                        <td className="p-1 px-2 text-[11px] text-center text-slate-500 bg-slate-50/50">{n(entry.k7_3_entrada)}</td>
-                                        <td className="p-1 px-2 text-[11px] text-center text-slate-500 bg-slate-50/50">{n(entry.k7_3_saida)}</td>
-                                        <td className="p-1 px-2 text-[11px] text-center text-slate-500">{n(entry.k7_4_entrada)}</td>
-                                        <td className="p-1 px-2 text-[11px] text-center text-slate-500">{n(entry.k7_4_saida)}</td>
-                                        <td className="p-2 text-center font-bold text-indigo-500 text-xs border-r border-slate-100">{n(k7Avg)}</td>
-
-                                        <td className="p-1 px-2 text-[10px] text-center text-slate-400 font-medium">
-                                            <div className="border-b border-slate-100 pb-0.5 mb-0.5 text-center">{entry.massa ? Number(entry.massa).toFixed(2) : '-'}</div>
-                                            <div className="text-center">{entry.comprimento || '-'}</div>
-                                        </td>
-                                        <td className="p-2 text-center font-black text-amber-700 bg-amber-50">{n(bit)}</td>
-
-                                        <td className={`p-2 text-center text-[11px] font-bold ${checkAnalysisValue(entry.escoamento, 600).color} ${checkAnalysisValue(entry.escoamento, 600).bg}`}>
-                                            {n(entry.escoamento)} <span className="opacity-70 text-[10px] ml-0.5">{checkAnalysisValue(entry.escoamento, 600).icon}</span>
-                                        </td>
-                                        <td className={`p-2 text-center text-[11px] font-bold border-x border-slate-100 ${checkAnalysisValue(entry.resistencia, 660).color} ${checkAnalysisValue(entry.resistencia, 660).bg}`}>
-                                            {n(entry.resistencia)} <span className="opacity-70 text-[10px] ml-0.5">{checkAnalysisValue(entry.resistencia, 660).icon}</span>
-                                        </td>
-                                        <td className={`p-2 text-center text-[11px] font-bold ${checkAnalysisValue(entry.alongamento, 5).color} ${checkAnalysisValue(entry.alongamento, 5).bg}`}>
-                                            {n(entry.alongamento)} <span className="opacity-70 text-[10px] ml-0.5">{checkAnalysisValue(entry.alongamento, 5).icon}</span>
-                                        </td>
-
-                                        <td className={`p-2 text-center font-black border-r border-slate-100 ${checkAnalysisValue(rel, 1.05).color} ${checkAnalysisValue(rel, 1.05).bg}`}>
-                                            {n(rel)} <span className="text-[12px] opacity-80 ml-0.5">{checkAnalysisValue(rel, 1.05).icon}</span>
-                                        </td>
-
-                                        <td className="p-2 text-center">
-                                            <div className="flex items-center justify-center gap-1">
-                                                <button onClick={() => setPrintingEntry(entry)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="Imprimir Relatório"><PrinterIcon className="h-4 w-4" /></button>
-                                                <button onClick={() => handleDelete(entry.id)} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition" title="Excluir"><TrashIcon className="h-4 w-4" /></button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            {printingEntry && <LabReportModal reportData={printingEntry} onClose={() => setPrintingEntry(null)} />}
         </div>
     );
 };
