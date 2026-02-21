@@ -54,8 +54,11 @@ const generatePDF = (catLabel: string, pautas: { name: string; items: MeetingIte
     const today = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
     const pautasHtml = pautas.map(pauta => {
-        const pending = pauta.items.filter(i => !i.completed);
-        const done = pauta.items.filter(i => i.completed);
+        const improvements = pauta.items.filter(i => i.itemType !== 'idea');
+        const ideas = pauta.items.filter(i => i.itemType === 'idea');
+
+        const pending = improvements.filter(i => !i.completed);
+        const done = improvements.filter(i => i.completed);
 
         const itemRow = (item: MeetingItem, isDone: boolean) => `
             <tr class="${isDone ? 'done' : ''} ${!isDone && isOverdue(item.dueDate) ? 'overdue' : ''}">
@@ -70,7 +73,7 @@ const generatePDF = (catLabel: string, pautas: { name: string; items: MeetingIte
                 <div class="pauta-header">
                     <span class="pauta-dot">●</span>
                     <h3>${pauta.name}</h3>
-                    <span class="pauta-count">${done.length}/${pauta.items.length} concluídos</span>
+                    <span class="pauta-count">${done.length}/${improvements.length} concluídos</span>
                 </div>
                 <table>
                     <thead>
@@ -85,7 +88,29 @@ const generatePDF = (catLabel: string, pautas: { name: string; items: MeetingIte
                         ${done.map(i => itemRow(i, true)).join('')}
                     </tbody>
                 </table>
-                ${pauta.items.length === 0 ? '<p class="empty">Nenhum item registrado</p>' : ''}
+                ${improvements.length === 0 ? '<p class="empty">Nenhuma melhoria registrada</p>' : ''}
+                
+                ${ideas.length > 0 ? `
+                <div class="ideas-section">
+                    <div class="ideas-header">
+                        💡 Mural de Boas Ideias
+                    </div>
+                    <div class="ideas-container">
+                        ${ideas.map(idea => `
+                        <div class="idea-card ${idea.completed ? 'done' : ''}">
+                            <div style="font-size: 14px; margin-right: 8px; margin-top: 2px;">
+                                ${idea.completed ? '✅' : '🌟'}
+                            </div>
+                            <div style="flex: 1;">
+                                ${idea.content.replace(/\n/g, '<br/>')}
+                                <div class="decoration decoration-1">✨</div>
+                                <div class="decoration decoration-2">🎉</div>
+                            </div>
+                        </div>
+                        `).join('')}
+                    </div>
+                </div>
+                ` : ''}
             </div>
         `;
     }).join('');
@@ -203,6 +228,72 @@ const generatePDF = (catLabel: string, pautas: { name: string; items: MeetingIte
         tr.overdue { background: #fef2f2; }
 
         .empty { text-align: center; padding: 16px; color: #cbd5e1; font-weight: 600; font-size: 10px; }
+
+        .ideas-section {
+            background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+            border: 2px dashed #fde68a;
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 14px;
+            position: relative;
+            overflow: hidden;
+            page-break-inside: avoid;
+        }
+        .ideas-header {
+            font-size: 14px;
+            font-weight: 900;
+            color: #d97706;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            text-shadow: 1px 1px 0px rgba(255,255,255,0.7);
+        }
+        .ideas-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .idea-card {
+            background-color: #ffffff;
+            border: 1px solid #fcd34d;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #92400e;
+            box-shadow: 0 4px 6px -1px rgba(251, 191, 36, 0.1), 0 2px 4px -1px rgba(251, 191, 36, 0.06);
+            display: flex;
+            align-items: flex-start;
+            position: relative;
+        }
+        .idea-card:nth-child(even) {
+            transform: rotate(1deg);
+        }
+        .idea-card:nth-child(odd) {
+            transform: rotate(-1deg);
+        }
+        .idea-card.done {
+            opacity: 0.55;
+            text-decoration: line-through;
+            transform: rotate(0);
+            box-shadow: none;
+            background-color: #f8fafc;
+            border-color: #cbd5e1;
+            color: #64748b;
+        }
+        .idea-card.done .decoration { display: none; }
+        .decoration {
+            position: absolute;
+            opacity: 0.3;
+            font-size: 16px;
+            pointer-events: none;
+        }
+        .decoration-1 { top: -6px; right: -6px; }
+        .decoration-2 { bottom: -6px; left: -6px; }
 
         .footer {
             margin-top: 30px;
