@@ -46,6 +46,18 @@ const LabReportModal: React.FC<LabReportModalProps> = ({ reportData, onClose }) 
 
     const n = (v: any) => (v !== null && v !== undefined && !isNaN(Number(v))) ? Number(v).toFixed(2) : '—';
     const nd = (v: any) => (v !== null && v !== undefined && !isNaN(Number(v))) ? Number(v).toFixed(4) : '—';
+
+    const checkValue = (val: any, min: number) => {
+        if (!val || isNaN(Number(val))) return { color: '', label: '—' };
+        return Number(val) >= min
+            ? { color: 'text-emerald-600', label: '✓ APROVADO' }
+            : { color: 'text-red-500', label: '⚠ REPROVADO' };
+    };
+
+    const escStatus = checkValue(reportData.escoamento, 600);
+    const resStatus = checkValue(reportData.resistencia, 660);
+    const aloStatus = checkValue(reportData.alongamento, 5);
+    const relStatus = checkValue(relacao, 1.05);
     const dateStr = reportData.date ? new Date(reportData.date).toLocaleDateString('pt-BR') : '—';
     const timeStr = reportData.date ? new Date(reportData.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—';
 
@@ -223,22 +235,33 @@ const LabReportModal: React.FC<LabReportModalProps> = ({ reportData, onClose }) 
                             </table>
 
                             <table className="w-full border-collapse border border-black text-left">
+                                <thead>
+                                    <tr>
+                                        <th className="border border-black p-2 bg-gray-200 font-bold uppercase text-xs">Propriedade</th>
+                                        <th className="border border-black p-2 bg-gray-200 font-bold uppercase text-xs text-center">Valor</th>
+                                        <th className="border border-black p-2 bg-gray-200 font-bold uppercase text-xs text-center">Status Mínimo</th>
+                                    </tr>
+                                </thead>
                                 <tbody>
                                     <tr>
-                                        <th className="border border-black p-3 bg-gray-100 font-bold uppercase text-xs w-1/2">Escoamento (MPa)</th>
-                                        <td className="border border-black p-3 font-bold">{n(reportData.escoamento)}</td>
+                                        <th className="border border-black p-2 bg-gray-100 font-bold uppercase text-xs">Escoamento <span className="text-[9px] font-normal text-gray-500 block">Mín: 600 MPa</span></th>
+                                        <td className={`border border-black p-2 font-bold text-center ${escStatus.color}`}>{n(reportData.escoamento)}</td>
+                                        <td className={`border border-black p-2 font-bold text-xs text-center ${escStatus.color}`}>{escStatus.label}</td>
                                     </tr>
                                     <tr>
-                                        <th className="border border-black p-3 bg-gray-100 font-bold uppercase text-xs">Resistência (MPa)</th>
-                                        <td className="border border-black p-3 font-bold">{n(reportData.resistencia)}</td>
+                                        <th className="border border-black p-2 bg-gray-100 font-bold uppercase text-xs">Resistência <span className="text-[9px] font-normal text-gray-500 block">Mín: 660 MPa</span></th>
+                                        <td className={`border border-black p-2 font-bold text-center ${resStatus.color}`}>{n(reportData.resistencia)}</td>
+                                        <td className={`border border-black p-2 font-bold text-xs text-center ${resStatus.color}`}>{resStatus.label}</td>
                                     </tr>
                                     <tr>
-                                        <th className="border border-black p-3 bg-gray-100 font-bold uppercase text-xs">Alongamento (%)</th>
-                                        <td className="border border-black p-3 font-bold">{n(reportData.alongamento)}</td>
+                                        <th className="border border-black p-2 bg-gray-100 font-bold uppercase text-xs">Alongamento <span className="text-[9px] font-normal text-gray-500 block">Mín: 5%</span></th>
+                                        <td className={`border border-black p-2 font-bold text-center ${aloStatus.color}`}>{n(reportData.alongamento)}</td>
+                                        <td className={`border border-black p-2 font-bold text-xs text-center ${aloStatus.color}`}>{aloStatus.label}</td>
                                     </tr>
                                     <tr>
-                                        <th className="border border-black p-3 bg-gray-200 font-black uppercase text-sm">Relação Auto</th>
-                                        <td className="border border-black p-3 font-black text-lg bg-gray-50">{nd(relacao)}</td>
+                                        <th className="border border-black p-2 bg-gray-100 font-black uppercase text-xs">Relação Auto <span className="text-[9px] font-normal text-gray-500 block">Mín: 1.05</span></th>
+                                        <td className={`border border-black p-2 font-black text-center ${relStatus.color} bg-gray-50`}>{nd(relacao)}</td>
+                                        <td className={`border border-black p-2 font-bold text-xs text-center ${relStatus.color} bg-gray-50`}>{relStatus.label}</td>
                                     </tr>
                                 </tbody>
                             </table>

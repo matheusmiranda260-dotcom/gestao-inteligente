@@ -179,6 +179,13 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
         return entries.filter(e => (e.lote || '').toLowerCase().includes(t) || (e.fornecedor || '').toLowerCase().includes(t));
     }, [entries, searchTerm]);
 
+    const checkAnalysisValue = (val: any, min: number) => {
+        if (!val || isNaN(Number(val))) return { color: 'text-slate-600', icon: '', bg: 'bg-slate-50' };
+        return Number(val) >= min
+            ? { color: 'text-emerald-600', icon: '✓', bg: 'bg-emerald-50/50' }
+            : { color: 'text-red-600', icon: '⚠️', bg: 'bg-red-50' };
+    };
+
     // MAIN CHART RENDER
     const drawDynamicChart = (canvasRef: React.RefObject<HTMLCanvasElement>, points: { label: string, value: number }[], metricKey: string, chartTitle: string) => {
         const canvas = canvasRef.current;
@@ -681,16 +688,31 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-6 mb-8">
-                                <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-5">
-                                    <p className="text-xs font-bold text-indigo-500 uppercase tracking-widest mb-1">Relação Auto</p>
-                                    <p className="text-4xl font-black text-indigo-700">{formRelacao !== null ? formRelacao.toFixed(2) : '--'}</p>
-                                    <p className="text-[10px] text-indigo-400 mt-2 font-medium">Resist: {form.resistencia} / Esc: {form.escoamento}</p>
-                                </div>
-                                <div className="bg-amber-50 border border-amber-100 rounded-xl p-5">
-                                    <p className="text-xs font-bold text-amber-500 uppercase tracking-widest mb-1">Bitola Final Auto</p>
-                                    <p className="text-4xl font-black text-amber-700">{formBitola !== null ? formBitola.toFixed(2) : '--'}<span className="text-xl">mm</span></p>
-                                    <p className="text-[10px] text-amber-400 mt-2 font-medium">Massa: {form.massa}g / Comp: {form.comprimento}mm</p>
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+                                {[
+                                    { label: 'Escoamento', val: form.escoamento, min: 600, limit: 'Mín: 600' },
+                                    { label: 'Resistência', val: form.resistencia, min: 660, limit: 'Mín: 660' },
+                                    { label: 'Alongamento', val: form.alongamento, min: 5, limit: 'Mín: 5%' },
+                                    { label: 'Relação Auto', val: formRelacao, min: 1.05, limit: 'Mín: 1.05' }
+                                ].map((item, idx) => {
+                                    const st = checkAnalysisValue(item.val, item.min);
+                                    return (
+                                        <div key={idx} className={`${st.bg} border ${st.color.replace('text', 'border')} border-opacity-30 rounded-xl p-4 flex flex-col justify-between`}>
+                                            <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${st.color} opacity-80`}>{item.label}</p>
+                                            <div className="flex items-center gap-2">
+                                                <p className={`text-2xl lg:text-3xl font-black ${st.color}`}>
+                                                    {item.val !== null && item.val !== '' ? Number(item.val).toFixed(2) : '--'}
+                                                </p>
+                                                <span className={`text-lg ${st.color}`}>{st.icon}</span>
+                                            </div>
+                                            <p className="text-[10px] text-slate-500 mt-1 font-medium bg-white/50 px-2 py-0.5 rounded-md inline-block self-start">{item.limit}</p>
+                                        </div>
+                                    )
+                                })}
+                                <div className="bg-slate-100 border border-slate-200 rounded-xl p-4 flex flex-col justify-between">
+                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Bitola Final Auto</p>
+                                    <p className="text-2xl lg:text-3xl font-black text-slate-700">{formBitola !== null ? formBitola.toFixed(2) : '--'}<span className="text-sm">mm</span></p>
+                                    <p className="text-[10px] text-slate-400 mt-1 font-medium">Massa: {form.massa} / L: {form.comprimento}</p>
                                 </div>
                             </div>
 
@@ -876,11 +898,19 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
                                         </td>
                                         <td className="p-2 text-center font-black text-amber-700 bg-amber-50">{n(bit)}</td>
 
-                                        <td className="p-2 text-center text-[11px] font-bold text-slate-600">{n(entry.escoamento)}</td>
-                                        <td className="p-2 text-center text-[11px] font-bold text-slate-600 border-x border-slate-100 bg-slate-50">{n(entry.resistencia)}</td>
-                                        <td className="p-2 text-center text-[11px] font-bold text-slate-600">{n(entry.alongamento)}</td>
+                                        <td className={`p-2 text-center text-[11px] font-bold ${checkAnalysisValue(entry.escoamento, 600).color} ${checkAnalysisValue(entry.escoamento, 600).bg}`}>
+                                            {n(entry.escoamento)} <span className="opacity-70 text-[10px] ml-0.5">{checkAnalysisValue(entry.escoamento, 600).icon}</span>
+                                        </td>
+                                        <td className={`p-2 text-center text-[11px] font-bold border-x border-slate-100 ${checkAnalysisValue(entry.resistencia, 660).color} ${checkAnalysisValue(entry.resistencia, 660).bg}`}>
+                                            {n(entry.resistencia)} <span className="opacity-70 text-[10px] ml-0.5">{checkAnalysisValue(entry.resistencia, 660).icon}</span>
+                                        </td>
+                                        <td className={`p-2 text-center text-[11px] font-bold ${checkAnalysisValue(entry.alongamento, 5).color} ${checkAnalysisValue(entry.alongamento, 5).bg}`}>
+                                            {n(entry.alongamento)} <span className="opacity-70 text-[10px] ml-0.5">{checkAnalysisValue(entry.alongamento, 5).icon}</span>
+                                        </td>
 
-                                        <td className="p-2 text-center font-black text-indigo-700 bg-indigo-50 border-r border-slate-100">{n(rel)}</td>
+                                        <td className={`p-2 text-center font-black border-r border-slate-100 ${checkAnalysisValue(rel, 1.05).color} ${checkAnalysisValue(rel, 1.05).bg}`}>
+                                            {n(rel)} <span className="text-[12px] opacity-80 ml-0.5">{checkAnalysisValue(rel, 1.05).icon}</span>
+                                        </td>
 
                                         <td className="p-2 text-center">
                                             <div className="flex items-center justify-center gap-1">
