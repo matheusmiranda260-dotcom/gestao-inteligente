@@ -60,9 +60,7 @@ const generatePDF = (catLabel: string, pautas: { name: string; items: MeetingIte
         const itemRow = (item: MeetingItem, isDone: boolean) => `
             <tr class="${isDone ? 'done' : ''} ${!isDone && isOverdue(item.dueDate) ? 'overdue' : ''}">
                 <td class="status">${isDone ? '✅' : '⬜'}</td>
-                <td class="content">${item.content}</td>
-                <td class="responsible">${item.assignedTo ? getEmployeeName(item.assignedTo) : '—'}</td>
-                <td class="date">${item.dueDate ? formatDateFull(item.dueDate) : '—'}</td>
+                <td class="content">${item.content.replace(/\n/g, '<br/>')}</td>
                 <td class="status-text">${isDone ? `Concluído ${item.completedAt ? formatDateFull(item.completedAt) : ''}` : isOverdue(item.dueDate) ? 'ATRASADO' : 'Pendente'}</td>
             </tr>
         `;
@@ -79,8 +77,6 @@ const generatePDF = (catLabel: string, pautas: { name: string; items: MeetingIte
                         <tr>
                             <th class="th-status"></th>
                             <th class="th-content">Item de Melhoria</th>
-                            <th class="th-responsible">Responsável</th>
-                            <th class="th-date">Prazo</th>
                             <th class="th-status-text">Status</th>
                         </tr>
                     </thead>
@@ -194,14 +190,10 @@ const generatePDF = (catLabel: string, pautas: { name: string; items: MeetingIte
             vertical-align: top;
         }
         .th-status, .status { width: 24px; text-align: center; }
-        .th-content, .content { width: 40%; }
-        .th-responsible, .responsible { width: 20%; }
-        .th-date, .date { width: 15%; }
-        .th-status-text, .status-text { width: 15%; }
+        .th-content, .content { width: 75%; }
+        .th-status-text, .status-text { width: 20%; }
 
         .content { font-weight: 600; }
-        .responsible { font-size: 9px; font-weight: 700; color: #6366f1; }
-        .date { font-size: 9px; font-weight: 600; color: #64748b; }
         .status-text { font-size: 9px; font-weight: 700; }
 
         tr.done td { opacity: 0.45; }
