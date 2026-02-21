@@ -163,29 +163,41 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
             finalReductionRatio = totalAreaRatio; // Se tem só 1 passe, ele faz o tranco inteiro
         }
 
-        let interReductionRatio = 1;
+        let interReductionRatioTarget = 1;
         if (qtdK7 > 1) {
-            // (interRatio ^ (qtdK7 - 1)) * finalRatio = totalAreaRatio
-            // interRatio = (totalAreaRatio / finalRatio) ^ (1 / (qtdK7 - 1))
-            interReductionRatio = Math.pow(totalAreaRatio / finalReductionRatio, 1 / (qtdK7 - 1));
+            interReductionRatioTarget = totalAreaRatio / finalReductionRatio;
         }
 
         const ideals = [];
+        const pctReducoes = [];
         let currentD = mp;
 
-        for (let i = 0; i < qtdK7; i++) {
-            const isFinal = (i === qtdK7 - 1);
-            const ratio = (isFinal && qtdK7 > 1) ? finalReductionRatio : interReductionRatio;
+        if (qtdK7 > 1) {
+            const L_total = -Math.log(interReductionRatioTarget);
 
-            // Nova Área = Antiga Área * razão => Novo Diâmetro = Antigo Diâmetro * sqrt(razão)
-            currentD = currentD * Math.sqrt(ratio);
-
-            // Garante que o último seja cravado a saída esperada (evita dízima periódica/arredondamento)
-            if (isFinal) {
-                currentD = saidaEsperada;
+            let totalWeight = 0;
+            for (let i = 1; i <= qtdK7 - 1; i++) {
+                totalWeight += (qtdK7 - i) + 1.5;
             }
 
+            for (let i = 1; i <= qtdK7 - 1; i++) {
+                const w = (qtdK7 - i) + 1.5;
+                const L_i = L_total * (w / totalWeight);
+                const ratio_i = Math.exp(-L_i);
+
+                currentD = currentD * Math.sqrt(ratio_i);
+                ideals.push(currentD);
+                pctReducoes.push((1 - ratio_i) * 100);
+            }
+
+            // Passe Final
+            currentD = saidaEsperada;
             ideals.push(currentD);
+            pctReducoes.push((1 - finalReductionRatio) * 100);
+        } else {
+            currentD = saidaEsperada;
+            ideals.push(currentD);
+            pctReducoes.push((1 - finalReductionRatio) * 100);
         }
 
         setForm(prev => ({
@@ -196,13 +208,19 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
             k7_4_ideal: ideals[3] ? ideals[3].toFixed(2).replace('.', ',') : '',
         }));
 
-        let msg = `✨ A IA calculou o SETUP METALÚRGICO IDEAL com decréscimo progressivo!\n\n`;
+        let msg = `✨ A IA calculou uma CURVA DESCENDENTE LINEAR para o Setup Ideal!\n\n`;
         if (qtdK7 > 1) {
-            msg += `- Passos Intermediários calc. p/ Área: ${((1 - interReductionRatio) * 100).toFixed(1)}%\n`;
-            msg += `- Passe Final (Acabamento) calc. p/ Área: ${((1 - finalReductionRatio) * 100).toFixed(1)}%\n\n`;
-            msg += `Dica de IA: O passe final com menor redução (10~15%) alivia a tração da máquina e previne encruamento severo, otimizando o Alongamento e Escoamento final da sua Mola/CA60.`;
+            msg += `Em um processo correto, os estiramentos caem em formato de rampa. Veja sua curva detalhada:\n`;
+            for (let i = 0; i < pctReducoes.length; i++) {
+                if (i === pctReducoes.length - 1) {
+                    msg += `K7-${i + 1} (Final/Refino): ${pctReducoes[i].toFixed(1)}%\n`;
+                } else {
+                    msg += `K7-${i + 1} (Intermediário): ${pctReducoes[i].toFixed(1)}%\n`;
+                }
+            }
+            msg += `\nA rampa evita rompimento na última fieira/disco e otimiza Alongamento/Escoamento na saída!`;
         } else {
-            msg += `- Único passe esmagando ${((1 - finalReductionRatio) * 100).toFixed(1)}% do aço (Alerta de encruamento gravíssimo).`;
+            msg += `Alerta: Um único passe violento esmagando ${pctReducoes[0].toFixed(1)}% do aço (Encruamento altíssimo!).`;
         }
 
         setAiDiagnosisMsg(msg);
