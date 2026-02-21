@@ -675,7 +675,8 @@ const MeetingsTasks: React.FC<MeetingsTasksProps> = ({
     const getItemsForPauta = (catId: string, pautaName: string): MeetingItem[] => {
         return allItems.filter(item =>
             (item.category === catId || item.category === categories.find(c => c.id === catId)?.label) &&
-            item.pauta === pautaName
+            item.pauta === pautaName &&
+            item.content !== `Pauta "${pautaName}" criada`
         );
     };
 
@@ -757,10 +758,11 @@ const MeetingsTasks: React.FC<MeetingsTasksProps> = ({
         generatePDF(cat.label, pautas, getEmployeeName);
     };
 
-    const totalItems = allItems.length;
-    const completedItemsCount = allItems.filter(i => i.completed).length;
-    const pendingItems = totalItems - completedItemsCount;
-    const overdueItems = allItems.filter(i => !i.completed && isOverdue(i.dueDate)).length;
+    const realItems = allItems.filter(item => item.content !== `Pauta "${item.pauta}" criada`);
+    const totalItems = realItems.length;
+    const completedItemsCount = realItems.filter(i => i.completed).length;
+    const pendingItemsTotal = totalItems - completedItemsCount;
+    const overdueItemsCount = realItems.filter(i => !i.completed && isOverdue(i.dueDate)).length;
     const completionRate = totalItems > 0 ? Math.round((completedItemsCount / totalItems) * 100) : 0;
 
     return (
@@ -810,12 +812,12 @@ const MeetingsTasks: React.FC<MeetingsTasksProps> = ({
                         </div>
                         <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-3xl min-w-[90px] text-center">
                             <p className="text-[9px] font-black text-amber-400 tracking-widest uppercase mb-1">Pendentes</p>
-                            <p className="text-3xl font-black text-amber-400">{pendingItems}</p>
+                            <p className="text-3xl font-black text-amber-400">{pendingItemsTotal}</p>
                         </div>
-                        {overdueItems > 0 && (
+                        {overdueItemsCount > 0 && (
                             <div className="bg-rose-500/10 border border-rose-500/20 p-4 rounded-3xl min-w-[90px] text-center animate-pulse">
                                 <p className="text-[9px] font-black text-rose-400 tracking-widest uppercase mb-1">Atrasados</p>
-                                <p className="text-3xl font-black text-rose-400">{overdueItems}</p>
+                                <p className="text-3xl font-black text-rose-400">{overdueItemsCount}</p>
                             </div>
                         )}
                         <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-3xl min-w-[90px] text-center">
@@ -851,7 +853,8 @@ const MeetingsTasks: React.FC<MeetingsTasksProps> = ({
                         {categories.map(cat => {
                             const pautas = getPautasForCategory(cat.id);
                             const catAllItems = allItems.filter(item =>
-                                item.category === cat.id || item.category === cat.label
+                                (item.category === cat.id || item.category === cat.label) &&
+                                item.content !== `Pauta "${item.pauta}" criada`
                             );
                             const catPending = catAllItems.filter(i => !i.completed).length;
                             const catDone = catAllItems.filter(i => i.completed).length;
