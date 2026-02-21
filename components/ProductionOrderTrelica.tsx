@@ -23,6 +23,37 @@ export const trelicaModels = [
     { cod: 'H16_12', modelo: 'H-16', tamanho: '12', superior: '6', inferior: '5', senozoide: '4,2', pesoFinal: '11,263', pesoSuperior: '2,665', pesoSenozoide: '4,894', pesoInferior: '3,703' },
     { cod: 'H25_12', modelo: 'H-25', tamanho: '12', superior: '8', inferior: '6', senozoide: '5', pesoFinal: '20,042', pesoSuperior: '4,739', pesoSenozoide: '9,973', pesoInferior: '5,330' },
 ];
+
+const getWeightPerMeter = (d: string) => {
+    const dNum = parseFloat(d.replace(',', '.'));
+    if (isNaN(dNum)) return 0;
+    return dNum * dNum * 0.0061654;
+};
+
+const calculateTrelicaWeights = (tamanhoStr: string, superior: string, inferior: string, senozoide: string, trName: string) => {
+    const tamanho = parseFloat(tamanhoStr.replace(',', '.'));
+    if (isNaN(tamanho) || !superior || !inferior || !senozoide || !trName) return null;
+
+    let senozoideMultiplier = 2.58; // default to H-8
+    const nameUpper = trName.toUpperCase();
+    if (nameUpper.includes('H6') || nameUpper.includes('H-6')) senozoideMultiplier = 2.41;
+    else if (nameUpper.includes('H8') || nameUpper.includes('H-8')) senozoideMultiplier = 2.58;
+    else if (nameUpper.includes('H10') || nameUpper.includes('H-10')) senozoideMultiplier = 2.86;
+    else if (nameUpper.includes('H12') || nameUpper.includes('H-12')) senozoideMultiplier = 3.19;
+    else if (nameUpper.includes('H16') || nameUpper.includes('H-16')) senozoideMultiplier = 3.74;
+    else if (nameUpper.includes('H25') || nameUpper.includes('H-25')) senozoideMultiplier = 5.40;
+
+    const wSup = getWeightPerMeter(superior) * tamanho;
+    const wInf = getWeightPerMeter(inferior) * tamanho * 2;
+    const wSen = getWeightPerMeter(senozoide) * tamanho * senozoideMultiplier;
+
+    return {
+        pesoSuperior: wSup.toFixed(3).replace('.', ','),
+        pesoInferior: wInf.toFixed(3).replace('.', ','),
+        pesoSenozoide: wSen.toFixed(3).replace('.', ','),
+        pesoFinal: (wSup + wInf + wSen).toFixed(3).replace('.', ',')
+    };
+};
 type TrelicaModel = typeof trelicaModels[number];
 type AvailableStockItem = StockItem & { availableQuantity: number };
 
@@ -183,6 +214,9 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
     const [senozoideLeftLots, setSenozoideLeftLots] = useState<string[]>([]);
     const [senozoideRightLots, setSenozoideRightLots] = useState<string[]>([]);
 
+    const [isCustomModel, setIsCustomModel] = useState(false);
+    const [customModelSetup, setCustomModelSetup] = useState({ name: '', tamanho: '', superior: '', inferior: '', senozoide: '' });
+
     const [showHistoryModal, setShowHistoryModal] = useState(false);
     const [productionReportData, setProductionReportData] = useState<ProductionOrderData | null>(null);
 
@@ -227,8 +261,14 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
     }, [stock]);
 
     const handleModelChange = (cod: string) => {
-        const model = trelicaModels.find(m => m.cod === cod) || null;
-        setSelectedModel(model);
+        if (cod === 'CUSTOM') {
+            setIsCustomModel(true);
+            setSelectedModel(null);
+        } else {
+            setIsCustomModel(false);
+            const model = trelicaModels.find(m => m.cod === cod) || null;
+            setSelectedModel(model);
+        }
         // Limpar seleções
         setSuperiorLots([]);
         setInferiorLeftLots([]);
@@ -236,6 +276,23 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
         setSenozoideLeftLots([]);
         setSenozoideRightLots([]);
     };
+
+    useEffect(() => {
+        if (isCustomModel && customModelSetup.name && customModelSetup.tamanho && customModelSetup.superior && customModelSetup.inferior && customModelSetup.senozoide) {
+            const weights = calculateTrelicaWeights(customModelSetup.tamanho, customModelSetup.superior, customModelSetup.inferior, customModelSetup.senozoide, customModelSetup.name);
+            if (weights) {
+                setSelectedModel({
+                    cod: 'CUSTOM',
+                    modelo: customModelSetup.name,
+                    tamanho: customModelSetup.tamanho,
+                    superior: customModelSetup.superior.replace('.', ','),
+                    inferior: customModelSetup.inferior.replace('.', ','),
+                    senozoide: customModelSetup.senozoide.replace('.', ','),
+                    ...weights
+                });
+            }
+        }
+    }, [customModelSetup, isCustomModel]);
 
     const { baseSuperiorLots, baseInferiorLeftLots, baseInferiorRightLots, baseSenozoideLeftLots, baseSenozoideRightLots } = useMemo(() => {
         if (!selectedModel) return { baseSuperiorLots: [], baseInferiorLeftLots: [], baseInferiorRightLots: [], baseSenozoideLeftLots: [], baseSenozoideRightLots: [] };
@@ -581,7 +638,57 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
                                             </button>
                                         );
                                     })}
+                                    <button
+                                        type="button"
+                                        onClick={() => handleModelChange('CUSTOM')}
+                                        className={`p-3 rounded-xl border-2 transition-all text-left group ${isCustomModel ? 'border-emerald-500 bg-emerald-50/50 shadow-md ring-4 ring-emerald-500/10' : 'border-dashed border-slate-300 hover:border-emerald-400 hover:bg-emerald-50/30'}`}
+                                    >
+                                        <div className={`text-[10px] font-black mb-1 ${isCustomModel ? 'text-emerald-600' : 'text-slate-400'}`}>NOVO</div>
+                                        <div className={`text-sm font-bold leading-tight ${isCustomModel ? 'text-emerald-950' : 'text-slate-600 group-hover:text-emerald-700'}`}>Modelo Personalizado</div>
+                                        <div className="text-[10px] font-medium text-slate-500 mt-1">Configurar Base</div>
+                                    </button>
                                 </div>
+
+                                {isCustomModel && (
+                                    <div className="mt-6 p-6 rounded-2xl bg-emerald-50/50 border border-emerald-100 shadow-inner">
+                                        <h4 className="text-sm font-black text-emerald-900 uppercase tracking-widest mb-4">Parâmetros do Novo Modelo</h4>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                                            <div>
+                                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Nome da TR</label>
+                                                <input type="text" value={customModelSetup.name} onChange={(e) => setCustomModelSetup(prev => ({ ...prev, name: e.target.value }))} className="w-full text-sm font-bold p-3 bg-white rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all outline-none" placeholder="Ex: H-12 EX" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Tamanho da Peça (m)</label>
+                                                <input type="number" step="0.1" value={customModelSetup.tamanho} onChange={(e) => setCustomModelSetup(prev => ({ ...prev, tamanho: e.target.value }))} className="w-full text-sm font-bold p-3 bg-white rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all outline-none" placeholder="Ex: 12" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Bitola Superior</label>
+                                                <input type="number" step="0.1" value={customModelSetup.superior} onChange={(e) => setCustomModelSetup(prev => ({ ...prev, superior: e.target.value }))} className="w-full text-sm font-bold p-3 bg-white rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all outline-none" placeholder="Ex: 5.6" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Bitola Inferior</label>
+                                                <input type="number" step="0.1" value={customModelSetup.inferior} onChange={(e) => setCustomModelSetup(prev => ({ ...prev, inferior: e.target.value }))} className="w-full text-sm font-bold p-3 bg-white rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all outline-none" placeholder="Ex: 3.8" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Bitola Senozoide</label>
+                                                <input type="number" step="0.1" value={customModelSetup.senozoide} onChange={(e) => setCustomModelSetup(prev => ({ ...prev, senozoide: e.target.value }))} className="w-full text-sm font-bold p-3 bg-white rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all outline-none" placeholder="Ex: 3.8" />
+                                            </div>
+                                        </div>
+                                        {selectedModel?.cod === 'CUSTOM' && (
+                                            <div className="mt-4 flex items-center gap-2 text-xs font-bold text-emerald-700 bg-emerald-100/50 p-2 rounded-lg border border-emerald-200/50 w-fit">
+                                                <span className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-200 text-emerald-800">
+                                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                                </span>
+                                                Peso Final Calculado: {selectedModel.pesoFinal} kg
+                                            </div>
+                                        )}
+                                        {(!customModelSetup.name || !customModelSetup.tamanho || !customModelSetup.superior || !customModelSetup.inferior || !customModelSetup.senozoide) && (
+                                            <div className="mt-4 text-xs font-medium text-amber-600 bg-amber-50 p-2 rounded-lg py-2 px-3 border border-amber-100">
+                                                Preencha todos os campos para calcular as estimativas de matéria-prima.
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
