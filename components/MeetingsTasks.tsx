@@ -270,16 +270,9 @@ const generatePDF = (catLabel: string, pautas: { name: string; items: MeetingIte
             align-items: flex-start;
             position: relative;
         }
-        .idea-card:nth-child(even) {
-            transform: rotate(1deg);
-        }
-        .idea-card:nth-child(odd) {
-            transform: rotate(-1deg);
-        }
         .idea-card.done {
             opacity: 0.55;
             text-decoration: line-through;
-            transform: rotate(0);
             box-shadow: none;
             background-color: #f8fafc;
             border-color: #cbd5e1;
