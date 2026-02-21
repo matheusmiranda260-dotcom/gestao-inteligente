@@ -129,6 +129,71 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
     const canGoToStep3 = true; // K7 is optional strictly, but visually guided
     const canGoToStep4 = (r !== null || a !== null || esc !== null); // Some traction data
 
+    const handleAISuggestion = () => {
+        if (!form.bitola_mp || !form.bitola_saida_ideal) {
+            alert('A IA precisa saber a Bitola MP e a Bitola de Saída Esperada primeiro.');
+            return;
+        }
+
+        const saidaEsperada = parseLocalNum(form.bitola_saida_ideal);
+        if (!saidaEsperada) {
+            alert('Digite uma bitola de saída esperada válida.');
+            return;
+        }
+
+        // Search in history for successful tests that match the criteria
+        const successRuns = entries.filter(e => {
+            if (e.bitola_mp !== form.bitola_mp) return false;
+            const bFinal = calcBitola(Number(e.massa), Number(e.comprimento));
+            if (!bFinal) return false;
+            // Similar final dimension (+- 0.15mm tolerance for matching)
+            if (Math.abs(bFinal - saidaEsperada) > 0.15) return false;
+            // Passed minimum specs (Quality checked)
+            if (Number(e.escoamento) < 600 || Number(e.resistencia) < 660 || Number(e.alongamento) < 5) return false;
+
+            const k7_1 = calcK7Media(Number(e.k7_1_entrada), Number(e.k7_1_saida));
+            if (!k7_1) return false; // Needs at least 1 K7 to learn from
+
+            return true;
+        });
+
+        if (successRuns.length === 0) {
+            alert('A IA ainda não possui histórico de SUCESSO Aprovado o suficiente para esta combinação (MP => Saída). Tente estipular manualmente desta vez, e a IA aprenderá para as próximas!');
+            return;
+        }
+
+        let sums = { k1: 0, k2: 0, k3: 0, k4: 0 };
+        let counts = { k1: 0, k2: 0, k3: 0, k4: 0 };
+
+        successRuns.forEach(r => {
+            const m1 = calcK7Media(Number(r.k7_1_entrada), Number(r.k7_1_saida));
+            if (m1) { sums.k1 += m1; counts.k1++; }
+            const m2 = calcK7Media(Number(r.k7_2_entrada), Number(r.k7_2_saida));
+            if (m2) { sums.k2 += m2; counts.k2++; }
+            const m3 = calcK7Media(Number(r.k7_3_entrada), Number(r.k7_3_saida));
+            if (m3) { sums.k3 += m3; counts.k3++; }
+            const m4 = calcK7Media(Number(r.k7_4_entrada), Number(r.k7_4_saida));
+            if (m4) { sums.k4 += m4; counts.k4++; }
+        });
+
+        let activeK7s = 0;
+        if (counts.k1 > 0) activeK7s++;
+        if (counts.k2 > 0) activeK7s++;
+        if (counts.k3 > 0) activeK7s++;
+        if (counts.k4 > 0) activeK7s++;
+
+        setForm(prev => ({
+            ...prev,
+            qtd_k7_ideal: String(activeK7s),
+            k7_1_ideal: counts.k1 > 0 ? (sums.k1 / counts.k1).toFixed(2).replace('.', ',') : '',
+            k7_2_ideal: counts.k2 > 0 ? (sums.k2 / counts.k2).toFixed(2).replace('.', ',') : '',
+            k7_3_ideal: counts.k3 > 0 ? (sums.k3 / counts.k3).toFixed(2).replace('.', ',') : '',
+            k7_4_ideal: counts.k4 > 0 ? (sums.k4 / counts.k4).toFixed(2).replace('.', ',') : '',
+        }));
+
+        alert(`✨ IA analisou ${successRuns.length} teste(s) perfeitos do seu histórico e preencheu o melhor setup para essa bitola automaticamente!`);
+    };
+
     const handleSave = async () => {
         const newEntry: LabAnalysisEntry = {
             id: generateId(),
@@ -555,13 +620,24 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-slate-600 mb-2 uppercase tracking-wide">Qtd. de Laminadores (K7)</label>
-                                        <select value={form.qtd_k7_ideal} onChange={e => setForm({ ...form, qtd_k7_ideal: e.target.value })} className="w-full p-4 border-2 border-slate-200 rounded-xl text-xl font-bold focus:border-indigo-500 focus:ring-0 transition bg-white">
-                                            <option value="">Selecione...</option>
-                                            <option value="1">1 K7</option>
-                                            <option value="2">2 K7s</option>
-                                            <option value="3">3 K7s</option>
-                                            <option value="4">4 K7s</option>
-                                        </select>
+                                        <div className="flex gap-2">
+                                            <select value={form.qtd_k7_ideal} onChange={e => setForm({ ...form, qtd_k7_ideal: e.target.value })} className="flex-1 p-4 border-2 border-slate-200 rounded-xl text-xl font-bold focus:border-indigo-500 focus:ring-0 transition bg-white">
+                                                <option value="">Selecione...</option>
+                                                <option value="1">1 K7</option>
+                                                <option value="2">2 K7s</option>
+                                                <option value="3">3 K7s</option>
+                                                <option value="4">4 K7s</option>
+                                            </select>
+                                            <button
+                                                type="button"
+                                                onClick={handleAISuggestion}
+                                                className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 font-bold px-4 rounded-xl transition flex flex-col items-center justify-center border-2 border-indigo-200"
+                                                title="Sugerir baseado no histórico de testes aprovados"
+                                            >
+                                                <span className="text-xl">💡</span>
+                                                <span className="text-[10px] uppercase tracking-widest mt-1">IA</span>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                                 {form.qtd_k7_ideal && (
