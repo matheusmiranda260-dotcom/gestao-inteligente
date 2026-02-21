@@ -298,7 +298,8 @@ const LabReportModal: React.FC<LabReportModalProps> = ({ reportData, onClose }) 
                     }
                 }
             `}} />
-        </div>
+        </div>,
+        document.body
     );
 };
 
