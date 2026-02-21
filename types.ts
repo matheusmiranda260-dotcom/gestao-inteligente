@@ -30,6 +30,7 @@ export interface MeetingItem {
     category?: string;
     pauta?: string;
     dueDate?: string; // ISO date string for improvement deadline
+    itemType?: 'improvement' | 'idea';
 }
 
 export interface MeetingCategory {

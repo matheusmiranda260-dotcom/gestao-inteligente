@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { Meeting, MeetingItem, User, Employee, MeetingCategory } from '../types';
-import { PlusIcon, TrashIcon, CheckCircleIcon, XIcon, ClockIcon, CalendarIcon, ClipboardListIcon, PencilIcon, UserIcon, UserGroupIcon, CogIcon, WrenchScrewdriverIcon, ArchiveIcon, FilterIcon, AdjustmentsIcon, ChevronRightIcon, ChevronDownIcon } from './icons';
+import { PlusIcon, TrashIcon, CheckCircleIcon, XIcon, ClockIcon, CalendarIcon, ClipboardListIcon, PencilIcon, UserIcon, UserGroupIcon, CogIcon, WrenchScrewdriverIcon, ArchiveIcon, FilterIcon, AdjustmentsIcon, ChevronRightIcon, ChevronDownIcon, LightBulbIcon } from './icons';
 
 interface MeetingsTasksProps {
     meetings: Meeting[];
@@ -376,44 +376,42 @@ const PautaSection: React.FC<{
     pautaName: string;
     items: MeetingItem[];
     employees: Employee[];
-    onAddItem: (content: string, assignedTo?: string, dueDate?: string) => void;
+    onAddItem: (content: string, itemType?: 'improvement' | 'idea') => void;
     onToggleItem: (itemId: string) => void;
     onDeleteItem: (itemId: string) => void;
-    onEditItem: (itemId: string, content: string, assignedTo?: string, dueDate?: string) => void;
+    onEditItem: (itemId: string, content: string) => void;
     onDeletePauta: () => void;
     onRenamePauta: (newName: string) => void;
     getEmployeeName: (idOrName: string) => string;
 }> = ({ pautaName, items, employees, onAddItem, onToggleItem, onDeleteItem, onEditItem, onDeletePauta, onRenamePauta, getEmployeeName }) => {
     const [isOpen, setIsOpen] = useState(true);
     const [newContent, setNewContent] = useState('');
-    const [assignedTo, setAssignedTo] = useState('');
-    const [dueDate, setDueDate] = useState('');
+    const [newIdeaContent, setNewIdeaContent] = useState('');
     const [isEditing, setIsEditing] = useState(false);
     const [editName, setEditName] = useState(pautaName);
     const [showCompleted, setShowCompleted] = useState(false);
 
     const [editingItemId, setEditingItemId] = useState<string | null>(null);
     const [editItemContent, setEditItemContent] = useState('');
-    const [editItemAssignedTo, setEditItemAssignedTo] = useState('');
-    const [editItemDueDate, setEditItemDueDate] = useState('');
 
     const startEditingItem = (item: MeetingItem) => {
         setEditingItemId(item.id);
         setEditItemContent(item.content);
-        setEditItemAssignedTo(item.assignedTo || '');
-        setEditItemDueDate(item.dueDate || '');
     };
 
     const saveEditingItem = () => {
         if (!editingItemId || !editItemContent.trim()) return;
-        onEditItem(editingItemId, editItemContent.trim(), editItemAssignedTo || undefined, editItemDueDate || undefined);
+        onEditItem(editingItemId, editItemContent.trim());
         setEditingItemId(null);
     };
 
-    const pendingItems = items.filter(i => !i.completed);
-    const completedItems = items.filter(i => i.completed);
+    const improvements = items.filter(i => i.itemType !== 'idea');
+    const ideas = items.filter(i => i.itemType === 'idea');
+
+    const pendingItems = improvements.filter(i => !i.completed);
+    const completedItems = improvements.filter(i => i.completed);
     const total = items.length;
-    const done = completedItems.length;
+    const done = items.filter(i => i.completed).length;
     const overdueCount = pendingItems.filter(i => isOverdue(i.dueDate)).length;
 
     const handleSaveRename = () => {
@@ -431,7 +429,7 @@ const PautaSection: React.FC<{
                     <div className="text-slate-400 transition-transform flex-shrink-0" style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}>
                         <ChevronRightIcon className="h-4 w-4" />
                     </div>
-                    <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${overdueCount > 0 ? 'bg-rose-500 animate-pulse' : done === total && total > 0 ? 'bg-emerald-500' : 'bg-indigo-500'}`}></div>
+                    <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${done === total && total > 0 ? 'bg-emerald-500' : 'bg-indigo-500'}`}></div>
 
                     {isEditing ? (
                         <div className="flex items-center gap-2 flex-1">
@@ -568,26 +566,6 @@ const PautaSection: React.FC<{
                                 </button>
                                 <div className="flex-1 min-w-0">
                                     <p className="font-bold text-[12px] text-slate-700 leading-snug whitespace-pre-wrap">{item.content}</p>
-                                    <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                        {item.assignedTo && (
-                                            <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-500">
-                                                {getEmployeeName(item.assignedTo)}
-                                            </span>
-                                        )}
-                                        {item.dueDate && (
-                                            <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md flex items-center gap-1 ${overdue
-                                                ? 'bg-rose-100 text-rose-600'
-                                                : days !== null && days <= 3
-                                                    ? 'bg-amber-50 text-amber-600'
-                                                    : 'bg-slate-100 text-slate-500'
-                                                }`}>
-                                                <CalendarIcon className="h-2.5 w-2.5" />
-                                                {formatDate(item.dueDate)}
-                                                {overdue && ' · ATRASADO'}
-                                                {!overdue && days !== null && days <= 3 && days >= 0 && ` · ${days}d`}
-                                            </span>
-                                        )}
-                                    </div>
                                 </div>
                                 <div className="opacity-0 group-hover/item:opacity-100 flex items-center transition-all flex-shrink-0">
                                     <button
@@ -649,6 +627,100 @@ const PautaSection: React.FC<{
                             ))}
                         </div>
                     )}
+
+                    {/* Boas Ideias Section */}
+                    <div className="mt-4 pt-4 border-t-2 border-slate-100/60">
+                        <h5 className="text-[10px] font-black uppercase tracking-widest text-amber-500 mb-3 flex items-center gap-1.5 px-2">
+                            <LightBulbIcon className="h-4 w-4" />
+                            Boas Ideias
+                        </h5>
+
+                        <div className="bg-amber-50/50 rounded-xl p-3 space-y-2 border border-amber-100/50 mb-3">
+                            <div className="relative">
+                                <textarea
+                                    value={newIdeaContent}
+                                    onChange={(e) => setNewIdeaContent(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !e.shiftKey && newIdeaContent.trim()) {
+                                            e.preventDefault();
+                                            onAddItem(newIdeaContent.trim(), 'idea');
+                                            setNewIdeaContent('');
+                                        }
+                                    }}
+                                    placeholder="Deixe uma ideia genial... (Shift+Enter para pular linha)"
+                                    className="w-full bg-white border border-amber-200/60 p-3 pr-10 rounded-xl font-bold text-slate-700 placeholder:text-amber-300 focus:border-amber-400 outline-none transition-all text-[12px] min-h-[56px] resize-y custom-scrollbar"
+                                />
+                                <button
+                                    onClick={() => {
+                                        if (newIdeaContent.trim()) {
+                                            onAddItem(newIdeaContent.trim(), 'idea');
+                                            setNewIdeaContent('');
+                                        }
+                                    }}
+                                    className="absolute right-2 top-2 bg-amber-500 rounded-lg flex items-center justify-center p-1.5 text-white hover:scale-110 active:scale-95 transition-all shadow-md shadow-amber-500/20"
+                                >
+                                    <PlusIcon className="h-4 w-4" />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* List Ideas */}
+                        <div className="space-y-1">
+                            {ideas.map(idea => {
+                                if (editingItemId === idea.id) {
+                                    return (
+                                        <div key={idea.id} className="bg-amber-50/80 p-3 rounded-xl border border-amber-200 mt-2">
+                                            <div className="space-y-2">
+                                                <textarea
+                                                    value={editItemContent}
+                                                    onChange={(e) => setEditItemContent(e.target.value)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                                            e.preventDefault();
+                                                            saveEditingItem();
+                                                        }
+                                                    }}
+                                                    autoFocus
+                                                    className="w-full bg-white border border-amber-200 p-2 rounded-lg font-bold text-slate-700 text-[12px] outline-none min-h-[64px] resize-y custom-scrollbar"
+                                                />
+                                                <div className="flex gap-2 justify-end">
+                                                    <button onClick={saveEditingItem} className="bg-amber-500 hover:bg-amber-600 text-white p-1.5 rounded-lg transition-all flex items-center gap-1.5 px-3 text-[10px] font-black uppercase tracking-widest">
+                                                        <CheckCircleIcon className="h-4 w-4" />
+                                                        Salvar
+                                                    </button>
+                                                    <button onClick={() => setEditingItemId(null)} className="bg-rose-100 hover:bg-rose-200 text-rose-600 p-1.5 rounded-lg transition-all">
+                                                        <XIcon className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+
+                                return (
+                                    <div key={idea.id} className={`group/item flex items-start gap-3 p-3 rounded-xl transition-all border border-transparent hover:bg-slate-50 ${idea.completed ? 'opacity-50' : ''}`}>
+                                        <button
+                                            onClick={() => onToggleItem(idea.id)}
+                                            className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all flex-shrink-0 ${idea.completed ? 'bg-amber-500 border-amber-500' : 'border-amber-200 hover:border-amber-500'}`}
+                                        >
+                                            <div className={`w-1.5 h-1.5 rounded-full transition-all ${idea.completed ? 'bg-white scale-100' : 'bg-amber-500 scale-0 group-hover/item:scale-100'}`} />
+                                        </button>
+                                        <div className="flex-1 min-w-0">
+                                            <p className={`font-bold text-[12px] text-slate-700 leading-snug whitespace-pre-wrap ${idea.completed ? 'line-through text-slate-400' : ''}`}>{idea.content}</p>
+                                        </div>
+                                        <div className="opacity-0 group-hover/item:opacity-100 flex items-center transition-all flex-shrink-0">
+                                            <button onClick={() => startEditingItem(idea)} className="text-slate-300 hover:text-amber-500 p-1.5 transition-all">
+                                                <PencilIcon className="h-3.5 w-3.5" />
+                                            </button>
+                                            <button onClick={() => onDeleteItem(idea.id)} className="text-slate-300 hover:text-rose-500 p-1.5 transition-all">
+                                                <XIcon className="h-3.5 w-3.5" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
 
                     {items.length === 0 && (
                         <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest text-center py-3">Sem itens de melhoria</p>
@@ -720,16 +792,15 @@ const MeetingsTasks: React.FC<MeetingsTasksProps> = ({
         setNewPautaName(prev => ({ ...prev, [catId]: '' }));
     };
 
-    const handleAddItem = (catId: string, pautaName: string, content: string, assignedTo?: string, dueDate?: string) => {
+    const handleAddItem = (catId: string, pautaName: string, content: string, itemType?: 'improvement' | 'idea') => {
         if (!gembaBoard) return;
         const newItem: MeetingItem = {
             id: Math.random().toString(36).substring(2, 9),
             content,
             completed: false,
-            assignedTo,
             category: catId,
             pauta: pautaName,
-            dueDate
+            itemType
         };
         onUpdateMeeting(gembaBoard.id, { items: [...allItems, newItem] });
     };
@@ -750,10 +821,10 @@ const MeetingsTasks: React.FC<MeetingsTasksProps> = ({
         onUpdateMeeting(gembaBoard.id, { items: allItems.filter(item => item.id !== itemId) });
     };
 
-    const handleEditItem = (itemId: string, content: string, assignedTo?: string, dueDate?: string) => {
+    const handleEditItem = (itemId: string, content: string) => {
         if (!gembaBoard) return;
         const newItems = allItems.map(item => {
-            if (item.id === itemId) return { ...item, content, assignedTo, dueDate };
+            if (item.id === itemId) return { ...item, content };
             return item;
         });
         onUpdateMeeting(gembaBoard.id, { items: newItems });
@@ -961,7 +1032,7 @@ const MeetingsTasks: React.FC<MeetingsTasksProps> = ({
                                                 pautaName={pautaName}
                                                 items={getItemsForPauta(cat.id, pautaName)}
                                                 employees={employees}
-                                                onAddItem={(content, assignedTo, dueDate) => handleAddItem(cat.id, pautaName, content, assignedTo, dueDate)}
+                                                onAddItem={(content, itemType) => handleAddItem(cat.id, pautaName, content, itemType)}
                                                 onToggleItem={toggleItem}
                                                 onDeleteItem={deleteItem}
                                                 onEditItem={handleEditItem}
