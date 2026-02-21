@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Page, User, LabAnalysisEntry, StockGauge } from '../types';
-import { ArrowLeftIcon, PlusIcon, TrashIcon, ChartBarIcon, SaveIcon, SearchIcon, FilterIcon, CheckCircleIcon, DocumentReportIcon } from './icons';
+import { ArrowLeftIcon, PlusIcon, TrashIcon, ChartBarIcon, SaveIcon, SearchIcon, FilterIcon, CheckCircleIcon, DocumentReportIcon, PrinterIcon } from './icons';
 import { insertItem, deleteItem, fetchTable } from '../services/supabaseService';
+import LabReportModal from './LabReportModal';
 
 interface LaboratoryProps {
     setPage: (page: Page) => void;
@@ -24,6 +25,7 @@ const parseLocalNum = (val: any): number | null => {
 
 export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, gauges = [] }) => {
     const [entries, setEntries] = useState<LabAnalysisEntry[]>([]);
+    const [printingEntry, setPrintingEntry] = useState<LabAnalysisEntry | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [chartType, setChartType] = useState<'resistencia' | 'alongamento' | 'relacao' | 'bitola'>('resistencia');
@@ -881,7 +883,10 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
                                         <td className="p-2 text-center font-black text-indigo-700 bg-indigo-50 border-r border-slate-100">{n(rel)}</td>
 
                                         <td className="p-2 text-center">
-                                            <button onClick={() => handleDelete(entry.id)} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition"><TrashIcon className="h-4 w-4" /></button>
+                                            <div className="flex items-center justify-center gap-1">
+                                                <button onClick={() => setPrintingEntry(entry)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="Imprimir Relatório"><PrinterIcon className="h-4 w-4" /></button>
+                                                <button onClick={() => handleDelete(entry.id)} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition" title="Excluir"><TrashIcon className="h-4 w-4" /></button>
+                                            </div>
                                         </td>
                                     </tr>
                                 );
@@ -890,6 +895,7 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
                     </table>
                 </div>
             </div>
+            {printingEntry && <LabReportModal reportData={printingEntry} onClose={() => setPrintingEntry(null)} />}
         </div>
     );
 };
