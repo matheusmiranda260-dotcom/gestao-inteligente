@@ -61,6 +61,62 @@ const LabReportModal: React.FC<LabReportModalProps> = ({ reportData, onClose }) 
     const dateStr = reportData.date ? new Date(reportData.date).toLocaleDateString('pt-BR') : '—';
     const timeStr = reportData.date ? new Date(reportData.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—';
 
+    // Virtual AI Diagnosis
+    const generateAiInsight = () => {
+        const insights = [];
+        let hasError = false;
+
+        const esc = Number(reportData.escoamento) || 0;
+        const res = Number(reportData.resistencia) || 0;
+        if (esc > 0 && res > 0 && (esc < 600 || res < 660)) {
+            hasError = true;
+            insights.push("⚙️ Tração/Escoamento Baixos: Possível desgaste prematuro nos roletes laminadores, excesso de lubrificação causando deslizamento, ou a matéria-prima (MP) possui teor de carbono inferior ao certificado.");
+        }
+
+        const alo = Number(reportData.alongamento) || 0;
+        if (alo > 0 && alo < 5) {
+            hasError = true;
+            insights.push("⛓️ Extrema Fragilidade (< 5%): O material está quebradiço. Fio máquina com microfissuras internas ou redução agressiva em um único passe, encruando o fio além do limite mecânico suportado.");
+        }
+
+        if (relacao !== null && relacao < 1.05) {
+            hasError = true;
+            insights.push("⚖️ Relação Auto Inadequada: A diferença entre escoamento e limite de resistência está extremamente curta. O fio de perdeu sua ductilidade durante a redução (encruamento severo).");
+        }
+
+        let hasAnomaly = false;
+        for (let i = 1; i < medias.length; i++) {
+            if (medias[i] !== null && medias[i - 1] !== null && medias[i]! > medias[i - 1]!) {
+                hasAnomaly = true;
+            }
+        }
+        if (hasAnomaly) {
+            hasError = true;
+            insights.push("📐 Anomalia Dimensional Grave: Detectado um aumento no diâmetro durante o fluxo de redução (o fio engrossou). Verifique imediatamente uma possível quebra no rolete ou montagem de K7 invertida.");
+        }
+
+        let hasSetupDeviant = false;
+        for (let i = 1; i <= 4; i++) {
+            const ideal = Number((reportData as any)[`k7_${i}_ideal`]);
+            const real = medias[i - 1];
+            if (ideal > 0 && real !== null && Math.abs(ideal - real) > 0.05) {
+                hasSetupDeviant = true;
+            }
+        }
+        if (hasSetupDeviant) {
+            hasError = true;
+            insights.push("🎯 Desvio de Setup Ideal: Um ou mais cassetes não entregaram a milimetragem planejada no Setup Ideal. Recomenda-se ajustar a aproximação dos rolos ou medir a ovalização na saída do K7 em questão.");
+        }
+
+        if (!hasError) {
+            return [{ type: 'success', text: "🎉 Análise da IA: Todo o lote atendeu rigorosamente aos padrões de qualidade. Setup de laminação e propriedades mecânicas trabalharam em perfeita harmonia. Produto 100% aprovado." }];
+        }
+
+        return insights.map(i => ({ type: 'error', text: i }));
+    };
+
+    const aiInsights = generateAiInsight();
+
     // Simple line chart component for the print version
     const ChartComponent = () => {
         const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -271,6 +327,19 @@ const LabReportModal: React.FC<LabReportModalProps> = ({ reportData, onClose }) 
                         <h3 className="text-lg font-black uppercase tracking-widest mb-2 border-b-2 border-dashed border-gray-300 pb-2">3. Fluxo de Redução</h3>
                         <div className="flex justify-center border border-black p-4 mb-8 bg-gray-50">
                             <ChartComponent />
+                        </div>
+
+                        {/* Diagnóstico de IA */}
+                        <h3 className="text-lg font-black uppercase tracking-widest mb-2 border-b-2 border-dashed border-gray-300 pb-2 flex justify-between items-center">
+                            <span>4. Parecer: Assistente Virtual (IA)</span>
+                            <span className="text-xs font-medium text-gray-500 normal-case tracking-normal border border-gray-300 px-2 py-0.5 rounded-full">Análise Algorítmica</span>
+                        </h3>
+                        <div className={`p-5 mb-8 border-2 ${aiInsights.some(i => i.type === 'error') ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                            {aiInsights.map((insight, idx) => (
+                                <p key={idx} className={`text-sm font-bold mb-3 last:mb-0 leading-relaxed ${insight.type === 'error' ? 'text-red-900' : 'text-emerald-900'}`}>
+                                    {insight.text}
+                                </p>
+                            ))}
                         </div>
 
                         {/* Spacer para empurrar assinaturas para baixo se houver espaço, mas aqui definimos margin top auto */}
