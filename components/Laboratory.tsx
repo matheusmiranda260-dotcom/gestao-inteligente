@@ -66,6 +66,7 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
     };
 
     const [form, setForm] = useState(initialForm);
+    const [aiDiagnosisMsg, setAiDiagnosisMsg] = useState<string>('');
 
     useEffect(() => {
         const load = async () => {
@@ -204,7 +205,7 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
             msg += `- Único passe esmagando ${((1 - finalReductionRatio) * 100).toFixed(1)}% do aço (Alerta de encruamento gravíssimo).`;
         }
 
-        alert(msg);
+        setAiDiagnosisMsg(msg);
     };
 
     const handleSave = async () => {
@@ -241,6 +242,7 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
             await insertItem('lab_analysis', newEntry);
             setEntries(prev => [newEntry, ...prev]);
             setForm(initialForm);
+            setAiDiagnosisMsg('');
             setStep(0);
             alert('Relatório de análise salvo e gerado com sucesso!');
         } catch (err) {
@@ -576,7 +578,7 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
             <div className="max-w-4xl mx-auto py-8">
                 {/* WIZARD HEADER */}
                 <div className="mb-8">
-                    <button onClick={() => setStep(0)} className="text-slate-400 font-bold text-sm flex items-center gap-2 hover:text-indigo-600 mb-6 transition">
+                    <button onClick={() => { setStep(0); setAiDiagnosisMsg(''); setForm(initialForm); }} className="text-slate-400 font-bold text-sm flex items-center gap-2 hover:text-indigo-600 mb-6 transition">
                         <ArrowLeftIcon className="h-4 w-4" /> Cancelar e Voltar
                     </button>
                     <div className="flex justify-between relative">
@@ -666,10 +668,22 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
                                         </div>
                                     </div>
                                 )}
+
+                                {aiDiagnosisMsg && (
+                                    <div className="bg-emerald-50 border-2 border-emerald-200 p-6 rounded-2xl mt-6 animate-fade-in-up">
+                                        <h4 className="font-black text-emerald-800 flex items-center gap-2 mb-3">
+                                            <span className="text-xl">🤖</span>
+                                            DIAGNÓSTICO METALÚRGICO DA IA
+                                        </h4>
+                                        <div className="text-emerald-900 font-medium text-sm leading-relaxed whitespace-pre-line">
+                                            {aiDiagnosisMsg}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="mt-12 flex justify-end">
-                                <button disabled={!canGoToStep2} onClick={() => setStep(2)} className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-4 px-10 rounded-xl text-lg transition shadow-lg shadow-indigo-200">
+                                <button disabled={!canGoToStep2} onClick={() => { setStep(2); setAiDiagnosisMsg(''); }} className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-4 px-10 rounded-xl text-lg transition shadow-lg shadow-indigo-200">
                                     Avançar
                                 </button>
                             </div>
