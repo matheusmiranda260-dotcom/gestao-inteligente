@@ -274,141 +274,176 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
         const H = rect.height;
         ctx.clearRect(0, 0, W, H);
 
-        // Build data points: MP + K7 averages
         const mpVal = bitolaMP;
-        const stages: { label: string; value: number | null; reduction: number | null }[] = [
-            { label: 'MP', value: mpVal, reduction: null },
+        const stages: { label: string; value: number | null; reduction: number | null; refLabel: string }[] = [
+            { label: 'MP', value: mpVal, reduction: null, refLabel: '' },
             ...formK7Medias.map((avg, i) => ({
                 label: `K7-${i + 1}`,
                 value: avg,
-                reduction: formK7Reducoes[i]
+                reduction: formK7Reducoes[i],
+                refLabel: i === 0 ? 'MP \u2192 K7-1' : `K7-${i} \u2192 K7-${i + 1}`
             }))
         ];
 
-        // Filter to only stages that have values
         const activeStages = stages.filter(s => s.value !== null && s.value > 0);
+        const activeReductions = activeStages.filter(s => s.reduction !== null);
 
         if (activeStages.length < 2) {
-            ctx.fillStyle = '#94a3b8';
-            ctx.font = '14px Inter, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText('Preencha os valores dos K7 para visualizar o fluxo', W / 2, H / 2);
+            ctx.fillStyle = '#94a3b8'; ctx.font = '14px Inter, sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText('Preencha os valores dos K7 para visualizar a precis\u00e3o do fluxo', W / 2, H / 2);
             return;
         }
 
-        const padL = 50, padR = 30, padT = 45, padB = 30;
-        const chartW = W - padL - padR;
-        const chartH = H - padT - padB;
+        const splitY = H * 0.45; // 45% top, 55% bottom
 
-        // Title
-        ctx.fillStyle = '#1e293b';
-        ctx.font = 'bold 13px Inter, sans-serif';
-        ctx.textAlign = 'left';
-        ctx.fillText('Fluxo de Redução — Diâmetro (mm)', padL, 18);
+        // ================== TOP PANEL: DIAMETER LINE ==================
+        const tPadL = 50, tPadR = 25, tPadT = 30, tPadB = 25;
+        const tChartW = W - tPadL - tPadR;
+        const tChartH = splitY - tPadT - tPadB;
+
+        ctx.fillStyle = '#1e293b'; ctx.font = 'bold 12px Inter, sans-serif'; ctx.textAlign = 'left';
+        ctx.fillText('\ud83d\udcc9 Di\u00e2metro (mm)', tPadL, 16);
 
         const values = activeStages.map(s => s.value as number);
-        // Tight scale for high sensitivity - only 2% padding
         const dataMax = Math.max(...values);
         const dataMin = Math.min(...values);
-        const dataRange = dataMax - dataMin || 0.5;
-        const maxVal = dataMax + dataRange * 0.08;
-        const minVal = Math.max(0, dataMin - dataRange * 0.08);
-        const range = maxVal - minVal || 1;
+        const dataRange = dataMax - dataMin || 0.3;
+        const tMaxVal = dataMax + dataRange * 0.08;
+        const tMinVal = Math.max(0, dataMin - dataRange * 0.08);
+        const tRange = tMaxVal - tMinVal || 1;
 
-        // More grid lines for precision (8 divisions)
-        const gridLines = 8;
-        ctx.strokeStyle = '#e2e8f0';
-        ctx.lineWidth = 1;
-        for (let i = 0; i <= gridLines; i++) {
-            const y = padT + (chartH / gridLines) * i;
-            ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
-            const val = maxVal - (range / gridLines) * i;
+        const tGridLines = 4;
+        ctx.strokeStyle = '#f1f5f9'; ctx.lineWidth = 1;
+        for (let i = 0; i <= tGridLines; i++) {
+            const y = tPadT + (tChartH / tGridLines) * i;
+            ctx.beginPath(); ctx.moveTo(tPadL, y); ctx.lineTo(W - tPadR, y); ctx.stroke();
+            const val = tMaxVal - (tRange / tGridLines) * i;
             ctx.fillStyle = '#94a3b8'; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
-            ctx.fillText(val.toFixed(2), padL - 6, y + 3);
+            ctx.fillText(val.toFixed(2), tPadL - 6, y + 4);
         }
 
-        // Calculate positions
         const positions = activeStages.map((s, i) => {
-            const x = padL + (activeStages.length > 1 ? (chartW / (activeStages.length - 1)) * i : chartW / 2);
-            const y = padT + chartH - (((s.value as number) - minVal) / range) * chartH;
+            const x = tPadL + (activeStages.length > 1 ? (tChartW / (activeStages.length - 1)) * i : tChartW / 2);
+            const y = tPadT + tChartH - (((s.value as number) - tMinVal) / tRange) * tChartH;
             return { x, y, ...s };
         });
 
-        // Draw gradient area fill
-        const gradient = ctx.createLinearGradient(0, padT, 0, padT + chartH);
-        gradient.addColorStop(0, 'rgba(99, 102, 241, 0.15)');
-        gradient.addColorStop(1, 'rgba(99, 102, 241, 0.02)');
+        const gradient = ctx.createLinearGradient(0, tPadT, 0, tPadT + tChartH);
+        gradient.addColorStop(0, 'rgba(99, 102, 241, 0.1)');
+        gradient.addColorStop(1, 'rgba(99, 102, 241, 0)');
         ctx.beginPath();
-        positions.forEach((p, i) => {
-            if (i === 0) ctx.moveTo(p.x, p.y);
-            else ctx.lineTo(p.x, p.y);
-        });
-        ctx.lineTo(positions[positions.length - 1].x, padT + chartH);
-        ctx.lineTo(positions[0].x, padT + chartH);
+        positions.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
+        ctx.lineTo(positions[positions.length - 1].x, tPadT + tChartH);
+        ctx.lineTo(positions[0].x, tPadT + tChartH);
         ctx.closePath();
-        ctx.fillStyle = gradient;
-        ctx.fill();
+        ctx.fillStyle = gradient; ctx.fill();
 
-        // Draw connecting lines
-        ctx.beginPath();
-        ctx.strokeStyle = '#6366f1';
-        ctx.lineWidth = 3;
-        ctx.lineJoin = 'round';
-        positions.forEach((p, i) => {
-            if (i === 0) ctx.moveTo(p.x, p.y);
-            else ctx.lineTo(p.x, p.y);
-        });
-        ctx.stroke();
-
-        // Draw reduction % between stages
         for (let i = 1; i < positions.length; i++) {
-            const prev = positions[i - 1];
-            const curr = positions[i];
-            const reduction = curr.reduction;
-            if (reduction === null) continue;
-
-            const midX = (prev.x + curr.x) / 2;
-            const midY = Math.min(prev.y, curr.y) - 18;
-
-            // Badge background
-            const text = `${reduction > 0 ? '-' : '+'}${Math.abs(reduction).toFixed(1)}%`;
-            ctx.font = 'bold 10px Inter, sans-serif';
-            const tw = ctx.measureText(text).width;
-            const bw = tw + 10, bh = 18;
-            const bx = midX - bw / 2, by = midY - bh / 2;
-
-            ctx.fillStyle = reduction > 0 ? '#dcfce7' : '#fee2e2';
-            ctx.strokeStyle = reduction > 0 ? '#86efac' : '#fca5a5';
-            ctx.lineWidth = 1;
+            const prev = positions[i - 1], curr = positions[i];
+            const isAnomaly = (curr.value as number) > (prev.value as number);
             ctx.beginPath();
-            ctx.roundRect(bx, by, bw, bh, 4);
-            ctx.fill(); ctx.stroke();
-
-            ctx.fillStyle = reduction > 0 ? '#15803d' : '#dc2626';
-            ctx.textAlign = 'center';
-            ctx.fillText(text, midX, midY + 4);
+            ctx.strokeStyle = isAnomaly ? '#ef4444' : '#6366f1';
+            ctx.lineWidth = isAnomaly ? 3 : 2.5;
+            ctx.setLineDash(isAnomaly ? [4, 4] : []);
+            ctx.moveTo(prev.x, prev.y); ctx.lineTo(curr.x, curr.y); ctx.stroke();
+            ctx.setLineDash([]);
         }
 
-        // Draw nodes
-        positions.forEach((p, i) => {
-            // Node circle
+        positions.forEach((p) => {
             const isMP = p.label === 'MP';
-            const nodeRadius = isMP ? 8 : 7;
-            ctx.beginPath(); ctx.arc(p.x, p.y, nodeRadius, 0, Math.PI * 2);
-            ctx.fillStyle = isMP ? '#f59e0b' : '#6366f1';
-            ctx.fill();
-            ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.stroke();
+            const nr = isMP ? 7 : 6;
+            ctx.beginPath(); ctx.arc(p.x, p.y, nr + 2, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill();
+            ctx.beginPath(); ctx.arc(p.x, p.y, nr, 0, Math.PI * 2);
+            ctx.fillStyle = isMP ? '#f59e0b' : '#6366f1'; ctx.fill();
+            ctx.strokeStyle = isMP ? '#fbbf24' : '#818cf8'; ctx.lineWidth = 1.5; ctx.stroke();
 
-            // Value above
-            ctx.fillStyle = '#1e293b';
-            ctx.font = 'bold 13px Inter, sans-serif';
-            ctx.textAlign = 'center';
+            ctx.fillStyle = '#0f172a'; ctx.font = 'bold 12px Inter, sans-serif'; ctx.textAlign = 'center';
             ctx.fillText((p.value as number).toFixed(2), p.x, p.y - 14);
+            ctx.fillStyle = isMP ? '#92400e' : '#3730a3'; ctx.font = 'bold 10px Inter, sans-serif';
+            ctx.fillText(p.label, p.x, tPadT + tChartH + 12);
+        });
 
-            // Label below
-            ctx.fillStyle = isMP ? '#b45309' : '#4338ca';
-            ctx.font = 'bold 11px Inter, sans-serif';
-            ctx.fillText(p.label, p.x, padT + chartH + 16);
+        // DIVIDER
+        ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(20, splitY); ctx.lineTo(W - 20, splitY); ctx.stroke();
+
+        // ================== BOTTOM PANEL: REDUCTION % BARS ==================
+        const bPadL = 50, bPadR = 25, bPadT = 25, bPadB = 30;
+        const bChartH = H - splitY - bPadT - bPadB;
+        const bChartW = W - bPadL - bPadR;
+        const bTop = splitY + bPadT;
+
+        ctx.fillStyle = '#1e293b'; ctx.font = 'bold 12px Inter, sans-serif'; ctx.textAlign = 'left';
+        ctx.fillText('\ud83d\udcca Taxa de Redu\u00e7\u00e3o (%)', bPadL, splitY + 14);
+
+        if (activeReductions.length === 0) return;
+
+        const reds = activeReductions.map(s => s.reduction as number);
+        const rMax = Math.max(...reds, 5);
+        const rMin = Math.min(...reds, 0);
+        const rRange = (rMax - rMin) || 10;
+        const barMaxVal = rMax + rRange * 0.2;
+        const barMinVal = Math.min(0, rMin - rRange * 0.1);
+        const barRange = barMaxVal - barMinVal || 10;
+
+        const bGridLines = 4;
+        for (let i = 0; i <= bGridLines; i++) {
+            const y = bTop + (bChartH / bGridLines) * i;
+            const val = barMaxVal - (barRange / bGridLines) * i;
+            ctx.strokeStyle = '#f1f5f9'; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(bPadL, y); ctx.lineTo(W - bPadR, y); ctx.stroke();
+            ctx.fillStyle = '#94a3b8'; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
+            ctx.fillText(val.toFixed(1) + '%', bPadL - 6, y + 4);
+        }
+
+        const baseY = bTop + bChartH - ((0 - barMinVal) / barRange) * bChartH;
+        if (barMinVal < 0) {
+            ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+            ctx.beginPath(); ctx.moveTo(bPadL, baseY); ctx.lineTo(W - bPadR, baseY); ctx.stroke(); ctx.setLineDash([]);
+            ctx.fillStyle = '#ef4444'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'left';
+            ctx.fillText('0%', bPadL + 2, baseY - 4);
+        }
+
+        const avgR = reds.reduce((a, b) => a + b, 0) / reds.length;
+        const avgY = bTop + bChartH - ((avgR - barMinVal) / barRange) * bChartH;
+        ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+        ctx.beginPath(); ctx.moveTo(bPadL, avgY); ctx.lineTo(W - bPadR, avgY); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = '#b45309'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'right';
+        ctx.fillText('\u00d8 ' + avgR.toFixed(1) + '%', W - bPadR, avgY - 4);
+
+        const barCount = activeReductions.length;
+        const totalBarSpace = bChartW * 0.7;
+        const barW = Math.min(50, totalBarSpace / barCount);
+        const barSpacing = (bChartW - barW * barCount) / (barCount + 1);
+
+        activeReductions.forEach((s, i) => {
+            const red = s.reduction as number;
+            const bx = bPadL + barSpacing * (i + 1) + barW * i;
+            const barTopY = bTop + bChartH - ((red - barMinVal) / barRange) * bChartH;
+            const bH = Math.abs(baseY - barTopY);
+
+            const isAnomaly = red <= 0;
+            const isLow = red > 0 && red < avgR * 0.6;
+            const barColor = isAnomaly ? '#fecaca' : isLow ? '#fef3c7' : '#dcfce7';
+            const barBorder = isAnomaly ? '#ef4444' : isLow ? '#f59e0b' : '#22c55e';
+
+            const bY = red >= 0 ? barTopY : baseY;
+            ctx.fillStyle = barColor; ctx.strokeStyle = barBorder; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.roundRect(bx, bY, barW, bH || 2, [3, 3, 0, 0]); ctx.fill(); ctx.stroke();
+
+            ctx.fillStyle = isAnomaly ? '#dc2626' : '#15803d';
+            ctx.font = 'bold 12px Inter, sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText(red.toFixed(1) + '%', bx + barW / 2, (red >= 0 ? barTopY - 6 : baseY + bH + 14));
+
+            if (isAnomaly) {
+                ctx.fillStyle = '#ef4444'; ctx.font = '14px sans-serif';
+                ctx.fillText('\u26a0', bx + barW / 2, barTopY - 18);
+            }
+
+            ctx.fillStyle = '#64748b'; ctx.font = '9px Inter, sans-serif';
+            ctx.fillText(s.refLabel, bx + barW / 2, bTop + bChartH + 12);
+            ctx.fillStyle = '#334155'; ctx.font = 'bold 10px Inter, sans-serif';
+            ctx.fillText(s.label, bx + barW / 2, bTop + bChartH + 24);
         });
     };
 
