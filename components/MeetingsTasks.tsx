@@ -503,58 +503,30 @@ const PautaSection: React.FC<{
                     {/* Add Item Form */}
                     <div className="bg-slate-50/80 rounded-xl p-3 space-y-2 border border-slate-100">
                         <div className="relative">
-                            <input
-                                type="text"
+                            <textarea
                                 value={newContent}
                                 onChange={(e) => setNewContent(e.target.value)}
                                 onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && newContent.trim()) {
-                                        onAddItem(newContent.trim(), assignedTo || undefined, dueDate || undefined);
+                                    if (e.key === 'Enter' && !e.shiftKey && newContent.trim()) {
+                                        e.preventDefault();
+                                        onAddItem(newContent.trim());
                                         setNewContent('');
-                                        setAssignedTo('');
-                                        setDueDate('');
                                     }
                                 }}
-                                placeholder="Adicionar item de melhoria..."
-                                className="w-full bg-white border border-slate-200 p-3 pr-10 rounded-xl font-bold text-slate-700 placeholder:text-slate-300 focus:border-indigo-500 outline-none transition-all text-[12px]"
+                                placeholder="Adicionar item de melhoria... (Shift+Enter para pular linha)"
+                                className="w-full bg-white border border-slate-200 p-3 pr-10 rounded-xl font-bold text-slate-700 placeholder:text-slate-300 focus:border-indigo-500 outline-none transition-all text-[12px] min-h-[64px] resize-y custom-scrollbar"
                             />
                             <button
                                 onClick={() => {
                                     if (newContent.trim()) {
-                                        onAddItem(newContent.trim(), assignedTo || undefined, dueDate || undefined);
+                                        onAddItem(newContent.trim());
                                         setNewContent('');
-                                        setAssignedTo('');
-                                        setDueDate('');
                                     }
                                 }}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 bg-indigo-600 rounded-lg flex items-center justify-center text-white hover:scale-110 active:scale-95 transition-all"
+                                className="absolute right-2 top-2 bg-indigo-600 rounded-lg flex items-center justify-center p-1.5 text-white hover:scale-110 active:scale-95 transition-all"
                             >
-                                <PlusIcon className="h-3 w-3" />
+                                <PlusIcon className="h-4 w-4" />
                             </button>
-                        </div>
-                        <div className="flex gap-2">
-                            <div className="relative flex-1">
-                                <select
-                                    value={assignedTo}
-                                    onChange={(e) => setAssignedTo(e.target.value)}
-                                    className="appearance-none w-full bg-white border border-slate-200 px-3 py-2 pl-8 rounded-lg font-black text-[9px] text-slate-400 focus:border-indigo-500 outline-none transition-all uppercase tracking-widest"
-                                >
-                                    <option value="">Responsável</option>
-                                    {employees.map(emp => (
-                                        <option key={emp.id} value={emp.name}>{emp.name}</option>
-                                    ))}
-                                </select>
-                                <UserIcon className="h-3.5 w-3.5 text-slate-300 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                            </div>
-                            <div className="relative flex-1">
-                                <input
-                                    type="date"
-                                    value={dueDate}
-                                    onChange={(e) => setDueDate(e.target.value)}
-                                    className="w-full bg-white border border-slate-200 px-3 py-2 pl-8 rounded-lg font-black text-[9px] text-slate-400 focus:border-indigo-500 outline-none transition-all uppercase tracking-widest"
-                                />
-                                <CalendarIcon className="h-3.5 w-3.5 text-slate-300 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                            </div>
                         </div>
                     </div>
 
@@ -567,40 +539,23 @@ const PautaSection: React.FC<{
                             return (
                                 <div key={item.id} className="bg-indigo-50/50 p-3 rounded-xl border-2 border-indigo-200 mt-2">
                                     <div className="space-y-2">
-                                        <input
-                                            type="text"
+                                        <textarea
                                             value={editItemContent}
                                             onChange={(e) => setEditItemContent(e.target.value)}
-                                            onKeyDown={(e) => e.key === 'Enter' && saveEditingItem()}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && !e.shiftKey) {
+                                                    e.preventDefault();
+                                                    saveEditingItem();
+                                                }
+                                            }}
                                             autoFocus
                                             placeholder="Descreva a melhoria..."
-                                            className="w-full bg-white border border-indigo-200 p-2 rounded-lg font-bold text-slate-700 text-[12px] outline-none"
+                                            className="w-full bg-white border border-indigo-200 p-2 rounded-lg font-bold text-slate-700 text-[12px] outline-none min-h-[64px] resize-y custom-scrollbar"
                                         />
-                                        <div className="flex gap-2">
-                                            <div className="relative flex-1">
-                                                <select
-                                                    value={editItemAssignedTo}
-                                                    onChange={(e) => setEditItemAssignedTo(e.target.value)}
-                                                    className="appearance-none w-full bg-white border border-indigo-200 px-3 py-1.5 pl-8 rounded-lg font-black text-[9px] text-slate-600 outline-none uppercase tracking-widest"
-                                                >
-                                                    <option value="">Responsável</option>
-                                                    {employees.map(emp => (
-                                                        <option key={emp.id} value={emp.name}>{emp.name}</option>
-                                                    ))}
-                                                </select>
-                                                <UserIcon className="h-3.5 w-3.5 text-indigo-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                                            </div>
-                                            <div className="relative flex-1">
-                                                <input
-                                                    type="date"
-                                                    value={editItemDueDate}
-                                                    onChange={(e) => setEditItemDueDate(e.target.value)}
-                                                    className="w-full bg-white border border-indigo-200 px-3 py-1.5 pl-8 rounded-lg font-black text-[9px] text-slate-600 outline-none uppercase tracking-widest"
-                                                />
-                                                <CalendarIcon className="h-3.5 w-3.5 text-indigo-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                                            </div>
-                                            <button onClick={saveEditingItem} className="bg-indigo-600 hover:bg-indigo-700 text-white p-1.5 rounded-lg transition-all" title="Salvar">
+                                        <div className="flex gap-2 justify-end">
+                                            <button onClick={saveEditingItem} className="bg-indigo-600 hover:bg-indigo-700 text-white p-1.5 rounded-lg transition-all flex items-center gap-1.5 px-3 text-[10px] font-black uppercase tracking-widest" title="Salvar">
                                                 <CheckCircleIcon className="h-4 w-4" />
+                                                Salvar
                                             </button>
                                             <button onClick={() => setEditingItemId(null)} className="bg-rose-100 hover:bg-rose-200 text-rose-600 p-1.5 rounded-lg transition-all" title="Cancelar">
                                                 <XIcon className="h-4 w-4" />
@@ -620,7 +575,7 @@ const PautaSection: React.FC<{
                                     <div className={`w-1.5 h-1.5 rounded-full scale-0 group-hover/item:scale-100 transition-all ${overdue ? 'bg-rose-500' : 'bg-indigo-500'}`} />
                                 </button>
                                 <div className="flex-1 min-w-0">
-                                    <p className="font-bold text-[12px] text-slate-700 leading-snug">{item.content}</p>
+                                    <p className="font-bold text-[12px] text-slate-700 leading-snug whitespace-pre-wrap">{item.content}</p>
                                     <div className="flex items-center gap-2 mt-1 flex-wrap">
                                         {item.assignedTo && (
                                             <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-500">
@@ -685,7 +640,7 @@ const PautaSection: React.FC<{
                                         <CheckCircleIcon className="h-3 w-3 text-white" />
                                     </button>
                                     <div className="flex-1 min-w-0">
-                                        <p className="font-bold text-[11px] text-slate-400 line-through leading-snug">{item.content}</p>
+                                        <p className="font-bold text-[11px] text-slate-400 line-through leading-snug whitespace-pre-wrap">{item.content}</p>
                                         {item.completedAt && (
                                             <span className="text-[8px] font-black text-emerald-500/60 uppercase tracking-widest">
                                                 Concluído em {formatDate(item.completedAt)}
