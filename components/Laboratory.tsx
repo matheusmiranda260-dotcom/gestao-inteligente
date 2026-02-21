@@ -130,68 +130,81 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
     const canGoToStep4 = (r !== null || a !== null || esc !== null); // Some traction data
 
     const handleAISuggestion = () => {
-        if (!form.bitola_mp || !form.bitola_saida_ideal) {
-            alert('A IA precisa saber a Bitola MP e a Bitola de Saída Esperada primeiro.');
+        if (!form.bitola_mp || !form.bitola_saida_ideal || !form.qtd_k7_ideal) {
+            alert('A IA precisa saber a Bitola MP, a Bitola de Saída Esperada e a Qtd de Laminadores (K7) para calcular o setup metalúrgico.');
             return;
         }
 
+        const mp = parseLocalNum(form.bitola_mp);
         const saidaEsperada = parseLocalNum(form.bitola_saida_ideal);
-        if (!saidaEsperada) {
-            alert('Digite uma bitola de saída esperada válida.');
+        const qtdK7 = parseInt(form.qtd_k7_ideal);
+
+        if (!mp || !saidaEsperada || qtdK7 <= 0) {
+            alert('Valores inválidos para cálculo.');
             return;
         }
 
-        // Search in history for successful tests that match the criteria
-        const successRuns = entries.filter(e => {
-            if (e.bitola_mp !== form.bitola_mp) return false;
-            const bFinal = calcBitola(Number(e.massa), Number(e.comprimento));
-            if (!bFinal) return false;
-            // Similar final dimension (+- 0.15mm tolerance for matching)
-            if (Math.abs(bFinal - saidaEsperada) > 0.15) return false;
-            // Passed minimum specs (Quality checked)
-            if (Number(e.escoamento) < 600 || Number(e.resistencia) < 660 || Number(e.alongamento) < 5) return false;
-
-            const k7_1 = calcK7Media(Number(e.k7_1_entrada), Number(e.k7_1_saida));
-            if (!k7_1) return false; // Needs at least 1 K7 to learn from
-
-            return true;
-        });
-
-        if (successRuns.length === 0) {
-            alert('A IA ainda não possui histórico de SUCESSO Aprovado o suficiente para esta combinação (MP => Saída). Tente estipular manualmente desta vez, e a IA aprenderá para as próximas!');
+        if (saidaEsperada >= mp) {
+            alert('A bitola de saída deve ser menor que a bitola da matéria-prima.');
             return;
         }
 
-        let sums = { k1: 0, k2: 0, k3: 0, k4: 0 };
-        let counts = { k1: 0, k2: 0, k3: 0, k4: 0 };
+        // Cálculo Baseado em Redução de Área (RA = 1 - (D_out / D_in)^2)
+        // Regra Metalúrgica Estipulada:
+        // Passes intermediários (1 a N-1): ~18-22% de redução
+        // Passe final (N): ~10-15% (refino/acabamento)
 
-        successRuns.forEach(r => {
-            const m1 = calcK7Media(Number(r.k7_1_entrada), Number(r.k7_1_saida));
-            if (m1) { sums.k1 += m1; counts.k1++; }
-            const m2 = calcK7Media(Number(r.k7_2_entrada), Number(r.k7_2_saida));
-            if (m2) { sums.k2 += m2; counts.k2++; }
-            const m3 = calcK7Media(Number(r.k7_3_entrada), Number(r.k7_3_saida));
-            if (m3) { sums.k3 += m3; counts.k3++; }
-            const m4 = calcK7Media(Number(r.k7_4_entrada), Number(r.k7_4_saida));
-            if (m4) { sums.k4 += m4; counts.k4++; }
-        });
+        const totalAreaRatio = Math.pow(saidaEsperada / mp, 2);
 
-        let activeK7s = 0;
-        if (counts.k1 > 0) activeK7s++;
-        if (counts.k2 > 0) activeK7s++;
-        if (counts.k3 > 0) activeK7s++;
-        if (counts.k4 > 0) activeK7s++;
+        // Alvo matemático para o passe final (média da meta: 12.5% de redução de área => 0.875 ratio)
+        let finalReductionRatio = 0.875;
+        if (qtdK7 === 1) {
+            finalReductionRatio = totalAreaRatio; // Se tem só 1 passe, ele faz o tranco inteiro
+        }
+
+        let interReductionRatio = 1;
+        if (qtdK7 > 1) {
+            // (interRatio ^ (qtdK7 - 1)) * finalRatio = totalAreaRatio
+            // interRatio = (totalAreaRatio / finalRatio) ^ (1 / (qtdK7 - 1))
+            interReductionRatio = Math.pow(totalAreaRatio / finalReductionRatio, 1 / (qtdK7 - 1));
+        }
+
+        const ideals = [];
+        let currentD = mp;
+
+        for (let i = 0; i < qtdK7; i++) {
+            const isFinal = (i === qtdK7 - 1);
+            const ratio = (isFinal && qtdK7 > 1) ? finalReductionRatio : interReductionRatio;
+
+            // Nova Área = Antiga Área * razão => Novo Diâmetro = Antigo Diâmetro * sqrt(razão)
+            currentD = currentD * Math.sqrt(ratio);
+
+            // Garante que o último seja cravado a saída esperada (evita dízima periódica/arredondamento)
+            if (isFinal) {
+                currentD = saidaEsperada;
+            }
+
+            ideals.push(currentD);
+        }
 
         setForm(prev => ({
             ...prev,
-            qtd_k7_ideal: String(activeK7s),
-            k7_1_ideal: counts.k1 > 0 ? (sums.k1 / counts.k1).toFixed(2).replace('.', ',') : '',
-            k7_2_ideal: counts.k2 > 0 ? (sums.k2 / counts.k2).toFixed(2).replace('.', ',') : '',
-            k7_3_ideal: counts.k3 > 0 ? (sums.k3 / counts.k3).toFixed(2).replace('.', ',') : '',
-            k7_4_ideal: counts.k4 > 0 ? (sums.k4 / counts.k4).toFixed(2).replace('.', ',') : '',
+            k7_1_ideal: ideals[0] ? ideals[0].toFixed(2).replace('.', ',') : '',
+            k7_2_ideal: ideals[1] ? ideals[1].toFixed(2).replace('.', ',') : '',
+            k7_3_ideal: ideals[2] ? ideals[2].toFixed(2).replace('.', ',') : '',
+            k7_4_ideal: ideals[3] ? ideals[3].toFixed(2).replace('.', ',') : '',
         }));
 
-        alert(`✨ IA analisou ${successRuns.length} teste(s) perfeitos do seu histórico e preencheu o melhor setup para essa bitola automaticamente!`);
+        let msg = `✨ A IA calculou o SETUP METALÚRGICO IDEAL com decréscimo progressivo!\n\n`;
+        if (qtdK7 > 1) {
+            msg += `- Passos Intermediários calc. p/ Área: ${((1 - interReductionRatio) * 100).toFixed(1)}%\n`;
+            msg += `- Passe Final (Acabamento) calc. p/ Área: ${((1 - finalReductionRatio) * 100).toFixed(1)}%\n\n`;
+            msg += `Dica de IA: O passe final com menor redução (10~15%) alivia a tração da máquina e previne encruamento severo, otimizando o Alongamento e Escoamento final da sua Mola/CA60.`;
+        } else {
+            msg += `- Único passe esmagando ${((1 - finalReductionRatio) * 100).toFixed(1)}% do aço (Alerta de encruamento gravíssimo).`;
+        }
+
+        alert(msg);
     };
 
     const handleSave = async () => {
