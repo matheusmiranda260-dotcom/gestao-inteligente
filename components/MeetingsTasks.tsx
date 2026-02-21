@@ -387,10 +387,11 @@ const PautaSection: React.FC<{
     onAddItem: (content: string, assignedTo?: string, dueDate?: string) => void;
     onToggleItem: (itemId: string) => void;
     onDeleteItem: (itemId: string) => void;
+    onEditItem: (itemId: string, content: string, assignedTo?: string, dueDate?: string) => void;
     onDeletePauta: () => void;
     onRenamePauta: (newName: string) => void;
     getEmployeeName: (idOrName: string) => string;
-}> = ({ pautaName, items, employees, onAddItem, onToggleItem, onDeleteItem, onDeletePauta, onRenamePauta, getEmployeeName }) => {
+}> = ({ pautaName, items, employees, onAddItem, onToggleItem, onDeleteItem, onEditItem, onDeletePauta, onRenamePauta, getEmployeeName }) => {
     const [isOpen, setIsOpen] = useState(true);
     const [newContent, setNewContent] = useState('');
     const [assignedTo, setAssignedTo] = useState('');
@@ -398,6 +399,24 @@ const PautaSection: React.FC<{
     const [isEditing, setIsEditing] = useState(false);
     const [editName, setEditName] = useState(pautaName);
     const [showCompleted, setShowCompleted] = useState(false);
+
+    const [editingItemId, setEditingItemId] = useState<string | null>(null);
+    const [editItemContent, setEditItemContent] = useState('');
+    const [editItemAssignedTo, setEditItemAssignedTo] = useState('');
+    const [editItemDueDate, setEditItemDueDate] = useState('');
+
+    const startEditingItem = (item: MeetingItem) => {
+        setEditingItemId(item.id);
+        setEditItemContent(item.content);
+        setEditItemAssignedTo(item.assignedTo || '');
+        setEditItemDueDate(item.dueDate || '');
+    };
+
+    const saveEditingItem = () => {
+        if (!editingItemId || !editItemContent.trim()) return;
+        onEditItem(editingItemId, editItemContent.trim(), editItemAssignedTo || undefined, editItemDueDate || undefined);
+        setEditingItemId(null);
+    };
 
     const pendingItems = items.filter(i => !i.completed);
     const completedItems = items.filter(i => i.completed);
@@ -544,6 +563,54 @@ const PautaSection: React.FC<{
                         const days = daysRemaining(item.dueDate);
                         const overdue = isOverdue(item.dueDate);
 
+                        if (editingItemId === item.id) {
+                            return (
+                                <div key={item.id} className="bg-indigo-50/50 p-3 rounded-xl border-2 border-indigo-200 mt-2">
+                                    <div className="space-y-2">
+                                        <input
+                                            type="text"
+                                            value={editItemContent}
+                                            onChange={(e) => setEditItemContent(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && saveEditingItem()}
+                                            autoFocus
+                                            placeholder="Descreva a melhoria..."
+                                            className="w-full bg-white border border-indigo-200 p-2 rounded-lg font-bold text-slate-700 text-[12px] outline-none"
+                                        />
+                                        <div className="flex gap-2">
+                                            <div className="relative flex-1">
+                                                <select
+                                                    value={editItemAssignedTo}
+                                                    onChange={(e) => setEditItemAssignedTo(e.target.value)}
+                                                    className="appearance-none w-full bg-white border border-indigo-200 px-3 py-1.5 pl-8 rounded-lg font-black text-[9px] text-slate-600 outline-none uppercase tracking-widest"
+                                                >
+                                                    <option value="">Responsável</option>
+                                                    {employees.map(emp => (
+                                                        <option key={emp.id} value={emp.name}>{emp.name}</option>
+                                                    ))}
+                                                </select>
+                                                <UserIcon className="h-3.5 w-3.5 text-indigo-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                                            </div>
+                                            <div className="relative flex-1">
+                                                <input
+                                                    type="date"
+                                                    value={editItemDueDate}
+                                                    onChange={(e) => setEditItemDueDate(e.target.value)}
+                                                    className="w-full bg-white border border-indigo-200 px-3 py-1.5 pl-8 rounded-lg font-black text-[9px] text-slate-600 outline-none uppercase tracking-widest"
+                                                />
+                                                <CalendarIcon className="h-3.5 w-3.5 text-indigo-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                                            </div>
+                                            <button onClick={saveEditingItem} className="bg-indigo-600 hover:bg-indigo-700 text-white p-1.5 rounded-lg transition-all" title="Salvar">
+                                                <CheckCircleIcon className="h-4 w-4" />
+                                            </button>
+                                            <button onClick={() => setEditingItemId(null)} className="bg-rose-100 hover:bg-rose-200 text-rose-600 p-1.5 rounded-lg transition-all" title="Cancelar">
+                                                <XIcon className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        }
+
                         return (
                             <div key={item.id} className={`group/item flex items-start gap-3 p-3 rounded-xl transition-all ${overdue ? 'bg-rose-50/60 border border-rose-100' : 'hover:bg-slate-50 border border-transparent'}`}>
                                 <button
@@ -575,12 +642,22 @@ const PautaSection: React.FC<{
                                         )}
                                     </div>
                                 </div>
-                                <button
-                                    onClick={() => onDeleteItem(item.id)}
-                                    className="opacity-0 group-hover/item:opacity-100 text-slate-300 hover:text-rose-500 p-1 transition-all flex-shrink-0"
-                                >
-                                    <XIcon className="h-3 w-3" />
-                                </button>
+                                <div className="opacity-0 group-hover/item:opacity-100 flex items-center transition-all flex-shrink-0">
+                                    <button
+                                        onClick={() => startEditingItem(item)}
+                                        className="text-slate-300 hover:text-indigo-500 p-1.5 transition-all"
+                                        title="Editar Item"
+                                    >
+                                        <PencilIcon className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                        onClick={() => onDeleteItem(item.id)}
+                                        className="text-slate-300 hover:text-rose-500 p-1.5 transition-all"
+                                        title="Excluir Item"
+                                    >
+                                        <XIcon className="h-3.5 w-3.5" />
+                                    </button>
+                                </div>
                             </div>
                         );
                     })}
@@ -724,6 +801,15 @@ const MeetingsTasks: React.FC<MeetingsTasksProps> = ({
     const deleteItem = (itemId: string) => {
         if (!gembaBoard) return;
         onUpdateMeeting(gembaBoard.id, { items: allItems.filter(item => item.id !== itemId) });
+    };
+
+    const handleEditItem = (itemId: string, content: string, assignedTo?: string, dueDate?: string) => {
+        if (!gembaBoard) return;
+        const newItems = allItems.map(item => {
+            if (item.id === itemId) return { ...item, content, assignedTo, dueDate };
+            return item;
+        });
+        onUpdateMeeting(gembaBoard.id, { items: newItems });
     };
 
     const deletePauta = (catId: string, pautaName: string) => {
@@ -931,6 +1017,7 @@ const MeetingsTasks: React.FC<MeetingsTasksProps> = ({
                                                 onAddItem={(content, assignedTo, dueDate) => handleAddItem(cat.id, pautaName, content, assignedTo, dueDate)}
                                                 onToggleItem={toggleItem}
                                                 onDeleteItem={deleteItem}
+                                                onEditItem={handleEditItem}
                                                 onDeletePauta={() => deletePauta(cat.id, pautaName)}
                                                 onRenamePauta={(newName) => renamePauta(cat.id, pautaName, newName)}
                                                 getEmployeeName={getEmployeeName}
