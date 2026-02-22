@@ -18,23 +18,22 @@ export async function extractLotDataFromImage(file: File) {
 
         const base64Image = await base64EncodedDataPromise;
 
-        const prompt = `Você é um leitor inteligente de etiquetas industriais e notas de materiais de produção.
-Analise a imagem fornecida com muita atenção. Tente extrair as informações de TODOS os lotes que encontrar (pode haver mais de um).
-Para cada lote, extraia:
-1. Lote Interno (Pode estar sob o nome de Lote, Lote Produto, Lote Master, etc)
-2. Lote Fornecedor (Pode estar como Lote Forn, Lote Origem, Lote Fabricante, ou simplesmente outro código de lote)
-3. Corrida (Normalmente um código alfanumérico com a descrição Corrida)
-4. Fornecedor (Nome da empresa, fabricante)
-5. Peso Líquido / Peso da Etiqueta em Kg (O peso em kg)
+        const prompt = `Você é um robô leitor especialista em etiquetas industriais (aço, arames, trefila).
+Sua tarefa é extrair os dados EXATOS das etiquetas na imagem com precisão máxima. Extraia a informação de TODOS os lotes que encontrar.
+Regras RIGOROSAS para cada campo:
+1. Lote Fornecedor (supplierLot): É o número de lote original de fábrica (fabricante). Costuma ter muitos números ou código de barras associado. Procure palavras como "Lote", "Lot", "Lote Forn".
+2. Lote Interno (internalLot): Normalmente é um código numérico ou curto adicionado na própria empresa no recebimento. Pode estar escrito à mão ou em etiqueta menor. Se só houver 1 (um) número de lote na etiqueta grande de fábrica, preencha apenas Lote Fornecedor (deixe o Lote Interno null).
+3. Corrida (runNumber): Procure estritamente pelas palavras "Corrida", "Heat", "Nº Corrida" ou "Cast". É um código alfanumérico que identifica a fundição do metal.
+4. Fornecedor (supplier): O nome da empresa que fabricou ou enviou o material (Ex: ArcelorMittal, Gerdau, Simec, etc). Fica no topo da etiqueta ou logotipo.
+5. Peso Líquido (labelWeight): O peso (KG). Ignore "Peso Bruto". Pegue APENAS o número do "Peso Líquido" ou "Net Weight". Use ponto para milhares/decimais se estiver claro (ex: 2150.5).
 
-Sua resposta DEVE ser ÚNICA E EXCLUSIVAMENTE um array (lista) em formato JSON válido, contendo objetos. Não inclua NADA mais em sua resposta. 
-Se você não encontrar um dado específico em um lote, coloque \`null\` para ele.
-Para o peso, forneça APENAS o NÚMERO, utilizando ponto (.) para casas decimais no padrão (ex: 2150.80).
+Sua resposta DEVE ser ÚNICA E EXCLUSIVAMENTE um array em formato JSON válido, contendo objetos. NÃO inclua nenhum tipo de texto antes ou depois do JSON. Não coloque crases (\`\`\`).
+Se não achar alguma informação em um lote específico, preencha com \`null\` (sem aspas).
 
 Formato EXATO esperado (SEMPRE um array, mesmo se só encontrar um lote):
 [
   {
-    "internalLot": "texto encontrado",
+    "internalLot": "texto ou null",
     "supplierLot": "texto encontrado",
     "runNumber": "texto",
     "labelWeight": 1500.5,
