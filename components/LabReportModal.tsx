@@ -35,7 +35,7 @@ const LabReportModal: React.FC<LabReportModalProps> = ({ reportData, onClose }) 
 
     const medias = [0, 1, 2, 3].map(i => calcK7Media(k7Entradas[i], k7Saidas[i]));
 
-    const bitolaMPNum = Number(reportData.bitola_mp?.replace(',', '.'));
+    const bitolaMPNum = Number(String(getV('bitola_mp') || '').replace(',', '.'));
 
     const reducoes = [0, 1, 2, 3].map(i => {
         const currentMedia = medias[i];
@@ -45,12 +45,12 @@ const LabReportModal: React.FC<LabReportModalProps> = ({ reportData, onClose }) 
         return (1 - Math.pow(currentMedia / prevDiameter, 2)) * 100;
     });
 
-    const relacao = (reportData.resistencia && reportData.escoamento && Number(reportData.escoamento) > 0)
-        ? (Number(reportData.resistencia) / Number(reportData.escoamento))
+    const relacao = (getV('resistencia') && getV('escoamento') && Number(getV('escoamento')) > 0)
+        ? (Number(getV('resistencia')) / Number(getV('escoamento')))
         : null;
 
-    const bitolaFinal = (reportData.massa && reportData.comprimento && Number(reportData.comprimento) > 0)
-        ? Math.sqrt(Number(reportData.massa) / Number(reportData.comprimento)) * 12.744
+    const bitolaFinal = (getV('massa') && getV('comprimento') && Number(getV('comprimento')) > 0)
+        ? Math.sqrt(Number(getV('massa')) / Number(getV('comprimento'))) * 12.744
         : null;
 
     const n = (v: any) => (v !== null && v !== undefined && !isNaN(Number(v))) ? Number(v).toFixed(2) : '—';
@@ -63,26 +63,26 @@ const LabReportModal: React.FC<LabReportModalProps> = ({ reportData, onClose }) 
             : { color: 'text-red-500', label: '⚠ REPROVADO' };
     };
 
-    const escStatus = checkValue(reportData.escoamento, 600);
-    const resStatus = checkValue(reportData.resistencia, 660);
-    const aloStatus = checkValue(reportData.alongamento, 5);
+    const escStatus = checkValue(getV('escoamento'), 600);
+    const resStatus = checkValue(getV('resistencia'), 660);
+    const aloStatus = checkValue(getV('alongamento'), 5);
     const relStatus = checkValue(relacao, 1.05);
-    const dateStr = reportData.date ? new Date(reportData.date).toLocaleDateString('pt-BR') : '—';
-    const timeStr = reportData.date ? new Date(reportData.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—';
+    const dateStr = getV('date') ? new Date(getV('date')).toLocaleDateString('pt-BR') : '—';
+    const timeStr = getV('date') ? new Date(getV('date')).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—';
 
     // Virtual AI Diagnosis
     const generateAiInsight = () => {
         const insights = [];
         let hasError = false;
 
-        const esc = Number(reportData.escoamento) || 0;
-        const res = Number(reportData.resistencia) || 0;
+        const esc = Number(getV('escoamento')) || 0;
+        const res = Number(getV('resistencia')) || 0;
         if (esc > 0 && res > 0 && (esc < 600 || res < 660)) {
             hasError = true;
             insights.push("⚙️ Tração/Escoamento Baixos: Possível desgaste prematuro nos roletes laminadores, excesso de lubrificação causando deslizamento, ou a matéria-prima (MP) possui teor de carbono inferior ao certificado.");
         }
 
-        const alo = Number(reportData.alongamento) || 0;
+        const alo = Number(getV('alongamento')) || 0;
         if (alo > 0 && alo < 5) {
             hasError = true;
             insights.push("⛓️ Extrema Fragilidade (< 5%): O material está quebradiço. Fio máquina com microfissuras internas ou redução agressiva em um único passe, encruando o fio além do limite mecânico suportado.");
@@ -130,8 +130,8 @@ const LabReportModal: React.FC<LabReportModalProps> = ({ reportData, onClose }) 
         const prompt = `Atue como um Engenheiro Metalúrgico Sênior, especialista em Laminação a Frio e Trefilação de fio máquina (aço baixo carbono). Estou com um problema de qualidade no meu processo.
 
 DADOS DA MATÉRIA PRIMA:
-- Bitola Fio Máquina: ${reportData.bitola_mp}mm
-- Fornecedor: ${reportData.fornecedor || 'Desconhecido'}
+- Bitola Fio Máquina: ${getV('bitola_mp')}mm
+- Fornecedor: ${getV('fornecedor') || 'Desconhecido'}
 
 SETUP DE REDUÇÃO (SAÍDA DOS CASSETES):
 - K7-1: ${medias[0] || 'N/A'} mm
@@ -140,9 +140,9 @@ SETUP DE REDUÇÃO (SAÍDA DOS CASSETES):
 - K7-4: ${medias[3] || 'N/A'} mm
 
 RESULTADOS DO ENSAIO FÍSICO (Falha):
-- Escoamento: ${reportData.escoamento || 'N/A'} MPa (Mínimo Exigido: 600)
-- Resistência: ${reportData.resistencia || 'N/A'} MPa (Mínimo Exigido: 660)
-- Alongamento: ${reportData.alongamento || 'N/A'}% (Mínimo Exigido: 5%)
+- Escoamento: ${getV('escoamento') || 'N/A'} MPa (Mínimo Exigido: 600)
+- Resistência: ${getV('resistencia') || 'N/A'} MPa (Mínimo Exigido: 660)
+- Alongamento: ${getV('alongamento') || 'N/A'}% (Mínimo Exigido: 5%)
 - Relação: ${relacao?.toFixed(3) || 'N/A'} (Mínimo: 1.05)
 
 DIAGNÓSTICO INTERNO NOSSO SINALIZOU:
@@ -268,7 +268,7 @@ Por favor, faça uma análise aprofundada baseada nos números acima.
                             </div>
                             <div className="text-right">
                                 <h2 className="text-3xl font-black uppercase text-gray-800">Relatório de Ensaio</h2>
-                                <p className="text-md font-bold mt-1">LOTE OFICIAL: <span className="text-xl bg-gray-200 px-2 rounded">{reportData.lote}</span></p>
+                                <p className="text-md font-bold mt-1">LOTE OFICIAL: <span className="text-xl bg-gray-200 px-2 rounded">{getV('lote')}</span></p>
                             </div>
                         </div>
 
@@ -276,7 +276,7 @@ Por favor, faça uma análise aprofundada baseada nos números acima.
                         <div className="grid grid-cols-5 gap-4 mb-8">
                             <div className="border border-black p-3">
                                 <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Operador</p>
-                                <p className="text-lg font-black uppercase">{reportData.operator || '—'}</p>
+                                <p className="text-lg font-black uppercase">{getV('operator') || '—'}</p>
                             </div>
                             <div className="border border-black p-3">
                                 <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Data / Hora</p>
@@ -284,15 +284,15 @@ Por favor, faça uma análise aprofundada baseada nos números acima.
                             </div>
                             <div className="border border-black p-3">
                                 <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Bitola MP</p>
-                                <p className="text-lg font-black">{reportData.bitola_mp} mm</p>
+                                <p className="text-lg font-black">{getV('bitola_mp')} mm</p>
                             </div>
                             <div className="border border-black p-3">
                                 <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Fornecedor</p>
-                                <p className="text-lg font-black">{reportData.fornecedor}</p>
+                                <p className="text-lg font-black">{getV('fornecedor')}</p>
                             </div>
                             <div className="border border-black p-3">
                                 <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Velocidade</p>
-                                <p className="text-lg font-black">{reportData.velocidade ? `${n(reportData.velocidade)} m/min` : '—'}</p>
+                                <p className="text-lg font-black">{getV('velocidade') ? `${n(getV('velocidade'))} m/min` : '—'}</p>
                             </div>
                         </div>
 
@@ -332,11 +332,11 @@ Por favor, faça uma análise aprofundada baseada nos números acima.
                                 <tbody>
                                     <tr>
                                         <th className="border border-black p-3 bg-gray-100 font-bold uppercase text-xs w-1/2">Massa (g)</th>
-                                        <td className="border border-black p-3 font-bold">{n(reportData.massa)}</td>
+                                        <td className="border border-black p-3 font-bold">{n(getV('massa'))}</td>
                                     </tr>
                                     <tr>
                                         <th className="border border-black p-3 bg-gray-100 font-bold uppercase text-xs">Comprimento (mm)</th>
-                                        <td className="border border-black p-3 font-bold">{n(reportData.comprimento)}</td>
+                                        <td className="border border-black p-3 font-bold">{n(getV('comprimento'))}</td>
                                     </tr>
                                     <tr>
                                         <th className="border border-black p-3 bg-gray-200 font-black uppercase text-sm">Bitola Final (mm)</th>
@@ -356,17 +356,17 @@ Por favor, faça uma análise aprofundada baseada nos números acima.
                                 <tbody>
                                     <tr>
                                         <th className="border border-black p-2 bg-gray-100 font-bold uppercase text-xs">Escoamento <span className="text-[9px] font-normal text-gray-500 block">Mín: 600 MPa</span></th>
-                                        <td className={`border border-black p-2 font-bold text-center ${escStatus.color}`}>{n(reportData.escoamento)}</td>
+                                        <td className={`border border-black p-2 font-bold text-center ${escStatus.color}`}>{n(getV('escoamento'))}</td>
                                         <td className={`border border-black p-2 font-bold text-xs text-center ${escStatus.color}`}>{escStatus.label}</td>
                                     </tr>
                                     <tr>
                                         <th className="border border-black p-2 bg-gray-100 font-bold uppercase text-xs">Resistência <span className="text-[9px] font-normal text-gray-500 block">Mín: 660 MPa</span></th>
-                                        <td className={`border border-black p-2 font-bold text-center ${resStatus.color}`}>{n(reportData.resistencia)}</td>
+                                        <td className={`border border-black p-2 font-bold text-center ${resStatus.color}`}>{n(getV('resistencia'))}</td>
                                         <td className={`border border-black p-2 font-bold text-xs text-center ${resStatus.color}`}>{resStatus.label}</td>
                                     </tr>
                                     <tr>
                                         <th className="border border-black p-2 bg-gray-100 font-bold uppercase text-xs">Alongamento <span className="text-[9px] font-normal text-gray-500 block">Mín: 5%</span></th>
-                                        <td className={`border border-black p-2 font-bold text-center ${aloStatus.color}`}>{n(reportData.alongamento)}</td>
+                                        <td className={`border border-black p-2 font-bold text-center ${aloStatus.color}`}>{n(getV('alongamento'))}</td>
                                         <td className={`border border-black p-2 font-bold text-xs text-center ${aloStatus.color}`}>{aloStatus.label}</td>
                                     </tr>
                                     <tr>
