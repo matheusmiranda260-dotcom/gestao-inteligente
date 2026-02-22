@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Page, StockItem, ConferenceData, ConferenceLotData, Bitola, MaterialType, TransferRecord, ProductionOrderData, StockGauge, User } from '../types';
 import { MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions } from '../types';
+import { extractLotDataFromImage } from '../services/geminiService';
 import { ArrowLeftIcon, PencilIcon, TrashIcon, WarningIcon, BookOpenIcon, TruckIcon, DocumentReportIcon, PrinterIcon, LockOpenIcon, ClipboardListIcon, ChartBarIcon, XCircleIcon, ArchiveIcon, LocationOffIcon, CheckCircleIcon, ScaleIcon, AdjustmentsIcon, SearchIcon, ExclamationIcon, CogIcon, CameraIcon } from './icons';
 
 import LotHistoryModal from './LotHistoryModal';
@@ -139,24 +140,33 @@ const AddConferencePage: React.FC<{
         }]);
     };
 
-    const handleSimulateScan = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleSimulateScan = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
         setScanningLot(index);
 
-        // Simulação de delay da Inteligência Artificial lendo a imagem
-        setTimeout(() => {
-            handleLotChange(index, 'internalLot', `LOTE-IA-${Math.floor(Math.random() * 1000)}`);
-            handleLotChange(index, 'supplierLot', `FORN-${Math.floor(Math.random() * 10000)}`);
-            handleLotChange(index, 'runNumber', `RUN${Math.floor(Math.random() * 1000)}`);
-            handleLotChange(index, 'labelWeight', 2000 + Math.floor(Math.random() * 200));
-            handleLotChange(index, 'scaleWeight', 2000 + Math.floor(Math.random() * 200));
+        try {
+            const extractedData = await extractLotDataFromImage(file);
 
-            // FIXME: Apenas para teste local / aviso para implementação real do GPT Vision
-            alert('Leitura da Etiqueta Simulada por Inteligência Artificial concluída (A integração real enviará esta foto para reconhecimento via API). Verifique os dados inseridos.');
+            if (extractedData.internalLot) handleLotChange(index, 'internalLot', extractedData.internalLot);
+            if (extractedData.supplierLot) handleLotChange(index, 'supplierLot', extractedData.supplierLot);
+            if (extractedData.runNumber) handleLotChange(index, 'runNumber', String(extractedData.runNumber));
+            if (extractedData.supplier) handleLotChange(index, 'supplier', extractedData.supplier);
+
+            if (extractedData.labelWeight) {
+                handleLotChange(index, 'labelWeight', Number(extractedData.labelWeight));
+                handleLotChange(index, 'scaleWeight', Number(extractedData.labelWeight));
+            }
+
+            alert('✅ Leitura por Inteligência Artificial concluída! Por favor, verifique os dados no formulário.');
+        } catch (error) {
+            console.error("Falha ao usar IA do Gemini", error);
+            alert('Falha ao processar a imagem com a Inteligência Artificial. Verifique sua conexão ou tente outra imagem mais nítida.');
+        } finally {
             setScanningLot(null);
-        }, 2500);
+            e.target.value = ''; // Reseta o input para permitir nova foto
+        }
     };
 
     const handleLotChange = (index: number, field: keyof ConferenceLotData, value: string | number) => {
