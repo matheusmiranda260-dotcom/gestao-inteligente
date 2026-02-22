@@ -152,11 +152,18 @@ const AddConferencePage: React.FC<{
             if (extractedArray && extractedArray.length > 0) {
                 const newLotsData = extractedArray.map((extractedData: any) => {
                     const defaultMaterial = lots.length > 0 ? (lots[lots.length - 1]?.materialType || 'Fio Máquina') : 'Fio Máquina';
+
+                    // Tratamento para garantir que bitola convertida da IA bata com a string no sistema (Ex: "5.5" -> "5,5")
+                    let parsedBitola = extractedData.bitola;
+                    if (parsedBitola) {
+                        parsedBitola = parsedBitola.replace('.', ',');
+                    }
+
                     return {
                         internalLot: extractedData.internalLot || '',
                         supplierLot: extractedData.supplierLot || '',
                         runNumber: String(extractedData.runNumber || ''),
-                        bitola: getInitialBitola(defaultMaterial),
+                        bitola: parsedBitola || getInitialBitola(defaultMaterial),
                         materialType: defaultMaterial,
                         labelWeight: Number(extractedData.labelWeight) || 0,
                         scaleWeight: Number(extractedData.labelWeight) || 0,

@@ -25,7 +25,8 @@ Regras RIGOROSAS para cada campo:
 2. Lote Interno (internalLot): Normalmente é um código numérico ou curto adicionado na própria empresa no recebimento. Pode estar escrito à mão ou em etiqueta menor. Se só houver 1 (um) número de lote na etiqueta grande de fábrica, preencha apenas Lote Fornecedor (deixe o Lote Interno null).
 3. Corrida (runNumber): Procure estritamente pelas palavras "Corrida", "Heat", "Nº Corrida" ou "Cast". É um código alfanumérico que identifica a fundição do metal.
 4. Fornecedor (supplier): O nome da empresa que fabricou ou enviou o material (Ex: ArcelorMittal, Gerdau, Simec, etc). Fica no topo da etiqueta ou logotipo.
-5. Peso Líquido (labelWeight): O peso (KG). Ignore "Peso Bruto". Pegue APENAS o número do "Peso Líquido" ou "Net Weight". Use ponto para milhares/decimais se estiver claro (ex: 2150.5).
+5. Bitola / Diâmetro (bitola): A grossura do fio de aço, arame ou vergalhão, normalmente em milímetros (mm). Procure por "Bitola", "Diam", "Size" ou "Ø". Exemplo: 5.5, 6.0, 12.5. Retorne isso em formato numérico como String (ex: "5.5" ou "6.0").
+6. Peso Líquido (labelWeight): O peso (KG). Ignore "Peso Bruto". Pegue APENAS o número do "Peso Líquido" ou "Net Weight". Cuidado para não confundir o peso líquido com o peso bruto ou quantidade de peças. Use ponto para decimais (ex: 2150.5).
 
 Sua resposta DEVE ser ÚNICA E EXCLUSIVAMENTE um array em formato JSON válido, contendo objetos. NÃO inclua nenhum tipo de texto antes ou depois do JSON. Não coloque crases (\`\`\`).
 Se não achar alguma informação em um lote específico, preencha com \`null\` (sem aspas).
@@ -36,6 +37,7 @@ Formato EXATO esperado (SEMPRE um array, mesmo se só encontrar um lote):
     "internalLot": "texto ou null",
     "supplierLot": "texto encontrado",
     "runNumber": "texto",
+    "bitola": "texto",
     "labelWeight": 1500.5,
     "supplier": "texto do fornecedor"
   }
@@ -85,6 +87,7 @@ Formato EXATO esperado (SEMPRE um array, mesmo se só encontrar um lote):
             supplierLot: data.supplierLot,
             runNumber: data.runNumber,
             labelWeight: typeof data.labelWeight === 'number' ? data.labelWeight : (parseFloat(data.labelWeight) || null),
+            bitola: typeof data.bitola === 'number' ? data.bitola.toString() : (data.bitola || null),
             supplier: data.supplier
         }));
 
