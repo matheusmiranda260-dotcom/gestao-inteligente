@@ -18,30 +18,39 @@ export async function extractLotDataFromImage(file: File) {
 
         const base64Image = await base64EncodedDataPromise;
 
-        const prompt = `Você é um robô leitor especialista em etiquetas industriais (aço, arames, trefila).
-Sua tarefa é extrair os dados EXATOS das etiquetas na imagem com precisão máxima. Extraia a informação de TODOS os lotes que encontrar.
+        const prompt = `Você é um robô leitor especialista em etiquetas industriais (aço, arames, trefila) e romaneios.
+Sua tarefa é extrair os dados EXATOS com precisão máxima.
 Regras RIGOROSAS para cada campo:
 1. Lote Fornecedor (supplierLot): É o número de lote original de fábrica (fabricante). Costuma ter muitos números ou código de barras associado. Procure palavras como "Lote", "Lot", "Lote Forn".
-2. Lote Interno (internalLot): Normalmente é um código numérico ou curto adicionado na própria empresa no recebimento. Pode estar escrito à mão ou em etiqueta menor. Se só houver 1 (um) número de lote na etiqueta grande de fábrica, preencha apenas Lote Fornecedor (deixe o Lote Interno null).
-3. Corrida (runNumber): Procure estritamente pelas palavras "Corrida", "Heat", "Nº Corrida" ou "Cast". É um código alfanumérico que identifica a fundição do metal.
-4. Fornecedor (supplier): O nome da empresa que fabricou ou enviou o material (Ex: ArcelorMittal, Gerdau, Simec, etc). Fica no topo da etiqueta ou logotipo.
-5. Bitola / Diâmetro (bitola): A grossura do fio de aço, arame ou vergalhão, normalmente em milímetros (mm). Procure por "Bitola", "Diam", "Size" ou "Ø". Exemplo: 5.5, 6.0, 12.5. Retorne isso em formato numérico como String (ex: "5.5" ou "6.0").
-6. Peso Líquido (labelWeight): O peso (KG). Ignore "Peso Bruto". Pegue APENAS o número do "Peso Líquido" ou "Net Weight". Cuidado para não confundir o peso líquido com o peso bruto ou quantidade de peças. Use ponto para decimais (ex: 2150.5).
+2. Lote Interno (internalLot): Se não houver, coloque \`null\`.
+3. Corrida (runNumber): Procure estritamente pelas palavras "Corrida", "Heat", "Nº Corrida" ou "Cast". Identifica a fundição do metal.
+4. Fornecedor (supplier): O nome da empresa que fabricou ou enviou o material (Ex: ArcelorMittal, Gerdau, Simec, etc). Fica no topo da etiqueta ou logotipo. Ignore números como "1008" ou "1006" neste campo (esses são qualidades do aço).
+5. Bitola / Diâmetro (bitola): A grossura em milímetros. Exemplo: 5.5, 6.0, 12.5. Retorne isso em formato numérico como String (ex: "5.5" ou "6.0").
+6. Peso Líquido (labelWeight): O peso (KG). Ignore "Peso Bruto". Pegue APENAS o número do "Peso Líquido" ou "Net Weight". Use ponto para decimais (ex: 2150.5).
 
-Sua resposta DEVE ser ÚNICA E EXCLUSIVAMENTE um array em formato JSON válido, contendo objetos. NÃO inclua nenhum tipo de texto antes ou depois do JSON. Não coloque crases (\`\`\`).
-Se não achar alguma informação em um lote específico, preencha com \`null\` (sem aspas).
+[NOVAS INSTRUÇÕES GLOBAIS]
+Verifique se na imagem constam também as seguintes informações gerais do documento:
+- nfe: Número da Nota Fiscal (NF, NFe, Nota Fiscal Eletrônica).
+- conferenceNumber: Algum número de Conferência ou Romaneio visível.
 
-Formato EXATO esperado (SEMPRE um array, mesmo se só encontrar um lote):
-[
-  {
-    "internalLot": "texto ou null",
-    "supplierLot": "texto encontrado",
-    "runNumber": "texto",
-    "bitola": "texto",
-    "labelWeight": 1500.5,
-    "supplier": "texto do fornecedor"
-  }
-]`;
+Sua resposta DEVE ser ÚNICA E EXCLUSIVAMENTE um objeto JSON válido. NÃO inclua nenhum tipo de texto antes ou depois do JSON. Não coloque crases (\`\`\`).
+Se não achar alguma informação, preencha com \`null\` (sem aspas).
+
+Formato EXATO esperado (SEMPRE UM ÚNICO OBJETO JSON com a propriedade "lots" sendo um array):
+{
+  "nfe": "texto ou null",
+  "conferenceNumber": "texto ou null",
+  "lots": [
+    {
+      "internalLot": "texto ou null",
+      "supplierLot": "texto encontrado",
+      "runNumber": "texto",
+      "bitola": "texto",
+      "labelWeight": 1500.5,
+      "supplier": "texto do fornecedor"
+    }
+  ]
+}`;
 
         const requestBody = {
             contents: [
@@ -79,10 +88,22 @@ Formato EXATO esperado (SEMPRE um array, mesmo se só encontrar um lote):
 
         const parsedData = JSON.parse(textResult);
 
-        // Garante que é array
-        const dataArray = Array.isArray(parsedData) ? parsedData : [parsedData];
+        // Suporta tanto o formato antigo (array direto) quanto o novo (objeto com NFe e lots)
+        let nfe = null;
+        let conferenceNumber = null;
+        let dataArray = [];
 
-        return dataArray.map((data: any) => ({
+        if (Array.isArray(parsedData)) {
+            dataArray = parsedData;
+        } else if (parsedData && parsedData.lots) {
+            nfe = parsedData.nfe;
+            conferenceNumber = parsedData.conferenceNumber;
+            dataArray = Array.isArray(parsedData.lots) ? parsedData.lots : [];
+        } else if (parsedData) {
+            dataArray = [parsedData];
+        }
+
+        const lotsData = dataArray.map((data: any) => ({
             internalLot: data.internalLot,
             supplierLot: data.supplierLot,
             runNumber: data.runNumber,
@@ -90,6 +111,12 @@ Formato EXATO esperado (SEMPRE um array, mesmo se só encontrar um lote):
             bitola: typeof data.bitola === 'number' ? data.bitola.toString() : (data.bitola || null),
             supplier: data.supplier
         }));
+
+        return {
+            nfe,
+            conferenceNumber,
+            lots: lotsData
+        };
 
     } catch (error) {
         console.error("Erro na leitura da imagem:", error);

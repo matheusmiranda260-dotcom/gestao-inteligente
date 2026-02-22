@@ -147,10 +147,18 @@ const AddConferencePage: React.FC<{
         setIsScanning(true);
 
         try {
-            const extractedArray = await extractLotDataFromImage(file);
+            const extractedResult = await extractLotDataFromImage(file);
 
-            if (extractedArray && extractedArray.length > 0) {
-                const newLotsData = extractedArray.map((extractedData: any) => {
+            if (extractedResult.nfe || extractedResult.conferenceNumber) {
+                setConferenceData(prev => ({
+                    ...prev,
+                    nfe: extractedResult.nfe || prev.nfe,
+                    conferenceNumber: extractedResult.conferenceNumber || prev.conferenceNumber
+                }));
+            }
+
+            if (extractedResult.lots && extractedResult.lots.length > 0) {
+                const newLotsData = extractedResult.lots.map((extractedData: any) => {
                     const defaultMaterial = lots.length > 0 ? (lots[lots.length - 1]?.materialType || 'Fio Máquina') : 'Fio Máquina';
 
                     // Tratamento para garantir que bitola convertida da IA bata com a string no sistema (Ex: "5.5" -> "5,5")
@@ -166,7 +174,7 @@ const AddConferencePage: React.FC<{
                         bitola: parsedBitola || getInitialBitola(defaultMaterial),
                         materialType: defaultMaterial,
                         labelWeight: Number(extractedData.labelWeight) || 0,
-                        scaleWeight: Number(extractedData.labelWeight) || 0,
+                        scaleWeight: 0, // Inicia zerado, não copia etiqueta
                         supplier: extractedData.supplier || conferenceData.supplier
                     };
                 });
@@ -178,9 +186,9 @@ const AddConferencePage: React.FC<{
                 } else {
                     setLots(prev => [...prev, ...newLotsData]);
                 }
-                alert(`✅ Leitura concluída! ${extractedArray.length} lote(s) detectado(s). Por favor, verifique os dados importados.`);
+                alert(`✅ Leitura concluída! ${extractedResult.lots.length} lote(s) detectado(s). Por favor, verifique os dados importados.`);
             } else {
-                alert('Nenhum dado de lote foi encontrado na imagem.');
+                alert('Nenhum dado de lote foi encontrado na imagem. Verifique se pegou a NFe corretamente.');
             }
 
         } catch (error) {
