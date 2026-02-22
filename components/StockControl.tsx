@@ -55,7 +55,7 @@ const AddConferencePage: React.FC<{
         conferenceNumber: '',
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [scanningLot, setScanningLot] = useState<number | null>(null);
+    const [isScanning, setIsScanning] = useState(false);
 
     // Initial bitola depends on default material
     const getInitialBitola = (material: string) => {
@@ -140,32 +140,48 @@ const AddConferencePage: React.FC<{
         }]);
     };
 
-    const handleSimulateScan = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleGlobalScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        setScanningLot(index);
+        setIsScanning(true);
 
         try {
-            const extractedData = await extractLotDataFromImage(file);
+            const extractedArray = await extractLotDataFromImage(file);
 
-            if (extractedData.internalLot) handleLotChange(index, 'internalLot', extractedData.internalLot);
-            if (extractedData.supplierLot) handleLotChange(index, 'supplierLot', extractedData.supplierLot);
-            if (extractedData.runNumber) handleLotChange(index, 'runNumber', String(extractedData.runNumber));
-            if (extractedData.supplier) handleLotChange(index, 'supplier', extractedData.supplier);
+            if (extractedArray && extractedArray.length > 0) {
+                const newLotsData = extractedArray.map((extractedData: any) => {
+                    const defaultMaterial = lots.length > 0 ? (lots[lots.length - 1]?.materialType || 'Fio Máquina') : 'Fio Máquina';
+                    return {
+                        internalLot: extractedData.internalLot || '',
+                        supplierLot: extractedData.supplierLot || '',
+                        runNumber: String(extractedData.runNumber || ''),
+                        bitola: getInitialBitola(defaultMaterial),
+                        materialType: defaultMaterial,
+                        labelWeight: Number(extractedData.labelWeight) || 0,
+                        scaleWeight: Number(extractedData.labelWeight) || 0,
+                        supplier: extractedData.supplier || conferenceData.supplier
+                    };
+                });
 
-            if (extractedData.labelWeight) {
-                handleLotChange(index, 'labelWeight', Number(extractedData.labelWeight));
-                handleLotChange(index, 'scaleWeight', Number(extractedData.labelWeight));
+                const currentLotsHaveData = lots.some(l => l.internalLot || l.supplierLot || l.runNumber || (l.labelWeight && l.labelWeight > 0));
+
+                if (!currentLotsHaveData && lots.length <= 1) {
+                    setLots(newLotsData);
+                } else {
+                    setLots(prev => [...prev, ...newLotsData]);
+                }
+                alert(`✅ Leitura concluída! ${extractedArray.length} lote(s) detectado(s). Por favor, verifique os dados importados.`);
+            } else {
+                alert('Nenhum dado de lote foi encontrado na imagem.');
             }
 
-            alert('✅ Leitura por Inteligência Artificial concluída! Por favor, verifique os dados no formulário.');
         } catch (error) {
             console.error("Falha ao usar IA do Gemini", error);
             alert('Falha ao processar a imagem com a Inteligência Artificial. Verifique sua conexão ou tente outra imagem mais nítida.');
         } finally {
-            setScanningLot(null);
-            e.target.value = ''; // Reseta o input para permitir nova foto
+            setIsScanning(false);
+            e.target.value = ''; // Reseta o input
         }
     };
 
@@ -308,6 +324,27 @@ const AddConferencePage: React.FC<{
                             <input type="text" value={conferenceData.conferenceNumber} onChange={e => setConferenceData({ ...conferenceData, conferenceNumber: e.target.value })} className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F3F5C] outline-none shadow-sm" placeholder="CONF-XXXX" required />
                         </div>
                     </div>
+
+                    {/* Botão Global de IA */}
+                    <div className="mt-6 flex justify-end">
+                        <div className="relative">
+                            <input
+                                type="file"
+                                accept="image/*"
+                                capture="environment"
+                                className="hidden"
+                                id="scan-global"
+                                onChange={handleGlobalScan}
+                            />
+                            <label
+                                htmlFor="scan-global"
+                                className={`py-3 px-6 rounded-lg font-bold transition border border-transparent flex items-center gap-2 cursor-pointer shadow-md ${isScanning ? 'bg-blue-100 text-blue-600 animate-pulse' : 'bg-gradient-to-r from-emerald-600 to-[#0F3F5C] text-white hover:opacity-90 hover:-translate-y-0.5'}`}
+                            >
+                                <CameraIcon className="h-6 w-6" />
+                                <span>{isScanning ? 'Processando Documento/Foto com IA...' : 'Ler Etiqueta(s) com Inteligência Artificial'}</span>
+                            </label>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Lots Table/List Section */}
@@ -373,26 +410,7 @@ const AddConferencePage: React.FC<{
                                             </td>
 
                                             <td className="p-3 align-top text-center">
-                                                <div className="flex flex-col gap-2 items-center">
-                                                    <div>
-                                                        <input
-                                                            type="file"
-                                                            accept="image/*"
-                                                            capture="environment"
-                                                            className="hidden"
-                                                            id={'scan-desktop-' + index}
-                                                            onChange={(e) => handleSimulateScan(index, e)}
-                                                        />
-                                                        <label
-                                                            htmlFor={'scan-desktop-' + index}
-                                                            className={`p-2 rounded-lg transition border border-transparent flex items-center justify-center cursor-pointer shadow-sm ${scanningLot === index ? 'bg-blue-100 text-blue-600 animate-pulse' : 'bg-[#0F3F5C] text-white hover:bg-[#0A2A3D]'}`}
-                                                            title="Escanear Etiqueta com IA"
-                                                        >
-                                                            <CameraIcon className="h-4 w-4" />
-                                                        </label>
-                                                    </div>
-                                                    <button type="button" onClick={() => handleRemoveLot(index)} className="p-2 text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition border border-red-100 shadow-sm"><TrashIcon className="h-4 w-4" /></button>
-                                                </div>
+                                                <button type="button" onClick={() => handleRemoveLot(index)} className="p-2 text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition border border-red-100 shadow-sm"><TrashIcon className="h-5 w-5" /></button>
                                             </td>
                                         </tr>
                                     )
@@ -421,23 +439,6 @@ const AddConferencePage: React.FC<{
                             return (
                                 <div key={index} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 relative">
                                     <div className="absolute top-4 right-4 flex gap-2">
-                                        <div>
-                                            <input
-                                                type="file"
-                                                accept="image/*"
-                                                capture="environment"
-                                                className="hidden"
-                                                id={'scan-mobile-' + index}
-                                                onChange={(e) => handleSimulateScan(index, e)}
-                                            />
-                                            <label
-                                                htmlFor={'scan-mobile-' + index}
-                                                className={`p-2 rounded-lg transition border border-transparent flex items-center justify-center cursor-pointer shadow-sm ${scanningLot === index ? 'bg-blue-100 text-blue-600 animate-pulse' : 'bg-[#0F3F5C] text-white hover:bg-[#0A2A3D]'}`}
-                                                title="Escanear Etiqueta com IA"
-                                            >
-                                                <CameraIcon className="h-5 w-5" />
-                                            </label>
-                                        </div>
                                         <button type="button" onClick={() => handleRemoveLot(index)} className="text-red-500 bg-red-50 p-2 rounded-lg hover:bg-red-100 shadow-sm">
                                             <TrashIcon className="h-5 w-5" />
                                         </button>
