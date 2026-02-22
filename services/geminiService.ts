@@ -26,7 +26,8 @@ Regras RIGOROSAS para cada campo:
 3. Corrida (runNumber): Procure estritamente pelas palavras "Corrida", "Heat", "Nº Corrida" ou "Cast". Identifica a fundição do metal.
 4. Fornecedor (supplier): O nome da empresa que fabricou ou enviou o material (Ex: ArcelorMittal, Gerdau, Simec, etc). Fica no topo da etiqueta ou logotipo. Ignore números como "1008" ou "1006" neste campo (esses são qualidades do aço).
 5. Bitola / Diâmetro (bitola): A grossura em milímetros. Exemplo: 5.5, 6.0, 12.5. Retorne isso em formato numérico como String (ex: "5.5" ou "6.0").
-6. Peso Líquido (labelWeight): O peso (KG). Ignore "Peso Bruto". Pegue APENAS o número do "Peso Líquido" ou "Net Weight". Use ponto para decimais (ex: 2150.5).
+6. Peso Líquido (labelWeight): O peso original na etiqueta de fábrica ou romaneio do fornecedor (KG). Ignore "Peso Bruto". Pegue APENAS o número.
+7. Peso da Balança (scaleWeight): Geralmente é um peso aferido (pesado) localmente, às vezes anotado à mão na nota, impresso em etiqueta de balança local ou em ticket de pesagem da própria fábrica. Se achar, coloque aqui. Se não houver nenhum peso aferido secundário/de balança aparente diferente, preencha com \`null\` ou passe o MESMO peso do labelWeight.
 
 [NOVAS INSTRUÇÕES GLOBAIS]
 Verifique se na imagem constam também as seguintes informações gerais do documento:
@@ -47,6 +48,7 @@ Formato EXATO esperado (SEMPRE UM ÚNICO OBJETO JSON com a propriedade "lots" se
       "runNumber": "texto",
       "bitola": "texto",
       "labelWeight": 1500.5,
+      "scaleWeight": 1500.5,
       "supplier": "texto do fornecedor"
     }
   ]
@@ -108,6 +110,7 @@ Formato EXATO esperado (SEMPRE UM ÚNICO OBJETO JSON com a propriedade "lots" se
             supplierLot: data.supplierLot,
             runNumber: data.runNumber,
             labelWeight: typeof data.labelWeight === 'number' ? data.labelWeight : (parseFloat(data.labelWeight) || null),
+            scaleWeight: typeof data.scaleWeight === 'number' ? data.scaleWeight : (parseFloat(data.scaleWeight) || null),
             bitola: typeof data.bitola === 'number' ? data.bitola.toString() : (data.bitola || null),
             supplier: data.supplier
         }));

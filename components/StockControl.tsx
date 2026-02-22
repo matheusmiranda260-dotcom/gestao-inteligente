@@ -174,7 +174,7 @@ const AddConferencePage: React.FC<{
                         bitola: parsedBitola || getInitialBitola(defaultMaterial),
                         materialType: defaultMaterial,
                         labelWeight: Number(extractedData.labelWeight) || 0,
-                        scaleWeight: 0, // Inicia zerado, não copia etiqueta
+                        scaleWeight: Number(extractedData.scaleWeight) || Number(extractedData.labelWeight) || 0,
                         supplier: extractedData.supplier || conferenceData.supplier
                     };
                 });
