@@ -15,9 +15,6 @@ const ConferenceReport: React.FC<ConferenceReportProps> = ({ reportData, onClose
     scaleWeight: Number(lot.scaleWeight) || 0,
   }));
   const totalLabelWeight = safeLots.reduce((acc, lot) => acc + lot.labelWeight, 0);
-  const totalScaleWeight = safeLots.reduce((acc, lot) => acc + lot.scaleWeight, 0);
-  const difference = totalScaleWeight - totalLabelWeight;
-  const differencePercentage = totalLabelWeight > 0 ? ((difference / totalLabelWeight) * 100) : 0;
 
   return createPortal(
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[9999] print-modal-container">
@@ -85,9 +82,7 @@ const ConferenceReport: React.FC<ConferenceReportProps> = ({ reportData, onClose
                     <th className="px-2 py-2 text-center border-r border-slate-400 w-24">Bitola(mm)</th>
                     <th className="px-2 py-2 text-center border-r border-slate-400">FORNECEDOR</th>
                     <th className="px-2 py-2 text-center border-r border-slate-400">Corrida</th>
-                    <th className="px-2 py-2 text-center border-r border-slate-400 w-32">Peso etiqueta</th>
-                    <th className="px-2 py-2 text-center border-r border-slate-400 w-32">Peso balança</th>
-                    <th className="px-2 py-2 text-center border-r border-slate-400 w-28">DIFERENÇA</th>
+                    <th className="px-2 py-2 text-center border-r border-slate-400 w-32">Peso Liquido (Kg)</th>
                   </tr>
                 </thead>
                 <tbody className="text-black border-b-2 border-slate-900">
@@ -105,17 +100,6 @@ const ConferenceReport: React.FC<ConferenceReportProps> = ({ reportData, onClose
                         <td className="px-2 py-2 text-center border-r border-slate-400 uppercase truncate max-w-[120px] font-bold text-sm" title={displaySupplier}>{displaySupplier}</td>
                         <td className="px-2 py-2 text-center border-r border-slate-400 font-mono font-bold text-base">{lot.runNumber}</td>
                         <td className="px-2 py-2 text-center border-r border-slate-400 font-bold text-lg">{lot.labelWeight.toFixed(0)}</td>
-                        <td className="px-2 py-2 text-center border-r border-slate-400 font-black text-lg">{lot.scaleWeight.toFixed(0)}</td>
-                        <td className="px-2 py-2 text-center border-r border-slate-400 font-black text-lg">
-                          <span className="block">
-                            {lotDiff > 0 ? '+' : ''}{lotDiff.toFixed(0)}
-                          </span>
-                          {lotDiff !== 0 && (
-                            <span className="block text-xs">
-                              ({lotPercent > 0 ? '+' : ''}{lotPercent.toFixed(1)}%)
-                            </span>
-                          )}
-                        </td>
                       </tr>
                     );
                   })}
@@ -126,19 +110,8 @@ const ConferenceReport: React.FC<ConferenceReportProps> = ({ reportData, onClose
                     <td colSpan={9} className="h-4"></td> {/* Added Space */}
                   </tr>
                   <tr className="text-base">
-                    <td colSpan={6} className="px-2 py-2 text-right uppercase font-black text-sm">Total:</td>
-                    <td className="px-2 py-2 text-center font-black">{totalLabelWeight.toFixed(0)}</td>
-                    <td className="px-2 py-2 text-center font-black">{totalScaleWeight.toFixed(0)}</td>
-                    <td className="px-2 py-2 text-center whitespace-nowrap font-black">
-                      <span className="block">
-                        {difference > 0 ? '+' : ''}{difference.toFixed(0)}
-                      </span>
-                      {difference !== 0 && (
-                        <span className="block text-xs">
-                          ({differencePercentage > 0 ? '+' : ''}{differencePercentage.toFixed(1)}%)
-                        </span>
-                      )}
-                    </td>
+                    <td colSpan={6} className="px-2 py-2 text-right uppercase font-black text-sm">Total Geral:</td>
+                    <td className="px-2 py-2 text-center font-black text-xl">{totalLabelWeight.toFixed(0)} KG</td>
                   </tr>
                 </tfoot>
               </table>

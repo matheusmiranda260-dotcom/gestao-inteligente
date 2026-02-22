@@ -432,15 +432,16 @@ const App: React.FC = () => {
                 materialType: lot.materialType,
                 bitola: lot.bitola,
                 labelWeight: lot.labelWeight,
-                initialQuantity: lot.scaleWeight,
-                remainingQuantity: lot.scaleWeight,
+                initialQuantity: lot.labelWeight,
+                remainingQuantity: lot.labelWeight,
                 status: 'Disponível',
                 history: [{
                     type: 'Entrada',
                     date: new Date().toISOString(),
                     details: {
                         action: 'Conferência de Recebimento',
-                        weight: lot.scaleWeight
+                        weight: lot.labelWeight,
+                        'Peso Balança': lot.scaleWeight
                     }
                 }]
             }));
@@ -497,15 +498,16 @@ const App: React.FC = () => {
                     materialType: lot.materialType,
                     bitola: lot.bitola,
                     labelWeight: lot.labelWeight,
-                    initialQuantity: lot.scaleWeight,
-                    remainingQuantity: existingItem?.remainingQuantity ?? lot.scaleWeight,
+                    initialQuantity: lot.labelWeight,
+                    remainingQuantity: existingItem?.remainingQuantity ?? lot.labelWeight,
                     status: existingItem?.status ?? 'Disponível',
                     history: [...(existingItem?.history || []), {
                         type: 'Entrada (Editada)',
                         date: new Date().toISOString(),
                         details: {
                             action: 'Conferência Editada',
-                            weight: lot.scaleWeight
+                            weight: lot.labelWeight,
+                            'Peso Balança': lot.scaleWeight
                         }
                     }],
                     productionOrderIds: existingItem?.productionOrderIds,
