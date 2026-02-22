@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Page, StockItem, ConferenceData, ConferenceLotData, Bitola, MaterialType, TransferRecord, ProductionOrderData, StockGauge, User } from '../types';
 import { MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions } from '../types';
-import { ArrowLeftIcon, PencilIcon, TrashIcon, WarningIcon, BookOpenIcon, TruckIcon, DocumentReportIcon, PrinterIcon, LockOpenIcon, ClipboardListIcon, ChartBarIcon, XCircleIcon, ArchiveIcon, LocationOffIcon, CheckCircleIcon, ScaleIcon, AdjustmentsIcon, SearchIcon, ExclamationIcon, CogIcon } from './icons';
+import { ArrowLeftIcon, PencilIcon, TrashIcon, WarningIcon, BookOpenIcon, TruckIcon, DocumentReportIcon, PrinterIcon, LockOpenIcon, ClipboardListIcon, ChartBarIcon, XCircleIcon, ArchiveIcon, LocationOffIcon, CheckCircleIcon, ScaleIcon, AdjustmentsIcon, SearchIcon, ExclamationIcon, CogIcon, CameraIcon } from './icons';
 
 import LotHistoryModal from './LotHistoryModal';
 import FinishedConferencesModal from './FinishedConferencesModal';
@@ -54,6 +54,7 @@ const AddConferencePage: React.FC<{
         conferenceNumber: '',
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [scanningLot, setScanningLot] = useState<number | null>(null);
 
     // Initial bitola depends on default material
     const getInitialBitola = (material: string) => {
@@ -136,6 +137,26 @@ const AddConferencePage: React.FC<{
             scaleWeight: 0,
             supplier: conferenceData.supplier
         }]);
+    };
+
+    const handleSimulateScan = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setScanningLot(index);
+
+        // Simulação de delay da Inteligência Artificial lendo a imagem
+        setTimeout(() => {
+            handleLotChange(index, 'internalLot', `LOTE-IA-${Math.floor(Math.random() * 1000)}`);
+            handleLotChange(index, 'supplierLot', `FORN-${Math.floor(Math.random() * 10000)}`);
+            handleLotChange(index, 'runNumber', `RUN${Math.floor(Math.random() * 1000)}`);
+            handleLotChange(index, 'labelWeight', 2000 + Math.floor(Math.random() * 200));
+            handleLotChange(index, 'scaleWeight', 2000 + Math.floor(Math.random() * 200));
+
+            // FIXME: Apenas para teste local / aviso para implementação real do GPT Vision
+            alert('Leitura da Etiqueta Simulada por Inteligência Artificial concluída (A integração real enviará esta foto para reconhecimento via API). Verifique os dados inseridos.');
+            setScanningLot(null);
+        }, 2500);
     };
 
     const handleLotChange = (index: number, field: keyof ConferenceLotData, value: string | number) => {
@@ -341,7 +362,28 @@ const AddConferencePage: React.FC<{
                                                 ) : <span className="text-slate-300">-</span>}
                                             </td>
 
-                                            <td className="p-3 align-top text-center"><button type="button" onClick={() => handleRemoveLot(index)} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"><TrashIcon className="h-5 w-5" /></button></td>
+                                            <td className="p-3 align-top text-center">
+                                                <div className="flex flex-col gap-2 items-center">
+                                                    <div>
+                                                        <input
+                                                            type="file"
+                                                            accept="image/*"
+                                                            capture="environment"
+                                                            className="hidden"
+                                                            id={'scan-desktop-' + index}
+                                                            onChange={(e) => handleSimulateScan(index, e)}
+                                                        />
+                                                        <label
+                                                            htmlFor={'scan-desktop-' + index}
+                                                            className={`p-2 rounded-lg transition border border-transparent flex items-center justify-center cursor-pointer shadow-sm ${scanningLot === index ? 'bg-blue-100 text-blue-600 animate-pulse' : 'bg-[#0F3F5C] text-white hover:bg-[#0A2A3D]'}`}
+                                                            title="Escanear Etiqueta com IA"
+                                                        >
+                                                            <CameraIcon className="h-4 w-4" />
+                                                        </label>
+                                                    </div>
+                                                    <button type="button" onClick={() => handleRemoveLot(index)} className="p-2 text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition border border-red-100 shadow-sm"><TrashIcon className="h-4 w-4" /></button>
+                                                </div>
+                                            </td>
                                         </tr>
                                     )
                                 })}
@@ -368,8 +410,25 @@ const AddConferencePage: React.FC<{
 
                             return (
                                 <div key={index} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 relative">
-                                    <div className="absolute top-4 right-4">
-                                        <button type="button" onClick={() => handleRemoveLot(index)} className="text-red-500 bg-red-50 p-2 rounded-lg hover:bg-red-100">
+                                    <div className="absolute top-4 right-4 flex gap-2">
+                                        <div>
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                capture="environment"
+                                                className="hidden"
+                                                id={'scan-mobile-' + index}
+                                                onChange={(e) => handleSimulateScan(index, e)}
+                                            />
+                                            <label
+                                                htmlFor={'scan-mobile-' + index}
+                                                className={`p-2 rounded-lg transition border border-transparent flex items-center justify-center cursor-pointer shadow-sm ${scanningLot === index ? 'bg-blue-100 text-blue-600 animate-pulse' : 'bg-[#0F3F5C] text-white hover:bg-[#0A2A3D]'}`}
+                                                title="Escanear Etiqueta com IA"
+                                            >
+                                                <CameraIcon className="h-5 w-5" />
+                                            </label>
+                                        </div>
+                                        <button type="button" onClick={() => handleRemoveLot(index)} className="text-red-500 bg-red-50 p-2 rounded-lg hover:bg-red-100 shadow-sm">
                                             <TrashIcon className="h-5 w-5" />
                                         </button>
                                     </div>
