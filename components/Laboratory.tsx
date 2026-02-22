@@ -1037,11 +1037,16 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
                                 {filteredEntries.map(entry => {
                                     const rel = calcRelacao(Number(entry.resistencia), Number(entry.escoamento));
                                     const bit = calcBitola(Number(entry.massa), Number(entry.comprimento));
+                                    const getE = (v: any, k: string) => {
+                                        const camel = k.replace(/_([a-z])/g, (_, g) => g.toUpperCase());
+                                        return v[k] ?? v[camel];
+                                    };
+
                                     const k7AvgArr = [
-                                        calcK7Media(entry.k7_1_entrada !== null ? Number(entry.k7_1_entrada) : null, entry.k7_1_saida !== null ? Number(entry.k7_1_saida) : null),
-                                        calcK7Media(entry.k7_2_entrada !== null ? Number(entry.k7_2_entrada) : null, entry.k7_2_saida !== null ? Number(entry.k7_2_saida) : null),
-                                        calcK7Media(entry.k7_3_entrada !== null ? Number(entry.k7_3_entrada) : null, entry.k7_3_saida !== null ? Number(entry.k7_3_saida) : null),
-                                        calcK7Media(entry.k7_4_entrada !== null ? Number(entry.k7_4_entrada) : null, entry.k7_4_saida !== null ? Number(entry.k7_4_saida) : null),
+                                        calcK7Media(getE(entry, 'k7_1_entrada') != null ? Number(getE(entry, 'k7_1_entrada')) : null, getE(entry, 'k7_1_saida') != null ? Number(getE(entry, 'k7_1_saida')) : null),
+                                        calcK7Media(getE(entry, 'k7_2_entrada') != null ? Number(getE(entry, 'k7_2_entrada')) : null, getE(entry, 'k7_2_saida') != null ? Number(getE(entry, 'k7_2_saida')) : null),
+                                        calcK7Media(getE(entry, 'k7_3_entrada') != null ? Number(getE(entry, 'k7_3_entrada')) : null, getE(entry, 'k7_3_saida') != null ? Number(getE(entry, 'k7_3_saida')) : null),
+                                        calcK7Media(getE(entry, 'k7_4_entrada') != null ? Number(getE(entry, 'k7_4_entrada')) : null, getE(entry, 'k7_4_saida') != null ? Number(getE(entry, 'k7_4_saida')) : null),
                                     ].filter(v => v !== null) as number[];
                                     const k7Avg = k7AvgArr.length > 0 ? k7AvgArr.reduce((a, b) => a + b, 0) / k7AvgArr.length : null;
 
@@ -1053,14 +1058,14 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
                                             <td className="p-3 text-center text-emerald-600 font-bold bg-emerald-50/30">{entry.bitola_mp}</td>
                                             <td className="p-3 text-xs text-slate-500 border-r border-slate-100">{entry.fornecedor}</td>
 
-                                            <td className="p-1 px-2 text-[11px] text-center text-slate-500 border-l border-slate-100 bg-slate-50/50">{n(entry.k7_1_entrada)}</td>
-                                            <td className="p-1 px-2 text-[11px] text-center text-slate-500 bg-slate-50/50">{n(entry.k7_1_saida)}</td>
-                                            <td className="p-1 px-2 text-[11px] text-center text-slate-500">{n(entry.k7_2_entrada)}</td>
-                                            <td className="p-1 px-2 text-[11px] text-center text-slate-500">{n(entry.k7_2_saida)}</td>
-                                            <td className="p-1 px-2 text-[11px] text-center text-slate-500 bg-slate-50/50">{n(entry.k7_3_entrada)}</td>
-                                            <td className="p-1 px-2 text-[11px] text-center text-slate-500 bg-slate-50/50">{n(entry.k7_3_saida)}</td>
-                                            <td className="p-1 px-2 text-[11px] text-center text-slate-500">{n(entry.k7_4_entrada)}</td>
-                                            <td className="p-1 px-2 text-[11px] text-center text-slate-500">{n(entry.k7_4_saida)}</td>
+                                            <td className="p-1 px-2 text-[11px] text-center text-slate-500 border-l border-slate-100 bg-slate-50/50">{n(getE(entry, 'k7_1_entrada'))}</td>
+                                            <td className="p-1 px-2 text-[11px] text-center text-slate-500 bg-slate-50/50">{n(getE(entry, 'k7_1_saida'))}</td>
+                                            <td className="p-1 px-2 text-[11px] text-center text-slate-500">{n(getE(entry, 'k7_2_entrada'))}</td>
+                                            <td className="p-1 px-2 text-[11px] text-center text-slate-500">{n(getE(entry, 'k7_2_saida'))}</td>
+                                            <td className="p-1 px-2 text-[11px] text-center text-slate-500 bg-slate-50/50">{n(getE(entry, 'k7_3_entrada'))}</td>
+                                            <td className="p-1 px-2 text-[11px] text-center text-slate-500 bg-slate-50/50">{n(getE(entry, 'k7_3_saida'))}</td>
+                                            <td className="p-1 px-2 text-[11px] text-center text-slate-500">{n(getE(entry, 'k7_4_entrada'))}</td>
+                                            <td className="p-1 px-2 text-[11px] text-center text-slate-500">{n(getE(entry, 'k7_4_saida'))}</td>
                                             <td className="p-2 text-center font-bold text-indigo-500 text-xs border-r border-slate-100">{n(k7Avg)}</td>
 
                                             <td className="p-1 px-2 text-[10px] text-center text-slate-400 font-medium">

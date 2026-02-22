@@ -8,13 +8,22 @@ interface LabReportModalProps {
 }
 
 const LabReportModal: React.FC<LabReportModalProps> = ({ reportData, onClose }) => {
+    const getV = (key: string) => {
+        const camel = key.replace(/_([a-z])/g, (_, g) => g.toUpperCase());
+        return (reportData as any)[key] ?? (reportData as any)[camel];
+    };
+
     const k7Entradas = [
-        reportData.k7_1_entrada, reportData.k7_2_entrada,
-        reportData.k7_3_entrada, reportData.k7_4_entrada
+        getV('k7_1_entrada'), getV('k7_2_entrada'),
+        getV('k7_3_entrada'), getV('k7_4_entrada')
     ];
     const k7Saidas = [
-        reportData.k7_1_saida, reportData.k7_2_saida,
-        reportData.k7_3_saida, reportData.k7_4_saida
+        getV('k7_1_saida'), getV('k7_2_saida'),
+        getV('k7_3_saida'), getV('k7_4_saida')
+    ];
+    const k7Ideais = [
+        getV('k7_1_ideal'), getV('k7_2_ideal'),
+        getV('k7_3_ideal'), getV('k7_4_ideal')
     ];
 
     const calcK7Media = (ent: number | null | undefined, sai: number | null | undefined) => {
@@ -97,7 +106,7 @@ const LabReportModal: React.FC<LabReportModalProps> = ({ reportData, onClose }) 
 
         let hasSetupDeviant = false;
         for (let i = 1; i <= 4; i++) {
-            const ideal = Number((reportData as any)[`k7_${i}_ideal`]);
+            const ideal = Number(getV(`k7_${i}_ideal`));
             const real = medias[i - 1];
             if (ideal > 0 && real !== null && Math.abs(ideal - real) > 0.05) {
                 hasSetupDeviant = true;
@@ -264,7 +273,7 @@ Por favor, faça uma análise aprofundada baseada nos números acima.
                         </div>
 
                         {/* Metadados */}
-                        <div className="grid grid-cols-4 gap-4 mb-8">
+                        <div className="grid grid-cols-5 gap-4 mb-8">
                             <div className="border border-black p-3">
                                 <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Operador</p>
                                 <p className="text-lg font-black uppercase">{reportData.operator || '—'}</p>
@@ -281,6 +290,10 @@ Por favor, faça uma análise aprofundada baseada nos números acima.
                                 <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Fornecedor</p>
                                 <p className="text-lg font-black">{reportData.fornecedor}</p>
                             </div>
+                            <div className="border border-black p-3">
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Velocidade</p>
+                                <p className="text-lg font-black">{reportData.velocidade ? `${n(reportData.velocidade)} m/min` : '—'}</p>
+                            </div>
                         </div>
 
                         {/* Setup de Laminação - Tabela */}
@@ -288,11 +301,12 @@ Por favor, faça uma análise aprofundada baseada nos números acima.
                         <table className="w-full border-collapse border border-black text-center mb-8">
                             <thead>
                                 <tr className="bg-gray-100">
-                                    <th className="border border-black p-2 font-black uppercase text-xs w-1/5">Estágio</th>
-                                    <th className="border border-black p-2 font-black uppercase text-xs w-1/5">Entrada (mm)</th>
-                                    <th className="border border-black p-2 font-black uppercase text-xs w-1/5">Saída (mm)</th>
-                                    <th className="border border-black p-2 font-black uppercase text-xs w-1/5">Média (mm)</th>
-                                    <th className="border border-black p-2 font-black uppercase text-xs w-1/5">% Redução da Área</th>
+                                    <th className="border border-black p-2 font-black uppercase text-xs w-1/6">Estágio</th>
+                                    <th className="border border-black p-2 font-black uppercase text-xs w-1/6">Entrada (mm)</th>
+                                    <th className="border border-black p-2 font-black uppercase text-xs w-1/6">Saída (mm)</th>
+                                    <th className="border border-black p-2 font-black uppercase text-xs w-1/6">Média (mm)</th>
+                                    <th className="border border-black p-2 font-black uppercase text-xs w-1/6">Ideal (mm)</th>
+                                    <th className="border border-black p-2 font-black uppercase text-xs w-1/6">% Redução da Área</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -302,6 +316,7 @@ Por favor, faça uma análise aprofundada baseada nos números acima.
                                         <td className="border border-black p-3">{n(k7Entradas[i])}</td>
                                         <td className="border border-black p-3">{n(k7Saidas[i])}</td>
                                         <td className="border border-black p-3 font-bold text-gray-800 bg-gray-50">{n(medias[i])}</td>
+                                        <td className="border border-black p-3 font-black text-black bg-gray-50">{n(k7Ideais[i])}</td>
                                         <td className="border border-black p-3 font-black">
                                             {reducoes[i] !== null ? `${reducoes[i]!.toFixed(2)}%` : '—'}
                                         </td>
@@ -422,7 +437,7 @@ Por favor, faça uma análise aprofundada baseada nos números acima.
                 __html: `
                 @media print {
                     @page { margin: 0; size: A4; }
-                    body * { visibility: hidden; }
+                    body * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; visibility: hidden; }
                     .print-modal-container {
                         position: absolute;
                         left: 0;
