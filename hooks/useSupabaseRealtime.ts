@@ -4,7 +4,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import type {
     StockItem, ConferenceData, ProductionOrderData, TransferRecord,
     FinishedProductItem, PontaItem, FinishedGoodsTransferRecord,
-    PartsRequest, ShiftReport, ProductionRecord, InventorySession,
+    PartsRequest, ShiftReport, ProductionRecord,
     StickyNote, Meeting, MeetingCategory
 } from '../types';
 import { mapToCamelCase } from '../services/supabaseService';
@@ -21,7 +21,7 @@ interface RealtimeSetters {
     setShiftReports: React.Dispatch<React.SetStateAction<ShiftReport[]>>;
     setTrefilaProduction: React.Dispatch<React.SetStateAction<ProductionRecord[]>>;
     setTrelicaProduction: React.Dispatch<React.SetStateAction<ProductionRecord[]>>;
-    setInventorySessions: React.Dispatch<React.SetStateAction<InventorySession[]>>;
+
     setStickyNotes: React.Dispatch<React.SetStateAction<StickyNote[]>>;
     setMeetings: React.Dispatch<React.SetStateAction<Meeting[]>>;
     setMeetingCategories: React.Dispatch<React.SetStateAction<MeetingCategory[]>>;
@@ -171,8 +171,7 @@ export function useAllRealtimeSubscriptions(setters: RealtimeSetters, enabled: b
         // Finished Goods Transfers
         createSubscription<FinishedGoodsTransferRecord>('finished_goods_transfers', setters.setFinishedGoodsTransfers);
 
-        // Inventory Sessions
-        createSubscription<InventorySession>('inventory_sessions', setters.setInventorySessions);
+
 
         // Sticky Notes
         createSubscription<StickyNote>('sticky_notes', setters.setStickyNotes);

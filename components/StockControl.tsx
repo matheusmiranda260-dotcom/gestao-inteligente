@@ -9,7 +9,7 @@ import FinishedConferencesModal from './FinishedConferencesModal';
 import ConferenceReport from './ConferenceReport';
 import TransfersHistoryModal from './TransfersHistoryModal';
 import TransferReport from './TransferReport';
-import InventoryReport from './InventoryReport';
+
 import StockDashboard from './StockDashboard';
 import { trelicaModels } from './ProductionOrderTrelica';
 
@@ -820,7 +820,7 @@ const StockControl: React.FC<{
     const [conferenceReportData, setConferenceReportData] = useState<ConferenceData | null>(null);
     const [transferHistoryOpen, setTransferHistoryOpen] = useState(false);
     const [transferReportData, setTransferReportData] = useState<TransferRecord | null>(null);
-    const [showInventoryReport, setShowInventoryReport] = useState(false);
+
     const [stockDashboardOpen, setStockDashboardOpen] = useState(false);
     const [duplicatesModalOpen, setDuplicatesModalOpen] = useState(false);
 
@@ -996,7 +996,7 @@ const StockControl: React.FC<{
                     {transferHistoryOpen && <TransfersHistoryModal transfers={transfers} onClose={() => setTransferHistoryOpen(false)} onShowReport={setTransferReportData} />}
                     {transferReportData && <TransferReport reportData={transferReportData} onClose={() => setTransferReportData(null)} />}
 
-                    {showInventoryReport && <InventoryReport stock={stock} filters={{ searchTerm, statusFilter, materialFilter, bitolaFilter }} onClose={() => setShowInventoryReport(false)} />}
+
 
                     {/* Confirmation Modals */}
                     {releasingItem && (
@@ -1094,9 +1094,7 @@ const StockControl: React.FC<{
                             <button onClick={() => setStockDashboardOpen(true)} className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
                                 <ChartBarIcon className="h-5 w-5" />Estatística
                             </button>
-                            <button onClick={() => setShowInventoryReport(true)} className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
-                                <PrinterIcon className="h-5 w-5" />Imprimir
-                            </button>
+
                             <button onClick={() => setTransferHistoryOpen(true)} className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
                                 <TruckIcon className="h-5 w-5" />Histórico Transf.
                             </button>

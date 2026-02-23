@@ -15,45 +15,56 @@ const permissionCategories = [
     {
         title: '📦 Estoque',
         permissions: [
-            { page: 'stock', label: 'Gestão de Lotes (Visualização)' },
-            { page: 'stock_add', label: 'Adicionar ao Estoque (Conferência)' },
+            { page: 'stock', label: 'Gestão de Lotes (Relatórios e Filtros)' },
+            { page: 'stock_add', label: 'Conferência: Adicionar Material' },
             { page: 'stock_transfer', label: 'Transferência entre Setores' },
         ]
     },
     {
         title: '🏭 Produção - Trefila',
         permissions: [
-            { page: 'trefila_in_progress', label: 'Painel: Em Produção' },
+            { page: 'trefila', label: 'Dashboard Trefila (Visão Geral)' },
+            { page: 'trefila_in_progress', label: 'Painel: Máquina em Operação' },
             { page: 'trefila_weighing', label: 'Pesagem de Rolos' },
-            { page: 'trefila_pending', label: 'Fila: Próximas Produções' },
-            { page: 'trefila_completed', label: 'Histórico: Produções Finalizadas' },
+            { page: 'trefila_pending', label: 'Próximas Produções (Fila)' },
+            { page: 'trefila_completed', label: 'Histórico de Produções' },
             { page: 'trefila_reports', label: 'Relatórios de Turno' },
-            { page: 'productionOrder', label: 'Criar Nova Ordem de Produção' },
+            { page: 'trefila_parts', label: 'Gerenciador de Peças (Trefila)' },
+            { page: 'trefila_rings', label: 'Setup de Anéis (Trocas)' },
+            { page: 'productionOrder', label: 'Criar Ordem de Produção' },
         ]
     },
     {
         title: '🏗️ Produção - Treliça',
         permissions: [
-            { page: 'trelica_in_progress', label: 'Painel: Em Produção' },
-            { page: 'trelica_pending', label: 'Fila: Próximas Produções' },
-            { page: 'trelica_completed', label: 'Histórico: Produções Finalizadas' },
+            { page: 'trelica', label: 'Dashboard Treliça (Visão Geral)' },
+            { page: 'trelica_in_progress', label: 'Painel: Máquina em Operação' },
+            { page: 'trelica_pending', label: 'Próximas Produções (Fila)' },
+            { page: 'trelica_completed', label: 'Histórico de Produções' },
             { page: 'trelica_reports', label: 'Relatórios de Turno' },
-            { page: 'productionOrderTrelica', label: 'Criar Nova Ordem de Produção' },
+            { page: 'trelica_parts', label: 'Gerenciador de Peças (Treliça)' },
+            { page: 'productionOrderTrelica', label: 'Criar Ordem de Produção' },
             { page: 'finishedGoods', label: 'Estoque de Produto Acabado' },
         ]
     },
     {
-        title: '📊 Gestão & Sistema',
+        title: '🧪 Qualidade e Suporte',
         permissions: [
-            { page: 'productionDashboard', label: 'Dashboard Geral de Produção' },
-            { page: 'reports', label: 'Relatórios Gerenciais e KPIs' },
-            { page: 'peopleManagement', label: 'Gestão de Pessoas (RH)' },
-            { page: 'continuousImprovement', label: 'Melhoria Contínua (Kaizen)' },
-            { page: 'workInstructions', label: 'Instruções de Trabalho (POP)' },
-            { page: 'partsManager', label: 'Gerenciador de Peças (Manutenção)' },
+            { page: 'laboratory', label: '🔬 Laboratório (Ensaios e Testes)' },
+            { page: 'productionDashboard', label: '📊 Dashboard Gerencial de Produção' },
+            { page: 'reports', label: '📈 Relatórios e KPIs Estratégicos' },
+            { page: 'continuousImprovement', label: '💡 Melhoria Contínua (Kaizen)' },
+            { page: 'workInstructions', label: '📖 Instruções de Trabalho (POP)' },
+        ]
+    },
+    {
+        title: '👥 Gestão & RH',
+        permissions: [
+            { page: 'peopleManagement', label: 'Gestão de Pessoas' },
             { page: 'meetingsTasks', label: 'Reuniões e Tarefas (Atas)' },
-            { page: 'gaugesManager', label: 'Configurações de Bitolas' },
             { page: 'userManagement', label: 'Controle de Usuários e Acessos' },
+            { page: 'partsManager', label: 'Catálogo de Peças (Global)' },
+            { page: 'gaugesManager', label: 'Configurações de Bitolas' },
         ]
     }
 ];
@@ -155,30 +166,74 @@ const UserModal: React.FC<{
                         />
                     </div>
                     <div className="mt-6 border-t pt-4">
-                        <h3 className="text-lg font-bold text-slate-800 mb-4 px-1">Permissões de Acesso</h3>
-                        <div className="space-y-6">
-                            {permissionCategories.map((category) => (
-                                <div key={category.title} className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                                    <h4 className="text-sm font-black text-indigo-600 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
-                                        {category.title}
-                                    </h4>
-                                    <div className="grid grid-cols-1 gap-2">
-                                        {category.permissions.map(({ page, label }) => (
-                                            <label key={page} className="flex items-center space-x-3 p-2.5 rounded-lg hover:bg-white hover:shadow-sm transition-all cursor-pointer border border-transparent hover:border-slate-200 group">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={!!permissions[page as Page]}
-                                                    onChange={(e) => handlePermissionChange(page as Page, e.target.checked)}
-                                                    className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 transition-all"
-                                                />
-                                                <span className="text-sm font-medium text-slate-700 group-hover:text-slate-900">{label}</span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-extrabold text-[#0F3F5C] px-1">Permissões de Acesso</h3>
+                            {role === 'user' ? (
+                                <span className="text-[10px] bg-indigo-100 text-indigo-700 font-bold px-2 py-1 rounded-full uppercase tracking-tighter">Personalizado</span>
+                            ) : (
+                                <span className="text-[10px] bg-emerald-100 text-emerald-700 font-bold px-2 py-1 rounded-full uppercase tracking-tighter">Acesso Total</span>
+                            )}
                         </div>
+
+                        {role !== 'user' ? (
+                            <div className="bg-emerald-50 border border-emerald-100 p-6 rounded-2xl text-center">
+                                <div className="w-12 h-12 bg-emerald-500 text-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg shadow-emerald-200">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                                </div>
+                                <p className="text-sm font-bold text-emerald-800">Acesso Total Habilitado</p>
+                                <p className="text-xs text-emerald-600 mt-1 px-4">Usuários com função <strong>{role === 'admin' ? 'Administrador' : 'Gestor'}</strong> possuem permissão para acessar todas as funcionalidades do sistema automaticamente.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-6 animate-fadeIn">
+                                {permissionCategories.map((category) => (
+                                    <div key={category.title} className="bg-slate-50 p-4 rounded-xl border border-slate-100 group/cat transition-all hover:shadow-md hover:bg-white overflow-hidden">
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h4 className="text-sm font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
+                                                {category.title}
+                                            </h4>
+                                            <div className="flex gap-2 opacity-0 group-hover/cat:opacity-100 transition-opacity">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const newPerms = { ...permissions };
+                                                        category.permissions.forEach(p => newPerms[p.page as Page] = true);
+                                                        setPermissions(newPerms);
+                                                    }}
+                                                    className="text-[10px] font-bold text-indigo-500 hover:text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded transition"
+                                                >
+                                                    Marcar Tudo
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const newPerms = { ...permissions };
+                                                        category.permissions.forEach(p => newPerms[p.page as Page] = false);
+                                                        setPermissions(newPerms);
+                                                    }}
+                                                    className="text-[10px] font-bold text-slate-400 hover:text-red-500 bg-white px-2 py-0.5 rounded border border-slate-100 transition"
+                                                >
+                                                    Limpar
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-1 gap-2">
+                                            {category.permissions.map(({ page, label }) => (
+                                                <label key={page} className="flex items-center space-x-3 p-2.5 rounded-lg hover:bg-slate-50 transition-all cursor-pointer border border-transparent hover:border-slate-100 group">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={!!permissions[page as Page]}
+                                                        onChange={(e) => handlePermissionChange(page as Page, e.target.checked)}
+                                                        className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 transition-all cursor-pointer"
+                                                    />
+                                                    <span className="text-sm font-semibold text-slate-700 group-hover:text-slate-900">{label}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
                 <div className="flex justify-end gap-4 pt-4 mt-auto border-t">

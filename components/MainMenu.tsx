@@ -125,7 +125,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser }) =
 
             <main className="space-y-10">
                 {/* ESTOQUE */}
-                {(hasPermission('stock') || hasPermission('finishedGoods') || hasPermission('stock_add') || hasPermission('stock_transfer') || hasPermission('stock_inventory')) && (
+                {(hasPermission('stock') || hasPermission('finishedGoods') || hasPermission('stock_add') || hasPermission('stock_transfer')) && (
                     <section>
                         <div className="section-title">
                             <h2>Estoque</h2>

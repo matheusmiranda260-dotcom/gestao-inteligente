@@ -15,7 +15,7 @@ export interface TrelicaSelectedLots {
     allSenozoideRight?: string[];
 }
 
-export type Page = 'login' | 'menu' | 'stock' | 'stock_add' | 'stock_inventory' | 'stock_transfer' |
+export type Page = 'login' | 'menu' | 'stock' | 'stock_add' | 'stock_transfer' |
     'trefila' | 'trefila_in_progress' | 'trefila_pending' | 'trefila_completed' | 'trefila_reports' | 'trefila_parts' | 'trefila_weighing' | 'trefila_rings' |
     'trelica' | 'trelica_in_progress' | 'trelica_pending' | 'trelica_completed' | 'trelica_reports' | 'trelica_parts' |
     'productionOrder' | 'productionOrderTrelica' | 'reports' | 'userManagement' | 'productionDashboard' |
@@ -487,26 +487,7 @@ export interface EmployeeDocument {
     createdAt: string;
 }
 
-export interface InventorySession {
-    id: string;
-    materialType: MaterialType;
-    bitola: Bitola;
-    startDate: string;
-    endDate?: string | null;
-    status: 'open' | 'completed' | 're-audit';
-    operator: string;
-    itemsCount: number;
-    checkedCount: number;
-    auditedLots: {
-        lotId: string;
-        internalLot: string;
-        systemWeight: number;
-        physicalWeight: number;
-        observation?: string | null;
-        tempLotData?: any;
-    }[];
-    appliedToStock?: boolean;
-}
+
 
 export interface RowConfig {
     rowName: string;

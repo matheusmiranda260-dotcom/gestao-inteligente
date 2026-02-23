@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'; // Refresh Trigger
-import type { Page, User, Employee, StockItem, ConferenceData, ProductionOrderData, TransferRecord, Bitola, MachineType, PartsRequest, ShiftReport, ProductionRecord, TransferredLotInfo, ProcessedLot, DowntimeEvent, OperatorLog, TrelicaSelectedLots, WeighedPackage, FinishedProductItem, Ponta, PontaItem, FinishedGoodsTransferRecord, TransferredFinishedGoodInfo, KaizenProblem, InventorySession, Meeting, MeetingItem, MeetingCategory } from './types';
+import type { Page, User, Employee, StockItem, ConferenceData, ProductionOrderData, TransferRecord, Bitola, MachineType, PartsRequest, ShiftReport, ProductionRecord, TransferredLotInfo, ProcessedLot, DowntimeEvent, OperatorLog, TrelicaSelectedLots, WeighedPackage, FinishedProductItem, Ponta, PontaItem, FinishedGoodsTransferRecord, TransferredFinishedGoodInfo, KaizenProblem, Meeting, MeetingItem, MeetingCategory } from './types';
 import { FioMaquinaBitolaOptions, TrefilaBitolaOptions } from './types';
 import Login from './components/Login';
 import MainMenu from './components/MainMenu';
@@ -19,7 +19,7 @@ import ContinuousImprovement from './components/ContinuousImprovement';
 import WorkInstructions from './components/WorkInstructions';
 import PeopleManagement from './components/PeopleManagement';
 
-import StockInventory from './components/StockInventory';
+
 import StockTransfer from './components/StockTransfer';
 import GaugesManager from './components/GaugesManager';
 import TrefilaWeighing from './components/TrefilaWeighing';
@@ -53,7 +53,7 @@ const App: React.FC = () => {
     const [shiftReports, setShiftReports] = useState<ShiftReport[]>([]);
     const [trefilaProduction, setTrefilaProduction] = useState<ProductionRecord[]>([]);
     const [trelicaProduction, setTrelicaProduction] = useState<ProductionRecord[]>([]);
-    const [inventorySessions, setInventorySessions] = useState<InventorySession[]>([]);
+
     const [gauges, setGauges] = useState<StockGauge[]>([]);
     const [stickyNotes, setStickyNotes] = useState<StickyNote[]>([]);
     const [meetings, setMeetings] = useState<Meeting[]>([]);
@@ -89,7 +89,7 @@ const App: React.FC = () => {
                 const [
                     fetchedUsers, fetchedEmployees, fetchedStock, fetchedConferences, fetchedTransfers,
                     fetchedOrders, fetchedFinishedGoods, fetchedPontas, fetchedFGTransfers,
-                    fetchedParts, fetchedReports, fetchedProductionRecords, fetchedInvSessions, fetchedGauges, fetchedNotes, fetchedMeetings, fetchedCategories
+                    fetchedParts, fetchedReports, fetchedProductionRecords, fetchedGauges, fetchedNotes, fetchedMeetings, fetchedCategories
                 ] = await Promise.all([
                     fetchTable<User>('app_users'),
                     fetchTable<Employee>('employees'),
@@ -103,7 +103,7 @@ const App: React.FC = () => {
                     fetchTable<PartsRequest>('parts_requests'),
                     fetchTable<ShiftReport>('shift_reports'),
                     fetchTable<ProductionRecord>('production_records'),
-                    fetchTable<InventorySession>('inventory_sessions').catch(() => []),
+
                     fetchTable<StockGauge>('stock_gauges').catch(() => []),
                     fetchTable<StickyNote>('sticky_notes').catch(() => []),
                     fetchTable<Meeting>('meetings').catch(() => []),
@@ -121,7 +121,7 @@ const App: React.FC = () => {
                 setFinishedGoodsTransfers(fetchedFGTransfers);
                 setPartsRequests(fetchedParts);
                 setShiftReports(fetchedReports);
-                setInventorySessions(fetchedInvSessions);
+
                 setGauges(fetchedGauges || []);
                 setStickyNotes(fetchedNotes || []);
                 setMeetings(fetchedMeetings || []);
@@ -195,7 +195,7 @@ const App: React.FC = () => {
         setShiftReports,
         setTrefilaProduction,
         setTrelicaProduction,
-        setInventorySessions,
+
         setGauges,
         setStickyNotes,
         setMeetings,
@@ -581,47 +581,11 @@ const App: React.FC = () => {
         }
     };
 
-    const addInventorySession = async (session: InventorySession) => {
-        try {
-            await insertItem<InventorySession>('inventory_sessions', session);
-        } catch (error) { showNotification('Erro ao salvar sessão de inventário.', 'error'); }
-    };
 
-    const updateInventorySession = async (id: string, updates: Partial<InventorySession>) => {
-        try {
-            await updateItem<InventorySession>('inventory_sessions', id, updates);
-        } catch (error) { showNotification('Erro ao atualizar sessão de inventário.', 'error'); }
-    };
 
-    const deleteInventorySession = async (id: string) => {
-        try {
-            const session = inventorySessions.find(s => s.id === id);
-            if (session && session.auditedLots && session.auditedLots.length > 0) {
-                for (const audited of session.auditedLots) {
-                    const lot = stock.find(s => s.id === audited.lotId);
-                    if (!lot) continue;
 
-                    if (audited.systemWeight === 0 && lot.supplier === 'CADASTRADO NO INVENTÁRIO') {
-                        // It was a quick-add lot, delete it
-                        await deleteItem('stock_items', audited.lotId);
-                    } else {
-                        // Revert weight and clear audit info
-                        await updateItem<StockItem>('stock_items', audited.lotId, {
-                            remainingQuantity: audited.systemWeight,
-                            lastAuditDate: null,
-                            auditObservation: null
-                        });
-                    }
-                }
-            }
 
-            await deleteItem('inventory_sessions', id);
-            showNotification('Inventário removido e alterações revertidas.', 'success');
-        } catch (error) {
-            console.error(error);
-            showNotification('Erro ao excluir sessão de inventário.', 'error');
-        }
-    };
+
 
     const createTransfer = async (destinationSector: string, lotsToTransfer: Map<string, number>): Promise<TransferRecord | null> => {
         if (!currentUser) return null;
@@ -2024,7 +1988,7 @@ const App: React.FC = () => {
             case 'stock': return <StockControl stock={stock} conferences={conferences} transfers={transfers} setPage={setPage} addConference={addConference} deleteStockItem={deleteStockItem} updateStockItem={(item) => updateStockItem(item.id, item)} createTransfer={createTransfer} editConference={editConference} deleteConference={deleteConference} productionOrders={productionOrders} initialView="list" gauges={gauges} currentUser={currentUser} />;
 
             case 'stock_add': return <StockControl stock={stock} conferences={conferences} transfers={transfers} setPage={setPage} addConference={addConference} deleteStockItem={deleteStockItem} updateStockItem={(item) => updateStockItem(item.id, item)} createTransfer={createTransfer} editConference={editConference} deleteConference={deleteConference} productionOrders={productionOrders} initialView="add" gauges={gauges} currentUser={currentUser} />;
-            case 'stock_inventory': return <StockInventory stock={stock} setPage={setPage} updateStockItem={updateStockItem} addStockItem={addStockItem} deleteStockItem={deleteStockItem} inventorySessions={inventorySessions} addInventorySession={addInventorySession} updateInventorySession={updateInventorySession} deleteInventorySession={deleteInventorySession} currentUser={currentUser} gauges={gauges} />;
+
             case 'stock_transfer': return <StockTransfer stock={stock} transfers={transfers} setPage={setPage} createTransfer={createTransfer} gauges={gauges} />;
             case 'trefila': return <MachineControl machineType="Trefila" {...mcProps} initialView="dashboard" initialModal={null} />;
             case 'trefila_in_progress': return <MachineControl machineType="Trefila" {...mcProps} initialView="in_progress" initialModal={null} />;

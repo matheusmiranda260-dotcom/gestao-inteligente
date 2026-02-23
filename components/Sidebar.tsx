@@ -34,7 +34,7 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
     };
 
     React.useEffect(() => {
-        if (['stock', 'stock_add', 'stock_inventory', 'stock_transfer'].includes(page)) {
+        if (['stock', 'stock_add', 'stock_transfer'].includes(page)) {
             setExpandedMenus(prev => prev.includes('stock') ? prev : [...prev, 'stock']);
         } else if (['trefila', 'trefila_in_progress', 'trefila_pending', 'trefila_completed', 'trefila_reports', 'trefila_parts', 'trefila_weighing', 'trefila_rings'].includes(page)) {
             setExpandedMenus(prev => prev.includes('trefila') ? prev : [...prev, 'trefila']);
@@ -229,7 +229,7 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                             {/* Collapsible Matéria-prima */}
                             <button
                                 onClick={() => toggleMenu('stock')}
-                                className={`sidebar-item ${['stock', 'stock_add', 'stock_inventory', 'stock_transfer'].includes(page) ? 'active' : ''} justify-between group`}
+                                className={`sidebar-item ${['stock', 'stock_add', 'stock_transfer'].includes(page) ? 'active' : ''} justify-between group`}
                                 title={isCollapsed ? 'Matéria-prima' : ''}
                             >
                                 <div className="flex items-center gap-3 overflow-hidden">
