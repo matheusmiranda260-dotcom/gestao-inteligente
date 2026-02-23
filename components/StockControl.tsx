@@ -203,7 +203,9 @@ const StockControl: React.FC<{
 
     const filtered = useMemo(() => stock.filter(i =>
         i.status !== 'Consumido' &&
-        (i.internalLot.toLowerCase().includes(searchTerm.toLowerCase()) || i.nfe.toLowerCase().includes(searchTerm.toLowerCase())) &&
+        (i.internalLot.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            i.nfe.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (i.steelType || '').toLowerCase().includes(searchTerm.toLowerCase())) &&
         (materialFilter === '' || i.materialType === materialFilter) &&
         (bitolaFilter === '' || i.bitola === bitolaFilter)
     ).sort((a, b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime()), [stock, searchTerm, materialFilter, bitolaFilter]);
@@ -312,6 +314,7 @@ const StockControl: React.FC<{
                             <tr>
                                 <th className="p-3 text-center">Data</th>
                                 <th className="p-3 text-center">Lote Interno</th>
+                                <th className="p-3 text-center">Tipo Aço</th>
                                 <th className="p-3 text-center">Mat.</th>
                                 <th className="p-3 text-center">Bitola</th>
                                 <th className="p-3 text-center">Peso (kg)</th>
@@ -324,6 +327,7 @@ const StockControl: React.FC<{
                                 <tr key={item.id} className="hover:bg-slate-50">
                                     <td className="p-3 text-center text-slate-500 font-medium">{new Date(item.entryDate).toLocaleDateString('pt-BR')}</td>
                                     <td className="p-3 text-center font-black text-slate-900">{item.internalLot}</td>
+                                    <td className="p-3 text-center font-bold text-slate-600">{item.steelType || '-'}</td>
                                     <td className="p-3 text-center text-slate-500">{item.materialType}</td>
                                     <td className="p-3 text-center font-black text-blue-600">{item.bitola}</td>
                                     <td className="p-3 text-center font-black text-slate-800">{item.remainingQuantity.toFixed(2)}</td>
