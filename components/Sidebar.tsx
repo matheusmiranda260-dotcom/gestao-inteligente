@@ -115,7 +115,7 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                     <div className="sidebar-category-title">{isCollapsed ? '🏭' : '🏭 Produção'}</div>
 
                     {/* Trefila Collapsible */}
-                    {(hasPermission('trefila_in_progress') || hasPermission('trefila_weighing') || hasPermission('trefila_pending') || hasPermission('trefila_completed') || hasPermission('trefila_reports') || hasPermission('trefila_rings')) && (
+                    {(hasPermission('trefila') || hasPermission('trefila_in_progress') || hasPermission('trefila_weighing') || hasPermission('trefila_pending') || hasPermission('trefila_completed') || hasPermission('trefila_reports') || hasPermission('trefila_rings') || hasPermission('trefila_parts')) && (
                         <>
                             <button
                                 onClick={() => toggleMenu('trefila')}
@@ -135,6 +135,11 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
 
                             {!isCollapsed && expandedMenus.includes('trefila') && (
                                 <div className="ml-4 pl-4 border-l border-slate-700/50 flex flex-col gap-0.5 mt-1 mb-2 animate-in slide-in-from-left-2 duration-200">
+                                    {hasPermission('trefila') && (
+                                        <button onClick={() => setPage('trefila')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                            📊 Dashboard Trefila
+                                        </button>
+                                    )}
                                     {hasPermission('trefila_in_progress') && (
                                         <button onClick={() => setPage('trefila_in_progress')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_in_progress' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             ⚙️ Em Produção
@@ -157,12 +162,17 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                                     )}
                                     {hasPermission('trefila_reports') && (
                                         <button onClick={() => setPage('trefila_reports')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_reports' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                            📊 Relatórios de Turno
+                                            📑 Relatórios de Turno
                                         </button>
                                     )}
                                     {hasPermission('trefila_rings') && (
                                         <button onClick={() => setPage('trefila_rings')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_rings' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             💍 Simulação & Anéis
+                                        </button>
+                                    )}
+                                    {hasPermission('trefila_parts') && (
+                                        <button onClick={() => setPage('trefila_parts')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_parts' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                            🔧 Peças e Trocas
                                         </button>
                                     )}
                                 </div>
@@ -171,7 +181,7 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                     )}
 
                     {/* Treliça Collapsible */}
-                    {(hasPermission('trelica_in_progress') || hasPermission('trelica_pending') || hasPermission('trelica_completed') || hasPermission('trelica_reports')) && (
+                    {(hasPermission('trelica') || hasPermission('trelica_in_progress') || hasPermission('trelica_pending') || hasPermission('trelica_completed') || hasPermission('trelica_reports') || hasPermission('trelica_parts')) && (
                         <>
                             <button
                                 onClick={() => toggleMenu('trelica')}
@@ -191,6 +201,11 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
 
                             {!isCollapsed && expandedMenus.includes('trelica') && (
                                 <div className="ml-4 pl-4 border-l border-slate-700/50 flex flex-col gap-0.5 mt-1 mb-2 animate-in slide-in-from-left-2 duration-200">
+                                    {hasPermission('trelica') && (
+                                        <button onClick={() => setPage('trelica')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelica' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                            📊 Dashboard Treliça
+                                        </button>
+                                    )}
                                     {hasPermission('trelica_in_progress') && (
                                         <button onClick={() => setPage('trelica_in_progress')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelica_in_progress' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             ⚙️ Em Produção
@@ -208,7 +223,12 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                                     )}
                                     {hasPermission('trelica_reports') && (
                                         <button onClick={() => setPage('trelica_reports')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelica_reports' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                            📊 Relatórios de Turno
+                                            📑 Relatórios de Turno
+                                        </button>
+                                    )}
+                                    {hasPermission('trelica_parts') && (
+                                        <button onClick={() => setPage('trelica_parts')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelica_parts' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                            🔧 Peças e Trocas
                                         </button>
                                     )}
                                 </div>

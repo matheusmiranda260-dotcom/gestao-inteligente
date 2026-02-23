@@ -262,15 +262,15 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser }) =
                 )}
 
                 {/* EM PRODUÇÃO */}
-                {(hasPermission('trefila_in_progress') || hasPermission('trefila_pending') || hasPermission('trefila_completed') || hasPermission('trefila_reports') || hasPermission('trefila_rings') ||
-                    hasPermission('trelica_in_progress') || hasPermission('trelica_pending') || hasPermission('trelica_completed') || hasPermission('trelica_reports') ||
+                {(hasPermission('trefila') || hasPermission('trefila_in_progress') || hasPermission('trefila_pending') || hasPermission('trefila_completed') || hasPermission('trefila_reports') || hasPermission('trefila_rings') ||
+                    hasPermission('trelica') || hasPermission('trelica_in_progress') || hasPermission('trelica_pending') || hasPermission('trelica_completed') || hasPermission('trelica_reports') ||
                     hasPermission('productionDashboard')) && (
                         <section>
                             <div className="section-title">
                                 <h2>Em Produção</h2>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-                                {(hasPermission('trefila_in_progress') || hasPermission('trefila_pending') || hasPermission('trefila_completed') || hasPermission('trefila_reports') || hasPermission('trefila_rings')) && (
+                                {(hasPermission('trefila') || hasPermission('trefila_in_progress') || hasPermission('trefila_pending') || hasPermission('trefila_completed') || hasPermission('trefila_reports') || hasPermission('trefila_rings')) && (
                                     <MenuButton
                                         onClick={() => setPage('trefila')}
                                         label="Produção (Trefila)"
@@ -279,7 +279,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser }) =
                                         color="cyan"
                                     />
                                 )}
-                                {(hasPermission('trelica_in_progress') || hasPermission('trelica_pending') || hasPermission('trelica_completed') || hasPermission('trelica_reports')) && (
+                                {(hasPermission('trelica') || hasPermission('trelica_in_progress') || hasPermission('trelica_pending') || hasPermission('trelica_completed') || hasPermission('trelica_reports')) && (
                                     <MenuButton
                                         onClick={() => setPage('trelica')}
                                         label="Produção (Treliça)"
