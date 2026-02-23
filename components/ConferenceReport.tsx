@@ -12,7 +12,6 @@ const ConferenceReport: React.FC<ConferenceReportProps> = ({ reportData, onClose
   const safeLots = (reportData.lots || []).map(lot => ({
     ...lot,
     labelWeight: Number(lot.labelWeight) || 0,
-    scaleWeight: Number(lot.scaleWeight) || 0,
   }));
   const totalLabelWeight = safeLots.reduce((acc, lot) => acc + lot.labelWeight, 0);
 
@@ -87,8 +86,6 @@ const ConferenceReport: React.FC<ConferenceReportProps> = ({ reportData, onClose
                 </thead>
                 <tbody className="text-black border-b-2 border-slate-900">
                   {safeLots.map((lot, index) => {
-                    const lotDiff = lot.scaleWeight - lot.labelWeight;
-                    const lotPercent = lot.labelWeight ? (lotDiff / lot.labelWeight) * 100 : 0;
                     const displaySupplier = lot.supplier || reportData.supplier;
 
                     return (

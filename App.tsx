@@ -441,7 +441,6 @@ const App: React.FC = () => {
                     details: {
                         action: 'Conferência de Recebimento',
                         weight: lot.labelWeight,
-                        'Peso Balança': lot.scaleWeight
                     }
                 }]
             }));
@@ -507,7 +506,6 @@ const App: React.FC = () => {
                         details: {
                             action: 'Conferência Editada',
                             weight: lot.labelWeight,
-                            'Peso Balança': lot.scaleWeight
                         }
                     }],
                     productionOrderIds: existingItem?.productionOrderIds,

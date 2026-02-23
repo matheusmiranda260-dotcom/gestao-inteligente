@@ -61,7 +61,6 @@ const EditConferenceModal: React.FC<{
                 bitola: FioMaquinaBitolaOptions[0],
                 materialType: 'Fio Máquina' as MaterialType,
                 labelWeight: 0,
-                scaleWeight: 0,
             }],
         }));
     };
@@ -121,7 +120,7 @@ const EditConferenceModal: React.FC<{
                     <table className="w-full text-sm">
                         <thead className="sticky top-0 bg-slate-100 z-10">
                             <tr>
-                                {['Lote Interno', 'Lote Fornecedor', 'Corrida', 'Tipo Material', 'Bitola', 'Peso Etiqueta (kg)', 'Peso Balança (kg)', ''].map(h => (
+                                {['Lote Interno', 'Lote Fornecedor', 'Corrida', 'Tipo Material', 'Bitola', 'Peso Etiqueta (kg)', ''].map(h => (
                                     <th key={h} className="p-2 text-left font-semibold text-slate-600">{h}</th>
                                 ))}
                             </tr>
@@ -151,9 +150,6 @@ const EditConferenceModal: React.FC<{
                                     </td>
                                     <td className="p-2">
                                         <input type="number" step="0.01" value={lot.labelWeight} onChange={e => handleLotChange(idx, 'labelWeight', parseFloat(e.target.value))} className="w-full p-2 border border-slate-300 rounded" required />
-                                    </td>
-                                    <td className="p-2">
-                                        <input type="number" step="0.01" value={lot.scaleWeight} onChange={e => handleLotChange(idx, 'scaleWeight', parseFloat(e.target.value))} className="w-full p-2 border border-slate-300 rounded" required />
                                     </td>
                                     <td className="p-2 text-center">
                                         <button type="button" onClick={() => handleRemoveLot(idx)} className="p-1 text-red-500 hover:text-red-700">
@@ -193,7 +189,6 @@ const FinishedConferencesModal: React.FC<FinishedConferencesModalProps> = ({ con
             bitola: s.bitola || '',
             materialType: s.materialType || 'Fio Máquina',
             labelWeight: Number(s.labelWeight) || 0,
-            scaleWeight: Number(s.initialQuantity || s.remainingQuantity) || 0,
             supplier: s.supplier || conf.supplier || '',
         }));
         return { ...conf, lots };
@@ -296,7 +291,6 @@ const FinishedConferencesModal: React.FC<FinishedConferencesModalProps> = ({ con
                                                                                 <th className="p-2 text-left font-semibold">Tipo de Material</th>
                                                                                 <th className="p-2 text-left font-semibold">Bitola</th>
                                                                                 <th className="p-2 text-right font-semibold">Peso Etiqueta (kg)</th>
-                                                                                <th className="p-2 text-right font-semibold">Peso Balança (kg)</th>
                                                                             </tr>
                                                                         </thead>
                                                                         <tbody>
@@ -307,7 +301,6 @@ const FinishedConferencesModal: React.FC<FinishedConferencesModalProps> = ({ con
                                                                                     <td className="p-2">{lot.materialType}</td>
                                                                                     <td className="p-2">{lot.bitola}</td>
                                                                                     <td className="p-2 text-right">{(Number(lot.labelWeight) || 0).toFixed(2)}</td>
-                                                                                    <td className="p-2 text-right font-bold">{(Number(lot.scaleWeight) || 0).toFixed(2)}</td>
                                                                                 </tr>
                                                                             ))}
                                                                         </tbody>

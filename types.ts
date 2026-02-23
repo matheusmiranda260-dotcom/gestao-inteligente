@@ -1,280 +1,165 @@
 // types.ts
 
-export interface TrelicaSelectedLots {
-    superior: string;
-    inferior1: string;
-    inferior2: string;
-    senozoide1: string;
-    senozoide2: string;
-    allSuperior?: string[];
-    allInferior?: string[];
-    allSenozoide?: string[];
-    allInferiorLeft?: string[];
-    allInferiorRight?: string[];
-    allSenozoideLeft?: string[];
-    allSenozoideRight?: string[];
-}
+export type Page = 'login' | 'menu' | 'stock' | 'stockAdd' | 'stockTransfer' | 'finishedGoods' | 'productionOrderTrelica' | 'productionOrder' | 'productionDashboard' | 'meetingsTasks' | 'continuousImprovement' | 'peopleManagement' | 'trefila' | 'trefilaInProgress' | 'trefilaPending' | 'trefilaCompleted' | 'trefilaRings' | 'trefilaReports' | 'trefilaWeighing' | 'trefilaTemplates' | 'trefilaParts' | 'trelica' | 'trelicaInProgress' | 'trelicaPending' | 'trelicaCompleted' | 'trelicaReports' | 'trelicaParts' | 'reports' | 'laboratory' | 'userManagement' | 'gaugesManager' | 'partsManager' | 'workInstructions' | 'people' | 'finished_goods' | 'spare_parts' | 'quality' | 'instructions' | 'weighing' | 'meetings';
 
-export type Page = 'login' | 'menu' | 'stock' | 'stockAdd' | 'stockTransfer' |
-    'trefila' | 'trefilaInProgress' | 'trefilaPending' | 'trefilaCompleted' | 'trefilaReports' | 'trefilaParts' | 'trefilaWeighing' | 'trefilaRings' |
-    'trelica' | 'trelicaInProgress' | 'trelicaPending' | 'trelicaCompleted' | 'trelicaReports' | 'trelicaParts' |
-    'productionOrder' | 'productionOrderTrelica' | 'reports' | 'userManagement' | 'productionDashboard' |
-    'finishedGoods' | 'partsManager' | 'continuousImprovement' | 'workInstructions' | 'peopleManagement' | 'gaugesManager' | 'meetingsTasks' | 'laboratory';
+export type MachineType = 'Trefila-01' | 'Trefila-02' | 'Trefila-03' | 'Trefila-04' | 'Treliça-01' | 'Treliça-02' | 'Treliça-03' | 'Treliça-04' | 'Corte-01' | 'Corte-02' | 'Trefila' | 'Treliça' | 'Geral' | 'Empilhadeira';
 
-export interface MeetingItem {
+export type MaterialType = 'Arame' | 'Treliça' | 'Ponta' | 'Fio Máquina' | 'Sucata' | 'CA-60' | 'CA-50';
+
+export type Bitola = string; // e.g., '3.40', '4,20', '8.00'
+
+export interface User {
     id: string;
-    content: string;
-    completed: boolean;
-    completedAt?: string;
-    assignedTo?: string;
-    category?: string;
-    pauta?: string;
-    dueDate?: string; // ISO date string for improvement deadline
-    itemType?: 'improvement' | 'idea';
+    username: string;
+    password?: string;
+    role: 'admin' | 'user' | 'gestor';
+    permissions?: Partial<Record<Page, boolean>>;
+    employeeId?: string;
 }
 
-export interface MeetingCategory {
-    id: string;
-    label: string;
-    icon_name?: string;
-    created_at?: string;
-}
-
-export interface Meeting {
-    id: string;
-    title: string;
-    meetingDate: string; // ISO string
-    createdAt: string;
-    author: string;
-    items: MeetingItem[];
-}
-
-export interface StickyNote {
-    id: string;
-    content: string;
-    color: string;
-    author: string;
-    date: string;
-    completed?: boolean;
-}
-
-export interface InstructionStep {
-    id: string;
-    order: number;
-    title: string;
-    description: string;
-    photoUrl?: string;
-}
-
-export interface WorkInstruction {
-    id: string;
-    title: string;
-    machine: string;
-    description: string;
-    steps: InstructionStep[];
-    updatedAt?: string;
-}
-
-export interface PartUsage {
-    id: string;
-    date: string; // ISO string
-    quantity: number;
-    machine: string;
-    reason?: string;
-    user?: string;
-    type?: 'IN' | 'OUT';
-}
-
-export interface SparePart {
+export interface Employee {
     id: string;
     name: string;
-    description?: string;
-    model: string;
-    machine: string;
-    currentStock: number;
-    minStock: number;
-    location?: string;
-    lastUpdated?: string;
-    imageUrl?: string;
-    history?: PartUsage[];
-}
+    photoUrl?: string; // Mapped from photo_url
+    sector: string;
+    shift: string;
+    active: boolean;
+    appUserId?: string;
+    createdAt?: string;
 
-export type MachineType = 'Trefila' | 'Treliça';
-
-export const FioMaquinaBitolaOptions = ['8.00', '7.00', '6.50', '6.35', '5.50'] as const;
-export const TrefilaBitolaOptions = ['3.40', '3.80', '4.20', '4.60', '5.00', '5.40', '6.00', '6.35', '3.20', '5.60', '5.80', '8.00', '6.00', '5.00'] as const;
-export type Bitola = string;
-
-export interface StockGauge {
-    id: string;
-    materialType: string;
-    gauge: string;
-}
-
-export const MaterialOptions = ['Fio Máquina', 'CA-60'] as const;
-export type MaterialType = typeof MaterialOptions[number];
-
-export interface HistoryEvent {
-    type: string;
-    date: string; // ISO string
-    details: Record<string, string | number>;
+    // Personnel Details
+    jobTitle?: string;
+    admissionDate?: string;
+    birthDate?: string;
+    maritalStatus?: string;
+    childrenCount?: number;
+    phone?: string;
+    email?: string;
+    managerId?: string;
+    orgPositionId?: string;
 }
 
 export interface StockItem {
     id: string;
-    entryDate: string; // ISO string
-    supplier: string;
-    nfe: string;
-    conferenceNumber: string;
     internalLot: string;
-    supplierLot: string;
-    runNumber: string;
-    materialType: MaterialType;
+    supplierLot?: string;
+    runNumber?: string;
+    model?: string;
     bitola: Bitola;
-    labelWeight: number;
-    initialQuantity: number;
+    quantity?: number;
+    weight?: number;
+    labelWeight?: number;
+    initialQuantity?: number;
     remainingQuantity: number;
-    status: 'Disponível' | 'Em Produção' | 'Em Produção - Treliça' | 'Em Produção - Trefila' | 'Transferido' | 'Disponível - Suporte Treliça' | 'CA-60' | 'Consumido para fazer treliça';
-    history?: HistoryEvent[];
+    sector?: string;
+    materialType: MaterialType | string;
+    supplier?: string;
+    nfe?: string;
+    conferenceNumber?: string;
+    entryDate?: string;
+    status: string;
+    history?: any[];
+    lastMovement?: string;
+    subSlot?: string;
     productionOrderIds?: string[];
-    location?: string | null;
-    lastAuditDate?: string | null;
-    auditObservation?: string | null;
+    location?: string;
+    lastAuditDate?: string;
+    auditObservation?: string;
 }
 
 export interface ConferenceLotData {
     internalLot: string;
     supplierLot: string;
     runNumber: string;
+    materialType: string | MaterialType;
     bitola: Bitola;
-    materialType: MaterialType;
     labelWeight: number;
-    scaleWeight: number;
     supplier?: string;
 }
 
 export interface ConferenceData {
-    id?: string;
-    entryDate: string; // ISO string
+    id: string;
+    date: string;
+    entryDate: string;
+    operator: string;
     supplier: string;
     nfe: string;
     conferenceNumber: string;
     lots: ConferenceLotData[];
 }
 
-export interface ProductionRecord {
-    id: string;
-    date: string; // ISO string
-    machine: MachineType;
-    producedWeight: number;
-    consumedLots: { id: string; consumedQuantity: number }[];
-    scrapWeight?: number;
-}
-
-export interface User {
-    id: string;
-    username: string;
-    password: string;
-    role: 'admin' | 'user' | 'gestor';
-    permissions?: Partial<Record<Page, boolean>>;
-    employeeId?: string;
-}
-
-export interface DowntimeEvent {
-    stopTime: string; // ISO string
-    resumeTime: string | null; // ISO string or null
-    reason: string;
-}
-
-export interface ProcessedLot {
-    lotId: string;
-    finalWeight: number | null;
-    measuredGauge?: number; // Bitola aferida em mm
-    startTime: string; // ISO string
-    endTime: string; // ISO string
-}
-
-export interface OperatorLog {
-    operator: string;
-    startTime: string; // ISO string
-    endTime?: string | null; // ISO string or null
-    startQuantity?: number;
-    endQuantity?: number;
-    postProductionActivities?: {
-        timestamp: string; // ISO string
-        description: string;
-    }[];
-}
-
-export interface WeighedPackage {
-    packageNumber: number;
-    quantity: number;
-    weight: number;
-    timestamp: string;
-}
-
-export interface Ponta {
-    quantity: number;
-    size: number; // in meters
-    totalWeight: number;
-}
-
 export interface ProductionOrderData {
     id: string;
     orderNumber: string;
+    startTime: string;
+    endTime?: string;
+    creationDate?: string;
+    status: 'Inativa' | 'Ativa' | 'Finalizado' | 'pending' | 'completed' | 'Cancelada' | string;
     machine: MachineType;
+    operator: string;
     targetBitola: Bitola;
     trelicaModel?: string;
     tamanho?: string;
-    quantityToProduce?: number;
-    selectedLotIds: string[] | TrelicaSelectedLots;
-    totalWeight: number; // Peso da matéria prima
-    plannedOutputWeight?: number; // Peso planejado do produto final (ex: Qtd * Peso Final da Treliça)
-    status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-    creationDate: string; // ISO string
-    startTime?: string; // ISO string
-    endTime?: string; // ISO string
-    downtimeEvents?: DowntimeEvent[];
-    processedLots?: ProcessedLot[];
+    quantityToProduce: number;
+    scraps?: { type: string; weight: number }[];
+    stops?: { reason: string; duration: number }[];
+    totalProducedMeters?: number;
+    totalProducedWeight?: number;
     actualProducedWeight?: number;
-    operatorLogs?: OperatorLog[];
-    activeLotProcessing?: { lotId?: string; startTime?: string; } | null;
     actualProducedQuantity?: number;
-    scrapWeight?: number;
-    weighedPackages?: WeighedPackage[];
+    plannedOutputWeight?: number;
+    averageSpeed?: number;
+    summary?: any;
+    selectedLotIds?: any;
+    totalWeight?: number;
+    weighedPackages?: any[];
+    processedLots?: any[];
+    downtimeEvents?: any[];
+    operatorLogs?: any[];
+    activeLotProcessing?: { lotId: string; startTime: string };
     pontas?: Ponta[];
-    lastQuantityUpdate?: string; // ISO string
+    lastQuantityUpdate?: string;
+    scrapWeight?: number;
+    scrapx?: { type: string; weight: number }[]; // Compatibility if typo was used
 }
 
-export interface FinishedProductItem {
+export interface TransferRecord {
     id: string;
-    productionDate: string; // ISO string
-    productionOrderId: string;
-    orderNumber: string;
-    productType: 'Treliça';
-    model: string;
-    size: string;
-    quantity: number;
-    totalWeight: number;
-    status: 'Disponível' | 'Vendido' | 'Transferido';
+    date: string;
+    operator: string;
+    destinationSector: string;
+    transferredLots: TransferredLotInfo[];
 }
 
-export interface PontaItem {
+export interface TransferredLotInfo {
+    id?: string;
+    lotId?: string;
+    internalLot?: string;
+    materialType?: string;
+    bitola?: string;
+    transferredQuantity?: number;
+    model?: string;
+    quantity?: number;
+    weight?: number;
+    originalSector?: string;
+}
+
+export interface ProductionRecord {
     id: string;
-    productionDate: string; // ISO string
-    productionOrderId: string;
-    orderNumber: string;
-    productType: 'Ponta de Treliça';
-    model: string;
-    size: string; // The size of the ponta, e.g., "7" for 7m
-    quantity: number;
-    totalWeight: number;
-    status: 'Disponível' | 'Vendido' | 'Transferido';
+    productionOrderId?: string;
+    date: string;
+    machine: MachineType;
+    operator?: string;
+    producedWeight: number;
+    producedQuantity?: number;
+    bitola?: Bitola;
+    model?: string;
+    consumedLots?: any[];
 }
 
 export interface PartsRequest {
     id: string;
-    date: string; // ISO string
+    date: string;
     operator: string;
     machine: MachineType;
     productionOrderId: string;
@@ -286,40 +171,96 @@ export interface PartsRequest {
 
 export interface ShiftReport {
     id: string;
-    date: string; // End of shift date
-    operator: string;
     machine: MachineType;
+    operator: string;
     productionOrderId: string;
-    orderNumber: string;
-    targetBitola: Bitola;
+    orderNumber?: string;
+    targetBitola?: Bitola;
     trelicaModel?: string;
     tamanho?: string;
     quantityToProduce?: number;
-    shiftStartTime: string;
-    shiftEndTime: string;
-    processedLots: ProcessedLot[];
-    downtimeEvents: DowntimeEvent[];
-    totalProducedQuantity: number;
-    totalProducedWeight: number;
-    totalProducedMeters: number;
-    totalScrapWeight: number;
-    scrapPercentage: number;
+    shiftStartTime?: string;
+    shiftEndTime?: string;
+    processedLots?: any[];
+    downtimeEvents?: any[];
+    totalProducedQuantity?: number;
+    totalProducedWeight?: number;
+    totalProducedMeters?: number;
+    totalScrapWeight?: number;
+    scrapPercentage?: number;
+    date?: string;
+
+    // Optional old fields
+    startTime?: string;
+    endTime?: string;
+    totalWeight?: number;
+    totalPcs?: number;
+    scraps?: { type: string; weight: number }[];
+    stops?: { reason: string; duration: number }[];
 }
 
-export interface TransferredLotInfo {
+export interface ProcessedLot {
     lotId: string;
-    internalLot: string;
-    materialType: MaterialType;
-    bitola: Bitola;
-    transferredQuantity: number;
+    finalWeight: number | null;
+    measuredGauge?: number;
+    startTime: string;
+    endTime: string;
 }
 
-export interface TransferRecord {
-    id: string; // e.g., TRANSF-001
-    date: string; // ISO string
+export interface DowntimeEvent {
+    id?: string;
+    stopTime: string;
+    resumeTime: string | null;
+    reason: string;
+}
+
+export interface OperatorLog {
     operator: string;
-    destinationSector: string;
-    transferredLots: TransferredLotInfo[];
+    startTime: string;
+    endTime?: string | null;
+    startQuantity?: number;
+    endQuantity?: number;
+}
+
+export interface WeighedPackage {
+    id?: string;
+    weight: number;
+    timestamp: string;
+    packageNumber: number;
+    quantity?: number;
+}
+
+export interface FinishedProductItem {
+    id: string;
+    productionDate: string;
+    productionOrderId: string;
+    orderNumber: string;
+    productType: 'Treliça';
+    model: string;
+    size: string;
+    quantity: number;
+    totalWeight: number;
+    status: 'Disponível' | 'Vendido' | 'Transferido';
+}
+
+export interface Ponta {
+    size: number;
+    weight?: number;
+    quantity: number;
+    totalWeight: number;
+}
+
+export interface PontaItem {
+    id: string;
+    productionDate: string;
+    productionOrderId: string;
+    orderNumber: string;
+    productType: 'Ponta de Treliça';
+    model: string;
+    size: string;
+    quantity: number;
+    totalWeight: number;
+    status: 'Disponível' | 'Vendido' | 'Transferido';
 }
 
 export interface TransferredFinishedGoodInfo {
@@ -333,29 +274,11 @@ export interface TransferredFinishedGoodInfo {
 
 export interface FinishedGoodsTransferRecord {
     id: string;
-    date: string; // ISO string
+    date: string;
     operator: string;
     destinationSector: string;
     otherDestination?: string;
     transferredItems: TransferredFinishedGoodInfo[];
-}
-
-export interface TrefilaRecipe {
-    id: string;
-    name: string;
-    type: 'K-7 CA 60' | string;
-    entryDiameter: number;
-    finalDiameter: number;
-    passes: number;
-    passDiameters: number[];
-    passRings: { entry: string; output: string }[];
-    createdAt?: string;
-}
-
-export interface TrefilaRingStock {
-    id: string;
-    model: string;
-    quantity: number;
 }
 
 export interface KaizenAction {
@@ -378,121 +301,31 @@ export interface KaizenProblem {
     responsibleIds?: string[];
 }
 
-export interface Employee {
+export interface MeetingItem {
     id: string;
-    name: string;
-    photoUrl?: string; // Mapped from photo_url
-    sector: string;
-    shift: string;
-    active: boolean;
-    appUserId?: string;
+    content: string;
+    completed: boolean;
+    completedAt?: string;
+    itemType?: 'improvement' | 'idea';
+    dueDate?: string;
+    category?: string;
+    pauta?: string;
+}
+
+export interface Meeting {
+    id: string;
+    title: string;
+    meetingDate: string;
+    categoryId?: string;
     createdAt?: string;
-    // New fields
-    jobTitle?: string;
-    admissionDate?: string;
-    birthDate?: string;
-    maritalStatus?: string;
-    childrenCount?: number;
-    phone?: string;
-    email?: string;
-    managerId?: string;
-    orgPositionId?: string; // Link to the Org Chart Position
+    author?: string;
+    items: MeetingItem[];
 }
 
-export interface OrgUnit {
+export interface MeetingCategory {
     id: string;
-    name: string;
-    unitType?: 'machine' | 'department' | 'sector';
-    parentId?: string;
-    displayOrder: number;
-}
-
-export interface OrgPosition {
-    id: string;
-    orgUnitId: string;
-    title: string;
-    description?: string; // Detailed Job Description
-    isLeadership: boolean;
-    displayOrder: number;
-}
-
-export interface EmployeeCourse {
-    id: string;
-    employeeId: string;
-    courseName: string;
-    institution?: string;
-    completionDate?: string;
-    expiryDate?: string;
-    status: 'Concluído' | 'Em Andamento' | 'Pendente';
-    educationType?: 'Escolaridade' | 'Graduação' | 'Pós-Graduação' | 'Técnico' | 'Curso Livre' | 'Certificação';
-    attachmentUrl?: string; // Link to certificate/diploma
-    workloadHours?: number;
-}
-
-export interface EmployeeAbsence {
-    id: string;
-    employeeId: string;
-    startDate: string;
-    endDate?: string;
-    reason: string;
-    type?: string;
-    attachmentUrl?: string;
-}
-
-export interface EmployeeVacation {
-    id: string;
-    employeeId: string;
-    startDate: string;
-    endDate: string;
-    status: 'Programada' | 'Gozada' | 'Vendida' | 'Cancelada';
-}
-
-export interface EmployeeResponsibility {
-    id: string;
-    employeeId: string;
-    description: string;
-    isCritical: boolean;
-}
-
-export interface Evaluation {
-    id: string;
-    employeeId: string; // Mapped from employee_id
-    evaluator: string;
-    date: string;
-    organizationScore: number;
-    cleanlinessScore: number;
-    effortScore: number;
-    communicationScore: number;
-    improvementScore: number;
-    totalScore: number;
-    note?: string;
-    photoUrl?: string;
-}
-
-export interface Achievement {
-    id: string;
-    employeeId: string;
-    type: 'model_area' | 'idea_month' | 'highlight_week' | 'custom';
-    title: string;
-    description?: string;
-    date: string;
-}
-
-export interface EmployeeDocument {
-    id: string;
-    employeeId: string;
-    title: string;
-    type: string;
-    url: string;
-    createdAt: string;
-}
-
-
-
-export interface RowConfig {
-    rowName: string;
-    baseSize: number;
-    maxHeight: number;
+    label: string;
+    icon_name?: string;
 }
 
 export interface StickyNote {
@@ -504,11 +337,25 @@ export interface StickyNote {
     completed?: boolean;
 }
 
+export interface StockGauge {
+    id: string;
+    gauge: string;
+    materialType: MaterialType | string;
+    minWeight?: number;
+    idealWeight?: number;
+}
+
 export interface LabAnalysisEntry {
     id: string;
     lote: string;
     fornecedor: string;
     bitola_mp?: string;
+    bitola_saida_ideal?: string;
+    qtd_k7_ideal?: string;
+    k7_1_ideal?: number | null;
+    k7_2_ideal?: number | null;
+    k7_3_ideal?: number | null;
+    k7_4_ideal?: number | null;
     k7_1_entrada: number | null;
     k7_1_saida: number | null;
     k7_2_entrada: number | null;
@@ -525,10 +372,156 @@ export interface LabAnalysisEntry {
     alongamento: number | null;
     date: string;
     operator: string;
-    bitola_saida_ideal?: string | null;
-    qtd_k7_ideal?: string | null;
-    k7_1_ideal?: number | null;
-    k7_2_ideal?: number | null;
-    k7_3_ideal?: number | null;
-    k7_4_ideal?: number | null;
 }
+
+export interface TrefilaRecipe {
+    id: string;
+    name: string;
+    type: string;
+    entryDiameter: number;
+    finalDiameter: number;
+    passes: number;
+    passDiameters: number[];
+    passRings: { entry: string; output: string }[];
+}
+
+export interface TrefilaRingStock {
+    id: string;
+    model: string;
+    quantity: number;
+}
+
+export interface Evaluation {
+    id: string;
+    employeeId: string;
+    evaluator: string;
+    date: string;
+    organizationScore: number;
+    cleanlinessScore: number;
+    effortScore: number;
+    communicationScore: number;
+    improvementScore: number;
+    totalScore: number;
+    note?: string;
+    photoUrl?: string;
+}
+
+export interface Achievement {
+    id: string;
+    employeeId: string;
+    type: string;
+    title: string;
+    description?: string;
+    date: string;
+}
+
+export interface EmployeeCourse {
+    id: string;
+    employeeId: string;
+    courseName: string;
+    institution?: string;
+    educationType?: string;
+    completionDate?: string | null;
+    expiryDate?: string | null;
+    workloadHours?: number | null;
+    status: string;
+    attachmentUrl?: string | null;
+}
+
+export interface EmployeeAbsence {
+    id: string;
+    employeeId: string;
+    type: string;
+    startDate: string;
+    endDate?: string | null;
+    reason: string;
+    attachmentUrl?: string | null;
+}
+
+export interface EmployeeVacation {
+    id: string;
+    employeeId: string;
+    period?: string;
+    startDate: string;
+    endDate: string;
+    status: string;
+}
+
+export interface EmployeeResponsibility {
+    id: string;
+    employeeId: string;
+    description: string;
+    isCritical: boolean;
+}
+
+export interface OrgUnit {
+    id: string;
+    name: string;
+    unitType?: string;
+    parentId?: string;
+    displayOrder: number;
+}
+
+export interface OrgPosition {
+    id: string;
+    orgUnitId: string;
+    title: string;
+    description?: string;
+    isLeadership: boolean;
+    displayOrder: number;
+}
+
+export interface EmployeeDocument {
+    id: string;
+    employeeId: string;
+    title: string;
+    type: string;
+    url: string;
+    createdAt?: string;
+}
+
+export interface TrelicaSelectedLots {
+    [key: string]: any;
+}
+
+export interface SparePart {
+    id: string;
+    name: string;
+    model: string;
+    machine: string;
+    currentStock: number;
+    minStock: number;
+    imageUrl?: string;
+}
+
+export interface PartUsage {
+    id: string;
+    date: string;
+    quantity: number;
+    machine: string;
+    reason: string;
+    user: string;
+    type: 'IN' | 'OUT';
+}
+
+export interface InstructionStep {
+    id: string;
+    order: number;
+    title: string;
+    description: string;
+    photoUrl?: string;
+}
+
+export interface WorkInstruction {
+    id: string;
+    title: string;
+    machine: string;
+    description: string;
+    steps: InstructionStep[];
+    updatedAt?: string;
+}
+
+export const trelicaLabels = ['H08 (8m)', 'H12 (12m)', 'H6 (6m)', 'H10 (10m)'];
+export const MaterialOptions = ['Arame', 'Treliça', 'Ponta', 'Fio Máquina', 'Sucata', 'CA-60', 'CA-50'];
+export const FioMaquinaBitolaOptions = ['8', '7', '6.5', '6.35', '5.5'];
+export const TrefilaBitolaOptions = ['3.40', '3.80', '4.20', '4,20', '5', '6', '6.35', '3.20', '5.60', '5.80', '6.00', '4.40', '5.50'];
