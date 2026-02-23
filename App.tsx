@@ -429,6 +429,7 @@ const App: React.FC = () => {
                 internalLot: lot.internalLot,
                 supplierLot: '', // No longer used in UI
                 runNumber: lot.runNumber,
+                steelType: lot.steelType || '1006',
                 materialType: lot.materialType,
                 bitola: lot.bitola,
                 labelWeight: lot.labelWeight,
@@ -494,6 +495,7 @@ const App: React.FC = () => {
                     internalLot: lot.internalLot,
                     supplierLot: '', // No longer used
                     runNumber: lot.runNumber,
+                    steelType: lot.steelType || '1006',
                     materialType: lot.materialType,
                     bitola: lot.bitola,
                     labelWeight: lot.labelWeight,

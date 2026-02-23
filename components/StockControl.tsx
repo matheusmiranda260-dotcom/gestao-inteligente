@@ -7,7 +7,7 @@ import type {
     ConferenceLotData, ConferenceData, StockItem, Bitola, MaterialType, Page, StockGauge, User, TransferRecord
 } from '../types';
 import {
-    FioMaquinaBitolaOptions, TrefilaBitolaOptions, MaterialOptions, CA60BitolaOptions
+    FioMaquinaBitolaOptions, TrefilaBitolaOptions, MaterialOptions, CA60BitolaOptions, SteelTypeOptions
 } from '../types';
 import { extractLotDataFromImage } from '../services/geminiService';
 import ConferenceReport from './ConferenceReport';
@@ -44,7 +44,7 @@ const AddConferencePage: React.FC<{
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
     const [lots, setLots] = useState<Partial<ConferenceLotData>[]>([{
-        internalLot: '', runNumber: '', bitola: '8.00', materialType: 'Fio Máquina', labelWeight: 0
+        internalLot: '', runNumber: '', steelType: '1006', bitola: '8.00', materialType: 'Fio Máquina', labelWeight: 0
     }]);
     const [duplicateErrors, setDuplicateErrors] = useState<Record<number, string>>({});
     const [historyOpen, setHistoryOpen] = useState(false);
@@ -132,12 +132,20 @@ const AddConferencePage: React.FC<{
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead className="bg-slate-50 border-y">
-                                <tr>{['Lote Interno', 'Corrida', 'Material', 'Bitola', 'Peso Etiqueta', ''].map(h => <th key={h} className="p-3 text-left font-bold text-slate-600 uppercase text-[10px]">{h}</th>)}</tr>
+                                <tr>{['Lote Interno', 'Tipo de Aço', 'Corrida', 'Material', 'Bitola', 'Peso Etiqueta', ''].map(h => <th key={h} className="p-3 text-left font-bold text-slate-600 uppercase text-[10px]">{h}</th>)}</tr>
                             </thead>
                             <tbody>
                                 {lots.map((lot, index) => (
                                     <tr key={index} className="border-b">
-                                        <td className="p-2"><input type="text" value={lot.internalLot || ''} onChange={e => handleLotChange(index, 'internalLot', e.target.value)} className="w-full p-2 border rounded" required />{duplicateErrors[index] && <p className="text-red-500 text-[9px] font-bold">{duplicateErrors[index]}</p>}</td>
+                                        <td className="p-2">
+                                            <input type="text" value={lot.internalLot || ''} onChange={e => handleLotChange(index, 'internalLot', e.target.value)} className="w-full p-2 border rounded" required />
+                                            {duplicateErrors[index] && <p className="text-red-500 text-[9px] font-bold">{duplicateErrors[index]}</p>}
+                                        </td>
+                                        <td className="p-2">
+                                            <select value={lot.steelType || ''} onChange={e => handleLotChange(index, 'steelType', e.target.value)} className="w-full p-2 border rounded" required>
+                                                {SteelTypeOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                                            </select>
+                                        </td>
                                         <td className="p-2"><input type="text" value={lot.runNumber || ''} onChange={e => handleLotChange(index, 'runNumber', e.target.value)} className="w-full p-2 border rounded" required /></td>
                                         <td className="p-2"><select value={lot.materialType} onChange={e => handleLotChange(index, 'materialType', e.target.value)} className="w-full p-2 border rounded">{MaterialOptions.map(m => <option key={m} value={m}>{m}</option>)}</select></td>
                                         <td className="p-2">
@@ -279,8 +287,20 @@ const EditStockItemModal: React.FC<{ item: StockItem; onClose: () => void; onSav
                             <input type="text" value={formData.internalLot} onChange={e => setFormData({ ...formData, internalLot: e.target.value })} className="w-full px-3 py-2 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required />
                         </div>
                         <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Tipo de Aço</label>
+                            <select value={formData.steelType || ''} onChange={e => setFormData({ ...formData, steelType: e.target.value })} className="w-full px-3 py-2 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                                {SteelTypeOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
                             <label className="text-xs font-bold text-slate-500 uppercase">NFe</label>
                             <input type="text" value={formData.nfe} onChange={e => setFormData({ ...formData, nfe: e.target.value })} className="w-full px-3 py-2 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Corrida</label>
+                            <input type="text" value={formData.runNumber || ''} onChange={e => setFormData({ ...formData, runNumber: e.target.value })} className="w-full px-3 py-2 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
                         </div>
                     </div>
 

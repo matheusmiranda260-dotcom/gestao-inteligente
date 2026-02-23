@@ -65,11 +65,13 @@ export interface StockItem {
     location?: string;
     lastAuditDate?: string;
     auditObservation?: string;
+    steelType?: string;
 }
 
 export interface ConferenceLotData {
     internalLot: string;
     runNumber: string;
+    steelType: string;
     materialType: string | MaterialType;
     bitola: Bitola;
     labelWeight: number;
@@ -525,3 +527,4 @@ export const MaterialOptions = ['Fio Máquina', 'CA-60'];
 export const FioMaquinaBitolaOptions = ['8.00', '7.00', '6.50', '6.35', '5.50'];
 export const CA60BitolaOptions = ['3.40', '3.80', '4.20', '4.40', '5.00', '5.50', '5.60', '5.80', '6.00', '6.35', '7.00'];
 export const TrefilaBitolaOptions = CA60BitolaOptions; // Keeping for compatibility
+export const SteelTypeOptions = ['1006', '1008', '1010', '1012', '1015', '1018', 'Outro'];

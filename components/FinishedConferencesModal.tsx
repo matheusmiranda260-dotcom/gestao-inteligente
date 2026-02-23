@@ -1,7 +1,7 @@
 // FinishedConferencesModal.tsx
 import React, { useState, useEffect } from 'react';
 import type { ConferenceData, ConferenceLotData, StockItem, Bitola, MaterialType } from '../types';
-import { MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions, CA60BitolaOptions } from '../types';
+import { MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions, CA60BitolaOptions, SteelTypeOptions } from '../types';
 import { PrinterIcon, PencilIcon, TrashIcon, WarningIcon } from './icons';
 
 interface FinishedConferencesModalProps {
@@ -126,8 +126,8 @@ const EditConferenceModal: React.FC<{
                     <table className="w-full text-sm">
                         <thead className="sticky top-0 bg-slate-100 z-10">
                             <tr>
-                                {['Lote Interno', 'Corrida', 'Tipo Material', 'Bitola', 'Peso Etiqueta (kg)', ''].map(h => (
-                                    <th key={h} className="p-2 text-left font-semibold text-slate-600">{h}</th>
+                                {['Lote Interno', 'Tipo de Aço', 'Corrida', 'Tipo Material', 'Bitola', 'Peso Etiqueta (kg)', ''].map(h => (
+                                    <th key={h} className="p-2 text-left font-semibold text-slate-600 space-nowrap whitespace-nowrap">{h}</th>
                                 ))}
                             </tr>
                         </thead>
@@ -137,6 +137,11 @@ const EditConferenceModal: React.FC<{
                                     <td className="p-2">
                                         <input type="text" value={lot.internalLot} onChange={e => handleLotChange(idx, 'internalLot', e.target.value)} className="w-full p-2 border border-slate-300 rounded" required />
                                         {duplicateErrors[idx] && <p className="text-red-500 text-xs mt-1">{duplicateErrors[idx]}</p>}
+                                    </td>
+                                    <td className="p-2">
+                                        <select value={lot.steelType || ''} onChange={e => handleLotChange(idx, 'steelType', e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white">
+                                            {SteelTypeOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                                        </select>
                                     </td>
                                     <td className="p-2">
                                         <input type="text" value={lot.runNumber} onChange={e => handleLotChange(idx, 'runNumber', e.target.value)} className="w-full p-2 border border-slate-300 rounded" required />
@@ -200,6 +205,7 @@ const FinishedConferencesModal: React.FC<FinishedConferencesModalProps> = ({ con
         const lots: ConferenceLotData[] = stockItems.map(s => ({
             internalLot: s.internalLot || '',
             runNumber: s.runNumber || '',
+            steelType: s.steelType || '1006',
             bitola: s.bitola || '',
             materialType: s.materialType || 'Fio Máquina',
             labelWeight: Number(s.labelWeight) || 0,
