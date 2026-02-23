@@ -1328,16 +1328,15 @@ const MachineControl: React.FC<MachineControlProps> = ({
                         </div>
                     )}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-                        {hasPermission(machinePrefix === 'trefila' ? 'trefila_in_progress' : 'trelica_in_progress') && (
+                        {hasPermission(machinePrefix === 'trefila' ? 'trefilaInProgress' : 'trelicaInProgress') && (
                             <MachineMenuButton
                                 onClick={() => setView('in_progress')}
                                 label={postProductionOrder ? "Acompanhar" : "Painel"}
                                 description={postProductionOrder ? "Pós-Produção" : "Em Produção"}
                                 icon={<CogIcon className={`h-6 w-6 ${activeOrder ? 'animate-spin' : ''}`} />}
-                                disabled={!activeOrder && !postProductionOrder}
                             />
                         )}
-                        {hasPermission(machinePrefix === 'trefila' ? 'trefila_pending' : 'trelica_pending') && (
+                        {hasPermission(machinePrefix === 'trefila' ? 'trefilaPending' : 'trelicaPending') && (
                             <MachineMenuButton
                                 onClick={() => setView('pending')}
                                 label="Fila"
@@ -1345,7 +1344,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                 icon={<ClipboardListIcon className="h-6 w-6" />}
                             />
                         )}
-                        {hasPermission(machinePrefix === 'trefila' ? 'trefila_completed' : 'trelica_completed') && (
+                        {hasPermission(machinePrefix === 'trefila' ? 'trefilaCompleted' : 'trelicaCompleted') && (
                             <MachineMenuButton
                                 onClick={() => setView('completed')}
                                 label="Histórico"
@@ -1353,7 +1352,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                 icon={<ArchiveIcon className="h-6 w-6" />}
                             />
                         )}
-                        {hasPermission(machinePrefix === 'trefila' ? 'trefila_reports' : 'trelica_reports') && (
+                        {hasPermission(machinePrefix === 'trefila' ? 'trefilaReports' : 'trelicaReports') && (
                             <MachineMenuButton
                                 onClick={() => setShowShiftReportsModal(true)}
                                 label="Turnos"
@@ -1361,7 +1360,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                 icon={<DocumentReportIcon className="h-6 w-6" />}
                             />
                         )}
-                        {machineType === 'Trefila' && hasPermission('trefila_rings') && (
+                        {machineType === 'Trefila' && hasPermission('trefilaRings') && (
                             <MachineMenuButton
                                 onClick={() => setShowTrefilaCalculation(true)}
                                 label="Simulação"

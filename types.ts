@@ -15,9 +15,9 @@ export interface TrelicaSelectedLots {
     allSenozoideRight?: string[];
 }
 
-export type Page = 'login' | 'menu' | 'stock' | 'stock_add' | 'stock_transfer' |
-    'trefila' | 'trefila_in_progress' | 'trefila_pending' | 'trefila_completed' | 'trefila_reports' | 'trefila_parts' | 'trefila_weighing' | 'trefila_rings' |
-    'trelica' | 'trelica_in_progress' | 'trelica_pending' | 'trelica_completed' | 'trelica_reports' | 'trelica_parts' |
+export type Page = 'login' | 'menu' | 'stock' | 'stockAdd' | 'stockTransfer' |
+    'trefila' | 'trefilaInProgress' | 'trefilaPending' | 'trefilaCompleted' | 'trefilaReports' | 'trefilaParts' | 'trefilaWeighing' | 'trefilaRings' |
+    'trelica' | 'trelicaInProgress' | 'trelicaPending' | 'trelicaCompleted' | 'trelicaReports' | 'trelicaParts' |
     'productionOrder' | 'productionOrderTrelica' | 'reports' | 'userManagement' | 'productionDashboard' |
     'finishedGoods' | 'partsManager' | 'continuousImprovement' | 'workInstructions' | 'peopleManagement' | 'gaugesManager' | 'meetingsTasks' | 'laboratory';
 

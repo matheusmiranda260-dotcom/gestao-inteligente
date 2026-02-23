@@ -34,11 +34,11 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
     };
 
     React.useEffect(() => {
-        if (['stock', 'stock_add', 'stock_transfer'].includes(page)) {
+        if (['stock', 'stockAdd', 'stockTransfer'].includes(page)) {
             setExpandedMenus(prev => prev.includes('stock') ? prev : [...prev, 'stock']);
-        } else if (['trefila', 'trefila_in_progress', 'trefila_pending', 'trefila_completed', 'trefila_reports', 'trefila_parts', 'trefila_weighing', 'trefila_rings'].includes(page)) {
+        } else if (['trefila', 'trefilaInProgress', 'trefilaPending', 'trefilaCompleted', 'trefilaReports', 'trefilaParts', 'trefilaWeighing', 'trefilaRings'].includes(page)) {
             setExpandedMenus(prev => prev.includes('trefila') ? prev : [...prev, 'trefila']);
-        } else if (['trelica', 'trelica_in_progress', 'trelica_pending', 'trelica_completed', 'trelica_reports', 'trelica_parts'].includes(page)) {
+        } else if (['trelica', 'trelicaInProgress', 'trelicaPending', 'trelicaCompleted', 'trelicaReports', 'trelicaParts'].includes(page)) {
             setExpandedMenus(prev => prev.includes('trelica') ? prev : [...prev, 'trelica']);
         } else if (['peopleManagement', 'continuousImprovement'].includes(page)) {
             setExpandedMenus(prev => prev.includes('people') ? prev : [...prev, 'people']);
@@ -115,11 +115,11 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                     <div className="sidebar-category-title">{isCollapsed ? '🏭' : '🏭 Produção'}</div>
 
                     {/* Trefila Collapsible */}
-                    {(hasPermission('trefila') || hasPermission('trefila_in_progress') || hasPermission('trefila_weighing') || hasPermission('trefila_pending') || hasPermission('trefila_completed') || hasPermission('trefila_reports') || hasPermission('trefila_rings') || hasPermission('trefila_parts')) && (
+                    {(hasPermission('trefila') || hasPermission('trefilaInProgress') || hasPermission('trefilaWeighing') || hasPermission('trefilaPending') || hasPermission('trefilaCompleted') || hasPermission('trefilaReports') || hasPermission('trefilaRings') || hasPermission('trefilaParts')) && (
                         <>
                             <button
                                 onClick={() => toggleMenu('trefila')}
-                                className={`sidebar-item ${['trefila', 'trefila_in_progress', 'trefila_pending', 'trefila_completed', 'trefila_reports', 'trefila_parts'].includes(page) ? 'active' : ''} justify-between group`}
+                                className={`sidebar-item ${['trefila', 'trefilaInProgress', 'trefilaPending', 'trefilaCompleted', 'trefilaReports', 'trefilaParts'].includes(page) ? 'active' : ''} justify-between group`}
                                 title={isCollapsed ? 'Produção – Trefila' : ''}
                             >
                                 <div className="flex items-center gap-3 overflow-hidden">
@@ -140,38 +140,38 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                                             📊 Dashboard Trefila
                                         </button>
                                     )}
-                                    {hasPermission('trefila_in_progress') && (
-                                        <button onClick={() => setPage('trefila_in_progress')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_in_progress' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                    {hasPermission('trefilaInProgress') && (
+                                        <button onClick={() => setPage('trefilaInProgress')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaInProgress' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             ⚙️ Em Produção
                                         </button>
                                     )}
-                                    {hasPermission('trefila_weighing') && (
-                                        <button onClick={() => setPage('trefila_weighing')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_weighing' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                    {hasPermission('trefilaWeighing') && (
+                                        <button onClick={() => setPage('trefilaWeighing')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaWeighing' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             ⚖️ Pesagem de Rolos
                                         </button>
                                     )}
-                                    {hasPermission('trefila_pending') && (
-                                        <button onClick={() => setPage('trefila_pending')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_pending' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                    {hasPermission('trefilaPending') && (
+                                        <button onClick={() => setPage('trefilaPending')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaPending' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             📋 Próximas Produções
                                         </button>
                                     )}
-                                    {hasPermission('trefila_completed') && (
-                                        <button onClick={() => setPage('trefila_completed')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_completed' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                    {hasPermission('trefilaCompleted') && (
+                                        <button onClick={() => setPage('trefilaCompleted')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaCompleted' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             📦 Produções Finalizadas
                                         </button>
                                     )}
-                                    {hasPermission('trefila_reports') && (
-                                        <button onClick={() => setPage('trefila_reports')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_reports' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                    {hasPermission('trefilaReports') && (
+                                        <button onClick={() => setPage('trefilaReports')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaReports' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             📑 Relatórios de Turno
                                         </button>
                                     )}
-                                    {hasPermission('trefila_rings') && (
-                                        <button onClick={() => setPage('trefila_rings')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_rings' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                    {hasPermission('trefilaRings') && (
+                                        <button onClick={() => setPage('trefilaRings')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaRings' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             💍 Simulação & Anéis
                                         </button>
                                     )}
-                                    {hasPermission('trefila_parts') && (
-                                        <button onClick={() => setPage('trefila_parts')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefila_parts' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                    {hasPermission('trefilaParts') && (
+                                        <button onClick={() => setPage('trefilaParts')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaParts' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             🔧 Peças e Trocas
                                         </button>
                                     )}
@@ -181,11 +181,11 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                     )}
 
                     {/* Treliça Collapsible */}
-                    {(hasPermission('trelica') || hasPermission('trelica_in_progress') || hasPermission('trelica_pending') || hasPermission('trelica_completed') || hasPermission('trelica_reports') || hasPermission('trelica_parts')) && (
+                    {(hasPermission('trelica') || hasPermission('trelicaInProgress') || hasPermission('trelicaPending') || hasPermission('trelicaCompleted') || hasPermission('trelicaReports') || hasPermission('trelicaParts')) && (
                         <>
                             <button
                                 onClick={() => toggleMenu('trelica')}
-                                className={`sidebar-item ${['trelica', 'trelica_in_progress', 'trelica_pending', 'trelica_completed', 'trelica_reports', 'trelica_parts'].includes(page) ? 'active' : ''} justify-between group`}
+                                className={`sidebar-item ${['trelica', 'trelicaInProgress', 'trelicaPending', 'trelicaCompleted', 'trelicaReports', 'trelicaParts'].includes(page) ? 'active' : ''} justify-between group`}
                                 title={isCollapsed ? 'Produção – Treliça' : ''}
                             >
                                 <div className="flex items-center gap-3 overflow-hidden">
@@ -206,28 +206,28 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                                             📊 Dashboard Treliça
                                         </button>
                                     )}
-                                    {hasPermission('trelica_in_progress') && (
-                                        <button onClick={() => setPage('trelica_in_progress')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelica_in_progress' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                    {hasPermission('trelicaInProgress') && (
+                                        <button onClick={() => setPage('trelicaInProgress')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelicaInProgress' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             ⚙️ Em Produção
                                         </button>
                                     )}
-                                    {hasPermission('trelica_pending') && (
-                                        <button onClick={() => setPage('trelica_pending')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelica_pending' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                    {hasPermission('trelicaPending') && (
+                                        <button onClick={() => setPage('trelicaPending')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelicaPending' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             📋 Próximas Produções
                                         </button>
                                     )}
-                                    {hasPermission('trelica_completed') && (
-                                        <button onClick={() => setPage('trelica_completed')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelica_completed' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                    {hasPermission('trelicaCompleted') && (
+                                        <button onClick={() => setPage('trelicaCompleted')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelicaCompleted' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             📦 Produções Finalizadas
                                         </button>
                                     )}
-                                    {hasPermission('trelica_reports') && (
-                                        <button onClick={() => setPage('trelica_reports')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelica_reports' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                    {hasPermission('trelicaReports') && (
+                                        <button onClick={() => setPage('trelicaReports')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelicaReports' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             📑 Relatórios de Turno
                                         </button>
                                     )}
-                                    {hasPermission('trelica_parts') && (
-                                        <button onClick={() => setPage('trelica_parts')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelica_parts' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                    {hasPermission('trelicaParts') && (
+                                        <button onClick={() => setPage('trelicaParts')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelicaParts' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             🔧 Peças e Trocas
                                         </button>
                                     )}
@@ -249,7 +249,7 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                             {/* Collapsible Matéria-prima */}
                             <button
                                 onClick={() => toggleMenu('stock')}
-                                className={`sidebar-item ${['stock', 'stock_add', 'stock_transfer'].includes(page) ? 'active' : ''} justify-between group`}
+                                className={`sidebar-item ${['stock', 'stockAdd', 'stockTransfer'].includes(page) ? 'active' : ''} justify-between group`}
                                 title={isCollapsed ? 'Matéria-prima' : ''}
                             >
                                 <div className="flex items-center gap-3 overflow-hidden">
@@ -266,13 +266,13 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                             {/* Submenu */}
                             {!isCollapsed && expandedMenus.includes('stock') && (
                                 <div className="ml-4 pl-4 border-l border-slate-700/50 flex flex-col gap-0.5 mt-1 mb-2 animate-in slide-in-from-left-2 duration-200">
-                                    {hasPermission('stock_add') && (
-                                        <button onClick={() => setPage('stock_add')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stock_add' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                    {hasPermission('stockAdd') && (
+                                        <button onClick={() => setPage('stockAdd')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stockAdd' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             + Conferência
                                         </button>
                                     )}
-                                    {hasPermission('stock_transfer') && (
-                                        <button onClick={() => setPage('stock_transfer')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stock_transfer' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                    {hasPermission('stockTransfer') && (
+                                        <button onClick={() => setPage('stockTransfer')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stockTransfer' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             ➡️ Transferência
                                         </button>
                                     )}

@@ -16,21 +16,21 @@ const permissionCategories = [
         title: '📦 Estoque',
         permissions: [
             { page: 'stock', label: 'Gestão de Lotes (Relatórios e Filtros)' },
-            { page: 'stock_add', label: 'Conferência: Adicionar Material' },
-            { page: 'stock_transfer', label: 'Transferência entre Setores' },
+            { page: 'stockAdd', label: 'Conferência: Adicionar Material' },
+            { page: 'stockTransfer', label: 'Transferência entre Setores' },
         ]
     },
     {
         title: '🏭 Produção - Trefila',
         permissions: [
             { page: 'trefila', label: 'Dashboard Trefila (Visão Geral)' },
-            { page: 'trefila_in_progress', label: 'Painel: Máquina em Operação' },
-            { page: 'trefila_weighing', label: 'Pesagem de Rolos' },
-            { page: 'trefila_pending', label: 'Próximas Produções (Fila)' },
-            { page: 'trefila_completed', label: 'Histórico de Produções' },
-            { page: 'trefila_reports', label: 'Relatórios de Turno' },
-            { page: 'trefila_parts', label: 'Gerenciador de Peças (Trefila)' },
-            { page: 'trefila_rings', label: 'Setup de Anéis (Trocas)' },
+            { page: 'trefilaInProgress', label: 'Painel: Máquina em Operação' },
+            { page: 'trefilaWeighing', label: 'Pesagem de Rolos' },
+            { page: 'trefilaPending', label: 'Próximas Produções (Fila)' },
+            { page: 'trefilaCompleted', label: 'Histórico de Produções' },
+            { page: 'trefilaReports', label: 'Relatórios de Turno' },
+            { page: 'trefilaParts', label: 'Gerenciador de Peças (Trefila)' },
+            { page: 'trefilaRings', label: 'Setup de Anéis (Trocas)' },
             { page: 'productionOrder', label: 'Criar Ordem de Produção' },
         ]
     },
@@ -38,11 +38,11 @@ const permissionCategories = [
         title: '🏗️ Produção - Treliça',
         permissions: [
             { page: 'trelica', label: 'Dashboard Treliça (Visão Geral)' },
-            { page: 'trelica_in_progress', label: 'Painel: Máquina em Operação' },
-            { page: 'trelica_pending', label: 'Próximas Produções (Fila)' },
-            { page: 'trelica_completed', label: 'Histórico de Produções' },
-            { page: 'trelica_reports', label: 'Relatórios de Turno' },
-            { page: 'trelica_parts', label: 'Gerenciador de Peças (Treliça)' },
+            { page: 'trelicaInProgress', label: 'Painel: Máquina em Operação' },
+            { page: 'trelicaPending', label: 'Próximas Produções (Fila)' },
+            { page: 'trelicaCompleted', label: 'Histórico de Produções' },
+            { page: 'trelicaReports', label: 'Relatórios de Turno' },
+            { page: 'trelicaParts', label: 'Gerenciador de Peças (Treliça)' },
             { page: 'productionOrderTrelica', label: 'Criar Ordem de Produção' },
             { page: 'finishedGoods', label: 'Estoque de Produto Acabado' },
         ]

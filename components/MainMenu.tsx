@@ -125,7 +125,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser }) =
 
             <main className="space-y-10">
                 {/* ESTOQUE */}
-                {(hasPermission('stock') || hasPermission('finishedGoods') || hasPermission('stock_add') || hasPermission('stock_transfer')) && (
+                {(hasPermission('stock') || hasPermission('finishedGoods') || hasPermission('stockAdd') || hasPermission('stockTransfer')) && (
                     <section>
                         <div className="section-title">
                             <h2>Estoque</h2>
@@ -140,18 +140,18 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser }) =
                                     color="cyan"
                                 />
                             )}
-                            {hasPermission('stock_add') && (
+                            {hasPermission('stockAdd') && (
                                 <MenuButton
-                                    onClick={() => setPage('stock_add')}
+                                    onClick={() => setPage('stockAdd')}
                                     label="Adicionar ao Estoque"
                                     description="Conferência de entrada de novos lotes."
                                     icon={<ClipboardListIcon />}
                                     color="teal"
                                 />
                             )}
-                            {hasPermission('stock_transfer') && (
+                            {hasPermission('stockTransfer') && (
                                 <MenuButton
-                                    onClick={() => setPage('stock_transfer')}
+                                    onClick={() => setPage('stockTransfer')}
                                     label="Transferência"
                                     description="Movimentação de lotes entre setores."
                                     icon={<AdjustmentsIcon />}
@@ -262,26 +262,39 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser }) =
                 )}
 
                 {/* EM PRODUÇÃO */}
-                {(hasPermission('trefila') || hasPermission('trefila_in_progress') || hasPermission('trefila_pending') || hasPermission('trefila_completed') || hasPermission('trefila_reports') || hasPermission('trefila_rings') ||
-                    hasPermission('trelica') || hasPermission('trelica_in_progress') || hasPermission('trelica_pending') || hasPermission('trelica_completed') || hasPermission('trelica_reports') ||
+                {(hasPermission('trefila') || hasPermission('trefilaInProgress') || hasPermission('trefilaPending') || hasPermission('trefilaCompleted') || hasPermission('trefilaReports') || hasPermission('trefilaRings') ||
+                    hasPermission('trelica') || hasPermission('trelicaInProgress') || hasPermission('trelicaPending') || hasPermission('trelicaCompleted') || hasPermission('trelicaReports') ||
                     hasPermission('productionDashboard')) && (
                         <section>
                             <div className="section-title">
                                 <h2>Em Produção</h2>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-                                {(hasPermission('trefila') || hasPermission('trefila_in_progress') || hasPermission('trefila_pending') || hasPermission('trefila_completed') || hasPermission('trefila_reports') || hasPermission('trefila_rings')) && (
+                                {(hasPermission('trefila') || hasPermission('trefilaInProgress') || hasPermission('trefilaPending') || hasPermission('trefilaCompleted') || hasPermission('trefilaReports') || hasPermission('trefilaRings')) && (
                                     <MenuButton
-                                        onClick={() => setPage('trefila')}
+                                        onClick={() => {
+                                            if (hasPermission('trefila')) setPage('trefila');
+                                            else if (hasPermission('trefilaInProgress')) setPage('trefilaInProgress');
+                                            else if (hasPermission('trefilaPending')) setPage('trefilaPending');
+                                            else if (hasPermission('trefilaCompleted')) setPage('trefilaCompleted');
+                                            else if (hasPermission('trefilaRings')) setPage('trefilaRings');
+                                            else setPage('trefilaReports');
+                                        }}
                                         label="Produção (Trefila)"
                                         description="Painel de operação da máquina trefiladeira."
                                         icon={<CogIcon />}
                                         color="cyan"
                                     />
                                 )}
-                                {(hasPermission('trelica') || hasPermission('trelica_in_progress') || hasPermission('trelica_pending') || hasPermission('trelica_completed') || hasPermission('trelica_reports')) && (
+                                {(hasPermission('trelica') || hasPermission('trelicaInProgress') || hasPermission('trelicaPending') || hasPermission('trelicaCompleted') || hasPermission('trelicaReports')) && (
                                     <MenuButton
-                                        onClick={() => setPage('trelica')}
+                                        onClick={() => {
+                                            if (hasPermission('trelica')) setPage('trelica');
+                                            else if (hasPermission('trelicaInProgress')) setPage('trelicaInProgress');
+                                            else if (hasPermission('trelicaPending')) setPage('trelicaPending');
+                                            else if (hasPermission('trelicaCompleted')) setPage('trelicaCompleted');
+                                            else setPage('trelicaReports');
+                                        }}
                                         label="Produção (Treliça)"
                                         description="Painel de operação da máquina de treliça."
                                         icon={<CogIcon />}

@@ -1987,24 +1987,24 @@ const App: React.FC = () => {
             case 'menu': return <MainMenu setPage={setPage} onLogout={handleLogout} currentUser={currentUser} />;
             case 'stock': return <StockControl stock={stock} conferences={conferences} transfers={transfers} setPage={setPage} addConference={addConference} deleteStockItem={deleteStockItem} updateStockItem={(item) => updateStockItem(item.id, item)} createTransfer={createTransfer} editConference={editConference} deleteConference={deleteConference} productionOrders={productionOrders} initialView="list" gauges={gauges} currentUser={currentUser} />;
 
-            case 'stock_add': return <StockControl stock={stock} conferences={conferences} transfers={transfers} setPage={setPage} addConference={addConference} deleteStockItem={deleteStockItem} updateStockItem={(item) => updateStockItem(item.id, item)} createTransfer={createTransfer} editConference={editConference} deleteConference={deleteConference} productionOrders={productionOrders} initialView="add" gauges={gauges} currentUser={currentUser} />;
+            case 'stockAdd': return <StockControl stock={stock} conferences={conferences} transfers={transfers} setPage={setPage} addConference={addConference} deleteStockItem={deleteStockItem} updateStockItem={(item) => updateStockItem(item.id, item)} createTransfer={createTransfer} editConference={editConference} deleteConference={deleteConference} productionOrders={productionOrders} initialView="add" gauges={gauges} currentUser={currentUser} />;
 
-            case 'stock_transfer': return <StockTransfer stock={stock} transfers={transfers} setPage={setPage} createTransfer={createTransfer} gauges={gauges} />;
+            case 'stockTransfer': return <StockTransfer stock={stock} transfers={transfers} setPage={setPage} createTransfer={createTransfer} gauges={gauges} />;
             case 'trefila': return <MachineControl machineType="Trefila" {...mcProps} initialView="dashboard" initialModal={null} />;
-            case 'trefila_in_progress': return <MachineControl machineType="Trefila" {...mcProps} initialView="in_progress" initialModal={null} />;
-            case 'trefila_pending': return <MachineControl machineType="Trefila" {...mcProps} initialView="pending" initialModal={null} />;
-            case 'trefila_completed': return <MachineControl machineType="Trefila" {...mcProps} initialView="completed" initialModal={null} />;
-            case 'trefila_reports': return <MachineControl machineType="Trefila" {...mcProps} initialView="dashboard" initialModal="reports" />;
-            case 'trefila_parts': return <MachineControl machineType="Trefila" {...mcProps} initialView="dashboard" initialModal="parts" />;
-            case 'trefila_weighing': return <TrefilaWeighing productionOrders={productionOrders} stock={stock} recordLotWeight={recordLotWeight} />;
-            case 'trefila_rings': return <MachineControl machineType="Trefila" {...mcProps} initialView="dashboard" initialModal="rings" />;
+            case 'trefilaInProgress': return <MachineControl machineType="Trefila" {...mcProps} initialView="in_progress" initialModal={null} />;
+            case 'trefilaPending': return <MachineControl machineType="Trefila" {...mcProps} initialView="pending" initialModal={null} />;
+            case 'trefilaCompleted': return <MachineControl machineType="Trefila" {...mcProps} initialView="completed" initialModal={null} />;
+            case 'trefilaReports': return <MachineControl machineType="Trefila" {...mcProps} initialView="dashboard" initialModal="reports" />;
+            case 'trefilaParts': return <MachineControl machineType="Trefila" {...mcProps} initialView="dashboard" initialModal="parts" />;
+            case 'trefilaWeighing': return <TrefilaWeighing productionOrders={productionOrders} stock={stock} recordLotWeight={recordLotWeight} />;
+            case 'trefilaRings': return <MachineControl machineType="Trefila" {...mcProps} initialView="dashboard" initialModal="rings" />;
 
             case 'trelica': return <MachineControl machineType="Treliça" {...mcProps} initialView="dashboard" initialModal={null} />;
-            case 'trelica_in_progress': return <MachineControl machineType="Treliça" {...mcProps} initialView="in_progress" initialModal={null} />;
-            case 'trelica_pending': return <MachineControl machineType="Treliça" {...mcProps} initialView="pending" initialModal={null} />;
-            case 'trelica_completed': return <MachineControl machineType="Treliça" {...mcProps} initialView="completed" initialModal={null} />;
-            case 'trelica_reports': return <MachineControl machineType="Treliça" {...mcProps} initialView="dashboard" initialModal="reports" />;
-            case 'trelica_parts': return <MachineControl machineType="Treliça" {...mcProps} initialView="dashboard" initialModal="parts" />;
+            case 'trelicaInProgress': return <MachineControl machineType="Treliça" {...mcProps} initialView="in_progress" initialModal={null} />;
+            case 'trelicaPending': return <MachineControl machineType="Treliça" {...mcProps} initialView="pending" initialModal={null} />;
+            case 'trelicaCompleted': return <MachineControl machineType="Treliça" {...mcProps} initialView="completed" initialModal={null} />;
+            case 'trelicaReports': return <MachineControl machineType="Treliça" {...mcProps} initialView="dashboard" initialModal="reports" />;
+            case 'trelicaParts': return <MachineControl machineType="Treliça" {...mcProps} initialView="dashboard" initialModal="parts" />;
 
             case 'productionOrder': return <ProductionOrder setPage={setPage} stock={stock} productionOrders={productionOrders} addProductionOrder={addProductionOrder} showNotification={showNotification} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} gauges={gauges} currentUser={currentUser} />;
             case 'productionOrderTrelica': return <ProductionOrderTrelica setPage={setPage} stock={stock} productionOrders={productionOrders} addProductionOrder={addProductionOrder} showNotification={showNotification} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} gauges={gauges} currentUser={currentUser} />;
@@ -2052,10 +2052,10 @@ const App: React.FC = () => {
                             </button>
                             <span className="text-slate-400 text-sm font-black uppercase tracking-widest flex items-center gap-2">
                                 <div className="w-1.5 h-1.5 rounded-full bg-slate-400"></div>
-                                {page === 'trefila_in_progress' ? 'Produção Trefila' :
-                                    page === 'trelica_in_progress' ? 'Produção Treliça' :
+                                {page === 'trefilaInProgress' ? 'Produção Trefila' :
+                                    page === 'trelicaInProgress' ? 'Produção Treliça' :
                                         page === 'productionDashboard' ? 'Painel de Controle' :
-                                            page.charAt(0).toUpperCase() + page.slice(1).replace('_', ' ')}
+                                            page.charAt(0).toUpperCase() + page.slice(1).replace(/([A-Z])/g, ' $1')}
                             </span>
                         </div>
                         <div className="flex items-center gap-6">
