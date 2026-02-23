@@ -29,20 +29,19 @@ const EditConferenceModal: React.FC<{
     // Validate duplicate lot combinations
     useEffect(() => {
         const newErrors: Record<number, string> = {};
-        const existingStockKeys = new Set(
+        const existingInternalLots = new Set(
             stock
                 .filter(item => !formData.lots.some(lot =>
                     item.internalLot === lot.internalLot &&
-                    item.supplierLot === lot.supplierLot &&
                     item.conferenceNumber === conference.conferenceNumber))
-                .map(item => `${item.internalLot.trim().toLowerCase()}|${item.supplierLot.trim().toLowerCase()}`)
+                .map(item => item.internalLot.trim().toLowerCase())
         );
         const currentKeys = new Set<string>();
         formData.lots.forEach((lot, idx) => {
-            if (!lot.internalLot || !lot.supplierLot) return;
-            const key = `${lot.internalLot.trim().toLowerCase()}|${lot.supplierLot.trim().toLowerCase()}`;
-            if (existingStockKeys.has(key)) {
-                newErrors[idx] = 'Combinação de lote já existe no estoque.';
+            if (!lot.internalLot) return;
+            const key = lot.internalLot.trim().toLowerCase();
+            if (existingInternalLots.has(key)) {
+                newErrors[idx] = 'Este lote já existe no estoque.';
             } else if (currentKeys.has(key)) {
                 newErrors[idx] = 'Lote duplicado nesta conferência.';
             }
@@ -56,7 +55,6 @@ const EditConferenceModal: React.FC<{
             ...prev,
             lots: [...prev.lots, {
                 internalLot: '',
-                supplierLot: '',
                 runNumber: '',
                 bitola: FioMaquinaBitolaOptions[0],
                 materialType: 'Fio Máquina' as MaterialType,
@@ -120,7 +118,7 @@ const EditConferenceModal: React.FC<{
                     <table className="w-full text-sm">
                         <thead className="sticky top-0 bg-slate-100 z-10">
                             <tr>
-                                {['Lote Interno', 'Lote Fornecedor', 'Corrida', 'Tipo Material', 'Bitola', 'Peso Etiqueta (kg)', ''].map(h => (
+                                {['Lote Interno', 'Corrida', 'Tipo Material', 'Bitola', 'Peso Etiqueta (kg)', ''].map(h => (
                                     <th key={h} className="p-2 text-left font-semibold text-slate-600">{h}</th>
                                 ))}
                             </tr>
@@ -131,9 +129,6 @@ const EditConferenceModal: React.FC<{
                                     <td className="p-2">
                                         <input type="text" value={lot.internalLot} onChange={e => handleLotChange(idx, 'internalLot', e.target.value)} className="w-full p-2 border border-slate-300 rounded" required />
                                         {duplicateErrors[idx] && <p className="text-red-500 text-xs mt-1">{duplicateErrors[idx]}</p>}
-                                    </td>
-                                    <td className="p-2">
-                                        <input type="text" value={lot.supplierLot} onChange={e => handleLotChange(idx, 'supplierLot', e.target.value)} className="w-full p-2 border border-slate-300 rounded" required />
                                     </td>
                                     <td className="p-2">
                                         <input type="text" value={lot.runNumber} onChange={e => handleLotChange(idx, 'runNumber', e.target.value)} className="w-full p-2 border border-slate-300 rounded" required />
@@ -194,7 +189,6 @@ const FinishedConferencesModal: React.FC<FinishedConferencesModalProps> = ({ con
         const stockItems = stock.filter(s => s.conferenceNumber === conf.conferenceNumber);
         const lots: ConferenceLotData[] = stockItems.map(s => ({
             internalLot: s.internalLot || '',
-            supplierLot: s.supplierLot || '',
             runNumber: s.runNumber || '',
             bitola: s.bitola || '',
             materialType: s.materialType || 'Fio Máquina',

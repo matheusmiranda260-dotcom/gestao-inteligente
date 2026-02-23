@@ -44,18 +44,18 @@ const AddConferencePage: React.FC<{
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
     const [lots, setLots] = useState<Partial<ConferenceLotData>[]>([{
-        internalLot: '', supplierLot: '', runNumber: '', bitola: '8.00', materialType: 'Fio Máquina', labelWeight: 0
+        internalLot: '', runNumber: '', bitola: '8.00', materialType: 'Fio Máquina', labelWeight: 0
     }]);
     const [duplicateErrors, setDuplicateErrors] = useState<Record<number, string>>({});
     const [historyOpen, setHistoryOpen] = useState(false);
 
     useEffect(() => {
         const newErrors: Record<number, string> = {};
-        const existingStock = new Set(stock.filter(s => s.status !== 'Consumido').map(i => `${i.internalLot.trim().toLowerCase()}|${i.supplierLot.trim().toLowerCase()}`));
+        const existingStock = new Set(stock.filter(s => s.status !== 'Consumido').map(i => i.internalLot.trim().toLowerCase()));
         const currentBatch = new Set();
         lots.forEach((l, i) => {
-            if (!l.internalLot || !l.supplierLot) return;
-            const key = `${l.internalLot.trim().toLowerCase()}|${l.supplierLot.trim().toLowerCase()}`;
+            if (!l.internalLot) return;
+            const key = l.internalLot.trim().toLowerCase();
             if (existingStock.has(key)) newErrors[i] = "Já existe no estoque.";
             else if (currentBatch.has(key)) newErrors[i] = "Duplicado nesta lista.";
             currentBatch.add(key);
@@ -82,7 +82,7 @@ const AddConferencePage: React.FC<{
             if (res.nfe || res.conferenceNumber) setConferenceData(p => ({ ...p, nfe: res.nfe || p.nfe, conferenceNumber: res.conferenceNumber || p.conferenceNumber }));
             if (res.lots?.length) {
                 const mapped = res.lots.map((l: any) => ({
-                    internalLot: l.internalLot || '', supplierLot: l.supplierLot || '', runNumber: String(l.runNumber || ''),
+                    internalLot: l.internalLot || '', runNumber: String(l.runNumber || ''),
                     bitola: (l.bitola || '8.00').replace('.', ','), materialType: 'Fio Máquina' as MaterialType, labelWeight: Number(l.labelWeight) || 0
                 }));
                 setLots(p => (p.length === 1 && !p[0].internalLot) ? mapped : [...p, ...mapped]);
@@ -93,7 +93,7 @@ const AddConferencePage: React.FC<{
     const handleFinalSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (isSubmitting || Object.keys(duplicateErrors).length) return;
-        const validLots = lots.filter(l => !!l.internalLot && !!l.supplierLot) as ConferenceLotData[];
+        const validLots = lots.filter(l => !!l.internalLot) as ConferenceLotData[];
         if (!validLots.length) return alert('Adicione lotes');
         setIsSubmitting(true);
         try {
@@ -124,13 +124,12 @@ const AddConferencePage: React.FC<{
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead className="bg-slate-50 border-y">
-                                <tr>{['Lote Interno', 'Lote Fornec.', 'Corrida', 'Material', 'Bitola', 'Peso Etiqueta', ''].map(h => <th key={h} className="p-3 text-left font-bold text-slate-600 uppercase text-[10px]">{h}</th>)}</tr>
+                                <tr>{['Lote Interno', 'Corrida', 'Material', 'Bitola', 'Peso Etiqueta', ''].map(h => <th key={h} className="p-3 text-left font-bold text-slate-600 uppercase text-[10px]">{h}</th>)}</tr>
                             </thead>
                             <tbody>
                                 {lots.map((lot, index) => (
                                     <tr key={index} className="border-b">
                                         <td className="p-2"><input type="text" value={lot.internalLot || ''} onChange={e => handleLotChange(index, 'internalLot', e.target.value)} className="w-full p-2 border rounded" required />{duplicateErrors[index] && <p className="text-red-500 text-[9px] font-bold">{duplicateErrors[index]}</p>}</td>
-                                        <td className="p-2"><input type="text" value={lot.supplierLot || ''} onChange={e => handleLotChange(index, 'supplierLot', e.target.value)} className="w-full p-2 border rounded" required /></td>
                                         <td className="p-2"><input type="text" value={lot.runNumber || ''} onChange={e => handleLotChange(index, 'runNumber', e.target.value)} className="w-full p-2 border rounded" required /></td>
                                         <td className="p-2"><select value={lot.materialType} onChange={e => handleLotChange(index, 'materialType', e.target.value)} className="w-full p-2 border rounded">{MaterialOptions.map(m => <option key={m} value={m}>{m}</option>)}</select></td>
                                         <td className="p-2"><select value={lot.bitola} onChange={e => handleLotChange(index, 'bitola', e.target.value)} className="w-full p-2 border rounded">{[...new Set([...FioMaquinaBitolaOptions, ...TrefilaBitolaOptions, ...gauges.map(g => g.gauge)])].map(b => <option key={b} value={b}>{b}</option>)}</select></td>

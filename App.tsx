@@ -427,7 +427,7 @@ const App: React.FC = () => {
                 nfe: data.nfe,
                 conferenceNumber: data.conferenceNumber,
                 internalLot: lot.internalLot,
-                supplierLot: lot.supplierLot,
+                supplierLot: '', // No longer used in UI
                 runNumber: lot.runNumber,
                 materialType: lot.materialType,
                 bitola: lot.bitola,
@@ -469,7 +469,7 @@ const App: React.FC = () => {
             // Build a map of existing lot states to preserve status info where possible
             const existingLotMap = new Map<string, StockItem>();
             conferenceStockItems.forEach(item => {
-                existingLotMap.set(`${item.internalLot.trim().toLowerCase()}|${item.supplierLot.trim().toLowerCase()}`, item);
+                existingLotMap.set(item.internalLot.trim().toLowerCase(), item);
             });
 
             // Delete all old stock items associated with this conference directly from DB
@@ -482,7 +482,7 @@ const App: React.FC = () => {
 
             // Create new stock items, preserving status of lots that existed before
             const newStockItems: StockItem[] = updatedData.lots.map(lot => {
-                const key = `${lot.internalLot.trim().toLowerCase()}|${lot.supplierLot.trim().toLowerCase()}`;
+                const key = lot.internalLot.trim().toLowerCase();
                 const existingItem = existingLotMap.get(key);
 
                 return {
@@ -492,7 +492,7 @@ const App: React.FC = () => {
                     nfe: updatedData.nfe,
                     conferenceNumber: updatedData.conferenceNumber,
                     internalLot: lot.internalLot,
-                    supplierLot: lot.supplierLot,
+                    supplierLot: '', // No longer used
                     runNumber: lot.runNumber,
                     materialType: lot.materialType,
                     bitola: lot.bitola,

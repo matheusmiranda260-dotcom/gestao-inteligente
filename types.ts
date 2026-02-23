@@ -69,7 +69,6 @@ export interface StockItem {
 
 export interface ConferenceLotData {
     internalLot: string;
-    supplierLot: string;
     runNumber: string;
     materialType: string | MaterialType;
     bitola: Bitola;
