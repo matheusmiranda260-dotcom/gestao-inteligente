@@ -244,9 +244,15 @@ const StockControl: React.FC<{
                             <label className="text-[10px] font-bold text-slate-500 uppercase">Bitola</label>
                             <select value={bitolaFilter} onChange={e => setBitolaFilter(e.target.value)} className="bg-transparent outline-none font-bold text-sm min-w-[80px]">
                                 <option value="">Todas</option>
-                                {([...new Set([...FioMaquinaBitolaOptions, ...CA60BitolaOptions, ...gauges.map(g => g.gauge)])]).sort((a, b) => parseFloat(a) - parseFloat(b)).map(b => (
-                                    <option key={b} value={b}>{b}</option>
-                                ))}
+                                {(() => {
+                                    let options = [];
+                                    if (materialFilter === 'Fio Máquina') options = FioMaquinaBitolaOptions;
+                                    else if (materialFilter === 'CA-60') options = CA60BitolaOptions;
+                                    else options = [...new Set([...FioMaquinaBitolaOptions, ...CA60BitolaOptions, ...gauges.map(g => g.gauge)])];
+                                    return options.sort((a, b) => parseFloat(a) - parseFloat(b)).map(b => (
+                                        <option key={b} value={b}>{b}</option>
+                                    ));
+                                })()}
                             </select>
                         </div>
                         <button onClick={handlePrint} className="bg-white text-slate-600 font-bold py-2 px-4 rounded-xl shadow border flex items-center gap-2 hover:bg-slate-50 transition">
@@ -256,12 +262,21 @@ const StockControl: React.FC<{
                 </div>
                 <button onClick={() => setIsAdding(true)} className="bg-[#0F3F5C] text-white font-bold py-2 px-6 rounded-lg shadow-lg shrink-0 whitespace-nowrap">+ Novo Recebimento</button>
             </header>
-            <div className="md:hidden flex flex-wrap gap-2 no-print">
+            <div className="md:hidden flex flex-wrap gap-2 no-print p-2">
                 <div className="bg-white p-2 rounded-lg shadow border flex items-center gap-2 px-4 shadow-sm">
                     <label className="text-[10px] font-bold text-slate-500">MP:</label>
                     <select value={materialFilter} onChange={e => setMaterialFilter(e.target.value)} className="bg-transparent outline-none font-bold text-xs">
                         <option value="">Todos</option>
                         {MaterialOptions.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                </div>
+                <div className="bg-white p-2 rounded-lg shadow border flex items-center gap-2 px-4 shadow-sm">
+                    <label className="text-[10px] font-bold text-slate-500">Ø:</label>
+                    <select value={bitolaFilter} onChange={e => setBitolaFilter(e.target.value)} className="bg-transparent outline-none font-bold text-xs">
+                        <option value="">Todas</option>
+                        {(materialFilter === 'Fio Máquina' ? FioMaquinaBitolaOptions : (materialFilter === 'CA-60' ? CA60BitolaOptions : [...new Set([...FioMaquinaBitolaOptions, ...CA60BitolaOptions])])).sort((a, b) => parseFloat(a) - parseFloat(b)).map(b => (
+                            <option key={b} value={b}>{b}</option>
+                        ))}
                     </select>
                 </div>
             </div>
