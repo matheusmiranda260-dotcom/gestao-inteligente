@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
     ArrowLeftIcon, CameraIcon, TrashIcon, CheckCircleIcon, DocumentReportIcon,
-    AdjustmentsIcon, PencilIcon, BookOpenIcon, SearchIcon, FilterIcon
+    AdjustmentsIcon, PencilIcon, BookOpenIcon, SearchIcon, FilterIcon, XIcon
 } from './icons';
 import type {
     ConferenceLotData, ConferenceData, StockItem, Bitola, MaterialType, Page, StockGauge, User, TransferRecord
@@ -163,6 +163,7 @@ const StockControl: React.FC<{
     const [reportView, setReportView] = useState<ConferenceData | null>(null);
     const [historyLot, setHistoryLot] = useState<StockItem | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [editingItem, setEditingItem] = useState<StockItem | null>(null);
 
     const filtered = useMemo(() => stock.filter(i =>
         i.status !== 'Consumido' && (i.internalLot.toLowerCase().includes(searchTerm.toLowerCase()) || i.nfe.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -174,6 +175,17 @@ const StockControl: React.FC<{
         <div className="p-4 md:p-8 space-y-6">
             {reportView && <ConferenceReport reportData={reportView} onClose={() => setReportView(null)} />}
             {historyLot && <LotHistoryModal lot={historyLot} onClose={() => setHistoryLot(null)} />}
+            {editingItem && (
+                <EditStockItemModal
+                    item={editingItem}
+                    onClose={() => setEditingItem(null)}
+                    onSave={(updated) => {
+                        updateStockItem(updated);
+                        setEditingItem(null);
+                    }}
+                    gauges={gauges}
+                />
+            )}
             <header className="flex justify-between items-center">
                 <h1 className="text-3xl font-bold text-slate-800">Estoque</h1>
                 <button onClick={() => setIsAdding(true)} className="bg-[#0F3F5C] text-white font-bold py-2 px-6 rounded-lg shadow-lg">+ Novo Recebimento</button>
@@ -196,14 +208,87 @@ const StockControl: React.FC<{
                                     <td className="p-3 font-black text-slate-800">{item.remainingQuantity.toFixed(2)}</td>
                                     <td className="p-3">{getStatusBadge(item.status)}</td>
                                     <td className="p-3 flex justify-center gap-2">
-                                        <button onClick={() => setHistoryLot(item)}><BookOpenIcon className="h-5 w-5 text-slate-400" /></button>
-                                        <button onClick={() => confirm('Excluir?') && deleteStockItem(item.id)}><TrashIcon className="h-5 w-5 text-red-400" /></button>
+                                        <button onClick={() => setHistoryLot(item)} title="Histórico"><BookOpenIcon className="h-5 w-5 text-slate-400 hover:text-blue-500" /></button>
+                                        <button onClick={() => setEditingItem(item)} title="Editar"><PencilIcon className="h-5 w-5 text-slate-400 hover:text-amber-500" /></button>
+                                        <button onClick={() => confirm('Excluir?') && deleteStockItem(item.id)} title="Excluir"><TrashIcon className="h-5 w-5 text-red-400 hover:text-red-600" /></button>
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+    );
+};
+
+const EditStockItemModal: React.FC<{ item: StockItem; onClose: () => void; onSave: (i: StockItem) => void; gauges: StockGauge[] }> = ({ item, onClose, onSave, gauges }) => {
+    const [formData, setFormData] = useState<StockItem>({ ...item });
+
+    const materialGauges = useMemo(() => gauges.filter(g => g.materialType === formData.materialType).map(g => g.gauge), [gauges, formData.materialType]);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onSave(formData);
+    };
+
+    return (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+                <div className="bg-[#0F3F5C] p-4 text-white flex justify-between items-center">
+                    <h2 className="text-lg font-bold">Editar Lote: {item.internalLot}</h2>
+                    <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-full transition-colors"><XIcon className="h-6 w-6" /></button>
+                </div>
+                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Lote Interno</label>
+                            <input type="text" value={formData.internalLot} onChange={e => setFormData({ ...formData, internalLot: e.target.value })} className="w-full px-3 py-2 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">NFe</label>
+                            <input type="text" value={formData.nfe} onChange={e => setFormData({ ...formData, nfe: e.target.value })} className="w-full px-3 py-2 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Tipo de Material</label>
+                            <select value={formData.materialType} onChange={e => setFormData({ ...formData, materialType: e.target.value as any })} className="w-full px-3 py-2 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                                <option value="Fio Máquina">Fio Máquina</option>
+                                <option value="CA-60">CA-60</option>
+                            </select>
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Bitola</label>
+                            <select value={formData.bitola} onChange={e => setFormData({ ...formData, bitola: e.target.value })} className="w-full px-3 py-2 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                                {materialGauges.map(g => <option key={g} value={g}>{g}</option>)}
+                                {!materialGauges.includes(formData.bitola) && <option value={formData.bitola}>{formData.bitola}</option>}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Peso Atual (kg)</label>
+                            <input type="number" step="0.01" value={formData.remainingQuantity} onChange={e => setFormData({ ...formData, remainingQuantity: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Status</label>
+                            <select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as any })} className="w-full px-3 py-2 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                                <option value="Disponível">Disponível</option>
+                                <option value="Reservado">Reservado</option>
+                                <option value="Em Produção">Em Produção</option>
+                                <option value="Consumido">Consumido</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="pt-4 flex gap-3">
+                        <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-colors">Cancelar</button>
+                        <button type="submit" className="flex-1 px-4 py-2 bg-[#0F3F5C] text-white font-bold rounded-xl hover:bg-[#0A2A3D] transition-colors shadow-lg shadow-blue-900/20">Salvar Alterações</button>
+                    </div>
+                </form>
             </div>
         </div>
     );
