@@ -195,18 +195,25 @@ const StockControl: React.FC<{
             </div>
             <div className="bg-white rounded-xl shadow-lg border overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-center">
+                    <table className="w-full text-sm">
                         <thead className="bg-slate-50 border-b font-bold text-slate-600 uppercase text-[10px]">
-                            <tr><th className="p-3">Data</th><th className="p-3">Lote Interno</th><th className="p-3">Bitola</th><th className="p-3">Peso (kg)</th><th className="p-3">Status</th><th className="p-3">Ações</th></tr>
+                            <tr>
+                                <th className="p-3 text-center">Data</th>
+                                <th className="p-3 text-center">Lote Interno</th>
+                                <th className="p-3 text-center">Bitola</th>
+                                <th className="p-3 text-center">Peso (kg)</th>
+                                <th className="p-3 text-center">Status</th>
+                                <th className="p-3 text-center">Ações</th>
+                            </tr>
                         </thead>
                         <tbody className="divide-y">
                             {filtered.map(item => (
                                 <tr key={item.id} className="hover:bg-slate-50">
-                                    <td className="p-3 text-slate-500 font-medium">{new Date(item.entryDate).toLocaleDateString('pt-BR')}</td>
-                                    <td className="p-3 font-black text-slate-900">{item.internalLot}</td>
-                                    <td className="p-3 font-black text-blue-600">{item.bitola}</td>
-                                    <td className="p-3 font-black text-slate-800">{item.remainingQuantity.toFixed(2)}</td>
-                                    <td className="p-3">{getStatusBadge(item.status)}</td>
+                                    <td className="p-3 text-center text-slate-500 font-medium">{new Date(item.entryDate).toLocaleDateString('pt-BR')}</td>
+                                    <td className="p-3 text-center font-black text-slate-900">{item.internalLot}</td>
+                                    <td className="p-3 text-center font-black text-blue-600">{item.bitola}</td>
+                                    <td className="p-3 text-center font-black text-slate-800">{item.remainingQuantity.toFixed(2)}</td>
+                                    <td className="p-3 text-center">{getStatusBadge(item.status)}</td>
                                     <td className="p-3 flex justify-center gap-2">
                                         <button onClick={() => setHistoryLot(item)} title="Histórico"><BookOpenIcon className="h-5 w-5 text-slate-400 hover:text-blue-500" /></button>
                                         <button onClick={() => setEditingItem(item)} title="Editar"><PencilIcon className="h-5 w-5 text-slate-400 hover:text-amber-500" /></button>
