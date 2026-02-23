@@ -1108,7 +1108,8 @@ const App: React.FC = () => {
         if (!currentUser) return;
         const now = new Date().toISOString();
 
-        const order = productionOrders.find(o => o.id === orderId);
+        const fetchedOrders = await fetchByColumn<ProductionOrderData>('production_orders', 'id', orderId);
+        const order = fetchedOrders[0];
         if (!order) return;
 
         // Close ANY other open logic for this order before starting our own
@@ -1285,7 +1286,8 @@ const App: React.FC = () => {
     const endOperatorShift = async (orderId: string, finalQuantity?: number) => {
         if (!currentUser) return;
 
-        const order = productionOrders.find(o => o.id === orderId);
+        const fetchedOrders = await fetchByColumn<ProductionOrderData>('production_orders', 'id', orderId);
+        const order = fetchedOrders[0];
         if (!order) return;
 
         const now = new Date().toISOString();
@@ -1349,7 +1351,8 @@ const App: React.FC = () => {
 
     const logDowntime = async (orderId: string, reason: string) => {
         const now = new Date().toISOString();
-        const order = productionOrders.find(o => o.id === orderId);
+        const fetchedOrders = await fetchByColumn<ProductionOrderData>('production_orders', 'id', orderId);
+        const order = fetchedOrders[0];
         if (!order) return;
 
         const newEvents = [...(order.downtimeEvents || [])];
@@ -1377,7 +1380,8 @@ const App: React.FC = () => {
 
     const logResumeProduction = async (orderId: string) => {
         const now = new Date().toISOString();
-        const order = productionOrders.find(o => o.id === orderId);
+        const fetchedOrders = await fetchByColumn<ProductionOrderData>('production_orders', 'id', orderId);
+        const order = fetchedOrders[0];
         if (!order) return;
 
         const newEvents = [...(order.downtimeEvents || [])];
@@ -1413,7 +1417,8 @@ const App: React.FC = () => {
 
     const startLotProcessing = async (orderId: string, lotId: string) => {
         const now = new Date().toISOString();
-        const order = productionOrders.find(o => o.id === orderId);
+        const fetchedOrders = await fetchByColumn<ProductionOrderData>('production_orders', 'id', orderId);
+        const order = fetchedOrders[0];
         if (!order) return;
 
         const newEvents = [...(order.downtimeEvents || [])];
@@ -1443,7 +1448,8 @@ const App: React.FC = () => {
 
     const finishLotProcessing = async (orderId: string, lotId: string) => {
         const now = new Date().toISOString();
-        const order = productionOrders.find(o => o.id === orderId);
+        const fetchedOrders = await fetchByColumn<ProductionOrderData>('production_orders', 'id', orderId);
+        const order = fetchedOrders[0];
         if (!order || order.activeLotProcessing?.lotId !== lotId) return;
 
         const processedLot: ProcessedLot = {
@@ -1474,7 +1480,8 @@ const App: React.FC = () => {
 
     const completeProduction = async (orderId: string, finalData: { actualProducedQuantity?: number; scrapWeight?: number; pontas?: Ponta[] }) => {
         const now = new Date().toISOString();
-        const orderToComplete = productionOrders.find(o => o.id === orderId);
+        const fetchedOrders = await fetchByColumn<ProductionOrderData>('production_orders', 'id', orderId);
+        const orderToComplete = fetchedOrders[0];
 
         if (!orderToComplete || orderToComplete.status === 'completed') return;
 
@@ -1821,7 +1828,8 @@ const App: React.FC = () => {
     };
 
     const recordPackageWeight = async (orderId: string, packageData: { packageNumber: number; quantity: number; weight: number; }) => {
-        const order = productionOrders.find(o => o.id === orderId);
+        const fetchedOrders = await fetchByColumn<ProductionOrderData>('production_orders', 'id', orderId);
+        const order = fetchedOrders[0];
         if (!order) return;
         const newPackage: WeighedPackage = { ...packageData, timestamp: new Date().toISOString() };
         const newWeighedPackages = [...(order.weighedPackages || []).filter(p => p.packageNumber !== packageData.packageNumber), newPackage].sort((a, b) => a.packageNumber - b.packageNumber);
