@@ -230,7 +230,7 @@ const StockControl: React.FC<{
                 <div className="flex justify-between items-center mb-6">
                     <div>
                         <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter italic">MSM <span className="text-slate-500 font-light">Gestão Inteligente</span></h1>
-                        <p className="text-[10px] font-bold text-slate-500 uppercase">Relatório de Inventário de Estoque</p>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase">Relatório de Inventário de Estoque - Setor Laminação</p>
                     </div>
                     <div className="text-right">
                         <p className="text-xs font-bold text-slate-900">{new Date().toLocaleDateString('pt-BR')} {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
