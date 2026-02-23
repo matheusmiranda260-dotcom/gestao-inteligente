@@ -65,7 +65,7 @@ const AddConferencePage: React.FC<{
 
     const handleAddLot = () => {
         const lastLot = lots[lots.length - 1];
-        setLots([...lots, { ...lastLot, internalLot: '', supplierLot: '', labelWeight: 0 }]);
+        setLots([...lots, { ...lastLot, internalLot: '', labelWeight: 0 }]);
     };
 
     const handleLotChange = (index: number, field: keyof ConferenceLotData, value: any) => {
