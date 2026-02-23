@@ -260,7 +260,10 @@ const StockControl: React.FC<{
                         </button>
                     </div>
                 </div>
-                <button onClick={() => setIsAdding(true)} className="bg-[#0F3F5C] text-white font-bold py-2 px-6 rounded-lg shadow-lg shrink-0 whitespace-nowrap">+ Novo Recebimento</button>
+                <div className="flex items-center gap-4">
+                    <button onClick={() => setPage('gauges')} className="bg-white text-slate-600 font-bold py-2 px-6 rounded-lg shadow border flex items-center gap-2 hover:bg-slate-50 transition whitespace-nowrap"><AdjustmentsIcon className="h-5 w-5" /> Gerenciar Bitolas</button>
+                    <button onClick={() => setIsAdding(true)} className="bg-[#0F3F5C] text-white font-bold py-2 px-6 rounded-lg shadow-lg shrink-0 whitespace-nowrap">+ Novo Recebimento</button>
+                </div>
             </header>
             <div className="md:hidden flex flex-wrap gap-2 no-print p-2">
                 <div className="bg-white p-2 rounded-lg shadow border flex items-center gap-2 px-4 shadow-sm">
