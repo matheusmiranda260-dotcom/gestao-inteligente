@@ -1,7 +1,7 @@
 // FinishedConferencesModal.tsx
 import React, { useState, useEffect } from 'react';
 import type { ConferenceData, ConferenceLotData, StockItem, Bitola, MaterialType } from '../types';
-import { MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions } from '../types';
+import { MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions, CA60BitolaOptions } from '../types';
 import { PrinterIcon, PencilIcon, TrashIcon, WarningIcon } from './icons';
 
 interface FinishedConferencesModalProps {
@@ -67,6 +67,14 @@ const EditConferenceModal: React.FC<{
         setFormData(prev => {
             const newLots = [...prev.lots];
             (newLots[index] as any)[field] = value;
+
+            if (field === 'materialType') {
+                const applicable = value === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions;
+                if (!applicable.includes(newLots[index].bitola)) {
+                    newLots[index].bitola = applicable[0];
+                }
+            }
+
             return { ...prev, lots: newLots };
         });
     };
@@ -140,7 +148,9 @@ const EditConferenceModal: React.FC<{
                                     </td>
                                     <td className="p-2">
                                         <select value={lot.bitola} onChange={e => handleLotChange(idx, 'bitola', e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white">
-                                            {allBitolaOptions.map(b => (<option key={b} value={b}>{b}</option>))}
+                                            {(lot.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions).map(b => (
+                                                <option key={b} value={b}>{b}</option>
+                                            ))}
                                         </select>
                                     </td>
                                     <td className="p-2">

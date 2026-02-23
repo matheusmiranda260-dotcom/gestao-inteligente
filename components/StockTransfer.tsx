@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { StockItem, Page, TransferRecord, MaterialType, Bitola, StockGauge } from '../types';
-import { MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions } from '../types';
+import { MaterialOptions, FioMaquinaBitolaOptions, TrefilaBitolaOptions, CA60BitolaOptions } from '../types';
 import { ArrowLeftIcon, TruckIcon, CalculatorIcon, CheckCircleIcon, ExclamationIcon, ClipboardListIcon } from './icons';
 import TransfersHistoryModal from './TransfersHistoryModal';
 import TransferReport from './TransferReport';
@@ -39,7 +39,7 @@ const StockTransfer: React.FC<StockTransferProps> = ({ stock, transfers, setPage
         const caGaugesFromDB = gauges.filter(g => g.materialType === 'CA-60').map(g => String(g.gauge));
 
         const finalFM = [...new Set([...FioMaquinaBitolaOptions, ...fmGaugesFromDB])];
-        const finalCA = [...new Set([...TrefilaBitolaOptions, ...caGaugesFromDB])];
+        const finalCA = [...new Set([...CA60BitolaOptions, ...caGaugesFromDB])];
 
         return [...new Set([...finalFM, ...finalCA])].sort((a, b) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')));
     }, [gauges]);
@@ -59,6 +59,14 @@ const StockTransfer: React.FC<StockTransferProps> = ({ stock, transfers, setPage
     const updateRequest = (index: number, field: keyof TransferRequest, value: any) => {
         const newRequests = [...requests];
         (newRequests[index] as any)[field] = value;
+
+        if (field === 'materialType') {
+            const applicable = value === 'Fio Máquina' ? FioMaquinaBitolaOptions : (value === 'CA-60' ? CA60BitolaOptions : []);
+            if (!applicable.includes(newRequests[index].bitola)) {
+                newRequests[index].bitola = applicable[0] || '';
+            }
+        }
+
         setRequests(newRequests);
     };
 
@@ -354,7 +362,7 @@ const StockTransfer: React.FC<StockTransferProps> = ({ stock, transfers, setPage
                                                     <option value="">Bitola...</option>
                                                     {(() => {
                                                         const materialGaugesFromDB = gauges.filter(g => g.materialType === req.materialType).map(g => g.gauge);
-                                                        const defaultOptions = req.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : TrefilaBitolaOptions;
+                                                        const defaultOptions = req.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions;
                                                         const combinedOptions = [...new Set([...defaultOptions, ...materialGaugesFromDB])].sort((a, b) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')));
                                                         return combinedOptions.map(b => <option key={b} value={b}>{b}</option>);
                                                     })()}

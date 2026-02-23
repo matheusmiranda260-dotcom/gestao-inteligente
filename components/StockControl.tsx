@@ -7,7 +7,7 @@ import type {
     ConferenceLotData, ConferenceData, StockItem, Bitola, MaterialType, Page, StockGauge, User, TransferRecord
 } from '../types';
 import {
-    FioMaquinaBitolaOptions, TrefilaBitolaOptions, MaterialOptions
+    FioMaquinaBitolaOptions, TrefilaBitolaOptions, MaterialOptions, CA60BitolaOptions
 } from '../types';
 import { extractLotDataFromImage } from '../services/geminiService';
 import ConferenceReport from './ConferenceReport';
@@ -71,6 +71,14 @@ const AddConferencePage: React.FC<{
     const handleLotChange = (index: number, field: keyof ConferenceLotData, value: any) => {
         const newLots = [...lots];
         (newLots[index] as any)[field] = value;
+
+        if (field === 'materialType') {
+            const applicableBitolas = value === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions;
+            if (!applicableBitolas.includes(newLots[index].bitola || '')) {
+                newLots[index].bitola = applicableBitolas[0];
+            }
+        }
+
         setLots(newLots);
     };
 
@@ -132,7 +140,13 @@ const AddConferencePage: React.FC<{
                                         <td className="p-2"><input type="text" value={lot.internalLot || ''} onChange={e => handleLotChange(index, 'internalLot', e.target.value)} className="w-full p-2 border rounded" required />{duplicateErrors[index] && <p className="text-red-500 text-[9px] font-bold">{duplicateErrors[index]}</p>}</td>
                                         <td className="p-2"><input type="text" value={lot.runNumber || ''} onChange={e => handleLotChange(index, 'runNumber', e.target.value)} className="w-full p-2 border rounded" required /></td>
                                         <td className="p-2"><select value={lot.materialType} onChange={e => handleLotChange(index, 'materialType', e.target.value)} className="w-full p-2 border rounded">{MaterialOptions.map(m => <option key={m} value={m}>{m}</option>)}</select></td>
-                                        <td className="p-2"><select value={lot.bitola} onChange={e => handleLotChange(index, 'bitola', e.target.value)} className="w-full p-2 border rounded">{[...new Set([...FioMaquinaBitolaOptions, ...TrefilaBitolaOptions, ...gauges.map(g => g.gauge)])].map(b => <option key={b} value={b}>{b}</option>)}</select></td>
+                                        <td className="p-2">
+                                            <select value={lot.bitola} onChange={e => handleLotChange(index, 'bitola', e.target.value)} className="w-full p-2 border rounded">
+                                                {(lot.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions).map(b => (
+                                                    <option key={b} value={b}>{b}</option>
+                                                ))}
+                                            </select>
+                                        </td>
                                         <td className="p-2">
                                             <input
                                                 type="text"
@@ -273,16 +287,28 @@ const EditStockItemModal: React.FC<{ item: StockItem; onClose: () => void; onSav
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
                             <label className="text-xs font-bold text-slate-500 uppercase">Tipo de Material</label>
-                            <select value={formData.materialType} onChange={e => setFormData({ ...formData, materialType: e.target.value as any })} className="w-full px-3 py-2 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                                <option value="Fio Máquina">Fio Máquina</option>
-                                <option value="CA-60">CA-60</option>
+                            <select
+                                value={formData.materialType}
+                                onChange={e => {
+                                    const val = e.target.value;
+                                    const applicable = val === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions;
+                                    setFormData(p => ({
+                                        ...p,
+                                        materialType: val,
+                                        bitola: applicable.includes(p.bitola) ? p.bitola : applicable[0]
+                                    }));
+                                }}
+                                className="w-full px-3 py-2 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                            >
+                                {MaterialOptions.map(m => <option key={m} value={m}>{m}</option>)}
                             </select>
                         </div>
                         <div className="space-y-1">
                             <label className="text-xs font-bold text-slate-500 uppercase">Bitola</label>
                             <select value={formData.bitola} onChange={e => setFormData({ ...formData, bitola: e.target.value })} className="w-full px-3 py-2 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                                {materialGauges.map(g => <option key={g} value={g}>{g}</option>)}
-                                {!materialGauges.includes(formData.bitola) && <option value={formData.bitola}>{formData.bitola}</option>}
+                                {(formData.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions).map(b => (
+                                    <option key={b} value={b}>{b}</option>
+                                ))}
                             </select>
                         </div>
                     </div>
