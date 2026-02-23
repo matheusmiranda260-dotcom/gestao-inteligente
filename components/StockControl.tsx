@@ -273,7 +273,7 @@ const StockControl: React.FC<{
             )}
             <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div className="flex items-center gap-6">
-                    <h1 className="text-3xl font-bold text-slate-800 shrink-0">Estoque</h1>
+                    <h1 className="text-3xl font-bold text-slate-800 shrink-0 no-print">Estoque</h1>
                     <div className="hidden md:flex items-center gap-4 no-print grow">
                         <div className="bg-white p-2 rounded-xl shadow border flex items-center gap-2 px-4 shrink-0">
                             <label className="text-[10px] font-bold text-slate-500 uppercase">Material</label>
@@ -313,7 +313,7 @@ const StockControl: React.FC<{
                         </div>
                     </div>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 no-print">
                     <button onClick={() => setPage('gaugesManager')} className="bg-white text-slate-600 font-bold py-2 px-6 rounded-lg shadow border flex items-center gap-2 hover:bg-slate-50 transition whitespace-nowrap"><AdjustmentsIcon className="h-5 w-5" /> Gerenciar Bitolas</button>
                     <button onClick={() => setIsAdding(true)} className="bg-[#0F3F5C] text-white font-bold py-2 px-6 rounded-lg shadow-lg shrink-0 whitespace-nowrap">+ Novo Recebimento</button>
                 </div>
