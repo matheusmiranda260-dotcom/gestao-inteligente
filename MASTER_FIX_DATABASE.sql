@@ -16,6 +16,12 @@ ALTER TABLE public.stock_items ADD COLUMN IF NOT EXISTS "supplier_lot" TEXT;
 ALTER TABLE public.stock_items ADD COLUMN IF NOT EXISTS "conference_number" TEXT;
 ALTER TABLE public.stock_items ADD COLUMN IF NOT EXISTS "initial_quantity" NUMERIC;
 ALTER TABLE public.stock_items ADD COLUMN IF NOT EXISTS "remaining_quantity" NUMERIC;
+ALTER TABLE public.stock_items ADD COLUMN IF NOT EXISTS "steel_type" TEXT DEFAULT '1006';
+ALTER TABLE public.stock_items ADD COLUMN IF NOT EXISTS "material_type" TEXT DEFAULT 'Fio Máquina';
+ALTER TABLE public.stock_items ADD COLUMN IF NOT EXISTS "run_number" TEXT;
+ALTER TABLE public.stock_items ADD COLUMN IF NOT EXISTS "entry_date" TIMESTAMPTZ;
+ALTER TABLE public.stock_items ADD COLUMN IF NOT EXISTS "supplier" TEXT;
+ALTER TABLE public.stock_items ADD COLUMN IF NOT EXISTS "nfe" TEXT;
 
 -- Habilita RLS e cria políticas de acesso total (IMPORTANTE: Corrige bugs de inserção/deleção)
 ALTER TABLE public.stock_items ENABLE ROW LEVEL SECURITY;
