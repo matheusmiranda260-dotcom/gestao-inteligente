@@ -212,6 +212,13 @@ const StockControl: React.FC<{
         window.print();
     };
 
+    const stats = useMemo(() => {
+        return filtered.reduce((acc, item) => ({
+            count: acc.count + 1,
+            weight: acc.weight + item.remainingQuantity
+        }), { count: 0, weight: 0 });
+    }, [filtered]);
+
     if (isAdding) return <AddConferencePage onClose={() => setIsAdding(false)} onSubmit={addConference} stock={stock} onShowReport={setReportView} conferences={conferences} onEditConference={editConference} onDeleteConference={deleteConference} gauges={gauges} isGestor={isGestor} setPage={setPage} />;
 
     return (
@@ -255,9 +262,20 @@ const StockControl: React.FC<{
                                 })()}
                             </select>
                         </div>
-                        <button onClick={handlePrint} className="bg-white text-slate-600 font-bold py-2 px-4 rounded-xl shadow border flex items-center gap-2 hover:bg-slate-50 transition">
+                        <button onClick={handlePrint} className="bg-white text-slate-600 font-bold py-2 px-4 rounded-xl shadow border flex items-center gap-2 hover:bg-slate-50 transition mr-2">
                             <PrinterIcon className="h-5 w-5" />
                         </button>
+
+                        <div className="flex items-center gap-4 border-l pl-6 ml-2">
+                            <div className="flex flex-col">
+                                <span className="text-[10px] font-bold text-slate-400 border-b border-transparent">Lotes</span>
+                                <span className="text-xl font-black text-slate-800">{stats.count}</span>
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Kg Disponível</span>
+                                <span className="text-xl font-black text-blue-600">{stats.weight.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div className="flex items-center gap-4">
