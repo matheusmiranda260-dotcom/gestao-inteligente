@@ -225,6 +225,39 @@ const StockControl: React.FC<{
 
     return (
         <div className="p-4 md:p-8 space-y-6">
+            {/* Printable Report Header - Only visible during print */}
+            <div className="hidden print:block mb-8 border-b-2 border-slate-900 pb-4">
+                <div className="flex justify-between items-center mb-6">
+                    <div>
+                        <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter italic">MSM <span className="text-slate-500 font-light">Gestão Inteligente</span></h1>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase">Relatório de Inventário de Estoque</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-xs font-bold text-slate-900">{new Date().toLocaleDateString('pt-BR')} {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+                        <p className="text-[10px] text-slate-500 font-medium italic">Sistema MSM Control</p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-4 gap-4 bg-slate-50 p-4 rounded-lg border">
+                    <div>
+                        <p className="text-[8px] font-bold text-slate-400 uppercase">Filtro Material</p>
+                        <p className="text-sm font-black text-slate-800">{materialFilter || 'Todos'}</p>
+                    </div>
+                    <div>
+                        <p className="text-[8px] font-bold text-slate-400 uppercase">Filtro Bitola</p>
+                        <p className="text-sm font-black text-slate-800">{bitolaFilter || 'Todas'}</p>
+                    </div>
+                    <div>
+                        <p className="text-[8px] font-bold text-slate-400 uppercase">Total Lotes</p>
+                        <p className="text-sm font-black text-slate-800">{stats.count}</p>
+                    </div>
+                    <div>
+                        <p className="text-[8px] font-bold text-slate-400 uppercase">Peso Total</p>
+                        <p className="text-sm font-black text-blue-700">{stats.weight.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg</p>
+                    </div>
+                </div>
+            </div>
+
             {reportView && <ConferenceReport reportData={reportView} onClose={() => setReportView(null)} />}
             {historyLot && <LotHistoryModal lot={historyLot} onClose={() => setHistoryLot(null)} />}
             {editingItem && (
@@ -341,6 +374,17 @@ const StockControl: React.FC<{
                             ))}
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            {/* Printable Report Footer */}
+            <div className="hidden print:flex mt-12 justify-between items-end border-t border-dashed pt-8">
+                <div className="flex flex-col gap-1">
+                    <div className="w-48 h-px bg-slate-400"></div>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Responsável pelo Estoque</p>
+                </div>
+                <div className="text-right">
+                    <p className="text-[10px] font-black text-slate-400 italic">MSM - Tecnologia em Gestão de Produção</p>
                 </div>
             </div>
         </div>
