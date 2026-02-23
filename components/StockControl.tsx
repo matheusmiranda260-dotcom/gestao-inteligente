@@ -120,10 +120,10 @@ const AddConferencePage: React.FC<{
                 </div>
                 <form onSubmit={handleFinalSubmit} className="bg-white rounded-xl shadow-lg border overflow-hidden">
                     <div className="p-6 bg-slate-50 border-b grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div><label className="text-xs font-bold text-slate-500 uppercase">Data</label><input type="date" value={conferenceData.entryDate} onChange={e => setConferenceData({ ...conferenceData, entryDate: e.target.value })} className="w-full p-2 border rounded" required /></div>
-                        <div><label className="text-xs font-bold text-slate-500 uppercase">Fornecedor</label><input type="text" value={conferenceData.supplier} onChange={e => setConferenceData({ ...conferenceData, supplier: e.target.value })} className="w-full p-2 border rounded" required /></div>
-                        <div><label className="text-xs font-bold text-slate-500 uppercase">NFe</label><input type="text" value={conferenceData.nfe} onChange={e => setConferenceData({ ...conferenceData, nfe: e.target.value })} className="w-full p-2 border rounded" required /></div>
-                        <div><label className="text-xs font-bold text-slate-500 uppercase">Nº Conf.</label><input type="text" value={conferenceData.conferenceNumber} onChange={e => setConferenceData({ ...conferenceData, conferenceNumber: e.target.value })} className="w-full p-2 border rounded" required /></div>
+                        <div className="text-center"><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Data</label><input type="date" value={conferenceData.entryDate} onChange={e => setConferenceData({ ...conferenceData, entryDate: e.target.value })} className="w-full p-2 border rounded text-center" required /></div>
+                        <div className="text-center"><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Fornecedor</label><input type="text" value={conferenceData.supplier} onChange={e => setConferenceData({ ...conferenceData, supplier: e.target.value })} className="w-full p-2 border rounded text-center" required /></div>
+                        <div className="text-center"><label className="block text-xs font-bold text-slate-500 uppercase mb-1">NFe</label><input type="text" value={conferenceData.nfe} onChange={e => setConferenceData({ ...conferenceData, nfe: e.target.value })} className="w-full p-2 border rounded text-center" required /></div>
+                        <div className="text-center"><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nº Conf.</label><input type="text" value={conferenceData.conferenceNumber} onChange={e => setConferenceData({ ...conferenceData, conferenceNumber: e.target.value })} className="w-full p-2 border rounded text-center" required /></div>
                     </div>
                     <div className="p-4 flex justify-end">
                         <input type="file" accept="image/*" capture="environment" className="hidden" id="scan-ia" onChange={handleGlobalScan} />
@@ -132,24 +132,24 @@ const AddConferencePage: React.FC<{
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead className="bg-slate-50 border-y">
-                                <tr>{['Lote Interno', 'Tipo de Aço', 'Corrida', 'Material', 'Bitola', 'Peso Etiqueta', ''].map(h => <th key={h} className="p-3 text-left font-bold text-slate-600 uppercase text-[10px]">{h}</th>)}</tr>
+                                <tr>{['Lote Interno', 'Tipo de Aço', 'Corrida', 'Material', 'Bitola', 'Peso Etiqueta', ''].map(h => <th key={h} className="p-3 text-center font-bold text-slate-600 uppercase text-[10px]">{h}</th>)}</tr>
                             </thead>
                             <tbody>
                                 {lots.map((lot, index) => (
                                     <tr key={index} className="border-b">
                                         <td className="p-2">
-                                            <input type="text" value={lot.internalLot || ''} onChange={e => handleLotChange(index, 'internalLot', e.target.value)} className="w-full p-2 border rounded" required />
-                                            {duplicateErrors[index] && <p className="text-red-500 text-[9px] font-bold">{duplicateErrors[index]}</p>}
+                                            <input type="text" value={lot.internalLot || ''} onChange={e => handleLotChange(index, 'internalLot', e.target.value)} className="w-full p-2 border rounded text-center" required />
+                                            {duplicateErrors[index] && <p className="text-red-500 text-[9px] font-bold text-center">{duplicateErrors[index]}</p>}
                                         </td>
                                         <td className="p-2">
-                                            <select value={lot.steelType || ''} onChange={e => handleLotChange(index, 'steelType', e.target.value)} className="w-full p-2 border rounded" required>
+                                            <select value={lot.steelType || ''} onChange={e => handleLotChange(index, 'steelType', e.target.value)} className="w-full p-2 border rounded text-center" required>
                                                 {SteelTypeOptions.map(s => <option key={s} value={s}>{s}</option>)}
                                             </select>
                                         </td>
-                                        <td className="p-2"><input type="text" value={lot.runNumber || ''} onChange={e => handleLotChange(index, 'runNumber', e.target.value)} className="w-full p-2 border rounded" required /></td>
-                                        <td className="p-2"><select value={lot.materialType} onChange={e => handleLotChange(index, 'materialType', e.target.value)} className="w-full p-2 border rounded">{MaterialOptions.map(m => <option key={m} value={m}>{m}</option>)}</select></td>
+                                        <td className="p-2"><input type="text" value={lot.runNumber || ''} onChange={e => handleLotChange(index, 'runNumber', e.target.value)} className="w-full p-2 border rounded text-center" required /></td>
+                                        <td className="p-2"><select value={lot.materialType} onChange={e => handleLotChange(index, 'materialType', e.target.value)} className="w-full p-2 border rounded text-center">{MaterialOptions.map(m => <option key={m} value={m}>{m}</option>)}</select></td>
                                         <td className="p-2">
-                                            <select value={lot.bitola} onChange={e => handleLotChange(index, 'bitola', e.target.value)} className="w-full p-2 border rounded">
+                                            <select value={lot.bitola} onChange={e => handleLotChange(index, 'bitola', e.target.value)} className="w-full p-2 border rounded text-center">
                                                 {(lot.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions).map(b => (
                                                     <option key={b} value={b}>{b}</option>
                                                 ))}

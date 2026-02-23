@@ -105,21 +105,21 @@ const EditConferenceModal: React.FC<{
             <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-xl w-full max-w-6xl max-h-[95vh] flex flex-col">
                 <h2 className="text-2xl font-bold text-slate-800 mb-4 border-b pb-4">Editar Conferência: {conference.conferenceNumber}</h2>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 p-4 bg-slate-50 rounded-lg border">
-                    <div>
-                        <label className="text-sm font-medium">Data Entrada</label>
-                        <input type="date" value={formData.entryDate} onChange={e => setFormData({ ...formData, entryDate: e.target.value })} className="w-full p-2 border border-slate-300 rounded" required />
+                    <div className="text-center">
+                        <label className="block text-sm font-medium mb-1">Data Entrada</label>
+                        <input type="date" value={formData.entryDate} onChange={e => setFormData({ ...formData, entryDate: e.target.value })} className="w-full p-2 border border-slate-300 rounded text-center" required />
                     </div>
-                    <div>
-                        <label className="text-sm font-medium">Fornecedor</label>
-                        <input type="text" value={formData.supplier} onChange={e => setFormData({ ...formData, supplier: e.target.value })} className="w-full p-2 border border-slate-300 rounded" required />
+                    <div className="text-center">
+                        <label className="block text-sm font-medium mb-1">Fornecedor</label>
+                        <input type="text" value={formData.supplier} onChange={e => setFormData({ ...formData, supplier: e.target.value })} className="w-full p-2 border border-slate-300 rounded text-center" required />
                     </div>
-                    <div>
-                        <label className="text-sm font-medium">Nota Fiscal (NFe)</label>
-                        <input type="text" value={formData.nfe} onChange={e => setFormData({ ...formData, nfe: e.target.value })} className="w-full p-2 border border-slate-300 rounded" required />
+                    <div className="text-center">
+                        <label className="block text-sm font-medium mb-1">Nota Fiscal (NFe)</label>
+                        <input type="text" value={formData.nfe} onChange={e => setFormData({ ...formData, nfe: e.target.value })} className="w-full p-2 border border-slate-300 rounded text-center" required />
                     </div>
-                    <div>
-                        <label className="text-sm font-medium">Nº Conferência</label>
-                        <input type="text" value={formData.conferenceNumber} disabled className="w-full p-2 border border-slate-300 rounded bg-slate-100" />
+                    <div className="text-center">
+                        <label className="block text-sm font-medium mb-1">Nº Conferência</label>
+                        <input type="text" value={formData.conferenceNumber} disabled className="w-full p-2 border border-slate-300 rounded bg-slate-100 text-center" />
                     </div>
                 </div>
                 <div className="flex-grow overflow-y-auto border rounded-lg">
@@ -127,7 +127,7 @@ const EditConferenceModal: React.FC<{
                         <thead className="sticky top-0 bg-slate-100 z-10">
                             <tr>
                                 {['Lote Interno', 'Tipo de Aço', 'Corrida', 'Tipo Material', 'Bitola', 'Peso Etiqueta (kg)', ''].map(h => (
-                                    <th key={h} className="p-2 text-left font-semibold text-slate-600 space-nowrap whitespace-nowrap">{h}</th>
+                                    <th key={h} className="p-2 text-center font-semibold text-slate-600 space-nowrap whitespace-nowrap">{h}</th>
                                 ))}
                             </tr>
                         </thead>
@@ -135,24 +135,24 @@ const EditConferenceModal: React.FC<{
                             {formData.lots.map((lot, idx) => (
                                 <tr key={idx} className="border-b">
                                     <td className="p-2">
-                                        <input type="text" value={lot.internalLot} onChange={e => handleLotChange(idx, 'internalLot', e.target.value)} className="w-full p-2 border border-slate-300 rounded" required />
-                                        {duplicateErrors[idx] && <p className="text-red-500 text-xs mt-1">{duplicateErrors[idx]}</p>}
+                                        <input type="text" value={lot.internalLot} onChange={e => handleLotChange(idx, 'internalLot', e.target.value)} className="w-full p-2 border border-slate-300 rounded text-center" required />
+                                        {duplicateErrors[idx] && <p className="text-red-500 text-xs mt-1 text-center">{duplicateErrors[idx]}</p>}
                                     </td>
                                     <td className="p-2">
-                                        <select value={lot.steelType || ''} onChange={e => handleLotChange(idx, 'steelType', e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white">
+                                        <select value={lot.steelType || ''} onChange={e => handleLotChange(idx, 'steelType', e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-center">
                                             {SteelTypeOptions.map(s => <option key={s} value={s}>{s}</option>)}
                                         </select>
                                     </td>
                                     <td className="p-2">
-                                        <input type="text" value={lot.runNumber} onChange={e => handleLotChange(idx, 'runNumber', e.target.value)} className="w-full p-2 border border-slate-300 rounded" required />
+                                        <input type="text" value={lot.runNumber} onChange={e => handleLotChange(idx, 'runNumber', e.target.value)} className="w-full p-2 border border-slate-300 rounded text-center" required />
                                     </td>
                                     <td className="p-2">
-                                        <select value={lot.materialType} onChange={e => handleLotChange(idx, 'materialType', e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white">
+                                        <select value={lot.materialType} onChange={e => handleLotChange(idx, 'materialType', e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-center">
                                             {MaterialOptions.map(m => (<option key={m} value={m}>{m}</option>))}
                                         </select>
                                     </td>
                                     <td className="p-2">
-                                        <select value={lot.bitola} onChange={e => handleLotChange(idx, 'bitola', e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white">
+                                        <select value={lot.bitola} onChange={e => handleLotChange(idx, 'bitola', e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-center">
                                             {(lot.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions).map(b => (
                                                 <option key={b} value={b}>{b}</option>
                                             ))}
@@ -167,7 +167,7 @@ const EditConferenceModal: React.FC<{
                                                 const val = e.target.value.replace(/\D/g, '');
                                                 handleLotChange(idx, 'labelWeight', parseInt(val) || 0);
                                             }}
-                                            className="w-full p-2 border border-slate-300 rounded no-spinner"
+                                            className="w-full p-2 border border-slate-300 rounded no-spinner text-center"
                                             required
                                         />
                                     </td>
