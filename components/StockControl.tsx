@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
     ArrowLeftIcon, CameraIcon, TrashIcon, CheckCircleIcon, DocumentReportIcon,
-    AdjustmentsIcon, PencilIcon, BookOpenIcon, SearchIcon, FilterIcon, XIcon
+    AdjustmentsIcon, PencilIcon, BookOpenIcon, SearchIcon, FilterIcon, XIcon, PrinterIcon
 } from './icons';
 import type {
     ConferenceLotData, ConferenceData, StockItem, Bitola, MaterialType, Page, StockGauge, User, TransferRecord
@@ -198,10 +198,19 @@ const StockControl: React.FC<{
     const [historyLot, setHistoryLot] = useState<StockItem | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [editingItem, setEditingItem] = useState<StockItem | null>(null);
+    const [materialFilter, setMaterialFilter] = useState('');
+    const [bitolaFilter, setBitolaFilter] = useState('');
 
     const filtered = useMemo(() => stock.filter(i =>
-        i.status !== 'Consumido' && (i.internalLot.toLowerCase().includes(searchTerm.toLowerCase()) || i.nfe.toLowerCase().includes(searchTerm.toLowerCase()))
-    ).sort((a, b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime()), [stock, searchTerm]);
+        i.status !== 'Consumido' &&
+        (i.internalLot.toLowerCase().includes(searchTerm.toLowerCase()) || i.nfe.toLowerCase().includes(searchTerm.toLowerCase())) &&
+        (materialFilter === '' || i.materialType === materialFilter) &&
+        (bitolaFilter === '' || i.bitola === bitolaFilter)
+    ).sort((a, b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime()), [stock, searchTerm, materialFilter, bitolaFilter]);
+
+    const handlePrint = () => {
+        window.print();
+    };
 
     if (isAdding) return <AddConferencePage onClose={() => setIsAdding(false)} onSubmit={addConference} stock={stock} onShowReport={setReportView} conferences={conferences} onEditConference={editConference} onDeleteConference={deleteConference} gauges={gauges} isGestor={isGestor} setPage={setPage} />;
 
@@ -220,12 +229,45 @@ const StockControl: React.FC<{
                     gauges={gauges}
                 />
             )}
-            <header className="flex justify-between items-center">
-                <h1 className="text-3xl font-bold text-slate-800">Estoque</h1>
-                <button onClick={() => setIsAdding(true)} className="bg-[#0F3F5C] text-white font-bold py-2 px-6 rounded-lg shadow-lg">+ Novo Recebimento</button>
+            <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div className="flex items-center gap-6">
+                    <h1 className="text-3xl font-bold text-slate-800 shrink-0">Estoque</h1>
+                    <div className="hidden md:flex items-center gap-4 no-print grow">
+                        <div className="bg-white p-2 rounded-xl shadow border flex items-center gap-2 px-4 shrink-0">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase">Material</label>
+                            <select value={materialFilter} onChange={e => setMaterialFilter(e.target.value)} className="bg-transparent outline-none font-bold text-sm min-w-[120px]">
+                                <option value="">Todos</option>
+                                {MaterialOptions.map(m => <option key={m} value={m}>{m}</option>)}
+                            </select>
+                        </div>
+                        <div className="bg-white p-2 rounded-xl shadow border flex items-center gap-2 px-4 shrink-0">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase">Bitola</label>
+                            <select value={bitolaFilter} onChange={e => setBitolaFilter(e.target.value)} className="bg-transparent outline-none font-bold text-sm min-w-[80px]">
+                                <option value="">Todas</option>
+                                {([...new Set([...FioMaquinaBitolaOptions, ...CA60BitolaOptions, ...gauges.map(g => g.gauge)])]).sort((a, b) => parseFloat(a) - parseFloat(b)).map(b => (
+                                    <option key={b} value={b}>{b}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <button onClick={handlePrint} className="bg-white text-slate-600 font-bold py-2 px-4 rounded-xl shadow border flex items-center gap-2 hover:bg-slate-50 transition">
+                            <PrinterIcon className="h-5 w-5" />
+                        </button>
+                    </div>
+                </div>
+                <button onClick={() => setIsAdding(true)} className="bg-[#0F3F5C] text-white font-bold py-2 px-6 rounded-lg shadow-lg shrink-0 whitespace-nowrap">+ Novo Recebimento</button>
             </header>
-            <div className="bg-white p-4 rounded-xl shadow border flex items-center gap-4">
-                <SearchIcon className="h-5 w-5 text-slate-400" /><input type="text" placeholder="Buscar lote ou NFe..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="flex-grow outline-none" />
+            <div className="md:hidden flex flex-wrap gap-2 no-print">
+                <div className="bg-white p-2 rounded-lg shadow border flex items-center gap-2 px-4 shadow-sm">
+                    <label className="text-[10px] font-bold text-slate-500">MP:</label>
+                    <select value={materialFilter} onChange={e => setMaterialFilter(e.target.value)} className="bg-transparent outline-none font-bold text-xs">
+                        <option value="">Todos</option>
+                        {MaterialOptions.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                </div>
+            </div>
+            <div className="no-print bg-white p-4 rounded-xl shadow border flex items-center gap-4">
+                <SearchIcon className="h-5 w-5 text-slate-400" />
+                <input type="text" placeholder="Buscar lote ou NFe..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="flex-grow outline-none" />
             </div>
             <div className="bg-white rounded-xl shadow-lg border overflow-hidden">
                 <div className="overflow-x-auto">
@@ -234,10 +276,11 @@ const StockControl: React.FC<{
                             <tr>
                                 <th className="p-3 text-center">Data</th>
                                 <th className="p-3 text-center">Lote Interno</th>
+                                <th className="p-3 text-center">Mat.</th>
                                 <th className="p-3 text-center">Bitola</th>
                                 <th className="p-3 text-center">Peso (kg)</th>
                                 <th className="p-3 text-center">Status</th>
-                                <th className="p-3 text-center">Ações</th>
+                                <th className="p-3 text-center no-print">Ações</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y">
@@ -245,10 +288,11 @@ const StockControl: React.FC<{
                                 <tr key={item.id} className="hover:bg-slate-50">
                                     <td className="p-3 text-center text-slate-500 font-medium">{new Date(item.entryDate).toLocaleDateString('pt-BR')}</td>
                                     <td className="p-3 text-center font-black text-slate-900">{item.internalLot}</td>
+                                    <td className="p-3 text-center text-slate-500">{item.materialType}</td>
                                     <td className="p-3 text-center font-black text-blue-600">{item.bitola}</td>
                                     <td className="p-3 text-center font-black text-slate-800">{item.remainingQuantity.toFixed(2)}</td>
                                     <td className="p-3 text-center">{getStatusBadge(item.status)}</td>
-                                    <td className="p-3 flex justify-center gap-2">
+                                    <td className="p-3 flex justify-center gap-2 no-print">
                                         <button onClick={() => setHistoryLot(item)} title="Histórico"><BookOpenIcon className="h-5 w-5 text-slate-400 hover:text-blue-500" /></button>
                                         <button onClick={() => setEditingItem(item)} title="Editar"><PencilIcon className="h-5 w-5 text-slate-400 hover:text-amber-500" /></button>
                                         <button onClick={() => confirm('Excluir?') && deleteStockItem(item.id)} title="Excluir"><TrashIcon className="h-5 w-5 text-red-400 hover:text-red-600" /></button>
