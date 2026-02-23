@@ -321,12 +321,7 @@ tr:hover td {
 
 @media print {
 
-  /* 1. Hide everything by default */
-  body * {
-    visibility: hidden;
-  }
-
-  /* 2. Reset Root to be layout neutral */
+  /* 1. Reset Root to be layout neutral */
   #root,
   html,
   body {
@@ -337,10 +332,8 @@ tr:hover td {
     height: auto !important;
   }
 
-  /* 3. Show ONLY the print container and its children */
-  .print-modal-container,
-  .print-modal-container * {
-    visibility: visible !important;
+  .no-print {
+    display: none !important;
   }
 
   /* 4. Position the container at the very top-left of the page */

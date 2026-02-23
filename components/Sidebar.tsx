@@ -85,7 +85,7 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
     };
 
     return (
-        <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
+        <aside className={`sidebar no-print ${isCollapsed ? 'collapsed' : ''} ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
             <div className="sidebar-header">
                 {!isCollapsed && (
                     <div className="sidebar-logo">
