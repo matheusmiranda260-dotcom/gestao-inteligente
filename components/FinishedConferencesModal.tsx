@@ -149,7 +149,17 @@ const EditConferenceModal: React.FC<{
                                         </select>
                                     </td>
                                     <td className="p-2">
-                                        <input type="number" step="0.01" value={lot.labelWeight} onChange={e => handleLotChange(idx, 'labelWeight', parseFloat(e.target.value))} className="w-full p-2 border border-slate-300 rounded" required />
+                                        <input
+                                            type="text"
+                                            inputMode="numeric"
+                                            value={lot.labelWeight}
+                                            onChange={e => {
+                                                const val = e.target.value.replace(/\D/g, '');
+                                                handleLotChange(idx, 'labelWeight', parseInt(val) || 0);
+                                            }}
+                                            className="w-full p-2 border border-slate-300 rounded no-spinner"
+                                            required
+                                        />
                                     </td>
                                     <td className="p-2 text-center">
                                         <button type="button" onClick={() => handleRemoveLot(idx)} className="p-1 text-red-500 hover:text-red-700">

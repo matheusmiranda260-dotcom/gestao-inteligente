@@ -134,7 +134,20 @@ const AddConferencePage: React.FC<{
                                         <td className="p-2"><input type="text" value={lot.runNumber || ''} onChange={e => handleLotChange(index, 'runNumber', e.target.value)} className="w-full p-2 border rounded" required /></td>
                                         <td className="p-2"><select value={lot.materialType} onChange={e => handleLotChange(index, 'materialType', e.target.value)} className="w-full p-2 border rounded">{MaterialOptions.map(m => <option key={m} value={m}>{m}</option>)}</select></td>
                                         <td className="p-2"><select value={lot.bitola} onChange={e => handleLotChange(index, 'bitola', e.target.value)} className="w-full p-2 border rounded">{[...new Set([...FioMaquinaBitolaOptions, ...TrefilaBitolaOptions, ...gauges.map(g => g.gauge)])].map(b => <option key={b} value={b}>{b}</option>)}</select></td>
-                                        <td className="p-2"><input type="number" step="0.01" value={lot.labelWeight || ''} onChange={e => handleLotChange(index, 'labelWeight', parseFloat(e.target.value))} className="w-full p-2 border rounded font-bold" required /></td>
+                                        <td className="p-2">
+                                            <input
+                                                type="text"
+                                                inputMode="numeric"
+                                                value={lot.labelWeight || ''}
+                                                onChange={e => {
+                                                    const val = e.target.value.replace(/\D/g, '');
+                                                    handleLotChange(index, 'labelWeight', val ? parseInt(val) : 0);
+                                                }}
+                                                className="w-full p-2 border rounded font-bold text-center no-spinner"
+                                                placeholder="0"
+                                                required
+                                            />
+                                        </td>
                                         <td className="p-2"><button type="button" onClick={() => setLots(lots.filter((_, i) => i !== index))} className="p-2 text-red-500"><TrashIcon className="h-5 w-5" /></button></td>
                                     </tr>
                                 ))}
@@ -278,7 +291,17 @@ const EditStockItemModal: React.FC<{ item: StockItem; onClose: () => void; onSav
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
                             <label className="text-xs font-bold text-slate-500 uppercase">Peso Atual (kg)</label>
-                            <input type="number" step="0.01" value={formData.remainingQuantity} onChange={e => setFormData({ ...formData, remainingQuantity: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required />
+                            <input
+                                type="text"
+                                inputMode="numeric"
+                                value={formData.remainingQuantity}
+                                onChange={e => {
+                                    const val = e.target.value.replace(/\D/g, '');
+                                    setFormData({ ...formData, remainingQuantity: parseInt(val) || 0 });
+                                }}
+                                className="w-full px-3 py-2 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none no-spinner"
+                                required
+                            />
                         </div>
                         <div className="space-y-1">
                             <label className="text-xs font-bold text-slate-500 uppercase">Status</label>

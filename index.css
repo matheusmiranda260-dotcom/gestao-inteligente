@@ -243,6 +243,18 @@ tr:hover td {
   background: transparent;
 }
 
+/* Utility to hide input spinners */
+.no-spinner::-webkit-outer-spin-button,
+.no-spinner::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.no-spinner {
+  -moz-appearance: textfield;
+  appearance: none;
+}
+
 .no-scrollbar {
   -ms-overflow-style: none;
   /* IE and Edge */
