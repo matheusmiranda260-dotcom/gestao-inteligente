@@ -1091,9 +1091,6 @@ const StockControl: React.FC<{
                         </div>
                         {/* Keeping Existing buttons, but REMOVED Finished Conferences Button */}
                         <div className="flex gap-4">
-                            <button onClick={() => setPage('stock_inventory')} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition flex items-center gap-2">
-                                <ScaleIcon className="h-5 w-5" />Inventário Mobile
-                            </button>
                             <button onClick={() => setStockDashboardOpen(true)} className="bg-white hover:bg-slate-50 text-slate-800 font-semibold py-2 px-4 rounded-lg border border-slate-300 transition flex items-center gap-2">
                                 <ChartBarIcon className="h-5 w-5" />Estatística
                             </button>
@@ -1211,7 +1208,7 @@ const StockControl: React.FC<{
                                         <th className="px-2 py-1.5 text-center">Material / Bitola</th>
                                         <th className="px-2 py-1.5 text-right">Etiqueta (kg)</th>
                                         <th className="px-2 py-1.5 text-center">Status</th>
-                                        <th className="px-2 py-1.5 text-center">Conf. Física</th>
+
                                         <th className="px-2 py-1.5 text-center">Ações</th>
                                     </tr>
                                 </thead>
@@ -1270,16 +1267,7 @@ const StockControl: React.FC<{
                                                     )}
                                                 </div>
                                             </td>
-                                            <td className="px-2 py-0.5 whitespace-nowrap text-center">
-                                                {item.lastAuditDate ? (
-                                                    <div className="flex flex-col items-center leading-none">
-                                                        <CheckCircleIcon className="h-3.5 w-3.5 text-emerald-500" />
-                                                        <span className="text-[8px] font-bold text-emerald-600 uppercase">OK-{new Date(item.lastAuditDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</span>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-[10px] font-bold text-slate-200">-</span>
-                                                )}
-                                            </td>
+
                                             <td className="px-2 py-0.5">
                                                 <div className="flex items-center justify-center gap-0.5">
                                                     <button onClick={() => setHistoryLot(item)} className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition" title="Ver Histórico"><BookOpenIcon className="h-3.5 w-3.5" /></button>

@@ -158,15 +158,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser }) =
                                     color="indigo"
                                 />
                             )}
-                            {hasPermission('stock_inventory') && (
-                                <MenuButton
-                                    onClick={() => setPage('stock_inventory')}
-                                    label="Inventário (Conferência)"
-                                    description="Auditoria física de estoque via celular."
-                                    icon={<ChartBarIcon />}
-                                    color="blue"
-                                />
-                            )}
+
 
                             {hasPermission('finishedGoods') && (
                                 <MenuButton

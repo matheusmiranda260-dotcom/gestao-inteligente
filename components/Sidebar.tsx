@@ -256,11 +256,7 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                                             ➡️ Transferência
                                         </button>
                                     )}
-                                    {hasPermission('stock_inventory') && (
-                                        <button onClick={() => setPage('stock_inventory')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stock_inventory' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                            📋 Inventário (Relatório)
-                                        </button>
-                                    )}
+
                                     {hasPermission('stock') && (
                                         <button onClick={() => setPage('stock')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stock' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             ⚙️ Gestão de Lotes
