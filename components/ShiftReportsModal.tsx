@@ -703,7 +703,7 @@ const ShiftReportsModal: React.FC<ShiftReportsModalProps> = ({ reports, stock, o
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-40 p-4 print-modal-container">
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[60] p-4 print-modal-container">
             <div className="bg-white p-0 rounded-xl shadow-2xl w-full max-w-7xl max-h-[90vh] flex flex-col print-modal-content overflow-hidden">
                 {!printingReport && (
                     <div className="flex justify-between items-center p-6 border-b border-slate-200 bg-white no-print">

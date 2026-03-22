@@ -91,7 +91,7 @@ const ProductionOrderHistoryModal: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
             <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-7xl max-h-[90vh] flex flex-col">
                 {editingOrder && <EditProductionOrderModal order={editingOrder} onClose={() => setEditingOrder(null)} onSubmit={updateProductionOrder} />}
                 {deletingOrder && (

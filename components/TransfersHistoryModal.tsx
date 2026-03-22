@@ -10,7 +10,7 @@ interface TransfersHistoryModalProps {
 
 const TransfersHistoryModal: React.FC<TransfersHistoryModalProps> = ({ transfers, onClose, onShowReport }) => {
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
             <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col">
                 <div className="flex justify-between items-center border-b pb-4 mb-4">
                     <h2 className="text-2xl font-bold text-slate-800">Histórico de Transferências de Material</h2>
