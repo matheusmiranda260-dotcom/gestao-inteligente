@@ -899,26 +899,53 @@ const MachineControl: React.FC<MachineControlProps> = ({
             setShowPartsRequestModal(true);
             setShowShiftReportsModal(false);
         } else if (initialModal === null) {
-            setShowShiftReportsModal(false);
             setShowPartsRequestModal(false);
         }
     }, [initialModal]);
 
     const shiftStatus = useMemo(() => {
         const currentTime = now;
-        const day = currentTime.getDay();
-        const isWeekday = day >= 1 && day <= 5;
-
-        // Use actual shift start if available, otherwise default to 07:45
+        
         const actualStart = currentOperatorLog ? new Date(currentOperatorLog.startTime) : null;
-        const defaultStart = new Date(currentTime);
-        defaultStart.setHours(7, 45, 0, 0);
+        const referenceTime = actualStart || currentTime;
+        const refHour = referenceTime.getHours();
+        const refMinutes = referenceTime.getMinutes();
+        const timeVal = refHour + refMinutes / 60;
 
-        const shiftStart = actualStart || defaultStart;
+        let shiftName = 'Turno Padrão';
+        let shiftLabel = '07:45 - 17:30';
+        let startH = 7, startM = 45;
+        let endH = 17, endM = 30;
 
-        // Target end is 17:30 OR start + duration? Stick to 17:30 for standard shift visual
-        const shiftEnd = new Date(currentTime);
-        shiftEnd.setHours(17, 30, 0, 0);
+        // Configuração de 2 turnos para a Treliça
+        if (activeOrder?.machine !== 'Trefila') {
+            if (timeVal >= 4 && timeVal < 14) { 
+                // Turno A (Inicia entre 04:00 e 13:59)
+                shiftName = 'Turno A';
+                shiftLabel = '05:00 - 14:44';
+                startH = 5; startM = 0;
+                endH = 14; endM = 44;
+            } else {
+                // Turno B (Inicia a partir das 14:00)
+                shiftName = 'Turno B';
+                shiftLabel = '14:00 - 00:00';
+                startH = 14; startM = 0;
+                endH = 23; endM = 59;
+            }
+        }
+
+        const shiftStart = new Date(referenceTime);
+        shiftStart.setHours(startH, startM, 0, 0);
+
+        const shiftEnd = new Date(referenceTime);
+        shiftEnd.setHours(endH, endM, 59, 999);
+
+        // Ajuste caso o Turno B ultrapasse a meia-noite (para turnos noturnos no futuro)
+        if (endH < startH && currentTime.getHours() <= endH) {
+             shiftStart.setDate(shiftStart.getDate() - 1);
+        } else if (endH < startH && currentTime.getHours() >= startH) {
+             shiftEnd.setDate(shiftEnd.getDate() + 1);
+        }
 
         const nowMs = currentTime.getTime();
         const startMs = shiftStart.getTime();
@@ -931,36 +958,30 @@ const MachineControl: React.FC<MachineControlProps> = ({
         let isOvertime = false;
         let timeStatusText = '';
 
-        if (isWeekday && nowMs <= endMs) {
-            // Normal shift progress
+        if (nowMs <= endMs) {
+            // Dentro do turno
             if (nowMs < startMs) {
                 timeStatusText = `Turno inicia em ${formatDuration(startMs - nowMs)}`;
             } else {
                 progress = (elapsedSinceStart / totalShiftDuration) * 100;
                 const remainingMs = endMs - nowMs;
-                timeStatusText = `Faltam ${formatDuration(remainingMs)} para o fim do turno`;
+                timeStatusText = `Faltam ${formatDuration(remainingMs)}`;
             }
         } else {
-            // Overtime or Weekend
+            // Passou do horário do turno
             progress = 100;
             isOvertime = true;
-            if (nowMs > endMs) {
-                timeStatusText = `+${formatDuration(nowMs - endMs)} de hora extra`;
-            } else {
-                // Should be covered by weekday check, but fallback
-                timeStatusText = 'Hora Extra';
-            }
-            if (!isWeekday) {
-                timeStatusText = 'Trabalho em fim de semana (Hora Extra)';
-            }
+            timeStatusText = `+${formatDuration(nowMs - endMs)} (Extra)`;
         }
 
         return {
             isOvertime,
             progress: Math.max(0, Math.min(100, progress)),
             timeStatusText,
+            shiftName,
+            shiftLabel
         };
-    }, [now, currentOperatorLog]);
+    }, [now, currentOperatorLog, activeOrder?.machine]);
 
 
     const { waitingLots, completedLots } = useMemo(() => {
@@ -1626,7 +1647,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                 <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
                                                     <div className={`h-full transition-all duration-700 ${shiftStatus.isOvertime ? 'bg-red-500' : 'bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]'}`} style={{ width: `${shiftStatus.progress}%` }}></div>
                                                 </div>
-                                                <p className="text-[10px] text-slate-500 font-bold uppercase text-center tracking-widest">Turno: 07:45 - 17:30</p>
+                                                <p className="text-[10px] text-slate-500 font-bold uppercase text-center tracking-widest">{shiftStatus.shiftName}: {shiftStatus.shiftLabel}</p>
                                             </div>
                                         </div>
                                     )}
@@ -2164,7 +2185,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                         <h3 className="text-lg font-semibold text-slate-700 mb-3 flex items-center gap-2"><ClockIcon className="h-5 w-5" /> Status do Turno</h3>
                                         <div className="space-y-3">
                                             <div className="text-center">
-                                                <p className="text-sm text-slate-500">Turno Padrão: 07:45 - 17:30</p>
+                                                <p className="text-sm text-slate-500">{shiftStatus.shiftName}: {shiftStatus.shiftLabel}</p>
                                                 {shiftStatus.isOvertime && <p className="text-sm font-bold text-red-500 animate-pulse">HORA EXTRA</p>}
                                             </div>
                                             <div className="w-full bg-slate-200 rounded-full h-4">
