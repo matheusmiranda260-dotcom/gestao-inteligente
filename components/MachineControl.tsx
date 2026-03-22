@@ -433,7 +433,7 @@ interface MachineControlProps {
     logResumeProduction?: (orderId: string) => void;
     startLotProcessing?: (orderId: string, lotId: string) => void;
     finishLotProcessing?: (orderId: string, lotId: string) => void;
-    recordLotWeight?: (orderId: string, lotId: string, finalWeight: number | null, measuredGauge?: number) => void;
+    recordLotWeight?: (orderId: string, lotId: string, finalWeight?: number | null, measuredGauge?: number) => void;
     recordPackageWeight?: (orderId: string, packageData: { packageNumber: number; quantity: number; weight: number; }) => void;
     completeProduction?: (orderId: string, finalData: { actualProducedQuantity?: number, pontas?: Ponta[] }) => void;
     addPartsRequest?: (data: Omit<PartsRequest, 'id' | 'date' | 'operator' | 'status' | 'machine' | 'productionOrderId'>) => void;
@@ -532,30 +532,29 @@ const MachineControl: React.FC<MachineControlProps> = ({
     const handleRecordWeight = (lotId: string) => {
         if (!activeOrder || !recordLotWeight) return;
 
-        // Encontra o lote nos processados para saber o que já foi salvo anteriormente
         const lot = (activeOrder.processedLots || []).find(p => p.lotId === lotId);
         if (!lot) return;
 
         const weightStr = pendingWeights.get(lotId);
         const gaugeStr = pendingGauges.get(lotId);
 
-        // Prioridade para o novo valor do input, senão mantém o valor já salvo no banco
-        const finalWeight = weightStr ? parseFloat(weightStr.replace(',', '.')) : lot.finalWeight;
-        const measuredGauge = gaugeStr ? parseFloat(gaugeStr.replace(',', '.')) : lot.measuredGauge;
+        const parsedWeight = weightStr ? parseFloat(weightStr.replace(',', '.')) : undefined;
+        const parsedGauge = gaugeStr ? parseFloat(gaugeStr.replace(',', '.')) : undefined;
 
-        // Prossegue se tivermos pelo menos o peso OU se tivermos a bitola aferida
-        if ((finalWeight !== null && !isNaN(finalWeight)) || (measuredGauge !== null && measuredGauge !== undefined && !isNaN(measuredGauge))) {
-            recordLotWeight(activeOrder.id, lotId, finalWeight, measuredGauge === null ? undefined : measuredGauge);
+        const finalWeight = (parsedWeight !== undefined && !isNaN(parsedWeight)) ? parsedWeight : undefined;
+        const measuredGauge = (parsedGauge !== undefined && !isNaN(parsedGauge)) ? parsedGauge : undefined;
 
-            // Limpa os estados locais apenas do que foi enviado nos inputs
-            if (weightStr) {
+        if (finalWeight !== undefined || measuredGauge !== undefined) {
+            recordLotWeight(activeOrder.id, lotId, finalWeight, measuredGauge);
+
+            if (finalWeight !== undefined) {
                 setPendingWeights(prev => {
                     const newMap = new Map(prev);
                     newMap.delete(lotId);
                     return newMap;
                 });
             }
-            if (gaugeStr) {
+            if (measuredGauge !== undefined) {
                 setPendingGauges(prev => {
                     const newMap = new Map(prev);
                     newMap.delete(lotId);

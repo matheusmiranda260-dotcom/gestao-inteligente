@@ -1753,7 +1753,7 @@ const App: React.FC = () => {
         }
     };
 
-    const recordLotWeight = async (orderId: string, lotId: string, finalWeight: number | null, measuredGauge?: number) => {
+    const recordLotWeight = async (orderId: string, lotId: string, finalWeight?: number | null, measuredGauge?: number) => {
         try {
             // Fetch the latest version of the order using fetchByColumn which handles camelCase conversion
             const orders = await fetchByColumn<ProductionOrderData>('production_orders', 'id', orderId);
