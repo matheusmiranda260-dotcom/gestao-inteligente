@@ -200,7 +200,21 @@ const StockControl: React.FC<{
     const [editingItem, setEditingItem] = useState<StockItem | null>(null);
     const [materialFilter, setMaterialFilter] = useState('');
     const [bitolaFilter, setBitolaFilter] = useState('');
-    const [statusFilter, setStatusFilter] = useState('');
+    const [statusFilter, setStatusFilter] = useState<string[]>([]);
+    const [isStatusOpen, setIsStatusOpen] = useState(false);
+    const [isMobileStatusOpen, setIsMobileStatusOpen] = useState(false);
+    
+    const statusDesktopRef = useRef<HTMLDivElement>(null);
+    const statusMobileRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (statusDesktopRef.current && !statusDesktopRef.current.contains(event.target as Node)) setIsStatusOpen(false);
+            if (statusMobileRef.current && !statusMobileRef.current.contains(event.target as Node)) setIsMobileStatusOpen(false);
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
     const availableBitolas = useMemo(() => {
         let options: string[] = [];
@@ -228,8 +242,13 @@ const StockControl: React.FC<{
             (i.steelType || '').toLowerCase().includes(searchTerm.toLowerCase())) &&
         (materialFilter === '' || i.materialType === materialFilter) &&
         (bitolaFilter === '' || i.bitola === bitolaFilter) &&
-        (statusFilter === '' || i.status === statusFilter)
-    ).sort((a, b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime()), [stock, searchTerm, materialFilter, bitolaFilter, statusFilter]);
+        (statusFilter.length === 0 || statusFilter.includes(i.status))
+    ).sort((a, b) => {
+        const lotA = parseInt(a.internalLot.replace(/\D/g, '')) || 0;
+        const lotB = parseInt(b.internalLot.replace(/\D/g, '')) || 0;
+        if (lotA !== lotB) return lotB - lotA;
+        return b.internalLot.localeCompare(a.internalLot);
+    }), [stock, searchTerm, materialFilter, bitolaFilter, statusFilter]);
 
     const handlePrint = () => {
         window.print();
@@ -271,7 +290,7 @@ const StockControl: React.FC<{
                         </div>
                         <div>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status</p>
-                            <p className="text-base font-black text-slate-800">{statusFilter || 'Todos'}</p>
+                            <p className="text-base font-black text-slate-800 max-w-[150px] truncate">{statusFilter.length === 0 ? 'Todos' : statusFilter.join(', ')}</p>
                         </div>
                     </div>
                     <div className="flex gap-6 items-center text-center">
@@ -320,16 +339,44 @@ const StockControl: React.FC<{
                                 ))}
                             </select>
                         </div>
-                        <div className="bg-white p-2 rounded-xl shadow border flex items-center gap-2 px-4 shrink-0">
+                        <div className="bg-white p-2 rounded-xl shadow border flex items-center gap-2 px-4 shrink-0 relative" ref={statusDesktopRef}>
                             <label className="text-[10px] font-bold text-slate-500 uppercase">Status</label>
-                            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="bg-transparent outline-none font-bold text-sm min-w-[80px]">
-                                <option value="">Todos</option>
-                                <option value="Disponível">Disponível</option>
-                                <option value="Disponível - Suporte Treliça">Suporte Treliça</option>
-                                <option value="Em Produção - Trefila">Em Prod. Trefila</option>
-                                <option value="Em Produção - Treliça">Em Prod. Treliça</option>
-                                <option value="Reservado">Reservado</option>
-                            </select>
+                            <button 
+                                onClick={() => setIsStatusOpen(!isStatusOpen)}
+                                className="bg-transparent outline-none font-bold text-sm min-w-[80px] text-left flex justify-between items-center"
+                            >
+                                <span className="truncate max-w-[100px]">{statusFilter.length === 0 ? 'Todos' : `${statusFilter.length} Sel.`}</span>
+                                <svg className="w-4 h-4 ml-1 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                            </button>
+                            {isStatusOpen && (
+                                <div className="absolute top-full left-0 mt-2 bg-white border rounded-xl shadow-xl z-50 p-3 flex flex-col gap-2 min-w-[200px]">
+                                    <label className="flex items-center gap-2 text-sm font-bold text-slate-700 cursor-pointer mb-1 hover:text-[#0F3F5C] transition-colors">
+                                        <input type="checkbox" checked={statusFilter.length === 0} onChange={() => setStatusFilter([])} className="form-checkbox h-4 w-4 text-[#0F3F5C] rounded border-slate-300 focus:ring-[#0F3F5C]" />
+                                        Todos
+                                    </label>
+                                    <hr className="my-1 border-slate-100" />
+                                    {[
+                                        { val: 'Disponível', label: 'Disponível' },
+                                        { val: 'Disponível - Suporte Treliça', label: 'Suporte Treliça' },
+                                        { val: 'Em Produção - Trefila', label: 'Em Prod. Trefila' },
+                                        { val: 'Em Produção - Treliça', label: 'Em Prod. Treliça' },
+                                        { val: 'Reservado', label: 'Reservado' }
+                                    ].map(s => (
+                                        <label key={s.val} className="flex items-center gap-2 text-xs font-bold text-slate-600 cursor-pointer hover:text-slate-900 transition-colors py-1">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={statusFilter.includes(s.val)} 
+                                                onChange={e => {
+                                                    if (e.target.checked) setStatusFilter([...statusFilter, s.val]);
+                                                    else setStatusFilter(statusFilter.filter(x => x !== s.val));
+                                                }} 
+                                                className="form-checkbox h-4 w-4 text-[#0F3F5C] rounded border-slate-300 focus:ring-[#0F3F5C]"
+                                            />
+                                            {s.label}
+                                        </label>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                         <button onClick={handlePrint} className="bg-white text-slate-600 font-bold py-2 px-4 rounded-xl shadow border flex items-center gap-2 hover:bg-slate-50 transition mr-2">
                             <PrinterIcon className="h-5 w-5" />
@@ -369,16 +416,43 @@ const StockControl: React.FC<{
                         ))}
                     </select>
                 </div>
-                <div className="bg-white p-2 rounded-lg shadow border flex items-center gap-2 px-4 shadow-sm">
+                <div className="bg-white p-2 rounded-lg shadow border flex items-center gap-2 px-4 shadow-sm relative" ref={statusMobileRef}>
                     <label className="text-[10px] font-bold text-slate-500">ST:</label>
-                    <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="bg-transparent outline-none font-bold text-xs">
-                        <option value="">Todos</option>
-                        <option value="Disponível">Disponível</option>
-                        <option value="Disponível - Suporte Treliça">Sup. Treliça</option>
-                        <option value="Em Produção - Trefila">Em Prod. Trefila</option>
-                        <option value="Em Produção - Treliça">Em Prod. Treliça</option>
-                        <option value="Reservado">Reservado</option>
-                    </select>
+                    <button 
+                        onClick={() => setIsMobileStatusOpen(!isMobileStatusOpen)}
+                        className="bg-transparent outline-none font-bold text-xs text-left"
+                    >
+                        {statusFilter.length === 0 ? 'Todos' : `${statusFilter.length} Sel.`}
+                    </button>
+                    {isMobileStatusOpen && (
+                        <div className="absolute top-full left-0 mt-2 bg-white border rounded-xl shadow-xl z-50 p-3 min-w-[200px] flex flex-col gap-2">
+                            <label className="flex items-center gap-2 text-sm font-bold text-slate-700 cursor-pointer mb-1 hover:text-[#0F3F5C] transition-colors">
+                                <input type="checkbox" checked={statusFilter.length === 0} onChange={() => setStatusFilter([])} className="form-checkbox h-4 w-4 text-[#0F3F5C] rounded border-slate-300 focus:ring-[#0F3F5C]" />
+                                Todos
+                            </label>
+                            <hr className="my-1 border-slate-100" />
+                            {[
+                                { val: 'Disponível', label: 'Disponível' },
+                                { val: 'Disponível - Suporte Treliça', label: 'Sup. Treliça' },
+                                { val: 'Em Produção - Trefila', label: 'Em Prod. Trefila' },
+                                { val: 'Em Produção - Treliça', label: 'Em Prod. Treliça' },
+                                { val: 'Reservado', label: 'Reservado' }
+                            ].map(s => (
+                                <label key={s.val} className="flex items-center gap-2 text-xs font-bold text-slate-600 cursor-pointer hover:text-slate-900 transition-colors py-1">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={statusFilter.includes(s.val)} 
+                                        onChange={e => {
+                                            if (e.target.checked) setStatusFilter([...statusFilter, s.val]);
+                                            else setStatusFilter(statusFilter.filter(x => x !== s.val));
+                                        }} 
+                                        className="form-checkbox h-4 w-4 text-[#0F3F5C] rounded border-slate-300 focus:ring-[#0F3F5C]"
+                                    />
+                                    {s.label}
+                                </label>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
             <div className="no-print bg-white p-4 rounded-xl shadow border flex items-center gap-4">
