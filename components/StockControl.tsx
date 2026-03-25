@@ -200,6 +200,26 @@ const StockControl: React.FC<{
     const [editingItem, setEditingItem] = useState<StockItem | null>(null);
     const [materialFilter, setMaterialFilter] = useState('');
     const [bitolaFilter, setBitolaFilter] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
+
+    const availableBitolas = useMemo(() => {
+        let options: string[] = [];
+        if (materialFilter === 'Fio Máquina') {
+            options = [...FioMaquinaBitolaOptions, ...gauges.filter(g => g.materialType === 'Fio Máquina').map(g => g.gauge)];
+        } else if (materialFilter === 'CA-60') {
+            options = [...CA60BitolaOptions, ...gauges.filter(g => g.materialType === 'CA-60').map(g => g.gauge)];
+        } else {
+            options = [...FioMaquinaBitolaOptions, ...CA60BitolaOptions, ...gauges.map(g => g.gauge)];
+        }
+        
+        const stockBitolas = stock
+            .filter(i => i.status !== 'Consumido' && (materialFilter === '' || i.materialType === materialFilter))
+            .map(i => i.bitola);
+            
+        return [...new Set([...options, ...stockBitolas])]
+            .filter(Boolean)
+            .sort((a, b) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')));
+    }, [gauges, stock, materialFilter]);
 
     const filtered = useMemo(() => stock.filter(i =>
         i.status !== 'Consumido' &&
@@ -207,8 +227,9 @@ const StockControl: React.FC<{
             i.nfe.toLowerCase().includes(searchTerm.toLowerCase()) ||
             (i.steelType || '').toLowerCase().includes(searchTerm.toLowerCase())) &&
         (materialFilter === '' || i.materialType === materialFilter) &&
-        (bitolaFilter === '' || i.bitola === bitolaFilter)
-    ).sort((a, b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime()), [stock, searchTerm, materialFilter, bitolaFilter]);
+        (bitolaFilter === '' || i.bitola === bitolaFilter) &&
+        (statusFilter === '' || i.status === statusFilter)
+    ).sort((a, b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime()), [stock, searchTerm, materialFilter, bitolaFilter, statusFilter]);
 
     const handlePrint = () => {
         window.print();
@@ -238,22 +259,30 @@ const StockControl: React.FC<{
                     </div>
                 </div>
 
-                <div className="grid grid-cols-4 gap-4 bg-slate-50 p-4 rounded-lg border">
-                    <div>
-                        <p className="text-[8px] font-bold text-slate-400 uppercase">Filtro Material</p>
-                        <p className="text-sm font-black text-slate-800">{materialFilter || 'Todos'}</p>
+                <div className="flex justify-between items-center bg-slate-50 p-4 rounded-lg border">
+                    <div className="flex gap-8">
+                        <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Filtro Material</p>
+                            <p className="text-base font-black text-slate-800">{materialFilter || 'Todos'}</p>
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Filtro Bitola</p>
+                            <p className="text-base font-black text-slate-800">{bitolaFilter || 'Todas'}</p>
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status</p>
+                            <p className="text-base font-black text-slate-800">{statusFilter || 'Todos'}</p>
+                        </div>
                     </div>
-                    <div>
-                        <p className="text-[8px] font-bold text-slate-400 uppercase">Filtro Bitola</p>
-                        <p className="text-sm font-black text-slate-800">{bitolaFilter || 'Todas'}</p>
-                    </div>
-                    <div>
-                        <p className="text-[8px] font-bold text-slate-400 uppercase">Total Lotes</p>
-                        <p className="text-sm font-black text-slate-800">{stats.count}</p>
-                    </div>
-                    <div>
-                        <p className="text-[8px] font-bold text-slate-400 uppercase">Peso Total</p>
-                        <p className="text-sm font-black text-blue-700">{stats.weight.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg</p>
+                    <div className="flex gap-6 items-center text-center">
+                        <div className="px-6 py-2 bg-white rounded-xl shadow-sm border border-slate-200/60">
+                            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Lotes</p>
+                            <p className="text-3xl font-black text-slate-900">{stats.count}</p>
+                        </div>
+                        <div className="px-6 py-2 bg-blue-50 rounded-xl shadow-sm border border-blue-200">
+                            <p className="text-[11px] font-bold text-blue-500 uppercase tracking-widest mb-1">Peso Total</p>
+                            <p className="text-3xl font-black text-blue-700 tracking-tight">{stats.weight.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} <span className="text-xl font-bold text-blue-500">kg</span></p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -286,15 +315,20 @@ const StockControl: React.FC<{
                             <label className="text-[10px] font-bold text-slate-500 uppercase">Bitola</label>
                             <select value={bitolaFilter} onChange={e => setBitolaFilter(e.target.value)} className="bg-transparent outline-none font-bold text-sm min-w-[80px]">
                                 <option value="">Todas</option>
-                                {(() => {
-                                    let options = [];
-                                    if (materialFilter === 'Fio Máquina') options = FioMaquinaBitolaOptions;
-                                    else if (materialFilter === 'CA-60') options = CA60BitolaOptions;
-                                    else options = [...new Set([...FioMaquinaBitolaOptions, ...CA60BitolaOptions, ...gauges.map(g => g.gauge)])];
-                                    return options.sort((a, b) => parseFloat(a) - parseFloat(b)).map(b => (
-                                        <option key={b} value={b}>{b}</option>
-                                    ));
-                                })()}
+                                {availableBitolas.map(b => (
+                                    <option key={b} value={b}>{b}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="bg-white p-2 rounded-xl shadow border flex items-center gap-2 px-4 shrink-0">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase">Status</label>
+                            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="bg-transparent outline-none font-bold text-sm min-w-[80px]">
+                                <option value="">Todos</option>
+                                <option value="Disponível">Disponível</option>
+                                <option value="Disponível - Suporte Treliça">Suporte Treliça</option>
+                                <option value="Em Produção - Trefila">Em Prod. Trefila</option>
+                                <option value="Em Produção - Treliça">Em Prod. Treliça</option>
+                                <option value="Reservado">Reservado</option>
                             </select>
                         </div>
                         <button onClick={handlePrint} className="bg-white text-slate-600 font-bold py-2 px-4 rounded-xl shadow border flex items-center gap-2 hover:bg-slate-50 transition mr-2">
@@ -330,9 +364,20 @@ const StockControl: React.FC<{
                     <label className="text-[10px] font-bold text-slate-500">Ø:</label>
                     <select value={bitolaFilter} onChange={e => setBitolaFilter(e.target.value)} className="bg-transparent outline-none font-bold text-xs">
                         <option value="">Todas</option>
-                        {(materialFilter === 'Fio Máquina' ? FioMaquinaBitolaOptions : (materialFilter === 'CA-60' ? CA60BitolaOptions : [...new Set([...FioMaquinaBitolaOptions, ...CA60BitolaOptions])])).sort((a, b) => parseFloat(a) - parseFloat(b)).map(b => (
+                        {availableBitolas.map(b => (
                             <option key={b} value={b}>{b}</option>
                         ))}
+                    </select>
+                </div>
+                <div className="bg-white p-2 rounded-lg shadow border flex items-center gap-2 px-4 shadow-sm">
+                    <label className="text-[10px] font-bold text-slate-500">ST:</label>
+                    <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="bg-transparent outline-none font-bold text-xs">
+                        <option value="">Todos</option>
+                        <option value="Disponível">Disponível</option>
+                        <option value="Disponível - Suporte Treliça">Sup. Treliça</option>
+                        <option value="Em Produção - Trefila">Em Prod. Trefila</option>
+                        <option value="Em Produção - Treliça">Em Prod. Treliça</option>
+                        <option value="Reservado">Reservado</option>
                     </select>
                 </div>
             </div>
@@ -345,7 +390,7 @@ const StockControl: React.FC<{
                     <table className="w-full text-sm">
                         <thead className="bg-slate-50 border-b font-bold text-slate-600 uppercase text-[10px]">
                             <tr>
-                                <th className="p-3 text-center">Data</th>
+                                <th className="p-3 text-center print:hidden">Data</th>
                                 <th className="p-3 text-center">Lote Interno</th>
                                 <th className="p-3 text-center">Tipo Aço</th>
                                 <th className="p-3 text-center">Mat.</th>
@@ -358,7 +403,7 @@ const StockControl: React.FC<{
                         <tbody className="divide-y">
                             {filtered.map(item => (
                                 <tr key={item.id} className="hover:bg-slate-50">
-                                    <td className="p-3 text-center text-slate-500 font-medium">{new Date(item.entryDate).toLocaleDateString('pt-BR')}</td>
+                                    <td className="p-3 text-center text-slate-500 font-medium print:hidden">{new Date(item.entryDate).toLocaleDateString('pt-BR')}</td>
                                     <td className="p-3 text-center font-black text-slate-900">{item.internalLot}</td>
                                     <td className="p-3 text-center font-bold text-slate-600">{item.steelType || '-'}</td>
                                     <td className="p-3 text-center text-slate-500">{item.materialType}</td>
