@@ -62,7 +62,27 @@ const App: React.FC = () => {
     const [pendingKaizenCount, setPendingKaizenCount] = useState(0);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+    const motivacionais = useMemo(() => [
+        "A qualidade começa com você! Faça sempre o seu melhor.",
+        "Segurança em primeiro lugar, sempre.",
+        "Juntos somos mais fortes e produzimos melhor.",
+        "Atenção aos detalhes faz toda a diferença.",
+        "Um ambiente limpo é um ambiente seguro e produtivo.",
+        "A melhoria contínua é o caminho para o sucesso de todos.",
+        "Sua dedicação é o motor que move nossa fábrica.",
+        "Pense antes de agir: a segurança é responsabilidade de todos.",
+        "Qualidade não é um ato isolado, é um hábito diário.",
+        "Os desafios de hoje são as grandes conquistas de amanhã."
+    ], []);
 
+    const [fraseIndex, setFraseIndex] = useState(0);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setFraseIndex(prev => (prev + 1) % motivacionais.length);
+        }, 12000); // 12 seconds loop
+        return () => clearInterval(interval);
+    }, [motivacionais]);
 
     useEffect(() => {
         if (currentUser?.employeeId) {
@@ -2058,7 +2078,17 @@ const App: React.FC = () => {
                                             page.charAt(0).toUpperCase() + page.slice(1).replace(/([A-Z])/g, ' $1')}
                             </span>
                         </div>
-                        <div className="flex items-center gap-6">
+                        
+                        <div className="hidden lg:flex flex-1 justify-center mx-4 overflow-hidden">
+                            <div className="flex items-center gap-3 px-6 py-1.5 bg-gradient-to-r from-blue-50 to-slate-50 rounded-full border border-blue-100 shadow-sm h-[36px]">
+                                <span className="text-lg leading-none">💡</span>
+                                <span key={fraseIndex} className="text-[#0F3F5C] text-xs font-bold italic tracking-wide truncate animate-fade-in">
+                                    "{motivacionais[fraseIndex]}"
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-6 shrink-0">
                             <div className="flex flex-col items-end">
                                 <span className="text-sm font-bold text-slate-800">{currentUser?.username}</span>
                                 <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">{currentUser?.role}</span>
