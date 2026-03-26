@@ -1314,15 +1314,53 @@ const OrgChart: React.FC<{
 
     const handleDeleteUnit = async (id: string) => {
         if (!confirm('Excluir esta área e todos os itens dentro dela?')) return;
-        await deleteItem('org_units', id);
-        reloadData();
+        try {
+            await deleteItem('org_units', id);
+            reloadData();
+        } catch (error) {
+            console.error(error);
+            alert("Não é possível excluir esta área. Pode haver cargos ou funcionários vinculados a ela.");
+        }
     };
 
     const handleDeletePosition = async (id: string) => {
         if (!confirm('Excluir cargo?')) return;
-        await deleteItem('org_positions', id);
-        reloadData();
+        try {
+            await deleteItem('org_positions', id);
+            reloadData();
+        } catch (error) {
+            console.error(error);
+            alert("Não é possível excluir um cargo que possui funcionários vinculados. Por favor, desvincule os funcionários primeiro.");
+        }
     };
+
+    const handleGenerate2Shifts = async () => {
+        if (!confirm('Isso irá criar a estrutura de 2 turnos (Turno A e Turno B) para a área de Produção, com os devidos cargos de Encarregado e Auxiliar. Deseja continuar?')) return;
+        
+        try {
+            // 1. Create Root "Produção"
+            const prod = await insertItem('org_units', { name: 'PRODUÇÃO (Estrutura 2 Turnos)', unitType: 'department', displayOrder: units.length + 1 } as any);
+            
+            // 2. Create Shifts
+            const turnoA = await insertItem('org_units', { name: 'Turno A (05:00 - 14:44)', unitType: 'group', parentId: prod.id, displayOrder: 1 } as any);
+            const turnoB = await insertItem('org_units', { name: 'Turno B (14:00 - 24:00)', unitType: 'group', parentId: prod.id, displayOrder: 2 } as any);
+            
+            // 3. Create Roles for Turno A
+            await insertItem('org_positions', { orgUnitId: turnoA.id, title: 'Encarregado', isLeadership: true, description: 'Liderar as operações do Turno A.' } as any);
+            await insertItem('org_positions', { orgUnitId: turnoA.id, title: 'Auxiliar de Encarregado', isLeadership: false, description: 'Apoiar o encarregado no Turno A.' } as any);
+            
+            // 4. Create Roles for Turno B
+            await insertItem('org_positions', { orgUnitId: turnoB.id, title: 'Encarregado', isLeadership: true, description: 'Liderar as operações do Turno B.' } as any);
+            await insertItem('org_positions', { orgUnitId: turnoB.id, title: 'Auxiliar de Encarregado', isLeadership: false, description: 'Apoiar o encarregado no Turno B.' } as any);
+            
+            alert('Estrutura de 2 Turnos gerada com sucesso! Você pode agora vincular os funcionários a estes cargos.');
+            reloadData();
+        } catch (e) {
+            console.error('Erro ao gerar organograma 2 turnos:', e);
+            alert('Erro ao gerar estrutura.');
+        }
+    };
+
 
     const handleAssignEmployee = async (positionId: string, employeeId: string) => {
         // 1. Find details to sync
@@ -1398,17 +1436,32 @@ const OrgChart: React.FC<{
                 ))}
 
                 {/* Add New Root Button (Inline) */}
-                <div className="flex flex-col items-center opacity-60 hover:opacity-100 transition-opacity">
-                    <button
-                        onClick={handleCreateRoot}
-                        className="w-[200px] h-[100px] border-4 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 hover:border-slate-400 transition"
-                    >
-                        <PlusIcon className="h-8 w-8 mb-2" />
-                        <span className="font-bold">Nova Área Principal</span>
-                    </button>
-                    <p className="text-xs text-slate-400 mt-2 text-center max-w-[180px]">
-                        Ex: Administrativo, Comercial, Logística...
-                    </p>
+                <div className="flex flex-col gap-4">
+                    <div className="flex flex-col items-center opacity-60 hover:opacity-100 transition-opacity">
+                        <button
+                            onClick={handleCreateRoot}
+                            className="w-[200px] h-[100px] border-4 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 hover:border-slate-400 transition"
+                        >
+                            <PlusIcon className="h-8 w-8 mb-2" />
+                            <span className="font-bold">Nova Área Principal</span>
+                        </button>
+                        <p className="text-xs text-slate-400 mt-2 text-center max-w-[180px]">
+                            Ex: Administrativo, Comercial, Logística...
+                        </p>
+                    </div>
+
+                    <div className="flex flex-col items-center opacity-90 hover:opacity-100 transition-opacity">
+                        <button
+                            onClick={handleGenerate2Shifts}
+                            className="w-[200px] py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl shadow-md hover:shadow-lg hover:scale-105 transition flex flex-col items-center justify-center gap-2"
+                        >
+                            <UserGroupIcon className="h-6 w-6" />
+                            <span className="font-bold text-sm text-center">Gerar Estrutura<br/>2 Turnos (Produção)</span>
+                        </button>
+                        <p className="text-[10px] text-blue-500 mt-2 text-center max-w-[180px] font-semibold">
+                            Cria: Turno A, Turno B, Encarregados e Auxiliares
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>
