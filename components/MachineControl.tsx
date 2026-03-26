@@ -836,6 +836,18 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
     const statusStyle = statusConfig[currentMachineStatus];
 
+    const isShiftOverdue = useMemo(() => {
+        if (!currentOperatorLog || currentOperatorLog.endTime) return false;
+        
+        const startH = new Date(currentOperatorLog.startTime).getHours();
+        const startShift = (startH >= 5 && startH < 14) ? 'A' : 'B';
+        
+        const currentH = now.getHours();
+        const currentShift = (currentH >= 5 && currentH < 14) ? 'A' : 'B';
+        
+        return startShift !== currentShift;
+    }, [currentOperatorLog, now]);
+
 
     useEffect(() => {
         if (machineType === 'Treliça' && activeOrder && !isMachineStopped && hasActiveShift && !showQuantityPrompt) {
@@ -1418,6 +1430,19 @@ const MachineControl: React.FC<MachineControlProps> = ({
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-20 md:pb-8">
                                 {/* Coluna Esquerda: Visão Geral e Indicadores */}
                                 <div className={`lg:col-span-1 space-y-6 ${mobileTab !== 'monitor' ? 'hidden lg:block' : 'animate-fade-in'}`}>
+                                    {isShiftOverdue && (
+                                        <div className="bg-red-50 border-2 border-red-500 rounded-2xl p-4 shadow-sm flex items-start gap-4 animate-pulse">
+                                            <div className="bg-red-100 p-2 rounded-xl text-red-600 shrink-0">
+                                                <ExclamationIcon className="h-8 w-8" />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-red-700 font-black text-lg">⚠️ Fim de Turno!</h4>
+                                                <p className="text-red-600 text-xs font-bold mt-1 leading-relaxed">
+                                                    O horário do turno atual já encerrou. Encerre o turno para liberar o equipamento.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
                                     {/* Card de Status Principal - Novo Design */}
                                     <div className={`bg-white p-4 md:p-6 rounded-2xl shadow-sm border-l-[12px] ${statusStyle.border} relative overflow-hidden transition-all duration-500`}>
                                         {currentMachineStatus === 'Produzindo' && (
@@ -1457,13 +1482,27 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-3 md:gap-4 mt-6 p-3 md:p-4 bg-slate-50 rounded-xl">
-                                            <div>
-                                                <p className="text-[10px] md:text-xs text-slate-500 mb-1">Operador</p>
-                                                <p className="text-sm md:text-base font-semibold text-slate-700 truncate">{currentOperatorLog?.operator || 'N/A'}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-[10px] md:text-xs text-slate-500 mb-1">Início Turno</p>
-                                                <p className="text-sm md:text-base font-semibold text-slate-700">{currentOperatorLog ? new Date(currentOperatorLog.startTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</p>
+                                            <div className="col-span-2">
+                                                <p className="text-[10px] md:text-xs text-slate-500 mb-2 uppercase tracking-widest font-bold">Registro de Produção do Turno</p>
+                                                {currentOperatorLog ? (
+                                                    <div className="flex flex-wrap items-center gap-3">
+                                                        <span className="text-sm md:text-base font-black text-slate-800 bg-white border border-slate-200 shadow-sm px-4 py-1.5 rounded-lg">
+                                                            {currentOperatorLog.operator}
+                                                        </span>
+                                                        <span className="text-xs font-black bg-indigo-100 text-indigo-800 px-3 py-2 rounded-lg border border-indigo-200 uppercase tracking-widest shadow-sm">
+                                                            {(() => {
+                                                                const h = new Date(currentOperatorLog.startTime).getHours();
+                                                                return (h >= 5 && h < 14) ? 'Turno A (Manhã)' : 'Turno B (Tarde)';
+                                                            })()}
+                                                        </span>
+                                                        <span className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                                                            <ClockIcon className="h-3 w-3" />
+                                                            Início às {new Date(currentOperatorLog.startTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-sm font-bold text-slate-400 bg-white border px-3 py-1 rounded-lg">Sem operador em turno</span>
+                                                )}
                                             </div>
                                             {machineType === 'Trefila' ? (
                                                 <>
@@ -1738,6 +1777,22 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                     <PlayIcon className="h-7 w-7 group-hover:scale-110 transition-transform" />
                                                     <span className="tracking-tight uppercase">INICIAR MEU TURNO</span>
                                                 </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {!hasActiveShift && isAnyActiveShift && activeOrder && (
+                                        <div className="absolute inset-0 bg-slate-200/90 backdrop-blur-sm flex items-center justify-center rounded-2xl z-20 transition-all duration-500">
+                                            <div className="text-center p-8 bg-white rounded-3xl shadow-xl max-w-md mx-auto animate-fade-in-up border-2 border-red-50">
+                                                <div className="bg-red-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-red-100 shadow-inner">
+                                                    <CogIcon className="h-10 w-10 text-red-500 animate-spin-slow" />
+                                                </div>
+                                                <h3 className="text-2xl font-bold text-slate-800 mb-2 tracking-tight">Equipamento Bloqueado</h3>
+                                                <p className="text-slate-500 mb-6 text-sm leading-relaxed font-medium">
+                                                    A máquina está sendo operada por <strong className="text-slate-800">{currentOperatorLog?.operator}</strong>. Ele(a) precisa encerrar o turno atual para que você possa assumir.
+                                                </p>
+                                                <div className="w-full bg-slate-100/80 text-slate-500 font-black py-4 px-6 rounded-2xl uppercase text-sm flex items-center justify-center gap-3 tracking-widest">
+                                                    AGUARDANDO LIBERAÇÃO
+                                                </div>
                                             </div>
                                         </div>
                                     )}
