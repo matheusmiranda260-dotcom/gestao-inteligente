@@ -789,7 +789,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
         
         // Regras de negócio de "Meta por Turno":
         let shiftGoal = 0;
-        if (modelStr.includes('H12')) {
+        if (modelStr.includes('H12') || modelStr.includes('H-12')) {
             shiftGoal = sizeValue >= 10 ? 250 : 500;
         } else {
             shiftGoal = sizeValue >= 10 ? 300 : 600;
