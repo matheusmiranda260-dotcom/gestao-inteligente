@@ -190,27 +190,26 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     }
 
     return (
-        <div className="flex flex-col lg:h-[calc(100vh-8rem)] h-auto bg-white rounded-3xl shadow-xl lg:overflow-hidden overflow-visible border border-slate-200/60 ring-1 ring-black/5">
-            {/* PREMIUM HEADER */}
-            <div className={`px-5 py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-2 shadow-lg z-10 ${currentStyle.bg}`}>
-                <div className="flex items-center gap-4">
-                    <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-md shadow-inner border border-white/30 hidden sm:block">
+        <div className="flex flex-col lg:h-[calc(100vh-8rem)] h-auto bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-200/60 ring-1 ring-black/5">
+            {/* HEADER - compact on mobile landscape */}
+            <div className={`px-3 py-2 sm:px-5 sm:py-3 flex flex-row items-center justify-between gap-2 shadow-lg z-10 ${currentStyle.bg}`}>
+                <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+                    <div className="bg-white/20 p-2 sm:p-3 rounded-xl backdrop-blur-md shadow-inner border border-white/30 shrink-0">
                         {currentStyle.icon}
                     </div>
-                    <div>
-                        <div className="flex items-center gap-3">
-                            <h2 className="text-2xl md:text-3xl font-black text-white uppercase tracking-wider drop-shadow-sm">{machineType}</h2>
-                            {isAlertActive && <WarningIcon className="h-6 w-6 text-yellow-300 animate-ping" />}
+                    <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                            <h2 className="text-lg sm:text-2xl font-black text-white uppercase tracking-wider drop-shadow-sm truncate">{machineType}</h2>
+                            {isAlertActive && <WarningIcon className="h-5 w-5 text-yellow-300 animate-ping shrink-0" />}
                         </div>
-                        <div className="flex items-center gap-2 mt-0.5 opacity-90">
-                            <span className="text-xs md:text-sm font-black uppercase tracking-widest text-white">{currentStyle.title}</span>
-                            {machineStatus.reason && <span className="text-xs md:text-sm font-bold text-white/90">&bull; {machineStatus.reason}</span>}
+                        <div className="flex flex-wrap items-center gap-1 sm:gap-2 opacity-90">
+                            <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-white">{currentStyle.title}</span>
+                            {machineStatus.reason && <span className="text-[10px] sm:text-xs font-bold text-white/90 truncate max-w-[140px]">&bull; {machineStatus.reason}</span>}
                         </div>
                     </div>
                 </div>
-                <div className="text-left lg:text-right mt-2 lg:mt-0 flex items-baseline gap-1">
-                    <p className="text-4xl sm:text-5xl font-mono font-black tracking-tighter drop-shadow-md text-white">{formatDuration(machineStatus.durationMs)}</p>
-                    <span className="lg:hidden text-[10px] font-bold text-white/60 uppercase">Duração</span>
+                <div className="text-right shrink-0">
+                    <p className="text-3xl sm:text-4xl font-mono font-black tracking-tighter drop-shadow-md text-white">{formatDuration(machineStatus.durationMs)}</p>
                 </div>
             </div>
 
@@ -228,11 +227,11 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                 </div>
             )}
 
-            {/* DENSE CONTENT GRID - ZERO GLOBAL SCROLL */}
-            <div className="flex-1 p-2 lg:p-4 grid grid-cols-1 lg:grid-cols-2 gap-3 lg:gap-4 lg:overflow-hidden overflow-visible bg-slate-50">
+            {/* CONTENT GRID - 2 cols on landscape mobile (sm), 2 cols on desktop (lg) */}
+            <div className="flex-1 p-2 sm:p-3 lg:p-4 grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 lg:gap-4 overflow-y-auto bg-slate-50">
                 
                 {/* LEFT COLUMN: CRITICAL METRICS */}
-                <div className="flex flex-col gap-3 lg:gap-4 lg:overflow-y-auto overflow-visible custom-scrollbar pr-1 min-h-0">
+                <div className="flex flex-col gap-2 sm:gap-3">
                     
                     {/* CARD 1: META DIÁRIA */}
                     <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
@@ -380,8 +379,8 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                     </div>
                 </div>
 
-                {/* RIGHT COLUMN: LISTS & TABLES (Flex column to share remaining vertical space) */}
-                <div className="flex flex-col gap-3 lg:gap-4 md:row-span-1 lg:min-h-[300px] min-h-0">
+                {/* RIGHT COLUMN */}
+                <div className="flex flex-col gap-2 sm:gap-3">
                     
                     {/* PARADAS TABLE (Flex-1 so it scrolls within its box) */}
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col flex-1 overflow-hidden min-h-0">
