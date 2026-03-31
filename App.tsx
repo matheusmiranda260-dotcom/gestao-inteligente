@@ -918,6 +918,40 @@ const App: React.FC = () => {
         }
     };
 
+    const pauseProductionOrder = async (orderId: string) => {
+        try {
+            const orderToPause = productionOrders.find(o => o.id === orderId);
+            if (!orderToPause) return;
+
+            const now = new Date().toISOString();
+
+            // Close all open operator logs
+            const closedLogs = (orderToPause.operatorLogs || []).map(log =>
+                !log.endTime ? { ...log, endTime: now, endQuantity: orderToPause.actualProducedQuantity || 0 } : log
+            );
+
+            // Close any open downtime events
+            const closedEvents = [...(orderToPause.downtimeEvents || [])];
+            for (let i = closedEvents.length - 1; i >= 0; i--) {
+                if (!closedEvents[i].resumeTime) {
+                    closedEvents[i] = { ...closedEvents[i], resumeTime: now };
+                    break;
+                }
+            }
+
+            // Update the order to paused
+            await updateItem('production_orders', orderId, {
+                status: 'paused',
+                operatorLogs: closedLogs,
+                downtimeEvents: closedEvents,
+            });
+            showNotification('Ordem de produção arquivada (pausada).', 'success');
+        } catch (error) {
+            console.error('Erro ao pausar ordem:', error);
+            showNotification('Erro ao pausar ordem de produção.', 'error');
+        }
+    };
+
     const cancelProductionOrder = async (orderId: string) => {
         try {
             const orderToCancel = productionOrders.find(o => o.id === orderId);
@@ -1074,7 +1108,7 @@ const App: React.FC = () => {
             // Start the new order
             const updates: Partial<ProductionOrderData> = {
                 status: 'in_progress',
-                startTime: now,
+                startTime: orderToStartData.startTime || now,
                 downtimeEvents: [...(orderToStartData.downtimeEvents || []), {
                     stopTime: now,
                     resumeTime: null,
@@ -2013,7 +2047,8 @@ const App: React.FC = () => {
             startProductionOrder, startOperatorShift, endOperatorShift, logDowntime,
             logResumeProduction, startLotProcessing, finishLotProcessing, recordLotWeight,
             addPartsRequest, logPostProductionActivity, completeProduction, recordPackageWeight,
-            updateProducedQuantity, users, deleteShiftReport, gauges, cancelProductionOrder
+            updateProducedQuantity, users, deleteShiftReport, gauges, cancelProductionOrder,
+            pauseProductionOrder
         };
 
         switch (page) {

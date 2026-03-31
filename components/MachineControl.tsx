@@ -439,6 +439,7 @@ interface MachineControlProps {
     addPartsRequest?: (data: Omit<PartsRequest, 'id' | 'date' | 'operator' | 'status' | 'machine' | 'productionOrderId'>) => void;
     deleteShiftReport?: (reportId: string) => void;
     cancelProductionOrder?: (orderId: string) => void;
+    pauseProductionOrder?: (orderId: string) => void;
     initialView?: View;
     initialModal?: 'reports' | 'parts' | 'rings' | null;
     gauges?: StockGauge[];
@@ -484,7 +485,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
     logDowntime, logResumeProduction, startLotProcessing, finishLotProcessing,
     recordLotWeight, recordPackageWeight, completeProduction, addPartsRequest,
     logPostProductionActivity, updateProducedQuantity, deleteShiftReport,
-    cancelProductionOrder, initialView, initialModal, gauges = []
+    cancelProductionOrder, pauseProductionOrder, initialView, initialModal, gauges = []
 }) => {
 
     const [pendingWeights, setPendingWeights] = useState<Map<string, string>>(new Map());
@@ -686,7 +687,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
         if (active.length === 0) return undefined;
         return active.sort((a, b) => new Date(b.creationDate).getTime() - new Date(a.creationDate).getTime())[0];
     }, [productionOrders, machineType]);
-    const pendingOrders = useMemo(() => productionOrders.filter(o => o.machine === machineType && o.status === 'pending').sort((a, b) => new Date(a.creationDate).getTime() - new Date(b.creationDate).getTime()), [productionOrders, machineType]);
+    const pendingOrders = useMemo(() => productionOrders.filter(o => o.machine === machineType && (o.status === 'pending' || o.status === 'paused')).sort((a, b) => new Date(a.creationDate || 0).getTime() - new Date(b.creationDate || 0).getTime()), [productionOrders, machineType]);
     const completedOrders = useMemo(() => productionOrders.filter(o => o.machine === machineType && o.status === 'completed').sort((a, b) => new Date(b.endTime || 0).getTime() - new Date(a.endTime || 0).getTime()), [productionOrders, machineType]);
 
     useEffect(() => {
@@ -2209,6 +2210,23 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                             </button>
                                         )}
 
+                                        {/* Botão Pausar Ordem (Arquivar/Trocar) */}
+                                        {pauseProductionOrder && (
+                                            <button
+                                                onClick={() => {
+                                                    if (window.confirm('Tem certeza que deseja arquivar/pausar esta ordem para iniciar outra? Seu turno atual será encerrado e a ordem voltará para a fila de pendentes.')) {
+                                                        pauseProductionOrder(activeOrder.id);
+                                                        setView('pending'); // Auto redireciona para a aba Pendentes
+                                                    }
+                                                }}
+                                                className="p-3.5 text-amber-500 hover:text-amber-600 hover:bg-amber-50/50 rounded-2xl transition active:scale-90 flex flex-col items-center gap-0.5"
+                                                title="Arquivar Ordem / Trocar de Ordem"
+                                            >
+                                                <ArchiveIcon className="h-7 w-7" />
+                                                <span className="text-[8px] font-black uppercase">Pausar OP</span>
+                                            </button>
+                                        )}
+
                                         {/* Botão Cancelar Ordem */}
                                         {cancelProductionOrder && (
                                             <button
@@ -2279,6 +2297,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                 <table className="w-full text-sm text-left text-slate-500">
                                     <thead className="text-xs text-slate-700 uppercase bg-slate-50">
                                         <tr>
+                                            <th className="px-6 py-3">Status</th>
                                             <th className="px-6 py-3">Data Criação</th>
                                             <th className="px-6 py-3">Nº Ordem</th>
                                             <th className="px-6 py-3">{machineType === 'Trefila' ? 'Bitola Saída' : 'Modelo'}</th>
@@ -2288,14 +2307,29 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                     </thead>
                                     <tbody>
                                         {pendingOrders.map(order => (
-                                            <tr key={order.id} className="bg-white border-b hover:bg-slate-50">
+                                            <tr key={order.id} className={`border-b hover:bg-slate-50 ${order.status === 'paused' ? 'bg-amber-50/30' : 'bg-white'}`}>
+                                                <td className="px-6 py-4">
+                                                    {order.status === 'paused' ? (
+                                                        <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2.5 py-0.5 rounded uppercase border border-amber-200">Em Pausa</span>
+                                                    ) : (
+                                                        <span className="bg-slate-100 text-slate-600 text-xs font-bold px-2.5 py-0.5 rounded uppercase border border-slate-200">Fila</span>
+                                                    )}
+                                                </td>
                                                 <td className="px-6 py-4">{new Date(order.creationDate).toLocaleDateString('pt-BR')}</td>
-                                                <td className="px-6 py-4 font-medium text-slate-900">{order.orderNumber}</td>
+                                                <td className="px-6 py-4 font-medium text-slate-900">
+                                                    {order.orderNumber}
+                                                    {order.status === 'paused' && order.actualProducedQuantity && order.actualProducedQuantity > 0 ? (
+                                                        <span className="block text-[10px] text-amber-600 mt-0.5 font-bold">Já produzido: {order.actualProducedQuantity}</span>
+                                                    ) : null}
+                                                </td>
                                                 <td className="px-6 py-4">{machineType === 'Trefila' ? order.targetBitola : `${order.trelicaModel} (${order.quantityToProduce} pçs)`}</td>
                                                 <td className="px-6 py-4 text-right">{order.totalWeight.toFixed(2)}</td>
                                                 <td className="px-6 py-4 text-center">
-                                                    <button onClick={() => startProductionOrder && startProductionOrder(order.id)} className="bg-emerald-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-600 transition flex items-center justify-center gap-2 mx-auto">
-                                                        <PlayIcon className="h-5 w-5" /> Iniciar
+                                                    <button onClick={() => {
+                                                        if(startProductionOrder) startProductionOrder(order.id);
+                                                        setView('in_progress');
+                                                    }} className={`${order.status === 'paused' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-emerald-500 hover:bg-emerald-600'} text-white font-bold py-2 px-4 rounded-lg transition flex items-center justify-center gap-2 mx-auto`}>
+                                                        <PlayIcon className="h-5 w-5" /> {order.status === 'paused' ? 'Retomar' : 'Iniciar'}
                                                     </button>
                                                 </td>
                                             </tr>
