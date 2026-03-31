@@ -26,9 +26,10 @@ interface MachineStatusViewProps {
     dailyProducedValue: number;
     dailyGoal: number;
     goalUnit: string;
+    shiftGoal?: number;
 }
 
-const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, activeOrder, stock, dailyProducedValue, dailyGoal, goalUnit }) => {
+const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, activeOrder, stock, dailyProducedValue, dailyGoal, goalUnit, shiftGoal }) => {
     // Local timer to ensure the clock ticks even if parent doesn't re-render
     const [localNow, setLocalNow] = useState(new Date());
 
@@ -266,7 +267,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                     {/* CARD 2: PROGRESSO DA PRODUÇÃO */}
                     <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col justify-center">
                         <div className="flex justify-between items-center mb-3">
-                            <h3 className="font-black text-slate-700 uppercase tracking-widest text-[10px] md:text-xs">Progresso do Turno</h3>
+                            <h3 className="font-black text-slate-700 uppercase tracking-widest text-[10px] md:text-xs">Progresso do Turno {/* Ordem */}</h3>
                         </div>
                         
                         {machineType === 'Treliça' && (
@@ -295,20 +296,32 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                             <div className="flex flex-col">
                                 <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">{machineType === 'Trefila' ? 'Lotes Processados' : 'Peças Produzidas'}</span>
                                 {currentOperatorLog && (
-                                    <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mt-0.5">
-                                        Turno: {machineType === 'Trefila' 
-                                            ? (activeOrder.processedLots || []).filter(l => new Date(l.endTime).getTime() >= new Date(currentOperatorLog.startTime).getTime()).length 
-                                            : ((activeOrder.actualProducedQuantity || 0) - (currentOperatorLog.startQuantity || 0))}
+                                    <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mt-0.5 flex flex-col">
+                                        <span>Turno Atual: {machineType === 'Trefila' 
+                                            ? (activeOrder.processedLots || []).filter(l => l.endTime && new Date(l.endTime).getTime() >= new Date(currentOperatorLog.startTime).getTime()).length 
+                                            : ((activeOrder.actualProducedQuantity || 0) - (currentOperatorLog.startQuantity || 0))}</span>
+                                        {shiftGoal && (
+                                            <span className="mt-0.5 text-[9px] text-slate-400">META TURNO: <strong className="text-indigo-500">{shiftGoal} pecas</strong></span>
+                                        )}
                                     </span>
                                 )}
                             </div>
-                            <span className="text-xl md:text-2xl font-black text-slate-800 tracking-tighter">{machineType === 'Trefila' ? processedLotsCount : producedQuantity} <span className="text-sm font-bold text-slate-400">/ {machineType === 'Trefila' ? totalLotsCount : plannedQuantity}</span></span>
+                            <span className="text-xl md:text-2xl font-black text-slate-800 tracking-tighter" title="Total da Ordem de Produção">{machineType === 'Trefila' ? processedLotsCount : producedQuantity} <span className="text-sm font-bold text-slate-400">/ {machineType === 'Trefila' ? totalLotsCount : plannedQuantity}</span></span>
                         </div>
                         <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden shadow-inner ring-1 ring-black/5">
                             <div className="bg-gradient-to-r from-emerald-500 to-teal-500 h-full rounded-full text-white text-[9px] flex items-center justify-center font-bold tracking-widest" style={{ width: `${progress}%` }}>
                                 {progress > 10 && `${progress.toFixed(0)}%`}
                             </div>
                         </div>
+                        
+                        {/* Fill secondary progress bar for Shift vs ShiftGoal */}
+                        {shiftGoal && shiftGoal > 0 && currentOperatorLog && machineType === 'Treliça' && (
+                            <div className="mt-3">
+                                <div className="w-full bg-indigo-50 rounded-full h-1.5 overflow-hidden ring-1 ring-black/5">
+                                    <div className="bg-gradient-to-r from-indigo-400 to-indigo-500 h-full rounded-full" style={{ width: `${Math.min(100, (((activeOrder.actualProducedQuantity || 0) - (currentOperatorLog.startQuantity || 0)) / shiftGoal) * 100)}%` }}></div>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* CARD 3: DETALHES & EFICIÊNCIA */}
@@ -771,13 +784,23 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
     // Calculate pieces and goal for Treliça
     const trelicaDisplayData = useMemo(() => {
         const sizeStr = activeTrelicaOrder ? String(activeTrelicaOrder.tamanho || '6') : '6';
+        const modelStr = activeTrelicaOrder ? String(activeTrelicaOrder.trelicaModel || '').toUpperCase() : '';
         const sizeValue = parseFloat(sizeStr.replace(',', '.'));
-        const goal = sizeValue >= 10 ? 350 : 750;
+        
+        // Regras de negócio de "Meta por Turno":
+        let shiftGoal = 0;
+        if (modelStr.includes('H12')) {
+            shiftGoal = sizeValue >= 10 ? 250 : 500;
+        } else {
+            shiftGoal = sizeValue >= 10 ? 300 : 600;
+        }
+
         const totalPiecesProduced = sizeValue > 0 ? Math.round(dailyProduction.trelicaMeters / sizeValue) : 0;
 
         return {
             value: totalPiecesProduced,
-            goal: goal,
+            goal: shiftGoal * 2, // Meta diária consolida 2 turnos teóricos (A e B)
+            shiftGoal: shiftGoal,
             unit: sizeValue >= 10 ? 'pçs (12m)' : 'pçs (6m)'
         };
     }, [activeTrelicaOrder, dailyProduction.trelicaMeters]);
@@ -827,6 +850,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                             stock={stock}
                             dailyProducedValue={trelicaDisplayData.value}
                             dailyGoal={trelicaDisplayData.goal}
+                            shiftGoal={trelicaDisplayData.shiftGoal}
                             goalUnit={trelicaDisplayData.unit}
                         />
                     </div>
