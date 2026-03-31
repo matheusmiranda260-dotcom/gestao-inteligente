@@ -189,7 +189,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     }
 
     return (
-        <div className="flex flex-col lg:h-[calc(100vh-8rem)] h-auto bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-200/60 ring-1 ring-black/5">
+        <div className="flex flex-col lg:h-[calc(100vh-8rem)] h-auto bg-white rounded-3xl shadow-xl lg:overflow-hidden overflow-visible border border-slate-200/60 ring-1 ring-black/5">
             {/* PREMIUM HEADER */}
             <div className={`px-5 py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-2 shadow-lg z-10 ${currentStyle.bg}`}>
                 <div className="flex items-center gap-4">
@@ -227,10 +227,10 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             )}
 
             {/* DENSE CONTENT GRID - ZERO GLOBAL SCROLL */}
-            <div className="flex-1 p-3 lg:p-4 grid grid-cols-1 lg:grid-cols-2 gap-3 lg:gap-4 overflow-y-auto lg:overflow-hidden bg-slate-50">
+            <div className="flex-1 p-2 lg:p-4 grid grid-cols-1 lg:grid-cols-2 gap-3 lg:gap-4 lg:overflow-hidden overflow-visible bg-slate-50">
                 
                 {/* LEFT COLUMN: CRITICAL METRICS */}
-                <div className="flex flex-col gap-3 lg:gap-4 overflow-y-auto custom-scrollbar pr-1 min-h-0">
+                <div className="flex flex-col gap-3 lg:gap-4 lg:overflow-y-auto overflow-visible custom-scrollbar pr-1 min-h-0">
                     
                     {/* CARD 1: META DIÁRIA */}
                     <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
@@ -379,7 +379,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                 </div>
 
                 {/* RIGHT COLUMN: LISTS & TABLES (Flex column to share remaining vertical space) */}
-                <div className="flex flex-col gap-3 lg:gap-4 md:row-span-1 min-h-[300px]">
+                <div className="flex flex-col gap-3 lg:gap-4 md:row-span-1 lg:min-h-[300px] min-h-0">
                     
                     {/* PARADAS TABLE (Flex-1 so it scrolls within its box) */}
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col flex-1 overflow-hidden min-h-0">
@@ -435,7 +435,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
 
                     {/* LOTES TABLE (TREFILA ONLY, flex-1) */}
                     {machineType === 'Trefila' && (
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col flex-1 overflow-hidden min-h-0">
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col flex-1 lg:overflow-hidden overflow-visible min-h-0">
                             <div className="bg-slate-50 border-b border-slate-100 p-2.5 px-4 shrink-0 shadow-sm z-10 flex justify-between items-center">
                                 <h3 className="font-black text-slate-600 uppercase tracking-widest text-[10px] flex justify-center items-center gap-1.5">
                                     <BookOpenIcon className="h-3 w-3 text-indigo-500" /> HISTÓRICO DE LOTES
@@ -444,7 +444,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                     {(activeOrder.processedLots || []).length} Finalizados
                                 </span>
                             </div>
-                            <div className="flex-1 overflow-y-auto custom-scrollbar bg-white">
+                            <div className="flex-1 lg:overflow-y-auto overflow-visible custom-scrollbar bg-white">
                                 <table className="w-full text-left border-collapse">
                                     <thead className="sticky top-0 bg-white/95 backdrop-blur-sm z-10 shadow-sm">
                                         <tr className="text-[9px] uppercase font-black text-slate-400 border-b border-slate-100">
@@ -645,7 +645,7 @@ const MachineAnalyticsView: React.FC<MachineAnalyticsProps> = ({ machineType, da
     const isWarning = shiftUptimePct < 80 && shiftUptimePct >= 50;
 
     return (
-        <div className="flex flex-col lg:h-[calc(100vh-8rem)] h-auto bg-slate-900 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden border border-slate-700/60 ring-1 ring-black/5 text-white transition-opacity duration-700 relative">
+        <div className="flex flex-col lg:h-[calc(100vh-8rem)] h-auto bg-slate-900 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] lg:overflow-hidden overflow-visible border border-slate-700/60 ring-1 ring-black/5 text-white transition-opacity duration-700 relative">
             <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/40 via-transparent to-transparent pointer-events-none"></div>
             
             {/* FULL DAY CONSOLIDATION BANNER */}
