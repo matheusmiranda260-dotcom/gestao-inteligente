@@ -236,7 +236,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                     <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
                         <div className="flex justify-between items-center mb-2">
                             <h3 className="font-black text-slate-700 uppercase tracking-widest text-[10px] md:text-xs title-font flex items-center gap-1.5">
-                                <ScaleIcon className="h-4 w-4 text-indigo-500" /> Meta Diária da Fábrica
+                                <ScaleIcon className="h-4 w-4 text-indigo-500" /> {machineType === 'Treliça' ? 'Meta do Turno Atual' : 'Meta Diária da Fábrica'}
                             </h3>
                             <span className="text-[10px] font-black bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded uppercase tracking-widest ring-1 ring-indigo-500/20">
                                 {((dailyProducedValue / dailyGoal) * 100).toFixed(0)}%
@@ -497,6 +497,23 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     );
 };
 
+// --- FUNÇÃO AUXILIAR DE DATA DE FÁBRICA ---
+// Turno A começa às 05:00. Portanto, tudo que foi reportado entre 00:00 e 04:59
+// pertence astrologicamente/fabrilmente ao DIA ANTERIOR (Turno B da noite).
+const getFactoryDateString = (dateObj: Date | string): string => {
+    try {
+        const factoryDate = new Date(dateObj);
+        if (isNaN(factoryDate.getTime())) return '';
+        // Se ainda está nas madrugadas (antes das 05h), contabiliza no dia anterior
+        if (factoryDate.getHours() < 5) {
+            factoryDate.setDate(factoryDate.getDate() - 1);
+        }
+        return factoryDate.toLocaleDateString('sv-SE');
+    } catch {
+        return '';
+    }
+};
+
 interface MachineAnalyticsProps {
     machineType: MachineType;
     dailyValue: number;
@@ -506,7 +523,7 @@ interface MachineAnalyticsProps {
 }
 
 const MachineAnalyticsView: React.FC<MachineAnalyticsProps> = ({ machineType, dailyValue, unit, productionOrders, activeOrder }) => {
-    const todayStr = new Date().toLocaleDateString('sv-SE');
+    const todayStr = getFactoryDateString(new Date());
     const nowMs = new Date().getTime();
 
     // --- ACCUMULATED DAY MATH ---
@@ -515,10 +532,20 @@ const MachineAnalyticsView: React.FC<MachineAnalyticsProps> = ({ machineType, da
     
     productionOrders.forEach(order => {
         if (order.machine !== machineType) return;
-        (order.operatorLogs || []).forEach(log => {
-            if (!log.startTime || !log.startTime.startsWith(todayStr)) return;
+        (order.operatorLogs || []).forEach((log, index, arr) => {
+            if (!log.startTime) return;
+            const logDateStr = getFactoryDateString(log.startTime);
+            if (logDateStr !== todayStr) return;
+            
             const startStr = log.startTime;
-            const endStr = log.endTime || new Date().toISOString();
+            
+            let endStr = new Date().toISOString();
+            if (log.endTime) {
+                endStr = log.endTime;
+            } else {
+                const isLast = index === arr.length - 1;
+                if (!isLast) endStr = startStr; // Cancela tempo ativo fantasmas
+            }
             
             const shiftStart = new Date(startStr).getTime();
             const shiftEnd = new Date(endStr).getTime();
@@ -725,16 +752,11 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
 
     const dailyProduction = useMemo(() => {
         const now = new Date();
-        const todayStr = now.toLocaleDateString('sv-SE'); // Safe YYYY-MM-DD in local time
+        const todayStr = getFactoryDateString(now);
 
         const isToday = (dateInput: string | undefined) => {
             if (!dateInput) return false;
-            try {
-                // Ensure we get local date for comparison
-                return new Date(dateInput).toLocaleDateString('sv-SE') === todayStr;
-            } catch (e) {
-                return false;
-            }
+            return getFactoryDateString(dateInput) === todayStr;
         };
 
         // Create a quick lookup map for stock items
@@ -755,9 +777,16 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
 
             if (machineLower.includes('treli')) {
                 const size = parseFloat(String(order.tamanho || '6').replace(',', '.'));
-                (order.operatorLogs || []).forEach(log => {
+                (order.operatorLogs || []).forEach((log, index, arr) => {
                     if (log.startTime && isToday(log.startTime)) {
-                        const endQty = log.endTime ? (log.endQuantity || 0) : (order.actualProducedQuantity || 0);
+                        let endQty = 0;
+                        if (log.endTime) {
+                            endQty = log.endQuantity || 0;
+                        } else {
+                            // EVITAR SOMA DUPLA: Apenas o último turno em aberto ganha os pontos "ao vivo"
+                            const isLast = index === arr.length - 1;
+                            endQty = isLast ? (order.actualProducedQuantity || 0) : (log.startQuantity || 0);
+                        }
                         const startQty = log.startQuantity || 0;
                         const producedInTurn = Math.max(0, endQty - startQty);
                         trelicaMeters += (producedInTurn * (size || 6));
@@ -795,15 +824,21 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
             shiftGoal = sizeValue >= 10 ? 300 : 600;
         }
 
-        const totalPiecesProduced = sizeValue > 0 ? Math.round(dailyProduction.trelicaMeters / sizeValue) : 0;
+        let currentShiftProduced = 0;
+        if (activeTrelicaOrder) {
+            const currentOperatorLog = activeTrelicaOrder.operatorLogs?.slice().reverse().find(log => !log.endTime);
+            if (currentOperatorLog) {
+                 currentShiftProduced = (activeTrelicaOrder.actualProducedQuantity || 0) - (currentOperatorLog.startQuantity || 0);
+            }
+        }
 
         return {
-            value: totalPiecesProduced,
-            goal: shiftGoal * 2, // Meta diária consolida 2 turnos teóricos (A e B)
+            value: currentShiftProduced,
+            goal: shiftGoal,
             shiftGoal: shiftGoal,
             unit: sizeValue >= 10 ? 'pçs (12m)' : 'pçs (6m)'
         };
-    }, [activeTrelicaOrder, dailyProduction.trelicaMeters]);
+    }, [activeTrelicaOrder]);
 
     const [displayMode, setDisplayMode] = useState<'realtime' | 'analytics'>('realtime');
 
