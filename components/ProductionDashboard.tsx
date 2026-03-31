@@ -47,6 +47,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
 
     useEffect(() => {
         if (!activeOrder) return;
+        setLocalNow(new Date()); // Refresh on mount and order change
 
         const timestamps = [
             activeOrder.startTime,
@@ -909,8 +910,8 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
     }, []);
 
     return (
-        <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4">
+        <div className="space-y-4 lg:space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4 lg:gap-6 pt-2 lg:pt-4">
                 {/* Column 1: Trefila */}
                 <div className="relative">
                     <div className={`transition-opacity duration-700 ${displayMode === 'realtime' ? 'opacity-100 relative z-10' : 'opacity-0 absolute inset-0 z-0 pointer-events-none'}`}>
