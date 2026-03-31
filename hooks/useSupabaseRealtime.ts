@@ -95,7 +95,7 @@ export function useAllRealtimeSubscriptions(setters: RealtimeSetters, enabled: b
                                             ? options.onUpdate(updatedItem, prev)
                                             : prev.map(item =>
                                                 (item as any)[idField] === (updatedItem as any)[idField]
-                                                    ? updatedItem
+                                                    ? { ...item, ...updatedItem }
                                                     : item
                                             )
                                     );

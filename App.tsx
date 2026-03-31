@@ -1355,7 +1355,8 @@ const App: React.FC = () => {
         const updates: Partial<ProductionOrderData> = { downtimeEvents: newEvents };
 
         try {
-            await updateItem('production_orders', orderId, updates);
+            const updatedOrder = await updateItem<ProductionOrderData>('production_orders', orderId, updates);
+            setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
             showNotification('Parada registrada.', 'success');
         } catch (error) {
             showNotification('Erro ao registrar parada.', 'error');
@@ -1392,7 +1393,8 @@ const App: React.FC = () => {
         }
 
         try {
-            await updateItem('production_orders', orderId, { downtimeEvents: newEvents });
+            const updatedOrder = await updateItem<ProductionOrderData>('production_orders', orderId, { downtimeEvents: newEvents });
+            setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
             showNotification('Produção retomada.', 'success');
         } catch (error) {
             showNotification('Erro ao retomar produção.', 'error');
@@ -1423,7 +1425,8 @@ const App: React.FC = () => {
         };
 
         try {
-            await updateItem('production_orders', orderId, updates);
+            const updatedOrder = await updateItem<ProductionOrderData>('production_orders', orderId, updates);
+            setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
             showNotification('Processamento de lote iniciado.', 'success');
         } catch (error) {
             showNotification('Erro ao iniciar lote.', 'error');
@@ -1455,7 +1458,8 @@ const App: React.FC = () => {
         };
 
         try {
-            await updateItem('production_orders', orderId, updates);
+            const updatedOrder = await updateItem<ProductionOrderData>('production_orders', orderId, updates);
+            setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
             showNotification('Processamento de lote finalizado.', 'success');
         } catch (error) {
             showNotification('Erro ao finalizar lote.', 'error');
@@ -1827,10 +1831,11 @@ const App: React.FC = () => {
     const updateProducedQuantity = async (orderId: string, quantity: number) => {
         try {
             const now = new Date().toISOString();
-            await updateItem('production_orders', orderId, {
+            const updatedOrder = await updateItem<ProductionOrderData>('production_orders', orderId, {
                 actualProducedQuantity: quantity,
                 lastQuantityUpdate: now
             });
+            setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
             showNotification('Contagem de peças atualizada.', 'success');
         } catch (error) { showNotification('Erro ao atualizar contagem.', 'error'); }
     };
