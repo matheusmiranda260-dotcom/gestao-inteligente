@@ -484,6 +484,105 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     );
 };
 
+interface MachineAnalyticsProps {
+    machineType: MachineType;
+    dailyValue: number;
+    unit: string;
+    productionOrders: ProductionOrderData[];
+}
+
+const MachineAnalyticsView: React.FC<MachineAnalyticsProps> = ({ machineType, dailyValue, unit, productionOrders }) => {
+    const todayStr = new Date().toLocaleDateString('sv-SE');
+    const nowMs = new Date().getTime();
+
+    let uptime = 0;
+    let downtime = 0;
+    
+    productionOrders.forEach(order => {
+        if (order.machine !== machineType) return;
+        
+        (order.operatorLogs || []).forEach(log => {
+            if (!log.startTime || !log.startTime.startsWith(todayStr)) return;
+            const startStr = log.startTime;
+            const endStr = log.endTime || new Date().toISOString();
+            
+            const shiftStart = new Date(startStr).getTime();
+            const shiftEnd = new Date(endStr).getTime();
+            if (shiftEnd <= shiftStart) return;
+
+            let logDown = 0;
+            (order.downtimeEvents || []).forEach(ev => {
+                const eStart = new Date(ev.stopTime).getTime();
+                const eEnd = ev.resumeTime ? new Date(ev.resumeTime).getTime() : nowMs;
+                const interStart = Math.max(shiftStart, eStart);
+                const interEnd = Math.min(shiftEnd, eEnd);
+                if (interEnd > interStart) logDown += (interEnd - interStart);
+            });
+            
+            downtime += logDown;
+            uptime += (shiftEnd - shiftStart) - logDown;
+        });
+    });
+
+    const totalHours = (uptime + downtime) / 3600000;
+    const piecesPerHour = totalHours > 0 ? Math.round(dailyValue / totalHours) : 0;
+    
+    const uptimePct = totalHours > 0 ? (uptime / (uptime + downtime)) * 100 : 0;
+    const downtimePct = totalHours > 0 ? (downtime / (uptime + downtime)) * 100 : 0;
+
+    return (
+        <div className="flex flex-col h-[calc(100vh-8rem)] bg-slate-900 rounded-3xl shadow-xl overflow-hidden border border-slate-700/60 ring-1 ring-black/5 text-white transition-opacity duration-700">
+            <div className="px-5 py-4 flex flex-col items-center justify-center bg-gradient-to-br from-indigo-900 via-slate-800 to-slate-900 h-1/2 border-b border-indigo-500/20 relative shadow-inner">
+                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
+                <h3 className="text-xl font-black text-indigo-400 uppercase tracking-[0.2em] opacity-90">{machineType}</h3>
+                <p className="text-white/60 font-bold uppercase tracking-widest text-[10px] mb-4">TOTAL PRODUZIDO HOJE</p>
+                
+                <div className="text-7xl md:text-8xl font-black drop-shadow-[0_5px_15px_rgba(99,102,241,0.5)] text-white font-mono tracking-tighter">
+                    {dailyValue.toLocaleString('pt-BR')}
+                </div>
+                
+                <div className="mt-4 bg-indigo-500/20 text-indigo-300 px-4 py-1.5 rounded-full shadow-lg text-[10px] md:text-xs font-black uppercase tracking-widest ring-1 ring-indigo-400/40 backdrop-blur-md">
+                    {machineType === 'Trefila' ? 'KILOGRAMAS PROCESSADOS' : 'PEÇAS FABRICADAS'}
+                </div>
+            </div>
+
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 p-4 lg:p-6 gap-4 lg:gap-6 bg-slate-950">
+                <div className="bg-slate-800/80 rounded-2xl flex flex-col justify-center items-center shadow-[inset_0_2px_10px_rgba(255,255,255,0.02)] border border-slate-700/50 p-6 relative overflow-hidden group hover:border-emerald-500/30 transition-colors">
+                    <div className="absolute -top-10 -left-10 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl opacity-50 group-hover:opacity-100 transition-opacity"></div>
+                    <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mb-2 text-center z-10">Ritmo Produtivo (Média)</p>
+                    <div className="text-5xl md:text-6xl font-black text-emerald-400 font-mono tracking-tighter drop-shadow-md z-10 mt-1">
+                        {piecesPerHour.toLocaleString('pt-BR')}
+                    </div>
+                    <p className="text-emerald-500/70 font-black text-[10px] uppercase tracking-widest mt-2 bg-emerald-500/10 px-2 py-0.5 rounded z-10">{unit} / Hora</p>
+                </div>
+
+                <div className="bg-slate-800/80 rounded-2xl flex flex-col justify-center shadow-[inset_0_2px_10px_rgba(255,255,255,0.02)] border border-slate-700/50 p-5 md:p-6 relative overflow-hidden group hover:border-rose-500/30 transition-colors">
+                    <div className="absolute top-0 right-0 w-40 h-40 bg-rose-500/5 rounded-full blur-3xl translate-x-10 -translate-y-10 group-hover:bg-rose-500/10 transition-colors"></div>
+                    <div className="absolute bottom-0 left-0 w-40 h-40 bg-emerald-500/5 rounded-full blur-3xl -translate-x-10 translate-y-10 group-hover:bg-emerald-500/10 transition-colors"></div>
+                    
+                    <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mb-4 relative z-10 text-center">Eficiência da Máquina</p>
+                    
+                    <div className="flex w-full h-8 rounded-full overflow-hidden mb-4 ring-1 ring-black/50 shadow-inner relative z-10 mt-2">
+                        <div className="bg-gradient-to-r from-emerald-600 to-emerald-400 flex items-center justify-center text-[10px] font-black text-emerald-950 shadow-[0_0_10px_rgba(16,185,129,0.5)]" style={{ width: `${uptimePct}%` }}>{uptimePct.toFixed(0)}%</div>
+                        <div className="bg-gradient-to-r from-rose-600 to-rose-400 flex items-center justify-center text-[10px] font-black text-rose-950 shadow-[0_0_10px_rgba(244,63,94,0.5)]" style={{ width: `${downtimePct}%` }}>{downtimePct.toFixed(0)}%</div>
+                    </div>
+                    
+                    <div className="flex justify-between relative z-10 mt-1 px-2">
+                        <div className="text-center">
+                            <p className="text-[9px] uppercase font-black text-emerald-500/80 tracking-widest mb-0.5">Operando</p>
+                            <p className="text-emerald-400/90 font-mono text-sm font-black">{formatDuration(uptime)}</p>
+                        </div>
+                        <div className="text-center">
+                            <p className="text-[9px] uppercase font-black text-rose-500/80 tracking-widest mb-0.5">Parada</p>
+                            <p className="text-rose-400/90 font-mono text-sm font-black">{formatDuration(downtime)}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 interface ProductionDashboardProps {
     setPage: (page: Page) => void;
     productionOrders: ProductionOrderData[];
@@ -576,25 +675,62 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
         };
     }, [activeTrelicaOrder, dailyProduction.trelicaMeters]);
 
+    const [displayMode, setDisplayMode] = useState<'realtime' | 'analytics'>('realtime');
+
+    useEffect(() => {
+        // Toggle view every 15 seconds
+        const timerObj = setInterval(() => {
+            setDisplayMode(prev => prev === 'realtime' ? 'analytics' : 'realtime');
+        }, 15000);
+        return () => clearInterval(timerObj);
+    }, []);
+
     return (
         <div className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4">
-                <MachineStatusView
-                    machineType="Trefila"
-                    activeOrder={activeTrefilaOrder}
-                    stock={stock}
-                    dailyProducedValue={dailyProduction.trefilaWeight}
-                    dailyGoal={16000}
-                    goalUnit="kg"
-                />
-                <MachineStatusView
-                    machineType="Treliça"
-                    activeOrder={activeTrelicaOrder}
-                    stock={stock}
-                    dailyProducedValue={trelicaDisplayData.value}
-                    dailyGoal={trelicaDisplayData.goal}
-                    goalUnit={trelicaDisplayData.unit}
-                />
+                {/* Column 1: Trefila */}
+                <div className="relative">
+                    <div className={`transition-opacity duration-700 ${displayMode === 'realtime' ? 'opacity-100 relative z-10' : 'opacity-0 absolute inset-0 z-0 pointer-events-none'}`}>
+                        <MachineStatusView
+                            machineType="Trefila"
+                            activeOrder={activeTrefilaOrder}
+                            stock={stock}
+                            dailyProducedValue={dailyProduction.trefilaWeight}
+                            dailyGoal={16000}
+                            goalUnit="kg"
+                        />
+                    </div>
+                    <div className={`transition-opacity duration-700 ${displayMode === 'analytics' ? 'opacity-100 relative z-10' : 'opacity-0 absolute inset-0 z-0 pointer-events-none'}`}>
+                        <MachineAnalyticsView
+                            machineType="Trefila"
+                            dailyValue={dailyProduction.trefilaWeight}
+                            unit="kg"
+                            productionOrders={productionOrders as ProductionOrderData[]}
+                        />
+                    </div>
+                </div>
+
+                {/* Column 2: Treliça */}
+                <div className="relative">
+                    <div className={`transition-opacity duration-700 ${displayMode === 'realtime' ? 'opacity-100 relative z-10' : 'opacity-0 absolute inset-0 z-0 pointer-events-none'}`}>
+                        <MachineStatusView
+                            machineType="Treliça"
+                            activeOrder={activeTrelicaOrder}
+                            stock={stock}
+                            dailyProducedValue={trelicaDisplayData.value}
+                            dailyGoal={trelicaDisplayData.goal}
+                            goalUnit={trelicaDisplayData.unit}
+                        />
+                    </div>
+                    <div className={`transition-opacity duration-700 ${displayMode === 'analytics' ? 'opacity-100 relative z-10' : 'opacity-0 absolute inset-0 z-0 pointer-events-none'}`}>
+                        <MachineAnalyticsView
+                            machineType="Treliça"
+                            dailyValue={trelicaDisplayData.value}
+                            unit={trelicaDisplayData.unit}
+                            productionOrders={productionOrders as ProductionOrderData[]}
+                        />
+                    </div>
+                </div>
             </div>
         </div>
     );
