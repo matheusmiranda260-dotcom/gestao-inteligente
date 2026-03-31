@@ -175,7 +175,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
 
     if (!activeOrder) {
         return (
-            <div className="bg-white rounded-3xl shadow-xl border border-slate-100 h-[calc(100vh-10rem)] flex flex-col overflow-hidden">
+            <div className="bg-white rounded-3xl shadow-xl border border-slate-100 lg:h-[calc(100vh-10rem)] h-auto min-h-[400px] flex flex-col overflow-hidden">
                 <div className="bg-slate-800 p-4">
                     <h2 className="text-2xl font-black text-white uppercase tracking-wider">{machineType}</h2>
                 </div>
@@ -189,7 +189,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     }
 
     return (
-        <div className="flex flex-col h-[calc(100vh-8rem)] bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-200/60 ring-1 ring-black/5">
+        <div className="flex flex-col lg:h-[calc(100vh-8rem)] h-auto bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-200/60 ring-1 ring-black/5">
             {/* PREMIUM HEADER */}
             <div className={`px-5 py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-2 shadow-lg z-10 ${currentStyle.bg}`}>
                 <div className="flex items-center gap-4">
@@ -327,7 +327,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                     {/* CARD 3: DETALHES & EFICIÊNCIA */}
                     <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
                         <h3 className="font-black text-slate-700 uppercase tracking-widest text-[10px] md:text-xs mb-3">Informações</h3>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <div>
                                     <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Ordem</p>
@@ -645,7 +645,7 @@ const MachineAnalyticsView: React.FC<MachineAnalyticsProps> = ({ machineType, da
     const isWarning = shiftUptimePct < 80 && shiftUptimePct >= 50;
 
     return (
-        <div className="flex flex-col h-[calc(100vh-8rem)] bg-slate-900 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden border border-slate-700/60 ring-1 ring-black/5 text-white transition-opacity duration-700 relative">
+        <div className="flex flex-col lg:h-[calc(100vh-8rem)] h-auto bg-slate-900 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden border border-slate-700/60 ring-1 ring-black/5 text-white transition-opacity duration-700 relative">
             <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/40 via-transparent to-transparent pointer-events-none"></div>
             
             {/* FULL DAY CONSOLIDATION BANNER */}
@@ -687,7 +687,7 @@ const MachineAnalyticsView: React.FC<MachineAnalyticsProps> = ({ machineType, da
                     <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Análise do Turno Atual (Idêntico ao Painel de Produção)</h4>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-4 lg:gap-6 flex-1">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 flex-1">
                     {/* Performance OEE Dial Visual Block */}
                     <div className="bg-slate-800/60 rounded-3xl p-5 border border-slate-700/50 flex flex-col items-center justify-center relative overflow-hidden group shadow-lg">
                         <div className={`absolute inset-0 bg-gradient-to-t ${isExcellent ? 'from-emerald-500/10' : isWarning ? 'from-amber-500/10' : 'from-rose-500/10'} opacity-50`}></div>
@@ -751,9 +751,9 @@ const MachineAnalyticsView: React.FC<MachineAnalyticsProps> = ({ machineType, da
                             </div>
                         </div>
                         
-                        <div className="flex flex-col gap-4 relative z-10">
+                        <div className="flex flex-col sm:flex-row lg:flex-col gap-4 relative z-10">
                             {/* Produtivo Item */}
-                            <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-700/50">
+                            <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-700/50 flex-1">
                                 <div className="flex justify-between mb-2">
                                     <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-1.5"><div className="w-2 h-2 bg-emerald-500 rounded-sm"></div> Produtivo</span>
                                     <span className="text-lg font-mono font-black text-white">{formatDuration(shiftUptime)}</span>
