@@ -1098,54 +1098,47 @@ const MachineControl: React.FC<MachineControlProps> = ({
         }
     }
 
-    const handleShiftEndRequest = (orderId: string) => {
-        // Only apply quantity prompt for Treliça machine
+    const proceedWithShiftEnd = (orderId: string) => {
         if (machineType !== 'Treliça') {
             if (endOperatorShift) {
                 const orderToEnd = productionOrders.find(o => o.id === orderId);
                 endOperatorShift(orderId, (orderToEnd?.actualProducedQuantity || 0));
             }
+            setPendingShiftEnd(null);
             return;
         }
+        setShowQuantityPrompt(true);
+    };
 
-        if (!currentOperatorLog) {
-            // Should not happen if ending active shift, but fallback
-            setPendingShiftEnd(orderId);
-            setShowQuantityPrompt(true);
-            return;
-        }
-
+    const handleShiftEndRequest = (orderId: string) => {
         const now = new Date();
         const dayOfWeek = now.getDay(); // 0 = Sunday, 6 = Saturday
         const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
-        if (isWeekend) {
-            // Overtime/Weekend shifts are flexible, allow ending anytime
-            setPendingShiftEnd(orderId);
-            setShowQuantityPrompt(true);
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
+        const currentMins = currentHour * 60 + currentMinute;
+
+        // Turno A: 14:17 = 857. Tolerance 10 min: 14:07 (847) to 14:27 (867)
+        // Turno B: 23:34 = 1414. Tolerance 10 min: 23:24 (1404) to 23:44 (1424)
+        const inWindowA = currentMins >= 847 && currentMins <= 867;
+        const inWindowB = currentMins >= 1404 && currentMins <= 1424;
+
+        setPendingShiftEnd(orderId);
+
+        if (!isWeekend && !inWindowA && !inWindowB && !isGestor) {
+            setShowManagerAuthForShiftEnd(true);
             return;
         }
 
-        const currentHour = now.getHours();
-        const currentMinute = now.getMinutes();
-
-        // Define Core Shift Hours: 07:00 to 17:30 (Weekdays only)
-        // We only require password if attempting to leave EARLY within this window.
-        const isWithinCoreHours = (currentHour > 7 || (currentHour === 7)) && (currentHour < 17 || (currentHour === 17 && currentMinute < 30));
-
-        if (isWithinCoreHours) {
-            setPendingShiftEnd(orderId);
-            setShowManagerAuthForShiftEnd(true);
-        } else {
-            // After 17:30 or Before 07:00
-            setPendingShiftEnd(orderId);
-            setShowQuantityPrompt(true);
-        }
+        proceedWithShiftEnd(orderId);
     };
 
     const handleManagerAuthSuccess = () => {
         setShowManagerAuthForShiftEnd(false);
-        setShowQuantityPrompt(true);
+        if (pendingShiftEnd) {
+            proceedWithShiftEnd(pendingShiftEnd);
+        }
     };
 
     const handleUpdateQuantity = (shiftQuantity: number) => {
@@ -1286,7 +1279,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
             {showManagerAuthForShiftEnd && (
                 <ManagerActionAuthorizationModal
                     users={users}
-                    actionDescription="O turno encerra às 17:30. É necessária autorização de um gestor para encerrá-lo antecipadamente."
+                    actionDescription="O encerramento do turno está fora do horário permitido (14:07 às 14:27 ou 23:24 às 23:44). É necessária autorização de um gestor."
                     onSuccess={handleManagerAuthSuccess}
                     onCancel={() => {
                         setShowManagerAuthForShiftEnd(false);
