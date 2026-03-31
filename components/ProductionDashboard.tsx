@@ -207,20 +207,21 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                         </div>
                     </div>
                 </div>
-                <div className="text-left lg:text-right mt-2 lg:mt-0">
-                    <p className="text-5xl md:text-5xl font-mono font-black tracking-tighter drop-shadow-md text-white">{formatDuration(machineStatus.durationMs)}</p>
+                <div className="text-left lg:text-right mt-2 lg:mt-0 flex items-baseline gap-1">
+                    <p className="text-4xl sm:text-5xl font-mono font-black tracking-tighter drop-shadow-md text-white">{formatDuration(machineStatus.durationMs)}</p>
+                    <span className="lg:hidden text-[10px] font-bold text-white/60 uppercase">Duração</span>
                 </div>
             </div>
 
             {/* LOT IN PROGRESS SUB-HEADER (TREFILA) */}
             {activeLotProcessingData && (
-                <div className="bg-slate-800 text-white px-5 py-2 flex flex-row justify-between items-center text-xs shadow-md z-0 shrink-0">
-                    <div className="flex items-center gap-3">
-                        <span className="font-black uppercase tracking-widest text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded border border-emerald-400/20">Lote em Processo</span>
-                        <span className="font-bold text-sm">{activeLotProcessingData.lotInfo.internalLot}</span>
+                <div className="bg-slate-800 text-white px-4 py-1.5 flex flex-wrap justify-between items-center text-[10px] shadow-md z-0 shrink-0 gap-y-1">
+                    <div className="flex items-center gap-2">
+                        <span className="font-black uppercase tracking-widest text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded border border-emerald-400/20 text-[9px]">Lote</span>
+                        <span className="font-bold">{activeLotProcessingData.lotInfo.internalLot}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-400">Peso Inicial:</span>
+                        <span className="font-bold text-slate-400">Peso:</span>
                         <span className="font-black text-emerald-300">{activeLotProcessingData.lotInfo.labelWeight.toFixed(0)} kg</span>
                     </div>
                 </div>
@@ -251,8 +252,8 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                     {dailyProducedValue >= dailyGoal && <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>}
                                 </div>
                             </div>
-                            <span className="text-base font-black text-slate-800 tracking-tighter whitespace-nowrap">
-                                {dailyProducedValue.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} <span className="text-[10px] text-slate-400 uppercase font-bold">{goalUnit}</span>
+                            <span className="text-sm sm:text-base font-black text-slate-800 tracking-tighter whitespace-nowrap overflow-hidden text-ellipsis">
+                                {dailyProducedValue.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} <span className="text-[9px] text-slate-400 uppercase font-bold">{goalUnit}</span>
                                 <span className="text-slate-300 mx-1">/</span>
                                 {dailyGoal.toLocaleString('pt-BR')}
                             </span>
@@ -306,7 +307,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                     </span>
                                 )}
                             </div>
-                            <span className="text-xl md:text-2xl font-black text-slate-800 tracking-tighter" title="Total da Ordem de Produção">{machineType === 'Trefila' ? processedLotsCount : producedQuantity} <span className="text-sm font-bold text-slate-400">/ {machineType === 'Trefila' ? totalLotsCount : plannedQuantity}</span></span>
+                            <span className="text-lg sm:text-xl md:text-2xl font-black text-slate-800 tracking-tighter whitespace-nowrap overflow-hidden text-ellipsis" title="Total da Ordem de Produção">{machineType === 'Trefila' ? processedLotsCount : producedQuantity} <span className="text-sm font-bold text-slate-400">/ {machineType === 'Trefila' ? totalLotsCount : plannedQuantity}</span></span>
                         </div>
                         <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden shadow-inner ring-1 ring-black/5">
                             <div className="bg-gradient-to-r from-emerald-500 to-teal-500 h-full rounded-full text-white text-[9px] flex items-center justify-center font-bold tracking-widest" style={{ width: `${progress}%` }}>
