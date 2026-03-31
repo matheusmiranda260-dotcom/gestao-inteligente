@@ -676,6 +676,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
         return !!currentUser.permissions?.[targetPage];
     };
 
+    const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor' || currentUser?.username === 'admin';
     const machinePrefix = machineType === 'Trefila' ? 'trefila' : 'trelica';
 
     const [productionReportData, setProductionReportData] = useState<ProductionOrderData | null>(null);
@@ -1308,14 +1309,20 @@ const MachineControl: React.FC<MachineControlProps> = ({
                             {isAnyActiveShift ? (
                                 <>
                                     <h3 className="text-xl font-semibold text-slate-800 mb-2">A ordem <span className="font-bold text-slate-600">{activeOrder.orderNumber}</span> está sendo operada por <span className="text-indigo-600 font-bold uppercase">{currentOperatorLog?.operator}</span>.</h3>
-                                    <p className="text-slate-500 mb-4 text-sm">Você pode acompanhar o progresso em tempo real no painel ou vincular-se se for trabalhar nesta máquina.</p>
+                                    <p className="text-slate-500 mb-4 text-sm">
+                                        {isGestor
+                                            ? "Você pode acompanhar o progresso em tempo real ou iniciar um turno auxiliar."
+                                            : "Aguarde o encerramento do turno atual para iniciar o seu ou acompanhe no painel."}
+                                    </p>
                                     <div className="flex flex-wrap justify-center gap-3">
                                         <button onClick={() => setView('in_progress')} className="bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 px-6 rounded-lg transition shadow-lg shadow-slate-200">
                                             Acompanhar Painel
                                         </button>
-                                        <button onClick={() => startOperatorShift && startOperatorShift(activeOrder.id)} className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold py-2 px-6 rounded-lg border border-emerald-100 transition">
-                                            Iniciar Meu Turno (Auxiliar)
-                                        </button>
+                                        {isGestor && (
+                                            <button onClick={() => startOperatorShift && startOperatorShift(activeOrder.id)} className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold py-2 px-6 rounded-lg border border-emerald-100 transition">
+                                                Iniciar Meu Turno (Gestor)
+                                            </button>
+                                        )}
                                     </div>
                                 </>
                             ) : (
