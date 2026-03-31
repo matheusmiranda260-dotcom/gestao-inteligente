@@ -636,10 +636,9 @@ const MachineAnalyticsView: React.FC<MachineAnalyticsProps> = ({ machineType, da
     const neededToGoal = Math.max(0, shiftGoal - shiftProduced);
     const requiredRate = remainingHours > 0 ? Math.ceil(neededToGoal / remainingHours) : 0;
     
-    // Treliça speed: m/min
-    const speedMMin = (machineType === 'Treliça' && shiftUptime > 0) 
-        ? ((shiftProduced * sizeValue) / (shiftUptime / 60000)) 
-        : 0;
+    const speedProductivePHP = (machineType === 'Treliça' && shiftUptime > 0) 
+        ? Math.round(shiftProduced / (shiftUptime / 3600000)) 
+        : piecesPerHourShift; // Fallback ou para Trefila
 
     // Determine performance tier
     const isExcellent = shiftUptimePct >= 80;
@@ -730,7 +729,7 @@ const MachineAnalyticsView: React.FC<MachineAnalyticsProps> = ({ machineType, da
                             <div className="mt-4 w-full bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-3 z-10 flex justify-between items-center">
                                 <div className="text-left">
                                     <p className="text-[7px] font-black text-indigo-400 uppercase tracking-widest">Velocidade Média</p>
-                                    <p className="text-sm font-black text-indigo-100">{speedMMin.toFixed(1)} <small className="text-[9px] opacity-70">m/min</small></p>
+                                    <p className="text-sm font-black text-indigo-100">{speedProductivePHP} <small className="text-[9px] opacity-70">pçs/h (Prod.)</small></p>
                                 </div>
                                 <div className="text-right">
                                     <p className="text-[7px] font-black text-indigo-400 uppercase tracking-widest">Ritmo p/ Meta</p>
