@@ -190,7 +190,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     }
 
     return (
-        <div className="flex flex-col lg:h-[calc(100vh-8rem)] h-auto bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-200/60 ring-1 ring-black/5">
+        <div className="flex flex-col lg:h-[calc(100vh-8rem)] h-auto bg-white rounded-3xl shadow-xl overflow-x-hidden border border-slate-200/60 ring-1 ring-black/5">
             {/* HEADER - compact on mobile landscape */}
             <div className={`px-3 py-2 sm:px-5 sm:py-3 flex flex-row items-center justify-between gap-2 shadow-lg z-10 ${currentStyle.bg}`}>
                 <div className="flex items-center gap-2 sm:gap-4 min-w-0">
@@ -228,13 +228,13 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             )}
 
             {/* CONTENT GRID - 2 cols on landscape mobile (sm), 2 cols on desktop (lg) */}
-            <div className="flex-1 p-2 sm:p-3 lg:p-4 grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 lg:gap-4 overflow-y-auto bg-slate-50">
+            <div className="flex-1 p-2 sm:p-3 lg:p-4 grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 lg:gap-4 overflow-y-auto overflow-x-hidden bg-slate-50 w-full">
                 
                 {/* LEFT COLUMN: CRITICAL METRICS */}
-                <div className="flex flex-col gap-2 sm:gap-3">
+                <div className="flex flex-col gap-2 sm:gap-3 overflow-x-hidden min-w-0">
                     
                     {/* CARD 1: META DIÁRIA */}
-                    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
+                    <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-200 overflow-hidden">
                         <div className="flex justify-between items-center mb-2">
                             <h3 className="font-black text-slate-700 uppercase tracking-widest text-[10px] md:text-xs title-font flex items-center gap-1.5">
                                 <ScaleIcon className="h-4 w-4 text-indigo-500" /> {machineType === 'Treliça' ? 'Meta do Turno Atual' : 'Meta Diária da Fábrica'}
@@ -243,7 +243,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                 {((dailyProducedValue / dailyGoal) * 100).toFixed(0)}%
                             </span>
                         </div>
-                        <div className="flex items-center gap-3 mt-1">
+                        <div className="flex items-center gap-2 mt-1 w-full">
                             <div className="flex-1 h-3.5 bg-slate-100 rounded-full overflow-hidden shadow-inner shrink-0 ring-1 ring-black/5">
                                 <div
                                     className={`h-full transition-all duration-1000 flex items-center justify-end pr-2 ${dailyProducedValue >= dailyGoal ? 'bg-gradient-to-r from-emerald-400 to-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]' : 'bg-gradient-to-r from-indigo-500 to-blue-500'}`}
@@ -252,7 +252,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                     {dailyProducedValue >= dailyGoal && <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>}
                                 </div>
                             </div>
-                            <span className="text-sm sm:text-base font-black text-slate-800 tracking-tighter whitespace-nowrap overflow-hidden text-ellipsis">
+                            <span className="text-xs font-black text-slate-800 tracking-tighter whitespace-nowrap shrink-0">
                                 {dailyProducedValue.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} <span className="text-[9px] text-slate-400 uppercase font-bold">{goalUnit}</span>
                                 <span className="text-slate-300 mx-1">/</span>
                                 {dailyGoal.toLocaleString('pt-BR')}
@@ -266,7 +266,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                     </div>
 
                     {/* CARD 2: PROGRESSO DA PRODUÇÃO */}
-                    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col justify-center">
+                    <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-200 flex flex-col justify-center overflow-hidden">
                         <div className="flex justify-between items-center mb-3">
                             <h3 className="font-black text-slate-700 uppercase tracking-widest text-[10px] md:text-xs">Progresso do Turno {/* Ordem */}</h3>
                         </div>
@@ -326,7 +326,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                     </div>
 
                     {/* CARD 3: DETALHES & EFICIÊNCIA */}
-                    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
+                    <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-200 overflow-hidden">
                         <h3 className="font-black text-slate-700 uppercase tracking-widest text-[10px] md:text-xs mb-3">Informações</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-2">
@@ -380,7 +380,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                 </div>
 
                 {/* RIGHT COLUMN */}
-                <div className="flex flex-col gap-2 sm:gap-3">
+                <div className="flex flex-col gap-2 sm:gap-3 overflow-x-hidden min-w-0">
                     
                     {/* PARADAS TABLE (Flex-1 so it scrolls within its box) */}
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col flex-1 overflow-hidden min-h-0">
