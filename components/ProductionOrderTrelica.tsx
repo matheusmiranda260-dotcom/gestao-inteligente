@@ -496,6 +496,7 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
 
         setOrderNumber('');
         setQuantity(1);
+        setIsGhostOrder(false);
         handleModelChange('');
     };
 
