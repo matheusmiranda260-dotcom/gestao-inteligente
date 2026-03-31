@@ -812,44 +812,52 @@ const App: React.FC = () => {
             const savedOrder = await insertItem<ProductionOrderData>('production_orders', newOrder);
 
             // Update stock items status
-            if (newOrder.machine === 'Trefila') {
-                const lotIds = newOrder.selectedLotIds as string[];
-                for (const lotId of lotIds) {
-                    const stockItem = stock.find(s => s.id === lotId);
-                    if (stockItem) {
-                        await updateItem<StockItem>('stock_items', lotId, {
-                            status: 'Em Produção - Trefila',
-                            productionOrderIds: [...(stockItem.productionOrderIds || []), savedOrder.id]
-                        });
+            if (!savedOrder.isGhostOrder) {
+                if (savedOrder.machine === 'Trefila') {
+                    const lotIds = savedOrder.selectedLotIds as string[];
+                    if (Array.isArray(lotIds)) {
+                        for (const lotId of lotIds) {
+                            const stockItem = stock.find(s => s.id === lotId);
+                            if (stockItem) {
+                                await updateItem<StockItem>('stock_items', lotId, {
+                                    status: 'Em Produção - Trefila',
+                                    productionOrderIds: [...(stockItem.productionOrderIds || []), savedOrder.id]
+                                });
+                            }
+                        }
                     }
-                }
-            } else if (newOrder.machine === 'Treliça') {
-                const lots = newOrder.selectedLotIds as TrelicaSelectedLots;
-                const lotRoleMap = new Map<string, string>();
+                } else if (savedOrder.machine === 'Treliça') {
+                    const lots = savedOrder.selectedLotIds as TrelicaSelectedLots;
+                    if (lots && typeof lots === 'object') {
+                        const lotRoleMap = new Map<string, string>();
 
-                const assignRole = (ids: string | string[] | undefined, role: string) => {
-                    if (!ids) return;
-                    if (Array.isArray(ids)) {
-                        ids.forEach(id => lotRoleMap.set(String(id).trim(), role));
-                    } else {
-                        lotRoleMap.set(String(ids).trim(), role);
-                    }
-                };
+                        const assignRole = (ids: string | string[] | undefined, role: string) => {
+                            if (!ids) return;
+                            if (Array.isArray(ids)) {
+                                ids.forEach(id => {
+                                    if (id) lotRoleMap.set(String(id).trim(), role);
+                                });
+                            } else {
+                                if (ids) lotRoleMap.set(String(ids).trim(), role);
+                            }
+                        };
 
-                assignRole(lots.allSuperior || lots.superior, 'Superior');
-                assignRole(lots.allInferiorLeft || lots.inferior1, 'Inferior Esq.');
-                assignRole(lots.allInferiorRight || lots.inferior2, 'Inferior Dir.');
-                assignRole(lots.allSenozoideLeft || lots.senozoide1, 'Senozoide Esq.');
-                assignRole(lots.allSenozoideRight || lots.senozoide2, 'Senozoide Dir.');
+                        assignRole(lots.allSuperior || lots.superior, 'Superior');
+                        assignRole(lots.allInferiorLeft || lots.inferior1, 'Inferior Esq.');
+                        assignRole(lots.allInferiorRight || lots.inferior2, 'Inferior Dir.');
+                        assignRole(lots.allSenozoideLeft || lots.senozoide1, 'Senozoide Esq.');
+                        assignRole(lots.allSenozoideRight || lots.senozoide2, 'Senozoide Dir.');
 
-                for (const [lotId, role] of lotRoleMap.entries()) {
-                    const stockItem = stock.find(s => s.id === lotId);
-                    if (stockItem) {
-                        await updateItem<StockItem>('stock_items', lotId, {
-                            status: 'Em Produção - Treliça',
-                            location: role,
-                            productionOrderIds: [...(stockItem.productionOrderIds || []), savedOrder.id]
-                        });
+                        for (const [lotId, role] of lotRoleMap.entries()) {
+                            const stockItem = stock.find(s => s.id === lotId);
+                            if (stockItem) {
+                                await updateItem<StockItem>('stock_items', lotId, {
+                                    status: 'Em Produção - Treliça',
+                                    location: role,
+                                    productionOrderIds: [...(stockItem.productionOrderIds || []), savedOrder.id]
+                                });
+                            }
+                        }
                     }
                 }
             }
