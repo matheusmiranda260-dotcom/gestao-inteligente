@@ -207,6 +207,7 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
         return savedSpeed ? parseFloat(savedSpeed) : 10;
     });
 
+    const [isGhostOrder, setIsGhostOrder] = useState(false);
     // Multi-lot states (Splitting Inferior and Senozoide into Left/Right)
     const [superiorLots, setSuperiorLots] = useState<string[]>([]);
     const [inferiorLeftLots, setInferiorLeftLots] = useState<string[]>([]);
@@ -416,30 +417,32 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
         }
 
         // Validations per side
-        if (superiorLots.length === 0) { showNotification('Selecione pelo menos um lote Superior.', 'error'); return; }
-        if (inferiorLeftLots.length === 0) { showNotification('Selecione lotes para Inferior (Lado 1).', 'error'); return; }
-        if (inferiorRightLots.length === 0) { showNotification('Selecione lotes para Inferior (Lado 2).', 'error'); return; }
-        if (senozoideLeftLots.length === 0) { showNotification('Selecione lotes para Senozoide (Lado 1).', 'error'); return; }
-        if (senozoideRightLots.length === 0) { showNotification('Selecione lotes para Senozoide (Lado 2).', 'error'); return; }
+        if (!isGhostOrder) {
+            if (superiorLots.length === 0) { showNotification('Selecione pelo menos um lote Superior.', 'error'); return; }
+            if (inferiorLeftLots.length === 0) { showNotification('Selecione lotes para Inferior (Lado 1).', 'error'); return; }
+            if (inferiorRightLots.length === 0) { showNotification('Selecione lotes para Inferior (Lado 2).', 'error'); return; }
+            if (senozoideLeftLots.length === 0) { showNotification('Selecione lotes para Senozoide (Lado 1).', 'error'); return; }
+            if (senozoideRightLots.length === 0) { showNotification('Selecione lotes para Senozoide (Lado 2).', 'error'); return; }
 
-        if (selectedSuperiorWeight < requiredSuperiorWeight) {
-            showNotification('Peso Superior insuficiente.', 'error'); return;
-        }
-        if (selectedInferiorLeftWeight < requiredInferiorSideWeight) {
-            showNotification('Peso Inferior (Lado 1) insuficiente.', 'error'); return;
-        }
-        if (selectedInferiorRightWeight < requiredInferiorSideWeight) {
-            showNotification('Peso Inferior (Lado 2) insuficiente.', 'error'); return;
-        }
-        if (selectedSenozoideLeftWeight < requiredSenozoideSideWeight) {
-            showNotification('Peso Senozoide (Lado 1) insuficiente.', 'error'); return;
-        }
-        if (selectedSenozoideRightWeight < requiredSenozoideSideWeight) {
-            showNotification('Peso Senozoide (Lado 2) insuficiente.', 'error'); return;
+            if (selectedSuperiorWeight < requiredSuperiorWeight) {
+                showNotification('Peso Superior insuficiente.', 'error'); return;
+            }
+            if (selectedInferiorLeftWeight < requiredInferiorSideWeight) {
+                showNotification('Peso Inferior (Lado 1) insuficiente.', 'error'); return;
+            }
+            if (selectedInferiorRightWeight < requiredInferiorSideWeight) {
+                showNotification('Peso Inferior (Lado 2) insuficiente.', 'error'); return;
+            }
+            if (selectedSenozoideLeftWeight < requiredSenozoideSideWeight) {
+                showNotification('Peso Senozoide (Lado 1) insuficiente.', 'error'); return;
+            }
+            if (selectedSenozoideRightWeight < requiredSenozoideSideWeight) {
+                showNotification('Peso Senozoide (Lado 2) insuficiente.', 'error'); return;
+            }
         }
 
         // Criar estrutura compatível com o back-end e report
-        const trelicaLots = {
+        const trelicaLots = isGhostOrder ? {} : {
             superior: superiorLots[0],
             inferior1: inferiorLeftLots[0],
             inferior2: inferiorRightLots[0],
@@ -488,6 +491,7 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
             selectedLotIds: trelicaLots as any, // Passing the rich object
             totalWeight: totalPlannedConsumption,
             plannedOutputWeight: plannedOutputWeight,
+            isGhostOrder: isGhostOrder,
         });
 
         setOrderNumber('');
@@ -608,14 +612,23 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
                                     <label htmlFor="orderNumber" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Número do Lote Interno / OP</label>
                                     <input type="text" id="orderNumber" value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} className="w-full text-lg font-bold p-4 bg-slate-50/50" placeholder="Ex: LOT-2025-001" required />
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div>
                                         <label htmlFor="quantity" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Qtd. Peças</label>
-                                        <input type="number" id="quantity" value={quantity} onChange={(e) => setQuantity(parseInt(e.target.value, 10) || 1)} min="1" className="w-full text-lg font-bold p-4 bg-slate-50/50" required />
+                                        <input type="number" id="quantity" value={quantity} onChange={(e) => setQuantity(parseInt(e.target.value, 10) || 1)} min="1" className="w-full text-lg font-bold p-4 bg-slate-50/50 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500" required />
                                     </div>
                                     <div>
                                         <label htmlFor="machineSpeed" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">M/minuto</label>
-                                        <input type="number" id="machineSpeed" value={machineSpeed} onChange={(e) => setMachineSpeed(parseFloat(e.target.value) || 1)} min="1" className="w-full text-lg font-bold p-4 bg-slate-50/50 text-indigo-600" required />
+                                        <input type="number" id="machineSpeed" value={machineSpeed} onChange={(e) => setMachineSpeed(parseFloat(e.target.value) || 1)} min="1" className="w-full text-lg font-bold p-4 bg-slate-50/50 text-indigo-600 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500" required />
+                                    </div>
+                                    <div className="flex flex-col justify-center mt-6">
+                                        <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl hover:bg-slate-50 transition border border-transparent hover:border-slate-200">
+                                            <input type="checkbox" checked={isGhostOrder} onChange={(e) => setIsGhostOrder(e.target.checked)} className="h-6 w-6 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" />
+                                            <div>
+                                                <span className="font-bold text-slate-700 text-sm">Ordem Fantasma</span>
+                                                <p className="text-[9px] text-slate-500 uppercase font-bold tracking-widest">Sem selecionar lotes</p>
+                                            </div>
+                                        </label>
                                     </div>
                                 </div>
                             </div>
@@ -744,8 +757,9 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
                                     </div>
 
                                     {/* Plano de Consumo Detalhado */}
-                                    <div className="pt-6 border-t border-white/10">
-                                        <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest px-1 mb-4">Plano de Uso de Lotes</h4>
+                                    {!isGhostOrder && (
+                                        <div className="pt-6 border-t border-white/10">
+                                            <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest px-1 mb-4">Plano de Uso de Lotes</h4>
                                         <div className="space-y-4 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
                                             {[
                                                 { label: 'Superior', plan: consumptionPlan?.superior },
@@ -779,13 +793,14 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
                                             ))}
                                         </div>
                                     </div>
+                                    )}
                                 </div>
                             )}
                         </div>
                     </div>
                 </div>
 
-                {selectedModel && (
+                {selectedModel && !isGhostOrder && (
                     <div className="pt-8 space-y-8 pb-32">
                         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                             <div className="section-title !my-0 !mt-0">
@@ -890,6 +905,16 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
                                 CONFIRMAR E CRIAR ORDEM
                             </button>
                         </div>
+                    </div>
+                )}
+
+                {selectedModel && isGhostOrder && (
+                    <div className="flex justify-center pt-10 pb-32">
+                        <button type="submit" className="group relative overflow-hidden bg-indigo-600 hover:bg-indigo-700 text-white font-black py-5 px-16 rounded-3xl shadow-2xl shadow-indigo-600/20 transition-all active:scale-95 text-xl flex items-center gap-4">
+                            <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
+                            <CheckCircleIcon className="h-8 w-8 text-indigo-200" />
+                            CONFIRMAR E CRIAR ORDEM FANTASMA
+                        </button>
                     </div>
                 )}
 

@@ -122,6 +122,7 @@ export interface ProductionOrderData {
     lastQuantityUpdate?: string;
     scrapWeight?: number;
     scrapx?: { type: string; weight: number }[]; // Compatibility if typo was used
+    isGhostOrder?: boolean;
 }
 
 export interface TransferRecord {
