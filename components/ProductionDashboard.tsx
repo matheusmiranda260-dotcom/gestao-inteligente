@@ -12,12 +12,11 @@ const formatDuration = (ms: number) => {
 };
 
 const statusStyles = {
-    Produzindo: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-500', icon: <CogIcon className="h-12 w-12 text-green-500 animate-spin" />, title: 'EM PRODUÇÃO' },
-
-    Preparacao: { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-500', icon: <WrenchScrewdriverIcon className="h-12 w-12 text-blue-500 animate-pulse" />, title: 'EM PREPARAÇÃO' },
-    Parada: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-500', icon: <PauseIcon className="h-12 w-12 text-red-500" />, title: 'MÁQUINA PARADA' },
-    Ocioso: { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-500', icon: <ClockIcon className="h-12 w-12 text-yellow-500" />, title: 'OCIOSA' },
-    Desligada: { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-500', icon: <StopIcon className="h-12 w-12 text-yellow-500" />, title: 'MÁQUINA DESLIGADA' },
+    Produzindo: { bg: 'bg-gradient-to-r from-emerald-500 to-teal-600', text: 'text-white', border: 'border-transparent', icon: <CogIcon className="h-8 w-8 text-white animate-spin drop-shadow-md" />, title: 'EM PRODUÇÃO' },
+    Preparacao: { bg: 'bg-gradient-to-r from-blue-500 to-indigo-600', text: 'text-white', border: 'border-transparent', icon: <WrenchScrewdriverIcon className="h-8 w-8 text-white animate-pulse drop-shadow-md" />, title: 'PREPARAÇÃO' },
+    Parada: { bg: 'bg-gradient-to-r from-rose-500 to-red-600', text: 'text-white', border: 'border-transparent', icon: <PauseIcon className="h-8 w-8 text-white drop-shadow-md" />, title: 'MÁQUINA PARADA' },
+    Ocioso: { bg: 'bg-gradient-to-r from-amber-400 to-orange-500', text: 'text-white', border: 'border-transparent', icon: <ClockIcon className="h-8 w-8 text-white drop-shadow-md" />, title: 'OCIOSA' },
+    Desligada: { bg: 'bg-gradient-to-r from-slate-600 to-slate-800', text: 'text-white', border: 'border-transparent', icon: <StopIcon className="h-8 w-8 text-white drop-shadow-md" />, title: 'DESLIGADA' },
 };
 
 interface MachineStatusViewProps {
@@ -175,346 +174,310 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
 
     if (!activeOrder) {
         return (
-            <div className="bg-white p-6 rounded-xl shadow-lg h-full flex flex-col">
-                <h2 className="text-2xl font-bold text-slate-800 mb-4">{machineType}</h2>
-                <div className="flex-grow flex flex-col items-center justify-center text-center text-slate-500">
-                    <ClockIcon className="h-16 w-16 text-slate-400 mb-4" />
-                    <p className="font-semibold">Máquina Ociosa</p>
-                    <p className="text-sm">Nenhuma ordem de produção em andamento.</p>
+            <div className="bg-white rounded-3xl shadow-xl border border-slate-100 h-[calc(100vh-10rem)] flex flex-col overflow-hidden">
+                <div className="bg-slate-800 p-4">
+                    <h2 className="text-2xl font-black text-white uppercase tracking-wider">{machineType}</h2>
+                </div>
+                <div className="flex-grow flex flex-col items-center justify-center text-center text-slate-500 bg-slate-50">
+                    <ClockIcon className="h-20 w-20 text-slate-300 mb-4" />
+                    <p className="font-bold tracking-widest uppercase text-slate-400">Máquina Ociosa</p>
+                    <p className="text-sm mt-2 text-slate-400">Nenhuma ordem em andamento.</p>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="bg-white p-4 md:p-6 rounded-xl shadow-lg flex flex-col space-y-4">
-            <h2 className="text-xl md:text-2xl font-bold text-slate-800">{machineType}</h2>
-            {isAlertActive && (
-                <div className="bg-red-500 text-white p-2 rounded-md text-center animate-pulse text-xs md:text-sm font-semibold">
-                    ALERTA: MÁQUINA PARADA HÁ {formatDuration(machineStatus.durationMs)}
-                </div>
-            )}
-            <div className={`p-3 md:p-4 rounded-md border-t-4 ${currentStyle.border} ${currentStyle.bg}`}>
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex items-center gap-3 md:gap-4">
-                        <div className="shrink-0">
-                            {currentStyle.icon}
-                        </div>
-                        <div>
-                            <p className={`text-xl md:text-2xl font-bold ${currentStyle.text}`}>{currentStyle.title}</p>
-                            <p className={`text-sm md:text-md font-semibold ${currentStyle.text} break-words`}>{machineStatus.reason}</p>
-                        </div>
+        <div className="flex flex-col h-[calc(100vh-8rem)] bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-200/60 ring-1 ring-black/5">
+            {/* PREMIUM HEADER */}
+            <div className={`px-5 py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-2 shadow-lg z-10 ${currentStyle.bg}`}>
+                <div className="flex items-center gap-4">
+                    <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-md shadow-inner border border-white/30 hidden sm:block">
+                        {currentStyle.icon}
                     </div>
-                    <div className="text-left md:text-right border-t md:border-t-0 pt-2 md:pt-0 border-current/20">
-                        <p className={`text-2xl md:text-3xl font-mono font-bold ${currentStyle.text}`}>{formatDuration(machineStatus.durationMs)}</p>
+                    <div>
+                        <div className="flex items-center gap-3">
+                            <h2 className="text-2xl md:text-3xl font-black text-white uppercase tracking-wider drop-shadow-sm">{machineType}</h2>
+                            {isAlertActive && <WarningIcon className="h-6 w-6 text-yellow-300 animate-ping" />}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5 opacity-90">
+                            <span className="text-xs md:text-sm font-black uppercase tracking-widest text-white">{currentStyle.title}</span>
+                            {machineStatus.reason && <span className="text-xs md:text-sm font-bold text-white/90">&bull; {machineStatus.reason}</span>}
+                        </div>
                     </div>
                 </div>
-
-                {activeLotProcessingData && (
-                    <div className="mt-4 pt-4 border-t border-current/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
-                        <div className="flex items-center gap-2">
-                            <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded ${machineStatus.status === 'Produzindo' ? 'bg-green-200 text-green-900' : 'bg-slate-200 text-slate-700'}`}>
-                                Lote em Processo
-                            </span>
-                            <span className="text-sm font-bold text-slate-700">
-                                {activeLotProcessingData.lotInfo.internalLot}
-                            </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-slate-500">Peso Inicial:</span>
-                            <span className="text-sm font-black text-slate-800">{activeLotProcessingData.lotInfo.labelWeight.toFixed(0)} kg</span>
-                        </div>
-                    </div>
-                )}
+                <div className="text-left lg:text-right mt-2 lg:mt-0">
+                    <p className="text-5xl md:text-5xl font-mono font-black tracking-tighter drop-shadow-md text-white">{formatDuration(machineStatus.durationMs)}</p>
+                </div>
             </div>
 
-            <div className="border p-3 md:p-4 rounded-md">
-                <div className="flex flex-col md:flex-row justify-between items-start mb-2 gap-2">
-                    <div className="w-full">
-                        <div className="flex justify-between items-center mb-1">
-                            <h3 className="font-bold text-slate-700 flex items-center gap-2">
+            {/* LOT IN PROGRESS SUB-HEADER (TREFILA) */}
+            {activeLotProcessingData && (
+                <div className="bg-slate-800 text-white px-5 py-2 flex flex-row justify-between items-center text-xs shadow-md z-0 shrink-0">
+                    <div className="flex items-center gap-3">
+                        <span className="font-black uppercase tracking-widest text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded border border-emerald-400/20">Lote em Processo</span>
+                        <span className="font-bold text-sm">{activeLotProcessingData.lotInfo.internalLot}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-400">Peso Inicial:</span>
+                        <span className="font-black text-emerald-300">{activeLotProcessingData.lotInfo.labelWeight.toFixed(0)} kg</span>
+                    </div>
+                </div>
+            )}
+
+            {/* DENSE CONTENT GRID - ZERO GLOBAL SCROLL */}
+            <div className="flex-1 p-3 lg:p-4 grid grid-cols-1 lg:grid-cols-2 gap-3 lg:gap-4 overflow-y-auto lg:overflow-hidden bg-slate-50">
+                
+                {/* LEFT COLUMN: CRITICAL METRICS */}
+                <div className="flex flex-col gap-3 lg:gap-4 overflow-y-auto custom-scrollbar pr-1 min-h-0">
+                    
+                    {/* CARD 1: META DIÁRIA */}
+                    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
+                        <div className="flex justify-between items-center mb-2">
+                            <h3 className="font-black text-slate-700 uppercase tracking-widest text-[10px] md:text-xs title-font flex items-center gap-1.5">
                                 <ScaleIcon className="h-4 w-4 text-indigo-500" /> Meta Diária da Fábrica
                             </h3>
-                            <span className="text-[10px] font-black bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full uppercase tracking-widest">
+                            <span className="text-[10px] font-black bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded uppercase tracking-widest ring-1 ring-indigo-500/20">
                                 {((dailyProducedValue / dailyGoal) * 100).toFixed(0)}%
                             </span>
                         </div>
-                        <div className="flex items-center gap-3">
-                            <div className="flex-1 h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-50 relative shadow-inner">
+                        <div className="flex items-center gap-3 mt-1">
+                            <div className="flex-1 h-3.5 bg-slate-100 rounded-full overflow-hidden shadow-inner shrink-0 ring-1 ring-black/5">
                                 <div
-                                    className={`h-full transition-all duration-1000 ease-out flex items-center justify-end pr-2 ${dailyProducedValue >= dailyGoal ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]' : 'bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.3)]'}`}
+                                    className={`h-full transition-all duration-1000 flex items-center justify-end pr-2 ${dailyProducedValue >= dailyGoal ? 'bg-gradient-to-r from-emerald-400 to-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]' : 'bg-gradient-to-r from-indigo-500 to-blue-500'}`}
                                     style={{ width: `${Math.min(100, (dailyProducedValue / dailyGoal) * 100)}%` }}
                                 >
                                     {dailyProducedValue >= dailyGoal && <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>}
                                 </div>
                             </div>
-                            <span className="text-sm font-black text-slate-800 tracking-tighter whitespace-nowrap">
-                                {dailyProducedValue.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} <span className="text-[10px] text-slate-400 font-bold uppercase">{goalUnit}</span>
+                            <span className="text-base font-black text-slate-800 tracking-tighter whitespace-nowrap">
+                                {dailyProducedValue.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} <span className="text-[10px] text-slate-400 uppercase font-bold">{goalUnit}</span>
                                 <span className="text-slate-300 mx-1">/</span>
                                 {dailyGoal.toLocaleString('pt-BR')}
                             </span>
                         </div>
                         {dailyProducedValue >= dailyGoal && (
-                            <div className="mt-2 flex items-center gap-2 text-emerald-600 animate-bounce">
-                                <CheckCircleIcon className="h-4 w-4" />
-                                <span className="text-[10px] font-black uppercase tracking-wider">Meta Batida! Parabéns à equipe! 👏</span>
+                            <div className="mt-2 flex items-center gap-1.5 text-emerald-600 font-bold text-[10px] animate-pulse">
+                                <CheckCircleIcon className="h-3 w-3" /> META BATIDA!
                             </div>
                         )}
                     </div>
-                </div>
-            </div>
 
-            <div className="border p-3 md:p-4 rounded-md">
-                <div className="flex flex-col md:flex-row justify-between items-start mb-2 gap-2">
-                    <div>
-                        <h3 className="font-semibold text-slate-700">Detalhes da Ordem</h3>
-                        {currentOperatorLog && (
-                            <p className="text-xs text-slate-500 mt-1">
-                                Início Turno: <span className="font-mono font-bold text-slate-700">{new Date(currentOperatorLog.startTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
-                            </p>
-                        )}
-                    </div>
-                    <div className="w-full md:w-auto mt-2 md:mt-0 text-left md:text-right text-xs">
-                        {(() => {
-                            const totalTime = shiftDowntime + shiftUptime;
-                            const downtimePct = totalTime > 0 ? (shiftDowntime / totalTime) * 100 : 0;
-                            const uptimePct = totalTime > 0 ? (shiftUptime / totalTime) * 100 : 0;
-
-                            return (
-                                <>
-                                    <div className="flex gap-2 justify-between md:justify-end mb-1 items-center border-b md:border-b-0 pb-1 md:pb-0 border-slate-100">
-                                        <span className="text-slate-500 font-medium">Parado:</span>
-                                        <div className="flex gap-2 items-center">
-                                            <span className="font-bold text-amber-600 font-mono">{formatDuration(shiftDowntime)}</span>
-                                            <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-[10px] font-bold min-w-[3rem] text-center">{downtimePct.toFixed(1)}%</span>
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-2 justify-between md:justify-end items-center">
-                                        <span className="text-slate-500 font-medium">Produtivo:</span>
-                                        <div className="flex gap-2 items-center">
-                                            <span className="font-bold text-emerald-600 font-mono">{formatDuration(shiftUptime)}</span>
-                                            <span className="bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded text-[10px] font-bold min-w-[3rem] text-center">{uptimePct.toFixed(1)}%</span>
-                                        </div>
-                                    </div>
-                                </>
-                            );
-                        })()}
-                    </div>
-                </div>
-                <div className="text-sm space-y-1 mt-3 pt-3 border-t border-slate-100">
-                    <p><strong>Nº Ordem:</strong> {activeOrder.orderNumber}</p>
-                    <p><strong>Operador:</strong> {currentOperator}</p>
-                    {machineType === 'Trefila' ? (
-                        <div className="grid grid-cols-2 gap-2 mt-2">
-                            <p><strong>Produto:</strong> CA-60 {activeOrder.targetBitola}mm</p>
-                            <p className="text-right"><strong>Meta:</strong> {activeOrder.totalWeight.toFixed(0)} kg</p>
+                    {/* CARD 2: PROGRESSO DA PRODUÇÃO */}
+                    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col justify-center">
+                        <div className="flex justify-between items-center mb-3">
+                            <h3 className="font-black text-slate-700 uppercase tracking-widest text-[10px] md:text-xs">Progresso do Turno</h3>
                         </div>
-                    ) : (
-                        <p><strong>Produto:</strong> {activeOrder.trelicaModel} ({activeOrder.tamanho} mts)</p>
-                    )}
-                </div>
-            </div>
+                        
+                        {machineType === 'Treliça' && (
+                            <div className="mb-4 bg-slate-50/80 p-3 flex justify-between items-center rounded-xl border border-slate-100">
+                                <div>
+                                    <span className="block text-[10px] uppercase font-bold text-slate-500 tracking-wider">Último Reporte</span>
+                                    <span className="text-[9px] text-slate-400 font-semibold">{machineStatus.status === 'Desligada' ? 'Finalizado' : 'A cada 10m'}</span>
+                                </div>
+                                {(() => {
+                                    if (machineStatus.status === 'Desligada') return <span className="text-slate-400 font-mono font-bold text-lg">--:--:--</span>;
+                                    const lastUpdate = activeOrder.lastQuantityUpdate || activeOrder.startTime;
+                                    if (!lastUpdate) return <span className="text-slate-400">-</span>;
+                                    let baseTime = new Date(lastUpdate).getTime();
+                                    if (currentOperatorLog && currentOperatorLog.startTime) {
+                                        const shiftStartMs = new Date(currentOperatorLog.startTime).getTime();
+                                        if (shiftStartMs > baseTime) baseTime = shiftStartMs;
+                                    }
+                                    const diff = now.getTime() - baseTime;
+                                    const isOverdue = diff > 10 * 60 * 1000;
+                                    return <span className={`font-mono font-bold text-lg ${isOverdue ? 'text-rose-500 animate-pulse bg-rose-50 px-2 py-0.5 rounded ring-1 ring-rose-500/20' : 'text-slate-700'}`}>{formatDuration(diff)}</span>;
+                                })()}
+                            </div>
+                        )}
 
-            <div className="border p-3 md:p-4 rounded-md">
-                <h3 className="font-semibold text-slate-700 mb-2">Progresso da Produção</h3>
-                {machineType === 'Trefila' ? (
-                    <div>
                         <div className="flex justify-between items-baseline mb-1">
                             <div className="flex flex-col">
-                                <span className="text-sm md:text-base text-slate-600">Lotes Processados</span>
+                                <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">{machineType === 'Trefila' ? 'Lotes Processados' : 'Peças Produzidas'}</span>
                                 {currentOperatorLog && (
-                                    <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">
-                                        No Turno: {(activeOrder.processedLots || []).filter(l => new Date(l.endTime).getTime() >= new Date(currentOperatorLog.startTime).getTime()).length}
+                                    <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mt-0.5">
+                                        Turno: {machineType === 'Trefila' 
+                                            ? (activeOrder.processedLots || []).filter(l => new Date(l.endTime).getTime() >= new Date(currentOperatorLog.startTime).getTime()).length 
+                                            : ((activeOrder.actualProducedQuantity || 0) - (currentOperatorLog.startQuantity || 0))}
                                     </span>
                                 )}
                             </div>
-                            <span className="text-lg md:text-xl font-bold text-slate-800">{processedLotsCount} / {totalLotsCount}</span>
+                            <span className="text-xl md:text-2xl font-black text-slate-800 tracking-tighter">{machineType === 'Trefila' ? processedLotsCount : producedQuantity} <span className="text-sm font-bold text-slate-400">/ {machineType === 'Trefila' ? totalLotsCount : plannedQuantity}</span></span>
                         </div>
-                        <div className="w-full bg-slate-200 rounded-full h-4 overflow-hidden shadow-inner relative">
-                            <div className="bg-gradient-to-r from-indigo-500 to-blue-600 h-full rounded-full text-white text-[10px] md:text-xs flex items-center justify-center font-bold transition-all duration-1000 ease-in-out" style={{ width: `${progress}%` }}>
+                        <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden shadow-inner ring-1 ring-black/5">
+                            <div className="bg-gradient-to-r from-emerald-500 to-teal-500 h-full rounded-full text-white text-[9px] flex items-center justify-center font-bold tracking-widest" style={{ width: `${progress}%` }}>
                                 {progress > 10 && `${progress.toFixed(0)}%`}
                             </div>
                         </div>
                     </div>
-                ) : (
-                    <div>
-                        {machineType === 'Treliça' && (
-                            <div className="mb-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
-                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-1 gap-1">
-                                    <span className="text-[10px] md:text-xs font-bold uppercase text-slate-500 tracking-wider">Tempo desde último reporte</span>
-                                    {(() => {
-                                        if (machineStatus.status === 'Desligada') {
-                                            return <span className="text-slate-400 font-mono font-bold text-lg md:text-base">--:--:--</span>;
-                                        }
 
-                                        const lastUpdate = activeOrder.lastQuantityUpdate || activeOrder.startTime;
-                                        if (!lastUpdate) return <span className="text-slate-400">-</span>;
-
-                                        let baseTime = new Date(lastUpdate).getTime();
-                                        if (currentOperatorLog && currentOperatorLog.startTime) {
-                                            const shiftStartMs = new Date(currentOperatorLog.startTime).getTime();
-                                            if (shiftStartMs > baseTime) {
-                                                baseTime = shiftStartMs;
-                                            }
-                                        }
-
-                                        const diff = now.getTime() - baseTime;
-                                        const isOverdue = diff > 10 * 60 * 1000; // 10 minutes
-                                        return (
-                                            <span className={`font-mono font-bold text-lg md:text-base ${isOverdue ? 'text-red-500 animate-pulse' : 'text-slate-700'}`}>
-                                                {formatDuration(diff)}
-                                            </span>
-                                        );
-                                    })()}
+                    {/* CARD 3: DETALHES & EFICIÊNCIA */}
+                    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
+                        <h3 className="font-black text-slate-700 uppercase tracking-widest text-[10px] md:text-xs mb-3">Informações</h3>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <div>
+                                    <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Ordem</p>
+                                    <p className="text-sm font-bold text-slate-700">#{activeOrder.orderNumber}</p>
                                 </div>
-                                <div className="text-[10px] md:text-xs text-slate-400 text-left md:text-right mt-1 md:mt-0">
-                                    {machineStatus.status === 'Desligada' ? 'Turno Finalizado' : 'Meta: Reportar a cada 10 min'}
+                                <div>
+                                    <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Operador(a)</p>
+                                    <p className="text-sm font-bold text-slate-700 uppercase">{currentOperator}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Produto</p>
+                                    <p className="text-xs font-bold text-slate-700 leading-tight">
+                                        {machineType === 'Trefila' ? `CA-60 ${activeOrder.targetBitola}mm` : `${activeOrder.trelicaModel} (${activeOrder.tamanho} mts)`}
+                                    </p>
                                 </div>
                             </div>
-                        )}
-                        <div className="flex justify-between items-baseline mb-1">
-                            <div className="flex flex-col">
-                                <span className="text-sm md:text-base text-slate-600">Peças Produzidas</span>
-                                {machineType === 'Treliça' && currentOperatorLog && (
-                                    <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">No Turno: {(activeOrder.actualProducedQuantity || 0) - (currentOperatorLog.startQuantity || 0)}</span>
+                            
+                            <div className="space-y-2 flex flex-col justify-end">
+                                {currentOperatorLog && (
+                                    <div className="text-right">
+                                        <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Início Turno</p>
+                                        <p className="text-xs font-mono font-bold text-slate-700 bg-slate-100 inline-block px-1.5 py-0.5 rounded">{new Date(currentOperatorLog.startTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+                                    </div>
                                 )}
+                                {(() => {
+                                    const totalTime = shiftDowntime + shiftUptime;
+                                    const downtimePct = totalTime > 0 ? (shiftDowntime / totalTime) * 100 : 0;
+                                    const uptimePct = totalTime > 0 ? (shiftUptime / totalTime) * 100 : 0;
+                                    return (
+                                        <div className="space-y-1 mt-2 p-2 bg-slate-50 rounded-xl border border-slate-100">
+                                            <div className="flex justify-between items-center bg-emerald-50/50 px-2 py-1 rounded">
+                                                <span className="text-[9px] uppercase font-black text-emerald-600/70">PRODUTIVO</span>
+                                                <div className="flex items-center gap-1.5 cursor-help" title={formatDuration(shiftUptime)}>
+                                                    <span className="font-bold text-emerald-600 text-xs">{uptimePct.toFixed(1)}%</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex justify-between items-center bg-rose-50/50 px-2 py-1 rounded">
+                                                <span className="text-[9px] uppercase font-black text-rose-600/70">PARADO</span>
+                                                <div className="flex items-center gap-1.5 cursor-help" title={formatDuration(shiftDowntime)}>
+                                                    <span className="font-bold text-rose-500 text-xs">{downtimePct.toFixed(1)}%</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
                             </div>
-                            <span className="text-lg md:text-xl font-bold text-slate-800">{producedQuantity} / {plannedQuantity}</span>
                         </div>
-                        <div className="w-full bg-slate-200 rounded-full h-4 overflow-hidden shadow-inner relative">
-                            <div className="bg-gradient-to-r from-emerald-500 to-teal-600 h-full rounded-full text-white text-[10px] md:text-xs flex items-center justify-center font-bold transition-all duration-1000 ease-in-out" style={{ width: `${progress}%` }}>
-                                {progress > 10 && `${progress.toFixed(0)}%`}
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            {machineType === 'Trefila' && (
-                <div className="border p-3 md:p-4 rounded-md">
-                    <h3 className="font-semibold text-slate-700 mb-2 underline decoration-slate-300 decoration-2 underline-offset-4 text-sm md:text-base uppercase tracking-tighter">LOTES PROCESSADOS:</h3>
-                    <div className="overflow-x-auto max-h-64 overflow-y-auto custom-scrollbar">
-                        <table className="w-full border-collapse min-w-[500px]">
-                            <thead>
-                                <tr className="bg-slate-100 text-slate-600 text-[10px] md:text-xs uppercase font-bold text-left sticky top-0 z-10 shadow-sm leading-none">
-                                    <th className="p-2 border border-slate-300 bg-slate-100 text-center">Lote</th>
-                                    <th className="p-2 border border-slate-300 bg-slate-100 text-right">KG (Entrada)</th>
-                                    <th className="p-2 border border-slate-300 bg-slate-100 text-right">KG (Saída)</th>
-                                    <th className="p-2 border border-slate-300 bg-slate-100 text-center">Bitola</th>
-                                    <th className="p-2 border border-slate-300 bg-slate-100 text-center">Finalizado</th>
-                                    <th className="p-2 border border-slate-300 bg-slate-100 text-center">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody className="text-xs md:text-sm">
-                                {(activeOrder.processedLots || [])
-                                    .slice()
-                                    .sort((a, b) => new Date(b.endTime).getTime() - new Date(a.endTime).getTime())
-                                    .map((lot, idx) => {
-                                        const lotInfo = stock.find(s => s.id === lot.lotId);
-                                        const isWaiting = lot.finalWeight === null || lot.measuredGauge === null || lot.measuredGauge === undefined;
-                                        const waitingMs = isWaiting ? now.getTime() - new Date(lot.endTime).getTime() : 0;
-
-                                        return (
-                                            <tr key={idx} className="border-b border-slate-200 hover:bg-slate-50 transition-colors">
-                                                <td className="p-2 border border-slate-300 font-bold text-slate-700 text-center bg-slate-50/50">
-                                                    {lotInfo?.internalLot || 'N/A'}
-                                                </td>
-                                                <td className="p-2 border border-slate-300 text-right font-medium text-slate-600 tabular-nums">
-                                                    {lotInfo?.labelWeight.toFixed(0) || '0'} kg
-                                                </td>
-                                                <td className="p-2 border border-slate-300 text-right font-black text-slate-900 tabular-nums bg-slate-50/50">
-                                                    {lot.finalWeight !== null ? `${lot.finalWeight.toFixed(1)} kg` : '-'}
-                                                </td>
-                                                <td className="p-2 border border-slate-300 text-center font-bold text-slate-700">
-                                                    {lot.measuredGauge ? `${lot.measuredGauge.toFixed(2)}mm` : '-'}
-                                                </td>
-                                                <td className="p-2 border border-slate-300 text-center font-mono text-slate-500 font-bold text-[10px] md:text-xs">
-                                                    {lot.endTime ? new Date(lot.endTime).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}
-                                                </td>
-                                                <td className="p-2 border border-slate-300 text-center">
-                                                    {isWaiting ? (
-                                                        <div className="flex flex-col items-center">
-                                                            <span className="text-[9px] font-black text-amber-600 animate-pulse uppercase leading-none">Ag. Pesagem</span>
-                                                            <span className="text-[10px] font-mono font-bold text-slate-400">{formatDuration(waitingMs)}</span>
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full uppercase">OK</span>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                {(activeOrder.processedLots || []).length === 0 && (
-                                    <tr>
-                                        <td colSpan={5} className="p-4 text-center text-slate-400 text-xs md:text-sm italic">
-                                            Nenhum lote processado.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
                     </div>
                 </div>
-            )}
 
-            <div className="border p-3 md:p-4 rounded-md">
-                <h3 className="font-semibold text-slate-700 mb-2 underline decoration-slate-300 decoration-2 underline-offset-4 text-sm md:text-base uppercase tracking-tighter">PARADAS E SEUS MOTIVOS:</h3>
-                <div className="overflow-x-auto max-h-64 overflow-y-auto custom-scrollbar">
-                    <table className="w-full border-collapse min-w-[300px]">
-                        <thead>
-                            <tr className="bg-slate-100 text-slate-600 text-[10px] md:text-xs uppercase font-bold text-left sticky top-0 z-10 shadow-sm leading-none">
-                                <th className="p-2 border border-slate-300 bg-slate-100 text-center">Início</th>
-                                <th className="p-2 border border-slate-300 bg-slate-100 text-center">Fim</th>
-                                <th className="p-2 border border-slate-300 bg-slate-100 text-left">Motivo</th>
-                                <th className="p-2 border border-slate-300 text-right bg-slate-100">Duração</th>
-                            </tr>
-                        </thead>
-                        <tbody className="text-xs md:text-sm">
-                            {(activeOrder.downtimeEvents || [])
-                                .slice()
-                                .sort((a, b) => new Date(a.stopTime).getTime() - new Date(b.stopTime).getTime())
-                                .filter(event => {
-                                    if (event.reason === 'Final de Turno') return false;
-                                    if (currentOperatorLog) {
-                                        return new Date(event.stopTime).getTime() >= new Date(currentOperatorLog.startTime).getTime();
-                                    }
-                                    return false;
-                                })
-                                .map((event, idx) => {
-                                    const eventEnd = event.resumeTime || (activeOrder.status === 'completed' ? activeOrder.endTime : null);
-                                    const duration = eventEnd
-                                        ? new Date(eventEnd).getTime() - new Date(event.stopTime).getTime()
-                                        : now.getTime() - new Date(event.stopTime).getTime();
+                {/* RIGHT COLUMN: LISTS & TABLES (Flex column to share remaining vertical space) */}
+                <div className="flex flex-col gap-3 lg:gap-4 md:row-span-1 min-h-[300px]">
+                    
+                    {/* PARADAS TABLE (Flex-1 so it scrolls within its box) */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col flex-1 overflow-hidden min-h-0">
+                        <div className="bg-slate-50 border-b border-slate-100 p-2.5 px-4 shrink-0 shadow-sm z-10 flex justify-between items-center">
+                            <h3 className="font-black text-slate-600 uppercase tracking-widest text-[10px] flex justify-center items-center gap-1.5">
+                                <WarningIcon className="h-3 w-3 text-rose-500" /> PARADAS DO TURNO
+                            </h3>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                                {((activeOrder.downtimeEvents || []).filter(e => e.reason !== 'Final de Turno' && currentOperatorLog && new Date(e.stopTime).getTime() >= new Date(currentOperatorLog.startTime).getTime()).length)} Registros
+                            </span>
+                        </div>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar bg-white">
+                            <table className="w-full text-left border-collapse">
+                                <thead className="sticky top-0 bg-white/95 backdrop-blur-sm z-10 shadow-sm">
+                                    <tr className="text-[9px] uppercase font-black text-slate-400 border-b border-slate-100">
+                                        <th className="p-2 px-3">Duração</th>
+                                        <th className="p-2">Início</th>
+                                        <th className="p-2 w-full">Motivo</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {(activeOrder.downtimeEvents || [])
+                                        .slice()
+                                        .filter(e => e.reason !== 'Final de Turno' && currentOperatorLog && new Date(e.stopTime).getTime() >= new Date(currentOperatorLog.startTime).getTime())
+                                        .sort((a, b) => new Date(b.stopTime).getTime() - new Date(a.stopTime).getTime())
+                                        .map((event, idx) => {
+                                            const eventEnd = event.resumeTime || (activeOrder.status === 'completed' ? activeOrder.endTime : null);
+                                            const duration = eventEnd ? new Date(eventEnd).getTime() - new Date(event.stopTime).getTime() : now.getTime() - new Date(event.stopTime).getTime();
+                                            return (
+                                                <tr key={idx} className="border-b border-slate-50 hover:bg-slate-50/50 group">
+                                                    <td className="p-2 px-3">
+                                                        <span className="bg-rose-50 text-rose-600 font-mono font-bold text-[10px] px-1.5 py-0.5 rounded inline-block group-hover:bg-rose-100 transition-colors">
+                                                            {formatDuration(duration)}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-2 font-mono font-medium text-[10px] text-slate-500">
+                                                        {new Date(event.stopTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                                    </td>
+                                                    <td className="p-2 text-[10px] md:text-xs font-bold text-slate-700 uppercase leading-none pr-3">
+                                                        {event.reason}
+                                                        {!event.resumeTime && <span className="ml-2 text-[8px] uppercase font-black bg-rose-500 text-white px-1 py-0.5 rounded animate-pulse">Atual</span>}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    {(activeOrder.downtimeEvents || []).filter(e => e.reason !== 'Final de Turno' && currentOperatorLog && new Date(e.stopTime).getTime() >= new Date(currentOperatorLog.startTime).getTime()).length === 0 && (
+                                        <tr><td colSpan={3} className="p-4 text-center text-[10px] font-bold uppercase text-slate-300">Nenhuma parada no turno</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
 
-                                    return (
-                                        <tr key={idx} className="border-b border-slate-200 hover:bg-slate-50 transition-colors">
-                                            <td className="p-2 border border-slate-300 font-bold text-rose-600 font-mono text-center tabular-nums bg-rose-50/20">
-                                                {new Date(event.stopTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                                            </td>
-                                            <td className="p-2 border border-slate-300 font-bold text-emerald-600 font-mono text-center tabular-nums bg-emerald-50/20">
-                                                {event.resumeTime
-                                                    ? new Date(event.resumeTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-                                                    : <span className="text-amber-500 text-[10px] animate-pulse uppercase font-black">Em Andamento</span>
-                                                }
-                                            </td>
-                                            <td className="p-2 border border-slate-300 italic text-slate-700 uppercase font-bold text-[10px] md:text-xs leading-tight">
-                                                {event.reason}
-                                            </td>
-                                            <td className="p-2 border border-slate-300 font-black text-rose-600 font-mono text-right tabular-nums bg-rose-50/20">
-                                                {formatDuration(duration)}
-                                            </td>
+                    {/* LOTES TABLE (TREFILA ONLY, flex-1) */}
+                    {machineType === 'Trefila' && (
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col flex-1 overflow-hidden min-h-0">
+                            <div className="bg-slate-50 border-b border-slate-100 p-2.5 px-4 shrink-0 shadow-sm z-10 flex justify-between items-center">
+                                <h3 className="font-black text-slate-600 uppercase tracking-widest text-[10px] flex justify-center items-center gap-1.5">
+                                    <BookOpenIcon className="h-3 w-3 text-indigo-500" /> HISTÓRICO DE LOTES
+                                </h3>
+                                <span className="text-[9px] font-bold text-slate-400 uppercase bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                                    {(activeOrder.processedLots || []).length} Finalizados
+                                </span>
+                            </div>
+                            <div className="flex-1 overflow-y-auto custom-scrollbar bg-white">
+                                <table className="w-full text-left border-collapse">
+                                    <thead className="sticky top-0 bg-white/95 backdrop-blur-sm z-10 shadow-sm">
+                                        <tr className="text-[9px] uppercase font-black text-slate-400 border-b border-slate-100">
+                                            <th className="p-2 px-3">Lote</th>
+                                            <th className="p-2 font-mono">SAÍDA</th>
+                                            <th className="p-2 text-center w-full">Medida / Status</th>
                                         </tr>
-                                    );
-                                })}
-                            {(activeOrder.downtimeEvents || []).filter(e => e.reason !== 'Final de Turno').length === 0 && (
-                                <tr>
-                                    <td colSpan={4} className="p-4 text-center text-slate-400 text-xs md:text-sm italic">
-                                        Nenhuma parada registrada.
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
+                                    </thead>
+                                    <tbody>
+                                        {(activeOrder.processedLots || [])
+                                            .slice()
+                                            .sort((a, b) => new Date(b.endTime).getTime() - new Date(a.endTime).getTime())
+                                            .map((lot, idx) => {
+                                                const lotInfo = stock.find(s => s.id === lot.lotId);
+                                                const isWaiting = lot.finalWeight === null || lot.measuredGauge === null || lot.measuredGauge === undefined;
+                                                return (
+                                                    <tr key={idx} className="border-b border-slate-50 hover:bg-slate-50/50">
+                                                        <td className="p-2 px-3 font-bold text-[10px] text-slate-700 overflow-hidden text-ellipsis whitespace-nowrap max-w-[80px]" title={lotInfo?.internalLot || 'N/A'}>
+                                                            {lotInfo?.internalLot || 'N/A'}
+                                                        </td>
+                                                        <td className="p-2">
+                                                            <span className="bg-slate-100/80 text-slate-700 font-mono font-bold text-[10px] px-1.5 py-0.5 rounded border border-slate-200 inline-block text-right min-w-[3rem]">
+                                                                {lot.finalWeight !== null ? lot.finalWeight.toFixed(0) : '-'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-2 text-[10px] font-bold text-slate-600 text-center">
+                                                            {isWaiting ? (
+                                                                <span className="text-[9px] uppercase font-black text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/50 animate-pulse inline-block">Ag. Pesagem</span>
+                                                            ) : (
+                                                                <div className="flex items-center justify-center gap-2">
+                                                                    <span className="bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded border border-emerald-200/50 text-[10px] font-bold uppercase">{lot.measuredGauge?.toFixed(2)}mm</span>
+                                                                    <CheckCircleIcon className="h-3 w-3 text-emerald-500" />
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        {(activeOrder.processedLots || []).length === 0 && (
+                                            <tr><td colSpan={3} className="p-4 text-center text-[10px] font-bold uppercase text-slate-300">Nenhum lote finalizado</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
