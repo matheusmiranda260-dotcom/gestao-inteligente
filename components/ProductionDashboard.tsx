@@ -520,9 +520,11 @@ interface MachineAnalyticsProps {
     unit: string;
     productionOrders: ProductionOrderData[];
     activeOrder: ProductionOrderData | undefined;
+    shiftGoal: number;
+    sizeValue?: number;
 }
 
-const MachineAnalyticsView: React.FC<MachineAnalyticsProps> = ({ machineType, dailyValue, unit, productionOrders, activeOrder }) => {
+const MachineAnalyticsView: React.FC<MachineAnalyticsProps> = ({ machineType, dailyValue, unit, productionOrders, activeOrder, shiftGoal, sizeValue = 6 }) => {
     const todayStr = getFactoryDateString(new Date());
     const nowMs = new Date().getTime();
 
@@ -600,6 +602,44 @@ const MachineAnalyticsView: React.FC<MachineAnalyticsProps> = ({ machineType, da
     const shiftUptimePct = totalShiftTime > 0 ? (shiftUptime / totalShiftTime) * 100 : 0;
     const shiftDowntimePct = totalShiftTime > 0 ? (shiftDowntime / totalShiftTime) * 100 : 0;
     const piecesPerHourShift = (totalShiftTime / 3600000) > 0 ? Math.round(shiftProduced / (totalShiftTime / 3600000)) : 0;
+
+    // --- REMAINING SHIFT ANALYTICS ---
+    const getShiftEndMs = () => {
+        const d = new Date();
+        const hour = d.getHours();
+        const min = d.getMinutes();
+        const nowTotalMin = hour * 60 + min;
+
+        // Shift A: 05:00 - 14:17 (Total min: 300 to 857)
+        // Shift B: 15:17 - 23:34 (Total min: 917 to 1414)
+        
+        let targetHour = 23;
+        let targetMin = 34;
+
+        if (nowTotalMin >= 300 && nowTotalMin < 857+10) { // +10 min tolerance
+            targetHour = 14;
+            targetMin = 17;
+        } else if (nowTotalMin >= 917 && nowTotalMin < 1414+10) {
+            targetHour = 23;
+            targetMin = 34;
+        }
+
+        const end = new Date();
+        end.setHours(targetHour, targetMin, 0, 0);
+        return end.getTime();
+    };
+
+    const shiftEndMs = getShiftEndMs();
+    const remainingTimeMs = Math.max(0, shiftEndMs - nowMs);
+    const remainingHours = remainingTimeMs / 3600000;
+    
+    const neededToGoal = Math.max(0, shiftGoal - shiftProduced);
+    const requiredRate = remainingHours > 0 ? Math.ceil(neededToGoal / remainingHours) : 0;
+    
+    // Treliça speed: m/min
+    const speedMMin = (machineType === 'Treliça' && shiftUptime > 0) 
+        ? ((shiftProduced * sizeValue) / (shiftUptime / 60000)) 
+        : 0;
 
     // Determine performance tier
     const isExcellent = shiftUptimePct >= 80;
@@ -681,18 +721,36 @@ const MachineAnalyticsView: React.FC<MachineAnalyticsProps> = ({ machineType, da
                                <p className="font-mono text-sm md:text-base font-black text-slate-300">{shiftProduced}</p>
                            </div>
                            <div className="bg-slate-900/50 rounded-lg p-2 flex-1 border border-slate-700/50">
-                               <p className="text-[8px] uppercase text-slate-500 font-bold tracking-wider mb-1">Status</p>
-                               <p className={`font-mono text-[9px] mt-1 uppercase font-black px-1 py-0.5 rounded ${isExcellent ? 'bg-emerald-500/20 text-emerald-400' : isWarning ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>
-                                    {isExcellent ? 'Excelente' : isWarning ? 'Atenção' : 'Crítico'}
-                               </p>
+                               <p className="text-[8px] uppercase text-slate-500 font-bold tracking-wider mb-1">Faltam</p>
+                               <p className="font-mono text-sm md:text-base font-black text-rose-400">{neededToGoal}</p>
                            </div>
                         </div>
+
+                        {machineType === 'Treliça' && (
+                            <div className="mt-4 w-full bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-3 z-10 flex justify-between items-center">
+                                <div className="text-left">
+                                    <p className="text-[7px] font-black text-indigo-400 uppercase tracking-widest">Velocidade Média</p>
+                                    <p className="text-sm font-black text-indigo-100">{speedMMin.toFixed(1)} <small className="text-[9px] opacity-70">m/min</small></p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-[7px] font-black text-indigo-400 uppercase tracking-widest">Ritmo p/ Meta</p>
+                                    <p className="text-sm font-black text-indigo-100">{requiredRate} <small className="text-[9px] opacity-70">{unit}/h</small></p>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Operational Efficiency (Uptime / Downtime sync) */}
                     <div className="bg-slate-800/60 rounded-3xl p-5 border border-slate-700/50 flex flex-col justify-center relative overflow-hidden group shadow-lg">
                         <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl opacity-50 group-hover:bg-indigo-500/20 transition-all"></div>
-                        <p className="text-slate-400 font-bold uppercase tracking-widest text-[9px] mb-6 relative z-10 text-center">Disponibilidade do Equipamento (Turno)</p>
+                        
+                        <div className="mb-6 flex justify-between items-center relative z-10 px-1">
+                            <p className="text-slate-400 font-bold uppercase tracking-widest text-[9px]">Fim do Turno</p>
+                            <div className="flex items-center gap-2">
+                                <ClockIcon className="h-3 w-3 text-amber-500" />
+                                <p className="text-xs font-black text-white font-mono">{formatDuration(remainingTimeMs)}</p>
+                            </div>
+                        </div>
                         
                         <div className="flex flex-col gap-4 relative z-10">
                             {/* Produtivo Item */}
@@ -870,8 +928,9 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                             machineType="Trefila"
                             dailyValue={dailyProduction.trefilaWeight}
                             unit="kg"
-                            productionOrders={productionOrders as ProductionOrderData[]}
+                            productionOrders={productionOrders}
                             activeOrder={activeTrefilaOrder}
+                            shiftGoal={6000}
                         />
                     </div>
                 </div>
@@ -893,9 +952,11 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                         <MachineAnalyticsView
                             machineType="Treliça"
                             dailyValue={trelicaDisplayData.value}
-                            unit={trelicaDisplayData.unit}
-                            productionOrders={productionOrders as ProductionOrderData[]}
+                            unit={trelicaDisplayData.unit.split(' ')[0]}
+                            productionOrders={productionOrders}
                             activeOrder={activeTrelicaOrder}
+                            shiftGoal={trelicaDisplayData.shiftGoal}
+                            sizeValue={parseFloat(String(activeTrelicaOrder?.tamanho || '6').replace(',', '.'))}
                         />
                     </div>
                 </div>
