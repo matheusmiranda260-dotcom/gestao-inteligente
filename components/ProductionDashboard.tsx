@@ -489,18 +489,19 @@ interface MachineAnalyticsProps {
     dailyValue: number;
     unit: string;
     productionOrders: ProductionOrderData[];
+    activeOrder: ProductionOrderData | undefined;
 }
 
-const MachineAnalyticsView: React.FC<MachineAnalyticsProps> = ({ machineType, dailyValue, unit, productionOrders }) => {
+const MachineAnalyticsView: React.FC<MachineAnalyticsProps> = ({ machineType, dailyValue, unit, productionOrders, activeOrder }) => {
     const todayStr = new Date().toLocaleDateString('sv-SE');
     const nowMs = new Date().getTime();
 
-    let uptime = 0;
-    let downtime = 0;
+    // --- ACCUMULATED DAY MATH ---
+    let totalUptime = 0;
+    let totalDowntime = 0;
     
     productionOrders.forEach(order => {
         if (order.machine !== machineType) return;
-        
         (order.operatorLogs || []).forEach(log => {
             if (!log.startTime || !log.startTime.startsWith(todayStr)) return;
             const startStr = log.startTime;
@@ -519,62 +520,168 @@ const MachineAnalyticsView: React.FC<MachineAnalyticsProps> = ({ machineType, da
                 if (interEnd > interStart) logDown += (interEnd - interStart);
             });
             
-            downtime += logDown;
-            uptime += (shiftEnd - shiftStart) - logDown;
+            totalDowntime += logDown;
+            totalUptime += (shiftEnd - shiftStart) - logDown;
         });
     });
 
-    const totalHours = (uptime + downtime) / 3600000;
-    const piecesPerHour = totalHours > 0 ? Math.round(dailyValue / totalHours) : 0;
+    const totalHours = (totalUptime + totalDowntime) / 3600000;
+    const piecesPerHourDay = totalHours > 0 ? Math.round(dailyValue / totalHours) : 0;
+    const globalUptimePct = totalHours > 0 ? (totalUptime / (totalUptime + totalDowntime)) * 100 : 0;
+    const globalDowntimePct = totalHours > 0 ? (totalDowntime / (totalUptime + totalDowntime)) * 100 : 0;
+
+    // --- CURRENT SHIFT MATH (MATCHES REALTIME) ---
+    let shiftUptime = 0;
+    let shiftDowntime = 0;
+    let shiftProduced = 0;
     
-    const uptimePct = totalHours > 0 ? (uptime / (uptime + downtime)) * 100 : 0;
-    const downtimePct = totalHours > 0 ? (downtime / (uptime + downtime)) * 100 : 0;
+    if (activeOrder) {
+        const currentOperatorLog = activeOrder.operatorLogs?.slice().reverse().find(log => !log.endTime);
+        if (currentOperatorLog) {
+            const shiftStartMs = new Date(currentOperatorLog.startTime).getTime();
+            
+            (activeOrder.downtimeEvents || []).forEach(ev => {
+                if (new Date(ev.stopTime).getTime() >= shiftStartMs) {
+                    const eEnd = ev.resumeTime ? new Date(ev.resumeTime).getTime() : nowMs;
+                    shiftDowntime += (eEnd - new Date(ev.stopTime).getTime());
+                }
+            });
+            shiftUptime = (nowMs - shiftStartMs) - shiftDowntime;
+            
+            if (machineType === 'Treliça') {
+                shiftProduced = (activeOrder.actualProducedQuantity || 0) - (currentOperatorLog.startQuantity || 0);
+            } else {
+                shiftProduced = (activeOrder.processedLots || []).filter(l => l.endTime && new Date(l.endTime).getTime() >= shiftStartMs).length;
+            }
+        }
+    }
+
+    const totalShiftTime = shiftUptime + shiftDowntime;
+    const shiftUptimePct = totalShiftTime > 0 ? (shiftUptime / totalShiftTime) * 100 : 0;
+    const shiftDowntimePct = totalShiftTime > 0 ? (shiftDowntime / totalShiftTime) * 100 : 0;
+    const piecesPerHourShift = (totalShiftTime / 3600000) > 0 ? Math.round(shiftProduced / (totalShiftTime / 3600000)) : 0;
+
+    // Determine performance tier
+    const isExcellent = shiftUptimePct >= 80;
+    const isWarning = shiftUptimePct < 80 && shiftUptimePct >= 50;
 
     return (
-        <div className="flex flex-col h-[calc(100vh-8rem)] bg-slate-900 rounded-3xl shadow-xl overflow-hidden border border-slate-700/60 ring-1 ring-black/5 text-white transition-opacity duration-700">
-            <div className="px-5 py-4 flex flex-col items-center justify-center bg-gradient-to-br from-indigo-900 via-slate-800 to-slate-900 h-1/2 border-b border-indigo-500/20 relative shadow-inner">
-                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
-                <h3 className="text-xl font-black text-indigo-400 uppercase tracking-[0.2em] opacity-90">{machineType}</h3>
-                <p className="text-white/60 font-bold uppercase tracking-widest text-[10px] mb-4">TOTAL PRODUZIDO HOJE</p>
-                
-                <div className="text-7xl md:text-8xl font-black drop-shadow-[0_5px_15px_rgba(99,102,241,0.5)] text-white font-mono tracking-tighter">
-                    {dailyValue.toLocaleString('pt-BR')}
+        <div className="flex flex-col h-[calc(100vh-8rem)] bg-slate-900 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden border border-slate-700/60 ring-1 ring-black/5 text-white transition-opacity duration-700 relative">
+            <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/40 via-transparent to-transparent pointer-events-none"></div>
+            
+            {/* FULL DAY CONSOLIDATION BANNER */}
+            <div className="px-6 py-6 border-b border-indigo-500/20 bg-slate-900/50 backdrop-blur-xl relative z-10">
+                <div className="flex justify-between items-start mb-2">
+                    <h3 className="text-xl md:text-2xl font-black text-indigo-400 uppercase tracking-[0.2em] opacity-90">{machineType}</h3>
+                    <div className="bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-full shadow-lg text-[10px] font-black uppercase tracking-widest ring-1 ring-indigo-400/40">
+                        Acumulado 24H
+                    </div>
                 </div>
                 
-                <div className="mt-4 bg-indigo-500/20 text-indigo-300 px-4 py-1.5 rounded-full shadow-lg text-[10px] md:text-xs font-black uppercase tracking-widest ring-1 ring-indigo-400/40 backdrop-blur-md">
-                    {machineType === 'Trefila' ? 'KILOGRAMAS PROCESSADOS' : 'PEÇAS FABRICADAS'}
+                <div className="flex flex-col items-center justify-center my-4">
+                    <p className="text-white/50 font-bold uppercase tracking-widest text-[10px] mb-1">Total Confirmado Hoje</p>
+                    <div className="text-6xl md:text-8xl font-black drop-shadow-[0_0_25px_rgba(99,102,241,0.2)] text-white font-mono tracking-tighter">
+                        {dailyValue.toLocaleString('pt-BR')}
+                    </div>
+                    <div className="mt-2 text-indigo-400 font-bold uppercase tracking-widest text-xs">
+                        {machineType === 'Trefila' ? 'KILOGRAMAS PROCESSADOS' : 'PEÇAS FABRICADAS'}
+                    </div>
+                </div>
+
+                {/* Global Timeline */}
+                <div className="mt-4 px-2">
+                    <div className="flex justify-between text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1.5">
+                        <span>Tempo Total Rodando: {formatDuration(totalUptime)}</span>
+                        <span>Média Diária: {piecesPerHourDay} {unit}/h</span>
+                    </div>
+                    <div className="w-full h-2 rounded-full overflow-hidden flex ring-1 ring-black/50 shadow-inner opacity-70">
+                        <div className="bg-indigo-500" style={{ width: `${globalUptimePct}%` }}></div>
+                        <div className="bg-rose-500/50" style={{ width: `${globalDowntimePct}%` }}></div>
+                    </div>
                 </div>
             </div>
 
-            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 p-4 lg:p-6 gap-4 lg:gap-6 bg-slate-950">
-                <div className="bg-slate-800/80 rounded-2xl flex flex-col justify-center items-center shadow-[inset_0_2px_10px_rgba(255,255,255,0.02)] border border-slate-700/50 p-6 relative overflow-hidden group hover:border-emerald-500/30 transition-colors">
-                    <div className="absolute -top-10 -left-10 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl opacity-50 group-hover:opacity-100 transition-opacity"></div>
-                    <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mb-2 text-center z-10">Ritmo Produtivo (Média)</p>
-                    <div className="text-5xl md:text-6xl font-black text-emerald-400 font-mono tracking-tighter drop-shadow-md z-10 mt-1">
-                        {piecesPerHour.toLocaleString('pt-BR')}
-                    </div>
-                    <p className="text-emerald-500/70 font-black text-[10px] uppercase tracking-widest mt-2 bg-emerald-500/10 px-2 py-0.5 rounded z-10">{unit} / Hora</p>
+            {/* LIVE SHIFT ANALYTICS */}
+            <div className="flex-1 p-5 lg:p-6 bg-slate-950/80 relative z-10 flex flex-col justify-between">
+                <div className="flex items-center gap-2 mb-4">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.8)]"></div>
+                    <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Análise do Turno Atual (Idêntico ao Painel de Produção)</h4>
                 </div>
-
-                <div className="bg-slate-800/80 rounded-2xl flex flex-col justify-center shadow-[inset_0_2px_10px_rgba(255,255,255,0.02)] border border-slate-700/50 p-5 md:p-6 relative overflow-hidden group hover:border-rose-500/30 transition-colors">
-                    <div className="absolute top-0 right-0 w-40 h-40 bg-rose-500/5 rounded-full blur-3xl translate-x-10 -translate-y-10 group-hover:bg-rose-500/10 transition-colors"></div>
-                    <div className="absolute bottom-0 left-0 w-40 h-40 bg-emerald-500/5 rounded-full blur-3xl -translate-x-10 translate-y-10 group-hover:bg-emerald-500/10 transition-colors"></div>
-                    
-                    <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mb-4 relative z-10 text-center">Eficiência da Máquina</p>
-                    
-                    <div className="flex w-full h-8 rounded-full overflow-hidden mb-4 ring-1 ring-black/50 shadow-inner relative z-10 mt-2">
-                        <div className="bg-gradient-to-r from-emerald-600 to-emerald-400 flex items-center justify-center text-[10px] font-black text-emerald-950 shadow-[0_0_10px_rgba(16,185,129,0.5)]" style={{ width: `${uptimePct}%` }}>{uptimePct.toFixed(0)}%</div>
-                        <div className="bg-gradient-to-r from-rose-600 to-rose-400 flex items-center justify-center text-[10px] font-black text-rose-950 shadow-[0_0_10px_rgba(244,63,94,0.5)]" style={{ width: `${downtimePct}%` }}>{downtimePct.toFixed(0)}%</div>
-                    </div>
-                    
-                    <div className="flex justify-between relative z-10 mt-1 px-2">
-                        <div className="text-center">
-                            <p className="text-[9px] uppercase font-black text-emerald-500/80 tracking-widest mb-0.5">Operando</p>
-                            <p className="text-emerald-400/90 font-mono text-sm font-black">{formatDuration(uptime)}</p>
+                
+                <div className="grid grid-cols-2 gap-4 lg:gap-6 flex-1">
+                    {/* Performance OEE Dial Visual Block */}
+                    <div className="bg-slate-800/60 rounded-3xl p-5 border border-slate-700/50 flex flex-col items-center justify-center relative overflow-hidden group shadow-lg">
+                        <div className={`absolute inset-0 bg-gradient-to-t ${isExcellent ? 'from-emerald-500/10' : isWarning ? 'from-amber-500/10' : 'from-rose-500/10'} opacity-50`}></div>
+                        
+                        <p className="text-slate-400 font-bold uppercase tracking-widest text-[9px] mb-4 z-10 text-center">Ritmo Turno</p>
+                        
+                        <div className="relative flex items-center justify-center mb-4 z-10 w-32 h-32 md:w-40 md:h-40">
+                            {/* Simple CSS Dial Gauge */}
+                            <svg className="w-full h-full transform -rotate-90">
+                                <circle cx="50%" cy="50%" r="45%" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="8" />
+                                <circle cx="50%" cy="50%" r="45%" fill="none" 
+                                    stroke={isExcellent ? "#10b981" : isWarning ? "#f59e0b" : "#f43f5e"} 
+                                    strokeWidth="8" 
+                                    strokeDasharray={`${shiftUptimePct * 2.8} 1000`} 
+                                    className="transition-all duration-1000 drop-shadow-[0_0_8px_currentColor]" />
+                            </svg>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                <span className="text-3xl md:text-5xl font-black font-mono tracking-tighter drop-shadow-md">
+                                    {piecesPerHourShift}
+                                </span>
+                                <span className={`text-[9px] uppercase font-black tracking-widest ${isExcellent ? 'text-emerald-500' : isWarning ? 'text-amber-500' : 'text-rose-500'}`}>
+                                    {unit}/H
+                                </span>
+                            </div>
                         </div>
-                        <div className="text-center">
-                            <p className="text-[9px] uppercase font-black text-rose-500/80 tracking-widest mb-0.5">Parada</p>
-                            <p className="text-rose-400/90 font-mono text-sm font-black">{formatDuration(downtime)}</p>
+
+                        <div className="flex justify-between w-full text-center z-10 gap-2">
+                           <div className="bg-slate-900/50 rounded-lg p-2 flex-1 border border-slate-700/50">
+                               <p className="text-[8px] uppercase text-slate-500 font-bold tracking-wider mb-1">Produzido</p>
+                               <p className="font-mono text-sm md:text-base font-black text-slate-300">{shiftProduced}</p>
+                           </div>
+                           <div className="bg-slate-900/50 rounded-lg p-2 flex-1 border border-slate-700/50">
+                               <p className="text-[8px] uppercase text-slate-500 font-bold tracking-wider mb-1">Status</p>
+                               <p className={`font-mono text-[9px] mt-1 uppercase font-black px-1 py-0.5 rounded ${isExcellent ? 'bg-emerald-500/20 text-emerald-400' : isWarning ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                                    {isExcellent ? 'Excelente' : isWarning ? 'Atenção' : 'Crítico'}
+                               </p>
+                           </div>
+                        </div>
+                    </div>
+
+                    {/* Operational Efficiency (Uptime / Downtime sync) */}
+                    <div className="bg-slate-800/60 rounded-3xl p-5 border border-slate-700/50 flex flex-col justify-center relative overflow-hidden group shadow-lg">
+                        <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl opacity-50 group-hover:bg-indigo-500/20 transition-all"></div>
+                        <p className="text-slate-400 font-bold uppercase tracking-widest text-[9px] mb-6 relative z-10 text-center">Disponibilidade do Equipamento (Turno)</p>
+                        
+                        <div className="flex flex-col gap-4 relative z-10">
+                            {/* Produtivo Item */}
+                            <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-700/50">
+                                <div className="flex justify-between mb-2">
+                                    <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-1.5"><div className="w-2 h-2 bg-emerald-500 rounded-sm"></div> Produtivo</span>
+                                    <span className="text-lg font-mono font-black text-white">{formatDuration(shiftUptime)}</span>
+                                </div>
+                                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                                    <div className="bg-emerald-500 h-full shadow-[0_0_10px_rgba(16,185,129,0.5)]" style={{ width: `${shiftUptimePct}%` }}></div>
+                                </div>
+                                <div className="text-right mt-1.5">
+                                    <span className="text-[9px] font-black text-emerald-500/70 tracking-widest">{shiftUptimePct.toFixed(1)}% DO TEMPO</span>
+                                </div>
+                            </div>
+                            
+                            {/* Parado Item */}
+                            <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-700/50">
+                                <div className="flex justify-between mb-2">
+                                    <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest flex items-center gap-1.5"><div className="w-2 h-2 bg-rose-500 rounded-sm"></div> Parado</span>
+                                    <span className="text-lg font-mono font-black text-white">{formatDuration(shiftDowntime)}</span>
+                                </div>
+                                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                                    <div className="bg-rose-500 h-full shadow-[0_0_10px_rgba(244,63,94,0.5)]" style={{ width: `${shiftDowntimePct}%` }}></div>
+                                </div>
+                                <div className="text-right mt-1.5">
+                                    <span className="text-[9px] font-black text-rose-500/70 tracking-widest">{shiftDowntimePct.toFixed(1)}% DO TEMPO</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -706,6 +813,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                             dailyValue={dailyProduction.trefilaWeight}
                             unit="kg"
                             productionOrders={productionOrders as ProductionOrderData[]}
+                            activeOrder={activeTrefilaOrder}
                         />
                     </div>
                 </div>
@@ -728,6 +836,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                             dailyValue={trelicaDisplayData.value}
                             unit={trelicaDisplayData.unit}
                             productionOrders={productionOrders as ProductionOrderData[]}
+                            activeOrder={activeTrelicaOrder}
                         />
                     </div>
                 </div>
