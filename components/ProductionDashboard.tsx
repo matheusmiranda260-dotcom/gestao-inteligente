@@ -62,16 +62,11 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
 
             timestamps.forEach(ts => {
                 const eventMs = new Date(ts).getTime();
-                if (isNaN(eventMs)) return;
                 const drift = eventMs - nowMs;
-                if (drift > maxDrift && drift < 3600000) {
+                if (drift > maxDrift) {
                     maxDrift = drift;
                 }
             });
-
-            if (Math.abs(maxDrift) > 86400000) {
-                maxDrift = 0;
-            }
 
             if (maxDrift !== currentDrift) {
                 localStorage.setItem(driftKey, maxDrift.toString());
@@ -80,18 +75,14 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
         });
     }, [activeOrder, driftKey]);
 
-    const now = useMemo(() => new Date(localNow.getTime() + stableDrift), [localNow, stableDrift]);
-
     const currentOperatorLog = useMemo(() => {
         if (!activeOrder?.operatorLogs || activeOrder.operatorLogs.length === 0) return null;
-        const todayStr = getFactoryDateString(now);
         const sorted = [...activeOrder.operatorLogs].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
         const lastLog = sorted[sorted.length - 1];
-        if (lastLog.endTime) return null;
-        // VALIDATE: Only return active log if it belongs to the CURRENT factory business day
-        if (getFactoryDateString(lastLog.startTime) !== todayStr) return null;
-        return lastLog;
-    }, [activeOrder, now]);
+        return lastLog.endTime ? null : lastLog;
+    }, [activeOrder]);
+
+    const now = useMemo(() => new Date(localNow.getTime() + stableDrift), [localNow, stableDrift]);
 
     const machineStatus = useMemo(() => {
         if (!activeOrder) {
@@ -535,58 +526,8 @@ interface MachineAnalyticsProps {
 }
 
 const MachineAnalyticsView: React.FC<MachineAnalyticsProps> = ({ machineType, dailyValue, unit, productionOrders, activeOrder, shiftGoal, sizeValue = 6 }) => {
-    // Local timer to ensure the clock ticks and remains reactive
-    const [localNow, setLocalNow] = useState(new Date());
-
-    // Persistent drift to align local clock with server timestamps (same as MachineStatusView)
-    const driftKey = `stableDrift_${machineType}`;
-    const [stableDrift, setStableDrift] = useState(() => {
-        const saved = localStorage.getItem(driftKey);
-        return saved ? parseInt(saved, 10) : 0;
-    });
-
-    useEffect(() => {
-        const timerId = setInterval(() => setLocalNow(new Date()), 1000);
-        return () => clearInterval(timerId);
-    }, []);
-
-    useEffect(() => {
-        if (!activeOrder) return;
-        
-        const timestamps = [
-            activeOrder.startTime,
-            activeOrder.lastQuantityUpdate,
-            ...(activeOrder.downtimeEvents || []).map(e => e.stopTime),
-            ...(activeOrder.downtimeEvents || []).map(e => e.resumeTime)
-        ].filter(Boolean) as string[];
-
-        setStableDrift(currentDrift => {
-            let maxDrift = currentDrift;
-            const nowMs = Date.now();
-
-            timestamps.forEach(ts => {
-                const eventMs = new Date(ts).getTime();
-                if (isNaN(eventMs)) return;
-                const drift = eventMs - nowMs;
-                if (drift > maxDrift && drift < 3600000) {
-                    maxDrift = drift;
-                }
-            });
-
-            if (Math.abs(maxDrift) > 86400000) {
-                maxDrift = 0;
-            }
-
-            if (maxDrift !== currentDrift) {
-                localStorage.setItem(driftKey, maxDrift.toString());
-            }
-            return maxDrift;
-        });
-    }, [activeOrder, driftKey]);
-
-    const now = useMemo(() => new Date(localNow.getTime() + stableDrift), [localNow, stableDrift]);
-    const nowMs = now.getTime();
-    const todayStr = getFactoryDateString(now);
+    const todayStr = getFactoryDateString(new Date());
+    const nowMs = new Date().getTime();
 
     // --- ACCUMULATED DAY MATH ---
     let totalUptime = 0;
@@ -600,9 +541,8 @@ const MachineAnalyticsView: React.FC<MachineAnalyticsProps> = ({ machineType, da
             if (logDateStr !== todayStr) return;
             
             const startStr = log.startTime;
-            const shiftStart = new Date(startStr).getTime();
             
-            let endStr = now.toISOString();
+            let endStr = new Date().toISOString();
             if (log.endTime) {
                 endStr = log.endTime;
             } else {
@@ -610,6 +550,7 @@ const MachineAnalyticsView: React.FC<MachineAnalyticsProps> = ({ machineType, da
                 if (!isLast) endStr = startStr; // Cancela tempo ativo fantasmas
             }
             
+            const shiftStart = new Date(startStr).getTime();
             const shiftEnd = new Date(endStr).getTime();
             if (shiftEnd <= shiftStart) return;
 
@@ -638,28 +579,17 @@ const MachineAnalyticsView: React.FC<MachineAnalyticsProps> = ({ machineType, da
     let shiftProduced = 0;
     
     if (activeOrder) {
-        const currentOperatorLog = activeOrder.operatorLogs?.slice().reverse().find(log => {
-            if (log.endTime) return false;
-            // Only consider logs from CURRENT factory day
-            return getFactoryDateString(log.startTime) === todayStr;
-        });
-
+        const currentOperatorLog = activeOrder.operatorLogs?.slice().reverse().find(log => !log.endTime);
         if (currentOperatorLog) {
             const shiftStartMs = new Date(currentOperatorLog.startTime).getTime();
             
             (activeOrder.downtimeEvents || []).forEach(ev => {
-                const eStart = new Date(ev.stopTime).getTime();
-                const eEnd = ev.resumeTime ? new Date(ev.resumeTime).getTime() : nowMs;
-                const interStart = Math.max(shiftStartMs, eStart);
-                const interEnd = Math.min(nowMs, eEnd);
-                if (interEnd > interStart) {
-                    shiftDowntime += (interEnd - interStart);
+                if (new Date(ev.stopTime).getTime() >= shiftStartMs) {
+                    const eEnd = ev.resumeTime ? new Date(ev.resumeTime).getTime() : nowMs;
+                    shiftDowntime += (eEnd - new Date(ev.stopTime).getTime());
                 }
             });
-            
-            // Critical fix: Ensure totalShiftTime uses the stable nowMs and handles drift
-            const totalShiftElapsed = Math.max(0, nowMs - shiftStartMs);
-            shiftUptime = Math.max(0, totalShiftElapsed - shiftDowntime);
+            shiftUptime = (nowMs - shiftStartMs) - shiftDowntime;
             
             if (machineType === 'Treliça') {
                 shiftProduced = (activeOrder.actualProducedQuantity || 0) - (currentOperatorLog.startQuantity || 0);
@@ -669,11 +599,10 @@ const MachineAnalyticsView: React.FC<MachineAnalyticsProps> = ({ machineType, da
         }
     }
 
-    const totalShiftTime = Math.max(1, shiftUptime + shiftDowntime);
-    const shiftUptimePct = (shiftUptime / totalShiftTime) * 100;
-    const shiftDowntimePct = (shiftDowntime / totalShiftTime) * 100;
-    const piecesPerHourShift = Math.round(shiftProduced / (totalShiftTime / 3600000));
-
+    const totalShiftTime = shiftUptime + shiftDowntime;
+    const shiftUptimePct = totalShiftTime > 0 ? (shiftUptime / totalShiftTime) * 100 : 0;
+    const shiftDowntimePct = totalShiftTime > 0 ? (shiftDowntime / totalShiftTime) * 100 : 0;
+    const piecesPerHourShift = (totalShiftTime / 3600000) > 0 ? Math.round(shiftProduced / (totalShiftTime / 3600000)) : 0;
 
     // --- REMAINING SHIFT ANALYTICS ---
     const getShiftEndMs = () => {
@@ -893,7 +822,6 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
         const processedIds = new Set<string>();
         let trelicaMeters = 0;
         let trefilaWeight = 0;
-        let trelicaPieces = 0;
 
         const orders = Array.isArray(productionOrders) ? productionOrders : [];
 
@@ -920,7 +848,6 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                         const startQty = log.startQuantity || 0;
                         const producedInTurn = Math.max(0, endQty - startQty);
                         trelicaMeters += (producedInTurn * (size || 6));
-                        trelicaPieces += producedInTurn;
                     }
                 });
             } else if (machineLower.includes('trefila')) {
@@ -938,7 +865,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
             }
         });
 
-        return { trelicaMeters, trefilaWeight, trelicaPieces };
+        return { trelicaMeters, trefilaWeight };
     }, [productionOrders, stock]);
 
     // Calculate pieces and goal for Treliça
@@ -957,11 +884,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
 
         let currentShiftProduced = 0;
         if (activeTrelicaOrder) {
-            const todayStr = getFactoryDateString(new Date());
-            const currentOperatorLog = activeTrelicaOrder.operatorLogs?.slice().reverse().find(log => {
-                if (log.endTime) return false;
-                return getFactoryDateString(log.startTime) === todayStr;
-            });
+            const currentOperatorLog = activeTrelicaOrder.operatorLogs?.slice().reverse().find(log => !log.endTime);
             if (currentOperatorLog) {
                  currentShiftProduced = (activeTrelicaOrder.actualProducedQuantity || 0) - (currentOperatorLog.startQuantity || 0);
             }
@@ -1019,7 +942,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                             machineType="Treliça"
                             activeOrder={activeTrelicaOrder}
                             stock={stock}
-                            dailyProducedValue={dailyProduction.trelicaPieces}
+                            dailyProducedValue={trelicaDisplayData.value}
                             dailyGoal={trelicaDisplayData.goal}
                             shiftGoal={trelicaDisplayData.shiftGoal}
                             goalUnit={trelicaDisplayData.unit}
@@ -1028,7 +951,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                     <div className={`transition-opacity duration-700 ${displayMode === 'analytics' ? 'opacity-100 relative z-10' : 'opacity-0 absolute inset-0 z-0 pointer-events-none'}`}>
                         <MachineAnalyticsView
                             machineType="Treliça"
-                            dailyValue={dailyProduction.trelicaPieces}
+                            dailyValue={trelicaDisplayData.value}
                             unit={trelicaDisplayData.unit.split(' ')[0]}
                             productionOrders={productionOrders}
                             activeOrder={activeTrelicaOrder}
