@@ -62,11 +62,16 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
 
             timestamps.forEach(ts => {
                 const eventMs = new Date(ts).getTime();
+                if (isNaN(eventMs)) return;
                 const drift = eventMs - nowMs;
-                if (drift > maxDrift) {
+                if (drift > maxDrift && drift < 3600000) {
                     maxDrift = drift;
                 }
             });
+
+            if (Math.abs(maxDrift) > 86400000) {
+                maxDrift = 0;
+            }
 
             if (maxDrift !== currentDrift) {
                 localStorage.setItem(driftKey, maxDrift.toString());
@@ -557,11 +562,16 @@ const MachineAnalyticsView: React.FC<MachineAnalyticsProps> = ({ machineType, da
 
             timestamps.forEach(ts => {
                 const eventMs = new Date(ts).getTime();
+                if (isNaN(eventMs)) return;
                 const drift = eventMs - nowMs;
-                if (drift > maxDrift) {
+                if (drift > maxDrift && drift < 3600000) {
                     maxDrift = drift;
                 }
             });
+
+            if (Math.abs(maxDrift) > 86400000) {
+                maxDrift = 0;
+            }
 
             if (maxDrift !== currentDrift) {
                 localStorage.setItem(driftKey, maxDrift.toString());
