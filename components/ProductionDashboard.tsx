@@ -80,14 +80,18 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
         });
     }, [activeOrder, driftKey]);
 
+    const now = useMemo(() => new Date(localNow.getTime() + stableDrift), [localNow, stableDrift]);
+
     const currentOperatorLog = useMemo(() => {
         if (!activeOrder?.operatorLogs || activeOrder.operatorLogs.length === 0) return null;
+        const todayStr = getFactoryDateString(now);
         const sorted = [...activeOrder.operatorLogs].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
         const lastLog = sorted[sorted.length - 1];
-        return lastLog.endTime ? null : lastLog;
-    }, [activeOrder]);
-
-    const now = useMemo(() => new Date(localNow.getTime() + stableDrift), [localNow, stableDrift]);
+        if (lastLog.endTime) return null;
+        // VALIDATE: Only return active log if it belongs to the CURRENT factory business day
+        if (getFactoryDateString(lastLog.startTime) !== todayStr) return null;
+        return lastLog;
+    }, [activeOrder, now]);
 
     const machineStatus = useMemo(() => {
         if (!activeOrder) {
@@ -634,7 +638,12 @@ const MachineAnalyticsView: React.FC<MachineAnalyticsProps> = ({ machineType, da
     let shiftProduced = 0;
     
     if (activeOrder) {
-        const currentOperatorLog = activeOrder.operatorLogs?.slice().reverse().find(log => !log.endTime);
+        const currentOperatorLog = activeOrder.operatorLogs?.slice().reverse().find(log => {
+            if (log.endTime) return false;
+            // Only consider logs from CURRENT factory day
+            return getFactoryDateString(log.startTime) === todayStr;
+        });
+
         if (currentOperatorLog) {
             const shiftStartMs = new Date(currentOperatorLog.startTime).getTime();
             
@@ -884,6 +893,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
         const processedIds = new Set<string>();
         let trelicaMeters = 0;
         let trefilaWeight = 0;
+        let trelicaPieces = 0;
 
         const orders = Array.isArray(productionOrders) ? productionOrders : [];
 
@@ -910,6 +920,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                         const startQty = log.startQuantity || 0;
                         const producedInTurn = Math.max(0, endQty - startQty);
                         trelicaMeters += (producedInTurn * (size || 6));
+                        trelicaPieces += producedInTurn;
                     }
                 });
             } else if (machineLower.includes('trefila')) {
@@ -927,7 +938,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
             }
         });
 
-        return { trelicaMeters, trefilaWeight };
+        return { trelicaMeters, trefilaWeight, trelicaPieces };
     }, [productionOrders, stock]);
 
     // Calculate pieces and goal for Treliça
@@ -946,7 +957,11 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
 
         let currentShiftProduced = 0;
         if (activeTrelicaOrder) {
-            const currentOperatorLog = activeTrelicaOrder.operatorLogs?.slice().reverse().find(log => !log.endTime);
+            const todayStr = getFactoryDateString(new Date());
+            const currentOperatorLog = activeTrelicaOrder.operatorLogs?.slice().reverse().find(log => {
+                if (log.endTime) return false;
+                return getFactoryDateString(log.startTime) === todayStr;
+            });
             if (currentOperatorLog) {
                  currentShiftProduced = (activeTrelicaOrder.actualProducedQuantity || 0) - (currentOperatorLog.startQuantity || 0);
             }
@@ -1004,7 +1019,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                             machineType="Treliça"
                             activeOrder={activeTrelicaOrder}
                             stock={stock}
-                            dailyProducedValue={trelicaDisplayData.value}
+                            dailyProducedValue={dailyProduction.trelicaPieces}
                             dailyGoal={trelicaDisplayData.goal}
                             shiftGoal={trelicaDisplayData.shiftGoal}
                             goalUnit={trelicaDisplayData.unit}
@@ -1013,7 +1028,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                     <div className={`transition-opacity duration-700 ${displayMode === 'analytics' ? 'opacity-100 relative z-10' : 'opacity-0 absolute inset-0 z-0 pointer-events-none'}`}>
                         <MachineAnalyticsView
                             machineType="Treliça"
-                            dailyValue={trelicaDisplayData.value}
+                            dailyValue={dailyProduction.trelicaPieces}
                             unit={trelicaDisplayData.unit.split(' ')[0]}
                             productionOrders={productionOrders}
                             activeOrder={activeTrelicaOrder}
