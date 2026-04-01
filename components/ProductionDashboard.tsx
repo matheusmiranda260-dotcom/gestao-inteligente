@@ -526,8 +526,53 @@ interface MachineAnalyticsProps {
 }
 
 const MachineAnalyticsView: React.FC<MachineAnalyticsProps> = ({ machineType, dailyValue, unit, productionOrders, activeOrder, shiftGoal, sizeValue = 6 }) => {
-    const todayStr = getFactoryDateString(new Date());
-    const nowMs = new Date().getTime();
+    // Local timer to ensure the clock ticks and remains reactive
+    const [localNow, setLocalNow] = useState(new Date());
+
+    // Persistent drift to align local clock with server timestamps (same as MachineStatusView)
+    const driftKey = `stableDrift_${machineType}`;
+    const [stableDrift, setStableDrift] = useState(() => {
+        const saved = localStorage.getItem(driftKey);
+        return saved ? parseInt(saved, 10) : 0;
+    });
+
+    useEffect(() => {
+        const timerId = setInterval(() => setLocalNow(new Date()), 1000);
+        return () => clearInterval(timerId);
+    }, []);
+
+    useEffect(() => {
+        if (!activeOrder) return;
+        
+        const timestamps = [
+            activeOrder.startTime,
+            activeOrder.lastQuantityUpdate,
+            ...(activeOrder.downtimeEvents || []).map(e => e.stopTime),
+            ...(activeOrder.downtimeEvents || []).map(e => e.resumeTime)
+        ].filter(Boolean) as string[];
+
+        setStableDrift(currentDrift => {
+            let maxDrift = currentDrift;
+            const nowMs = Date.now();
+
+            timestamps.forEach(ts => {
+                const eventMs = new Date(ts).getTime();
+                const drift = eventMs - nowMs;
+                if (drift > maxDrift) {
+                    maxDrift = drift;
+                }
+            });
+
+            if (maxDrift !== currentDrift) {
+                localStorage.setItem(driftKey, maxDrift.toString());
+            }
+            return maxDrift;
+        });
+    }, [activeOrder, driftKey]);
+
+    const now = useMemo(() => new Date(localNow.getTime() + stableDrift), [localNow, stableDrift]);
+    const nowMs = now.getTime();
+    const todayStr = getFactoryDateString(now);
 
     // --- ACCUMULATED DAY MATH ---
     let totalUptime = 0;
@@ -541,8 +586,9 @@ const MachineAnalyticsView: React.FC<MachineAnalyticsProps> = ({ machineType, da
             if (logDateStr !== todayStr) return;
             
             const startStr = log.startTime;
+            const shiftStart = new Date(startStr).getTime();
             
-            let endStr = new Date().toISOString();
+            let endStr = now.toISOString();
             if (log.endTime) {
                 endStr = log.endTime;
             } else {
@@ -550,7 +596,6 @@ const MachineAnalyticsView: React.FC<MachineAnalyticsProps> = ({ machineType, da
                 if (!isLast) endStr = startStr; // Cancela tempo ativo fantasmas
             }
             
-            const shiftStart = new Date(startStr).getTime();
             const shiftEnd = new Date(endStr).getTime();
             if (shiftEnd <= shiftStart) return;
 
@@ -584,12 +629,18 @@ const MachineAnalyticsView: React.FC<MachineAnalyticsProps> = ({ machineType, da
             const shiftStartMs = new Date(currentOperatorLog.startTime).getTime();
             
             (activeOrder.downtimeEvents || []).forEach(ev => {
-                if (new Date(ev.stopTime).getTime() >= shiftStartMs) {
-                    const eEnd = ev.resumeTime ? new Date(ev.resumeTime).getTime() : nowMs;
-                    shiftDowntime += (eEnd - new Date(ev.stopTime).getTime());
+                const eStart = new Date(ev.stopTime).getTime();
+                const eEnd = ev.resumeTime ? new Date(ev.resumeTime).getTime() : nowMs;
+                const interStart = Math.max(shiftStartMs, eStart);
+                const interEnd = Math.min(nowMs, eEnd);
+                if (interEnd > interStart) {
+                    shiftDowntime += (interEnd - interStart);
                 }
             });
-            shiftUptime = (nowMs - shiftStartMs) - shiftDowntime;
+            
+            // Critical fix: Ensure totalShiftTime uses the stable nowMs and handles drift
+            const totalShiftElapsed = Math.max(0, nowMs - shiftStartMs);
+            shiftUptime = Math.max(0, totalShiftElapsed - shiftDowntime);
             
             if (machineType === 'Treliça') {
                 shiftProduced = (activeOrder.actualProducedQuantity || 0) - (currentOperatorLog.startQuantity || 0);
@@ -599,10 +650,11 @@ const MachineAnalyticsView: React.FC<MachineAnalyticsProps> = ({ machineType, da
         }
     }
 
-    const totalShiftTime = shiftUptime + shiftDowntime;
-    const shiftUptimePct = totalShiftTime > 0 ? (shiftUptime / totalShiftTime) * 100 : 0;
-    const shiftDowntimePct = totalShiftTime > 0 ? (shiftDowntime / totalShiftTime) * 100 : 0;
-    const piecesPerHourShift = (totalShiftTime / 3600000) > 0 ? Math.round(shiftProduced / (totalShiftTime / 3600000)) : 0;
+    const totalShiftTime = Math.max(1, shiftUptime + shiftDowntime);
+    const shiftUptimePct = (shiftUptime / totalShiftTime) * 100;
+    const shiftDowntimePct = (shiftDowntime / totalShiftTime) * 100;
+    const piecesPerHourShift = Math.round(shiftProduced / (totalShiftTime / 3600000));
+
 
     // --- REMAINING SHIFT ANALYTICS ---
     const getShiftEndMs = () => {
