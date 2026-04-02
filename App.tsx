@@ -918,37 +918,34 @@ const App: React.FC = () => {
         }
     };
 
+    const executePauseOrder = async (orderId: string, now: string = new Date().toISOString()) => {
+        const orderToPause = productionOrders.find(o => o.id === orderId);
+        if (!orderToPause) return;
+
+        // Close any open logs for any operator on this machine
+        const closedLogs = (orderToPause.operatorLogs || []).map(log =>
+            !log.endTime ? { ...log, endTime: now, endQuantity: orderToPause.actualProducedQuantity || 0 } : log
+        );
+
+        // Close any open downtime events
+        const closedEvents = (orderToPause.downtimeEvents || []).map(event =>
+            !event.resumeTime ? { ...event, resumeTime: now } : event
+        );
+
+        const updatedOrder = await updateItem<ProductionOrderData>('production_orders', orderId, {
+            status: 'paused',
+            operatorLogs: closedLogs,
+            downtimeEvents: closedEvents,
+        });
+
+        // Update local state IMMEDIATELY
+        setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
+        return updatedOrder;
+    };
+
     const pauseProductionOrder = async (orderId: string) => {
         try {
-            const orderToPause = productionOrders.find(o => o.id === orderId);
-            if (!orderToPause) return;
-
-            const now = new Date().toISOString();
-
-            // Close all open operator logs
-            const closedLogs = (orderToPause.operatorLogs || []).map(log =>
-                !log.endTime ? { ...log, endTime: now, endQuantity: orderToPause.actualProducedQuantity || 0 } : log
-            );
-
-            // Close any open downtime events
-            const closedEvents = [...(orderToPause.downtimeEvents || [])];
-            for (let i = closedEvents.length - 1; i >= 0; i--) {
-                if (!closedEvents[i].resumeTime) {
-                    closedEvents[i] = { ...closedEvents[i], resumeTime: now };
-                    break;
-                }
-            }
-
-            // Update the order to paused
-            const updatedOrder = await updateItem<ProductionOrderData>('production_orders', orderId, {
-                status: 'paused',
-                operatorLogs: closedLogs,
-                downtimeEvents: closedEvents,
-            });
-
-            // Update local state IMMEDIATELY to prevent UI "stuck"
-            setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
-            
+            await executePauseOrder(orderId);
             showNotification('Ordem de produção arquivada (pausada).', 'success');
         } catch (error) {
             console.error('Erro ao pausar ordem:', error);
@@ -1082,11 +1079,11 @@ const App: React.FC = () => {
         );
 
         try {
-            // 1. First aggressively close any order that thinks it's in progress for this machine
-            const inProgressOrders = productionOrders.filter(o => o.machine === orderToStartData.machine && o.status === 'in_progress');
+            // 1. First aggressively close any order that thinks it's in progress for this machine properly
+            const inProgressOrders = productionOrders.filter(o => o.machine === orderToStartData.machine && o.status === 'in_progress' && o.id !== orderId);
             if (inProgressOrders.length > 0) {
                 await Promise.all(inProgressOrders.map(orderToPause => 
-                    updateItem('production_orders', orderToPause.id, { status: 'paused' })
+                    executePauseOrder(orderToPause.id, now)
                 ));
             }
 
@@ -1104,11 +1101,15 @@ const App: React.FC = () => {
             const updates: Partial<ProductionOrderData> = {
                 status: 'in_progress',
                 startTime: orderToStartData.startTime || now,
-                downtimeEvents: [...(orderToStartData.downtimeEvents || []), {
-                    stopTime: now,
-                    resumeTime: null,
-                    reason: 'Aguardando Início da Produção'
-                }]
+                // Ensure all previous downtime events for THIS order are closed before adding new "Aguardando"
+                downtimeEvents: [
+                    ...(orderToStartData.downtimeEvents || []).map(e => !e.resumeTime ? { ...e, resumeTime: now } : e),
+                    {
+                        stopTime: now,
+                        resumeTime: null,
+                        reason: 'Aguardando Início da Produção'
+                    }
+                ]
             };
 
             if (openShiftOrderIndex !== -1) {

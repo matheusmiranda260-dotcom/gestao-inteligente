@@ -89,32 +89,24 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             return { status: 'Ocioso', reason: 'Nenhuma ordem em produção', since: now.toISOString(), durationMs: 0 };
         }
 
-        const relevantEvents = [...(activeOrder.downtimeEvents || [])].sort((a, b) => new Date(a.stopTime).getTime() - new Date(b.stopTime).getTime());
-        const lastEvent = relevantEvents.length > 0 ? relevantEvents[relevantEvents.length - 1] : null;
+        const isAnyActiveShift = !!currentOperatorLog;
+        const openEvent = [...(activeOrder.downtimeEvents || [])]
+            .sort((a, b) => new Date(a.stopTime).getTime() - new Date(b.stopTime).getTime())
+            .find(e => !e.resumeTime);
 
-        if (!currentOperatorLog) {
-            return { status: 'Desligada', reason: 'Aguardando Início de Turno', since: lastEvent?.stopTime || activeOrder.startTime!, durationMs: 0 };
-        }
+        if (openEvent) {
+            const reason = openEvent.reason || 'Downtime';
+            const durationMs = Math.max(0, now.getTime() - new Date(openEvent.stopTime).getTime());
 
-        if (lastEvent?.resumeTime === null && lastEvent) {
-            const reason = (lastEvent.reason || '').trim();
-            const durationMs = Math.max(0, now.getTime() - new Date(lastEvent.stopTime).getTime());
-
-            if (reason === 'Final de Turno') {
-                const shiftStart = new Date(currentOperatorLog.startTime).getTime();
-                const stopTime = new Date(lastEvent.stopTime).getTime();
-                if (shiftStart > stopTime) {
-                    return { status: 'Produzindo', reason: '', since: currentOperatorLog.startTime, durationMs: Math.max(0, now.getTime() - shiftStart) };
-                }
-                return { status: 'Desligada', reason: 'Turno Encerrado', since: lastEvent.stopTime, durationMs: 0 };
-            }
             if (reason === 'Troca de Rolo / Preparação' || reason === 'Aguardando Início da Produção' || reason === 'Setup') {
-                return { status: 'Preparacao', reason: reason, since: lastEvent.stopTime, durationMs };
+                return { status: 'Preparacao', reason: reason, since: openEvent.stopTime, durationMs };
             }
-
-            return { status: 'Parada', reason: lastEvent.reason, since: lastEvent.stopTime, durationMs };
+            if (reason === 'Final de Turno' || !isAnyActiveShift) {
+                return { status: 'Desligada', reason: '', since: openEvent.stopTime, durationMs };
+            }
+            return { status: 'Parada', reason: reason, since: openEvent.stopTime, durationMs };
         } else {
-            let since = lastEvent?.resumeTime || activeOrder.startTime || now.toISOString();
+            let since = activeOrder.startTime || now.toISOString();
             const durationMs = Math.max(0, now.getTime() - new Date(since).getTime());
             return { status: 'Produzindo', reason: '', since, durationMs };
         }

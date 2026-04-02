@@ -829,23 +829,19 @@ const MachineControl: React.FC<MachineControlProps> = ({
     }, [currentOperatorLog]);
 
     const currentMachineStatus = useMemo(() => {
-        if (!activeOrder?.downtimeEvents || activeOrder.downtimeEvents.length === 0) {
-            return isAnyActiveShift ? 'Produzindo' : 'Desligada';
-        }
+        const events = activeOrder?.downtimeEvents || [];
+        const openEvent = events.find(e => !e.resumeTime);
 
-        const sortedEvents = [...activeOrder.downtimeEvents].sort((a, b) => new Date(a.stopTime).getTime() - new Date(b.stopTime).getTime());
-        const lastEvent = sortedEvents[sortedEvents.length - 1];
-
-        if (lastEvent.resumeTime !== null) {
+        if (!openEvent) {
             return isAnyActiveShift ? 'Produzindo' : 'Desligada';
         }
 
         const prepReasons = ['Aguardando Início da Produção', 'Troca de Rolo / Preparação', 'Setup'];
-        if (prepReasons.includes(lastEvent.reason)) {
+        if (prepReasons.includes(openEvent.reason)) {
             return 'Preparacao';
         }
 
-        if (lastEvent.reason === 'Final de Turno' || !isAnyActiveShift) {
+        if (openEvent.reason === 'Final de Turno' || !isAnyActiveShift) {
             return 'Desligada';
         }
 
