@@ -582,6 +582,62 @@ const MachineControl: React.FC<MachineControlProps> = ({
         }
     };
 
+    const getFactoryDateString = (dateObj: Date | string): string => {
+        try {
+            const factoryDate = new Date(dateObj);
+            if (isNaN(factoryDate.getTime())) return '';
+            if (factoryDate.getHours() < 5) {
+                factoryDate.setDate(factoryDate.getDate() - 1);
+            }
+            return factoryDate.toLocaleDateString('sv-SE');
+        } catch {
+            return '';
+        }
+    };
+
+    const shiftProducedTotal = useMemo(() => {
+        const todayStr = getFactoryDateString(now);
+        const currentHour = now.getHours();
+        const currentShift = (currentHour >= 5 && currentHour < 14) ? 'A' : 'B';
+
+        let totalPoints = 0;
+        (productionOrders || []).forEach(order => {
+            if (order.status === 'cancelled') return;
+            if (order.machine !== machineType) return;
+            
+            (order.operatorLogs || []).forEach(log => {
+                if (!log.startTime) return;
+                const logDateStr = getFactoryDateString(log.startTime);
+                if (logDateStr !== todayStr) return;
+
+                const startH = new Date(log.startTime).getHours();
+                const logShift = (startH >= 5 && startH < 14) ? 'A' : 'B';
+                if (logShift === currentShift) {
+                    if (machineType === 'Treliça') {
+                        const startQty = log.startQuantity || 0;
+                        const endQty = log.endTime ? (log.endQuantity || 0) : (order.actualProducedQuantity || 0);
+                        totalPoints += Math.max(0, endQty - startQty);
+                    } else {
+                        // For Trefila, we sum the count of lots finished in this shift
+                        (order.processedLots || []).forEach(lot => {
+                            if (lot.endTime) {
+                                const lotDateStr = getFactoryDateString(lot.endTime);
+                                if (lotDateStr === todayStr) {
+                                    const endH = new Date(lot.endTime).getHours();
+                                    const lotLS = (endH >= 5 && endH < 14) ? 'A' : 'B';
+                                    if (lotLS === currentShift) {
+                                        totalPoints += 1;
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }
+            });
+        });
+        return totalPoints;
+    }, [productionOrders, machineType, now]);
+
     const confirmResumePreviousStop = async (shouldResume: boolean) => {
         if (!activeOrder || !startOperatorShift) return;
 
@@ -1352,8 +1408,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                     <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">Progresso</p>
                                     <p className="font-bold">
                                         {machineType === 'Trefila'
-                                            ? `${(activeOrder.processedLots || []).length} / ${(activeOrder.selectedLotIds as string[]).length} Lotes`
-                                            : `${activeOrder.actualProducedQuantity || 0} / ${activeOrder.quantityToProduce} Pçs`
+                                            ? `${shiftProducedTotal} Lotes (Turno Atual)`
+                                            : `${shiftProducedTotal} / ${activeOrder.quantityToProduce} Pçs (Turno Atual)`
                                         }
                                     </p>
                                 </div>

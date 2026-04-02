@@ -940,11 +940,15 @@ const App: React.FC = () => {
             }
 
             // Update the order to paused
-            await updateItem('production_orders', orderId, {
+            const updatedOrder = await updateItem<ProductionOrderData>('production_orders', orderId, {
                 status: 'paused',
                 operatorLogs: closedLogs,
                 downtimeEvents: closedEvents,
             });
+
+            // Update local state IMMEDIATELY to prevent UI "stuck"
+            setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
+            
             showNotification('Ordem de produção arquivada (pausada).', 'success');
         } catch (error) {
             console.error('Erro ao pausar ordem:', error);
@@ -974,12 +978,15 @@ const App: React.FC = () => {
             }
 
             // Update the order to cancelled
-            await updateItem('production_orders', orderId, {
+            const updatedOrder = await updateItem<ProductionOrderData>('production_orders', orderId, {
                 status: 'cancelled',
                 endTime: now,
                 operatorLogs: closedLogs,
                 downtimeEvents: closedEvents,
             });
+
+            // Update local state IMMEDIATELY
+            setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
 
             // Collect all lot IDs from the order
             let lotIds: string[] = [];
@@ -1075,24 +1082,12 @@ const App: React.FC = () => {
         );
 
         try {
-            // Aggressively close ANY other in_progress orders for this machine
-            // to ensure the dashboard doesn't get stuck on ghost orders
-            const otherInProgressOrders = newOrders.filter(o => o.machine === newOrderMachine && o.status === 'in_progress' && o.id !== orderId);
-
-            for (const otherOrder of otherInProgressOrders) {
-                const closedLogs = (otherOrder.operatorLogs || []).map(log =>
-                    !log.endTime ? { ...log, endTime: now } : log
-                );
-                await updateItem('production_orders', otherOrder.id, {
-                    status: 'completed',
-                    endTime: now,
-                    operatorLogs: closedLogs
-                });
-                // Update local list
-                const idx = newOrders.findIndex(o => o.id === otherOrder.id);
-                if (idx !== -1) {
-                    newOrders[idx] = { ...newOrders[idx], status: 'completed', endTime: now, operatorLogs: closedLogs };
-                }
+            // 1. First aggressively close any order that thinks it's in progress for this machine
+            const inProgressOrders = productionOrders.filter(o => o.machine === orderToStartData.machine && o.status === 'in_progress');
+            if (inProgressOrders.length > 0) {
+                await Promise.all(inProgressOrders.map(orderToPause => 
+                    updateItem('production_orders', orderToPause.id, { status: 'paused' })
+                ));
             }
 
             if (openShiftOrderIndex !== -1) {
@@ -2146,7 +2141,9 @@ const App: React.FC = () => {
                         </div>
                     </header>
                 )}
-                <div className={currentUser && page !== 'login' ? 'p-4' : ''}>{renderPage()}</div>
+                <div className={currentUser && page !== 'login' ? 'p-4' : ''}>
+                    {renderPage()}
+                </div>
             </main>
         </div>
     );

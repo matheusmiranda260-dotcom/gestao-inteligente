@@ -578,26 +578,59 @@ const MachineAnalyticsView: React.FC<MachineAnalyticsProps> = ({ machineType, da
     let shiftDowntime = 0;
     let shiftProduced = 0;
     
-    if (activeOrder) {
-        const currentOperatorLog = activeOrder.operatorLogs?.slice().reverse().find(log => !log.endTime);
-        if (currentOperatorLog) {
-            const shiftStartMs = new Date(currentOperatorLog.startTime).getTime();
+    // Sum production for all orders in this shift
+    const shiftTodayStr = getFactoryDateString(new Date());
+    const currentHour = new Date().getHours();
+    const currentShift = (currentHour >= 5 && currentHour < 14) ? 'A' : 'B';
+
+    productionOrders.forEach(order => {
+        if (order.machine !== machineType) return;
+        (order.operatorLogs || []).forEach(log => {
+            if (!log.startTime) return;
+            const logDateStr = getFactoryDateString(log.startTime);
+            if (logDateStr !== todayStr) return;
             
-            (activeOrder.downtimeEvents || []).forEach(ev => {
-                if (new Date(ev.stopTime).getTime() >= shiftStartMs) {
-                    const eEnd = ev.resumeTime ? new Date(ev.resumeTime).getTime() : nowMs;
-                    shiftDowntime += (eEnd - new Date(ev.stopTime).getTime());
-                }
-            });
-            shiftUptime = (nowMs - shiftStartMs) - shiftDowntime;
+            const startH = new Date(log.startTime).getHours();
+            const logShift = (startH >= 5 && startH < 14) ? 'A' : 'B';
+            if (logShift !== currentShift) return;
+
+            const startQty = log.startQuantity || 0;
+            const endQty = log.endTime ? (log.endQuantity || 0) : (order.actualProducedQuantity || 0);
             
             if (machineType === 'Treliça') {
-                shiftProduced = (activeOrder.actualProducedQuantity || 0) - (currentOperatorLog.startQuantity || 0);
+                shiftProduced += Math.max(0, endQty - startQty);
             } else {
-                shiftProduced = (activeOrder.processedLots || []).filter(l => l.endTime && new Date(l.endTime).getTime() >= shiftStartMs).length;
+                // Trefila weight is handled differently but we can sum lots finished in this shift
+                (order.processedLots || []).forEach(lot => {
+                    if (lot.endTime) {
+                        const lotDateStr = getFactoryDateString(lot.endTime);
+                        if (lotDateStr === todayStr) {
+                            const endH = new Date(lot.endTime).getHours();
+                            const lotShift = (endH >= 5 && endH < 14) ? 'A' : 'B';
+                            if (lotShift === currentShift) {
+                                shiftProduced += (lot.finalWeight || 0);
+                            }
+                        }
+                    }
+                });
             }
-        }
-    }
+
+            // Approximate uptime for the whole shift
+            const shiftStartMs = new Date(log.startTime).getTime();
+            const shiftEndMs = log.endTime ? new Date(log.endTime).getTime() : nowMs;
+            
+            let logDown = 0;
+            (order.downtimeEvents || []).forEach(ev => {
+                const eStart = new Date(ev.stopTime).getTime();
+                const eEnd = ev.resumeTime ? new Date(ev.resumeTime).getTime() : nowMs;
+                const interStart = Math.max(shiftStartMs, eStart);
+                const interEnd = Math.min(shiftEndMs, eEnd);
+                if (interEnd > interStart) logDown += (interEnd - interStart);
+            });
+            shiftDowntime += logDown;
+            shiftUptime += (shiftEndMs - shiftStartMs) - logDown;
+        });
+    });
 
     const totalShiftTime = shiftUptime + shiftDowntime;
     const shiftUptimePct = totalShiftTime > 0 ? (shiftUptime / totalShiftTime) * 100 : 0;
@@ -796,6 +829,13 @@ interface ProductionDashboardProps {
 }
 
 const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, productionOrders, stock, currentUser }) => {
+    const [now, setNow] = useState(new Date());
+
+    useEffect(() => {
+        const timer = setInterval(() => setNow(new Date()), 1000);
+        return () => clearInterval(timer);
+    }, []);
+
     const activeTrefilaOrder = useMemo(() => {
         const active = productionOrders.filter(o => o.machine === 'Trefila' && o.status === 'in_progress');
         if (active.length === 0) return undefined;
@@ -809,64 +849,72 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
     }, [productionOrders]);
 
     const dailyProduction = useMemo(() => {
-        const now = new Date();
+        const nowMs = now.getTime();
         const todayStr = getFactoryDateString(now);
-
-        const isToday = (dateInput: string | undefined) => {
-            if (!dateInput) return false;
-            return getFactoryDateString(dateInput) === todayStr;
-        };
+        const currentHour = now.getHours();
+        const currentShift = (currentHour >= 5 && currentHour < 14) ? 'A' : 'B';
 
         // Create a quick lookup map for stock items
         const stockMap = new Map(stock.map(s => [s.id, s]));
-        const processedIds = new Set<string>();
-        let trelicaMeters = 0;
-        let trefilaWeight = 0;
+        let trelicaTotalMeters = 0;
+        let trefilaTotalWeight = 0;
+        let trelicaShiftPieces = 0;
+        let trefilaShiftWeight = 0;
 
         const orders = Array.isArray(productionOrders) ? productionOrders : [];
 
-        // Process in reverse to use latest order snapshots
-        [...orders].reverse().forEach(order => {
-            const id = order.id || `order-${order.orderNumber}-${order.machine}`;
-            if (processedIds.has(id)) return;
-            processedIds.add(id);
+        orders.forEach(order => {
+            const machine = (order.machine || '').toLowerCase();
+            const id = order.id;
 
-            const machineLower = (order.machine || '').toLowerCase();
-
-            if (machineLower.includes('treli')) {
+            if (machine.includes('treli')) {
                 const size = parseFloat(String(order.tamanho || '6').replace(',', '.'));
-                (order.operatorLogs || []).forEach((log, index, arr) => {
-                    if (log.startTime && isToday(log.startTime)) {
-                        let endQty = 0;
-                        if (log.endTime) {
-                            endQty = log.endQuantity || 0;
-                        } else {
-                            // EVITAR SOMA DUPLA: Apenas o último turno em aberto ganha os pontos "ao vivo"
-                            const isLast = index === arr.length - 1;
-                            endQty = isLast ? (order.actualProducedQuantity || 0) : (log.startQuantity || 0);
-                        }
+                (order.operatorLogs || []).forEach((log) => {
+                    if (!log.startTime) return;
+                    const logDateStr = getFactoryDateString(log.startTime);
+                    
+                    // Daily total (Today)
+                    if (logDateStr === todayStr) {
                         const startQty = log.startQuantity || 0;
-                        const producedInTurn = Math.max(0, endQty - startQty);
-                        trelicaMeters += (producedInTurn * (size || 6));
+                        const endQty = log.endTime ? (log.endQuantity || 0) : (order.actualProducedQuantity || 0);
+                        const pieces = Math.max(0, endQty - startQty);
+                        trelicaTotalMeters += (pieces * (size || 6));
+
+                        // Shift aggregation
+                        const startH = new Date(log.startTime).getHours();
+                        const logShift = (startH >= 5 && startH < 14) ? 'A' : 'B';
+                        if (logShift === currentShift) {
+                            trelicaShiftPieces += pieces;
+                        }
                     }
                 });
-            } else if (machineLower.includes('trefila')) {
+            } else if (machine.includes('trefila')) {
                 (order.processedLots || []).forEach(lot => {
-                    if (lot.endTime && isToday(lot.endTime)) {
-                        if (lot.finalWeight !== null) {
-                            trefilaWeight += lot.finalWeight;
-                        } else {
-                            // Use entry weight as estimate for lots finished today but not yet weighed
-                            const entryLot = stockMap.get(lot.lotId) as StockItem;
-                            trefilaWeight += (entryLot?.labelWeight || 0);
+                    if (lot.endTime) {
+                        const lotDateStr = getFactoryDateString(lot.endTime);
+                        if (lotDateStr === todayStr) {
+                            const weight = lot.finalWeight !== null ? lot.finalWeight : ((stockMap.get(lot.lotId) as StockItem)?.labelWeight || 0);
+                            trefilaTotalWeight += weight;
+
+                            const endH = new Date(lot.endTime).getHours();
+                            const lotShift = (endH >= 5 && endH < 14) ? 'A' : 'B';
+                            if (lotShift === currentShift) {
+                                trefilaShiftWeight += weight;
+                            }
                         }
                     }
                 });
             }
         });
 
-        return { trelicaMeters, trefilaWeight };
-    }, [productionOrders, stock]);
+        return { 
+            trelicaMeters: trelicaTotalMeters, 
+            trefilaWeight: trefilaTotalWeight, 
+            trelicaShiftPieces, 
+            trefilaShiftWeight,
+            currentShift 
+        };
+    }, [productionOrders, stock, now]);
 
     // Calculate pieces and goal for Treliça
     const trelicaDisplayData = useMemo(() => {
@@ -882,21 +930,13 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
             shiftGoal = sizeValue >= 10 ? 300 : 600;
         }
 
-        let currentShiftProduced = 0;
-        if (activeTrelicaOrder) {
-            const currentOperatorLog = activeTrelicaOrder.operatorLogs?.slice().reverse().find(log => !log.endTime);
-            if (currentOperatorLog) {
-                 currentShiftProduced = (activeTrelicaOrder.actualProducedQuantity || 0) - (currentOperatorLog.startQuantity || 0);
-            }
-        }
-
         return {
-            value: currentShiftProduced,
+            value: dailyProduction.trelicaShiftPieces,
             goal: shiftGoal,
             shiftGoal: shiftGoal,
             unit: sizeValue >= 10 ? 'pçs (12m)' : 'pçs (6m)'
         };
-    }, [activeTrelicaOrder]);
+    }, [activeTrelicaOrder, dailyProduction.trelicaShiftPieces]);
 
     const [displayMode, setDisplayMode] = useState<'realtime' | 'analytics'>('realtime');
 
@@ -918,15 +958,15 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                             machineType="Trefila"
                             activeOrder={activeTrefilaOrder}
                             stock={stock}
-                            dailyProducedValue={dailyProduction.trefilaWeight}
-                            dailyGoal={16000}
+                            dailyProducedValue={dailyProduction.trefilaShiftWeight}
+                            dailyGoal={6000}
                             goalUnit="kg"
                         />
                     </div>
                     <div className={`transition-opacity duration-700 ${displayMode === 'analytics' ? 'opacity-100 relative z-10' : 'opacity-0 absolute inset-0 z-0 pointer-events-none'}`}>
                         <MachineAnalyticsView
                             machineType="Trefila"
-                            dailyValue={dailyProduction.trefilaWeight}
+                            dailyValue={dailyProduction.trefilaShiftWeight}
                             unit="kg"
                             productionOrders={productionOrders}
                             activeOrder={activeTrefilaOrder}

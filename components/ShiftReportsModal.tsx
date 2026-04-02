@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { ShiftReport, StockItem } from '../types';
-import { PrinterIcon, DocumentReportIcon, ArchiveIcon, WarningIcon, TrashIcon } from './icons';
+import { PrinterIcon, DocumentReportIcon, ArchiveIcon, WarningIcon, TrashIcon, ChartBarIcon } from './icons';
 
 const formatDuration = (ms: number) => {
     if (ms < 0) ms = 0;
@@ -730,7 +730,38 @@ const ShiftReportsModal: React.FC<ShiftReportsModalProps> = ({ reports, stock, o
                 <div className={`flex-grow overflow-y-auto bg-white p-6 print-section`}>
                     {!printingReport ? (
                         reports.length > 0 ? (
-                            <div className="overflow-x-auto rounded-xl border border-slate-100 shadow-sm no-print">
+                            <div className="space-y-6 no-print">
+                                {/* NOVO: Resumo Consolidado do Turno (Caso haja múltiplas ordens no mesmo turno) */}
+                                <div className="bg-indigo-50/50 p-6 rounded-3xl border border-indigo-100/50">
+                                    <h3 className="text-lg font-black text-indigo-900 uppercase tracking-tighter mb-4 flex items-center gap-2">
+                                        <ChartBarIcon className="h-5 w-5 text-indigo-600" /> Resumo Consolidado do Período
+                                    </h3>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                                        <div className="bg-white p-4 rounded-2xl shadow-sm border border-indigo-100 flex flex-col justify-between">
+                                            <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Total Produzido</p>
+                                            <p className="text-3xl font-black text-indigo-900 tracking-tighter">
+                                                {reports.reduce((acc, r) => acc + (r.totalProducedWeight || 0), 0).toFixed(1)} <sub className="text-xs font-bold">kg</sub>
+                                            </p>
+                                        </div>
+                                        <div className="bg-white p-4 rounded-2xl shadow-sm border border-indigo-100 flex flex-col justify-between">
+                                            <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Total Peças/Lote</p>
+                                            <p className="text-3xl font-black text-indigo-900 tracking-tighter">
+                                                {reports.reduce((acc, r) => {
+                                                    const q = r.totalProducedQuantity > 0 ? r.totalProducedQuantity : ((r.totalProducedMeters || 0) / (parseFloat(r.tamanho || '6') || 6));
+                                                    return acc + q;
+                                                }, 0).toFixed(0)}
+                                            </p>
+                                        </div>
+                                        <div className="bg-white p-4 rounded-2xl shadow-sm border border-indigo-100 flex flex-col justify-between">
+                                            <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Tempo Total de Operação</p>
+                                            <p className="text-3xl font-black text-indigo-900 tracking-tighter">
+                                                {formatDuration(reports.reduce((acc, r) => acc + (new Date(r.shiftEndTime).getTime() - new Date(r.shiftStartTime).getTime()), 0))}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="overflow-x-auto rounded-xl border border-slate-100 shadow-sm">
                                 <table className="w-full text-base text-left text-slate-500">
                                     <thead className="text-sm font-black text-slate-700 uppercase bg-slate-50 text-center">
                                         <tr>
@@ -799,7 +830,8 @@ const ShiftReportsModal: React.FC<ShiftReportsModalProps> = ({ reports, stock, o
                                     </tbody>
                                 </table>
                             </div>
-                        ) : (
+                        </div>
+                    ) : (
                             <div className="flex flex-col items-center justify-center py-32 bg-slate-50/50 rounded-[4rem] border-4 border-dashed border-slate-200 h-full no-print">
                                 <div className="relative mb-12">
                                     <div className="absolute inset-0 bg-indigo-500 blur-3xl opacity-10 animate-pulse"></div>
