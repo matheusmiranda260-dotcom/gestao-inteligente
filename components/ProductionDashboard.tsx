@@ -22,6 +22,7 @@ const statusStyles = {
 interface MachineStatusViewProps {
     machineType: MachineType;
     activeOrder: ProductionOrderData | undefined;
+    allOrders: ProductionOrderData[];
     stock: StockItem[];
     dailyProducedValue: number;
     dailyGoal: number;
@@ -29,7 +30,7 @@ interface MachineStatusViewProps {
     shiftGoal?: number;
 }
 
-const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, activeOrder, stock, dailyProducedValue, dailyGoal, goalUnit, shiftGoal }) => {
+const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, activeOrder, allOrders, stock, dailyProducedValue, dailyGoal, goalUnit, shiftGoal }) => {
     // Local timer to ensure the clock ticks even if parent doesn't re-render
     const [localNow, setLocalNow] = useState(new Date());
 
@@ -121,23 +122,26 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
         const start = new Date(currentOperatorLog.startTime).getTime();
         const totalShiftDuration = Math.max(0, nowMs - start);
 
+        // Aggregate downtime from ALL orders on this machine in the current shift
+        const shiftOrders = allOrders.filter(o => o.machine === machineType && o.status !== 'cancelled');
         let downtime = 0;
-        if (activeOrder && activeOrder.downtimeEvents) {
-            downtime = activeOrder.downtimeEvents.reduce((acc, event) => {
+        shiftOrders.forEach(order => {
+            (order.downtimeEvents || []).forEach(event => {
+                // Only count events that fall within the operator's shift window
                 const stopTime = new Date(event.stopTime).getTime();
+                if (stopTime < start) return; // Before this shift
                 const resumeTime = event.resumeTime ? new Date(event.resumeTime).getTime() : nowMs;
                 const effectiveStart = Math.max(stopTime, start);
                 const effectiveEnd = Math.min(resumeTime, nowMs);
                 if (effectiveEnd > effectiveStart) {
-                    return acc + (effectiveEnd - effectiveStart);
+                    downtime += (effectiveEnd - effectiveStart);
                 }
-                return acc;
-            }, 0);
-        }
+            });
+        });
 
         const uptime = Math.max(0, totalShiftDuration - downtime);
         return { shiftDowntime: downtime, shiftUptime: uptime };
-    }, [now, currentOperatorLog, activeOrder]);
+    }, [now, currentOperatorLog, allOrders, machineType]);
 
     const isAlertActive = machineStatus.status === 'Parada' && machineStatus.durationMs > 30000;
     const currentStyle = statusStyles[machineStatus.status as keyof typeof statusStyles] || statusStyles.Ocioso;
@@ -374,32 +378,58 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                 {/* RIGHT COLUMN */}
                 <div className="flex flex-col gap-2 sm:gap-3 overflow-x-hidden min-w-0">
                     
-                    {/* PARADAS TABLE (Flex-1 so it scrolls within its box) */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col flex-1 overflow-hidden min-h-0">
-                        <div className="bg-slate-50 border-b border-slate-100 p-2.5 px-4 shrink-0 shadow-sm z-10 flex justify-between items-center">
-                            <h3 className="font-black text-slate-600 uppercase tracking-widest text-[10px] flex justify-center items-center gap-1.5">
-                                <WarningIcon className="h-3 w-3 text-rose-500" /> PARADAS DO TURNO
-                            </h3>
-                            <span className="text-[9px] font-bold text-slate-400 uppercase bg-white px-1.5 py-0.5 rounded border border-slate-200">
-                                {((activeOrder.downtimeEvents || []).filter(e => e.reason !== 'Final de Turno' && currentOperatorLog && new Date(e.stopTime).getTime() >= new Date(currentOperatorLog.startTime).getTime()).length)} Registros
-                            </span>
-                        </div>
-                        <div className="flex-1 overflow-y-auto custom-scrollbar bg-white">
-                            <table className="w-full text-left border-collapse">
-                                <thead className="sticky top-0 bg-white/95 backdrop-blur-sm z-10 shadow-sm">
-                                    <tr className="text-[9px] uppercase font-black text-slate-400 border-b border-slate-100">
-                                        <th className="p-2 px-3">Duração</th>
-                                        <th className="p-2">Início</th>
-                                        <th className="p-2 w-full">Motivo</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {(activeOrder.downtimeEvents || [])
-                                        .slice()
-                                        .filter(e => e.reason !== 'Final de Turno' && currentOperatorLog && new Date(e.stopTime).getTime() >= new Date(currentOperatorLog.startTime).getTime())
-                                        .sort((a, b) => new Date(b.stopTime).getTime() - new Date(a.stopTime).getTime())
-                                        .map((event, idx) => {
-                                            const eventEnd = event.resumeTime || (activeOrder.status === 'completed' ? activeOrder.endTime : null);
+                {/* PARADAS TABLE - aggregates across ALL shift orders */}
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col flex-1 overflow-hidden min-h-0">
+                    <div className="bg-slate-50 border-b border-slate-100 p-2.5 px-4 shrink-0 shadow-sm z-10 flex justify-between items-center">
+                        <h3 className="font-black text-slate-600 uppercase tracking-widest text-[10px] flex justify-center items-center gap-1.5">
+                            <WarningIcon className="h-3 w-3 text-rose-500" /> PARADAS DO TURNO
+                        </h3>
+                        {(() => {
+                            if (!currentOperatorLog) return <span className="text-[9px] font-bold text-slate-400 uppercase bg-white px-1.5 py-0.5 rounded border border-slate-200">0 Registros</span>;
+                            const shiftStart = new Date(currentOperatorLog.startTime).getTime();
+                            const total = allOrders
+                                .filter(o => o.machine === machineType)
+                                .flatMap(o => o.downtimeEvents || [])
+                                .filter(e => e.reason !== 'Final de Turno' && e.reason !== 'Aguardando Início da Produção' && new Date(e.stopTime).getTime() >= shiftStart)
+                                .length;
+                            return <span className="text-[9px] font-bold text-slate-400 uppercase bg-white px-1.5 py-0.5 rounded border border-slate-200">{total} Registros</span>;
+                        })()}
+                    </div>
+                    <div className="flex-1 overflow-y-auto custom-scrollbar bg-white">
+                        <table className="w-full text-left border-collapse">
+                            <thead className="sticky top-0 bg-white/95 backdrop-blur-sm z-10 shadow-sm">
+                                <tr className="text-[9px] uppercase font-black text-slate-400 border-b border-slate-100">
+                                    <th className="p-2 px-3">Duração</th>
+                                    <th className="p-2">Início</th>
+                                    <th className="p-2 w-full">Motivo</th>
+                                    <th className="p-2 pr-3 text-right">Ordem</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {(() => {
+                                    if (!currentOperatorLog) return null;
+                                    const shiftStart = new Date(currentOperatorLog.startTime).getTime();
+                                    // Collect events from ALL shift orders
+                                    const allEvents: Array<{ event: any; orderNumber: string; orderId: string }> = [];
+                                    allOrders
+                                        .filter(o => o.machine === machineType && o.status !== 'cancelled')
+                                        .forEach(order => {
+                                            (order.downtimeEvents || [])
+                                                .filter(e => e.reason !== 'Final de Turno' && e.reason !== 'Aguardando Início da Produção' && new Date(e.stopTime).getTime() >= shiftStart)
+                                                .forEach(event => {
+                                                    allEvents.push({ event, orderNumber: order.orderNumber, orderId: order.id });
+                                                });
+                                        });
+                                    
+                                    if (allEvents.length === 0) {
+                                        return <tr><td colSpan={4} className="p-4 text-center text-[10px] font-bold uppercase text-slate-300">Nenhuma parada no turno</td></tr>;
+                                    }
+
+                                    return allEvents
+                                        .sort((a, b) => new Date(b.event.stopTime).getTime() - new Date(a.event.stopTime).getTime())
+                                        .map(({ event, orderNumber, orderId }, idx) => {
+                                            const isCurrentOrder = orderId === activeOrder?.id;
+                                            const eventEnd = event.resumeTime || (isCurrentOrder && activeOrder?.status === 'completed' ? activeOrder.endTime : null);
                                             const duration = eventEnd ? new Date(eventEnd).getTime() - new Date(event.stopTime).getTime() : now.getTime() - new Date(event.stopTime).getTime();
                                             return (
                                                 <tr key={idx} className="border-b border-slate-50 hover:bg-slate-50/50 group">
@@ -411,20 +441,23 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                                     <td className="p-2 font-mono font-medium text-[10px] text-slate-500">
                                                         {new Date(event.stopTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                                                     </td>
-                                                    <td className="p-2 text-[10px] md:text-xs font-bold text-slate-700 uppercase leading-none pr-3">
+                                                    <td className="p-2 text-[10px] md:text-xs font-bold text-slate-700 uppercase leading-none">
                                                         {event.reason}
                                                         {!event.resumeTime && <span className="ml-2 text-[8px] uppercase font-black bg-rose-500 text-white px-1 py-0.5 rounded animate-pulse">Atual</span>}
                                                     </td>
+                                                    <td className="p-2 pr-3 text-right">
+                                                        <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${isCurrentOrder ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>
+                                                            #{orderNumber}
+                                                        </span>
+                                                    </td>
                                                 </tr>
                                             );
-                                        })}
-                                    {(activeOrder.downtimeEvents || []).filter(e => e.reason !== 'Final de Turno' && currentOperatorLog && new Date(e.stopTime).getTime() >= new Date(currentOperatorLog.startTime).getTime()).length === 0 && (
-                                        <tr><td colSpan={3} className="p-4 text-center text-[10px] font-bold uppercase text-slate-300">Nenhuma parada no turno</td></tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
+                                        });
+                                })()}
+                            </tbody>
+                        </table>
                     </div>
+                </div>
 
                     {/* LOTES TABLE (TREFILA ONLY, flex-1) */}
                     {machineType === 'Trefila' && (
@@ -949,6 +982,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                         <MachineStatusView
                             machineType="Trefila"
                             activeOrder={activeTrefilaOrder}
+                            allOrders={productionOrders}
                             stock={stock}
                             dailyProducedValue={dailyProduction.trefilaShiftWeight}
                             dailyGoal={6000}
@@ -973,6 +1007,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                         <MachineStatusView
                             machineType="Treliça"
                             activeOrder={activeTrelicaOrder}
+                            allOrders={productionOrders}
                             stock={stock}
                             dailyProducedValue={trelicaDisplayData.value}
                             dailyGoal={trelicaDisplayData.goal}

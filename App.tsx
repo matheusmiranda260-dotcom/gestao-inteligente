@@ -1054,7 +1054,6 @@ const App: React.FC = () => {
         }
     };
 
-    // Machine Control Trefila
     const startProductionOrder = async (orderId: string) => {
         if (!currentUser) return;
         const now = new Date().toISOString();
@@ -1072,38 +1071,27 @@ const App: React.FC = () => {
 
         const newOrderMachine = orderToStartData.machine;
 
-        // Find and close any existing open shift for this user/machine
-        const openShiftOrderIndex = newOrders.findIndex(o =>
-            o.machine === newOrderMachine &&
-            (o.operatorLogs || []).some(log => log.operator === currentUser.username && !log.endTime)
-        );
-
         try {
-            // 1. First aggressively close any order that thinks it's in progress for this machine properly
-            const inProgressOrders = productionOrders.filter(o => o.machine === orderToStartData.machine && o.status === 'in_progress' && o.id !== orderId);
+            // 1. Close ALL other in-progress orders on this machine (properly)
+            const inProgressOrders = productionOrders.filter(o => o.machine === newOrderMachine && o.status === 'in_progress' && o.id !== orderId);
             if (inProgressOrders.length > 0) {
-                await Promise.all(inProgressOrders.map(orderToPause => 
+                await Promise.all(inProgressOrders.map(orderToPause =>
                     executePauseOrder(orderToPause.id, now)
                 ));
             }
 
-            if (openShiftOrderIndex !== -1) {
-                const openShiftOrder = { ...newOrders[openShiftOrderIndex] };
-                openShiftOrder.operatorLogs = (openShiftOrder.operatorLogs || []).map(log =>
-                    (log.operator === currentUser.username && !log.endTime) ? { ...log, endTime: now } : log
-                );
+            // 2. Set up the new order
+            // Close any previously open downtime events on THIS order (e.g. from last time it was paused)
+            const closedPreviousEvents = (orderToStartData.downtimeEvents || []).map(e =>
+                !e.resumeTime ? { ...e, resumeTime: now } : e
+            );
 
-                await updateItem('production_orders', openShiftOrder.id, { operatorLogs: openShiftOrder.operatorLogs });
-                newOrders[openShiftOrderIndex] = openShiftOrder;
-            }
-
-            // Start the new order
+            // Add a new "Aguardando" event to signal it's not yet producing
             const updates: Partial<ProductionOrderData> = {
                 status: 'in_progress',
                 startTime: orderToStartData.startTime || now,
-                // Ensure all previous downtime events for THIS order are closed before adding new "Aguardando"
                 downtimeEvents: [
-                    ...(orderToStartData.downtimeEvents || []).map(e => !e.resumeTime ? { ...e, resumeTime: now } : e),
+                    ...closedPreviousEvents,
                     {
                         stopTime: now,
                         resumeTime: null,
@@ -1112,12 +1100,31 @@ const App: React.FC = () => {
                 ]
             };
 
-            if (openShiftOrderIndex !== -1) {
-                updates.operatorLogs = [...(orderToStartData.operatorLogs || []), {
-                    operator: currentUser.username,
-                    startTime: now,
-                    endTime: null
-                }];
+            // 3. If the current user already has an open shift somewhere on this machine,
+            //    auto-carry their session into this new order (no need to click 'Iniciar Turno' again)
+            const existingOpenLog = productionOrders
+                .filter(o => o.machine === newOrderMachine && o.id !== orderId)
+                .flatMap(o => o.operatorLogs || [])
+                .find(log => log.operator === currentUser.username && !log.endTime);
+
+            if (existingOpenLog) {
+                // Carry the existing log into the new order, using the current quantity as start baseline
+                updates.operatorLogs = [
+                    ...(orderToStartData.operatorLogs || []).map(log =>
+                        !log.endTime ? { ...log, endTime: now, endQuantity: orderToStartData.actualProducedQuantity || 0 } : log
+                    ),
+                    {
+                        operator: currentUser.username,
+                        startTime: now,
+                        endTime: null,
+                        startQuantity: orderToStartData.actualProducedQuantity || 0
+                    }
+                ];
+                // Also immediately close the "Aguardando" event since the operator is already active
+                const lastEvent = updates.downtimeEvents![updates.downtimeEvents!.length - 1];
+                if (lastEvent && !lastEvent.resumeTime) {
+                    lastEvent.resumeTime = now;
+                }
             }
 
             await updateItem('production_orders', orderToStartData.id, updates);
@@ -1135,7 +1142,7 @@ const App: React.FC = () => {
         const order = fetchedOrders[0];
         if (!order) return;
 
-        // Close ANY other open logic for this order before starting our own
+        // Close ALL open logs for any operator before starting the current user's
         const newLogs = (order.operatorLogs || []).map(log => {
             if (!log.endTime) {
                 return { ...log, endTime: now, endQuantity: order.actualProducedQuantity || 0 };
@@ -1143,53 +1150,35 @@ const App: React.FC = () => {
             return log;
         });
 
+        // Start the new log for the current user
+        const updatedLogs = [...newLogs, {
+            operator: currentUser.username,
+            startTime: now,
+            endTime: null,
+            startQuantity: order.actualProducedQuantity || 0
+        }];
+
+        // Close ALL open downtime events (not just the last one!)
+        const closedEvents = (order.downtimeEvents || []).map(event =>
+            !event.resumeTime ? { ...event, resumeTime: now } : event
+        );
+
         const updates: Partial<ProductionOrderData> = {
-            operatorLogs: [...newLogs, {
-                operator: currentUser.username,
-                startTime: now,
-                endTime: null,
-                startQuantity: order.actualProducedQuantity || 0
-            }],
+            operatorLogs: updatedLogs,
+            downtimeEvents: closedEvents,
         };
 
-        // Auto-resume for administrative stops
-        const newEvents = [...(order.downtimeEvents || [])];
-        let lastEventIndex = -1;
-        for (let i = newEvents.length - 1; i >= 0; i--) {
-            if (!newEvents[i].resumeTime) {
-                lastEventIndex = i;
-                break;
-            }
-        }
-
-        if (lastEventIndex !== -1) {
-            const lastReason = newEvents[lastEventIndex].reason;
-            if (lastReason === 'Final de Turno' || lastReason === 'Aguardando Início da Produção') {
-                newEvents[lastEventIndex].resumeTime = now;
-                updates.downtimeEvents = newEvents;
-            }
-        }
-
-        // For Trefila, if no active lot processing, ensure we are in "Troca de Rolo / Preparação"
+        // For Trefila: if no active lot, add a prep event (machine needs setup)
+        // NOTE: We do NOT add a stuck event for Treliça here - let the operators start directly
         if (order.machine === 'Trefila' && (!order.activeLotProcessing || !order.activeLotProcessing.lotId)) {
-            const currentEvents = updates.downtimeEvents || [...(order.downtimeEvents || [])];
-            const lastEvent = currentEvents.length > 0 ? currentEvents[currentEvents.length - 1] : null;
-
-            // Only push if not already in a preparation state
-            if (!lastEvent || lastEvent.resumeTime !== null || (lastEvent.reason !== 'Troca de Rolo / Preparação' && lastEvent.reason !== 'Setup')) {
-                const updatedEvents = [...currentEvents];
-                // Close previous open event if any (should already be handled but for extra safety)
-                if (updatedEvents.length > 0 && !updatedEvents[updatedEvents.length - 1].resumeTime) {
-                    updatedEvents[updatedEvents.length - 1].resumeTime = now;
-                }
-
-                updatedEvents.push({
+            updates.downtimeEvents = [
+                ...closedEvents,
+                {
                     stopTime: now,
                     resumeTime: null,
                     reason: 'Troca de Rolo / Preparação'
-                });
-                updates.downtimeEvents = updatedEvents;
-            }
+                }
+            ];
         }
 
         try {
