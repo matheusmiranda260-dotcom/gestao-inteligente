@@ -170,6 +170,44 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
         return { processedLotsCount, totalLotsCount, producedQuantity, plannedQuantity, progress: Math.min(100, progress) };
     }, [activeOrder, machineType]);
 
+    // Per-order production breakdown for the current shift (for Treliça multi-order display)
+    const shiftOrdersSummary = useMemo(() => {
+        if (machineType !== 'Treliça' || !currentOperatorLog) return [];
+
+        const shiftStart = new Date(currentOperatorLog.startTime).getTime();
+        const results: Array<{ orderId: string; orderNumber: string; model: string; size: string; pieces: number; isCurrent: boolean }> = [];
+
+        allOrders
+            .filter(o => o.machine === 'Treliça' && o.status !== 'cancelled')
+            .forEach(order => {
+                let orderPiecesInShift = 0;
+                (order.operatorLogs || []).forEach(log => {
+                    if (!log.startTime) return;
+                    const logStart = new Date(log.startTime).getTime();
+                    // Only count logs that overlap with the current shift window
+                    const logEnd = log.endTime ? new Date(log.endTime).getTime() : Date.now();
+                    if (logEnd < shiftStart) return; // Log ended before this shift
+
+                    const startQty = log.startQuantity || 0;
+                    const endQty = log.endTime ? (log.endQuantity || 0) : (order.actualProducedQuantity || 0);
+                    orderPiecesInShift += Math.max(0, endQty - startQty);
+                });
+
+                if (orderPiecesInShift > 0 || order.id === activeOrder?.id) {
+                    results.push({
+                        orderId: order.id,
+                        orderNumber: order.orderNumber,
+                        model: order.trelicaModel || '?',
+                        size: String(order.tamanho || '6'),
+                        pieces: orderPiecesInShift,
+                        isCurrent: order.id === activeOrder?.id,
+                    });
+                }
+            });
+
+        return results;
+    }, [allOrders, machineType, currentOperatorLog, activeOrder]);
+
     if (!activeOrder) {
         return (
             <div className="bg-white rounded-3xl shadow-xl border border-slate-100 lg:h-[calc(100vh-10rem)] h-auto min-h-[400px] flex flex-col overflow-hidden">
@@ -229,35 +267,80 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                 {/* LEFT COLUMN: CRITICAL METRICS */}
                 <div className="flex flex-col gap-2 sm:gap-3 overflow-x-hidden min-w-0">
                     
-                    {/* CARD 1: META DIÁRIA */}
+                    {/* CARD 1: META DIÁRIA / PER-ORDER BREAKDOWN */}
                     <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-200 overflow-hidden">
                         <div className="flex justify-between items-center mb-2">
                             <h3 className="font-black text-slate-700 uppercase tracking-widest text-[10px] md:text-xs title-font flex items-center gap-1.5">
                                 <ScaleIcon className="h-4 w-4 text-indigo-500" /> {machineType === 'Treliça' ? 'Meta do Turno Atual' : 'Meta Diária da Fábrica'}
                             </h3>
                             <span className="text-[10px] font-black bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded uppercase tracking-widest ring-1 ring-indigo-500/20">
-                                {((dailyProducedValue / dailyGoal) * 100).toFixed(0)}%
+                                {dailyGoal > 0 ? ((dailyProducedValue / dailyGoal) * 100).toFixed(0) : 0}%
                             </span>
                         </div>
-                        <div className="flex items-center gap-2 mt-1 w-full">
-                            <div className="flex-1 h-3.5 bg-slate-100 rounded-full overflow-hidden shadow-inner shrink-0 ring-1 ring-black/5">
-                                <div
-                                    className={`h-full transition-all duration-1000 flex items-center justify-end pr-2 ${dailyProducedValue >= dailyGoal ? 'bg-gradient-to-r from-emerald-400 to-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]' : 'bg-gradient-to-r from-indigo-500 to-blue-500'}`}
-                                    style={{ width: `${Math.min(100, (dailyProducedValue / dailyGoal) * 100)}%` }}
-                                >
-                                    {dailyProducedValue >= dailyGoal && <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>}
+
+                        {/* Per-order breakdown for Treliça when multiple orders exist in this shift */}
+                        {machineType === 'Treliça' && shiftOrdersSummary.length > 1 ? (
+                            <div className="space-y-2">
+                                {shiftOrdersSummary.map((item, idx) => {
+                                    const sizeValue = parseFloat(item.size.replace(',', '.'));
+                                    const isH12 = item.model.toUpperCase().includes('H12') || item.model.toUpperCase().includes('H-12');
+                                    const orderGoal = isH12 ? (sizeValue >= 10 ? 250 : 500) : (sizeValue >= 10 ? 300 : 600);
+                                    const pct = orderGoal > 0 ? Math.min(100, (item.pieces / orderGoal) * 100) : 0;
+                                    return (
+                                        <div key={item.orderId} className={`p-2 rounded-xl border ${item.isCurrent ? 'bg-indigo-50/50 border-indigo-200' : 'bg-slate-50/50 border-slate-100'}`}>
+                                            <div className="flex justify-between items-center mb-1">
+                                                <div className="flex items-center gap-1.5 min-w-0">
+                                                    {item.isCurrent && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></div>}
+                                                    <span className="text-[9px] font-black text-slate-600 uppercase truncate">
+                                                        {item.model} ({item.size}m)
+                                                    </span>
+                                                    <span className="text-[8px] font-bold text-slate-400">#{item.orderNumber}</span>
+                                                </div>
+                                                <span className="text-[10px] font-black text-slate-800 whitespace-nowrap">
+                                                    {item.pieces} <span className="text-[8px] text-slate-400">/ {orderGoal}</span>
+                                                </span>
+                                            </div>
+                                            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden ring-1 ring-black/5">
+                                                <div
+                                                    className={`h-full rounded-full transition-all duration-700 ${item.isCurrent ? 'bg-gradient-to-r from-indigo-500 to-blue-500' : 'bg-gradient-to-r from-slate-400 to-slate-500'}`}
+                                                    style={{ width: `${pct}%` }}
+                                                ></div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                {/* Total line */}
+                                <div className="flex justify-between items-center pt-1 border-t border-slate-200 mt-1">
+                                    <span className="text-[9px] font-black text-slate-500 uppercase">Total no Turno</span>
+                                    <span className="text-xs font-black text-slate-800">
+                                        {shiftOrdersSummary.reduce((sum, o) => sum + o.pieces, 0)} pçs
+                                    </span>
                                 </div>
                             </div>
-                            <span className="text-xs font-black text-slate-800 tracking-tighter whitespace-nowrap shrink-0">
-                                {dailyProducedValue.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} <span className="text-[9px] text-slate-400 uppercase font-bold">{goalUnit}</span>
-                                <span className="text-slate-300 mx-1">/</span>
-                                {dailyGoal.toLocaleString('pt-BR')}
-                            </span>
-                        </div>
-                        {dailyProducedValue >= dailyGoal && (
-                            <div className="mt-2 flex items-center gap-1.5 text-emerald-600 font-bold text-[10px] animate-pulse">
-                                <CheckCircleIcon className="h-3 w-3" /> META BATIDA!
-                            </div>
+                        ) : (
+                            /* Single order or non-Treliça: original display */
+                            <>
+                                <div className="flex items-center gap-2 mt-1 w-full">
+                                    <div className="flex-1 h-3.5 bg-slate-100 rounded-full overflow-hidden shadow-inner shrink-0 ring-1 ring-black/5">
+                                        <div
+                                            className={`h-full transition-all duration-1000 flex items-center justify-end pr-2 ${dailyProducedValue >= dailyGoal ? 'bg-gradient-to-r from-emerald-400 to-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]' : 'bg-gradient-to-r from-indigo-500 to-blue-500'}`}
+                                            style={{ width: `${Math.min(100, (dailyProducedValue / dailyGoal) * 100)}%` }}
+                                        >
+                                            {dailyProducedValue >= dailyGoal && <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>}
+                                        </div>
+                                    </div>
+                                    <span className="text-xs font-black text-slate-800 tracking-tighter whitespace-nowrap shrink-0">
+                                        {dailyProducedValue.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} <span className="text-[9px] text-slate-400 uppercase font-bold">{goalUnit}</span>
+                                        <span className="text-slate-300 mx-1">/</span>
+                                        {dailyGoal.toLocaleString('pt-BR')}
+                                    </span>
+                                </div>
+                                {dailyProducedValue >= dailyGoal && (
+                                    <div className="mt-2 flex items-center gap-1.5 text-emerald-600 font-bold text-[10px] animate-pulse">
+                                        <CheckCircleIcon className="h-3 w-3" /> META BATIDA!
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
 

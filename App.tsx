@@ -1367,17 +1367,10 @@ const App: React.FC = () => {
         const order = fetchedOrders[0];
         if (!order) return;
 
-        const newEvents = [...(order.downtimeEvents || [])];
-        let lastEventIndex = -1;
-        for (let i = newEvents.length - 1; i >= 0; i--) {
-            if (!newEvents[i].resumeTime) {
-                lastEventIndex = i;
-                break;
-            }
-        }
-        if (lastEventIndex !== -1) {
-            newEvents[lastEventIndex].resumeTime = now;
-        }
+        // Close ALL open downtime events (not just the last one)
+        const newEvents = (order.downtimeEvents || []).map(event =>
+            !event.resumeTime ? { ...event, resumeTime: now } : event
+        );
         newEvents.push({ stopTime: now, resumeTime: null, reason });
 
         const updates: Partial<ProductionOrderData> = { downtimeEvents: newEvents };
@@ -1397,25 +1390,15 @@ const App: React.FC = () => {
         const order = fetchedOrders[0];
         if (!order) return;
 
-        const newEvents = [...(order.downtimeEvents || [])];
-        let lastEventIndex = -1;
-        for (let i = newEvents.length - 1; i >= 0; i--) {
-            if (!newEvents[i].resumeTime) {
-                lastEventIndex = i;
-                break;
-            }
-        }
-
-        // Close any open event
-        if (lastEventIndex !== -1) {
-            newEvents[lastEventIndex].resumeTime = now;
-        }
+        // Close ALL open downtime events
+        const newEvents = (order.downtimeEvents || []).map(event =>
+            !event.resumeTime ? { ...event, resumeTime: now } : event
+        );
 
         // Trefila requirement: machine must be in "Troca de Rolo" if no lot is active
         if (order.machine === 'Trefila' && (!order.activeLotProcessing || !order.activeLotProcessing.lotId)) {
-            // Only add if we didn't just close a "Troca de Rolo" now, or if it's the first one
-            const justClosedReason = lastEventIndex !== -1 ? (order.downtimeEvents || [])[lastEventIndex].reason : null;
-            if (justClosedReason !== 'Troca de Rolo / Preparação') {
+            const lastClosedReason = (order.downtimeEvents || []).filter(e => !e.resumeTime).map(e => e.reason).pop();
+            if (lastClosedReason !== 'Troca de Rolo / Preparação') {
                 newEvents.push({ stopTime: now, resumeTime: null, reason: 'Troca de Rolo / Preparação' });
             }
         }
@@ -1435,17 +1418,10 @@ const App: React.FC = () => {
         const order = fetchedOrders[0];
         if (!order) return;
 
-        const newEvents = [...(order.downtimeEvents || [])];
-        let lastEventIndex = -1;
-        for (let i = newEvents.length - 1; i >= 0; i--) {
-            if (!newEvents[i].resumeTime) {
-                lastEventIndex = i;
-                break;
-            }
-        }
-        if (lastEventIndex !== -1) {
-            newEvents[lastEventIndex].resumeTime = now;
-        }
+        // Close ALL open downtime events
+        const newEvents = (order.downtimeEvents || []).map(event =>
+            !event.resumeTime ? { ...event, resumeTime: now } : event
+        );
 
         const updates: Partial<ProductionOrderData> = {
             activeLotProcessing: { lotId, startTime: now },
@@ -1504,17 +1480,10 @@ const App: React.FC = () => {
         let updates: Partial<ProductionOrderData> = {};
         const stockUpdates: { id: string, changes: Partial<StockItem> }[] = [];
 
-        const newEvents = [...(orderToComplete.downtimeEvents || [])];
-        let lastEventIndex = -1;
-        for (let i = newEvents.length - 1; i >= 0; i--) {
-            if (!newEvents[i].resumeTime) {
-                lastEventIndex = i;
-                break;
-            }
-        }
-        if (lastEventIndex !== -1) {
-            newEvents[lastEventIndex].resumeTime = now;
-        }
+        // Close ALL open downtime events
+        const newEvents = (orderToComplete.downtimeEvents || []).map(event =>
+            !event.resumeTime ? { ...event, resumeTime: now } : event
+        );
 
         // Close ALL open operator logs when completing the order
         const newLogs = (orderToComplete.operatorLogs || []).map(log =>

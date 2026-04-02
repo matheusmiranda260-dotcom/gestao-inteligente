@@ -571,13 +571,16 @@ const MachineControl: React.FC<MachineControlProps> = ({
     const handleStartShift = () => {
         if (!activeOrder || !startOperatorShift) return;
 
-        // Check for active downtime from previous shift
-        const lastEvent = activeOrder.downtimeEvents?.[(activeOrder.downtimeEvents.length || 0) - 1];
-        if (lastEvent && !lastEvent.resumeTime && lastEvent.reason !== 'Final de Turno' && lastEvent.reason !== 'Aguardando Início da Produção') {
-            setPreviousStopReason(lastEvent.reason);
+        // Check for ANY active downtime event from previous shift (not just the last array element)
+        const openEvent = (activeOrder.downtimeEvents || []).find(e =>
+            !e.resumeTime && e.reason !== 'Final de Turno' && e.reason !== 'Aguardando Início da Produção'
+        );
+
+        if (openEvent) {
+            setPreviousStopReason(openEvent.reason);
             setShowResumePreviousStopModal(true);
         } else {
-            // Normal start
+            // Normal start — all events are administrative, just begin
             startOperatorShift(activeOrder.id);
         }
     };
