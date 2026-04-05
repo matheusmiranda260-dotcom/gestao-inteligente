@@ -150,7 +150,7 @@ const ProductionOrderHistoryModal: React.FC<{
                                                     <button onClick={() => toggleExpand(order.id)} className="text-slate-600 hover:underline text-xs font-semibold">
                                                         {expandedOrderId === order.id ? 'Ocultar Lotes' : 'Ver Lotes'}
                                                     </button>
-                                                    {(order.status === 'pending' || (order.status === 'in_progress' && isGestor)) && (
+                                                    {(order.status === 'pending' || ((order.status === 'in_progress' || order.status === 'completed') && isGestor)) && (
                                                         <>
                                                             <button
                                                                 onClick={() => setEditingOrder(order)}

@@ -884,37 +884,86 @@ const App: React.FC = () => {
             const orderToDelete = productionOrders.find(o => o.id === orderId);
             if (!orderToDelete) return;
 
-            let lotIds: string[] = [];
-            if (orderToDelete.machine === 'Treliça' && !Array.isArray(orderToDelete.selectedLotIds)) {
-                const lots = orderToDelete.selectedLotIds as TrelicaSelectedLots;
-                if (lots.allSuperior && lots.allInferior && lots.allSenozoide) {
-                    lotIds = [...lots.allSuperior, ...lots.allInferior, ...lots.allSenozoide];
-                } else {
-                    lotIds = [lots.superior, lots.inferior1, lots.inferior2, lots.senozoide1, lots.senozoide2];
-                }
-            } else {
-                lotIds = Array.isArray(orderToDelete.selectedLotIds) ? orderToDelete.selectedLotIds : Object.values(orderToDelete.selectedLotIds) as string[];
+            if (!window.confirm(`⚠️ EXCLUSÃO DEFINITIVA: Tem certeza que deseja remover a ordem ${orderToDelete.orderNumber}? Isso apagará permanentemente todos os registros vinculados (relatórios, pesagens, etc).`)) {
+                return;
             }
 
-            // Update related stock items first
+            // 1. Collect all lot IDs to restore their status in stock
+            let lotIds: string[] = [];
+            const rawSelected = orderToDelete.selectedLotIds;
+            
+            if (orderToDelete.machine === 'Treliça' && rawSelected && !Array.isArray(rawSelected)) {
+                const lots = rawSelected as TrelicaSelectedLots;
+                // Standard single-lot fields (old format)
+                const singleIds = [lots.superior, lots.inferior1, lots.inferior2, lots.senozoide1, lots.senozoide2].filter(Boolean);
+                // Multi-lot array fields (new format)
+                const multiIds = [
+                    ...(lots.allSuperior || []),
+                    ...(lots.allInferiorLeft || []),
+                    ...(lots.allInferiorRight || []),
+                    ...(lots.allSenozoideLeft || []),
+                    ...(lots.allSenozoideRight || [])
+                ].filter(Boolean);
+                
+                lotIds = [...new Set([...singleIds, ...multiIds])];
+            } else if (Array.isArray(rawSelected)) {
+                lotIds = rawSelected.filter(Boolean);
+            } else if (rawSelected && typeof rawSelected === 'object') {
+                lotIds = Object.values(rawSelected).flat().filter(Boolean) as string[];
+            }
+
+            // 2. Update related stock items first (restore availability)
             for (const lotId of lotIds) {
                 const stockItem = stock.find(s => s.id === lotId);
                 if (stockItem) {
                     const newProductionOrderIds = (stockItem.productionOrderIds || []).filter(id => id !== orderId);
                     const isNowAvailable = newProductionOrderIds.length === 0;
 
+                    let newStatus = stockItem.status;
+                    if (isNowAvailable) {
+                        // Return to appropriate available status
+                        if (stockItem.status.includes('Treliça')) {
+                            newStatus = 'Disponível - Suporte Treliça';
+                        } else {
+                            newStatus = 'Disponível';
+                        }
+                    }
+
                     await updateItem<StockItem>('stock_items', lotId, {
-                        status: isNowAvailable ? 'Disponível' : stockItem.status,
-                        location: isNowAvailable ? '' : stockItem.location, // Clear role if back to available
+                        status: newStatus,
+                        location: isNowAvailable ? '' : stockItem.location,
                         productionOrderIds: newProductionOrderIds.length > 0 ? newProductionOrderIds : undefined,
                     });
                 }
             }
 
+            // 3. Clear related records in other tables to avoid foreign key violations
+            try {
+                await deleteItemByColumn('shift_reports', 'production_order_id', orderId);
+            } catch (e) { console.warn('No reports to delete or table missing'); }
+            
+            try {
+                await deleteItemByColumn('finished_goods', 'production_order_id', orderId);
+            } catch (e) { console.warn('No finished goods to delete or table missing'); }
+            
+            try {
+                await deleteItemByColumn('pontas_stock', 'production_order_id', orderId);
+            } catch (e) { console.warn('No pontas to delete or table missing'); }
+            
+            try {
+                await deleteItemByColumn('parts_requests', 'production_order_id', orderId);
+            } catch (e) { console.warn('No parts requests to delete or table missing'); }
+
+            // 4. Delete the order itself
             await deleteItem('production_orders', orderId);
-            showNotification('Ordem de produção removida.', 'success');
-        } catch (error) {
-            showNotification('Erro ao remover ordem de produção.', 'error');
+            
+            // 5. Update local state
+            setProductionOrders(prev => prev.filter(o => o.id !== orderId));
+            
+            showNotification('Ordem de produção e registros relacionados removidos com sucesso.', 'success');
+        } catch (error: any) {
+            console.error('Erro ao remover ordem:', error);
+            showNotification(`Erro ao remover ordem: ${error.message || 'Verifique se existem registros vinculados.'}`, 'error');
         }
     };
 
