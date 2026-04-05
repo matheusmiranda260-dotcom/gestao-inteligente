@@ -1072,8 +1072,17 @@ const App: React.FC = () => {
         const newOrderMachine = orderToStartData.machine;
 
         try {
-            // 1. Close ALL other in-progress orders on this machine (properly)
+            // 0. Transition Guard: If there are other orders in progress, ask for manager PIN
             const inProgressOrders = productionOrders.filter(o => o.machine === newOrderMachine && o.status === 'in_progress' && o.id !== orderId);
+            if (inProgressOrders.length > 0) {
+                const pin = window.prompt("⚠️ Troca de Ordem detectada. Insira a SENHA do encarregado para continuar:");
+                if (pin !== "1234") {
+                    if (pin !== null) showNotification("Senha incorreta!", "error");
+                    return;
+                }
+            }
+
+            // 1. Close ALL other in-progress orders on this machine (properly)
             if (inProgressOrders.length > 0) {
                 await Promise.all(inProgressOrders.map(orderToPause =>
                     executePauseOrder(orderToPause.id, now)

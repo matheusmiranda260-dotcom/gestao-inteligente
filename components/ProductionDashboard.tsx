@@ -85,6 +85,48 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
 
     const now = useMemo(() => new Date(localNow.getTime() + stableDrift), [localNow, stableDrift]);
 
+    const { shiftDowntime, shiftUptime, shiftStartMs, shiftEndMs } = useMemo(() => {
+        const h = now.getHours();
+        const isShiftA = h >= 5 && h < 14;
+        
+        const start = new Date(now);
+        start.setHours(isShiftA ? 5 : 14, 0, 0, 0);
+        
+        const end = new Date(now);
+        if (isShiftA) {
+            end.setHours(14, 0, 0, 0);
+        } else {
+            end.setDate(end.getDate() + 1);
+            end.setHours(5, 0, 0, 0);
+        }
+
+        const sMs = start.getTime();
+        const eMs = end.getTime();
+        const nowMs = now.getTime();
+        const effectiveEnd = Math.min(nowMs, eMs);
+        const totalDuration = Math.max(0, effectiveEnd - sMs);
+
+        // Aggregate downtime from ALL orders in this shift window
+        const shiftOrders = allOrders.filter(o => o.machine === machineType && o.status !== 'cancelled');
+        let downtime = 0;
+        shiftOrders.forEach(order => {
+            (order.downtimeEvents || []).forEach(event => {
+                const stopT = new Date(event.stopTime).getTime();
+                const resumeT = event.resumeTime ? new Date(event.resumeTime).getTime() : nowMs;
+                
+                const intersectStart = Math.max(sMs, stopT);
+                const intersectEnd = Math.min(effectiveEnd, resumeT);
+                
+                if (intersectEnd > intersectStart) {
+                    downtime += (intersectEnd - intersectStart);
+                }
+            });
+        });
+
+        const uptime = Math.max(0, totalDuration - downtime);
+        return { shiftDowntime: downtime, shiftUptime: uptime, shiftStartMs: sMs, shiftEndMs: eMs };
+    }, [now, allOrders, machineType]);
+
     const machineStatus = useMemo(() => {
         if (!activeOrder) {
             return { status: 'Ocioso', reason: 'Nenhuma ordem em produção', since: now.toISOString(), durationMs: 0 };
@@ -107,41 +149,12 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             }
             return { status: 'Parada', reason: reason, since: openEvent.stopTime, durationMs };
         } else {
-            let since = activeOrder.startTime || now.toISOString();
-            const durationMs = Math.max(0, now.getTime() - new Date(since).getTime());
-            return { status: 'Produzindo', reason: '', since, durationMs };
+            // When producing, show the productive time of the current shift
+            return { status: 'Produzindo', reason: '', since: activeOrder.startTime, durationMs: shiftUptime };
         }
-    }, [activeOrder, now, currentOperatorLog]);
+    }, [activeOrder, now, currentOperatorLog, shiftUptime]);
 
     const currentOperator = currentOperatorLog?.operator || 'N/A';
-
-    const { shiftDowntime, shiftUptime } = useMemo(() => {
-        if (!currentOperatorLog || !currentOperatorLog.startTime) return { shiftDowntime: 0, shiftUptime: 0 };
-
-        const nowMs = now.getTime();
-        const start = new Date(currentOperatorLog.startTime).getTime();
-        const totalShiftDuration = Math.max(0, nowMs - start);
-
-        // Aggregate downtime from ALL orders on this machine in the current shift
-        const shiftOrders = allOrders.filter(o => o.machine === machineType && o.status !== 'cancelled');
-        let downtime = 0;
-        shiftOrders.forEach(order => {
-            (order.downtimeEvents || []).forEach(event => {
-                // Only count events that fall within the operator's shift window
-                const stopTime = new Date(event.stopTime).getTime();
-                if (stopTime < start) return; // Before this shift
-                const resumeTime = event.resumeTime ? new Date(event.resumeTime).getTime() : nowMs;
-                const effectiveStart = Math.max(stopTime, start);
-                const effectiveEnd = Math.min(resumeTime, nowMs);
-                if (effectiveEnd > effectiveStart) {
-                    downtime += (effectiveEnd - effectiveStart);
-                }
-            });
-        });
-
-        const uptime = Math.max(0, totalShiftDuration - downtime);
-        return { shiftDowntime: downtime, shiftUptime: uptime };
-    }, [now, currentOperatorLog, allOrders, machineType]);
 
     const isAlertActive = machineStatus.status === 'Parada' && machineStatus.durationMs > 30000;
     const currentStyle = statusStyles[machineStatus.status as keyof typeof statusStyles] || statusStyles.Ocioso;
@@ -172,9 +185,8 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
 
     // Per-order production breakdown for the current shift (for Treliça multi-order display)
     const shiftOrdersSummary = useMemo(() => {
-        if (machineType !== 'Treliça' || !currentOperatorLog) return [];
+        if (machineType !== 'Treliça') return [];
 
-        const shiftStart = new Date(currentOperatorLog.startTime).getTime();
         const results: Array<{ orderId: string; orderNumber: string; model: string; size: string; pieces: number; isCurrent: boolean }> = [];
 
         allOrders
@@ -184,13 +196,18 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                 (order.operatorLogs || []).forEach(log => {
                     if (!log.startTime) return;
                     const logStart = new Date(log.startTime).getTime();
-                    // Only count logs that overlap with the current shift window
-                    const logEnd = log.endTime ? new Date(log.endTime).getTime() : Date.now();
-                    if (logEnd < shiftStart) return; // Log ended before this shift
-
-                    const startQty = log.startQuantity || 0;
-                    const endQty = log.endTime ? (log.endQuantity || 0) : (order.actualProducedQuantity || 0);
-                    orderPiecesInShift += Math.max(0, endQty - startQty);
+                    const logEnd = log.endTime ? new Date(log.endTime).getTime() : now.getTime();
+                    
+                    // Intersection with current shift window
+                    const intersectStart = Math.max(shiftStartMs, logStart);
+                    const intersectEnd = Math.min(shiftEndMs, logEnd);
+                    
+                    if (intersectEnd > intersectStart) {
+                        const startQty = log.startQuantity || 0;
+                        const endQty = log.endTime ? (log.endQuantity || 0) : (order.actualProducedQuantity || 0);
+                        // We count the pieces from this log since it was started/ongoing in this shift
+                        orderPiecesInShift += Math.max(0, endQty - startQty);
+                    }
                 });
 
                 if (orderPiecesInShift > 0 || order.id === activeOrder?.id) {
@@ -206,7 +223,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             });
 
         return results;
-    }, [allOrders, machineType, currentOperatorLog, activeOrder]);
+    }, [allOrders, machineType, activeOrder, shiftStartMs, shiftEndMs, now]);
 
     if (!activeOrder) {
         return (
@@ -361,10 +378,16 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                     const lastUpdate = activeOrder.lastQuantityUpdate || activeOrder.startTime;
                                     if (!lastUpdate) return <span className="text-slate-400">-</span>;
                                     let baseTime = new Date(lastUpdate).getTime();
+                                    
+                                    // Cap baseTime by shift start (scheduled) and operator log start
+                                    const scheduledShiftStartMs = shiftStartMs;
+                                    if (scheduledShiftStartMs > baseTime) baseTime = scheduledShiftStartMs;
+                                    
                                     if (currentOperatorLog && currentOperatorLog.startTime) {
-                                        const shiftStartMs = new Date(currentOperatorLog.startTime).getTime();
-                                        if (shiftStartMs > baseTime) baseTime = shiftStartMs;
+                                        const actualShiftStartMs = new Date(currentOperatorLog.startTime).getTime();
+                                        if (actualShiftStartMs > baseTime) baseTime = actualShiftStartMs;
                                     }
+                                    
                                     const diff = now.getTime() - baseTime;
                                     const isOverdue = diff > 10 * 60 * 1000;
                                     return <span className={`font-mono font-bold text-lg ${isOverdue ? 'text-rose-500 animate-pulse bg-rose-50 px-2 py-0.5 rounded ring-1 ring-rose-500/20' : 'text-slate-700'}`}>{formatDuration(diff)}</span>;
@@ -468,12 +491,10 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                             <WarningIcon className="h-3 w-3 text-rose-500" /> PARADAS DO TURNO
                         </h3>
                         {(() => {
-                            if (!currentOperatorLog) return <span className="text-[9px] font-bold text-slate-400 uppercase bg-white px-1.5 py-0.5 rounded border border-slate-200">0 Registros</span>;
-                            const shiftStart = new Date(currentOperatorLog.startTime).getTime();
                             const total = allOrders
                                 .filter(o => o.machine === machineType)
                                 .flatMap(o => o.downtimeEvents || [])
-                                .filter(e => e.reason !== 'Final de Turno' && e.reason !== 'Aguardando Início da Produção' && new Date(e.stopTime).getTime() >= shiftStart)
+                                .filter(e => e.reason !== 'Final de Turno' && e.reason !== 'Aguardando Início da Produção' && new Date(e.stopTime).getTime() >= shiftStartMs && new Date(e.stopTime).getTime() < shiftEndMs)
                                 .length;
                             return <span className="text-[9px] font-bold text-slate-400 uppercase bg-white px-1.5 py-0.5 rounded border border-slate-200">{total} Registros</span>;
                         })()}
@@ -490,15 +511,13 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                             </thead>
                             <tbody>
                                 {(() => {
-                                    if (!currentOperatorLog) return null;
-                                    const shiftStart = new Date(currentOperatorLog.startTime).getTime();
-                                    // Collect events from ALL shift orders
+                                    // Collect events from ALL orders in this shift window
                                     const allEvents: Array<{ event: any; orderNumber: string; orderId: string }> = [];
                                     allOrders
                                         .filter(o => o.machine === machineType && o.status !== 'cancelled')
                                         .forEach(order => {
                                             (order.downtimeEvents || [])
-                                                .filter(e => e.reason !== 'Final de Turno' && e.reason !== 'Aguardando Início da Produção' && new Date(e.stopTime).getTime() >= shiftStart)
+                                                .filter(e => e.reason !== 'Final de Turno' && e.reason !== 'Aguardando Início da Produção' && new Date(e.stopTime).getTime() >= shiftStartMs && new Date(e.stopTime).getTime() < shiftEndMs)
                                                 .forEach(event => {
                                                     allEvents.push({ event, orderNumber: order.orderNumber, orderId: order.id });
                                                 });
