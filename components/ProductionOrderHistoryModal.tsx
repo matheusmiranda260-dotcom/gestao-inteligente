@@ -13,6 +13,7 @@ const ProductionOrderStatusBadge: React.FC<ProductionOrderStatusBadgeProps> = ({
         in_progress: { text: 'Em Produção', className: 'bg-[#e6f0f5] text-[#0F3F5C]' },
         completed: { text: 'Concluída', className: 'bg-emerald-100 text-emerald-800' },
         cancelled: { text: 'Cancelada', className: 'bg-red-100 text-red-800' },
+        paused: { text: 'Pausada (Arquivo)', className: 'bg-indigo-100 text-indigo-800 shadow-sm ring-1 ring-indigo-500/20' },
     };
     const { text, className } = statusMap[status] || { text: 'Desconhecido', className: 'bg-slate-100 text-slate-800' };
     return <span className={`px-2 py-1 text-xs font-semibold rounded-full ${className}`}>{text}</span>;
@@ -150,7 +151,7 @@ const ProductionOrderHistoryModal: React.FC<{
                                                     <button onClick={() => toggleExpand(order.id)} className="text-slate-600 hover:underline text-xs font-semibold">
                                                         {expandedOrderId === order.id ? 'Ocultar Lotes' : 'Ver Lotes'}
                                                     </button>
-                                                    {(order.status === 'pending' || ((order.status === 'in_progress' || order.status === 'completed') && isGestor)) && (
+                                                    {(order.status === 'pending' || ((order.status === 'in_progress' || order.status === 'completed' || order.status === 'paused') && isGestor)) && (
                                                         <>
                                                             <button
                                                                 onClick={() => setEditingOrder(order)}
@@ -189,34 +190,51 @@ const ProductionOrderHistoryModal: React.FC<{
                                                                 </tr>
                                                             </thead>
                                                             <tbody className="divide-y">
-                                                                {Array.isArray(order.selectedLotIds) ? (
-                                                                    order.selectedLotIds.map((lotId, index) => {
-                                                                        const lot = stock.find(s => s.id === lotId);
-                                                                        return (
-                                                                            <tr key={index}>
-                                                                                <td className="p-2">-</td>
-                                                                                <td className="p-2">{lot?.internalLot || 'N/A'}</td>
-                                                                                <td className="p-2">{lot?.materialType || 'N/A'}</td>
-                                                                                <td className="p-2">{lot?.bitola || 'N/A'}</td>
-                                                                                <td className="p-2 text-right">{lot?.labelWeight.toFixed(2)}</td>
-                                                                            </tr>
-                                                                        )
-                                                                    })
-                                                                ) : (
-                                                                    Object.entries(order.selectedLotIds).map(([key, lotId]) => {
-                                                                        const lot = stock.find(s => s.id === lotId);
-                                                                        const labelMap: Record<string, string> = { superior: 'Superior', inferior1: 'Inferior 1', inferior2: 'Inferior 2', senozoide1: 'Senozoide 1', senozoide2: 'Senozoide 2' };
-                                                                        return (
-                                                                            <tr key={key}>
-                                                                                <td className="p-2 font-medium capitalize">{labelMap[key]}</td>
-                                                                                <td className="p-2">{lot?.internalLot || 'N/A'}</td>
-                                                                                <td className="p-2">{lot?.materialType || 'N/A'}</td>
-                                                                                <td className="p-2">{lot?.bitola || 'N/A'}</td>
-                                                                                <td className="p-2 text-right">{lot?.labelWeight.toFixed(2)}</td>
-                                                                            </tr>
-                                                                        )
-                                                                    })
-                                                                )}
+                                                                {(() => {
+                                                                    if (Array.isArray(order.selectedLotIds)) {
+                                                                        return order.selectedLotIds.map((lotId, index) => {
+                                                                            const lot = stock.find(s => s.id === lotId);
+                                                                            return (
+                                                                                <tr key={index}>
+                                                                                    <td className="p-2 font-medium text-slate-400">Lote #{index + 1}</td>
+                                                                                    <td className="p-2 font-bold">{lot?.internalLot || 'N/A'}</td>
+                                                                                    <td className="p-2">{lot?.materialType || 'N/A'}</td>
+                                                                                    <td className="p-2 font-mono">{lot?.bitola || 'N/A'}</td>
+                                                                                    <td className="p-2 text-right font-bold text-slate-700">{lot?.labelWeight.toFixed(2)}</td>
+                                                                                </tr>
+                                                                            );
+                                                                        });
+                                                                    } else {
+                                                                        // Object format (Treliça)
+                                                                        const lots = order.selectedLotIds as any;
+                                                                        const rows: React.ReactNode[] = [];
+                                                                        
+                                                                        const processLotGroup = (ids: string | string[] | undefined, label: string) => {
+                                                                            if (!ids) return;
+                                                                            const idArray = Array.isArray(ids) ? ids : [ids];
+                                                                            idArray.forEach((id, idx) => {
+                                                                                const lot = stock.find(s => s.id === id);
+                                                                                rows.push(
+                                                                                    <tr key={`${label}-${idx}`}>
+                                                                                        <td className="p-2 font-black text-indigo-600/70 uppercase text-[10px]">{label} {idArray.length > 1 ? `#${idx+1}` : ''}</td>
+                                                                                        <td className="p-2 font-bold">{lot?.internalLot || 'N/A'}</td>
+                                                                                        <td className="p-2 text-slate-500">{lot?.materialType || 'N/A'}</td>
+                                                                                        <td className="p-2 font-mono font-bold">{lot?.bitola || 'N/A'}</td>
+                                                                                        <td className="p-2 text-right font-bold text-slate-800">{lot?.labelWeight.toFixed(2)}</td>
+                                                                                    </tr>
+                                                                                );
+                                                                            });
+                                                                        };
+
+                                                                        processLotGroup(lots.allSuperior || lots.superior, 'Superior');
+                                                                        processLotGroup(lots.allInferiorLeft || lots.inferior1, 'Inferior Esq.');
+                                                                        processLotGroup(lots.allInferiorRight || lots.inferior2, 'Inferior Dir.');
+                                                                        processLotGroup(lots.allSenozoideLeft || lots.senozoide1, 'Senozoide Esq.');
+                                                                        processLotGroup(lots.allSenozoideRight || lots.senozoide2, 'Senozoide Dir.');
+                                                                        
+                                                                        return rows;
+                                                                    }
+                                                                })()}
                                                             </tbody>
                                                         </table>
                                                     </div>

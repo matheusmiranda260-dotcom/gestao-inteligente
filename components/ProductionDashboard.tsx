@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Page, ProductionOrderData, StockItem, User, OperatorLog, MachineType } from '../types';
-import { ArrowLeftIcon, WarningIcon, CogIcon, PauseIcon, ClockIcon, CheckCircleIcon, ScaleIcon, PlayIcon, BookOpenIcon, StopIcon, WrenchScrewdriverIcon } from './icons';
+import { ArrowLeftIcon, WarningIcon, CogIcon, PauseIcon, ClockIcon, CheckCircleIcon, ScaleIcon, PlayIcon, BookOpenIcon, StopIcon, WrenchScrewdriverIcon, ArchiveIcon } from './icons';
 
 const formatDuration = (ms: number) => {
     if (ms < 0) ms = 0;
@@ -983,6 +983,12 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
         return active.sort((a, b) => new Date(b.creationDate).getTime() - new Date(a.creationDate).getTime())[0];
     }, [productionOrders]);
 
+    const pausedOrders = useMemo(() => {
+        return productionOrders.filter(o => o.status === 'paused');
+    }, [productionOrders]);
+
+    const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor';
+
     const dailyProduction = useMemo(() => {
         const nowMs = now.getTime();
         const todayStr = getFactoryDateString(now);
@@ -1138,6 +1144,73 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                     </div>
                 </div>
             </div>
+
+            {/* SEÇÃO DE ORDENS PAUSADAS PARA O GESTOR */}
+            {isGestor && pausedOrders.length > 0 && (
+                <div className="mt-10 mb-6 bg-white/40 backdrop-blur-md p-8 rounded-[2.5rem] border border-white/60 shadow-2xl relative overflow-hidden group/paused">
+                    {/* Background decorations */}
+                    <div className="absolute -right-32 -top-32 w-80 h-80 bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none group-hover/paused:bg-indigo-500/20 transition-all duration-1000"></div>
+                    <div className="absolute -left-32 -bottom-32 w-80 h-80 bg-blue-500/10 rounded-full blur-[100px] pointer-events-none group-hover/paused:bg-blue-500/20 transition-all duration-1000"></div>
+
+                    <div className="flex flex-col sm:flex-row items-center justify-between mb-8 relative z-10 gap-4">
+                        <div className="flex items-center gap-4">
+                            <div className="bg-gradient-to-br from-indigo-500 to-blue-600 p-3.5 rounded-2xl text-white shadow-xl shadow-indigo-500/20 ring-4 ring-white/20">
+                                <ArchiveIcon className="h-7 w-7 stroke-[2.5]" />
+                            </div>
+                            <div>
+                                <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tighter leading-tight">Painel de Ordens Pausadas</h3>
+                                <p className="text-[11px] font-black text-indigo-500 uppercase tracking-[0.2em]">{pausedOrders.length} ordens no arquivo temporário</p>
+                            </div>
+                        </div>
+                        <div className="bg-white/80 backdrop-blur-sm px-5 py-2 rounded-2xl text-slate-500 uppercase text-[10px] font-black tracking-widest shadow-inner border border-slate-200/50 flex items-center gap-2">
+                             <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></div>
+                             Área do Gestor
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 relative z-10">
+                        {pausedOrders.map(order => (
+                            <div 
+                                key={order.id} 
+                                className="bg-white/95 p-5 rounded-3xl shadow-sm border border-slate-100 hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 flex flex-col justify-between group/card"
+                            >
+                                <div className="flex justify-between items-start mb-4">
+                                    <div className="bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-100/50 shadow-sm">
+                                        <p className="text-sm font-black text-indigo-900 tracking-tighter">#{order.orderNumber}</p>
+                                    </div>
+                                    <span className="text-[10px] font-black bg-slate-900 text-white px-3 py-1 rounded-full uppercase tracking-widest shadow-lg shadow-black/10">Pausada</span>
+                                </div>
+                                
+                                <div className="mb-6">
+                                    <div className="flex items-center gap-1.5 mb-1.5">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+                                        <p className="text-[10px] uppercase font-black text-slate-400 tracking-[0.1em]">{order.machine}</p>
+                                    </div>
+                                    <p className="text-base font-black text-slate-800 tracking-tight leading-snug min-h-[2.5rem]">
+                                        {order.machine === 'Treliça' ? order.trelicaModel : `Trefila ${order.targetBitola}mm`}
+                                    </p>
+                                    {order.actualProducedQuantity !== undefined && (
+                                        <div className="mt-3 flex items-baseline gap-1 text-slate-500">
+                                            <span className="text-xs font-bold">{order.actualProducedQuantity}</span>
+                                            <span className="text-[10px] font-black uppercase text-slate-400 tracking-tighter">{order.machine === 'Treliça' ? 'pçs produzidas' : 'kg finalizados'}</span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="flex items-center justify-between pt-4 border-t border-slate-50 mt-auto">
+                                    <div className="flex flex-col">
+                                        <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Criada em</span>
+                                        <span className="text-[10px] font-bold text-slate-500">{new Date(order.creationDate || '').toLocaleDateString('pt-BR')}</span>
+                                    </div>
+                                    <div className="bg-emerald-500 text-white px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tighter opacity-0 group-hover/card:opacity-100 transition-all duration-300 transform translate-x-2 group-hover/card:translate-x-0">
+                                        Pendente na Máquina
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
