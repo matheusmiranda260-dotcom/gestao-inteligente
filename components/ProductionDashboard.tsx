@@ -149,10 +149,18 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             }
             return { status: 'Parada', reason: reason, since: openEvent.stopTime, durationMs };
         } else {
-            // When producing, show the productive time of the current shift
-            return { status: 'Produzindo', reason: '', since: activeOrder.startTime, durationMs: shiftUptime };
+            // Calculate time since last resume or shift start (current bout duration)
+            const closedEvents = (activeOrder.downtimeEvents || []).filter(e => !!e.resumeTime);
+            const rawLastResume = closedEvents.length > 0
+                ? Math.max(...closedEvents.map(e => new Date(e.resumeTime!).getTime()))
+                : new Date(activeOrder.startTime).getTime();
+            
+            const effectiveSince = Math.max(rawLastResume, shiftStartMs);
+            const durationMs = Math.max(0, now.getTime() - effectiveSince);
+
+            return { status: 'Produzindo', reason: '', since: new Date(effectiveSince).toISOString(), durationMs };
         }
-    }, [activeOrder, now, currentOperatorLog, shiftUptime]);
+    }, [activeOrder, now, currentOperatorLog, shiftStartMs]);
 
     const currentOperator = currentOperatorLog?.operator || 'N/A';
 
