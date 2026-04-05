@@ -984,10 +984,11 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
     }, [productionOrders]);
 
     const pausedOrders = useMemo(() => {
+        if (!Array.isArray(productionOrders)) return [];
         return productionOrders.filter(o => o.status === 'paused');
     }, [productionOrders]);
 
-    const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor';
+    const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor' || currentUser?.username === 'admin';
 
     const dailyProduction = useMemo(() => {
         const nowMs = now.getTime();
@@ -1146,7 +1147,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
             </div>
 
             {/* SEÇÃO DE ORDENS PAUSADAS PARA O GESTOR */}
-            {isGestor && pausedOrders.length > 0 && (
+            {isGestor && (
                 <div className="mt-10 mb-6 bg-white/40 backdrop-blur-md p-8 rounded-[2.5rem] border border-white/60 shadow-2xl relative overflow-hidden group/paused">
                     {/* Background decorations */}
                     <div className="absolute -right-32 -top-32 w-80 h-80 bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none group-hover/paused:bg-indigo-500/20 transition-all duration-1000"></div>
@@ -1169,7 +1170,12 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 relative z-10">
-                        {pausedOrders.map(order => (
+                        {pausedOrders.length === 0 ? (
+                            <div className="col-span-full py-12 text-center bg-white/60 rounded-[2rem] border border-dashed border-indigo-200">
+                                <ArchiveIcon className="h-10 w-10 text-indigo-200 mx-auto mb-3" />
+                                <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest leading-relaxed px-4">Não há ordens de produção pausadas ou arquivadas no momento.</p>
+                            </div>
+                        ) : pausedOrders.map(order => (
                             <div 
                                 key={order.id} 
                                 className="bg-white/95 p-5 rounded-3xl shadow-sm border border-slate-100 hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 flex flex-col justify-between group/card"
