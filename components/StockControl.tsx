@@ -73,9 +73,12 @@ const AddConferencePage: React.FC<{
         (newLots[index] as any)[field] = value;
 
         if (field === 'materialType') {
-            const applicableBitolas = value === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions;
-            if (!applicableBitolas.includes(newLots[index].bitola || '')) {
-                newLots[index].bitola = applicableBitolas[0];
+            const base = value === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions;
+            const custom = gauges.filter(g => g.materialType === value).map(g => g.gauge);
+            const all = [...new Set([...base, ...custom])];
+            
+            if (!all.includes(newLots[index].bitola || '')) {
+                newLots[index].bitola = all[0] || '';
             }
         }
 
@@ -150,7 +153,14 @@ const AddConferencePage: React.FC<{
                                         <td className="p-2"><select value={lot.materialType} onChange={e => handleLotChange(index, 'materialType', e.target.value)} className="w-full p-2 border rounded text-center">{MaterialOptions.map(m => <option key={m} value={m}>{m}</option>)}</select></td>
                                         <td className="p-2">
                                             <select value={lot.bitola} onChange={e => handleLotChange(index, 'bitola', e.target.value)} className="w-full p-2 border rounded text-center">
-                                                {(lot.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions).map(b => (
+                                                {[...new Set([
+                                                    ...(lot.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions),
+                                                    ...gauges.filter(g => g.materialType === lot.materialType).map(g => g.gauge)
+                                                ])].sort((a, b) => {
+                                                    const numA = parseFloat(a.replace(',', '.'));
+                                                    const numB = parseFloat(b.replace(',', '.'));
+                                                    return numA - numB;
+                                                }).map(b => (
                                                     <option key={b} value={b}>{b}</option>
                                                 ))}
                                             </select>
@@ -513,7 +523,18 @@ const StockControl: React.FC<{
 const EditStockItemModal: React.FC<{ item: StockItem; onClose: () => void; onSave: (i: StockItem) => void; gauges: StockGauge[] }> = ({ item, onClose, onSave, gauges }) => {
     const [formData, setFormData] = useState<StockItem>({ ...item });
 
-    const materialGauges = useMemo(() => gauges.filter(g => g.materialType === formData.materialType).map(g => g.gauge), [gauges, formData.materialType]);
+    const materialGauges = useMemo(() => {
+        const baseOptions = formData.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions;
+        const customOptions = gauges.filter(g => g.materialType === formData.materialType).map(g => g.gauge);
+        
+        return [...new Set([...baseOptions, ...customOptions])]
+            .filter(Boolean)
+            .sort((a, b) => {
+                const numA = parseFloat(a.replace(',', '.'));
+                const numB = parseFloat(b.replace(',', '.'));
+                return numA - numB;
+            });
+    }, [gauges, formData.materialType]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -558,11 +579,14 @@ const EditStockItemModal: React.FC<{ item: StockItem; onClose: () => void; onSav
                                 value={formData.materialType}
                                 onChange={e => {
                                     const val = e.target.value;
-                                    const applicable = val === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions;
+                                    const base = val === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions;
+                                    const custom = gauges.filter(g => g.materialType === val).map(g => g.gauge);
+                                    const all = [...new Set([...base, ...custom])];
+                                    
                                     setFormData(p => ({
                                         ...p,
                                         materialType: val,
-                                        bitola: applicable.includes(p.bitola) ? p.bitola : applicable[0]
+                                        bitola: all.includes(p.bitola) ? p.bitola : (all[0] || '')
                                     }));
                                 }}
                                 className="w-full px-3 py-2 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
@@ -573,7 +597,7 @@ const EditStockItemModal: React.FC<{ item: StockItem; onClose: () => void; onSav
                         <div className="space-y-1">
                             <label className="text-xs font-bold text-slate-500 uppercase">Bitola</label>
                             <select value={formData.bitola} onChange={e => setFormData({ ...formData, bitola: e.target.value })} className="w-full px-3 py-2 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                                {(formData.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions).map(b => (
+                                {materialGauges.map(b => (
                                     <option key={b} value={b}>{b}</option>
                                 ))}
                             </select>
