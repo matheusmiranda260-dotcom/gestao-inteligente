@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
     ArrowLeftIcon, CameraIcon, TrashIcon, CheckCircleIcon, DocumentReportIcon,
-    AdjustmentsIcon, PencilIcon, BookOpenIcon, SearchIcon, FilterIcon, XIcon, PrinterIcon
+    AdjustmentsIcon, PencilIcon, BookOpenIcon, SearchIcon, FilterIcon, XIcon, PrinterIcon,
+    ArrowPathIcon, DownloadIcon
 } from './icons';
 import type {
     ConferenceLotData, ConferenceData, StockItem, Bitola, MaterialType, Page, StockGauge, User, TransferRecord
@@ -208,6 +209,7 @@ const StockControl: React.FC<{
     const [historyLot, setHistoryLot] = useState<StockItem | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [editingItem, setEditingItem] = useState<StockItem | null>(null);
+    const [consumingItem, setConsumingItem] = useState<StockItem | null>(null);
     const [materialFilter, setMaterialFilter] = useState('');
     const [bitolaFilter, setBitolaFilter] = useState('');
     const [statusFilter, setStatusFilter] = useState<string[]>([]);
@@ -246,7 +248,7 @@ const StockControl: React.FC<{
     }, [gauges, stock, materialFilter]);
 
     const filtered = useMemo(() => stock.filter(i =>
-        i.status !== 'Consumido' &&
+        (statusFilter.length > 0 ? true : i.status !== 'Consumido') &&
         (i.internalLot.toLowerCase().includes(searchTerm.toLowerCase()) ||
             i.nfe.toLowerCase().includes(searchTerm.toLowerCase()) ||
             (i.steelType || '').toLowerCase().includes(searchTerm.toLowerCase())) &&
@@ -271,10 +273,40 @@ const StockControl: React.FC<{
         }), { count: 0, weight: 0 });
     }, [filtered]);
 
+    const handleRevertToAvailable = (item: StockItem) => {
+        if (confirm(`Deseja voltar o lote ${item.internalLot} para status "Disponível"?`)) {
+            const updated = {
+                ...item,
+                status: 'Disponível',
+                history: [...(item.history || []), {
+                    type: 'Status Revertido',
+                    date: new Date().toISOString(),
+                    details: {
+                        'Ação': 'Retorno manual para Disponível',
+                        'Status Anterior': item.status,
+                        'Operador': currentUser?.username || 'Sistema'
+                    }
+                }]
+            };
+            updateStockItem(updated);
+        }
+    };
+
     if (isAdding) return <AddConferencePage onClose={() => setIsAdding(false)} onSubmit={addConference} stock={stock} onShowReport={setReportView} conferences={conferences} onEditConference={editConference} onDeleteConference={deleteConference} gauges={gauges} isGestor={isGestor} setPage={setPage} />;
 
     return (
         <div className="p-4 md:p-8 space-y-6">
+            {consumingItem && (
+                <ConsumeLotModal
+                    item={consumingItem}
+                    onClose={() => setConsumingItem(null)}
+                    onSave={(updated) => {
+                        updateStockItem(updated);
+                        setConsumingItem(null);
+                    }}
+                    currentUser={currentUser}
+                />
+            )}
             {/* Printable Report Header - Only visible during print */}
             <div className="hidden print:block mb-8 border-b-2 border-slate-900 pb-4">
                 <div className="flex justify-between items-center mb-6">
@@ -370,7 +402,8 @@ const StockControl: React.FC<{
                                         { val: 'Disponível - Suporte Treliça', label: 'Suporte Treliça' },
                                         { val: 'Em Produção - Trefila', label: 'Em Prod. Trefila' },
                                         { val: 'Em Produção - Treliça', label: 'Em Prod. Treliça' },
-                                        { val: 'Reservado', label: 'Reservado' }
+                                        { val: 'Reservado', label: 'Reservado' },
+                                        { val: 'Consumido', label: 'Consumido' }
                                     ].map(s => (
                                         <label key={s.val} className="flex items-center gap-2 text-xs font-bold text-slate-600 cursor-pointer hover:text-slate-900 transition-colors py-1">
                                             <input 
@@ -446,7 +479,8 @@ const StockControl: React.FC<{
                                 { val: 'Disponível - Suporte Treliça', label: 'Sup. Treliça' },
                                 { val: 'Em Produção - Trefila', label: 'Em Prod. Trefila' },
                                 { val: 'Em Produção - Treliça', label: 'Em Prod. Treliça' },
-                                { val: 'Reservado', label: 'Reservado' }
+                                { val: 'Reservado', label: 'Reservado' },
+                                { val: 'Consumido', label: 'Consumido' }
                             ].map(s => (
                                 <label key={s.val} className="flex items-center gap-2 text-xs font-bold text-slate-600 cursor-pointer hover:text-slate-900 transition-colors py-1">
                                     <input 
@@ -495,9 +529,23 @@ const StockControl: React.FC<{
                                     <td className="p-3 text-center font-black text-slate-800">{item.remainingQuantity.toFixed(2)}</td>
                                     <td className="p-3 text-center">{getStatusBadge(item.status)}</td>
                                     <td className="p-3 flex justify-center gap-2 no-print">
-                                        <button onClick={() => setHistoryLot(item)} title="Histórico"><BookOpenIcon className="h-5 w-5 text-slate-400 hover:text-blue-500" /></button>
-                                        <button onClick={() => setEditingItem(item)} title="Editar"><PencilIcon className="h-5 w-5 text-slate-400 hover:text-amber-500" /></button>
-                                        <button onClick={() => confirm('Excluir?') && deleteStockItem(item.id)} title="Excluir"><TrashIcon className="h-5 w-5 text-red-400 hover:text-red-600" /></button>
+                                        {(item.status.includes('Produção') || item.status === 'Reservado') && (
+                                            <button onClick={() => handleRevertToAvailable(item)} title="Voltar para Disponível" className="p-1 hover:bg-emerald-50 rounded-lg transition-colors">
+                                                <ArrowPathIcon className="h-5 w-5 text-emerald-500" />
+                                            </button>
+                                        )}
+                                        <button onClick={() => setConsumingItem(item)} title="Dar Baixa (Consumir)" className="p-1 hover:bg-slate-50 rounded-lg transition-colors">
+                                            <DownloadIcon className="h-5 w-5 text-slate-400 hover:text-[#0F3F5C]" />
+                                        </button>
+                                        <button onClick={() => setHistoryLot(item)} title="Histórico" className="p-1 hover:bg-blue-50 rounded-lg transition-colors">
+                                            <BookOpenIcon className="h-5 w-5 text-slate-400 hover:text-blue-500" />
+                                        </button>
+                                        <button onClick={() => setEditingItem(item)} title="Editar" className="p-1 hover:bg-amber-50 rounded-lg transition-colors">
+                                            <PencilIcon className="h-5 w-5 text-slate-400 hover:text-amber-500" />
+                                        </button>
+                                        <button onClick={() => confirm('Excluir?') && deleteStockItem(item.id)} title="Excluir" className="p-1 hover:bg-red-50 rounded-lg transition-colors">
+                                            <TrashIcon className="h-5 w-5 text-red-400 hover:text-red-600" />
+                                        </button>
                                     </td>
                                 </tr>
                             ))}
@@ -633,6 +681,102 @@ const EditStockItemModal: React.FC<{ item: StockItem; onClose: () => void; onSav
                     <div className="pt-4 flex gap-3">
                         <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-colors">Cancelar</button>
                         <button type="submit" className="flex-1 px-4 py-2 bg-[#0F3F5C] text-white font-bold rounded-xl hover:bg-[#0A2A3D] transition-colors shadow-lg shadow-blue-900/20">Salvar Alterações</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+const ConsumeLotModal: React.FC<{ item: StockItem; onClose: () => void; onSave: (i: StockItem) => void; currentUser: User | null }> = ({ item, onClose, onSave, currentUser }) => {
+    const [formData, setFormData] = useState({
+        weight: item.remainingQuantity,
+        observation: '',
+        reason: 'Uso na Produção'
+    });
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        
+        const newWeight = Math.max(0, item.remainingQuantity - formData.weight);
+        
+        const updated: StockItem = {
+            ...item,
+            remainingQuantity: newWeight,
+            status: newWeight <= 0 ? 'Consumido' : item.status,
+            history: [...(item.history || []), {
+                type: 'Baixa de Lote',
+                date: new Date().toISOString(),
+                details: {
+                    'Motivo': formData.reason,
+                    'Peso Retirado': `${formData.weight.toFixed(2)} kg`,
+                    'Peso Restante': `${newWeight.toFixed(2)} kg`,
+                    'Observação': formData.observation || '-',
+                    'Operador': currentUser?.username || 'Sistema'
+                }
+            }]
+        };
+        onSave(updated);
+    };
+
+    return (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200 border">
+                <div className="bg-[#0F3F5C] p-4 text-white flex justify-between items-center">
+                    <div>
+                        <h2 className="text-lg font-bold">Dar Baixa no Lote</h2>
+                        <p className="text-xs opacity-80">{item.internalLot} - {item.materialType} {item.bitola}</p>
+                    </div>
+                    <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-full transition-colors"><XIcon className="h-6 w-6" /></button>
+                </div>
+                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                    <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex justify-between items-center">
+                        <span className="text-sm font-bold text-blue-800">Saldo Atual:</span>
+                        <span className="text-xl font-black text-[#0F3F5C]">{item.remainingQuantity.toFixed(2)} kg</span>
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-500 uppercase">Quantidade para Baixar (kg)</label>
+                        <input 
+                            type="number" 
+                            step="0.01"
+                            value={formData.weight} 
+                            onChange={e => setFormData({ ...formData, weight: parseFloat(e.target.value) || 0 })} 
+                            max={item.remainingQuantity}
+                            className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-lg" 
+                            required 
+                        />
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-500 uppercase">Motivo / Destino</label>
+                        <select 
+                            value={formData.reason} 
+                            onChange={e => setFormData({ ...formData, reason: e.target.value })} 
+                            className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold"
+                        >
+                            <option value="Uso na Produção">Uso na Produção</option>
+                            <option value="Uso para Treliça">Uso para Treliça</option>
+                            <option value="Uso para Trefila">Uso para Trefila</option>
+                            <option value="Correção de Inventário">Correção de Inventário</option>
+                            <option value="Sucata / Perda">Sucata / Perda</option>
+                            <option value="Outro">Outro</option>
+                        </select>
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-500 uppercase">Observações Extras</label>
+                        <textarea 
+                            value={formData.observation} 
+                            onChange={e => setFormData({ ...formData, observation: e.target.value })} 
+                            placeholder="Ex: Utilizado para fazer treliça H12..."
+                            className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none min-h-[100px]"
+                        />
+                    </div>
+
+                    <div className="pt-4 flex gap-3">
+                        <button type="button" onClick={onClose} className="flex-1 px-4 py-3 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-colors">Cancelar</button>
+                        <button type="submit" className="flex-1 px-4 py-3 bg-[#0F3F5C] text-white font-bold rounded-xl hover:bg-[#0A2A3D] transition-colors shadow-lg shadow-blue-900/20">Confirmar Baixa</button>
                     </div>
                 </form>
             </div>
