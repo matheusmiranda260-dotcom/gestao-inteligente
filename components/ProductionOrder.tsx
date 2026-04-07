@@ -20,6 +20,8 @@ interface ProductionOrderProps {
 const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, productionOrders, addProductionOrder, showNotification, updateProductionOrder, deleteProductionOrder, gauges, currentUser }) => {
     const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor';
     const [orderNumber, setOrderNumber] = useState('');
+    const [isGhostOrder, setIsGhostOrder] = useState(false);
+    const [ghostTargetWeight, setGhostTargetWeight] = useState('');
 
     const initialTargetBitola = useMemo(() => {
         const trefilaGauges = gauges.filter(g => g.materialType === 'CA-60').map(g => g.gauge);
@@ -95,8 +97,13 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
             showNotification(`O número de ordem "${orderNumber}" já existe.`, 'error');
             return;
         }
-        if (selectedLotIds.length === 0) {
+        if (!isGhostOrder && selectedLotIds.length === 0) {
             showNotification('Selecione pelo menos um lote para a produção.', 'error');
+            return;
+        }
+
+        if (isGhostOrder && (!ghostTargetWeight || parseFloat(ghostTargetWeight) <= 0)) {
+            showNotification('Informe um peso válido para a produção fantasma.', 'error');
             return;
         }
 
@@ -105,7 +112,8 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
             machine: 'Trefila',
             targetBitola,
             selectedLotIds: selectedLotIds,
-            totalWeight: totalSelectedWeight
+            totalWeight: isGhostOrder ? parseFloat(ghostTargetWeight.replace(',', '.')) : totalSelectedWeight,
+            isGhostOrder: isGhostOrder
         });
 
         // Reset form
@@ -113,6 +121,8 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
         setTargetBitola(TrefilaBitolaOptions[0]);
         setSelectedLotIds([]);
         setInputBitolaFilter('');
+        setIsGhostOrder(false);
+        setGhostTargetWeight('');
     };
 
     return (
@@ -179,6 +189,34 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
                                         required
                                     />
                                 </div>
+                                <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-lg border border-amber-100">
+                                    <input
+                                        type="checkbox"
+                                        id="isGhostOrder"
+                                        checked={isGhostOrder}
+                                        onChange={(e) => setIsGhostOrder(e.target.checked)}
+                                        className="h-5 w-5 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                                    />
+                                    <label htmlFor="isGhostOrder" className="text-sm font-bold text-amber-800">
+                                        Ordem Fantasma (Não mexe no estoque)
+                                    </label>
+                                </div>
+                                {isGhostOrder && (
+                                    <div className="animate-fade-in">
+                                        <label htmlFor="ghostWeight" className="block text-sm font-medium text-slate-700">Peso Total a Produzir (kg)</label>
+                                        <input
+                                            type="text"
+                                            inputMode="decimal"
+                                            id="ghostWeight"
+                                            value={ghostTargetWeight}
+                                            onChange={(e) => setGhostTargetWeight(e.target.value)}
+                                            className="mt-1 p-2 w-full border border-amber-300 rounded-md bg-amber-50 shadow-inner font-bold"
+                                            placeholder="Ex: 1000,00"
+                                            required={isGhostOrder}
+                                        />
+                                        <p className="text-[10px] text-amber-600 mt-1 font-semibold uppercase">Será usado apenas para referência de produção</p>
+                                    </div>
+                                )}
                                 <div>
                                     <label htmlFor="inputBitolaFilter" className="block text-sm font-medium text-slate-700">Bitola de Entrada (Fio Máquina)</label>
                                     <select

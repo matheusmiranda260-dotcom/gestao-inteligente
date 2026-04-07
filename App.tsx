@@ -1566,32 +1566,48 @@ const App: React.FC = () => {
                 scrapWeight: calculatedScrapWeight >= 0 ? calculatedScrapWeight : 0,
             };
 
-            for (const item of stock) {
-                const processedLotData = (orderToComplete.processedLots || []).find(pLot => pLot.lotId === item.id);
-                if (processedLotData) {
-                    const finalWeight = processedLotData.finalWeight || 0;
-                    stockUpdates.push({
-                        id: item.id,
-                        changes: {
-                            materialType: 'CA-60',
-                            bitola: orderToComplete.targetBitola,
-                            labelWeight: finalWeight,
-                            initialQuantity: finalWeight,
-                            remainingQuantity: finalWeight,
-                            status: 'Disponível',
-                            productionOrderIds: (item.productionOrderIds || []).filter(id => id !== orderId),
-                            history: [...(item.history || []), {
-                                type: 'Transformado em CA-60',
-                                date: now,
-                                details: {
-                                    'Ordem': orderToComplete.orderNumber,
-                                    'Bitola Original': item.bitola,
-                                    'Bitola Final': orderToComplete.targetBitola,
-                                    'Peso Final (kg)': finalWeight.toFixed(2)
-                                }
-                            }]
-                        }
-                    });
+            if (!orderToComplete.isGhostOrder) {
+                for (const item of stock) {
+                    const processedLotData = (orderToComplete.processedLots || []).find(pLot => pLot.lotId === item.id);
+                    if (processedLotData) {
+                        const finalWeight = processedLotData.finalWeight || 0;
+                        stockUpdates.push({
+                            id: item.id,
+                            changes: {
+                                materialType: 'CA-60',
+                                bitola: orderToComplete.targetBitola,
+                                labelWeight: finalWeight,
+                                initialQuantity: finalWeight,
+                                remainingQuantity: finalWeight,
+                                status: 'Disponível',
+                                productionOrderIds: (item.productionOrderIds || []).filter(id => id !== orderId),
+                                history: [...(item.history || []), {
+                                    type: 'Transformado em CA-60',
+                                    date: now,
+                                    details: {
+                                        'Ordem': orderToComplete.orderNumber,
+                                        'Bitola Original': item.bitola,
+                                        'Bitola Final': orderToComplete.targetBitola,
+                                        'Peso Final (kg)': finalWeight.toFixed(2)
+                                    }
+                                }]
+                            }
+                        });
+                    }
+                }
+            } else {
+                // If it's a ghost order, we still might want to remove the order ID from the lots' list
+                // but keep the weight and status unchanged.
+                for (const item of stock) {
+                    const isLinked = (item.productionOrderIds || []).includes(orderId);
+                    if (isLinked) {
+                        stockUpdates.push({
+                            id: item.id,
+                            changes: {
+                                productionOrderIds: item.productionOrderIds?.filter(id => id !== orderId)
+                            }
+                        });
+                    }
                 }
             }
         } else { // Treliça
@@ -1881,6 +1897,27 @@ const App: React.FC = () => {
             setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
             showNotification(`Peso do pacote #${packageData.packageNumber} registrado.`, 'success');
         } catch (error) { showNotification('Erro ao registrar pacote.', 'error'); }
+    };
+
+    const addLotToOrder = async (orderId: string, lotId: string) => {
+        const fetchedOrders = await fetchByColumn<ProductionOrderData>('production_orders', 'id', orderId);
+        const order = fetchedOrders[0];
+        if (!order) return;
+
+        const currentLots = Array.isArray(order.selectedLotIds) ? order.selectedLotIds : [];
+        if (currentLots.includes(lotId)) return;
+
+        const updates: Partial<ProductionOrderData> = {
+            selectedLotIds: [...currentLots, lotId]
+        };
+
+        try {
+            const updatedOrder = await updateItem<ProductionOrderData>('production_orders', orderId, updates);
+            setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
+            showNotification('Lote adicionado à ordem.', 'success');
+        } catch (error) {
+            showNotification('Erro ao adicionar lote.', 'error');
+        }
     };
 
     const updateProducedQuantity = async (orderId: string, quantity: number) => {

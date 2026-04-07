@@ -381,7 +381,14 @@ const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportDat
                         <table className="w-full border-collapse border-2 border-black mb-1 text-center font-bold">
                             <tbody>
                                 <tr className="border-b border-black">
-                                    <td className="p-1">Ordem de produção : {reportData.orderNumber}</td>
+                                    <td className="p-1 relative">
+                                        Ordem de produção : {reportData.orderNumber}
+                                        {reportData.isGhostOrder && (
+                                            <span className="absolute right-2 top-1 px-3 py-1 bg-amber-100 text-amber-800 border-2 border-amber-300 rounded text-[10px] font-black uppercase tracking-tighter">
+                                                Ordem Fantasma
+                                            </span>
+                                        )}
+                                    </td>
                                 </tr>
                                 <tr className="border-b border-black">
                                     <td className="p-1">

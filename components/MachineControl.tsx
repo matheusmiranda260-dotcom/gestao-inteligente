@@ -416,6 +416,82 @@ const ManagerActionAuthorizationModal: React.FC<{
     );
 };
 
+const LotSelectionModal: React.FC<{
+    onClose: () => void;
+    onSelect: (lotId: string) => void;
+    stock: StockItem[];
+}> = ({ onClose, onSelect, stock }) => {
+    const [search, setSearch] = useState('');
+
+    const availableStock = useMemo(() => {
+        return stock.filter(item =>
+            item.status === 'Disponível' &&
+            item.remainingQuantity > 0 &&
+            (search === '' ||
+                item.internalLot.toLowerCase().includes(search.toLowerCase()) ||
+                item.supplier.toLowerCase().includes(search.toLowerCase()))
+        ).sort((a, b) => a.internalLot.localeCompare(b.internalLot, undefined, { numeric: true }));
+    }, [stock, search]);
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[100] p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                <div className="p-6 border-b border-slate-100">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-2xl font-bold text-slate-800">Selecionar Lote do Estoque</h2>
+                        <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition"><XCircleIcon className="h-6 w-6 text-slate-400" /></button>
+                    </div>
+                    <div className="relative">
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Buscar por lote ou fornecedor..."
+                            className="w-full p-3 pl-10 border-2 border-slate-100 rounded-xl focus:border-indigo-500 transition outline-none"
+                            autoFocus
+                        />
+                        <ArchiveIcon className="absolute left-3 top-3.5 h-5 w-5 text-slate-400" />
+                    </div>
+                </div>
+                <div className="flex-grow overflow-y-auto p-4">
+                    {availableStock.length > 0 ? (
+                        <div className="grid grid-cols-1 gap-2">
+                            {availableStock.map(lot => (
+                                <button
+                                    key={lot.id}
+                                    onClick={() => onSelect(lot.id)}
+                                    className="flex justify-between items-center p-4 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-200 border border-transparent rounded-xl transition text-left group"
+                                >
+                                    <div>
+                                        <p className="font-bold text-slate-800 text-lg group-hover:text-indigo-700">{lot.internalLot}</p>
+                                        <div className="flex gap-3 mt-1">
+                                            <span className="text-xs font-bold text-slate-500 uppercase">{lot.materialType}</span>
+                                            <span className="text-xs font-bold text-indigo-600 uppercase">{lot.bitola}</span>
+                                            <span className="text-xs text-slate-400">{lot.supplier}</span>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="font-black text-slate-600">{lot.remainingQuantity.toFixed(2)} kg</p>
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase">Disponível</p>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center py-10">
+                            <WarningIcon className="h-12 w-12 text-slate-300 mx-auto mb-2" />
+                            <p className="text-slate-500">Nenhum lote disponível encontrado.</p>
+                        </div>
+                    )}
+                </div>
+                <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+                    <button onClick={onClose} className="bg-white border-2 border-slate-200 text-slate-600 font-bold py-2 px-6 rounded-xl hover:bg-slate-100 transition">FECHAR</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 interface MachineControlProps {
     machineType: MachineType;
     setPage: (page: Page) => void;
@@ -443,6 +519,7 @@ interface MachineControlProps {
     initialView?: View;
     initialModal?: 'reports' | 'parts' | 'rings' | null;
     gauges?: StockGauge[];
+    addLotToOrder?: (orderId: string, lotId: string) => void;
 }
 
 const formatDuration = (ms: number) => {
@@ -485,7 +562,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
     logDowntime, logResumeProduction, startLotProcessing, finishLotProcessing,
     recordLotWeight, recordPackageWeight, completeProduction, addPartsRequest,
     logPostProductionActivity, updateProducedQuantity, deleteShiftReport,
-    cancelProductionOrder, pauseProductionOrder, initialView, initialModal, gauges = []
+    cancelProductionOrder, pauseProductionOrder, addLotToOrder, initialView, initialModal, gauges = []
 }) => {
 
     const [pendingWeights, setPendingWeights] = useState<Map<string, string>>(new Map());
@@ -725,6 +802,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
     const [lastShiftEndPromptDate, setLastShiftEndPromptDate] = useState<string | null>(null);
     const [showManagerAuthForShiftEnd, setShowManagerAuthForShiftEnd] = useState(false);
     const [lastPromptShownAt, setLastPromptShownAt] = useState<number>(0);
+    const [showLotSelectionModal, setShowLotSelectionModal] = useState(false);
 
     const hasPermission = (targetPage: Page): boolean => {
         if (!currentUser) return false;
@@ -1343,6 +1421,18 @@ const MachineControl: React.FC<MachineControlProps> = ({
                     }}
                 />
             )}
+            {showLotSelectionModal && (
+                <LotSelectionModal
+                    onClose={() => setShowLotSelectionModal(false)}
+                    stock={stock}
+                    onSelect={(lotId) => {
+                        if (activeOrder && addLotToOrder) {
+                            addLotToOrder(activeOrder.id, lotId);
+                            setShowLotSelectionModal(false);
+                        }
+                    }}
+                />
+            )}
 
 
             {/* Machine Header for better context on mobile */}
@@ -1883,7 +1973,18 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                             </div>
 
                                             <div className="bg-white p-6 rounded-2xl shadow-sm">
-                                                <h3 className="text-lg font-bold text-slate-700 mb-4">Fila de Lotes (Matéria-Prima)</h3>
+                                                <div className="flex justify-between items-center mb-4">
+                                                    <h3 className="text-lg font-bold text-slate-700">Fila de Lotes (Matéria-Prima)</h3>
+                                                    {activeOrder.isGhostOrder && (
+                                                        <button
+                                                            onClick={() => setShowLotSelectionModal(true)}
+                                                            className="flex items-center gap-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-4 py-2 rounded-xl text-xs font-bold border border-indigo-100 transition"
+                                                        >
+                                                            <ArchiveIcon className="h-4 w-4" />
+                                                            SELECIONAR DO ESTOQUE
+                                                        </button>
+                                                    )}
+                                                </div>
                                                 <div className="overflow-x-auto">
                                                     {waitingLots.length > 0 ? (
                                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
