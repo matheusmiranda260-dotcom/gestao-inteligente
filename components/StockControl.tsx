@@ -22,6 +22,7 @@ const getStatusBadge = (status: string) => {
         case 'Disponível - Suporte Treliça': return <span className={`${baseClass} bg-blue-100 text-blue-800 border-blue-200`}>Suporte Treliça</span>;
         case 'Em Produção - Trefila': return <span className={`${baseClass} bg-amber-100 text-amber-800 border-amber-200`}>Em Prod. Trefila</span>;
         case 'Em Produção - Treliça': return <span className={`${baseClass} bg-purple-100 text-purple-800 border-purple-200`}>Em Prod. Treliça</span>;
+        case 'Consumido': return <span className={`${baseClass} bg-slate-100 text-slate-400 border-slate-200 italic`}>Consumido</span>;
         default: return <span className={`${baseClass} bg-slate-100 text-slate-500 border-slate-200`}>{status}</span>;
     }
 };
@@ -247,15 +248,35 @@ const StockControl: React.FC<{
             .sort((a, b) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')));
     }, [gauges, stock, materialFilter]);
 
-    const filtered = useMemo(() => stock.filter(i =>
-        (statusFilter.length > 0 ? true : i.status !== 'Consumido') &&
-        (i.internalLot.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const filtered = useMemo(() => stock.filter(i => {
+        const matchesSearch = searchTerm.length === 0 || (
+            i.internalLot.toLowerCase().includes(searchTerm.toLowerCase()) ||
             i.nfe.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (i.steelType || '').toLowerCase().includes(searchTerm.toLowerCase())) &&
-        (materialFilter === '' || i.materialType === materialFilter) &&
-        (bitolaFilter === '' || i.bitola === bitolaFilter) &&
-        (statusFilter.length === 0 || statusFilter.includes(i.status))
-    ).sort((a, b) => {
+            (i.steelType || '').toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        
+        const passesSearch = searchTerm.length > 0 ? (
+            i.internalLot.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            i.nfe.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (i.steelType || '').toLowerCase().includes(searchTerm.toLowerCase())
+        ) : true;
+
+        const passesMaterial = materialFilter === '' || i.materialType === materialFilter;
+        const passesBitola = bitolaFilter === '' || i.bitola === bitolaFilter;
+        
+        // Regra de Status: 
+        // 1. Se houver filtro EXPLÍCITO de status, respeitamos ele.
+        // 2. Se NÃO houver filtro de status e NÃO houver busca, ocultamos Consumidos.
+        // 3. Se houver busca, mostramos Consumidos que batem com a busca.
+        if (statusFilter.length > 0) {
+            return passesSearch && passesMaterial && passesBitola && statusFilter.includes(i.status);
+        } else {
+            if (searchTerm.length > 0) {
+                return passesSearch && passesMaterial && passesBitola;
+            }
+            return i.status !== 'Consumido' && passesMaterial && passesBitola;
+        }
+    }).sort((a, b) => {
         const lotA = parseInt(a.internalLot.replace(/\D/g, '')) || 0;
         const lotB = parseInt(b.internalLot.replace(/\D/g, '')) || 0;
         if (lotA !== lotB) return lotB - lotA;
