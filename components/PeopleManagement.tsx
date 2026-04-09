@@ -1098,12 +1098,25 @@ const StaticShiftCard: React.FC<ShiftCardProps> = ({
                         <div key={slot.key} style={{ marginBottom: 5, display: 'flex', alignItems: 'center', gap: 5 }}>
                             {occ ? (
                                 <>
-                                    <span
-                                        style={{ fontWeight: 700, fontSize: 13, color: '#1e293b', cursor: 'pointer', textTransform: 'uppercase' }}
-                                        title="Clique para desvincular"
-                                        onClick={() => onUnassign(slot.key)}
-                                    >{occ.name.toUpperCase()}</span>
-                                    <span style={{ fontSize: 11, color: '#64748b' }}>( {slot.title} )</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <div style={{ height: 28, width: 28, borderRadius: '50%', background: '#e2e8f0', overflow: 'hidden', border: '1px solid #cbd5e1', flexShrink: 0 }}>
+                                            {occ.photoUrl ? (
+                                                <img src={occ.photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                            ) : (
+                                                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#64748b' }}>
+                                                    {occ.name.charAt(0)}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                            <span 
+                                                style={{ fontWeight: 800, fontSize: 12, color: '#0f172a', cursor: 'pointer', textTransform: 'uppercase', lineHeight: 1 }}
+                                                title="Clique para desvincular"
+                                                onClick={() => onUnassign(slot.key)}
+                                            >{occ.name.toUpperCase()}</span>
+                                            <span style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>{slot.title}</span>
+                                        </div>
+                                    </div>
                                 </>
                             ) : (
                                 <>
