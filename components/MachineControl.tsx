@@ -569,7 +569,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
     const [pendingGauges, setPendingGauges] = useState<Map<string, string>>(new Map()); // Novo estado para bitolas
     const [pendingPackageWeights, setPendingPackageWeights] = useState<Map<number, string>>(new Map());
     const [justCompletedOrderId, setJustCompletedOrderId] = useState<string | null>(null);
-    const [mobileTab, setMobileTab] = useState<'monitor' | 'work'>(machineType === 'Treliça' ? 'work' : 'monitor');
+    const [mobileTab, setMobileTab] = useState<'monitor' | 'work' | 'process' | 'weigh'>(machineType === 'Treliça' ? 'work' : 'monitor');
     const [managerOverrideData, setManagerOverrideData] = useState<{
         packageNumber: number;
         quantity: number;
@@ -1580,15 +1580,35 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                 className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all duration-200 ${mobileTab === 'monitor' ? 'bg-white shadow-md text-slate-900 border border-slate-100' : 'text-slate-500'}`}
                             >
                                 <ChartBarIcon className={`h-4 w-4 ${mobileTab === 'monitor' ? 'text-indigo-500' : 'text-slate-400'}`} />
-                                Monitoramento
+                                <span className="hidden sm:inline">Monitoramento</span>
+                                <span className="sm:hidden">Painel</span>
                             </button>
-                            <button
-                                onClick={() => setMobileTab('work')}
-                                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all duration-200 ${mobileTab === 'work' ? 'bg-white shadow-md text-slate-900 border border-slate-100' : 'text-slate-500'}`}
-                            >
-                                <ScaleIcon className={`h-4 w-4 ${mobileTab === 'work' ? 'text-indigo-500' : 'text-slate-400'}`} />
-                                {machineType === 'Trefila' ? 'Pesagem de Lotes' : 'Pesagem de Pacotes'}
-                            </button>
+                            {machineType === 'Trefila' ? (
+                                <>
+                                    <button
+                                        onClick={() => setMobileTab('process')}
+                                        className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all duration-200 ${mobileTab === 'process' ? 'bg-white shadow-md text-slate-900 border border-slate-100' : 'text-slate-500'}`}
+                                    >
+                                        <PlayIcon className={`h-4 w-4 ${mobileTab === 'process' ? 'text-indigo-500' : 'text-slate-400'}`} />
+                                        Processar
+                                    </button>
+                                    <button
+                                        onClick={() => setMobileTab('weigh')}
+                                        className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all duration-200 ${mobileTab === 'weigh' ? 'bg-white shadow-md text-slate-900 border border-slate-100' : 'text-slate-500'}`}
+                                    >
+                                        <ScaleIcon className={`h-4 w-4 ${mobileTab === 'weigh' ? 'text-indigo-500' : 'text-slate-400'}`} />
+                                        Pesagem
+                                    </button>
+                                </>
+                            ) : (
+                                <button
+                                    onClick={() => setMobileTab('work')}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all duration-200 ${mobileTab === 'work' ? 'bg-white shadow-md text-slate-900 border border-slate-100' : 'text-slate-500'}`}
+                                >
+                                    <ScaleIcon className={`h-4 w-4 ${mobileTab === 'work' ? 'text-indigo-500' : 'text-slate-400'}`} />
+                                    Pesagem de Pacotes
+                                </button>
+                            )}
                         </div>
                     )}
 
@@ -1920,7 +1940,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                 </div>
 
                                 {/* Coluna Direita: Área de Trabalho (Lotes/Pacotes) */}
-                                <div className={`lg:col-span-2 space-y-6 relative ${mobileTab !== 'work' ? 'hidden lg:block' : 'animate-fade-in'}`}>
+                                <div className={`lg:col-span-2 space-y-6 relative ${mobileTab === 'monitor' ? 'hidden lg:block' : 'animate-fade-in'}`}>
                                     {isMachineStopped && activeOrder && (
                                         <div className="absolute inset-0 bg-slate-200/80 backdrop-blur-sm flex items-center justify-center rounded-2xl z-20 border-2 border-slate-300 border-dashed transition-all duration-500">
                                             <div className="text-center p-8 bg-white rounded-3xl shadow-xl max-w-sm mx-auto animate-fade-in-up">
@@ -1966,7 +1986,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
                                     {machineType === 'Trefila' ? (
                                         <>
-                                            <div className="bg-white p-6 rounded-2xl shadow-sm">
+                                            <div className={`bg-white p-6 rounded-2xl shadow-sm ${mobileTab !== 'process' ? 'hidden lg:block' : 'animate-fade-in'}`}>
                                                 <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
                                                     <CogIcon className="h-6 w-6 text-slate-400" /> Lote em Processamento
                                                 </h3>
@@ -1993,7 +2013,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                 )}
                                             </div>
 
-                                            <div className="bg-white p-6 rounded-2xl shadow-sm">
+                                            <div className={`bg-white p-6 rounded-2xl shadow-sm ${mobileTab !== 'process' ? 'hidden lg:block' : 'animate-fade-in'}`}>
                                                 <div className="flex justify-between items-center mb-4">
                                                     <h3 className="text-lg font-bold text-slate-700">Fila de Lotes (Matéria-Prima)</h3>
                                                     {activeOrder.isGhostOrder && (
@@ -2030,7 +2050,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                 </div>
                                             </div>
 
-                                            <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm">
+                                            <div className={`bg-white p-4 md:p-6 rounded-2xl shadow-sm ${mobileTab !== 'weigh' ? 'hidden lg:block' : 'animate-fade-in'}`}>
                                                 <h3 className="text-lg font-bold text-slate-700 mb-4">Lotes Finalizados</h3>
                                                 <div className="overflow-x-auto max-h-80">
                                                     {/* Desktop Table */}
