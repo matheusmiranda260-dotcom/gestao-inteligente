@@ -1149,6 +1149,22 @@ const OrgChart: React.FC<{
         try { const s = localStorage.getItem('orgShiftTimes'); return s ? JSON.parse(s) : {}; } catch { return {}; }
     });
 
+    // Stats calculation
+    const totalSlots = useMemo(() => {
+        return Object.values(SHIFTS).reduce((acc, s) => acc + s.slots.length, 0);
+    }, []);
+
+    const assignedCount = useMemo(() => {
+        const slotKeys = Object.values(SHIFTS).flatMap(s => s.slots.map(sl => sl.key));
+        return employees.filter(e => e.orgPositionId && slotKeys.includes(e.orgPositionId)).length;
+    }, [employees]);
+
+    const vacanciesCount = totalSlots - assignedCount;
+
+    const handlePrint = () => {
+        window.print();
+    };
+
     // Added state for the NEW selection UI
     const [selectingFor, setSelectingFor] = useState<{ slotKey: string, title: string, sector: string } | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -1272,7 +1288,53 @@ const OrgChart: React.FC<{
 
     return (
         <div style={{ overflow: 'auto', padding: 40, background: '#f8fafc', minHeight: 600 }}>
-            <div style={col}>
+            
+            <style>{`
+                @media print {
+                    .no-print { display: none !important; }
+                    body { background: white !important; padding: 0 !important; }
+                    .print-header { display: flex !important; margin-bottom: 30px; border-bottom: 2px solid #0F3F5C; padding-bottom: 15px; }
+                    .org-container { padding: 0 !important; background: white !important; }
+                    .stats-container { margin-bottom: 20px !important; }
+                    @page { size: landscape; margin: 1cm; }
+                }
+                .print-header { display: none; }
+            `}</style>
+            
+            <div className="print-header flex items-center justify-between w-full">
+                <div style={{ fontSize: 24, fontWeight: 900, color: '#0F3F5C' }}>
+                    <span style={{ color: '#00E5FF' }}>MSM</span> GESTÃO
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                    <h2 style={{ fontSize: 18, fontWeight: 700, color: '#1e293b' }}>Organograma de Produção</h2>
+                    <p style={{ fontSize: 12, color: '#64748b' }}>{new Date().toLocaleDateString()}</p>
+                </div>
+            </div>
+
+            <div className="flex flex-col md:flex-row justify-between items-start mb-10 gap-6">
+                <div className="flex gap-4 stats-container">
+                    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 min-w-[180px]">
+                        <p className="text-[10px] uppercase font-black text-slate-400 tracking-widest mb-1">Colaboradores</p>
+                        <p className="text-3xl font-black text-[#0F3F5C]">{assignedCount}</p>
+                    </div>
+                    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 min-w-[180px]">
+                        <p className="text-[10px] uppercase font-black text-slate-400 tracking-widest mb-1">Vagas Disponíveis</p>
+                        <p className="text-3xl font-black text-blue-600">{vacanciesCount}</p>
+                    </div>
+                </div>
+
+                <button 
+                    onClick={handlePrint}
+                    className="no-print bg-[#0F3F5C] text-white px-6 py-3 rounded-xl font-bold hover:bg-[#1a5f8a] transition shadow-lg flex items-center gap-2"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.89l-4.72-4.72m0 0l4.72-4.72M2 9.17h18a2.25 2.25 0 012.25 2.25v6.75a2.25 2.25 0 01-2.25 2.25H6.75a2.25 2.25 0 01-2.25-2.25v-4.5m0-6.75V6.75a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0122.5 6.75v10.5" />
+                    </svg>
+                    Imprimir Organograma
+                </button>
+            </div>
+
+            <div className="org-container" style={col}>
 
                 <BlueLabelBox label="SETOR LAMINAÇÃO" />
                 <VLine />
