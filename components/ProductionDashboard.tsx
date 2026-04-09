@@ -1117,73 +1117,38 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
         };
     }, [activeTrelicaOrder, dailyProduction.trelicaShiftPieces]);
 
-    const [displayMode, setDisplayMode] = useState<'realtime' | 'analytics'>('realtime');
-
-    useEffect(() => {
-        // Toggle view every 15 seconds
-        const timerObj = setInterval(() => {
-            setDisplayMode(prev => prev === 'realtime' ? 'analytics' : 'realtime');
-        }, 15000);
-        return () => clearInterval(timerObj);
-    }, []);
-
     return (
         <div className="space-y-4 lg:space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4 lg:gap-6 pt-2 lg:pt-4">
                 {/* Column 1: Trefila */}
                 <div className="relative">
-                    <div className={`transition-opacity duration-700 ${displayMode === 'realtime' ? 'opacity-100 relative z-10' : 'opacity-0 absolute inset-0 z-0 pointer-events-none'}`}>
-                        <MachineStatusView
-                            machineType="Trefila"
-                            activeOrder={activeTrefilaOrder}
-                            allOrders={productionOrders}
-                            stock={stock}
-                            dailyProducedValue={dailyProduction.trefilaShiftWeight}
-                            dailyGoal={6000}
-                            goalUnit="kg"
-                            isGestor={isGestor}
-                            onResetShift={() => handleResetShift('Trefila')}
-                        />
-                    </div>
-                    <div className={`transition-opacity duration-700 ${displayMode === 'analytics' ? 'opacity-100 relative z-10' : 'opacity-0 absolute inset-0 z-0 pointer-events-none'}`}>
-                        <MachineAnalyticsView
-                            machineType="Trefila"
-                            dailyValue={dailyProduction.trefilaShiftWeight}
-                            unit="kg"
-                            productionOrders={productionOrders}
-                            activeOrder={activeTrefilaOrder}
-                            shiftGoal={6000}
-                        />
-                    </div>
+                    <MachineStatusView
+                        machineType="Trefila"
+                        activeOrder={activeTrefilaOrder}
+                        allOrders={productionOrders}
+                        stock={stock}
+                        dailyProducedValue={dailyProduction.trefilaShiftWeight}
+                        dailyGoal={6000}
+                        goalUnit="kg"
+                        isGestor={isGestor}
+                        onResetShift={() => handleResetShift('Trefila')}
+                    />
                 </div>
 
                 {/* Column 2: Treliça */}
                 <div className="relative">
-                    <div className={`transition-opacity duration-700 ${displayMode === 'realtime' ? 'opacity-100 relative z-10' : 'opacity-0 absolute inset-0 z-0 pointer-events-none'}`}>
-                        <MachineStatusView
-                            machineType="Treliça"
-                            activeOrder={activeTrelicaOrder}
-                            allOrders={productionOrders}
-                            stock={stock}
-                            dailyProducedValue={trelicaDisplayData.value}
-                            dailyGoal={trelicaDisplayData.goal}
-                            shiftGoal={trelicaDisplayData.shiftGoal}
-                            goalUnit={trelicaDisplayData.unit}
-                            isGestor={isGestor}
-                            onResetShift={() => handleResetShift('Treliça')}
-                        />
-                    </div>
-                    <div className={`transition-opacity duration-700 ${displayMode === 'analytics' ? 'opacity-100 relative z-10' : 'opacity-0 absolute inset-0 z-0 pointer-events-none'}`}>
-                        <MachineAnalyticsView
-                            machineType="Treliça"
-                            dailyValue={trelicaDisplayData.value}
-                            unit={trelicaDisplayData.unit.split(' ')[0]}
-                            productionOrders={productionOrders}
-                            activeOrder={activeTrelicaOrder}
-                            shiftGoal={trelicaDisplayData.shiftGoal}
-                            sizeValue={parseFloat(String(activeTrelicaOrder?.tamanho || '6').replace(',', '.'))}
-                        />
-                    </div>
+                    <MachineStatusView
+                        machineType="Treliça"
+                        activeOrder={activeTrelicaOrder}
+                        allOrders={productionOrders}
+                        stock={stock}
+                        dailyProducedValue={trelicaDisplayData.value}
+                        dailyGoal={trelicaDisplayData.goal}
+                        shiftGoal={trelicaDisplayData.shiftGoal}
+                        goalUnit={trelicaDisplayData.unit}
+                        isGestor={isGestor}
+                        onResetShift={() => handleResetShift('Treliça')}
+                    />
                 </div>
             </div>
 
