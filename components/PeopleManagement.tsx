@@ -1291,24 +1291,40 @@ const OrgChart: React.FC<{
             <style>{`
                 @media print {
                     .no-print { display: none !important; }
-                    body { background: white !important; padding: 0 !important; margin: 0 !important; overflow: visible !important; }
-                    .print-header { display: flex !important; margin-bottom: 20px; border-bottom: 2px solid #0F3F5C; padding: 10px 0; }
+                    html, body { 
+                        width: 297mm;
+                        height: 210mm;
+                        background: white !important; 
+                        padding: 0 !important; 
+                        margin: 0 !important; 
+                        overflow: visible !important; 
+                    }
+                    .print-header { display: flex !important; margin-bottom: 20px; border-bottom: 2px solid #0F3F5C; padding: 10px 0; width: 100%; }
                     .org-container { 
                         display: flex !important;
                         padding: 0 !important; 
                         background: white !important; 
                         width: 100% !important;
-                        zoom: 0.95;
+                        zoom: 0.9;
                     }
                     .stats-container { margin-bottom: 15px !important; }
-                    .org-scroll-wrapper { overflow: visible !important; width: 100% !important; min-height: auto !important; height: auto !important; padding: 0 !important; }
-                    @page { size: A4 landscape; margin: 5mm; }
+                    .org-scroll-wrapper { 
+                        overflow: visible !important; 
+                        width: 100% !important; 
+                        height: auto !important; 
+                        min-height: auto !important; 
+                        padding: 20mm 10mm !important; 
+                        background: white !important;
+                    }
+                    @page { 
+                        size: 297mm 210mm; 
+                        margin: 0; 
+                    }
                     * { 
                         -webkit-print-color-adjust: exact !important; 
                         print-color-adjust: exact !important; 
                         box-shadow: none !important; 
                         text-shadow: none !important;
-                        transition: none !important;
                     }
                 }
                 .print-header { display: none; }
