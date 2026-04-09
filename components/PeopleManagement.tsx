@@ -1332,12 +1332,27 @@ const OrgChart: React.FC<{
     };
 
     const handleGenerate2Shifts = async () => {
-        if (!confirm('Deseja apagar as áreas atuais e gerar a estrutura COMPLETA baseada no escopo (Setor Laminação > ADM > Máquinas)? Isso ajuda a organizar o que já foi criado.')) return;
+        if (!confirm('ATENÇÃO: Isso irá APAGAR TODO o organograma atual (áreas e cargos) e refazer do zero conforme a imagem do escopo. Deseja continuar?')) return;
         
         try {
-            // Optional: You could delete existing units here, but it's risky if they have many people.
-            // For now, let's just create a clean new root "ESCOPO FINAL - SETOR LAMINAÇÃO"
+            // 0. CLEANUP (Prevenção de duplicados)
+            const unitsToClear = await fetchTable<OrgUnit>('org_units');
+            const posToClear = await fetchTable<OrgPosition>('org_positions');
             
+            for (const p of posToClear) {
+                try { await deleteItem('org_positions', p.id); } catch(e) {}
+            }
+            for (const u of unitsToClear) {
+                try { await deleteItem('org_units', u.id); } catch(e) {}
+            }
+            
+            // Link Reset em funcionários
+            for (const e of employees) {
+                if (e.orgPositionId) {
+                    try { await updateItem('employees', e.id, { orgPositionId: null }); } catch(e) {}
+                }
+            }
+
             // 1. Root SETOR LAMINAÇÃO
             const setor = await insertItem('org_units', { name: 'SETOR LAMINAÇÃO', unitType: 'department', displayOrder: 1 } as any);
             
