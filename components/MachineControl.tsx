@@ -1441,11 +1441,27 @@ const MachineControl: React.FC<MachineControlProps> = ({
             {showLotSelectionModal && (
                 <LotSelectionModal
                     onClose={() => setShowLotSelectionModal(false)}
-                    stock={
-                        activeOrder?.isGhostOrder && activeOrder?.inputBitola
-                            ? stock.filter(lot => lot.materialType === 'Fio Máquina' && lot.bitola.replace(',', '.') === activeOrder.inputBitola?.replace(',', '.'))
-                            : stock.filter(lot => lot.materialType === 'Fio Máquina')
-                    }
+                    stock={(() => {
+                        const selectedIds = Array.isArray(activeOrder?.selectedLotIds) ? activeOrder?.selectedLotIds : [];
+                        const processedIds = (activeOrder?.processedLots || []).map(p => p.lotId);
+                        const currentActiveId = activeOrder?.activeLotProcessing?.lotId;
+                        const usedLotIds = new Set([...selectedIds, ...processedIds, currentActiveId].filter(Boolean));
+
+                        const filteredStock = stock.filter(lot => {
+                            const isAlreadyUsed = usedLotIds.has(lot.id);
+                            if (isAlreadyUsed) return false;
+
+                            const isFioMaquina = lot.materialType === 'Fio Máquina';
+                            if (!isFioMaquina) return false;
+
+                            // Se tiver bitola de entrada definida na ordem fantasma, filtra por ela
+                            if (activeOrder?.isGhostOrder && activeOrder?.inputBitola) {
+                                return lot.bitola.replace(',', '.') === activeOrder.inputBitola?.replace(',', '.');
+                            }
+                            return true;
+                        });
+                        return filteredStock;
+                    })()}
                     onSelect={(lotId) => {
                         if (activeOrder && addLotToOrder) {
                             addLotToOrder(activeOrder.id, lotId);
