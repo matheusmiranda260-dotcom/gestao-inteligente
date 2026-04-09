@@ -1332,46 +1332,37 @@ const OrgChart: React.FC<{
     };
 
     const handleGenerate2Shifts = async () => {
-        if (!confirm('ATENÇÃO: Isso irá APAGAR TODO o organograma atual (áreas e cargos) e refazer do zero conforme a imagem do escopo. Deseja continuar?')) return;
+        if (!confirm('CONFIRMAR LIMPEZA: Todas as duplicatas e áreas antigas serão apagadas para deixar apenas o Organograma Único e Correto. Deseja continuar?')) return;
         
         try {
-            // 0. FORCED CLEANUP (Exclui TUDO sem dó para evitar duplicatas)
+            // 0. FORCED CLEANUP (Exclui TUDO para garantir organograma único)
             const unitsToClear = await fetchTable<OrgUnit>('org_units');
             const posToClear = await fetchTable<OrgPosition>('org_positions');
             
-            // Delete all positions first (to avoid FK issues)
             for (const p of posToClear) {
-                try { await deleteItemByColumn('org_positions', 'id', p.id); } catch(e) { console.error(e); }
+                try { await deleteItemByColumn('org_positions', 'id', p.id); } catch(e) {}
             }
-            // Delete all units
             for (const u of unitsToClear) {
-                try { await deleteItemByColumn('org_units', 'id', u.id); } catch(e) { console.error(e); }
+                try { await deleteItemByColumn('org_units', 'id', u.id); } catch(e) {}
             }
             
-            // Link Reset em funcionários (Garante que ninguém fique preso a um ID fantasma)
+            // Link Reset em funcionários
             const allEmps = await fetchTable<Employee>('employees');
             for (const e of allEmps) {
                 if (e.orgPositionId) {
-                    try { await updateItem('employees', e.id, { orgPositionId: null }); } catch(e) { console.error(e); }
+                    try { await updateItem('employees', e.id, { orgPositionId: null }); } catch(e) {}
                 }
             }
 
             // 1. Root SETOR LAMINAÇÃO
             const setor = await insertItem('org_units', { name: 'SETOR LAMINAÇÃO', unitType: 'department', displayOrder: 1 } as any);
-            
-            // 2. ADMINISTRAÇÃO (Child of Setor)
             const adm = await insertItem('org_units', { name: 'ADMINISTRAÇÃO', unitType: 'department', parentId: setor.id, displayOrder: 1 } as any);
             
-            // helper to assign employee by name
             const assignByName = async (posId: string, name: string) => {
-                if (name.includes('?')) return;
-                const match = employees.find(e => e.name.toLowerCase().includes(name.toLowerCase()));
-                if (match) {
-                    await updateItem('employees', match.id, { orgPositionId: posId });
-                }
+                const match = allEmps.find(e => e.name.toLowerCase().includes(name.toLowerCase()));
+                if (match) await updateItem('employees', match.id, { orgPositionId: posId });
             };
 
-            // Adm Shifts
             const turnoAdm1 = await insertItem('org_units', { name: 'TURNO 2:00 as 11:34', unitType: 'group', parentId: adm.id, displayOrder: 1 } as any);
             const p1 = await insertItem('org_positions', { orgUnitId: turnoAdm1.id, title: 'encarregado', isLeadership: true } as any);
             await assignByName(p1.id, 'EDUARDO');
@@ -1380,10 +1371,8 @@ const OrgChart: React.FC<{
             const p2 = await insertItem('org_positions', { orgUnitId: turnoAdm2.id, title: 'gestor qualidade', isLeadership: true } as any);
             await assignByName(p2.id, 'MATHEUS');
 
-            // 3. MAQUINAS (Child of ADM for vertical stack in this visual chain)
             const maquinas = await insertItem('org_units', { name: 'MAQUINAS', unitType: 'group', parentId: adm.id, displayOrder: 3 } as any);
             
-            // helper to create machine structure
             const createMachine = async (name: string, shifts: { name: string, roles: { title: string, emp?: string }[] }[]) => {
                 const m = await insertItem('org_units', { name, unitType: 'machine', parentId: maquinas.id, displayOrder: 1 } as any);
                 for (const s of shifts) {
@@ -1395,25 +1384,18 @@ const OrgChart: React.FC<{
                 }
             };
 
-            await createMachine('TREFILA 1', [
-                { name: 'TURNO 7:45 as 17:30', roles: [{title: 'operador', emp: 'WILIAN'}, {title: 'Auxiliar', emp: 'DENIS'}, {title: 'Auxiliar', emp: 'Ryanderson'}] }
-            ]);
-
+            await createMachine('TREFILA 1', [{ name: 'TURNO 7:45 as 17:30', roles: [{title: 'operador', emp: 'WILIAN'}, {title: 'Auxiliar', emp: 'DENIS'}, {title: 'Auxiliar', emp: 'Ryanderson'}] }]);
             await createMachine('TRELIÇA 1', [
                 { name: 'TURNO 5:00 as 14:44', roles: [{title: 'operador', emp: 'ADRIAN'}, {title: 'Auxiliar', emp: 'JUNIOR'}] },
                 { name: 'TURNO 2:00 as 11:34', roles: [{title: 'operador', emp: 'Alceu'}, {title: 'Auxiliar', emp: 'Thiago'}] }
             ]);
-
             await createMachine('TRELIÇA 2', [
                 { name: 'TURNO 5:00 as 14:44', roles: [{title: 'operador'}, {title: 'Auxiliar'}] },
                 { name: 'TURNO 2:00 as 11:34', roles: [{title: 'operador'}, {title: 'Auxiliar'}] }
             ]);
-
-            await createMachine('MALHA', [
-                { name: 'TURNO 7:45 as 17:30', roles: [{title: 'operador'}, {title: 'Auxiliar'}, {title: 'Auxiliar'}] }
-            ]);
+            await createMachine('MALHA', [{ name: 'TURNO 7:45 as 17:30', roles: [{title: 'operador'}, {title: 'Auxiliar'}, {title: 'Auxiliar'}] }]);
             
-            alert('Estrutura de Laminação Final gerada com sucesso! Os funcionários foram vinculados automaticamente onde os nomes coincidiram.');
+            alert('Limpando duplicatas... Organograma Único gerado!');
             reloadData();
         } catch (e) {
             console.error('Erro ao gerar:', e);
@@ -1475,9 +1457,28 @@ const OrgChart: React.FC<{
 
     return (
         <div className="overflow-auto p-8 min-h-[600px] bg-slate-50 relative">
+            {/* Top Toolbar for Reset */}
+            <div className="flex justify-center mb-10 pb-6 border-b border-slate-200">
+                <div className="bg-white p-6 rounded-3xl shadow-xl border-2 border-red-100 flex flex-col items-center gap-4 max-w-md w-full">
+                    <div className="h-14 w-14 bg-red-100 rounded-full flex items-center justify-center text-red-600">
+                        <TrashIcon className="h-8 w-8" />
+                    </div>
+                    <div className="text-center">
+                        <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">CORREÇÃO DE DUPLICATAS</h3>
+                        <p className="text-xs text-slate-500 mt-1">Exclua as outras 3 estruturas e deixe apenas a correta clicando abaixo:</p>
+                    </div>
+                    <button
+                        onClick={handleGenerate2Shifts}
+                        className="w-full py-4 bg-red-600 text-white rounded-2xl font-black uppercase text-sm shadow-lg hover:bg-red-700 transition-all hover:scale-[1.02]"
+                    >
+                         UNICAR ORGANOGRAMA (LIMPAR TUDO)
+                    </button>
+                </div>
+            </div>
+
             <div className="flex gap-8 min-w-max justify-center items-start pt-10">
-                {/* Render Existing Roots */}
-                {tree.map(root => (
+                {/* Render ONLY the first root to prevent visual clutter if DB is still dirty */}
+                {tree.slice(0, 1).map(root => (
                     <OrgNode
                         key={root.id}
                         node={root}
@@ -1494,19 +1495,6 @@ const OrgChart: React.FC<{
                         evaluations={evaluations}
                     />
                 ))}
-
-                    <div className="flex flex-col items-center">
-                        <button
-                            onClick={handleGenerate2Shifts}
-                            className="w-[200px] py-6 bg-red-600 text-white rounded-2xl shadow-2xl hover:bg-red-700 transition-all flex flex-col items-center justify-center gap-2 border-4 border-white animate-pulse"
-                        >
-                            <TrashIcon className="h-8 w-8 text-white" />
-                            <span className="font-extrabold text-sm text-center uppercase">Limpar Tudo e<br/>Deixar Pronto</span>
-                        </button>
-                        <p className="text-[10px] text-red-600 mt-3 text-center max-w-[200px] font-black uppercase">
-                            Clique aqui uma última vez para apagar os erros e deixar igual à imagem.
-                        </p>
-                    </div>
             </div>
         </div>
     );
