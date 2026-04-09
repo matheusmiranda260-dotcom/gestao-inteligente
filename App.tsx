@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'; // Refresh Trigger
+import React, { useState, useEffect, useMemo, useCallback } from 'react'; // Refresh Trigger
 import type { Page, User, Employee, StockItem, ConferenceData, ProductionOrderData, TransferRecord, Bitola, MachineType, PartsRequest, ShiftReport, ProductionRecord, TransferredLotInfo, ProcessedLot, DowntimeEvent, OperatorLog, TrelicaSelectedLots, WeighedPackage, FinishedProductItem, Ponta, PontaItem, FinishedGoodsTransferRecord, TransferredFinishedGoodInfo, KaizenProblem, Meeting, MeetingItem, MeetingCategory } from './types';
 import { FioMaquinaBitolaOptions, TrefilaBitolaOptions } from './types';
 import Login from './components/Login';
@@ -45,7 +45,16 @@ const App: React.FC = () => {
     const [stock, setStock] = useState<StockItem[]>([]);
     const [conferences, setConferences] = useState<ConferenceData[]>([]);
     const [transfers, setTransfers] = useState<TransferRecord[]>([]);
-    const [productionOrders, setProductionOrders] = useState<ProductionOrderData[]>([]);
+    const [rawProductionOrders, setRawProductionOrders] = useState<ProductionOrderData[]>([]);
+    const productionOrders = useMemo(() => {
+        return rawProductionOrders.map(o => ({
+            ...o,
+            isGhostOrder: o.operatorLogs?.some(log => log.operator === 'GHOST_ORDER_FLAG') || false
+        }));
+    }, [rawProductionOrders]);
+    const setProductionOrders = useCallback((value: React.SetStateAction<ProductionOrderData[]>) => {
+        setRawProductionOrders(value);
+    }, []);
     const [finishedGoods, setFinishedGoods] = useState<FinishedProductItem[]>([]);
     const [pontasStock, setPontasStock] = useState<PontaItem[]>([]);
     const [finishedGoodsTransfers, setFinishedGoodsTransfers] = useState<FinishedGoodsTransferRecord[]>([]);
@@ -796,14 +805,15 @@ const App: React.FC = () => {
     };
 
     const addProductionOrder = async (orderData: Omit<ProductionOrderData, 'id' | 'status' | 'creationDate'>) => {
+        const { isGhostOrder, ...orderDataToSave } = orderData;
         const newOrder: Partial<ProductionOrderData> = {
-            ...orderData,
+            ...orderDataToSave,
             // id is NOT set here to allow insertItem to generate a proper UUID for Supabase
             status: 'pending',
             creationDate: new Date().toISOString(),
             downtimeEvents: [],
             processedLots: [],
-            operatorLogs: [],
+            operatorLogs: isGhostOrder ? [{ operator: 'GHOST_ORDER_FLAG', startTime: new Date().toISOString() }] : [],
             weighedPackages: [],
             pontas: []
         };
