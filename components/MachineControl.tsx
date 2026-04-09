@@ -1441,7 +1441,11 @@ const MachineControl: React.FC<MachineControlProps> = ({
             {showLotSelectionModal && (
                 <LotSelectionModal
                     onClose={() => setShowLotSelectionModal(false)}
-                    stock={stock}
+                    stock={
+                        activeOrder?.isGhostOrder && activeOrder?.inputBitola
+                            ? stock.filter(lot => lot.bitola.replace(',', '.') === activeOrder.inputBitola?.replace(',', '.'))
+                            : stock
+                    }
                     onSelect={(lotId) => {
                         if (activeOrder && addLotToOrder) {
                             addLotToOrder(activeOrder.id, lotId);

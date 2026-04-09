@@ -107,13 +107,19 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
             return;
         }
 
+        if (isGhostOrder && !inputBitolaFilter) {
+            showNotification('Informe a bitola de entrada (Fio Máquina) obrigatória.', 'error');
+            return;
+        }
+
         addProductionOrder({
             orderNumber,
             machine: 'Trefila',
             targetBitola,
             selectedLotIds: selectedLotIds,
             totalWeight: isGhostOrder ? parseFloat(ghostTargetWeight.replace(',', '.')) : totalSelectedWeight,
-            isGhostOrder: isGhostOrder
+            isGhostOrder: isGhostOrder,
+            inputBitola: inputBitolaFilter
         });
 
         // Reset form

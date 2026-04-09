@@ -47,10 +47,14 @@ const App: React.FC = () => {
     const [transfers, setTransfers] = useState<TransferRecord[]>([]);
     const [rawProductionOrders, setRawProductionOrders] = useState<ProductionOrderData[]>([]);
     const productionOrders = useMemo(() => {
-        return rawProductionOrders.map(o => ({
-            ...o,
-            isGhostOrder: o.operatorLogs?.some(log => log.operator === 'GHOST_ORDER_FLAG') || false
-        }));
+        return rawProductionOrders.map(o => {
+            const ghostLog = o.operatorLogs?.find(log => log.operator === 'GHOST_ORDER_FLAG');
+            return {
+                ...o,
+                isGhostOrder: !!ghostLog,
+                inputBitola: ghostLog?.action || ''
+            };
+        });
     }, [rawProductionOrders]);
     const setProductionOrders = useCallback((value: React.SetStateAction<ProductionOrderData[]>) => {
         setRawProductionOrders(value);
@@ -805,7 +809,7 @@ const App: React.FC = () => {
     };
 
     const addProductionOrder = async (orderData: Omit<ProductionOrderData, 'id' | 'status' | 'creationDate'>) => {
-        const { isGhostOrder, ...orderDataToSave } = orderData;
+        const { isGhostOrder, inputBitola, ...orderDataToSave } = orderData;
         const newOrder: Partial<ProductionOrderData> = {
             ...orderDataToSave,
             // id is NOT set here to allow insertItem to generate a proper UUID for Supabase
@@ -813,7 +817,7 @@ const App: React.FC = () => {
             creationDate: new Date().toISOString(),
             downtimeEvents: [],
             processedLots: [],
-            operatorLogs: isGhostOrder ? [{ operator: 'GHOST_ORDER_FLAG', startTime: new Date().toISOString() }] : [],
+            operatorLogs: isGhostOrder ? [{ operator: 'GHOST_ORDER_FLAG', action: inputBitola || '', startTime: new Date().toISOString() }] : [],
             weighedPackages: [],
             pontas: []
         };
