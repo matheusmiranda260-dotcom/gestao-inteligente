@@ -1443,8 +1443,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
                     onClose={() => setShowLotSelectionModal(false)}
                     stock={
                         activeOrder?.isGhostOrder && activeOrder?.inputBitola
-                            ? stock.filter(lot => lot.bitola.replace(',', '.') === activeOrder.inputBitola?.replace(',', '.'))
-                            : stock
+                            ? stock.filter(lot => lot.materialType === 'Fio Máquina' && lot.bitola.replace(',', '.') === activeOrder.inputBitola?.replace(',', '.'))
+                            : stock.filter(lot => lot.materialType === 'Fio Máquina')
                     }
                     onSelect={(lotId) => {
                         if (activeOrder && addLotToOrder) {
