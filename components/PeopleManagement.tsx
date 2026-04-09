@@ -1071,121 +1071,112 @@ const OrgNode: React.FC<{
 }> = ({ node, employees, onAddSubUnit, onAddPosition, onDeleteUnit, onDeletePosition, onEditPosition, onAssignEmployee, onCreateEmployee, onEditEmployee, onEditUnit, evaluations }) => {
 
     // Color mapping based on type
-    const getNodeColor = (type?: string) => {
+    const getNodeColor = (type?: string, name?: string) => {
+        const lowerName = name?.toLowerCase() || '';
+        if (lowerName.includes('turno')) return 'bg-white border-slate-200 text-slate-800 shadow-sm';
+        
         switch (type) {
-            case 'department': return 'bg-amber-400 border-amber-500 text-white'; // Amarelo (Administrativo, Produção)
-            case 'group': return 'bg-green-600 border-green-700 text-white'; // Verde (Máquinas)
-            case 'machine': return 'bg-orange-500 border-orange-600 text-white'; // Laranja (Máquinas Trefila/Treliça)
-            default: return 'bg-slate-500 border-slate-600 text-white';
+            case 'department': return 'bg-[#0F3F5C] border-b-[#0A2A3D] text-white shadow-xl'; 
+            case 'group': return 'bg-[#4a86e8] border-b-[#3a6dbd] text-white shadow-md'; 
+            case 'machine': return 'bg-blue-400 border-b-blue-600 text-white shadow-sm'; 
+            default: return 'bg-slate-500 border-b-slate-700 text-white';
         }
     };
 
+    const isShift = node.name.toLowerCase().includes('turno');
+
     return (
         <div className="flex flex-col items-center">
-            {/* The Node Itself */}
-            <div className={`relative p-3 rounded-lg shadow-md border-b-4 mb-4 min-w-[200px] text-center group transition-transform hover:-translate-y-1 ${getNodeColor(node.unitType)}`}>
-                <div className="font-bold text-lg uppercase tracking-wide">{node.name}</div>
-                {/* Controls */}
-                <div className="absolute -top-3 -right-3 hidden group-hover:flex gap-1">
-                    <button onClick={() => onEditUnit(node.id, node.name)} className="p-1 bg-white rounded-full text-slate-600 shadow-sm hover:scale-110" title="Editar Nome">
+            {/* The Node / Card */}
+            <div className={`relative rounded-2xl border-b-4 mb-4 min-w-[240px] transition-all group ${isShift ? 'bg-white border border-slate-200 p-0 overflow-hidden' : `${getNodeColor(node.unitType, node.name)} p-4`}`}>
+                
+                {isShift ? (
+                    <div className="flex flex-col">
+                        <div className="bg-slate-100 border-b border-slate-200 p-2 text-[10px] font-black text-[#0F3F5C] uppercase tracking-[0.15em] text-center">
+                            {node.name}
+                        </div>
+                        <div className="p-3 space-y-2 min-h-[40px]">
+                            {node.positions.length > 0 ? (
+                                node.positions.map(pos => {
+                                    const occupant = employees.find(e => e.orgPositionId === pos.id);
+                                    return (
+                                        <div key={pos.id} className="group/pos relative py-1 px-2 hover:bg-slate-50 rounded-lg border border-transparent hover:border-slate-100 transition-colors">
+                                            {occupant ? (
+                                                <div className="flex items-center gap-2 cursor-pointer" onClick={() => onEditEmployee(occupant)}>
+                                                    <div className="w-6 h-6 rounded-full bg-slate-200 overflow-hidden shrink-0 border border-slate-300">
+                                                        {occupant.photoUrl ? <img src={occupant.photoUrl} className="w-full h-full object-cover" /> : <span className="text-[8px] font-bold flex items-center justify-center h-full">{occupant.name.charAt(0)}</span>}
+                                                    </div>
+                                                    <div className="flex flex-col min-w-0">
+                                                        <span className="font-bold text-slate-800 text-[11px] truncate uppercase">{occupant.name.split(' ')[0]} {occupant.name.split(' ').slice(-1)}</span>
+                                                        <span className="text-[9px] text-slate-400 font-medium">( {pos.title} )</span>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[10px] text-slate-300 font-bold uppercase italic">( Vago: {pos.title} )</span>
+                                                    <button onClick={() => onCreateEmployee(pos.id)} className="text-blue-500 opacity-0 group-hover/pos:opacity-100"><PlusIcon className="h-3 w-3"/></button>
+                                                </div>
+                                            )}
+                                            {/* Pos Controls */}
+                                            <div className="absolute top-0 right-0 hidden group-hover/pos:flex gap-1 bg-white/90 backdrop-blur pb-1 pl-1 rounded-bl-lg">
+                                                <button onClick={() => onEditPosition(pos.id)} className="text-slate-400 hover:text-blue-500"><PencilIcon className="h-3 w-3"/></button>
+                                                <button onClick={() => onDeletePosition(pos.id)} className="text-slate-400 hover:text-red-500"><TrashIcon className="h-3 w-3"/></button>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            ) : (
+                                <p className="text-[10px] text-slate-400 text-center italic py-2">Nenhum cargo definido</p>
+                            )}
+                        </div>
+                        {/* Quick Add Pos for Shift */}
+                        <button onClick={() => onAddPosition(node.id)} className="w-full py-1 text-[9px] font-bold text-slate-400 hover:text-blue-500 bg-slate-50 border-t border-slate-100 opacity-0 group-hover:opacity-100 transition-opacity">
+                            + Adicionar Cargo
+                        </button>
+                    </div>
+                ) : (
+                    <>
+                        <div className="font-black text-sm uppercase tracking-[0.15em] text-center mb-1">{node.name}</div>
+                        {node.positions.length > 0 && (
+                            <div className="mt-4 space-y-2">
+                                {node.positions.map(pos => {
+                                    const occupant = employees.find(e => e.orgPositionId === pos.id);
+                                    return (
+                                        <div key={pos.id} className="bg-white/10 backdrop-blur-sm p-2 rounded-xl flex items-center gap-3 border border-white/10 hover:bg-white/20 transition-colors cursor-pointer" onClick={() => occupant && onEditEmployee(occupant)}>
+                                             <div className="w-8 h-8 rounded-full bg-slate-200/20 overflow-hidden flex-shrink-0">
+                                                {occupant?.photoUrl ? <img src={occupant.photoUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xs font-bold">{occupant?.name.charAt(0) || '?'}</div>}
+                                             </div>
+                                             <div className="flex flex-col min-w-0">
+                                                <div className="font-bold text-xs truncate">{occupant?.name || '(Vago)'}</div>
+                                                <div className="text-[10px] opacity-70 italic">{pos.title}</div>
+                                             </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </>
+                )}
+
+                {/* Main Controls */}
+                <div className="absolute -top-3 -right-3 flex opacity-0 group-hover:opacity-100 transition-opacity scale-90 hover:scale-100 gap-1.5 z-20">
+                    {!isShift && (
+                        <button onClick={() => onAddSubUnit(node.id)} className="p-2 bg-white rounded-xl text-blue-600 shadow-xl border border-slate-100" title="Sub-Área / Turno">
+                            <PlusIcon className="h-4 w-4" />
+                        </button>
+                    )}
+                    <button onClick={() => onEditUnit(node.id, node.name)} className="p-2 bg-white rounded-xl text-slate-600 shadow-xl border border-slate-100" title="Editar">
                         <PencilIcon className="h-4 w-4" />
                     </button>
-                    <button onClick={() => onAddSubUnit(node.id)} className="p-1 bg-white rounded-full text-blue-600 shadow-sm hover:scale-110" title="Adicionar Sub-Área">
-                        <PlusIcon className="h-4 w-4" />
-                    </button>
-                    <button onClick={() => onAddPosition(node.id)} className="p-1 bg-white rounded-full text-amber-600 shadow-sm hover:scale-110" title="Adicionar Cargo/Função">
-                        <UserIcon className="h-4 w-4" />
-                    </button>
-                    <button onClick={() => onDeleteUnit(node.id)} className="p-1 bg-white rounded-full text-red-600 shadow-sm hover:scale-110" title="Remover Área">
+                    <button onClick={() => onDeleteUnit(node.id)} className="p-2 bg-white rounded-xl text-red-600 shadow-xl border border-slate-100" title="Excluir">
                         <TrashIcon className="h-4 w-4" />
                     </button>
                 </div>
             </div>
 
-            {/* Positions directly under this Node (Vertical list usually) */}
-            {node.positions.length > 0 && (
-                <div className="flex flex-col items-center gap-2 mb-6 px-2 w-full">
-                    {node.positions.map(pos => {
-                        const occupant = employees.find(e => e.orgPositionId === pos.id);
-                        // Calculate Rating
-                        const empEvals = occupant ? evaluations.filter(ev => ev.employeeId === occupant.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) : [];
-                        const lastScore = empEvals.length > 0 ? (empEvals[0].totalScore / 5) : 0;
-
-                        return (
-                            <div key={pos.id} className="flex flex-col items-center relative group/pos w-full max-w-[200px]">
-                                {/* Blue Box: Role */}
-                                <div
-                                    className="bg-[#4a86e8] text-white px-2 py-1 rounded-t-lg shadow-sm font-semibold text-xs w-full text-center border-b border-blue-400 relative cursor-pointer hover:bg-blue-600 transition truncate"
-                                    title={pos.title}
-                                    onClick={() => onEditPosition(pos.id)}
-                                >
-                                    {pos.title}
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); onDeletePosition(pos.id); }}
-                                        className="absolute top-0.5 right-1 opacity-0 group-hover/pos:opacity-100 text-white hover:text-red-200"
-                                        title="Remover Cargo"
-                                    >
-                                        <XIcon className="h-3 w-3" />
-                                    </button>
-                                </div>
-
-                                {/* Employee Box Content */}
-                                <div className="bg-white border-x border-b border-slate-300 rounded-b-lg p-2 w-full shadow-sm min-h-[50px] flex items-center justify-center relative hover:bg-slate-50 transition-colors">
-                                    {occupant ? (
-                                        <div className="flex items-center w-full gap-2 cursor-pointer" onClick={() => onEditEmployee(occupant)}>
-                                            {/* Avatar */}
-                                            <div className="h-10 w-10 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden border border-slate-300 shrink-0">
-                                                {occupant.photoUrl ? (
-                                                    <img src={occupant.photoUrl} alt={occupant.name} className="h-full w-full object-cover" />
-                                                ) : (
-                                                    <span className="text-xs font-bold text-slate-500">{occupant.name.charAt(0)}</span>
-                                                )}
-                                            </div>
-                                            {/* Info */}
-                                            <div className="flex flex-col min-w-0 flex-grow">
-                                                <p className="font-bold text-xs text-slate-800 truncate leading-tight mb-0.5">{occupant.name}</p>
-                                                <div className="flex items-center">
-                                                    <StarIcon className={`h-3 w-3 ${lastScore > 0 ? 'text-yellow-400 fill-current' : 'text-slate-200'}`} />
-                                                    <span className="text-[10px] text-slate-500 ml-1 font-semibold">{lastScore > 0 ? lastScore.toFixed(1) : '-'}</span>
-                                                </div>
-                                            </div>
-                                            {/* Hidden Edit Trigger for quick swap (optional, or just click to edit) */}
-                                        </div>
-                                    ) : (
-                                        // Empty State - Dropdown to assign
-                                        <select
-                                            className="w-full bg-transparent outline-none text-slate-400 font-medium text-center cursor-pointer text-[10px] py-1"
-                                            value=""
-                                            onChange={(e) => {
-                                                if (e.target.value === 'NEW') onCreateEmployee(pos.id);
-                                                else if (e.target.value) onAssignEmployee(pos.id, e.target.value);
-                                            }}
-                                        >
-                                            <option value="">(Vago)</option>
-                                            {employees.filter(e => !e.orgPositionId).map(emp => (
-                                                <option key={emp.id} value={emp.id}>{emp.name}</option>
-                                            ))}
-                                            <option value="NEW" className="font-bold text-blue-600">+ Contratar</option>
-                                        </select>
-                                    )}
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
-
-            {/* Add Position Button for this Node */}
-            <div className="mb-6 opacity-0 hover:opacity-100 transition-opacity -mt-4">
-                <button onClick={() => onAddPosition(node.id)} className="text-xs bg-slate-200 hover:bg-slate-300 text-slate-600 px-2 py-1 rounded-full flex items-center gap-1">
-                    <PlusIcon className="h-3 w-3" /> Cargo
-                </button>
-            </div>
-
-            {/* Children Nodes (Horizontal Layout) */}
-            {/* Line from Parent down to Children */}
+            {/* Children Hierarchy Lines */}
             {node.children.length > 0 && (
-                <div className="h-6 w-0.5 bg-slate-300"></div>
+                <div className="w-0.5 h-8 bg-slate-300 relative"></div>
             )}
 
             {/* Children Nodes (Horizontal Layout) */}
@@ -1335,28 +1326,58 @@ const OrgChart: React.FC<{
     };
 
     const handleGenerate2Shifts = async () => {
-        if (!confirm('Isso irá criar a estrutura de 2 turnos (Turno A e Turno B) para a área de Produção, com os devidos cargos de Encarregado e Auxiliar. Deseja continuar?')) return;
+        if (!confirm('Deseja gerar a estrutura COMPLETA baseada no escopo (Setor Laminação > ADM > Máquinas)?')) return;
         
         try {
-            // 1. Create Root "Produção"
-            const prod = await insertItem('org_units', { name: 'PRODUÇÃO (Estrutura 2 Turnos)', unitType: 'department', displayOrder: units.length + 1 } as any);
+            // 1. Root SETOR LAMINAÇÃO
+            const setor = await insertItem('org_units', { name: 'SETOR LAMINAÇÃO', unitType: 'department', displayOrder: 1 } as any);
             
-            // 2. Create Shifts
-            const turnoA = await insertItem('org_units', { name: 'Turno A (05:00 - 14:44)', unitType: 'group', parentId: prod.id, displayOrder: 1 } as any);
-            const turnoB = await insertItem('org_units', { name: 'Turno B (14:00 - 24:00)', unitType: 'group', parentId: prod.id, displayOrder: 2 } as any);
+            // 2. ADMINISTRAÇÃO (Child of Setor for vertical stack)
+            const adm = await insertItem('org_units', { name: 'ADMINISTRAÇÃO', unitType: 'department', parentId: setor.id, displayOrder: 1 } as any);
             
-            // 3. Create Roles for Turno A
-            await insertItem('org_positions', { orgUnitId: turnoA.id, title: 'Encarregado', isLeadership: true, description: 'Liderar as operações do Turno A.' } as any);
-            await insertItem('org_positions', { orgUnitId: turnoA.id, title: 'Auxiliar de Encarregado', isLeadership: false, description: 'Apoiar o encarregado no Turno A.' } as any);
+            // Adm Shifts
+            const turnoAdm1 = await insertItem('org_units', { name: 'TURNO 2:00 as 11:34', unitType: 'group', parentId: adm.id, displayOrder: 1 } as any);
+            await insertItem('org_positions', { orgUnitId: turnoAdm1.id, title: 'Encarregado', isLeadership: true } as any);
+
+            const turnoAdm2 = await insertItem('org_units', { name: 'TURNO 5:00 as 14:44', unitType: 'group', parentId: adm.id, displayOrder: 2 } as any);
+            await insertItem('org_positions', { orgUnitId: turnoAdm2.id, title: 'Gestor Qualidade', isLeadership: true } as any);
+
+            // 3. MAQUINAS (Child of ADM for vertical stack, as per scope visual chain)
+            const maquinas = await insertItem('org_units', { name: 'MAQUINAS', unitType: 'department', parentId: adm.id, displayOrder: 2 } as any);
             
-            // 4. Create Roles for Turno B
-            await insertItem('org_positions', { orgUnitId: turnoB.id, title: 'Encarregado', isLeadership: true, description: 'Liderar as operações do Turno B.' } as any);
-            await insertItem('org_positions', { orgUnitId: turnoB.id, title: 'Auxiliar de Encarregado', isLeadership: false, description: 'Apoiar o encarregado no Turno B.' } as any);
+            // helper to create machine structure
+            const createMachine = async (name: string, shifts: { name: string, roles: string[] }[]) => {
+                const m = await insertItem('org_units', { name, unitType: 'machine', parentId: maquinas.id, displayOrder: 1 } as any);
+                for (const s of shifts) {
+                    const su = await insertItem('org_units', { name: s.name, unitType: 'group', parentId: m.id, displayOrder: 1 } as any);
+                    for (const role of s.roles) {
+                        await insertItem('org_positions', { orgUnitId: su.id, title: role, isLeadership: false } as any);
+                    }
+                }
+            };
+
+            await createMachine('TREFILA 1', [
+                { name: 'TURNO 7:45 as 17:30', roles: ['Operador', 'Auxiliar', 'Auxiliar'] }
+            ]);
+
+            await createMachine('TRELIÇA 1', [
+                { name: 'TURNO 5:00 as 14:44', roles: ['Operador', 'Auxiliar'] },
+                { name: 'TURNO 2:00 as 11:34', roles: ['Operador', 'Auxiliar'] }
+            ]);
+
+            await createMachine('TRELIÇA 2', [
+                { name: 'TURNO 5:00 as 14:44', roles: ['Operador', 'Auxiliar'] },
+                { name: 'TURNO 2:00 as 11:34', roles: ['Operador', 'Auxiliar'] }
+            ]);
+
+            await createMachine('MALHA', [
+                { name: 'TURNO 7:45 as 17:30', roles: ['Operador', 'Auxiliar', 'Auxiliar'] }
+            ]);
             
-            alert('Estrutura de 2 Turnos gerada com sucesso! Você pode agora vincular os funcionários a estes cargos.');
+            alert('Estrutura de Laminação gerada com sucesso! Agora você pode vincular os funcionários.');
             reloadData();
         } catch (e) {
-            console.error('Erro ao gerar organograma 2 turnos:', e);
+            console.error('Erro ao gerar:', e);
             alert('Erro ao gerar estrutura.');
         }
     };
