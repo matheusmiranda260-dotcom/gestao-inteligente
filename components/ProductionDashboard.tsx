@@ -337,11 +337,11 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
     };
 
     return (
-        <div className="min-h-screen bg-white text-slate-900 p-4 lg:p-8 flex flex-col gap-8 font-sans">
+        <div className="min-h-screen bg-slate-900 text-white p-4 lg:p-8 flex flex-col gap-8 font-sans">
             <header className="flex justify-center items-center">
                 <div className="text-center">
-                    <h1 className="text-3xl font-black tracking-[0.2em] uppercase bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Dashboard Laminação</h1>
-                    <p className="text-[10px] font-black text-indigo-500/80 uppercase tracking-[0.4em] mt-2">Live Factory Monitoring System v2.6</p>
+                    <h1 className="text-3xl font-black tracking-[0.2em] uppercase text-white">Dashboard Laminação</h1>
+                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.4em] mt-2">Live Factory Monitoring System v2.6</p>
                 </div>
             </header>
 
@@ -371,7 +371,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
             </div>
             
             <footer className="flex justify-center pb-4">
-                <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">DADOS ATUALIZADOS EM TEMPO REAL VIA SUPABASE</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">DADOS ATUALIZADOS EM TEMPO REAL VIA SUPABASE</p>
             </footer>
         </div>
     );
