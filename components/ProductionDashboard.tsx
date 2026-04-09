@@ -314,6 +314,20 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
     const activeTrefila = productionOrders.find(o => o.machine === 'Trefila' && o.status === 'in_progress');
     const activeTrelica = productionOrders.find(o => o.machine === 'Treliça' && o.status === 'in_progress');
 
+    const getTrelicaGoal = (activeOrder?: ProductionOrderData) => {
+        if (!activeOrder) return 500;
+        const model = (activeOrder.trelicaModel || '').toUpperCase();
+        const size = String(activeOrder.tamanho);
+        const isH12Leve = model.includes('H12') && model.includes('LEVE');
+        const is12m = size === '12';
+
+        if (isH12Leve) {
+            return is12m ? 250 : 500;
+        } else {
+            return is12m ? 350 : 700;
+        }
+    };
+
     return (
         <div className="min-h-screen bg-white text-slate-900 p-4 lg:p-8 flex flex-col gap-8 font-sans">
             <header className="flex justify-center items-center">
@@ -341,7 +355,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                     allOrders={productionOrders} 
                     stock={stock} 
                     dailyProducedValue={getDailyValue('Treliça')} 
-                    dailyGoal={new Date().getHours() >= 5 && new Date().getHours() < 14 ? 2500 : 2000} 
+                    dailyGoal={getTrelicaGoal(activeTrelica)} 
                     goalUnit="pçs" 
                     isGestor={isGestor} 
                     onResetShift={() => handleReset('Treliça')} 
