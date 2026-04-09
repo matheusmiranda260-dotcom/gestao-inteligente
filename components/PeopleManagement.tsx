@@ -1136,6 +1136,10 @@ const OrgChart: React.FC<{
         try { const s = localStorage.getItem('orgShiftTimes'); return s ? JSON.parse(s) : {}; } catch { return {}; }
     });
 
+    // Added state for the NEW selection UI
+    const [selectingFor, setSelectingFor] = useState<{ slotKey: string, title: string, sector: string } | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+
     const saveShiftTime = (key: string, val: string) => {
         const next = { ...shiftTimes, [key]: val };
         setShiftTimes(next);
@@ -1154,23 +1158,28 @@ const OrgChart: React.FC<{
         reloadData();
     };
 
-    const handleAddEmployee = async (slotKey: string) => {
-        const avail = employees.filter(e => !e.orgPositionId);
-        if (avail.length === 0) {
-            const name = prompt('Nenhum funcionário disponível. Nome do novo funcionário:');
-            if (name) triggerAddEmployee(slotKey);
-            return;
-        }
-        const list = avail.map((e, i) => `${i + 1}. ${e.name}`).join('\n');
-        const choice = prompt(`Selecione pelo número:\n\n${list}`);
-        if (!choice) return;
-        const idx = parseInt(choice) - 1;
-        if (idx >= 0 && idx < avail.length) {
-            const occ = employees.find(e => e.orgPositionId === slotKey);
-            if (occ) await updateItem('employees', occ.id, { orgPositionId: null });
-            await updateItem('employees', avail[idx].id, { orgPositionId: slotKey });
-            reloadData();
-        }
+    const handleAddEmployee = (slotKey: string, title: string, sector: string) => {
+        setSelectingFor({ slotKey, title, sector });
+        setSearchTerm('');
+    };
+
+    const confirmAssignment = async (employeeId: string) => {
+        if (!selectingFor) return;
+        const { slotKey, title, sector } = selectingFor;
+
+        // Desvincular quem estava antes (se houver)
+        const occ = employees.find(e => e.orgPositionId === slotKey);
+        if (occ) await updateItem('employees', occ.id, { orgPositionId: null });
+
+        // Vincular novo e atualizar cargo/setor
+        await updateItem('employees', employeeId, { 
+            orgPositionId: slotKey,
+            jobTitle: title,
+            sector: sector
+        });
+
+        setSelectingFor(null);
+        reloadData();
     };
 
     // Static shift definitions — keys are stable, stored as orgPositionId in DB
@@ -1185,13 +1194,13 @@ const OrgChart: React.FC<{
         malha_t1:   { key: 'malha_t1',   def: 'TURNO 7:45 AS 17:30', slots: [{ key: 'malha_t1_op', title: 'operador' }, { key: 'malha_t1_a1', title: 'Auxiliar' }, { key: 'malha_t1_a2', title: 'Auxiliar' }] },
     };
 
-    const card = (s: (typeof SHIFTS)[keyof typeof SHIFTS]) => (
+    const card = (s: (typeof SHIFTS)[keyof typeof SHIFTS], sector: string) => (
         <StaticShiftCard
             key={s.key}
             shiftKey={s.key} defaultTime={s.def} slots={s.slots}
             employees={employees} shiftTimes={shiftTimes}
             onEditShiftTime={handleEditShiftTime}
-            onAddEmployee={handleAddEmployee}
+            onAddEmployee={(slotKey) => handleAddEmployee(slotKey, s.slots.find(x => x.key === slotKey)?.title || '', sector)}
             onUnassign={handleUnassign}
         />
     );
@@ -1206,30 +1215,26 @@ const OrgChart: React.FC<{
                 <VLine />
                 <BlueLabelBox label="ADMINISTRAÇÃO" />
                 <VLine />
-                {card(SHIFTS.adm1)}
+                {card(SHIFTS.adm1, 'ADMINISTRAÇÃO')}
                 <VLine />
-                {card(SHIFTS.adm2)}
+                {card(SHIFTS.adm2, 'ADMINISTRAÇÃO')}
                 <VLine />
                 <BlueLabelBox label="MÁQUINAS" />
                 <VLine />
 
-                {/* Machines row with proper connecting lines */}
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                     <div style={{ display: 'flex', gap: 48, alignItems: 'flex-start' }}>
 
-                        {/* TREFILA 1 — first column: line extends right into gap */}
                         <div style={col}>
                             <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-                                {/* Horizontal: from center → right (extends 24px past column edge into gap) */}
                                 <div style={{ position: 'absolute', top: 0, left: '50%', right: -24, height: 2, background: '#000' }} />
                                 <div style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
                             </div>
                             <BlueLabelBox label="TREFILA 1" />
                             <VLine />
-                            {card(SHIFTS.tr1_t1)}
+                            {card(SHIFTS.tr1_t1, 'TREFILA 1')}
                         </div>
 
-                        {/* TRELIÇA 1 — middle column: line extends 24px on both sides into gaps */}
                         <div style={col}>
                             <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
                                 <div style={{ position: 'absolute', top: 0, left: -24, right: -24, height: 2, background: '#000' }} />
@@ -1237,9 +1242,9 @@ const OrgChart: React.FC<{
                             </div>
                             <BlueLabelBox label="TRELIÇA 1" />
                             <VLine />
-                            {card(SHIFTS.tc1_t1)}
+                            {card(SHIFTS.tc1_t1, 'TRELIÇA 1')}
                             <VLine />
-                            {card(SHIFTS.tc1_t2)}
+                            {card(SHIFTS.tc1_t2, 'TRELIÇA 1')}
                         </div>
 
                         {/* TRELIÇA 2 — middle column: line extends 24px on both sides */}
@@ -1250,9 +1255,9 @@ const OrgChart: React.FC<{
                             </div>
                             <BlueLabelBox label="TRELIÇA 2" />
                             <VLine />
-                            {card(SHIFTS.tc2_t1)}
+                            {card(SHIFTS.tc2_t1, 'TRELIÇA 2')}
                             <VLine />
-                            {card(SHIFTS.tc2_t2)}
+                            {card(SHIFTS.tc2_t2, 'TRELIÇA 2')}
                         </div>
 
                         {/* MALHA — last column: line extends left into gap */}
@@ -1264,15 +1269,101 @@ const OrgChart: React.FC<{
                             </div>
                             <BlueLabelBox label="MALHA" />
                             <VLine />
-                            {card(SHIFTS.malha_t1)}
+                            {card(SHIFTS.malha_t1, 'MALHA')}
                         </div>
 
                     </div>
                 </div>
 
-
-            </div>
+            {/* Employee Selection Overlay */}
+            {selectingFor && (
+                <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[80vh]">
+                        <div className="p-6 border-b flex justify-between items-center bg-slate-50 rounded-t-2xl">
+                            <div className="flex-1">
+                                <h3 className="font-bold text-slate-800 text-lg">Vincular Colaborador</h3>
+                                <p className="text-xs text-slate-500 uppercase font-black tracking-tight mt-1">
+                                    {selectingFor.sector} — <span className="text-blue-600">{selectingFor.title}</span>
+                                </p>
+                            </div>
+                            <button onClick={() => setSelectingFor(null)} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+                                <XIcon className="h-6 w-6 text-slate-400" />
+                            </button>
+                        </div>
+                        
+                        <div className="p-4 bg-white sticky top-0 z-10">
+                            <div className="relative">
+                                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                                <input 
+                                    type="text" 
+                                    placeholder="Buscar por nome..." 
+                                    className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    autoFocus
+                                />
+                            </div>
+                        </div>
+                        
+                        <div className="flex-1 overflow-auto p-3 space-y-1">
+                            {employees
+                                .filter(e => e.active) // Only active
+                                .filter(e => e.name.toLowerCase().includes(searchTerm.toLowerCase()))
+                                .length > 0 ? (
+                                    employees
+                                        .filter(e => e.active)
+                                        .filter(e => e.name.toLowerCase().includes(searchTerm.toLowerCase()))
+                                        .sort((a,b) => a.name.localeCompare(b.name))
+                                        .map(e => {
+                                            const isCurrentlyAssigned = !!e.orgPositionId;
+                                            return (
+                                                <button 
+                                                    key={e.id}
+                                                    onClick={() => {
+                                                        if (isCurrentlyAssigned && !confirm(`${e.name} já possui um cargo. Deseja movê-lo para esta nova posição?`)) return;
+                                                        confirmAssignment(e.id);
+                                                    }}
+                                                    className="w-full text-left p-3 hover:bg-blue-50 rounded-xl flex items-center gap-4 group transition-all border border-transparent hover:border-blue-100"
+                                                >
+                                                    <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold group-hover:bg-blue-100 group-hover:text-blue-600 overflow-hidden shrink-0 border border-slate-200">
+                                                        {e.photoUrl ? <img src={e.photoUrl} className="h-full w-full object-cover" /> : e.name.charAt(0)}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="font-bold text-slate-800 group-hover:text-blue-800 truncate">{e.name}</p>
+                                                        <p className="text-[10px] text-slate-500 uppercase font-medium">
+                                                            {isCurrentlyAssigned ? `${e.jobTitle} • ${e.sector}` : 'Disponível / Sem Cargo'}
+                                                        </p>
+                                                    </div>
+                                                    {isCurrentlyAssigned && (
+                                                        <div className="text-[10px] bg-slate-100 text-slate-500 px-2 py-1 rounded font-bold uppercase group-hover:bg-blue-200 group-hover:text-blue-700">Mover</div>
+                                                    )}
+                                                </button>
+                                            );
+                                        })
+                                ) : (
+                                    <div className="text-center py-12 px-6">
+                                        <div className="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                                            <SearchIcon className="h-10 w-10 text-slate-200" />
+                                        </div>
+                                        <p className="text-slate-400 font-medium">Nenhum colaborador encontrado com "{searchTerm}"</p>
+                                        <button 
+                                            onClick={() => { setSelectingFor(null); triggerAddEmployee(selectingFor.slotKey, selectingFor.sector); }}
+                                            className="mt-6 px-6 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition"
+                                        >
+                                            + Cadastrar Novo
+                                        </button>
+                                    </div>
+                                )
+                            }
+                        </div>
+                        <div className="p-4 bg-slate-50 border-t rounded-b-2xl text-[10px] text-center text-slate-400 uppercase font-black tracking-widest">
+                            Lista de Colaboradores MSM
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
+    </div>
     );
 };
 
