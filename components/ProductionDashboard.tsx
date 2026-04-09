@@ -145,7 +145,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     }, [allOrders, machineType, shiftStartMs, now]);
 
     return (
-        <div className="bg-white rounded-[3rem] shadow-xl border border-slate-200 flex flex-col overflow-hidden relative min-h-[600px] h-full">
+        <div className="bg-slate-100 rounded-[3rem] shadow-xl border border-slate-200 flex flex-col overflow-hidden relative min-h-[600px] h-full">
             <header className={`${currentStyle.bg} p-6 flex flex-col sm:flex-row justify-between items-center ${currentStyle.glow} border-b border-white/10 z-10 gap-4`}>
                 <div className="flex items-center gap-5">
                     <div className="bg-black/30 backdrop-blur-xl p-5 rounded-3xl border border-white/20">{currentStyle.icon}</div>
@@ -162,8 +162,8 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
 
             <main className="flex-1 p-6 grid grid-cols-1 lg:grid-cols-2 gap-6 overflow-hidden">
                 <div className="flex flex-col gap-6">
-                    {/* Meta Acumulada */}
-                    <div className="bg-slate-200/70 rounded-[2.5rem] p-8 border border-slate-300 flex flex-col justify-center relative overflow-hidden group shadow-sm">
+                    {/* Produção do Turno */}
+                    <div className="bg-slate-200 rounded-[2.5rem] p-8 border border-slate-300 flex flex-col justify-center relative overflow-hidden group shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)]">
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="font-black text-slate-400 uppercase tracking-widest text-[10px]">Produção do Turno</h3>
                             <div className="bg-indigo-50 text-indigo-600 px-4 py-2 rounded-2xl border border-indigo-100 flex flex-col items-end min-w-[100px]">
@@ -182,9 +182,9 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                             <p className="mt-4 text-[10px] font-black text-rose-500 uppercase tracking-widest text-right">
                                 Último Reporte: {new Date(activeOrder.lastQuantityUpdate).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                                 <span className="ml-2 opacity-70 italic lowercase">
-                                    ({Math.floor((now.getTime() - new Date(activeOrder.lastQuantityUpdate).getTime()) / 60000) === 0 
+                                    ({Math.max(0, Math.floor((now.getTime() - new Date(activeOrder.lastQuantityUpdate).getTime()) / 60000)) === 0 
                                         ? 'agora mesmo' 
-                                        : `${Math.floor((now.getTime() - new Date(activeOrder.lastQuantityUpdate).getTime()) / 60000)} min atrás`}
+                                        : `${Math.max(0, Math.floor((now.getTime() - new Date(activeOrder.lastQuantityUpdate).getTime()) / 60000))} min atrás`}
                                     )
                                 </span>
                             </p>
@@ -192,7 +192,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                     </div>
 
                     {/* Ordem Ativa */}
-                    <div className="bg-slate-200/70 rounded-[2.5rem] p-8 border border-slate-300 flex flex-col justify-center relative overflow-hidden shadow-sm">
+                    <div className="bg-slate-200 rounded-[2.5rem] p-8 border border-slate-300 flex flex-col justify-center relative overflow-hidden shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)]">
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="font-black text-slate-400 uppercase tracking-widest text-[10px]">Progresso da OP #{activeOrder?.orderNumber || '---'}</h3>
                             {isGestor && onResetShift && (
