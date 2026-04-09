@@ -1135,7 +1135,14 @@ const MachineControl: React.FC<MachineControlProps> = ({
         if (!activeOrder || activeOrder.machine !== 'Trefila') return { waitingLots: [], completedLots: [] };
 
         const processedLotIds = new Set(activeOrder.processedLots?.map(p => p.lotId) || []);
-        const allOrderLots = stock.filter(s => (activeOrder.selectedLotIds as string[]).includes(s.id));
+
+        // Para ordens fantasma, selectedLotIds pode começar vazio e lotes são adicionados dinamicamente
+        // Combina os lotes originais com os lotes dos processedLots (que podem ter sido adicionados depois)
+        const selectedIds = Array.isArray(activeOrder.selectedLotIds) ? activeOrder.selectedLotIds as string[] : [];
+        const processedIds = (activeOrder.processedLots || []).map(p => p.lotId);
+        const allKnownLotIds = [...new Set([...selectedIds, ...processedIds])];
+
+        const allOrderLots = stock.filter(s => allKnownLotIds.includes(s.id));
 
         const waiting = allOrderLots.filter(lot => !processedLotIds.has(lot.id) && lot.id !== activeLotProcessingData?.lotId);
 
@@ -1170,11 +1177,21 @@ const MachineControl: React.FC<MachineControlProps> = ({
     }, [activeOrder]);
 
     const allTrefilaLotsProcessed = useMemo(() => {
-        if (!activeOrder || activeOrder.machine !== 'Trefila' || !Array.isArray(activeOrder.selectedLotIds)) return false;
-        const totalLots = activeOrder.selectedLotIds.length;
-        if (totalLots === 0) return false;
+        if (!activeOrder || activeOrder.machine !== 'Trefila') return false;
+
+        // Para ordens fantasma sem lotes selecionados inicialmente:
+        // Permite fechar se ao menos 1 lote foi processado e pesado, OU se não há lotes em nenhum estado
+        const selectedIds = Array.isArray(activeOrder.selectedLotIds) ? activeOrder.selectedLotIds as string[] : [];
+        const processedIds = (activeOrder.processedLots || []).map(p => p.lotId);
+        const allKnownIds = [...new Set([...selectedIds, ...processedIds])];
+
+        if (allKnownIds.length === 0) {
+            // Ordem fantasma sem nenhum lote: permite fechar (caso especial)
+            return activeOrder.isGhostOrder === true;
+        }
+
         const weighedLots = (activeOrder.processedLots || []).filter(l => l.finalWeight !== null).length;
-        return totalLots === weighedLots;
+        return allKnownIds.length === weighedLots && weighedLots > 0;
     }, [activeOrder]);
 
     const allPackagesWeighed = useMemo(() => {

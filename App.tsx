@@ -796,9 +796,8 @@ const App: React.FC = () => {
     };
 
     const addProductionOrder = async (orderData: Omit<ProductionOrderData, 'id' | 'status' | 'creationDate'>) => {
-        const { isGhostOrder, ...orderDataToSave } = orderData;
         const newOrder: Partial<ProductionOrderData> = {
-            ...orderDataToSave,
+            ...orderData,
             // id is NOT set here to allow insertItem to generate a proper UUID for Supabase
             status: 'pending',
             creationDate: new Date().toISOString(),
@@ -813,7 +812,7 @@ const App: React.FC = () => {
             const savedOrder = await insertItem<ProductionOrderData>('production_orders', newOrder);
 
             // Update stock items status
-            if (!isGhostOrder) {
+            if (!orderData.isGhostOrder) {
                 if (savedOrder.machine === 'Trefila') {
                     const lotIds = savedOrder.selectedLotIds as string[];
                     if (Array.isArray(lotIds)) {
