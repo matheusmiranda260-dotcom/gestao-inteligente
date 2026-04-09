@@ -1291,48 +1291,22 @@ const OrgChart: React.FC<{
             <style>{`
                 @media print {
                     .no-print { display: none !important; }
-                    html, body { 
-                        width: 297mm;
-                        height: 210mm;
-                        background: white !important; 
-                        padding: 0 !important; 
-                        margin: 0 !important; 
-                        overflow: hidden !important; 
-                    }
-                    .print-header { display: flex !important; margin-bottom: 10px; border-bottom: 2px solid #0F3F5C; padding: 5px 0; width: 100%; }
+                    html, body { background: white !important; padding: 0 !important; margin: 0 !important; }
+                    .print-header { display: flex !important; margin-bottom: 20px; border-bottom: 2px solid #0F3F5C; padding: 10px 0; width: 100%; }
                     .org-container { 
                         display: flex !important;
                         padding: 0 !important; 
                         background: white !important; 
                         width: 100% !important;
-                        zoom: 0.8 !important;
-                        page-break-inside: avoid !important;
                     }
-                    .stats-container { margin-bottom: 10px !important; }
-                    .org-scroll-wrapper { 
-                        overflow: hidden !important; 
-                        width: 100% !important; 
-                        height: 210mm !important; 
-                        min-height: auto !important; 
-                        padding: 10mm !important; 
-                        background: white !important;
-                        display: flex;
-                        flex-direction: column;
-                        align-items: center;
-                    }
-                    @page { 
-                        size: 297mm 210mm; 
-                        margin: 0; 
-                    }
+                    .stats-container { margin-bottom: 15px !important; }
+                    .org-scroll-wrapper { overflow: visible !important; width: 100% !important; height: auto !important; padding: 10mm !important; }
+                    @page { size: landscape; margin: 1cm; }
                     * { 
                         -webkit-print-color-adjust: exact !important; 
                         print-color-adjust: exact !important; 
                         box-shadow: none !important; 
-                        text-shadow: none !important;
                     }
-                    /* Reduce line dimensions on print to save space */
-                    .org-vline { height: 16px !important; }
-                    .org-hline { height: 1px !important; }
                 }
                 .print-header { display: none; }
             `}</style>
