@@ -1089,7 +1089,7 @@ const StaticShiftCard: React.FC<ShiftCardProps> = ({
                 }}
             >
                 {display}
-                <PencilIcon className="h-3.5 w-3.5 opacity-50" />
+                <PencilIcon className="no-print h-3.5 w-3.5 opacity-50" />
             </div>
             <div style={{ padding: '10px 14px' }}>
                 {slots.map(slot => {
@@ -1123,6 +1123,7 @@ const StaticShiftCard: React.FC<ShiftCardProps> = ({
                                     <span style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>???? ( {slot.title} )</span>
                                     <button
                                         onClick={() => onAddEmployee(slot.key)}
+                                        className="no-print"
                                         style={{ background: '#dbeafe', border: 'none', borderRadius: 4, padding: '2px 7px', fontSize: 13, color: '#2563eb', cursor: 'pointer', fontWeight: 700, marginLeft: 4 }}
                                     >+</button>
                                 </>
@@ -1286,16 +1287,26 @@ const OrgChart: React.FC<{
     const col: React.CSSProperties = { display: 'flex', flexDirection: 'column', alignItems: 'center' };
 
     return (
-        <div style={{ overflow: 'auto', padding: 40, background: '#f8fafc', minHeight: 600 }}>
+        <div className="org-scroll-wrapper" style={{ overflow: 'auto', padding: 40, background: '#f8fafc', minHeight: 600 }}>
             
             <style>{`
                 @media print {
                     .no-print { display: none !important; }
-                    body { background: white !important; padding: 0 !important; }
-                    .print-header { display: flex !important; margin-bottom: 30px; border-bottom: 2px solid #0F3F5C; padding-bottom: 15px; }
-                    .org-container { padding: 0 !important; background: white !important; }
-                    .stats-container { margin-bottom: 20px !important; }
-                    @page { size: landscape; margin: 1cm; }
+                    body { background: white !important; padding: 0 !important; margin: 0 !important; overflow: visible !important; }
+                    .print-header { display: flex !important; margin-bottom: 20px; border-bottom: 2px solid #0F3F5C; padding: 10px 0; }
+                    .org-container { 
+                        display: flex !important;
+                        padding: 0 !important; 
+                        background: white !important; 
+                        width: 100% !important;
+                        transform: scale(0.85);
+                        transform-origin: top center;
+                        zoom: 1.1;
+                    }
+                    .stats-container { margin-bottom: 15px !important; }
+                    .org-scroll-wrapper { overflow: visible !important; width: 100% !important; min-height: auto !important; }
+                    @page { size: A4 landscape; margin: 10mm; }
+                    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
                 }
                 .print-header { display: none; }
             `}</style>
@@ -1712,7 +1723,7 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
 
             {/* Simple Add Modal removed, replaced by direct prompt logic */}
 
-            <header className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4 pt-4">
+            <header className="no-print flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4 pt-4">
                 <div className="flex items-center justify-between md:justify-start w-full md:w-auto">
                     <div className="flex items-center">
                         <div>
