@@ -1139,6 +1139,7 @@ const OrgChart: React.FC<{
     // Added state for the NEW selection UI
     const [selectingFor, setSelectingFor] = useState<{ slotKey: string, title: string, sector: string } | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [isUpdating, setIsUpdating] = useState(false);
 
     const saveShiftTime = (key: string, val: string) => {
         const next = { ...shiftTimes, [key]: val };
@@ -1164,22 +1165,37 @@ const OrgChart: React.FC<{
     };
 
     const confirmAssignment = async (employeeId: string) => {
-        if (!selectingFor) return;
-        const { slotKey, title, sector } = selectingFor;
+        if (!selectingFor || isUpdating) return;
+        setIsUpdating(true);
+        console.log('Confirming assignment for:', employeeId, selectingFor);
+        
+        try {
+            const { slotKey, title, sector } = selectingFor;
 
-        // Desvincular quem estava antes (se houver)
-        const occ = employees.find(e => e.orgPositionId === slotKey);
-        if (occ) await updateItem('employees', occ.id, { orgPositionId: null });
+            // 1. Desvincular quem estava antes no slot alvo (se houver)
+            const occupants = employees.filter(e => e.orgPositionId === slotKey);
+            for (const occ of occupants) {
+                console.log('Clearing previous occupant:', occ.name);
+                await updateItem('employees', occ.id, { orgPositionId: null });
+            }
 
-        // Vincular novo e atualizar cargo/setor
-        await updateItem('employees', employeeId, { 
-            orgPositionId: slotKey,
-            jobTitle: title,
-            sector: sector
-        });
+            // 2. Vincular o novo funcionário e sincronizar cargo/setor
+            console.log('Updating employee:', employeeId, 'to', title, sector);
+            const result = await updateItem('employees', employeeId, { 
+                orgPositionId: slotKey,
+                jobTitle: title,
+                sector: sector
+            });
+            console.log('Update result:', result);
 
-        setSelectingFor(null);
-        reloadData();
+            setSelectingFor(null);
+            reloadData();
+        } catch (error) {
+            console.error('Error assigning employee:', error);
+            alert('Falha ao vincular funcionário. Verifique sua conexão ou permissões.');
+        } finally {
+            setIsUpdating(false);
+        }
     };
 
     // Static shift definitions — keys are stable, stored as orgPositionId in DB
@@ -1319,11 +1335,12 @@ const OrgChart: React.FC<{
                                             return (
                                                 <button 
                                                     key={e.id}
-                                                    onClick={() => {
+                                                    disabled={isUpdating}
+                                                    onClick={async () => {
                                                         if (isCurrentlyAssigned && !confirm(`${e.name} já possui um cargo. Deseja movê-lo para esta nova posição?`)) return;
-                                                        confirmAssignment(e.id);
+                                                        await confirmAssignment(e.id);
                                                     }}
-                                                    className="w-full text-left p-3 hover:bg-blue-50 rounded-xl flex items-center gap-4 group transition-all border border-transparent hover:border-blue-100"
+                                                    className={`w-full text-left p-3 hover:bg-blue-50 rounded-xl flex items-center gap-4 group transition-all border border-transparent hover:border-blue-100 ${isUpdating ? 'opacity-50 cursor-wait' : ''}`}
                                                 >
                                                     <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold group-hover:bg-blue-100 group-hover:text-blue-600 overflow-hidden shrink-0 border border-slate-200">
                                                         {e.photoUrl ? <img src={e.photoUrl} className="h-full w-full object-cover" /> : e.name.charAt(0)}
