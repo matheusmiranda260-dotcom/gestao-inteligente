@@ -1211,6 +1211,7 @@ const OrgChart: React.FC<{
                 {card(SHIFTS.adm2)}
                 <VLine />
                 <BlueLabelBox label="MÁQUINAS" />
+                <VLine />
 
                 {/* Machines row with proper connecting lines */}
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
