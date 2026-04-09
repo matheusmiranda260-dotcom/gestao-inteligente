@@ -28,9 +28,11 @@ interface MachineStatusViewProps {
     dailyGoal: number;
     goalUnit: string;
     shiftGoal?: number;
+    onResetShift?: () => void;
+    isGestor?: boolean;
 }
 
-const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, activeOrder, allOrders, stock, dailyProducedValue, dailyGoal, goalUnit, shiftGoal }) => {
+const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, activeOrder, allOrders, stock, dailyProducedValue, dailyGoal, goalUnit, shiftGoal, onResetShift, isGestor }) => {
     // Local timer to ensure the clock ticks even if parent doesn't re-render
     const [localNow, setLocalNow] = useState(new Date());
 
@@ -373,6 +375,15 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                     <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-200 flex flex-col justify-center overflow-hidden">
                         <div className="flex justify-between items-center mb-3">
                             <h3 className="font-black text-slate-700 uppercase tracking-widest text-[10px] md:text-xs">Progresso do Turno {/* Ordem */}</h3>
+                            {isGestor && onResetShift && (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); onResetShift(); }}
+                                    className="text-[9px] font-bold bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-500 px-2 py-1 rounded-lg transition-all border border-slate-200 uppercase tracking-tighter"
+                                    title="Zerar dados acumulados para este monitor"
+                                >
+                                    Zerar Turno
+                                </button>
+                            )}
                         </div>
                         
                         {machineType === 'Treliça' && (
@@ -965,6 +976,17 @@ interface ProductionDashboardProps {
 
 const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, productionOrders, stock, currentUser }) => {
     const [now, setNow] = useState(new Date());
+    const [shiftResets, setShiftResets] = useState<Record<string, number>>(() => {
+        const saved = localStorage.getItem('dashboard_shift_resets');
+        return saved ? JSON.parse(saved) : {};
+    });
+
+    const handleResetShift = (machine: string) => {
+        if (!confirm(`Deseja realmente ZERAR os dados acumulados de ${machine} para este dispositivo?`)) return;
+        const newResets = { ...shiftResets, [machine]: Date.now() };
+        setShiftResets(newResets);
+        localStorage.setItem('dashboard_shift_resets', JSON.stringify(newResets));
+    };
 
     useEffect(() => {
         const timer = setInterval(() => setNow(new Date()), 1000);
@@ -1008,6 +1030,8 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
         orders.forEach(order => {
             const machine = (order.machine || '').toLowerCase();
             const id = order.id;
+            const machineKey = machine.includes('treli') ? 'Treliça' : 'Trefila';
+            const resetTime = shiftResets[machineKey] || 0;
 
             if (machine.includes('treli')) {
                 const size = parseFloat(String(order.tamanho || '6').replace(',', '.'));
@@ -1019,13 +1043,24 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                     if (logDateStr === todayStr) {
                         const startQty = log.startQuantity || 0;
                         const endQty = log.endTime ? (log.endQuantity || 0) : (order.actualProducedQuantity || 0);
-                        const pieces = Math.max(0, endQty - startQty);
+                        
+                        // If log was entirely before reset, skip
+                        const logEndMs = log.endTime ? new Date(log.endTime).getTime() : nowMs;
+                        if (logEndMs <= resetTime) return;
+
+                        // Calculate pieces produced AFTER reset
+                        let pieces = Math.max(0, endQty - startQty);
+                        
+                        if (new Date(log.startTime).getTime() < resetTime) {
+                            pieces = 0; 
+                        }
+                        
                         trelicaTotalMeters += (pieces * (size || 6));
 
                         // Shift aggregation
                         const startH = new Date(log.startTime).getHours();
                         const logShift = (startH >= 5 && startH < 14) ? 'A' : 'B';
-                        if (logShift === currentShift) {
+                        if (logShift === currentShift && new Date(log.startTime).getTime() >= resetTime) {
                             trelicaShiftPieces += pieces;
                         }
                     }
@@ -1034,7 +1069,9 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                 (order.processedLots || []).forEach(lot => {
                     if (lot.endTime) {
                         const lotDateStr = getFactoryDateString(lot.endTime);
-                        if (lotDateStr === todayStr) {
+                        const lotEndTimeMs = new Date(lot.endTime).getTime();
+                        
+                        if (lotDateStr === todayStr && lotEndTimeMs >= resetTime) {
                             const weight = lot.finalWeight !== null ? lot.finalWeight : ((stockMap.get(lot.lotId) as StockItem)?.labelWeight || 0);
                             trefilaTotalWeight += weight;
 
@@ -1104,6 +1141,8 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                             dailyProducedValue={dailyProduction.trefilaShiftWeight}
                             dailyGoal={6000}
                             goalUnit="kg"
+                            isGestor={isGestor}
+                            onResetShift={() => handleResetShift('Trefila')}
                         />
                     </div>
                     <div className={`transition-opacity duration-700 ${displayMode === 'analytics' ? 'opacity-100 relative z-10' : 'opacity-0 absolute inset-0 z-0 pointer-events-none'}`}>
@@ -1130,6 +1169,8 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                             dailyGoal={trelicaDisplayData.goal}
                             shiftGoal={trelicaDisplayData.shiftGoal}
                             goalUnit={trelicaDisplayData.unit}
+                            isGestor={isGestor}
+                            onResetShift={() => handleResetShift('Treliça')}
                         />
                     </div>
                     <div className={`transition-opacity duration-700 ${displayMode === 'analytics' ? 'opacity-100 relative z-10' : 'opacity-0 absolute inset-0 z-0 pointer-events-none'}`}>
