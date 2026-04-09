@@ -1051,15 +1051,15 @@ const EmployeeDetailModal: React.FC<{
 // --- STATIC ORG CHART (Fixed Structure) ---
 // The hierarchy is hardcoded. Only employees in slots and shift times are editable.
 
-const VLine: React.FC<{ height?: number }> = ({ height = 24 }) => (
-    <div style={{ width: 2, height: height || 24, background: '#000', margin: '0 auto' }} />
+const VLine: React.FC<{ height?: number }> = ({ height = 32 }) => (
+    <div style={{ width: 2, height: height || 32, background: '#000', margin: '0 auto' }} />
 );
 
 const BlueLabelBox: React.FC<{ label: string }> = ({ label }) => (
     <div style={{
-        background: '#4F81BD', border: '1.5px solid #2F5496', color: '#fff',
-        fontWeight: 900, fontSize: 11, letterSpacing: 1, textTransform: 'uppercase',
-        padding: '6px 24px', textAlign: 'center', minWidth: 150, whiteSpace: 'nowrap',
+        background: '#4F81BD', border: '2px solid #2F5496', color: '#fff',
+        fontWeight: 900, fontSize: 14, letterSpacing: 2, textTransform: 'uppercase',
+        padding: '10px 36px', textAlign: 'center', minWidth: 200, whiteSpace: 'nowrap',
     }}>
         {label}
     </div>
@@ -1078,39 +1078,39 @@ const StaticShiftCard: React.FC<ShiftCardProps> = ({
 }) => {
     const display = shiftTimes[shiftKey] || defaultTime;
     return (
-        <div style={{ border: '1.5px solid #9ca3af', background: '#fff', minWidth: 160, maxWidth: 210 }}>
+        <div style={{ border: '1.5px solid #9ca3af', background: '#fff', minWidth: 220, maxWidth: 280 }}>
             <div
                 onClick={() => onEditShiftTime(shiftKey, display)}
                 title="Clique para editar horário"
                 style={{
-                    background: '#f1f5f9', borderBottom: '1px solid #d1d5db', padding: '4px 8px',
-                    textAlign: 'center', fontWeight: 900, fontSize: 10, textTransform: 'uppercase',
-                    color: '#1e293b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                    background: '#f1f5f9', borderBottom: '1px solid #d1d5db', padding: '7px 12px',
+                    textAlign: 'center', fontWeight: 900, fontSize: 13, textTransform: 'uppercase',
+                    color: '#1e293b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                 }}
             >
                 {display}
-                <PencilIcon className="h-2.5 w-2.5 opacity-50" />
+                <PencilIcon className="h-3.5 w-3.5 opacity-50" />
             </div>
-            <div style={{ padding: '6px 10px' }}>
+            <div style={{ padding: '10px 14px' }}>
                 {slots.map(slot => {
                     const occ = employees.find(e => e.orgPositionId === slot.key);
                     return (
-                        <div key={slot.key} style={{ marginBottom: 3, display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <div key={slot.key} style={{ marginBottom: 5, display: 'flex', alignItems: 'center', gap: 5 }}>
                             {occ ? (
                                 <>
                                     <span
-                                        style={{ fontWeight: 700, fontSize: 10, color: '#1e293b', cursor: 'pointer', textTransform: 'uppercase' }}
+                                        style={{ fontWeight: 700, fontSize: 13, color: '#1e293b', cursor: 'pointer', textTransform: 'uppercase' }}
                                         title="Clique para desvincular"
                                         onClick={() => onUnassign(slot.key)}
                                     >{occ.name.toUpperCase()}</span>
-                                    <span style={{ fontSize: 9, color: '#64748b' }}>( {slot.title} )</span>
+                                    <span style={{ fontSize: 11, color: '#64748b' }}>( {slot.title} )</span>
                                 </>
                             ) : (
                                 <>
-                                    <span style={{ fontSize: 10, color: '#94a3b8', fontStyle: 'italic' }}>???? ( {slot.title} )</span>
+                                    <span style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>???? ( {slot.title} )</span>
                                     <button
                                         onClick={() => onAddEmployee(slot.key)}
-                                        style={{ background: '#dbeafe', border: 'none', borderRadius: 3, padding: '1px 4px', fontSize: 10, color: '#2563eb', cursor: 'pointer', fontWeight: 700, marginLeft: 2 }}
+                                        style={{ background: '#dbeafe', border: 'none', borderRadius: 4, padding: '2px 7px', fontSize: 13, color: '#2563eb', cursor: 'pointer', fontWeight: 700, marginLeft: 4 }}
                                     >+</button>
                                 </>
                             )}
@@ -1215,13 +1215,13 @@ const OrgChart: React.FC<{
 
                 {/* Machines row with proper connecting lines */}
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', gap: 32, alignItems: 'flex-start' }}>
+                    <div style={{ display: 'flex', gap: 48, alignItems: 'flex-start' }}>
 
                         {/* TREFILA 1 — first column: line extends right into gap */}
                         <div style={col}>
                             <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-                                {/* Horizontal: from center → right (extends 16px past column edge into gap) */}
-                                <div style={{ position: 'absolute', top: 0, left: '50%', right: -16, height: 2, background: '#000' }} />
+                                {/* Horizontal: from center → right (extends 24px past column edge into gap) */}
+                                <div style={{ position: 'absolute', top: 0, left: '50%', right: -24, height: 2, background: '#000' }} />
                                 <div style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
                             </div>
                             <BlueLabelBox label="TREFILA 1" />
@@ -1229,10 +1229,10 @@ const OrgChart: React.FC<{
                             {card(SHIFTS.tr1_t1)}
                         </div>
 
-                        {/* TRELIÇA 1 — middle column: line extends 16px on both sides into gaps */}
+                        {/* TRELIÇA 1 — middle column: line extends 24px on both sides into gaps */}
                         <div style={col}>
                             <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-                                <div style={{ position: 'absolute', top: 0, left: -16, right: -16, height: 2, background: '#000' }} />
+                                <div style={{ position: 'absolute', top: 0, left: -24, right: -24, height: 2, background: '#000' }} />
                                 <div style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
                             </div>
                             <BlueLabelBox label="TRELIÇA 1" />
@@ -1242,10 +1242,10 @@ const OrgChart: React.FC<{
                             {card(SHIFTS.tc1_t2)}
                         </div>
 
-                        {/* TRELIÇA 2 — middle column: line extends 16px on both sides */}
+                        {/* TRELIÇA 2 — middle column: line extends 24px on both sides */}
                         <div style={col}>
                             <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-                                <div style={{ position: 'absolute', top: 0, left: -16, right: -16, height: 2, background: '#000' }} />
+                                <div style={{ position: 'absolute', top: 0, left: -24, right: -24, height: 2, background: '#000' }} />
                                 <div style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
                             </div>
                             <BlueLabelBox label="TRELIÇA 2" />
@@ -1258,8 +1258,8 @@ const OrgChart: React.FC<{
                         {/* MALHA — last column: line extends left into gap */}
                         <div style={col}>
                             <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-                                {/* Horizontal: from left (extends 16px past column edge) → center */}
-                                <div style={{ position: 'absolute', top: 0, left: -16, right: '50%', height: 2, background: '#000' }} />
+                                {/* Horizontal: from left (extends 24px past column edge) → center */}
+                                <div style={{ position: 'absolute', top: 0, left: -24, right: '50%', height: 2, background: '#000' }} />
                                 <div style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
                             </div>
                             <BlueLabelBox label="MALHA" />
