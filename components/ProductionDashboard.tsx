@@ -166,8 +166,9 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                     <div className="bg-slate-200/70 rounded-[2.5rem] p-8 border border-slate-300 flex flex-col justify-center relative overflow-hidden group shadow-sm">
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="font-black text-slate-400 uppercase tracking-widest text-[10px]">Produção do Turno</h3>
-                            <div className="bg-indigo-50 text-indigo-600 text-[11px] font-black px-4 py-1.5 rounded-2xl border border-indigo-100">
-                                {dailyGoal > 0 ? ((dailyProducedValue / dailyGoal) * 100).toFixed(1) : 0}% Alvo
+                            <div className="bg-indigo-50 text-indigo-600 px-4 py-2 rounded-2xl border border-indigo-100 flex flex-col items-end min-w-[100px]">
+                                <span className="text-[14px] font-black leading-none">{dailyGoal > 0 ? ((dailyProducedValue / dailyGoal) * 100).toFixed(1) : 0}%</span>
+                                <span className="text-[8px] font-black uppercase tracking-tighter opacity-70 mt-0.5">da Meta ({dailyGoal}{goalUnit})</span>
                             </div>
                         </div>
                         <div className="flex items-baseline gap-4 mb-4">
@@ -329,7 +330,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                     allOrders={productionOrders} 
                     stock={stock} 
                     dailyProducedValue={getDailyValue('Trefila')} 
-                    dailyGoal={6000} 
+                    dailyGoal={new Date().getHours() >= 5 && new Date().getHours() < 14 ? 15000 : 12000} 
                     goalUnit="kg" 
                     isGestor={isGestor} 
                     onResetShift={() => handleReset('Trefila')} 
