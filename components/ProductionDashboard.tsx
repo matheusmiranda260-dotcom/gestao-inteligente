@@ -179,7 +179,15 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                             <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(79,70,229,0.3)]" style={{ width: `${Math.min(100, (dailyProducedValue / dailyGoal) * 100)}%` }} />
                         </div>
                         {activeOrder?.lastQuantityUpdate && (
-                            <p className="mt-4 text-[10px] font-black text-rose-500 uppercase tracking-widest text-right">Último Reporte: {new Date(activeOrder.lastQuantityUpdate).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+                            <p className="mt-4 text-[10px] font-black text-rose-500 uppercase tracking-widest text-right">
+                                Último Reporte: {new Date(activeOrder.lastQuantityUpdate).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                <span className="ml-2 opacity-70 italic lowercase">
+                                    ({Math.floor((now.getTime() - new Date(activeOrder.lastQuantityUpdate).getTime()) / 60000) === 0 
+                                        ? 'agora mesmo' 
+                                        : `${Math.floor((now.getTime() - new Date(activeOrder.lastQuantityUpdate).getTime()) / 60000)} min atrás`}
+                                    )
+                                </span>
+                            </p>
                         )}
                     </div>
 
