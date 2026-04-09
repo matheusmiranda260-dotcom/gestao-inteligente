@@ -1941,7 +1941,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
                                 {/* Coluna Direita: Área de Trabalho (Lotes/Pacotes) */}
                                 <div className={`lg:col-span-2 space-y-6 relative ${mobileTab === 'monitor' ? 'hidden lg:block' : 'animate-fade-in'}`}>
-                                    {isMachineStopped && activeOrder && (
+                                    {isMachineStopped && activeOrder && mobileTab !== 'weigh' && (
                                         <div className="absolute inset-0 bg-slate-200/80 backdrop-blur-sm flex items-center justify-center rounded-2xl z-20 border-2 border-slate-300 border-dashed transition-all duration-500">
                                             <div className="text-center p-8 bg-white rounded-3xl shadow-xl max-w-sm mx-auto animate-fade-in-up">
                                                 <div className="bg-amber-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-amber-50 shadow-inner">
@@ -1952,7 +1952,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                             </div>
                                         </div>
                                     )}
-                                    {!hasActiveShift && !isAnyActiveShift && activeOrder && (
+                                    {!hasActiveShift && !isAnyActiveShift && activeOrder && mobileTab !== 'weigh' && (
                                         <div className="absolute inset-0 bg-slate-200/90 backdrop-blur-sm flex items-center justify-center rounded-2xl z-20 transition-all duration-500">
                                             <div className="text-center p-8 bg-white rounded-3xl shadow-xl max-w-md mx-auto animate-fade-in-up">
                                                 <div className="bg-emerald-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-emerald-50 shadow-inner">
@@ -1967,7 +1967,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                             </div>
                                         </div>
                                     )}
-                                    {!hasActiveShift && isAnyActiveShift && activeOrder && (
+                                    {!hasActiveShift && isAnyActiveShift && activeOrder && mobileTab !== 'weigh' && (
                                         <div className="absolute inset-0 bg-slate-200/90 backdrop-blur-sm flex items-center justify-center rounded-2xl z-20 transition-all duration-500">
                                             <div className="text-center p-8 bg-white rounded-3xl shadow-xl max-w-md mx-auto animate-fade-in-up border-2 border-red-50">
                                                 <div className="bg-red-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-red-100 shadow-inner">
@@ -2076,8 +2076,16 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                         <td className="p-3 text-right text-slate-500 font-medium">{lot.lotInfo?.initialQuantity.toFixed(0)} kg</td>
                                                                         <td className="p-3">
                                                                             {lot.finalWeight == null ? (
-                                                                                <div className="text-right">
-                                                                                    <span className="text-[10px] font-black text-amber-500 uppercase animate-pulse">Aguardando Auxiliar</span>
+                                                                                <div className="flex items-center gap-1">
+                                                                                    <input
+                                                                                        type="text"
+                                                                                        inputMode="decimal"
+                                                                                        className="w-3/4 p-2 border-2 border-slate-100 rounded-lg text-center focus:border-indigo-500 bg-slate-50 focus:bg-white transition font-bold"
+                                                                                        placeholder="0.0"
+                                                                                        value={pendingWeights?.get(lot.lotId) || ''}
+                                                                                        onChange={e => handlePendingWeightChange(lot.lotId, e.target.value)}
+                                                                                    />
+                                                                                    <span className="text-[10px] font-bold text-slate-400">kg</span>
                                                                                 </div>
                                                                             ) : (
                                                                                 <div className="text-right font-black text-slate-900">{lot.finalWeight.toFixed(1)} kg</div>
@@ -2114,7 +2122,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                             {isWaiting ? (
                                                                                 <button
                                                                                     onClick={() => handleRecordWeight(lot.lotId)}
-                                                                                    disabled={isMachineStopped || !hasActiveShift}
+                                                                                    disabled={!hasActiveShift}
                                                                                     className="bg-emerald-500 text-white text-[10px] font-black py-2 px-3 rounded-lg hover:bg-emerald-600 w-full shadow-lg shadow-emerald-100 transition active:scale-95 disabled:opacity-50"
                                                                                 >
                                                                                     SALVAR
@@ -2158,9 +2166,14 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                         <div className="space-y-1">
                                                                             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Peso Saída (kg)</label>
                                                                             {lot.finalWeight == null ? (
-                                                                                <div className="p-3 bg-slate-50 rounded-xl text-center">
-                                                                                    <span className="text-[10px] font-black text-amber-500 uppercase animate-pulse">Aguardando Auxiliar</span>
-                                                                                </div>
+                                                                                <input
+                                                                                    type="text"
+                                                                                    inputMode="decimal"
+                                                                                    className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-center font-bold focus:border-indigo-500 outline-none transition uppercase"
+                                                                                    placeholder="0.0"
+                                                                                    value={pendingWeights?.get(lot.lotId) || ''}
+                                                                                    onChange={e => handlePendingWeightChange(lot.lotId, e.target.value)}
+                                                                                />
                                                                             ) : (
                                                                                 <div className="p-3 bg-slate-50 rounded-xl text-center font-black text-slate-800 text-lg">{lot.finalWeight.toFixed(1)}</div>
                                                                             )}
@@ -2185,7 +2198,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                     {isWaiting && (
                                                                         <button
                                                                             onClick={() => handleRecordWeight(lot.lotId)}
-                                                                            disabled={isMachineStopped || !hasActiveShift}
+                                                                            disabled={!hasActiveShift}
                                                                             className="w-full bg-emerald-600 text-white font-black py-4 rounded-xl shadow-lg shadow-emerald-100 active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-2"
                                                                         >
                                                                             <CheckCircleIcon className="h-6 w-6" />

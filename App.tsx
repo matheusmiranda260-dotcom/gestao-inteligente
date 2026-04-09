@@ -1862,6 +1862,7 @@ const App: React.FC = () => {
     };
 
     const recordLotWeight = async (orderId: string, lotId: string, finalWeight?: number | null, measuredGauge?: number) => {
+        console.log(`[Trefila] Registrando peso/bitola para lote ${lotId} na ordem ${orderId}:`, { finalWeight, measuredGauge });
         try {
             // Fetch the latest version of the order using fetchByColumn which handles camelCase conversion
             const orders = await fetchByColumn<ProductionOrderData>('production_orders', 'id', orderId);
@@ -1913,9 +1914,13 @@ const App: React.FC = () => {
     };
 
     const addLotToOrder = async (orderId: string, lotId: string) => {
+        console.log(`[Trefila] Adicionando lote ${lotId} à ordem ${orderId}`);
         const fetchedOrders = await fetchByColumn<ProductionOrderData>('production_orders', 'id', orderId);
         const order = fetchedOrders[0];
-        if (!order) return;
+        if (!order) {
+            console.error(`[Trefila] Ordem não encontrada: ${orderId}`);
+            return;
+        }
 
         const currentLots = Array.isArray(order.selectedLotIds) ? order.selectedLotIds : [];
         if (currentLots.includes(lotId)) return;
