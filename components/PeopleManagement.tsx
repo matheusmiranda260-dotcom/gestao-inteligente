@@ -1070,16 +1070,17 @@ const OrgNode: React.FC<{
     evaluations: Evaluation[];
 }> = ({ node, employees, onAddSubUnit, onAddPosition, onDeleteUnit, onDeletePosition, onEditPosition, onAssignEmployee, onCreateEmployee, onEditEmployee, onEditUnit, evaluations }) => {
 
-    // Color mapping based on type
+    // Color mapping based on Excel Scope
     const getNodeColor = (type?: string, name?: string) => {
         const lowerName = name?.toLowerCase() || '';
-        if (lowerName.includes('turno')) return 'bg-white border-slate-200 text-slate-800 shadow-sm';
+        if (lowerName.includes('turno')) return 'bg-white border-slate-400 text-slate-800';
         
         switch (type) {
-            case 'department': return 'bg-[#0F3F5C] border-b-[#0A2A3D] text-white shadow-xl'; 
-            case 'group': return 'bg-[#4a86e8] border-b-[#3a6dbd] text-white shadow-md'; 
-            case 'machine': return 'bg-blue-400 border-b-blue-600 text-white shadow-sm'; 
-            default: return 'bg-slate-500 border-b-slate-700 text-white';
+            case 'department': 
+            case 'group': 
+            case 'machine': 
+                return 'bg-[#4F81BD] border-[#385D8A] text-white'; // Excel blue
+            default: return 'bg-slate-500 border-slate-700 text-white';
         }
     };
 
@@ -1088,87 +1089,60 @@ const OrgNode: React.FC<{
     return (
         <div className="flex flex-col items-center">
             {/* The Node / Card */}
-            <div className={`relative rounded-2xl border-b-4 mb-4 min-w-[240px] transition-all group ${isShift ? 'bg-white border border-slate-200 p-0 overflow-hidden' : `${getNodeColor(node.unitType, node.name)} p-4`}`}>
+            <div className={`relative border-2 mb-4 min-w-[200px] transition-all group ${isShift ? 'bg-white border-slate-400 p-0 shadow-sm' : `${getNodeColor(node.unitType, node.name)} p-2 px-6 shadow-md`}`}>
                 
                 {isShift ? (
                     <div className="flex flex-col">
-                        <div className="bg-slate-100 border-b border-slate-200 p-2 text-[10px] font-black text-[#0F3F5C] uppercase tracking-[0.15em] text-center">
+                        <div className="border-b border-slate-200 p-1 text-[11px] font-black text-slate-800 uppercase text-center bg-slate-50">
                             {node.name}
                         </div>
-                        <div className="p-3 space-y-2 min-h-[40px]">
+                        <div className="p-2 space-y-1 min-h-[30px] text-center">
                             {node.positions.length > 0 ? (
                                 node.positions.map(pos => {
                                     const occupant = employees.find(e => e.orgPositionId === pos.id);
                                     return (
-                                        <div key={pos.id} className="group/pos relative py-1 px-2 hover:bg-slate-50 rounded-lg border border-transparent hover:border-slate-100 transition-colors">
+                                        <div key={pos.id} className="group/pos relative py-0.5">
                                             {occupant ? (
-                                                <div className="flex items-center gap-2 cursor-pointer" onClick={() => onEditEmployee(occupant)}>
-                                                    <div className="w-6 h-6 rounded-full bg-slate-200 overflow-hidden shrink-0 border border-slate-300">
-                                                        {occupant.photoUrl ? <img src={occupant.photoUrl} className="w-full h-full object-cover" /> : <span className="text-[8px] font-bold flex items-center justify-center h-full">{occupant.name.charAt(0)}</span>}
-                                                    </div>
-                                                    <div className="flex flex-col min-w-0">
-                                                        <span className="font-bold text-slate-800 text-[11px] truncate uppercase">{occupant.name.split(' ')[0]} {occupant.name.split(' ').slice(-1)}</span>
-                                                        <span className="text-[9px] text-slate-400 font-medium">( {pos.title} )</span>
-                                                    </div>
+                                                <div className="cursor-pointer" onClick={() => onEditEmployee(occupant)}>
+                                                    <span className="font-bold text-slate-800 text-[10px] uppercase">{occupant.name.toUpperCase()}</span>
+                                                    <span className="text-[9px] text-slate-500 font-medium ml-1">( {pos.title} )</span>
                                                 </div>
                                             ) : (
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-[10px] text-slate-300 font-bold uppercase italic">( Vago: {pos.title} )</span>
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <span className="text-[10px] text-slate-400 font-bold uppercase italic Tracking-tighter">???? ({pos.title})</span>
                                                     <button onClick={() => onCreateEmployee(pos.id)} className="text-blue-500 opacity-0 group-hover/pos:opacity-100"><PlusIcon className="h-3 w-3"/></button>
                                                 </div>
                                             )}
                                             {/* Pos Controls */}
-                                            <div className="absolute top-0 right-0 hidden group-hover/pos:flex gap-1 bg-white/90 backdrop-blur pb-1 pl-1 rounded-bl-lg">
-                                                <button onClick={() => onEditPosition(pos.id)} className="text-slate-400 hover:text-blue-500"><PencilIcon className="h-3 w-3"/></button>
-                                                <button onClick={() => onDeletePosition(pos.id)} className="text-slate-400 hover:text-red-500"><TrashIcon className="h-3 w-3"/></button>
+                                            <div className="absolute -top-1 -right-4 hidden group-hover/pos:flex gap-1 bg-white shadow rounded p-0.5 z-10">
+                                                <button onClick={() => onEditPosition(pos.id)} className="text-slate-400 hover:text-blue-500"><PencilIcon className="h-2 w-2"/></button>
+                                                <button onClick={() => onDeletePosition(pos.id)} className="text-slate-400 hover:text-red-500"><TrashIcon className="h-2 w-2"/></button>
                                             </div>
                                         </div>
                                     );
                                 })
                             ) : (
-                                <p className="text-[10px] text-slate-400 text-center italic py-2">Nenhum cargo definido</p>
+                                <p className="text-[9px] text-slate-400 text-center italic py-1">Vazio</p>
                             )}
                         </div>
-                        {/* Quick Add Pos for Shift */}
-                        <button onClick={() => onAddPosition(node.id)} className="w-full py-1 text-[9px] font-bold text-slate-400 hover:text-blue-500 bg-slate-50 border-t border-slate-100 opacity-0 group-hover:opacity-100 transition-opacity">
-                            + Adicionar Cargo
-                        </button>
                     </div>
                 ) : (
                     <>
-                        <div className="font-black text-sm uppercase tracking-[0.15em] text-center mb-1">{node.name}</div>
-                        {node.positions.length > 0 && (
-                            <div className="mt-4 space-y-2">
-                                {node.positions.map(pos => {
-                                    const occupant = employees.find(e => e.orgPositionId === pos.id);
-                                    return (
-                                        <div key={pos.id} className="bg-white/10 backdrop-blur-sm p-2 rounded-xl flex items-center gap-3 border border-white/10 hover:bg-white/20 transition-colors cursor-pointer" onClick={() => occupant && onEditEmployee(occupant)}>
-                                             <div className="w-8 h-8 rounded-full bg-slate-200/20 overflow-hidden flex-shrink-0">
-                                                {occupant?.photoUrl ? <img src={occupant.photoUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xs font-bold">{occupant?.name.charAt(0) || '?'}</div>}
-                                             </div>
-                                             <div className="flex flex-col min-w-0">
-                                                <div className="font-bold text-xs truncate">{occupant?.name || '(Vago)'}</div>
-                                                <div className="text-[10px] opacity-70 italic">{pos.title}</div>
-                                             </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
+                        <div className="font-black text-xs uppercase tracking-widest text-center">{node.name}</div>
                     </>
                 )}
 
                 {/* Main Controls */}
-                <div className="absolute -top-3 -right-3 flex opacity-0 group-hover:opacity-100 transition-opacity scale-90 hover:scale-100 gap-1.5 z-20">
+                <div className="absolute -top-3 -right-3 flex opacity-0 group-hover:opacity-100 transition-opacity scale-75 gap-1 z-20">
                     {!isShift && (
-                        <button onClick={() => onAddSubUnit(node.id)} className="p-2 bg-white rounded-xl text-blue-600 shadow-xl border border-slate-100" title="Sub-Área / Turno">
+                        <button onClick={() => onAddSubUnit(node.id)} className="p-1.5 bg-white rounded shadow text-blue-600 border border-slate-200">
                             <PlusIcon className="h-4 w-4" />
                         </button>
                     )}
-                    <button onClick={() => onEditUnit(node.id, node.name)} className="p-2 bg-white rounded-xl text-slate-600 shadow-xl border border-slate-100" title="Editar">
+                    <button onClick={() => onEditUnit(node.id, node.name)} className="p-1.5 bg-white rounded shadow text-slate-600 border border-slate-200">
                         <PencilIcon className="h-4 w-4" />
                     </button>
-                    <button onClick={() => onDeleteUnit(node.id)} className="p-2 bg-white rounded-xl text-red-600 shadow-xl border border-slate-100" title="Excluir">
+                    <button onClick={() => onDeleteUnit(node.id)} className="p-1.5 bg-white rounded shadow text-red-600 border border-slate-200">
                         <TrashIcon className="h-4 w-4" />
                     </button>
                 </div>
@@ -1176,7 +1150,7 @@ const OrgNode: React.FC<{
 
             {/* Children Hierarchy Lines */}
             {node.children.length > 0 && (
-                <div className="w-0.5 h-8 bg-slate-300 relative"></div>
+                <div className="w-[1.5px] h-6 bg-black relative"></div>
             )}
 
             {/* Children Nodes */}
@@ -1193,15 +1167,15 @@ const OrgNode: React.FC<{
                                 {!isVertical && (
                                     <>
                                         {/* Vertical Line Up */}
-                                        <div className="absolute top-0 left-1/2 -translate-x-1/2 h-6 w-0.5 bg-slate-300"></div>
+                                        <div className="absolute top-0 left-1/2 -translate-x-1/2 h-6 w-[1.5px] bg-black"></div>
                                         {/* Horizontal Line Left */}
-                                        {!isFirst && <div className="absolute top-0 left-0 w-[50%] h-0.5 bg-slate-300"></div>}
+                                        {!isFirst && <div className="absolute top-0 left-0 w-[50%] h-[1.5px] bg-black"></div>}
                                         {/* Horizontal Line Right */}
-                                        {!isLast && <div className="absolute top-0 right-0 w-[50%] h-0.5 bg-slate-300"></div>}
+                                        {!isLast && <div className="absolute top-0 right-0 w-[50%] h-[1.5px] bg-black"></div>}
                                     </>
                                 )}
                                 {isVertical && (
-                                     <div className="w-0.5 h-4 bg-slate-300"></div>
+                                     <div className="w-[1.5px] h-6 bg-black"></div>
                                 )}
 
                                 <OrgNode
@@ -1331,11 +1305,10 @@ const OrgChart: React.FC<{
         }
     };
 
-    const handleGenerate2Shifts = async () => {
-        if (!confirm('CONFIRMAR LIMPEZA: Todas as duplicatas e áreas antigas serão apagadas para deixar apenas o Organograma Único e Correto. Deseja continuar?')) return;
+    const handleClearAll = async () => {
+        if (!confirm('TEM CERTEZA? Isso irá apagar ABSOLUTAMENTE TUDO do organograma (áreas, cargos e turnos). Os funcionários não serão apagados, apenas desvinculados.')) return;
         
         try {
-            // 0. FORCED CLEANUP (Exclui TUDO para garantir organograma único)
             const unitsToClear = await fetchTable<OrgUnit>('org_units');
             const posToClear = await fetchTable<OrgPosition>('org_positions');
             
@@ -1346,7 +1319,6 @@ const OrgChart: React.FC<{
                 try { await deleteItemByColumn('org_units', 'id', u.id); } catch(e) {}
             }
             
-            // Link Reset em funcionários
             const allEmps = await fetchTable<Employee>('employees');
             for (const e of allEmps) {
                 if (e.orgPositionId) {
@@ -1354,10 +1326,26 @@ const OrgChart: React.FC<{
                 }
             }
 
+            alert('Organograma totalmente zerado!');
+            reloadData();
+        } catch (e) {
+            console.error(e);
+            alert('Erro ao zerar.');
+        }
+    };
+
+    const handleGenerate2Shifts = async () => {
+        if (!confirm('Deseja gerar a estrutura COMPLETA do escopo (Setor > ADM > Máquinas)?')) return;
+        
+        try {
+            // Re-uses logic but first cleans
+            await handleClearAll();
+            
             // 1. Root SETOR LAMINAÇÃO
             const setor = await insertItem('org_units', { name: 'SETOR LAMINAÇÃO', unitType: 'department', displayOrder: 1 } as any);
             const adm = await insertItem('org_units', { name: 'ADMINISTRAÇÃO', unitType: 'department', parentId: setor.id, displayOrder: 1 } as any);
             
+            const allEmps = await fetchTable<Employee>('employees');
             const assignByName = async (posId: string, name: string) => {
                 const match = allEmps.find(e => e.name.toLowerCase().includes(name.toLowerCase()));
                 if (match) await updateItem('employees', match.id, { orgPositionId: posId });
@@ -1395,7 +1383,7 @@ const OrgChart: React.FC<{
             ]);
             await createMachine('MALHA', [{ name: 'TURNO 7:45 as 17:30', roles: [{title: 'operador'}, {title: 'Auxiliar'}, {title: 'Auxiliar'}] }]);
             
-            alert('Limpando duplicatas... Organograma Único gerado!');
+            alert('Estrutura gerada com sucesso!');
             reloadData();
         } catch (e) {
             console.error('Erro ao gerar:', e);
@@ -1459,26 +1447,35 @@ const OrgChart: React.FC<{
         <div className="overflow-auto p-8 min-h-[600px] bg-slate-50 relative">
             {/* Top Toolbar for Reset */}
             <div className="flex justify-center mb-10 pb-6 border-b border-slate-200">
-                <div className="bg-white p-6 rounded-3xl shadow-xl border-2 border-red-100 flex flex-col items-center gap-4 max-w-md w-full">
-                    <div className="h-14 w-14 bg-red-100 rounded-full flex items-center justify-center text-red-600">
-                        <TrashIcon className="h-8 w-8" />
+                <div className="bg-white p-6 rounded-3xl shadow-xl border-2 border-slate-100 flex items-center gap-6 max-w-4xl w-full">
+                    <div className="flex flex-col flex-1">
+                        <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Gestão da Estrutura</h3>
+                        <p className="text-xs text-slate-500 mt-1">Limpe tudo para começar do zero ou gere a estrutura automática:</p>
                     </div>
-                    <div className="text-center">
-                        <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">CORREÇÃO DE DUPLICATAS</h3>
-                        <p className="text-xs text-slate-500 mt-1">Exclua as outras 3 estruturas e deixe apenas a correta clicando abaixo:</p>
+                    
+                    <div className="flex gap-3">
+                        <button
+                            onClick={handleClearAll}
+                            className="px-6 py-3 bg-slate-100 text-slate-600 rounded-xl font-black uppercase text-xs shadow hover:bg-red-50 hover:text-red-600 transition-all flex items-center gap-2"
+                        >
+                            <TrashIcon className="h-4 w-4" />
+                            Zerar Tudo
+                        </button>
+
+                        <button
+                            onClick={handleGenerate2Shifts}
+                            className="px-6 py-3 bg-[#4F81BD] text-white rounded-xl font-black uppercase text-xs shadow-lg hover:opacity-90 transition-all flex items-center gap-2"
+                        >
+                            <TrophyIcon className="h-4 w-4" />
+                            Gerar Escopo Excel
+                        </button>
                     </div>
-                    <button
-                        onClick={handleGenerate2Shifts}
-                        className="w-full py-4 bg-red-600 text-white rounded-2xl font-black uppercase text-sm shadow-lg hover:bg-red-700 transition-all hover:scale-[1.02]"
-                    >
-                         UNICAR ORGANOGRAMA (LIMPAR TUDO)
-                    </button>
                 </div>
             </div>
 
             <div className="flex gap-8 min-w-max justify-center items-start pt-10">
-                {/* Render ONLY the first root to prevent visual clutter if DB is still dirty */}
-                {tree.slice(0, 1).map(root => (
+                {/* Render Existing Roots */}
+                {tree.map(root => (
                     <OrgNode
                         key={root.id}
                         node={root}
@@ -1495,6 +1492,20 @@ const OrgChart: React.FC<{
                         evaluations={evaluations}
                     />
                 ))}
+
+                {/* Add New Root Button (Inline) - Only show if reasonably empty or for new areas */}
+                <div className="flex flex-col items-center opacity-60 hover:opacity-100 transition-opacity ml-8">
+                    <button
+                        onClick={handleCreateRoot}
+                        className="w-[200px] h-[100px] border-4 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 hover:border-slate-400 transition"
+                    >
+                        <PlusIcon className="h-8 w-8 mb-2" />
+                        <span className="font-bold">Nova Área Principal</span>
+                    </button>
+                    <p className="text-xs text-slate-400 mt-2 text-center max-w-[180px]">
+                        Clique aqui para começar a montar manualmente
+                    </p>
+                </div>
             </div>
         </div>
     );
