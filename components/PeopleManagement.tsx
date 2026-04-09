@@ -1135,6 +1135,18 @@ const StaticShiftCard: React.FC<ShiftCardProps> = ({
     );
 };
 
+// Static shift definitions — keys are stable, stored as orgPositionId in DB
+const SHIFTS = {
+    adm1:       { key: 'adm_t1',     def: 'TURNO 2:00 AS 11:34', slots: [{ key: 'adm_t1_enc', title: 'encarregado' }] },
+    adm2:       { key: 'adm_t2',     def: 'TURNO 5:00 AS 14:44', slots: [{ key: 'adm_t2_ges', title: 'gestor qualidade' }] },
+    tr1_t1:     { key: 'tr1_t1',     def: 'TURNO 7:45 AS 17:30', slots: [{ key: 'tr1_t1_op', title: 'operador' }, { key: 'tr1_t1_a1', title: 'Auxiliar' }, { key: 'tr1_t1_a2', title: 'Auxiliar' }] },
+    tc1_t1:     { key: 'tc1_t1',     def: 'TURNO 5:00 AS 14:44', slots: [{ key: 'tc1_t1_op', title: 'operador' }, { key: 'tc1_t1_a1', title: 'Auxiliar' }] },
+    tc1_t2:     { key: 'tc1_t2',     def: 'TURNO 2:00 AS 11:34', slots: [{ key: 'tc1_t2_op', title: 'operador' }, { key: 'tc1_t2_a1', title: 'Auxiliar' }] },
+    tc2_t1:     { key: 'tc2_t1',     def: 'TURNO 5:00 AS 14:44', slots: [{ key: 'tc2_t1_op', title: 'operador' }, { key: 'tc2_t1_a1', title: 'Auxiliar' }] },
+    tc2_t2:     { key: 'tc2_t2',     def: 'TURNO 2:00 AS 11:34', slots: [{ key: 'tc2_t2_op', title: 'operador' }, { key: 'tc2_t2_a1', title: 'Auxiliar' }] },
+    malha_t1:   { key: 'malha_t1',   def: 'TURNO 7:45 AS 17:30', slots: [{ key: 'malha_t1_op', title: 'operador' }, { key: 'malha_t1_a1', title: 'Auxiliar' }, { key: 'malha_t1_a2', title: 'Auxiliar' }] },
+};
+
 const OrgChart: React.FC<{
     employees: Employee[];
     units: OrgUnit[];
@@ -1163,6 +1175,15 @@ const OrgChart: React.FC<{
 
     const handlePrint = () => {
         window.print();
+    };
+
+    const handleEditShiftTime = (key: string, cur: string) => {
+        const v = prompt('Editar horário (ex: TURNO 7:45 AS 17:30):', cur);
+        if (v && v !== cur) {
+            const next = { ...shiftTimes, [key]: v };
+            setShiftTimes(next);
+            localStorage.setItem('orgShiftTimes', JSON.stringify(next));
+        }
     };
 
     // Added state for the NEW selection UI
@@ -1204,16 +1225,6 @@ const OrgChart: React.FC<{
         syncDB();
     }, [units, positions]);
 
-    const saveShiftTime = (key: string, val: string) => {
-        const next = { ...shiftTimes, [key]: val };
-        setShiftTimes(next);
-        localStorage.setItem('orgShiftTimes', JSON.stringify(next));
-    };
-
-    const handleEditShiftTime = (key: string, cur: string) => {
-        const v = prompt('Editar horário (ex: TURNO 7:45 AS 17:30):', cur);
-        if (v && v !== cur) saveShiftTime(key, v);
-    };
 
     const handleUnassign = async (slotKey: string) => {
         if (!confirm('Desvincular este funcionário do cargo?')) return;
@@ -1261,19 +1272,7 @@ const OrgChart: React.FC<{
         }
     };
 
-    // Static shift definitions — keys are stable, stored as orgPositionId in DB
-    const SHIFTS = {
-        adm1:       { key: 'adm_t1',     def: 'TURNO 2:00 AS 11:34', slots: [{ key: 'adm_t1_enc', title: 'encarregado' }] },
-        adm2:       { key: 'adm_t2',     def: 'TURNO 5:00 AS 14:44', slots: [{ key: 'adm_t2_ges', title: 'gestor qualidade' }] },
-        tr1_t1:     { key: 'tr1_t1',     def: 'TURNO 7:45 AS 17:30', slots: [{ key: 'tr1_t1_op', title: 'operador' }, { key: 'tr1_t1_a1', title: 'Auxiliar' }, { key: 'tr1_t1_a2', title: 'Auxiliar' }] },
-        tc1_t1:     { key: 'tc1_t1',     def: 'TURNO 5:00 AS 14:44', slots: [{ key: 'tc1_t1_op', title: 'operador' }, { key: 'tc1_t1_a1', title: 'Auxiliar' }] },
-        tc1_t2:     { key: 'tc1_t2',     def: 'TURNO 2:00 AS 11:34', slots: [{ key: 'tc1_t2_op', title: 'operador' }, { key: 'tc1_t2_a1', title: 'Auxiliar' }] },
-        tc2_t1:     { key: 'tc2_t1',     def: 'TURNO 5:00 AS 14:44', slots: [{ key: 'tc2_t1_op', title: 'operador' }, { key: 'tc2_t1_a1', title: 'Auxiliar' }] },
-        tc2_t2:     { key: 'tc2_t2',     def: 'TURNO 2:00 AS 11:34', slots: [{ key: 'tc2_t2_op', title: 'operador' }, { key: 'tc2_t2_a1', title: 'Auxiliar' }] },
-        malha_t1:   { key: 'malha_t1',   def: 'TURNO 7:45 AS 17:30', slots: [{ key: 'malha_t1_op', title: 'operador' }, { key: 'malha_t1_a1', title: 'Auxiliar' }, { key: 'malha_t1_a2', title: 'Auxiliar' }] },
-    };
-
-    const card = (s: (typeof SHIFTS)[keyof typeof SHIFTS], sector: string) => (
+    const card = (s: any, sector: string) => (
         <StaticShiftCard
             key={s.key}
             shiftKey={s.key} defaultTime={s.def} slots={s.slots}
@@ -1327,9 +1326,7 @@ const OrgChart: React.FC<{
                     onClick={handlePrint}
                     className="no-print bg-[#0F3F5C] text-white px-6 py-3 rounded-xl font-bold hover:bg-[#1a5f8a] transition shadow-lg flex items-center gap-2"
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.89l-4.72-4.72m0 0l4.72-4.72M2 9.17h18a2.25 2.25 0 012.25 2.25v6.75a2.25 2.25 0 01-2.25 2.25H6.75a2.25 2.25 0 01-2.25-2.25v-4.5m0-6.75V6.75a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0122.5 6.75v10.5" />
-                    </svg>
+                    <PrinterIcon className="h-5 w-5" />
                     Imprimir Organograma
                 </button>
             </div>
