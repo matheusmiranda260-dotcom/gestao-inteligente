@@ -1194,37 +1194,36 @@ const OrgChart: React.FC<{
 
     // Self-healing: Ensure hardcoded IDs exist in DB to satisfy Foreign Key constraints
     useEffect(() => {
+        let isSyncing = false;
         const syncDB = async () => {
+            if (isSyncing || units.length === 0) return;
+            isSyncing = true;
             try {
                 // Find or create a base unit for static positions
                 let unitId = units[0]?.id;
-                if (!unitId) {
-                    const newUnit = await insertItem<OrgUnit>('org_units', { name: 'ESTRUTURA FIXA' });
-                    unitId = newUnit.id;
-                }
-
-                // Collect all required slot keys from SHIFTS
+                
+                // Collect required IDs
                 const requiredIds: string[] = [];
                 Object.values(SHIFTS).forEach(s => s.slots.forEach(sl => requiredIds.push(sl.key)));
 
                 const missing = requiredIds.filter(id => !positions.find(p => p.id === id));
                 if (missing.length > 0) {
-                    console.log('Syncing missing static positions to DB:', missing);
+                    console.log('Syncing missing positions:', missing);
                     for (const id of missing) {
                         try {
                             await insertItem<OrgPosition>('org_positions', {
                                 id: id,
                                 orgUnitId: unitId,
-                                title: 'Slot Organograma'
+                                title: 'Slot'
                             });
-                        } catch (e) { console.error('Error syncing individual pos:', id, e); }
+                        } catch (e) {}
                     }
-                    reloadData(); // Refresh parents positions state
+                    reloadData();
                 }
-            } catch (err) { console.error('Failed to sync DB slots:', err); }
+            } catch (err) {} finally { isSyncing = false; }
         };
         syncDB();
-    }, [units, positions]);
+    }, [positions.length, units.length]); // Only re-run if lengths change
 
 
     const handleUnassign = async (slotKey: string) => {
@@ -1299,14 +1298,18 @@ const OrgChart: React.FC<{
                         padding: 0 !important; 
                         background: white !important; 
                         width: 100% !important;
-                        transform: scale(0.85);
-                        transform-origin: top center;
-                        zoom: 1.1;
+                        zoom: 0.95;
                     }
                     .stats-container { margin-bottom: 15px !important; }
-                    .org-scroll-wrapper { overflow: visible !important; width: 100% !important; min-height: auto !important; }
-                    @page { size: A4 landscape; margin: 10mm; }
-                    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                    .org-scroll-wrapper { overflow: visible !important; width: 100% !important; min-height: auto !important; height: auto !important; padding: 0 !important; }
+                    @page { size: A4 landscape; margin: 5mm; }
+                    * { 
+                        -webkit-print-color-adjust: exact !important; 
+                        print-color-adjust: exact !important; 
+                        box-shadow: none !important; 
+                        text-shadow: none !important;
+                        transition: none !important;
+                    }
                 }
                 .print-header { display: none; }
             `}</style>
