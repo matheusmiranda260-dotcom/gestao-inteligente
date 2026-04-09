@@ -1130,7 +1130,7 @@ const OrgChart: React.FC<{
     triggerAddEmployee: (posId?: string, prefillSector?: string) => void;
     triggerEditEmployee: (emp: Employee) => void;
     evaluations: Evaluation[];
-}> = ({ employees, reloadData, triggerAddEmployee }) => {
+}> = ({ employees, units, positions, reloadData, triggerAddEmployee, triggerEditEmployee }) => {
 
     const [shiftTimes, setShiftTimes] = useState<Record<string, string>>(() => {
         try { const s = localStorage.getItem('orgShiftTimes'); return s ? JSON.parse(s) : {}; } catch { return {}; }
@@ -1140,6 +1140,40 @@ const OrgChart: React.FC<{
     const [selectingFor, setSelectingFor] = useState<{ slotKey: string, title: string, sector: string } | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [isUpdating, setIsUpdating] = useState(false);
+
+    // Self-healing: Ensure hardcoded IDs exist in DB to satisfy Foreign Key constraints
+    useEffect(() => {
+        const syncDB = async () => {
+            try {
+                // Find or create a base unit for static positions
+                let unitId = units[0]?.id;
+                if (!unitId) {
+                    const newUnit = await insertItem<OrgUnit>('org_units', { name: 'ESTRUTURA FIXA' });
+                    unitId = newUnit.id;
+                }
+
+                // Collect all required slot keys from SHIFTS
+                const requiredIds: string[] = [];
+                Object.values(SHIFTS).forEach(s => s.slots.forEach(sl => requiredIds.push(sl.key)));
+
+                const missing = requiredIds.filter(id => !positions.find(p => p.id === id));
+                if (missing.length > 0) {
+                    console.log('Syncing missing static positions to DB:', missing);
+                    for (const id of missing) {
+                        try {
+                            await insertItem<OrgPosition>('org_positions', {
+                                id: id,
+                                orgUnitId: unitId,
+                                title: 'Slot Organograma'
+                            });
+                        } catch (e) { console.error('Error syncing individual pos:', id, e); }
+                    }
+                    reloadData(); // Refresh parents positions state
+                }
+            } catch (err) { console.error('Failed to sync DB slots:', err); }
+        };
+        syncDB();
+    }, [units, positions]);
 
     const saveShiftTime = (key: string, val: string) => {
         const next = { ...shiftTimes, [key]: val };
