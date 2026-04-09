@@ -163,7 +163,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             <main className="flex-1 p-6 grid grid-cols-1 lg:grid-cols-2 gap-6 overflow-hidden">
                 <div className="flex flex-col gap-6">
                     {/* Meta Acumulada */}
-                    <div className="bg-slate-100/80 rounded-[2.5rem] p-8 border border-slate-200 flex flex-col justify-center relative overflow-hidden group shadow-sm">
+                    <div className="bg-slate-200/70 rounded-[2.5rem] p-8 border border-slate-300 flex flex-col justify-center relative overflow-hidden group shadow-sm">
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="font-black text-slate-400 uppercase tracking-widest text-[10px]">Produção do Turno</h3>
                             <div className="bg-indigo-50 text-indigo-600 text-[11px] font-black px-4 py-1.5 rounded-2xl border border-indigo-100">
@@ -180,7 +180,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                     </div>
 
                     {/* Ordem Ativa */}
-                    <div className="bg-slate-100/80 rounded-[2.5rem] p-8 border border-slate-200 flex flex-col justify-center relative overflow-hidden shadow-sm">
+                    <div className="bg-slate-200/70 rounded-[2.5rem] p-8 border border-slate-300 flex flex-col justify-center relative overflow-hidden shadow-sm">
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="font-black text-slate-400 uppercase tracking-widest text-[10px]">Progresso da OP #{activeOrder?.orderNumber || '---'}</h3>
                             {isGestor && onResetShift && (
@@ -200,7 +200,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
 
                 <div className="flex flex-col gap-6 overflow-hidden">
                     {/* Lista de Paradas */}
-                    <div className="bg-slate-100/80 rounded-[2.5rem] border border-slate-200 flex flex-col flex-1 overflow-hidden shadow-sm">
+                    <div className="bg-slate-200/70 rounded-[2.5rem] border border-slate-300 flex flex-col flex-1 overflow-hidden shadow-sm">
                         <div className="p-5 border-b border-slate-100 bg-white flex justify-between items-center">
                             <h3 className="font-black text-slate-400 uppercase tracking-widest text-[10px] flex items-center gap-2"><WarningIcon className="h-4 w-4 text-rose-500" /> Histórico de Paradas</h3>
                         </div>
@@ -238,7 +238,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                     </div>
 
                     {/* Operador / Material */}
-                    <div className="bg-slate-100/80 rounded-[2.5rem] p-8 border border-slate-200 flex flex-col justify-between gap-6 shadow-sm">
+                    <div className="bg-slate-200/70 rounded-[2.5rem] p-8 border border-slate-300 flex flex-col justify-between gap-6 shadow-sm">
                         <div className="flex items-center gap-6">
                             <div className="bg-indigo-100 p-4 rounded-3xl border border-indigo-200"><UserGroupIcon className="h-6 w-6 text-indigo-600" /></div>
                             <div>
