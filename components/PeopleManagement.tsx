@@ -1311,13 +1311,15 @@ const OrgChart: React.FC<{
                 .print-header { display: none; }
             `}</style>
             
-            <div className="print-header flex items-center justify-between w-full">
-                <div style={{ fontSize: 24, fontWeight: 900, color: '#0F3F5C' }}>
-                    <span style={{ color: '#00E5FF' }}>MSM</span> GESTÃO
+            <div className="print-header flex items-center justify-between w-full relative">
+                <div style={{ fontSize: 18, fontWeight: 900, color: '#64748b', opacity: 0.4 }}>
+                    <span style={{ color: '#94a3b8' }}>MSM</span> GESTÃO
+                </div>
+                <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', textAlign: 'center' }}>
+                    <h2 style={{ fontSize: 20, fontWeight: 800, color: '#0F3F5C', textTransform: 'uppercase', letterSpacing: 1 }}>Organograma do setor - LAMINAÇÃO</h2>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                    <h2 style={{ fontSize: 18, fontWeight: 700, color: '#1e293b' }}>Organograma de Produção</h2>
-                    <p style={{ fontSize: 12, color: '#64748b' }}>{new Date().toLocaleDateString()}</p>
+                    <p style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>{new Date().toLocaleDateString('pt-BR')}</p>
                 </div>
             </div>
 
