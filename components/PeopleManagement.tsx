@@ -1214,18 +1214,13 @@ const OrgChart: React.FC<{
 
                 {/* Machines row with proper connecting lines */}
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    {/* The 4 machine columns with a shared horizontal connector */}
-                    <div style={{ position: 'relative', display: 'flex', gap: 32, alignItems: 'flex-start' }}>
+                    <div style={{ display: 'flex', gap: 32, alignItems: 'flex-start' }}>
 
-                        {/* Horizontal line: spans top of all columns, clipped to center-to-center of first/last */}
-                        {/* We simulate by drawing a border-top on each VLine child */}
-
-                        {/* TREFILA 1 */}
+                        {/* TREFILA 1 — first column: line extends right into gap */}
                         <div style={col}>
-                            {/* VLine + half of horizontal line (right side only for first child) */}
-                            <div style={{ position: 'relative', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                {/* Top connector: right half */}
-                                <div style={{ position: 'absolute', top: 0, left: '50%', right: 0, height: 2, background: '#000' }} />
+                            <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+                                {/* Horizontal: from center → right (extends 16px past column edge into gap) */}
+                                <div style={{ position: 'absolute', top: 0, left: '50%', right: -16, height: 2, background: '#000' }} />
                                 <div style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
                             </div>
                             <BlueLabelBox label="TREFILA 1" />
@@ -1233,11 +1228,10 @@ const OrgChart: React.FC<{
                             {card(SHIFTS.tr1_t1)}
                         </div>
 
-                        {/* TRELIÇA 1 */}
+                        {/* TRELIÇA 1 — middle column: line extends 16px on both sides into gaps */}
                         <div style={col}>
-                            <div style={{ position: 'relative', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                {/* Top connector: full width */}
-                                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: '#000' }} />
+                            <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+                                <div style={{ position: 'absolute', top: 0, left: -16, right: -16, height: 2, background: '#000' }} />
                                 <div style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
                             </div>
                             <BlueLabelBox label="TRELIÇA 1" />
@@ -1247,11 +1241,10 @@ const OrgChart: React.FC<{
                             {card(SHIFTS.tc1_t2)}
                         </div>
 
-                        {/* TRELIÇA 2 */}
+                        {/* TRELIÇA 2 — middle column: line extends 16px on both sides */}
                         <div style={col}>
-                            <div style={{ position: 'relative', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                {/* Top connector: full width */}
-                                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: '#000' }} />
+                            <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+                                <div style={{ position: 'absolute', top: 0, left: -16, right: -16, height: 2, background: '#000' }} />
                                 <div style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
                             </div>
                             <BlueLabelBox label="TRELIÇA 2" />
@@ -1261,17 +1254,18 @@ const OrgChart: React.FC<{
                             {card(SHIFTS.tc2_t2)}
                         </div>
 
-                        {/* MALHA */}
+                        {/* MALHA — last column: line extends left into gap */}
                         <div style={col}>
-                            <div style={{ position: 'relative', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                {/* Top connector: left half only (last child) */}
-                                <div style={{ position: 'absolute', top: 0, left: 0, right: '50%', height: 2, background: '#000' }} />
+                            <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+                                {/* Horizontal: from left (extends 16px past column edge) → center */}
+                                <div style={{ position: 'absolute', top: 0, left: -16, right: '50%', height: 2, background: '#000' }} />
                                 <div style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
                             </div>
                             <BlueLabelBox label="MALHA" />
                             <VLine />
                             {card(SHIFTS.malha_t1)}
                         </div>
+
                     </div>
                 </div>
 
