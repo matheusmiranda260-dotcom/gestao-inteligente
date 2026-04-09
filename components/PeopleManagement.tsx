@@ -1048,155 +1048,76 @@ const EmployeeDetailModal: React.FC<{
     );
 };
 
-// --- ORG CHART COMPONENTS ---
+// --- STATIC ORG CHART (Fixed Structure) ---
+// The hierarchy is hardcoded. Only employees in slots and shift times are editable.
 
-interface OrgTreeItem extends OrgUnit {
-    children: OrgTreeItem[];
-    positions: OrgPosition[];
+const VLine: React.FC<{ height?: number }> = ({ height = 24 }) => (
+    <div style={{ width: 2, height: height || 24, background: '#000', margin: '0 auto' }} />
+);
+
+const BlueLabelBox: React.FC<{ label: string }> = ({ label }) => (
+    <div style={{
+        background: '#4F81BD', border: '1.5px solid #2F5496', color: '#fff',
+        fontWeight: 900, fontSize: 11, letterSpacing: 1, textTransform: 'uppercase',
+        padding: '6px 24px', textAlign: 'center', minWidth: 150, whiteSpace: 'nowrap',
+    }}>
+        {label}
+    </div>
+);
+
+interface SlotDef { key: string; title: string; }
+interface ShiftCardProps {
+    shiftKey: string; defaultTime: string; slots: SlotDef[];
+    employees: Employee[]; shiftTimes: Record<string, string>;
+    onEditShiftTime: (key: string, cur: string) => void;
+    onAddEmployee: (slotKey: string) => void;
+    onUnassign: (slotKey: string) => void;
 }
-
-const OrgNode: React.FC<{
-    node: OrgTreeItem;
-    employees: Employee[];
-    onAddSubUnit: (parentId: string) => void;
-    onAddPosition: (unitId: string) => void;
-    onDeleteUnit: (id: string) => void;
-    onDeletePosition: (id: string) => void;
-    onEditPosition: (posId: string) => void; // New prop
-    onAssignEmployee: (posId: string, empId: string) => void;
-    onCreateEmployee: (posId: string) => void; // Shortcut to create emp for this position
-    onEditEmployee: (employee: Employee) => void; // New prop
-    onEditUnit: (id: string, currentName: string) => void;
-    evaluations: Evaluation[];
-}> = ({ node, employees, onAddSubUnit, onAddPosition, onDeleteUnit, onDeletePosition, onEditPosition, onAssignEmployee, onCreateEmployee, onEditEmployee, onEditUnit, evaluations }) => {
-
-    // Color mapping based on Excel Scope
-    const getNodeColor = (type?: string, name?: string) => {
-        const lowerName = name?.toLowerCase() || '';
-        if (lowerName.includes('turno')) return 'bg-white border-slate-400 text-slate-800';
-        
-        switch (type) {
-            case 'department': 
-            case 'group': 
-            case 'machine': 
-                return 'bg-[#4F81BD] border-[#385D8A] text-white'; // Excel blue
-            default: return 'bg-slate-500 border-slate-700 text-white';
-        }
-    };
-
-    const isShift = node.name.toLowerCase().includes('turno');
-
+const StaticShiftCard: React.FC<ShiftCardProps> = ({
+    shiftKey, defaultTime, slots, employees, shiftTimes, onEditShiftTime, onAddEmployee, onUnassign
+}) => {
+    const display = shiftTimes[shiftKey] || defaultTime;
     return (
-        <div className="flex flex-col items-center">
-            {/* The Node / Card */}
-            <div className={`relative border-2 mb-4 min-w-[200px] transition-all group ${isShift ? 'bg-white border-slate-400 p-0 shadow-sm' : `${getNodeColor(node.unitType, node.name)} p-2 px-6 shadow-md`}`}>
-                
-                {isShift ? (
-                    <div className="flex flex-col">
-                        <div className="border-b border-slate-200 p-1 text-[11px] font-black text-slate-800 uppercase text-center bg-slate-50">
-                            {node.name}
-                        </div>
-                        <div className="p-2 space-y-1 min-h-[30px] text-center">
-                            {node.positions.length > 0 ? (
-                                node.positions.map(pos => {
-                                    const occupant = employees.find(e => e.orgPositionId === pos.id);
-                                    return (
-                                        <div key={pos.id} className="group/pos relative py-0.5">
-                                            {occupant ? (
-                                                <div className="cursor-pointer" onClick={() => onEditEmployee(occupant)}>
-                                                    <span className="font-bold text-slate-800 text-[10px] uppercase">{occupant.name.toUpperCase()}</span>
-                                                    <span className="text-[9px] text-slate-500 font-medium ml-1">( {pos.title} )</span>
-                                                </div>
-                                            ) : (
-                                                <div className="flex items-center justify-center gap-1">
-                                                    <span className="text-[10px] text-slate-400 font-bold uppercase italic Tracking-tighter">???? ({pos.title})</span>
-                                                    <button onClick={() => onCreateEmployee(pos.id)} className="text-blue-500 opacity-0 group-hover/pos:opacity-100"><PlusIcon className="h-3 w-3"/></button>
-                                                </div>
-                                            )}
-                                            {/* Pos Controls */}
-                                            <div className="absolute -top-1 -right-4 hidden group-hover/pos:flex gap-1 bg-white shadow rounded p-0.5 z-10">
-                                                <button onClick={() => onEditPosition(pos.id)} className="text-slate-400 hover:text-blue-500"><PencilIcon className="h-2 w-2"/></button>
-                                                <button onClick={() => onDeletePosition(pos.id)} className="text-slate-400 hover:text-red-500"><TrashIcon className="h-2 w-2"/></button>
-                                            </div>
-                                        </div>
-                                    );
-                                })
+        <div style={{ border: '1.5px solid #9ca3af', background: '#fff', minWidth: 160, maxWidth: 210 }}>
+            <div
+                onClick={() => onEditShiftTime(shiftKey, display)}
+                title="Clique para editar horário"
+                style={{
+                    background: '#f1f5f9', borderBottom: '1px solid #d1d5db', padding: '4px 8px',
+                    textAlign: 'center', fontWeight: 900, fontSize: 10, textTransform: 'uppercase',
+                    color: '#1e293b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                }}
+            >
+                {display}
+                <PencilIcon className="h-2.5 w-2.5 opacity-50" />
+            </div>
+            <div style={{ padding: '6px 10px' }}>
+                {slots.map(slot => {
+                    const occ = employees.find(e => e.orgPositionId === slot.key);
+                    return (
+                        <div key={slot.key} style={{ marginBottom: 3, display: 'flex', alignItems: 'center', gap: 3 }}>
+                            {occ ? (
+                                <>
+                                    <span
+                                        style={{ fontWeight: 700, fontSize: 10, color: '#1e293b', cursor: 'pointer', textTransform: 'uppercase' }}
+                                        title="Clique para desvincular"
+                                        onClick={() => onUnassign(slot.key)}
+                                    >{occ.name.toUpperCase()}</span>
+                                    <span style={{ fontSize: 9, color: '#64748b' }}>( {slot.title} )</span>
+                                </>
                             ) : (
-                                <p className="text-[9px] text-slate-400 text-center italic py-1">Vazio</p>
+                                <>
+                                    <span style={{ fontSize: 10, color: '#94a3b8', fontStyle: 'italic' }}>???? ( {slot.title} )</span>
+                                    <button
+                                        onClick={() => onAddEmployee(slot.key)}
+                                        style={{ background: '#dbeafe', border: 'none', borderRadius: 3, padding: '1px 4px', fontSize: 10, color: '#2563eb', cursor: 'pointer', fontWeight: 700, marginLeft: 2 }}
+                                    >+</button>
+                                </>
                             )}
                         </div>
-                    </div>
-                ) : (
-                    <>
-                        <div className="font-black text-xs uppercase tracking-widest text-center">{node.name}</div>
-                    </>
-                )}
-
-                {/* Main Controls */}
-                <div className="absolute -top-3 -right-3 flex opacity-0 group-hover:opacity-100 transition-opacity scale-75 gap-1 z-20">
-                    {!isShift && (
-                        <button onClick={() => onAddSubUnit(node.id)} className="p-1.5 bg-white rounded shadow text-blue-600 border border-slate-200">
-                            <PlusIcon className="h-4 w-4" />
-                        </button>
-                    )}
-                    <button onClick={() => onEditUnit(node.id, node.name)} className="p-1.5 bg-white rounded shadow text-slate-600 border border-slate-200">
-                        <PencilIcon className="h-4 w-4" />
-                    </button>
-                    <button onClick={() => onDeleteUnit(node.id)} className="p-1.5 bg-white rounded shadow text-red-600 border border-slate-200">
-                        <TrashIcon className="h-4 w-4" />
-                    </button>
-                </div>
+                    );
+                })}
             </div>
-
-            {/* Children Hierarchy Lines */}
-            {node.children.length > 0 && (
-                <div className="w-[1.5px] h-6 bg-black relative"></div>
-            )}
-
-            {/* Children Nodes */}
-            {node.children.length > 0 && (
-                <div className={`relative flex ${node.unitType === 'department' ? 'flex-col items-center' : 'justify-center'}`}>
-                    {node.children.map((child, index) => {
-                        const isFirst = index === 0;
-                        const isLast = index === node.children.length - 1;
-                        const isVertical = node.unitType === 'department';
-
-                        return (
-                            <div key={child.id} className={`relative flex flex-col items-center px-3 ${isVertical ? 'pt-2' : 'pt-6'}`}>
-                                {/* Connector Lines */}
-                                {!isVertical && (
-                                    <>
-                                        {/* Vertical Line Up */}
-                                        <div className="absolute top-0 left-1/2 -translate-x-1/2 h-6 w-[1.5px] bg-black"></div>
-                                        {/* Horizontal Line Left */}
-                                        {!isFirst && <div className="absolute top-0 left-0 w-[50%] h-[1.5px] bg-black"></div>}
-                                        {/* Horizontal Line Right */}
-                                        {!isLast && <div className="absolute top-0 right-0 w-[50%] h-[1.5px] bg-black"></div>}
-                                    </>
-                                )}
-                                {isVertical && (
-                                     <div className="w-[1.5px] h-6 bg-black"></div>
-                                )}
-
-                                <OrgNode
-                                    node={child}
-                                    employees={employees}
-                                    onAddSubUnit={onAddSubUnit}
-                                    onAddPosition={onAddPosition}
-                                    onDeleteUnit={onDeleteUnit}
-                                    onDeletePosition={onDeletePosition}
-                                    onEditPosition={onEditPosition}
-                                    onAssignEmployee={onAssignEmployee}
-                                    onCreateEmployee={onCreateEmployee}
-                                    onEditEmployee={onEditEmployee}
-                                    onEditUnit={onEditUnit}
-                                    evaluations={evaluations}
-                                />
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
         </div>
     );
 };
@@ -1209,307 +1130,139 @@ const OrgChart: React.FC<{
     triggerAddEmployee: (posId?: string, prefillSector?: string) => void;
     triggerEditEmployee: (emp: Employee) => void;
     evaluations: Evaluation[];
-}> = ({ employees, units, positions, reloadData, triggerAddEmployee, triggerEditEmployee, evaluations }) => {
-    const [tree, setTree] = useState<OrgTreeItem[]>([]);
+}> = ({ employees, reloadData, triggerAddEmployee }) => {
 
-    useEffect(() => {
-        setTree(buildTree(units, positions));
-    }, [employees, units, positions]);
+    const [shiftTimes, setShiftTimes] = useState<Record<string, string>>(() => {
+        try { const s = localStorage.getItem('orgShiftTimes'); return s ? JSON.parse(s) : {}; } catch { return {}; }
+    });
 
-    const buildTree = (allUnits: OrgUnit[], allPositions: OrgPosition[]): OrgTreeItem[] => {
-        const unitMap = new Map<string, OrgTreeItem>();
-        allUnits.forEach(u => unitMap.set(u.id, { ...u, children: [], positions: [] }));
-
-        const roots: OrgTreeItem[] = [];
-
-        // Assign positions to units
-        allPositions.forEach(p => {
-            const unit = unitMap.get(p.orgUnitId);
-            if (unit) unit.positions.push(p);
-        });
-
-        // Build hierarchy
-        allUnits.forEach(u => {
-            const item = unitMap.get(u.id)!;
-            if (u.parentId && unitMap.has(u.parentId)) {
-                unitMap.get(u.parentId)!.children.push(item);
-            } else {
-                roots.push(item);
-            }
-        });
-
-        return roots.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+    const saveShiftTime = (key: string, val: string) => {
+        const next = { ...shiftTimes, [key]: val };
+        setShiftTimes(next);
+        localStorage.setItem('orgShiftTimes', JSON.stringify(next));
     };
 
-    // --- Actions ---
+    const handleEditShiftTime = (key: string, cur: string) => {
+        const v = prompt('Editar horário (ex: TURNO 7:45 AS 17:30):', cur);
+        if (v && v !== cur) saveShiftTime(key, v);
+    };
 
-    const handleEditUnit = async (id: string, currentName: string) => {
-        const newName = prompt("Novo nome da área:", currentName);
-        if (newName && newName !== currentName) {
-            await updateItem('org_units', id, { name: newName });
+    const handleUnassign = async (slotKey: string) => {
+        if (!confirm('Desvincular este funcionário do cargo?')) return;
+        const occ = employees.find(e => e.orgPositionId === slotKey);
+        if (occ) await updateItem('employees', occ.id, { orgPositionId: null });
+        reloadData();
+    };
+
+    const handleAddEmployee = async (slotKey: string) => {
+        const avail = employees.filter(e => !e.orgPositionId);
+        if (avail.length === 0) {
+            const name = prompt('Nenhum funcionário disponível. Nome do novo funcionário:');
+            if (name) triggerAddEmployee(slotKey);
+            return;
+        }
+        const list = avail.map((e, i) => `${i + 1}. ${e.name}`).join('\n');
+        const choice = prompt(`Selecione pelo número:\n\n${list}`);
+        if (!choice) return;
+        const idx = parseInt(choice) - 1;
+        if (idx >= 0 && idx < avail.length) {
+            const occ = employees.find(e => e.orgPositionId === slotKey);
+            if (occ) await updateItem('employees', occ.id, { orgPositionId: null });
+            await updateItem('employees', avail[idx].id, { orgPositionId: slotKey });
             reloadData();
         }
     };
 
-    const handleCreateRoot = async () => {
-        const name = prompt("Nome do Departamento/Área Principal:");
-        if (!name) return;
-
-        // Simple heuristic: if name contains 'Maquina' -> machine, else department
-        const type = name.toLowerCase().includes('maquina') ? 'machine' : (name.toLowerCase().includes('maquinas') ? 'group' : 'department');
-
-        await insertItem('org_units', { name, unitType: type, displayOrder: units.length + 1 } as any);
-        reloadData();
+    // Static shift definitions — keys are stable, stored as orgPositionId in DB
+    const SHIFTS = {
+        adm1:       { key: 'adm_t1',     def: 'TURNO 2:00 AS 11:34', slots: [{ key: 'adm_t1_enc', title: 'encarregado' }] },
+        adm2:       { key: 'adm_t2',     def: 'TURNO 5:00 AS 14:44', slots: [{ key: 'adm_t2_ges', title: 'gestor qualidade' }] },
+        tr1_t1:     { key: 'tr1_t1',     def: 'TURNO 7:45 AS 17:30', slots: [{ key: 'tr1_t1_op', title: 'operador' }, { key: 'tr1_t1_a1', title: 'Auxiliar' }, { key: 'tr1_t1_a2', title: 'Auxiliar' }] },
+        tc1_t1:     { key: 'tc1_t1',     def: 'TURNO 5:00 AS 14:44', slots: [{ key: 'tc1_t1_op', title: 'operador' }, { key: 'tc1_t1_a1', title: 'Auxiliar' }] },
+        tc1_t2:     { key: 'tc1_t2',     def: 'TURNO 2:00 AS 11:34', slots: [{ key: 'tc1_t2_op', title: 'operador' }, { key: 'tc1_t2_a1', title: 'Auxiliar' }] },
+        tc2_t1:     { key: 'tc2_t1',     def: 'TURNO 5:00 AS 14:44', slots: [{ key: 'tc2_t1_op', title: 'operador' }, { key: 'tc2_t1_a1', title: 'Auxiliar' }] },
+        tc2_t2:     { key: 'tc2_t2',     def: 'TURNO 2:00 AS 11:34', slots: [{ key: 'tc2_t2_op', title: 'operador' }, { key: 'tc2_t2_a1', title: 'Auxiliar' }] },
+        malha_t1:   { key: 'malha_t1',   def: 'TURNO 7:45 AS 17:30', slots: [{ key: 'malha_t1_op', title: 'operador' }, { key: 'malha_t1_a1', title: 'Auxiliar' }, { key: 'malha_t1_a2', title: 'Auxiliar' }] },
     };
 
-    const handleAddSubUnit = async (parentId: string) => {
-        const name = prompt("Nome da Sub-Área / Máquina:");
-        if (!name) return;
-        const parent = units.find(u => u.id === parentId);
+    const card = (s: (typeof SHIFTS)[keyof typeof SHIFTS]) => (
+        <StaticShiftCard
+            key={s.key}
+            shiftKey={s.key} defaultTime={s.def} slots={s.slots}
+            employees={employees} shiftTimes={shiftTimes}
+            onEditShiftTime={handleEditShiftTime}
+            onAddEmployee={handleAddEmployee}
+            onUnassign={handleUnassign}
+        />
+    );
 
-        let type = 'department';
-        if (parent?.unitType === 'department') type = 'group'; // Dept -> Group (e.g. Produção -> Máquinas)
-        if (parent?.unitType === 'group') type = 'machine'; // Group -> Machine (e.g. Máquinas -> Trefila 01)
-        if (name.toLowerCase().includes('maquina')) type = 'machine';
-
-        await insertItem('org_units', { name, unitType: type, parentId, displayOrder: 99 } as any);
-        reloadData();
-    };
-
-    const handleAddPosition = async (unitId: string) => {
-        const title = prompt("Nome do Cargo/Função:");
-        if (!title) return;
-        await insertItem('org_positions', { orgUnitId: unitId, title, isLeadership: false } as any);
-        reloadData();
-    };
-
-    const handleDeleteUnit = async (id: string) => {
-        if (!confirm('Excluir esta área e todos os itens dentro dela?')) return;
-        try {
-            await deleteItem('org_units', id);
-            reloadData();
-        } catch (error) {
-            console.error(error);
-            alert("Não é possível excluir esta área. Pode haver cargos ou funcionários vinculados a ela.");
-        }
-    };
-
-    const handleDeletePosition = async (id: string) => {
-        if (!confirm('Excluir cargo?')) return;
-        try {
-            await deleteItem('org_positions', id);
-            reloadData();
-        } catch (error) {
-            console.error(error);
-            alert("Não é possível excluir um cargo que possui funcionários vinculados. Por favor, desvincule os funcionários primeiro.");
-        }
-    };
-
-    const handleClearAll = async () => {
-        if (!confirm('TEM CERTEZA? Isso irá apagar ABSOLUTAMENTE TUDO do organograma (áreas, cargos e turnos). Os funcionários não serão apagados, apenas desvinculados.')) return;
-        
-        try {
-            const unitsToClear = await fetchTable<OrgUnit>('org_units');
-            const posToClear = await fetchTable<OrgPosition>('org_positions');
-            
-            for (const p of posToClear) {
-                try { await deleteItemByColumn('org_positions', 'id', p.id); } catch(e) {}
-            }
-            for (const u of unitsToClear) {
-                try { await deleteItemByColumn('org_units', 'id', u.id); } catch(e) {}
-            }
-            
-            const allEmps = await fetchTable<Employee>('employees');
-            for (const e of allEmps) {
-                if (e.orgPositionId) {
-                    try { await updateItem('employees', e.id, { orgPositionId: null }); } catch(e) {}
-                }
-            }
-
-            alert('Organograma totalmente zerado!');
-            reloadData();
-        } catch (e) {
-            console.error(e);
-            alert('Erro ao zerar.');
-        }
-    };
-
-    const handleGenerate2Shifts = async () => {
-        if (!confirm('Deseja gerar a estrutura COMPLETA do escopo (Setor > ADM > Máquinas)?')) return;
-        
-        try {
-            // Re-uses logic but first cleans
-            await handleClearAll();
-            
-            // 1. Root SETOR LAMINAÇÃO
-            const setor = await insertItem('org_units', { name: 'SETOR LAMINAÇÃO', unitType: 'department', displayOrder: 1 } as any);
-            const adm = await insertItem('org_units', { name: 'ADMINISTRAÇÃO', unitType: 'department', parentId: setor.id, displayOrder: 1 } as any);
-            
-            const allEmps = await fetchTable<Employee>('employees');
-            const assignByName = async (posId: string, name: string) => {
-                const match = allEmps.find(e => e.name.toLowerCase().includes(name.toLowerCase()));
-                if (match) await updateItem('employees', match.id, { orgPositionId: posId });
-            };
-
-            const turnoAdm1 = await insertItem('org_units', { name: 'TURNO 2:00 as 11:34', unitType: 'group', parentId: adm.id, displayOrder: 1 } as any);
-            const p1 = await insertItem('org_positions', { orgUnitId: turnoAdm1.id, title: 'encarregado', isLeadership: true } as any);
-            await assignByName(p1.id, 'EDUARDO');
-
-            const turnoAdm2 = await insertItem('org_units', { name: 'TURNO 5:00 as 14:44', unitType: 'group', parentId: adm.id, displayOrder: 2 } as any);
-            const p2 = await insertItem('org_positions', { orgUnitId: turnoAdm2.id, title: 'gestor qualidade', isLeadership: true } as any);
-            await assignByName(p2.id, 'MATHEUS');
-
-            const maquinas = await insertItem('org_units', { name: 'MAQUINAS', unitType: 'group', parentId: adm.id, displayOrder: 3 } as any);
-            
-            const createMachine = async (name: string, shifts: { name: string, roles: { title: string, emp?: string }[] }[]) => {
-                const m = await insertItem('org_units', { name, unitType: 'machine', parentId: maquinas.id, displayOrder: 1 } as any);
-                for (const s of shifts) {
-                    const su = await insertItem('org_units', { name: s.name, unitType: 'group', parentId: m.id, displayOrder: 1 } as any);
-                    for (const role of s.roles) {
-                        const p = await insertItem('org_positions', { orgUnitId: su.id, title: role.title, isLeadership: false } as any);
-                        if (role.emp) await assignByName(p.id, role.emp);
-                    }
-                }
-            };
-
-            await createMachine('TREFILA 1', [{ name: 'TURNO 7:45 as 17:30', roles: [{title: 'operador', emp: 'WILIAN'}, {title: 'Auxiliar', emp: 'DENIS'}, {title: 'Auxiliar', emp: 'Ryanderson'}] }]);
-            await createMachine('TRELIÇA 1', [
-                { name: 'TURNO 5:00 as 14:44', roles: [{title: 'operador', emp: 'ADRIAN'}, {title: 'Auxiliar', emp: 'JUNIOR'}] },
-                { name: 'TURNO 2:00 as 11:34', roles: [{title: 'operador', emp: 'Alceu'}, {title: 'Auxiliar', emp: 'Thiago'}] }
-            ]);
-            await createMachine('TRELIÇA 2', [
-                { name: 'TURNO 5:00 as 14:44', roles: [{title: 'operador'}, {title: 'Auxiliar'}] },
-                { name: 'TURNO 2:00 as 11:34', roles: [{title: 'operador'}, {title: 'Auxiliar'}] }
-            ]);
-            await createMachine('MALHA', [{ name: 'TURNO 7:45 as 17:30', roles: [{title: 'operador'}, {title: 'Auxiliar'}, {title: 'Auxiliar'}] }]);
-            
-            alert('Estrutura gerada com sucesso!');
-            reloadData();
-        } catch (e) {
-            console.error('Erro ao gerar:', e);
-            alert('Erro ao gerar estrutura.');
-        }
-    };
-
-
-    const handleAssignEmployee = async (positionId: string, employeeId: string) => {
-        // 1. Find details to sync
-        const targetPos = positions.find(p => p.id === positionId);
-        const targetUnit = units.find(u => u.id === targetPos?.orgUnitId);
-
-        if (employeeId) {
-            // Sync Job Title and Sector automatically
-            const updates: Partial<Employee> = {
-                orgPositionId: positionId,
-                jobTitle: targetPos?.title || undefined,
-                sector: targetUnit?.name || undefined
-            };
-            await updateItem('employees', employeeId, updates);
-        } else {
-            // Unassign logic: Find who is currently in this position
-            const occupants = employees.filter(e => e.orgPositionId === positionId);
-            for (const occ of occupants) {
-                await updateItem('employees', occ.id, { orgPositionId: null });
-            }
-        }
-        reloadData();
-    };
-
-    const handleEditPosition = async (posId: string) => {
-        const pos = positions.find(p => p.id === posId);
-        if (!pos) return;
-
-        const newTitle = prompt("Novo título do cargo:", pos.title);
-        if (newTitle === null) return;
-
-        const newDesc = prompt("Descrição de Cargo / Atribuições:", pos.description || '');
-        if (newDesc === null) return;
-
-        await updateItem('org_positions', posId, { title: newTitle, description: newDesc });
-
-        // Auto-sync all employees linked to this position
-        const occupants = employees.filter(e => e.orgPositionId === posId);
-        for (const occ of occupants) {
-            await updateItem('employees', occ.id, { jobTitle: newTitle });
-        }
-
-        reloadData();
-    };
-
-    const handleCreateEmployeeForPosition = (positionId: string) => {
-        // Find unit name for prefill
-        const pos = positions.find(p => p.id === positionId);
-        const unit = units.find(u => u.id === pos?.orgUnitId);
-        triggerAddEmployee(positionId, unit?.name);
-    };
+    const col: React.CSSProperties = { display: 'flex', flexDirection: 'column', alignItems: 'center' };
 
     return (
-        <div className="overflow-auto p-8 min-h-[600px] bg-slate-50 relative">
-            {/* Top Toolbar for Reset */}
-            <div className="flex justify-center mb-10 pb-6 border-b border-slate-200">
-                <div className="bg-white p-6 rounded-3xl shadow-xl border-2 border-slate-100 flex items-center gap-6 max-w-4xl w-full">
-                    <div className="flex flex-col flex-1">
-                        <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Gestão da Estrutura</h3>
-                        <p className="text-xs text-slate-500 mt-1">Limpe tudo para começar do zero ou gere a estrutura automática:</p>
-                    </div>
-                    
-                    <div className="flex gap-3">
-                        <button
-                            onClick={handleClearAll}
-                            className="px-6 py-3 bg-slate-100 text-slate-600 rounded-xl font-black uppercase text-xs shadow hover:bg-red-50 hover:text-red-600 transition-all flex items-center gap-2"
-                        >
-                            <TrashIcon className="h-4 w-4" />
-                            Zerar Tudo
-                        </button>
+        <div style={{ overflow: 'auto', padding: 40, background: '#f8fafc', minHeight: 600 }}>
+            <div style={col}>
 
-                        <button
-                            onClick={handleGenerate2Shifts}
-                            className="px-6 py-3 bg-[#4F81BD] text-white rounded-xl font-black uppercase text-xs shadow-lg hover:opacity-90 transition-all flex items-center gap-2"
-                        >
-                            <TrophyIcon className="h-4 w-4" />
-                            Gerar Escopo Excel
-                        </button>
+                <BlueLabelBox label="SETOR LAMINAÇÃO" />
+                <VLine />
+                <BlueLabelBox label="ADMINISTRAÇÃO" />
+                <VLine />
+                {card(SHIFTS.adm1)}
+                <VLine />
+                {card(SHIFTS.adm2)}
+                <VLine />
+                <BlueLabelBox label="MÁQUINAS" />
+
+                {/* Machines row with connecting lines */}
+                <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+                    {/* Horizontal top bar */}
+                    <div style={{ position: 'relative', width: '100%', height: 2 }}>
+                        <div style={{ position: 'absolute', left: '12.5%', right: '12.5%', top: 0, height: 2, background: '#000' }} />
+                    </div>
+                    <div style={{ display: 'flex', gap: 32, alignItems: 'flex-start' }}>
+                        {/* TREFILA 1 */}
+                        <div style={col}>
+                            <VLine />
+                            <BlueLabelBox label="TREFILA 1" />
+                            <VLine />
+                            {card(SHIFTS.tr1_t1)}
+                        </div>
+
+                        {/* TRELIÇA 1 */}
+                        <div style={col}>
+                            <VLine />
+                            <BlueLabelBox label="TRELIÇA 1" />
+                            <VLine />
+                            {card(SHIFTS.tc1_t1)}
+                            <VLine />
+                            {card(SHIFTS.tc1_t2)}
+                        </div>
+
+                        {/* TRELIÇA 2 */}
+                        <div style={col}>
+                            <VLine />
+                            <BlueLabelBox label="TRELIÇA 2" />
+                            <VLine />
+                            {card(SHIFTS.tc2_t1)}
+                            <VLine />
+                            {card(SHIFTS.tc2_t2)}
+                        </div>
+
+                        {/* MALHA */}
+                        <div style={col}>
+                            <VLine />
+                            <BlueLabelBox label="MALHA" />
+                            <VLine />
+                            {card(SHIFTS.malha_t1)}
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div className="flex gap-8 min-w-max justify-center items-start pt-10">
-                {/* Render Existing Roots */}
-                {tree.map(root => (
-                    <OrgNode
-                        key={root.id}
-                        node={root}
-                        employees={employees}
-                        onAddSubUnit={handleAddSubUnit}
-                        onAddPosition={handleAddPosition}
-                        onDeleteUnit={handleDeleteUnit}
-                        onDeletePosition={handleDeletePosition}
-                        onEditPosition={handleEditPosition}
-                        onAssignEmployee={handleAssignEmployee}
-                        onCreateEmployee={handleCreateEmployeeForPosition}
-                        onEditEmployee={triggerEditEmployee}
-                        onEditUnit={handleEditUnit}
-                        evaluations={evaluations}
-                    />
-                ))}
-
-                {/* Add New Root Button (Inline) - Only show if reasonably empty or for new areas */}
-                <div className="flex flex-col items-center opacity-60 hover:opacity-100 transition-opacity ml-8">
-                    <button
-                        onClick={handleCreateRoot}
-                        className="w-[200px] h-[100px] border-4 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 hover:border-slate-400 transition"
-                    >
-                        <PlusIcon className="h-8 w-8 mb-2" />
-                        <span className="font-bold">Nova Área Principal</span>
-                    </button>
-                    <p className="text-xs text-slate-400 mt-2 text-center max-w-[180px]">
-                        Clique aqui para começar a montar manualmente
-                    </p>
-                </div>
             </div>
         </div>
     );
 };
+
+
 
 
 
