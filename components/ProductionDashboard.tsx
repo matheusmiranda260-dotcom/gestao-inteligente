@@ -177,6 +177,9 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                         <div className="h-4 bg-slate-200 rounded-full overflow-hidden p-1">
                             <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(79,70,229,0.3)]" style={{ width: `${Math.min(100, (dailyProducedValue / dailyGoal) * 100)}%` }} />
                         </div>
+                        {activeOrder?.lastQuantityUpdate && (
+                            <p className="mt-4 text-[10px] font-black text-rose-500 uppercase tracking-widest text-right">Último Reporte: {new Date(activeOrder.lastQuantityUpdate).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+                        )}
                     </div>
 
                     {/* Ordem Ativa */}
@@ -196,9 +199,6 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                         </div>
                         <div className="mt-4 flex flex-wrap justify-between items-center gap-2">
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Disponibilidade: {(shiftUptime / (shiftUptime + shiftDowntime) * 100 || 0).toFixed(1)}%</p>
-                            {activeOrder?.lastQuantityUpdate && (
-                                <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest">Último Reporte: {new Date(activeOrder.lastQuantityUpdate).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
-                            )}
                         </div>
                     </div>
                 </div>
