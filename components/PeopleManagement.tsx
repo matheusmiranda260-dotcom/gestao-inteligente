@@ -1212,16 +1212,22 @@ const OrgChart: React.FC<{
                 <VLine />
                 <BlueLabelBox label="MÁQUINAS" />
 
-                {/* Machines row with connecting lines */}
-                <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-                    {/* Horizontal top bar */}
-                    <div style={{ position: 'relative', width: '100%', height: 2 }}>
-                        <div style={{ position: 'absolute', left: '12.5%', right: '12.5%', top: 0, height: 2, background: '#000' }} />
-                    </div>
-                    <div style={{ display: 'flex', gap: 32, alignItems: 'flex-start' }}>
+                {/* Machines row with proper connecting lines */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    {/* The 4 machine columns with a shared horizontal connector */}
+                    <div style={{ position: 'relative', display: 'flex', gap: 32, alignItems: 'flex-start' }}>
+
+                        {/* Horizontal line: spans top of all columns, clipped to center-to-center of first/last */}
+                        {/* We simulate by drawing a border-top on each VLine child */}
+
                         {/* TREFILA 1 */}
                         <div style={col}>
-                            <VLine />
+                            {/* VLine + half of horizontal line (right side only for first child) */}
+                            <div style={{ position: 'relative', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                {/* Top connector: right half */}
+                                <div style={{ position: 'absolute', top: 0, left: '50%', right: 0, height: 2, background: '#000' }} />
+                                <div style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
+                            </div>
                             <BlueLabelBox label="TREFILA 1" />
                             <VLine />
                             {card(SHIFTS.tr1_t1)}
@@ -1229,7 +1235,11 @@ const OrgChart: React.FC<{
 
                         {/* TRELIÇA 1 */}
                         <div style={col}>
-                            <VLine />
+                            <div style={{ position: 'relative', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                {/* Top connector: full width */}
+                                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: '#000' }} />
+                                <div style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
+                            </div>
                             <BlueLabelBox label="TRELIÇA 1" />
                             <VLine />
                             {card(SHIFTS.tc1_t1)}
@@ -1239,7 +1249,11 @@ const OrgChart: React.FC<{
 
                         {/* TRELIÇA 2 */}
                         <div style={col}>
-                            <VLine />
+                            <div style={{ position: 'relative', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                {/* Top connector: full width */}
+                                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: '#000' }} />
+                                <div style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
+                            </div>
                             <BlueLabelBox label="TRELIÇA 2" />
                             <VLine />
                             {card(SHIFTS.tc2_t1)}
@@ -1249,13 +1263,18 @@ const OrgChart: React.FC<{
 
                         {/* MALHA */}
                         <div style={col}>
-                            <VLine />
+                            <div style={{ position: 'relative', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                {/* Top connector: left half only (last child) */}
+                                <div style={{ position: 'absolute', top: 0, left: 0, right: '50%', height: 2, background: '#000' }} />
+                                <div style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
+                            </div>
                             <BlueLabelBox label="MALHA" />
                             <VLine />
                             {card(SHIFTS.malha_t1)}
                         </div>
                     </div>
                 </div>
+
 
             </div>
         </div>
