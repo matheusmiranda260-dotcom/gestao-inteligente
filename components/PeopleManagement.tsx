@@ -1052,7 +1052,7 @@ const EmployeeDetailModal: React.FC<{
 // The hierarchy is hardcoded. Only employees in slots and shift times are editable.
 
 const VLine: React.FC<{ height?: number }> = ({ height = 32 }) => (
-    <div style={{ width: 2, height: height || 32, background: '#000', margin: '0 auto' }} />
+    <div className="org-vline" style={{ width: 2, height: height || 32, background: '#000', margin: '0 auto' }} />
 );
 
 const BlueLabelBox: React.FC<{ label: string }> = ({ label }) => (
@@ -1297,24 +1297,28 @@ const OrgChart: React.FC<{
                         background: white !important; 
                         padding: 0 !important; 
                         margin: 0 !important; 
-                        overflow: visible !important; 
+                        overflow: hidden !important; 
                     }
-                    .print-header { display: flex !important; margin-bottom: 20px; border-bottom: 2px solid #0F3F5C; padding: 10px 0; width: 100%; }
+                    .print-header { display: flex !important; margin-bottom: 10px; border-bottom: 2px solid #0F3F5C; padding: 5px 0; width: 100%; }
                     .org-container { 
                         display: flex !important;
                         padding: 0 !important; 
                         background: white !important; 
                         width: 100% !important;
-                        zoom: 0.9;
+                        zoom: 0.8 !important;
+                        page-break-inside: avoid !important;
                     }
-                    .stats-container { margin-bottom: 15px !important; }
+                    .stats-container { margin-bottom: 10px !important; }
                     .org-scroll-wrapper { 
-                        overflow: visible !important; 
+                        overflow: hidden !important; 
                         width: 100% !important; 
-                        height: auto !important; 
+                        height: 210mm !important; 
                         min-height: auto !important; 
-                        padding: 20mm 10mm !important; 
+                        padding: 10mm !important; 
                         background: white !important;
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
                     }
                     @page { 
                         size: 297mm 210mm; 
@@ -1326,6 +1330,9 @@ const OrgChart: React.FC<{
                         box-shadow: none !important; 
                         text-shadow: none !important;
                     }
+                    /* Reduce line dimensions on print to save space */
+                    .org-vline { height: 16px !important; }
+                    .org-hline { height: 1px !important; }
                 }
                 .print-header { display: none; }
             `}</style>
@@ -1379,8 +1386,8 @@ const OrgChart: React.FC<{
 
                         <div style={col}>
                             <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-                                <div style={{ position: 'absolute', top: 0, left: '50%', right: -24, height: 2, background: '#000' }} />
-                                <div style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
+                                <div className="org-hline" style={{ position: 'absolute', top: 0, left: '50%', right: -24, height: 2, background: '#000' }} />
+                                <div className="org-vline" style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
                             </div>
                             <BlueLabelBox label="TREFILA 1" />
                             <VLine />
@@ -1389,8 +1396,8 @@ const OrgChart: React.FC<{
 
                         <div style={col}>
                             <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-                                <div style={{ position: 'absolute', top: 0, left: -24, right: -24, height: 2, background: '#000' }} />
-                                <div style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
+                                <div className="org-hline" style={{ position: 'absolute', top: 0, left: -24, right: -24, height: 2, background: '#000' }} />
+                                <div className="org-vline" style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
                             </div>
                             <BlueLabelBox label="TRELIÇA 1" />
                             <VLine />
@@ -1402,8 +1409,8 @@ const OrgChart: React.FC<{
                         {/* TRELIÇA 2 — middle column: line extends 24px on both sides */}
                         <div style={col}>
                             <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-                                <div style={{ position: 'absolute', top: 0, left: -24, right: -24, height: 2, background: '#000' }} />
-                                <div style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
+                                <div className="org-hline" style={{ position: 'absolute', top: 0, left: -24, right: -24, height: 2, background: '#000' }} />
+                                <div className="org-vline" style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
                             </div>
                             <BlueLabelBox label="TRELIÇA 2" />
                             <VLine />
@@ -1416,8 +1423,8 @@ const OrgChart: React.FC<{
                         <div style={col}>
                             <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
                                 {/* Horizontal: from left (extends 24px past column edge) → center */}
-                                <div style={{ position: 'absolute', top: 0, left: -24, right: '50%', height: 2, background: '#000' }} />
-                                <div style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
+                                <div className="org-hline" style={{ position: 'absolute', top: 0, left: -24, right: '50%', height: 2, background: '#000' }} />
+                                <div className="org-vline" style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
                             </div>
                             <BlueLabelBox label="MALHA" />
                             <VLine />
