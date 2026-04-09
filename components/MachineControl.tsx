@@ -2367,7 +2367,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                         )}
 
                                         {/* Botão Pausar Ordem (Arquivar/Trocar) */}
-                                        {pauseProductionOrder && (
+                                        {machineType !== 'Trefila' && pauseProductionOrder && (
                                             <button
                                                 onClick={() => {
                                                     if (window.confirm('Tem certeza que deseja arquivar/pausar esta ordem para iniciar outra? Seu turno atual será encerrado e a ordem voltará para a fila de pendentes.')) {
@@ -2383,15 +2383,15 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                             </button>
                                         )}
 
-                                        {/* Botão Cancelar Ordem */}
-                                        {cancelProductionOrder && (
+                                        {/* Botão Cancelar Ordem - Requer ser Gestor */}
+                                        {isGestor && cancelProductionOrder && (
                                             <button
                                                 onClick={() => setShowCancelConfirmation(true)}
-                                                className="p-3.5 text-red-400 hover:text-red-600 hover:bg-red-50/50 rounded-2xl transition active:scale-90 flex flex-col items-center gap-0.5"
+                                                className="p-3.5 text-red-500 hover:text-red-600 hover:bg-red-50/50 rounded-2xl transition active:scale-90 flex flex-col items-center gap-0.5"
                                                 title="Cancelar Ordem de Produção"
                                             >
                                                 <XCircleIcon className="h-7 w-7" />
-                                                <span className="text-[8px] font-black uppercase">Cancelar</span>
+                                                <span className="text-[8px] font-black uppercase font-black">Cancelar</span>
                                             </button>
                                         )}
                                     </div>
