@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ArrowLeftIcon, PlusIcon, StarIcon, ChartBarIcon, TrophyIcon, SearchIcon, FilterIcon, UserIcon, BookOpenIcon, ClockIcon, DocumentTextIcon, PencilIcon, TrashIcon, UserGroupIcon, ExclamationIcon, SaveIcon, XIcon, DownloadIcon, PrinterIcon, CheckCircleIcon } from './icons';
 import type { Page, Employee, Evaluation, Achievement, User, EmployeeCourse, EmployeeAbsence, EmployeeVacation, EmployeeResponsibility, OrgUnit, OrgPosition, EmployeeDocument, KaizenProblem } from '../types';
-import { fetchTable, insertItem, updateItem, deleteItem, fetchByColumn, uploadFile } from '../services/supabaseService';
+import { fetchTable, insertItem, updateItem, deleteItem, deleteItemByColumn, fetchByColumn, uploadFile } from '../services/supabaseService';
 
 interface PeopleManagementProps {
     setPage: (page: Page) => void;
@@ -1335,21 +1335,24 @@ const OrgChart: React.FC<{
         if (!confirm('ATENÇÃO: Isso irá APAGAR TODO o organograma atual (áreas e cargos) e refazer do zero conforme a imagem do escopo. Deseja continuar?')) return;
         
         try {
-            // 0. CLEANUP (Prevenção de duplicados)
+            // 0. FORCED CLEANUP (Exclui TUDO sem dó para evitar duplicatas)
             const unitsToClear = await fetchTable<OrgUnit>('org_units');
             const posToClear = await fetchTable<OrgPosition>('org_positions');
             
+            // Delete all positions first (to avoid FK issues)
             for (const p of posToClear) {
-                try { await deleteItem('org_positions', p.id); } catch(e) {}
+                try { await deleteItemByColumn('org_positions', 'id', p.id); } catch(e) { console.error(e); }
             }
+            // Delete all units
             for (const u of unitsToClear) {
-                try { await deleteItem('org_units', u.id); } catch(e) {}
+                try { await deleteItemByColumn('org_units', 'id', u.id); } catch(e) { console.error(e); }
             }
             
-            // Link Reset em funcionários
-            for (const e of employees) {
+            // Link Reset em funcionários (Garante que ninguém fique preso a um ID fantasma)
+            const allEmps = await fetchTable<Employee>('employees');
+            for (const e of allEmps) {
                 if (e.orgPositionId) {
-                    try { await updateItem('employees', e.id, { orgPositionId: null }); } catch(e) {}
+                    try { await updateItem('employees', e.id, { orgPositionId: null }); } catch(e) { console.error(e); }
                 }
             }
 
@@ -1492,34 +1495,18 @@ const OrgChart: React.FC<{
                     />
                 ))}
 
-                {/* Add New Root Button (Inline) */}
-                <div className="flex flex-col gap-4">
-                    <div className="flex flex-col items-center opacity-60 hover:opacity-100 transition-opacity">
-                        <button
-                            onClick={handleCreateRoot}
-                            className="w-[200px] h-[100px] border-4 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 hover:border-slate-400 transition"
-                        >
-                            <PlusIcon className="h-8 w-8 mb-2" />
-                            <span className="font-bold">Nova Área Principal</span>
-                        </button>
-                        <p className="text-xs text-slate-400 mt-2 text-center max-w-[180px]">
-                            Ex: Administrativo, Comercial, Logística...
-                        </p>
-                    </div>
-
-                    <div className="flex flex-col items-center opacity-95 hover:opacity-100 transition-opacity">
+                    <div className="flex flex-col items-center">
                         <button
                             onClick={handleGenerate2Shifts}
-                            className="w-[200px] py-4 bg-gradient-to-r from-blue-700 to-indigo-800 text-white rounded-xl shadow-lg hover:shadow-xl hover:scale-105 transition flex flex-col items-center justify-center gap-2 border-2 border-white/20"
+                            className="w-[200px] py-6 bg-red-600 text-white rounded-2xl shadow-2xl hover:bg-red-700 transition-all flex flex-col items-center justify-center gap-2 border-4 border-white animate-pulse"
                         >
-                            <TrophyIcon className="h-6 w-6 text-yellow-400" />
-                            <span className="font-bold text-xs text-center">REFAZER ORGANOGRAMA<br/>COMPLETO (ESCOPO)</span>
+                            <TrashIcon className="h-8 w-8 text-white" />
+                            <span className="font-extrabold text-sm text-center uppercase">Limpar Tudo e<br/>Deixar Pronto</span>
                         </button>
-                        <p className="text-[10px] text-slate-500 mt-2 text-center max-w-[180px] font-bold">
-                            Cria exatamente o PDF: ADM, Máquinas, Turnos e Equipes
+                        <p className="text-[10px] text-red-600 mt-3 text-center max-w-[200px] font-black uppercase">
+                            Clique aqui uma última vez para apagar os erros e deixar igual à imagem.
                         </p>
                     </div>
-                </div>
             </div>
         </div>
     );
