@@ -1,6 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type { Page, ProductionOrderData, StockItem, User, OperatorLog, MachineType } from '../types';
-import { ArrowLeftIcon, WarningIcon, CogIcon, PauseIcon, ClockIcon, CheckCircleIcon, ScaleIcon, PlayIcon, BookOpenIcon, StopIcon, WrenchScrewdriverIcon, ArchiveIcon } from './icons';
+import type { Page, ProductionOrderData, StockItem, User, OperatorLog, MachineType, ProcessedLot } from '../types';
+import { 
+    ArrowLeftIcon, WarningIcon, CogIcon, PauseIcon, ClockIcon, 
+    CheckCircleIcon, ScaleIcon, PlayIcon, BookOpenIcon, StopIcon, 
+    WrenchScrewdriverIcon, ArchiveIcon, UserGroupIcon, ChartBarIcon 
+} from './icons';
+
+// Custom Power Icon
+const PowerIcon = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5.636 5.636a9 9 0 1012.728 0M12 3v9" />
+    </svg>
+);
 
 const formatDuration = (ms: number) => {
     if (ms < 0) ms = 0;
@@ -12,11 +23,36 @@ const formatDuration = (ms: number) => {
 };
 
 const statusStyles = {
-    Produzindo: { bg: 'bg-gradient-to-r from-emerald-500 to-teal-600', text: 'text-white', border: 'border-transparent', icon: <CogIcon className="h-8 w-8 text-white animate-spin drop-shadow-md" />, title: 'EM PRODUÇÃO' },
-    Preparacao: { bg: 'bg-gradient-to-r from-blue-500 to-indigo-600', text: 'text-white', border: 'border-transparent', icon: <WrenchScrewdriverIcon className="h-8 w-8 text-white animate-pulse drop-shadow-md" />, title: 'PREPARAÇÃO' },
-    Parada: { bg: 'bg-gradient-to-r from-rose-500 to-red-600', text: 'text-white', border: 'border-transparent', icon: <PauseIcon className="h-8 w-8 text-white drop-shadow-md" />, title: 'MÁQUINA PARADA' },
-    Ocioso: { bg: 'bg-gradient-to-r from-amber-400 to-orange-500', text: 'text-white', border: 'border-transparent', icon: <ClockIcon className="h-8 w-8 text-white drop-shadow-md" />, title: 'OCIOSA' },
-    Desligada: { bg: 'bg-gradient-to-r from-slate-600 to-slate-800', text: 'text-white', border: 'border-transparent', icon: <StopIcon className="h-8 w-8 text-white drop-shadow-md" />, title: 'DESLIGADA' },
+    Produzindo: { 
+        bg: 'bg-gradient-to-br from-[#00F2FE] to-[#4FACFE]', 
+        glow: 'shadow-[0_0_20px_rgba(79,172,254,0.4)]',
+        icon: <CogIcon className="h-8 w-8 text-white animate-spin-slow drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" />, 
+        title: 'EM OPERAÇÃO' 
+    },
+    Preparacao: { 
+        bg: 'bg-gradient-to-br from-[#A8E063] to-[#56AB2F]', 
+        glow: 'shadow-[0_0_20px_rgba(86,171,47,0.4)]',
+        icon: <WrenchScrewdriverIcon className="h-8 w-8 text-white animate-pulse drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" />, 
+        title: 'PREPARAÇÃO' 
+    },
+    Parada: { 
+        bg: 'bg-gradient-to-br from-[#FF0844] to-[#FFB199]', 
+        glow: 'shadow-[0_0_20px_rgba(255,8,68,0.4)]',
+        icon: <PauseIcon className="h-8 w-8 text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" />, 
+        title: 'MAQUINA PARADA' 
+    },
+    Ocioso: { 
+        bg: 'bg-gradient-to-br from-[#FAD961] to-[#F76B1C]', 
+        glow: 'shadow-[0_0_20px_rgba(247,107,28,0.4)]',
+        icon: <ClockIcon className="h-8 w-8 text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" />, 
+        title: 'EQUIP. OCIOSO' 
+    },
+    Desligada: { 
+        bg: 'bg-gradient-to-br from-[#1F2937] to-[#111827]', 
+        glow: 'shadow-[0_0_25px_rgba(17,24,39,0.3)]',
+        icon: <PowerIcon className="h-8 w-8 text-white" />, 
+        title: 'DESLIGADA' 
+    },
 };
 
 interface MachineStatusViewProps {
@@ -27,942 +63,201 @@ interface MachineStatusViewProps {
     dailyProducedValue: number;
     dailyGoal: number;
     goalUnit: string;
-    shiftGoal?: number;
     onResetShift?: () => void;
     isGestor?: boolean;
 }
 
-const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, activeOrder, allOrders, stock, dailyProducedValue, dailyGoal, goalUnit, shiftGoal, onResetShift, isGestor }) => {
-    // Local timer to ensure the clock ticks even if parent doesn't re-render
-    const [localNow, setLocalNow] = useState(new Date());
-
-    // Persistent drift to align local clock with server timestamps, persisted in localStorage
-    const driftKey = `stableDrift_${machineType}`;
-    const [stableDrift, setStableDrift] = useState(() => {
-        const saved = localStorage.getItem(driftKey);
-        return saved ? parseInt(saved, 10) : 0;
-    });
+const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, activeOrder, allOrders, stock, dailyProducedValue, dailyGoal, goalUnit, onResetShift, isGestor }) => {
+    const [now, setNow] = useState(new Date());
 
     useEffect(() => {
-        const timerId = setInterval(() => setLocalNow(new Date()), 1000);
+        const timerId = setInterval(() => setNow(new Date()), 1000);
         return () => clearInterval(timerId);
     }, []);
 
-    useEffect(() => {
-        if (!activeOrder) return;
-        setLocalNow(new Date()); // Refresh on mount and order change
-
-        const timestamps = [
-            activeOrder.startTime,
-            activeOrder.lastQuantityUpdate,
-            ...(activeOrder.downtimeEvents || []).map(e => e.stopTime),
-            ...(activeOrder.downtimeEvents || []).map(e => e.resumeTime)
-        ].filter(Boolean) as string[];
-
-        setStableDrift(currentDrift => {
-            let maxDrift = currentDrift;
-            const nowMs = Date.now();
-
-            timestamps.forEach(ts => {
-                const eventMs = new Date(ts).getTime();
-                const drift = eventMs - nowMs;
-                if (drift > maxDrift) {
-                    maxDrift = drift;
-                }
-            });
-
-            if (maxDrift !== currentDrift) {
-                localStorage.setItem(driftKey, maxDrift.toString());
-            }
-            return maxDrift;
-        });
-    }, [activeOrder, driftKey]);
+    const h = now.getHours();
+    const isShiftA = h >= 5 && h < 14;
+    const shiftStart = new Date(now);
+    shiftStart.setHours(isShiftA ? 5 : 14, 0, 0, 0);
+    if (!isShiftA && h < 5) shiftStart.setDate(shiftStart.getDate() - 1);
+    const shiftStartMs = shiftStart.getTime();
 
     const currentOperatorLog = useMemo(() => {
         if (!activeOrder?.operatorLogs || activeOrder.operatorLogs.length === 0) return null;
-        const sorted = [...activeOrder.operatorLogs].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+        const logs = activeOrder.operatorLogs as OperatorLog[];
+        const sorted = [...logs].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
         const lastLog = sorted[sorted.length - 1];
         return lastLog.endTime ? null : lastLog;
     }, [activeOrder]);
 
-    const now = useMemo(() => new Date(localNow.getTime() + stableDrift), [localNow, stableDrift]);
-
-    const { shiftDowntime, shiftUptime, shiftStartMs, shiftEndMs } = useMemo(() => {
-        const h = now.getHours();
-        const isShiftA = h >= 5 && h < 14;
-        
-        const start = new Date(now);
-        start.setHours(isShiftA ? 5 : 14, 0, 0, 0);
-        
-        const end = new Date(now);
-        if (isShiftA) {
-            end.setHours(14, 0, 0, 0);
-        } else {
-            end.setDate(end.getDate() + 1);
-            end.setHours(5, 0, 0, 0);
-        }
-
-        const sMs = start.getTime();
-        const eMs = end.getTime();
-        const nowMs = now.getTime();
-        const effectiveEnd = Math.min(nowMs, eMs);
-        const totalDuration = Math.max(0, effectiveEnd - sMs);
-
-        // Aggregate downtime from ALL orders in this shift window
-        const shiftOrders = allOrders.filter(o => o.machine === machineType && o.status !== 'cancelled');
-        let downtime = 0;
-        shiftOrders.forEach(order => {
-            (order.downtimeEvents || []).forEach(event => {
-                const stopT = new Date(event.stopTime).getTime();
-                const resumeT = event.resumeTime ? new Date(event.resumeTime).getTime() : nowMs;
-                
-                const intersectStart = Math.max(sMs, stopT);
-                const intersectEnd = Math.min(effectiveEnd, resumeT);
-                
-                if (intersectEnd > intersectStart) {
-                    downtime += (intersectEnd - intersectStart);
-                }
-            });
-        });
-
-        const uptime = Math.max(0, totalDuration - downtime);
-        return { shiftDowntime: downtime, shiftUptime: uptime, shiftStartMs: sMs, shiftEndMs: eMs };
-    }, [now, allOrders, machineType]);
-
     const machineStatus = useMemo(() => {
         if (!activeOrder) {
-            return { status: 'Ocioso', reason: 'Nenhuma ordem em produção', since: now.toISOString(), durationMs: 0 };
+            return { status: 'Ocioso', reason: 'Nenhuma ordem ativa', durationMs: 0 };
         }
-
-        const isAnyActiveShift = !!currentOperatorLog;
-        const openEvent = [...(activeOrder.downtimeEvents || [])]
+        const events = (activeOrder.downtimeEvents || []) as any[];
+        const openEvent = [...events]
             .sort((a, b) => new Date(a.stopTime).getTime() - new Date(b.stopTime).getTime())
             .find(e => !e.resumeTime);
 
         if (openEvent) {
-            const reason = openEvent.reason || 'Downtime';
-            const durationMs = Math.max(0, now.getTime() - new Date(openEvent.stopTime).getTime());
-
-            if (reason === 'Troca de Rolo / Preparação' || reason === 'Aguardando Início da Produção' || reason === 'Setup') {
-                return { status: 'Preparacao', reason: reason, since: openEvent.stopTime, durationMs };
-            }
-            if (reason === 'Final de Turno' || !isAnyActiveShift) {
-                return { status: 'Desligada', reason: '', since: openEvent.stopTime, durationMs };
-            }
-            return { status: 'Parada', reason: reason, since: openEvent.stopTime, durationMs };
-        } else {
-            // Calculate time since last resume or shift start (current bout duration)
-            const closedEvents = (activeOrder.downtimeEvents || []).filter(e => !!e.resumeTime);
-            const rawLastResume = closedEvents.length > 0
-                ? Math.max(...closedEvents.map(e => new Date(e.resumeTime!).getTime()))
-                : new Date(activeOrder.startTime).getTime();
-            
-            const effectiveSince = Math.max(rawLastResume, shiftStartMs);
-            const durationMs = Math.max(0, now.getTime() - effectiveSince);
-
-            return { status: 'Produzindo', reason: '', since: new Date(effectiveSince).toISOString(), durationMs };
+            const reason = openEvent.reason || 'Parada';
+            const dur = now.getTime() - new Date(openEvent.stopTime).getTime();
+            if (reason.includes('Preparação') || reason.includes('Setup')) return { status: 'Preparacao', reason, durationMs: dur };
+            if (reason.includes('Turno') || !currentOperatorLog) return { status: 'Desligada', reason, durationMs: dur };
+            return { status: 'Parada', reason, durationMs: dur };
         }
+        
+        const resumes = (activeOrder.downtimeEvents || []).filter((e: any) => e.resumeTime).map((e: any) => new Date(e.resumeTime!).getTime());
+        const lastResume = resumes.length ? Math.max(...resumes) : new Date(activeOrder.startTime).getTime();
+        return { status: 'Produzindo', reason: '', durationMs: now.getTime() - Math.max(lastResume, shiftStartMs) };
     }, [activeOrder, now, currentOperatorLog, shiftStartMs]);
 
-    const currentOperator = currentOperatorLog?.operator || 'N/A';
-
-    const isAlertActive = machineStatus.status === 'Parada' && machineStatus.durationMs > 30000;
     const currentStyle = statusStyles[machineStatus.status as keyof typeof statusStyles] || statusStyles.Ocioso;
-
-    const activeLotProcessingData = useMemo(() => {
-        if (machineType === 'Trefila' && activeOrder?.activeLotProcessing?.lotId) {
-            const lotInfo = stock.find(s => s.id === activeOrder.activeLotProcessing!.lotId);
-            return lotInfo ? { ...activeOrder.activeLotProcessing, lotInfo } : null;
-        }
-        return null;
-    }, [activeOrder, stock, machineType]);
+    const currentOperator = currentOperatorLog?.operator || 'Nenhum';
 
     const { processedLotsCount, totalLotsCount, producedQuantity, plannedQuantity, progress } = useMemo(() => {
-        let processedLotsCount = 0, totalLotsCount = 0, producedQuantity = 0, plannedQuantity = 0, progress = 0;
-        if (!activeOrder) return { processedLotsCount, totalLotsCount, producedQuantity, plannedQuantity, progress };
-
-        if (machineType === 'Trefila' && Array.isArray(activeOrder.selectedLotIds)) {
-            processedLotsCount = (activeOrder.processedLots || []).length;
-            totalLotsCount = activeOrder.selectedLotIds.length;
-            if (totalLotsCount > 0) progress = (processedLotsCount / totalLotsCount) * 100;
-        } else if (machineType === 'Treliça') {
-            producedQuantity = activeOrder.actualProducedQuantity || 0;
-            plannedQuantity = activeOrder.quantityToProduce || 1;
-            progress = (producedQuantity / plannedQuantity) * 100;
+        let pc = 0, tc = 0, pq = 0, pl = 1, pg = 0;
+        if (activeOrder) {
+            if (activeOrder.machine === 'Trefila' || machineType === 'Trefila') {
+                pc = (activeOrder.processedLots || []).length;
+                tc = Array.isArray(activeOrder.selectedLotIds) ? activeOrder.selectedLotIds.length : 0;
+                pg = tc > 0 ? (pc / tc) * 100 : 0;
+            } else {
+                pq = activeOrder.actualProducedQuantity || 0;
+                pl = activeOrder.quantityToProduce || 1;
+                pg = (pq / pl) * 100;
+            }
         }
-        return { processedLotsCount, totalLotsCount, producedQuantity, plannedQuantity, progress: Math.min(100, progress) };
+        return { processedLotsCount: pc, totalLotsCount: tc, producedQuantity: pq, plannedQuantity: pl, progress: Math.min(100, pg) };
     }, [activeOrder, machineType]);
 
-    // Per-order production breakdown for the current shift (for Treliça multi-order display)
-    const shiftOrdersSummary = useMemo(() => {
-        if (machineType !== 'Treliça') return [];
-
-        const results: Array<{ orderId: string; orderNumber: string; model: string; size: string; pieces: number; isCurrent: boolean }> = [];
-
-        allOrders
-            .filter(o => o.machine === 'Treliça' && o.status !== 'cancelled')
-            .forEach(order => {
-                let orderPiecesInShift = 0;
-                (order.operatorLogs || []).forEach(log => {
-                    if (!log.startTime) return;
-                    const logStart = new Date(log.startTime).getTime();
-                    const logEnd = log.endTime ? new Date(log.endTime).getTime() : now.getTime();
-                    
-                    // Intersection with current shift window
-                    const intersectStart = Math.max(shiftStartMs, logStart);
-                    const intersectEnd = Math.min(shiftEndMs, logEnd);
-                    
-                    if (intersectEnd > intersectStart) {
-                        const startQty = log.startQuantity || 0;
-                        const endQty = log.endTime ? (log.endQuantity || 0) : (order.actualProducedQuantity || 0);
-                        // We count the pieces from this log since it was started/ongoing in this shift
-                        orderPiecesInShift += Math.max(0, endQty - startQty);
-                    }
-                });
-
-                if (orderPiecesInShift > 0 || order.id === activeOrder?.id) {
-                    results.push({
-                        orderId: order.id,
-                        orderNumber: order.orderNumber,
-                        model: order.trelicaModel || '?',
-                        size: String(order.tamanho || '6'),
-                        pieces: orderPiecesInShift,
-                        isCurrent: order.id === activeOrder?.id,
-                    });
-                }
+    const { shiftDowntime, shiftUptime } = useMemo(() => {
+        let dt = 0;
+        allOrders.filter(o => o.machine === machineType).forEach(o => {
+            (o.downtimeEvents || []).forEach((e: any) => {
+                const s = Math.max(shiftStartMs, new Date(e.stopTime).getTime());
+                const r = Math.min(now.getTime(), e.resumeTime ? new Date(e.resumeTime).getTime() : now.getTime());
+                if (r > s) dt += (r - s);
             });
-
-        return results;
-    }, [allOrders, machineType, activeOrder, shiftStartMs, shiftEndMs, now]);
-
-    if (!activeOrder) {
-        return (
-            <div className="bg-white rounded-3xl shadow-xl border border-slate-100 lg:h-[calc(100vh-10rem)] h-auto min-h-[400px] flex flex-col overflow-hidden">
-                <div className="bg-slate-800 p-4">
-                    <h2 className="text-2xl font-black text-white uppercase tracking-wider">{machineType}</h2>
-                </div>
-                <div className="flex-grow flex flex-col items-center justify-center text-center text-slate-500 bg-slate-50">
-                    <ClockIcon className="h-20 w-20 text-slate-300 mb-4" />
-                    <p className="font-bold tracking-widest uppercase text-slate-400">Máquina Ociosa</p>
-                    <p className="text-sm mt-2 text-slate-400">Nenhuma ordem em andamento.</p>
-                </div>
-            </div>
-        );
-    }
+        });
+        const total = Math.max(0, now.getTime() - shiftStartMs);
+        return { shiftDowntime: dt, shiftUptime: Math.max(0, total - dt) };
+    }, [allOrders, machineType, shiftStartMs, now]);
 
     return (
-        <div className="flex flex-col lg:h-[calc(100vh-8rem)] h-auto bg-white rounded-3xl shadow-xl overflow-x-hidden border border-slate-200/60 ring-1 ring-black/5">
-            {/* HEADER - compact on mobile landscape */}
-            <div className={`px-3 py-2 sm:px-5 sm:py-3 flex flex-row items-center justify-between gap-2 shadow-lg z-10 ${currentStyle.bg}`}>
-                <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-                    <div className="bg-white/20 p-2 sm:p-3 rounded-xl backdrop-blur-md shadow-inner border border-white/30 shrink-0">
-                        {currentStyle.icon}
-                    </div>
-                    <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                            <h2 className="text-lg sm:text-2xl font-black text-white uppercase tracking-wider drop-shadow-sm truncate">{machineType}</h2>
-                            {isAlertActive && <WarningIcon className="h-5 w-5 text-yellow-300 animate-ping shrink-0" />}
-                        </div>
-                        <div className="flex flex-wrap items-center gap-1 sm:gap-2 opacity-90">
-                            <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-white">{currentStyle.title}</span>
-                            {machineStatus.reason && <span className="text-[10px] sm:text-xs font-bold text-white/90 truncate max-w-[140px]">&bull; {machineStatus.reason}</span>}
-                        </div>
+        <div className="bg-[#141B2D] rounded-[3rem] shadow-2xl border border-white/5 flex flex-col overflow-hidden relative min-h-[600px] h-full">
+            <header className={`${currentStyle.bg} p-6 flex flex-col sm:flex-row justify-between items-center ${currentStyle.glow} border-b border-white/10 z-10 gap-4`}>
+                <div className="flex items-center gap-5">
+                    <div className="bg-black/30 backdrop-blur-xl p-5 rounded-3xl border border-white/20">{currentStyle.icon}</div>
+                    <div>
+                        <h2 className="text-4xl lg:text-5xl font-black text-white tracking-tighter uppercase leading-none">{machineType}</h2>
+                        <p className="text-xs font-black text-white/80 uppercase mt-2 tracking-widest">{currentStyle.title} {machineStatus.reason && `• ${machineStatus.reason}`}</p>
                     </div>
                 </div>
-                <div className="text-right shrink-0">
-                    <p className="text-3xl sm:text-4xl font-mono font-black tracking-tighter drop-shadow-md text-white">{formatDuration(machineStatus.durationMs)}</p>
+                <div className="bg-black/40 backdrop-blur-2xl px-8 py-4 rounded-[2.5rem] border border-white/10 flex flex-col items-center">
+                    <span className="text-[10px] font-black text-white/50 uppercase tracking-widest mb-1">Tempo no Estado</span>
+                    <span className="text-4xl lg:text-5xl font-black font-mono text-white">{formatDuration(machineStatus.durationMs)}</span>
                 </div>
-            </div>
+            </header>
 
-            {/* LOT IN PROGRESS SUB-HEADER (TREFILA) */}
-            {activeLotProcessingData && (
-                <div className="bg-slate-800 text-white px-4 py-1.5 flex flex-wrap justify-between items-center text-[10px] shadow-md z-0 shrink-0 gap-y-1">
-                    <div className="flex items-center gap-2">
-                        <span className="font-black uppercase tracking-widest text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded border border-emerald-400/20 text-[9px]">Lote</span>
-                        <span className="font-bold">{activeLotProcessingData.lotInfo.internalLot}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-400">Peso:</span>
-                        <span className="font-black text-emerald-300">{activeLotProcessingData.lotInfo.labelWeight.toFixed(0)} kg</span>
-                    </div>
-                </div>
-            )}
-
-            {/* CONTENT GRID - 2 cols on landscape mobile (sm), 2 cols on desktop (lg) */}
-            <div className="flex-1 p-2 sm:p-3 lg:p-4 grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 lg:gap-4 overflow-y-auto overflow-x-hidden bg-slate-50 w-full">
-                
-                {/* LEFT COLUMN: CRITICAL METRICS */}
-                <div className="flex flex-col gap-2 sm:gap-3 overflow-x-hidden min-w-0">
-                    
-                    {/* CARD 1: META DIÁRIA / PER-ORDER BREAKDOWN */}
-                    <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-200 overflow-hidden">
-                        <div className="flex justify-between items-center mb-2">
-                            <h3 className="font-black text-slate-700 uppercase tracking-widest text-[10px] md:text-xs title-font flex items-center gap-1.5">
-                                <ScaleIcon className="h-4 w-4 text-indigo-500" /> {machineType === 'Treliça' ? 'Meta do Turno Atual' : 'Meta Diária da Fábrica'}
-                            </h3>
-                            <span className="text-[10px] font-black bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded uppercase tracking-widest ring-1 ring-indigo-500/20">
-                                {dailyGoal > 0 ? ((dailyProducedValue / dailyGoal) * 100).toFixed(0) : 0}%
-                            </span>
-                        </div>
-
-                        {/* Per-order breakdown for Treliça when multiple orders exist in this shift */}
-                        {machineType === 'Treliça' && shiftOrdersSummary.length > 1 ? (
-                            <div className="space-y-2">
-                                {shiftOrdersSummary.map((item, idx) => {
-                                    const sizeValue = parseFloat(item.size.replace(',', '.'));
-                                    const isH12 = item.model.toUpperCase().includes('H12') || item.model.toUpperCase().includes('H-12');
-                                    const orderGoal = isH12 ? (sizeValue >= 10 ? 250 : 500) : (sizeValue >= 10 ? 300 : 600);
-                                    const pct = orderGoal > 0 ? Math.min(100, (item.pieces / orderGoal) * 100) : 0;
-                                    return (
-                                        <div key={item.orderId} className={`p-2 rounded-xl border ${item.isCurrent ? 'bg-indigo-50/50 border-indigo-200' : 'bg-slate-50/50 border-slate-100'}`}>
-                                            <div className="flex justify-between items-center mb-1">
-                                                <div className="flex items-center gap-1.5 min-w-0">
-                                                    {item.isCurrent && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></div>}
-                                                    <span className="text-[9px] font-black text-slate-600 uppercase truncate">
-                                                        {item.model} ({item.size}m)
-                                                    </span>
-                                                    <span className="text-[8px] font-bold text-slate-400">#{item.orderNumber}</span>
-                                                </div>
-                                                <span className="text-[10px] font-black text-slate-800 whitespace-nowrap">
-                                                    {item.pieces} <span className="text-[8px] text-slate-400">/ {orderGoal}</span>
-                                                </span>
-                                            </div>
-                                            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden ring-1 ring-black/5">
-                                                <div
-                                                    className={`h-full rounded-full transition-all duration-700 ${item.isCurrent ? 'bg-gradient-to-r from-indigo-500 to-blue-500' : 'bg-gradient-to-r from-slate-400 to-slate-500'}`}
-                                                    style={{ width: `${pct}%` }}
-                                                ></div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                                {/* Total line */}
-                                <div className="flex justify-between items-center pt-1 border-t border-slate-200 mt-1">
-                                    <span className="text-[9px] font-black text-slate-500 uppercase">Total no Turno</span>
-                                    <span className="text-xs font-black text-slate-800">
-                                        {shiftOrdersSummary.reduce((sum, o) => sum + o.pieces, 0)} pçs
-                                    </span>
-                                </div>
+            <main className="flex-1 p-6 grid grid-cols-1 lg:grid-cols-2 gap-6 overflow-hidden">
+                <div className="flex flex-col gap-6">
+                    {/* Meta Acumulada */}
+                    <div className="bg-slate-800/20 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white/5 flex flex-col justify-center relative overflow-hidden group">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="font-black text-slate-500 uppercase tracking-widest text-[10px]">Produção do Turno</h3>
+                            <div className="bg-indigo-500/20 text-indigo-400 text-[11px] font-black px-4 py-1.5 rounded-2xl border border-indigo-500/20">
+                                {dailyGoal > 0 ? ((dailyProducedValue / dailyGoal) * 100).toFixed(0) : 0}% Alvo
                             </div>
-                        ) : (
-                            /* Single order or non-Treliça: original display */
-                            <>
-                                <div className="flex items-center gap-2 mt-1 w-full">
-                                    <div className="flex-1 h-3.5 bg-slate-100 rounded-full overflow-hidden shadow-inner shrink-0 ring-1 ring-black/5">
-                                        <div
-                                            className={`h-full transition-all duration-1000 flex items-center justify-end pr-2 ${dailyProducedValue >= dailyGoal ? 'bg-gradient-to-r from-emerald-400 to-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]' : 'bg-gradient-to-r from-indigo-500 to-blue-500'}`}
-                                            style={{ width: `${Math.min(100, (dailyProducedValue / dailyGoal) * 100)}%` }}
-                                        >
-                                            {dailyProducedValue >= dailyGoal && <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>}
-                                        </div>
-                                    </div>
-                                    <span className="text-xs font-black text-slate-800 tracking-tighter whitespace-nowrap shrink-0">
-                                        {dailyProducedValue.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} <span className="text-[9px] text-slate-400 uppercase font-bold">{goalUnit}</span>
-                                        <span className="text-slate-300 mx-1">/</span>
-                                        {dailyGoal.toLocaleString('pt-BR')}
-                                    </span>
-                                </div>
-                                {dailyProducedValue >= dailyGoal && (
-                                    <div className="mt-2 flex items-center gap-1.5 text-emerald-600 font-bold text-[10px] animate-pulse">
-                                        <CheckCircleIcon className="h-3 w-3" /> META BATIDA!
-                                    </div>
-                                )}
-                            </>
-                        )}
+                        </div>
+                        <div className="flex items-baseline gap-4 mb-4">
+                            <span className="text-7xl font-black text-white tracking-tighter leading-none">{dailyProducedValue.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
+                            <span className="text-xl font-black text-slate-500 uppercase">{goalUnit}</span>
+                        </div>
+                        <div className="h-4 bg-black/40 rounded-full overflow-hidden p-1">
+                            <div className="h-full bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, (dailyProducedValue / dailyGoal) * 100)}%` }} />
+                        </div>
                     </div>
 
-                    {/* CARD 2: PROGRESSO DA PRODUÇÃO */}
-                    <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-200 flex flex-col justify-center overflow-hidden">
-                        <div className="flex justify-between items-center mb-3">
-                            <h3 className="font-black text-slate-700 uppercase tracking-widest text-[10px] md:text-xs">Progresso do Turno {/* Ordem */}</h3>
+                    {/* Ordem Ativa */}
+                    <div className="bg-slate-800/20 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white/5 flex flex-col justify-center relative overflow-hidden">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="font-black text-slate-500 uppercase tracking-widest text-[10px]">Progresso da OP #{activeOrder?.orderNumber || '---'}</h3>
                             {isGestor && onResetShift && (
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); onResetShift(); }}
-                                    className="text-[9px] font-bold bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-500 px-2 py-1 rounded-lg transition-all border border-slate-200 uppercase tracking-tighter"
-                                    title="Zerar dados acumulados para este monitor"
-                                >
-                                    Zerar Turno
-                                </button>
+                                <button onClick={onResetShift} className="text-[10px] font-black bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 px-4 py-2 rounded-2xl border border-white/5 uppercase transition-all">Zerar Turno</button>
                             )}
                         </div>
-                        
-                        {machineType === 'Treliça' && (
-                            <div className="mb-4 bg-slate-50/80 p-3 flex justify-between items-center rounded-xl border border-slate-100">
-                                <div>
-                                    <span className="block text-[10px] uppercase font-bold text-slate-500 tracking-wider">Último Reporte</span>
-                                    <span className="text-[9px] text-slate-400 font-semibold">{machineStatus.status === 'Desligada' ? 'Finalizado' : 'A cada 10m'}</span>
-                                </div>
-                                {(() => {
-                                    if (machineStatus.status === 'Desligada') return <span className="text-slate-400 font-mono font-bold text-lg">--:--:--</span>;
-                                    const lastUpdate = activeOrder.lastQuantityUpdate || activeOrder.startTime;
-                                    if (!lastUpdate) return <span className="text-slate-400">-</span>;
-                                    let baseTime = new Date(lastUpdate).getTime();
-                                    
-                                    // Cap baseTime by shift start (scheduled) and operator log start
-                                    const scheduledShiftStartMs = shiftStartMs;
-                                    if (scheduledShiftStartMs > baseTime) baseTime = scheduledShiftStartMs;
-                                    
-                                    if (currentOperatorLog && currentOperatorLog.startTime) {
-                                        const actualShiftStartMs = new Date(currentOperatorLog.startTime).getTime();
-                                        if (actualShiftStartMs > baseTime) baseTime = actualShiftStartMs;
-                                    }
-                                    
-                                    const diff = now.getTime() - baseTime;
-                                    const isOverdue = diff > 10 * 60 * 1000;
-                                    return <span className={`font-mono font-bold text-lg ${isOverdue ? 'text-rose-500 animate-pulse bg-rose-50 px-2 py-0.5 rounded ring-1 ring-rose-500/20' : 'text-slate-700'}`}>{formatDuration(diff)}</span>;
-                                })()}
-                            </div>
-                        )}
-
-                        <div className="flex justify-between items-baseline mb-1">
-                            <div className="flex flex-col">
-                                <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">{machineType === 'Trefila' ? 'Lotes Processados' : 'Peças Produzidas'}</span>
-                                {currentOperatorLog && (
-                                    <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mt-0.5 flex flex-col">
-                                        <span>Turno Atual: {machineType === 'Trefila' 
-                                            ? (activeOrder.processedLots || []).filter(l => l.endTime && new Date(l.endTime).getTime() >= new Date(currentOperatorLog.startTime).getTime()).length 
-                                            : ((activeOrder.actualProducedQuantity || 0) - (currentOperatorLog.startQuantity || 0))}</span>
-                                        {shiftGoal && (
-                                            <span className="mt-0.5 text-[9px] text-slate-400">META TURNO: <strong className="text-indigo-500">{shiftGoal} pecas</strong></span>
-                                        )}
-                                    </span>
-                                )}
-                            </div>
-                            <span className="text-lg sm:text-xl md:text-2xl font-black text-slate-800 tracking-tighter whitespace-nowrap overflow-hidden text-ellipsis" title="Total da Ordem de Produção">{machineType === 'Trefila' ? processedLotsCount : producedQuantity} <span className="text-sm font-bold text-slate-400">/ {machineType === 'Trefila' ? totalLotsCount : plannedQuantity}</span></span>
+                        <div className="flex items-baseline gap-4 mb-4">
+                            <span className="text-7xl font-black text-white tracking-tighter leading-none">{machineType === 'Trefila' ? processedLotsCount : producedQuantity}</span>
+                            <span className="text-xl font-black text-slate-500 uppercase">{machineType === 'Trefila' ? 'Lotes' : 'Peças'}</span>
                         </div>
-                        <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden shadow-inner ring-1 ring-black/5">
-                            <div className="bg-gradient-to-r from-emerald-500 to-teal-500 h-full rounded-full text-white text-[9px] flex items-center justify-center font-bold tracking-widest" style={{ width: `${progress}%` }}>
-                                {progress > 10 && `${progress.toFixed(0)}%`}
-                            </div>
+                        <div className="h-4 bg-black/40 rounded-full overflow-hidden p-1">
+                            <div className="h-full bg-gradient-to-r from-emerald-400 to-green-500 rounded-full transition-all duration-1000" style={{ width: `${progress}%` }} />
                         </div>
-                        
-                        {/* Fill secondary progress bar for Shift vs ShiftGoal */}
-                        {shiftGoal && shiftGoal > 0 && currentOperatorLog && machineType === 'Treliça' && (
-                            <div className="mt-3">
-                                <div className="w-full bg-indigo-50 rounded-full h-1.5 overflow-hidden ring-1 ring-black/5">
-                                    <div className="bg-gradient-to-r from-indigo-400 to-indigo-500 h-full rounded-full" style={{ width: `${Math.min(100, (((activeOrder.actualProducedQuantity || 0) - (currentOperatorLog.startQuantity || 0)) / shiftGoal) * 100)}%` }}></div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* CARD 3: DETALHES & EFICIÊNCIA */}
-                    <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-200 overflow-hidden">
-                        <h3 className="font-black text-slate-700 uppercase tracking-widest text-[10px] md:text-xs mb-3">Informações</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <div>
-                                    <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Ordem</p>
-                                    <p className="text-sm font-bold text-slate-700">#{activeOrder.orderNumber}</p>
-                                </div>
-                                <div>
-                                    <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Operador(a)</p>
-                                    <p className="text-sm font-bold text-slate-700 uppercase">{currentOperator}</p>
-                                </div>
-                                <div>
-                                    <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Produto</p>
-                                    <p className="text-xs font-bold text-slate-700 leading-tight">
-                                        {machineType === 'Trefila' ? `CA-60 ${activeOrder.targetBitola}mm` : `${activeOrder.trelicaModel} (${activeOrder.tamanho} mts)`}
-                                    </p>
-                                </div>
-                            </div>
-                            
-                            <div className="space-y-2 flex flex-col justify-end">
-                                {currentOperatorLog && (
-                                    <div className="text-right">
-                                        <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Início Turno</p>
-                                        <p className="text-xs font-mono font-bold text-slate-700 bg-slate-100 inline-block px-1.5 py-0.5 rounded">{new Date(currentOperatorLog.startTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
-                                    </div>
-                                )}
-                                {(() => {
-                                    const totalTime = shiftDowntime + shiftUptime;
-                                    const downtimePct = totalTime > 0 ? (shiftDowntime / totalTime) * 100 : 0;
-                                    const uptimePct = totalTime > 0 ? (shiftUptime / totalTime) * 100 : 0;
-                                    return (
-                                        <div className="space-y-1 mt-2 p-2 bg-slate-50 rounded-xl border border-slate-100">
-                                            <div className="flex justify-between items-center bg-emerald-50/50 px-2 py-1 rounded">
-                                                <span className="text-[9px] uppercase font-black text-emerald-600/70">PRODUTIVO</span>
-                                                <div className="flex items-center gap-1.5 cursor-help" title={formatDuration(shiftUptime)}>
-                                                    <span className="font-bold text-emerald-600 text-xs">{uptimePct.toFixed(1)}%</span>
-                                                </div>
-                                            </div>
-                                            <div className="flex justify-between items-center bg-rose-50/50 px-2 py-1 rounded">
-                                                <span className="text-[9px] uppercase font-black text-rose-600/70">PARADO</span>
-                                                <div className="flex items-center gap-1.5 cursor-help" title={formatDuration(shiftDowntime)}>
-                                                    <span className="font-bold text-rose-500 text-xs">{downtimePct.toFixed(1)}%</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })()}
-                            </div>
-                        </div>
+                        <p className="mt-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Disponibilidade: {(shiftUptime / (shiftUptime + shiftDowntime) * 100 || 0).toFixed(0)}%</p>
                     </div>
                 </div>
 
-                {/* RIGHT COLUMN */}
-                <div className="flex flex-col gap-2 sm:gap-3 overflow-x-hidden min-w-0">
-                    
-                {/* PARADAS TABLE - aggregates across ALL shift orders */}
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col flex-1 overflow-hidden min-h-0">
-                    <div className="bg-slate-50 border-b border-slate-100 p-2.5 px-4 shrink-0 shadow-sm z-10 flex justify-between items-center">
-                        <h3 className="font-black text-slate-600 uppercase tracking-widest text-[10px] flex justify-center items-center gap-1.5">
-                            <WarningIcon className="h-3 w-3 text-rose-500" /> PARADAS DO TURNO
-                        </h3>
-                        {(() => {
-                            const total = allOrders
-                                .filter(o => o.machine === machineType)
-                                .flatMap(o => o.downtimeEvents || [])
-                                .filter(e => e.reason !== 'Final de Turno' && e.reason !== 'Aguardando Início da Produção' && new Date(e.stopTime).getTime() >= shiftStartMs && new Date(e.stopTime).getTime() < shiftEndMs)
-                                .length;
-                            return <span className="text-[9px] font-bold text-slate-400 uppercase bg-white px-1.5 py-0.5 rounded border border-slate-200">{total} Registros</span>;
-                        })()}
-                    </div>
-                    <div className="flex-1 overflow-y-auto custom-scrollbar bg-white">
-                        <table className="w-full text-left border-collapse">
-                            <thead className="sticky top-0 bg-white/95 backdrop-blur-sm z-10 shadow-sm">
-                                <tr className="text-[9px] uppercase font-black text-slate-400 border-b border-slate-100">
-                                    <th className="p-2 px-3">Duração</th>
-                                    <th className="p-2">Início</th>
-                                    <th className="p-2 w-full">Motivo</th>
-                                    <th className="p-2 pr-3 text-right">Ordem</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {(() => {
-                                    // Collect events from ALL orders in this shift window
-                                    const allEvents: Array<{ event: any; orderNumber: string; orderId: string }> = [];
-                                    allOrders
-                                        .filter(o => o.machine === machineType && o.status !== 'cancelled')
-                                        .forEach(order => {
-                                            (order.downtimeEvents || [])
-                                                .filter(e => e.reason !== 'Final de Turno' && e.reason !== 'Aguardando Início da Produção' && new Date(e.stopTime).getTime() >= shiftStartMs && new Date(e.stopTime).getTime() < shiftEndMs)
-                                                .forEach(event => {
-                                                    allEvents.push({ event, orderNumber: order.orderNumber, orderId: order.id });
-                                                });
-                                        });
-                                    
-                                    if (allEvents.length === 0) {
-                                        return <tr><td colSpan={4} className="p-4 text-center text-[10px] font-bold uppercase text-slate-300">Nenhuma parada no turno</td></tr>;
-                                    }
-
-                                    return allEvents
-                                        .sort((a, b) => new Date(b.event.stopTime).getTime() - new Date(a.event.stopTime).getTime())
-                                        .map(({ event, orderNumber, orderId }, idx) => {
-                                            const isCurrentOrder = orderId === activeOrder?.id;
-                                            const eventEnd = event.resumeTime || (isCurrentOrder && activeOrder?.status === 'completed' ? activeOrder.endTime : null);
-                                            const duration = eventEnd ? new Date(eventEnd).getTime() - new Date(event.stopTime).getTime() : now.getTime() - new Date(event.stopTime).getTime();
+                <div className="flex flex-col gap-6 overflow-hidden">
+                    {/* Lista de Paradas */}
+                    <div className="bg-slate-800/20 backdrop-blur-xl rounded-[2.5rem] border border-white/5 flex flex-col flex-1 overflow-hidden">
+                        <div className="p-5 border-b border-white/5 bg-white/5 flex justify-between items-center">
+                            <h3 className="font-black text-white/50 uppercase tracking-widest text-[10px] flex items-center gap-2"><WarningIcon className="h-4 w-4 text-rose-500" /> Histórico de Paradas</h3>
+                        </div>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar">
+                            <table className="w-full text-left">
+                                <thead className="sticky top-0 bg-[#1e293b] z-20">
+                                    <tr className="text-[9px] uppercase font-black text-slate-500 border-b border-white/5">
+                                        <th className="p-4 px-6">Duração</th>
+                                        <th className="p-4">Motivo</th>
+                                        <th className="p-4 text-right px-6">OP</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-white/5">
+                                    {allOrders
+                                        .filter(o => o.machine === machineType)
+                                        .flatMap(o => (o.downtimeEvents || []).map((e: any) => ({ ...e, orderNumber: o.orderNumber })))
+                                        .filter(e => new Date(e.stopTime).getTime() >= shiftStartMs)
+                                        .sort((a,b) => new Date(b.stopTime).getTime() - new Date(a.stopTime).getTime())
+                                        .map((e, i) => {
+                                            const end = e.resumeTime ? new Date(e.resumeTime).getTime() : now.getTime();
                                             return (
-                                                <tr key={idx} className="border-b border-slate-50 hover:bg-slate-50/50 group">
-                                                    <td className="p-2 px-3">
-                                                        <span className="bg-rose-50 text-rose-600 font-mono font-bold text-[10px] px-1.5 py-0.5 rounded inline-block group-hover:bg-rose-100 transition-colors">
-                                                            {formatDuration(duration)}
-                                                        </span>
-                                                    </td>
-                                                    <td className="p-2 font-mono font-medium text-[10px] text-slate-500">
-                                                        {new Date(event.stopTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                                                    </td>
-                                                    <td className="p-2 text-[10px] md:text-xs font-bold text-slate-700 uppercase leading-none">
-                                                        {event.reason}
-                                                        {!event.resumeTime && <span className="ml-2 text-[8px] uppercase font-black bg-rose-500 text-white px-1 py-0.5 rounded animate-pulse">Atual</span>}
-                                                    </td>
-                                                    <td className="p-2 pr-3 text-right">
-                                                        <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${isCurrentOrder ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>
-                                                            #{orderNumber}
-                                                        </span>
-                                                    </td>
+                                                <tr key={i} className="hover:bg-white/[0.02] transition-colors">
+                                                    <td className="p-4 px-6 font-mono text-rose-400 font-black text-[11px]">{formatDuration(end - new Date(e.stopTime).getTime())}</td>
+                                                    <td className="p-4 text-[10px] font-black text-slate-300 uppercase truncate max-w-[150px]">{e.reason}</td>
+                                                    <td className="p-4 text-right px-6 text-[10px] font-bold text-slate-500">#{e.orderNumber}</td>
                                                 </tr>
                                             );
-                                        });
-                                })()}
-                            </tbody>
-                        </table>
+                                        })}
+                                    {allOrders.filter(o => o.machine === machineType).flatMap(o => o.downtimeEvents || []).filter(e => new Date(e.stopTime).getTime() >= shiftStartMs).length === 0 && (
+                                        <tr><td colSpan={3} className="p-8 text-center text-slate-600 text-[10px] font-bold uppercase tracking-[0.2em]">Nenhuma parada registrada</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                </div>
 
-                    {/* LOTES TABLE (TREFILA ONLY, flex-1) */}
-                    {machineType === 'Trefila' && (
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col flex-1 lg:overflow-hidden overflow-visible min-h-0">
-                            <div className="bg-slate-50 border-b border-slate-100 p-2.5 px-4 shrink-0 shadow-sm z-10 flex justify-between items-center">
-                                <h3 className="font-black text-slate-600 uppercase tracking-widest text-[10px] flex justify-center items-center gap-1.5">
-                                    <BookOpenIcon className="h-3 w-3 text-indigo-500" /> HISTÓRICO DE LOTES
-                                </h3>
-                                <span className="text-[9px] font-bold text-slate-400 uppercase bg-white px-1.5 py-0.5 rounded border border-slate-200">
-                                    {(activeOrder.processedLots || []).length} Finalizados
-                                </span>
-                            </div>
-                            <div className="flex-1 lg:overflow-y-auto overflow-visible custom-scrollbar bg-white">
-                                <table className="w-full text-left border-collapse">
-                                    <thead className="sticky top-0 bg-white/95 backdrop-blur-sm z-10 shadow-sm">
-                                        <tr className="text-[9px] uppercase font-black text-slate-400 border-b border-slate-100">
-                                            <th className="p-2 px-3">Lote</th>
-                                            <th className="p-2 font-mono">SAÍDA</th>
-                                            <th className="p-2 text-center w-full">Medida / Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {(activeOrder.processedLots || [])
-                                            .slice()
-                                            .sort((a, b) => new Date(b.endTime).getTime() - new Date(a.endTime).getTime())
-                                            .map((lot, idx) => {
-                                                const lotInfo = stock.find(s => s.id === lot.lotId);
-                                                const isWaiting = lot.finalWeight === null || lot.measuredGauge === null || lot.measuredGauge === undefined;
-                                                return (
-                                                    <tr key={idx} className="border-b border-slate-50 hover:bg-slate-50/50">
-                                                        <td className="p-2 px-3 font-bold text-[10px] text-slate-700 overflow-hidden text-ellipsis whitespace-nowrap max-w-[80px]" title={lotInfo?.internalLot || 'N/A'}>
-                                                            {lotInfo?.internalLot || 'N/A'}
-                                                        </td>
-                                                        <td className="p-2">
-                                                            <span className="bg-slate-100/80 text-slate-700 font-mono font-bold text-[10px] px-1.5 py-0.5 rounded border border-slate-200 inline-block text-right min-w-[3rem]">
-                                                                {lot.finalWeight !== null ? lot.finalWeight.toFixed(0) : '-'}
-                                                            </span>
-                                                        </td>
-                                                        <td className="p-2 text-[10px] font-bold text-slate-600 text-center">
-                                                            {isWaiting ? (
-                                                                <span className="text-[9px] uppercase font-black text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/50 animate-pulse inline-block">Ag. Pesagem</span>
-                                                            ) : (
-                                                                <div className="flex items-center justify-center gap-2">
-                                                                    <span className="bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded border border-emerald-200/50 text-[10px] font-bold uppercase">{lot.measuredGauge?.toFixed(2)}mm</span>
-                                                                    <CheckCircleIcon className="h-3 w-3 text-emerald-500" />
-                                                                </div>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        {(activeOrder.processedLots || []).length === 0 && (
-                                            <tr><td colSpan={3} className="p-4 text-center text-[10px] font-bold uppercase text-slate-300">Nenhum lote finalizado</td></tr>
-                                        )}
-                                    </tbody>
-                                </table>
+                    {/* Operador / Material */}
+                    <div className="bg-slate-800/20 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white/5 flex flex-col justify-between gap-6">
+                        <div className="flex items-center gap-6">
+                            <div className="bg-indigo-500/20 p-4 rounded-3xl border border-indigo-500/20"><UserGroupIcon className="h-6 w-6 text-indigo-400" /></div>
+                            <div>
+                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Operador Responsável</p>
+                                <p className="text-xl font-black text-white uppercase">{currentOperator}</p>
                             </div>
                         </div>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-};
-
-// --- FUNÇÃO AUXILIAR DE DATA DE FÁBRICA ---
-// Turno A começa às 05:00. Portanto, tudo que foi reportado entre 00:00 e 04:59
-// pertence astrologicamente/fabrilmente ao DIA ANTERIOR (Turno B da noite).
-const getFactoryDateString = (dateObj: Date | string): string => {
-    try {
-        const factoryDate = new Date(dateObj);
-        if (isNaN(factoryDate.getTime())) return '';
-        // Se ainda está nas madrugadas (antes das 05h), contabiliza no dia anterior
-        if (factoryDate.getHours() < 5) {
-            factoryDate.setDate(factoryDate.getDate() - 1);
-        }
-        return factoryDate.toLocaleDateString('sv-SE');
-    } catch {
-        return '';
-    }
-};
-
-interface MachineAnalyticsProps {
-    machineType: MachineType;
-    dailyValue: number;
-    unit: string;
-    productionOrders: ProductionOrderData[];
-    activeOrder: ProductionOrderData | undefined;
-    shiftGoal: number;
-    sizeValue?: number;
-}
-
-const MachineAnalyticsView: React.FC<MachineAnalyticsProps> = ({ machineType, dailyValue, unit, productionOrders, activeOrder, shiftGoal, sizeValue = 6 }) => {
-    const todayStr = getFactoryDateString(new Date());
-    const nowMs = new Date().getTime();
-
-    // --- ACCUMULATED DAY MATH ---
-    let totalUptime = 0;
-    let totalDowntime = 0;
-    
-    productionOrders.forEach(order => {
-        if (order.machine !== machineType) return;
-        (order.operatorLogs || []).forEach((log, index, arr) => {
-            if (!log.startTime) return;
-            const logDateStr = getFactoryDateString(log.startTime);
-            if (logDateStr !== todayStr) return;
-            
-            const startStr = log.startTime;
-            
-            let endStr = new Date().toISOString();
-            if (log.endTime) {
-                endStr = log.endTime;
-            } else {
-                const isLast = index === arr.length - 1;
-                if (!isLast) endStr = startStr; // Cancela tempo ativo fantasmas
-            }
-            
-            const shiftStart = new Date(startStr).getTime();
-            const shiftEnd = new Date(endStr).getTime();
-            if (shiftEnd <= shiftStart) return;
-
-            let logDown = 0;
-            (order.downtimeEvents || []).forEach(ev => {
-                const eStart = new Date(ev.stopTime).getTime();
-                const eEnd = ev.resumeTime ? new Date(ev.resumeTime).getTime() : nowMs;
-                const interStart = Math.max(shiftStart, eStart);
-                const interEnd = Math.min(shiftEnd, eEnd);
-                if (interEnd > interStart) logDown += (interEnd - interStart);
-            });
-            
-            totalDowntime += logDown;
-            totalUptime += (shiftEnd - shiftStart) - logDown;
-        });
-    });
-
-    const totalHours = (totalUptime + totalDowntime) / 3600000;
-    const piecesPerHourDay = totalHours > 0 ? Math.round(dailyValue / totalHours) : 0;
-    const globalUptimePct = totalHours > 0 ? (totalUptime / (totalUptime + totalDowntime)) * 100 : 0;
-    const globalDowntimePct = totalHours > 0 ? (totalDowntime / (totalUptime + totalDowntime)) * 100 : 0;
-
-    // --- CURRENT SHIFT MATH (MATCHES REALTIME) ---
-    let shiftUptime = 0;
-    let shiftDowntime = 0;
-    let shiftProduced = 0;
-    
-    // Sum production for all orders in this shift
-    const shiftTodayStr = getFactoryDateString(new Date());
-    const currentHour = new Date().getHours();
-    const currentShift = (currentHour >= 5 && currentHour < 14) ? 'A' : 'B';
-
-    productionOrders.forEach(order => {
-        if (order.machine !== machineType) return;
-        (order.operatorLogs || []).forEach(log => {
-            if (!log.startTime) return;
-            const logDateStr = getFactoryDateString(log.startTime);
-            if (logDateStr !== todayStr) return;
-            
-            const startH = new Date(log.startTime).getHours();
-            const logShift = (startH >= 5 && startH < 14) ? 'A' : 'B';
-            if (logShift !== currentShift) return;
-
-            const startQty = log.startQuantity || 0;
-            const endQty = log.endTime ? (log.endQuantity || 0) : (order.actualProducedQuantity || 0);
-            
-            if (machineType === 'Treliça') {
-                shiftProduced += Math.max(0, endQty - startQty);
-            } else {
-                // Trefila weight is handled differently but we can sum lots finished in this shift
-                (order.processedLots || []).forEach(lot => {
-                    if (lot.endTime) {
-                        const lotDateStr = getFactoryDateString(lot.endTime);
-                        if (lotDateStr === todayStr) {
-                            const endH = new Date(lot.endTime).getHours();
-                            const lotShift = (endH >= 5 && endH < 14) ? 'A' : 'B';
-                            if (lotShift === currentShift) {
-                                shiftProduced += (lot.finalWeight || 0);
-                            }
-                        }
-                    }
-                });
-            }
-
-            // Approximate uptime for the whole shift
-            const shiftStartMs = new Date(log.startTime).getTime();
-            const shiftEndMs = log.endTime ? new Date(log.endTime).getTime() : nowMs;
-            
-            let logDown = 0;
-            (order.downtimeEvents || []).forEach(ev => {
-                const eStart = new Date(ev.stopTime).getTime();
-                const eEnd = ev.resumeTime ? new Date(ev.resumeTime).getTime() : nowMs;
-                const interStart = Math.max(shiftStartMs, eStart);
-                const interEnd = Math.min(shiftEndMs, eEnd);
-                if (interEnd > interStart) logDown += (interEnd - interStart);
-            });
-            shiftDowntime += logDown;
-            shiftUptime += (shiftEndMs - shiftStartMs) - logDown;
-        });
-    });
-
-    const totalShiftTime = shiftUptime + shiftDowntime;
-    const shiftUptimePct = totalShiftTime > 0 ? (shiftUptime / totalShiftTime) * 100 : 0;
-    const shiftDowntimePct = totalShiftTime > 0 ? (shiftDowntime / totalShiftTime) * 100 : 0;
-    const piecesPerHourShift = (totalShiftTime / 3600000) > 0 ? Math.round(shiftProduced / (totalShiftTime / 3600000)) : 0;
-
-    // --- REMAINING SHIFT ANALYTICS ---
-    const getShiftEndMs = () => {
-        const d = new Date();
-        const hour = d.getHours();
-        const min = d.getMinutes();
-        const nowTotalMin = hour * 60 + min;
-
-        // Shift A: 05:00 - 14:17 (Total min: 300 to 857)
-        // Shift B: 15:17 - 23:34 (Total min: 917 to 1414)
-        
-        let targetHour = 23;
-        let targetMin = 34;
-
-        if (nowTotalMin >= 300 && nowTotalMin < 857+10) { // +10 min tolerance
-            targetHour = 14;
-            targetMin = 17;
-        } else if (nowTotalMin >= 917 && nowTotalMin < 1414+10) {
-            targetHour = 23;
-            targetMin = 34;
-        }
-
-        const end = new Date();
-        end.setHours(targetHour, targetMin, 0, 0);
-        return end.getTime();
-    };
-
-    const shiftEndMs = getShiftEndMs();
-    const remainingTimeMs = Math.max(0, shiftEndMs - nowMs);
-    const remainingHours = remainingTimeMs / 3600000;
-    
-    const neededToGoal = Math.max(0, shiftGoal - shiftProduced);
-    const requiredRate = remainingHours > 0 ? Math.ceil(neededToGoal / remainingHours) : 0;
-    
-    const speedProductivePHP = (machineType === 'Treliça' && shiftUptime > 0) 
-        ? Math.round(shiftProduced / (shiftUptime / 3600000)) 
-        : piecesPerHourShift; // Fallback ou para Trefila
-
-    // Determine performance tier
-    const isExcellent = shiftUptimePct >= 80;
-    const isWarning = shiftUptimePct < 80 && shiftUptimePct >= 50;
-
-    return (
-        <div className="flex flex-col lg:h-[calc(100vh-8rem)] h-auto bg-slate-900 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] lg:overflow-hidden overflow-visible border border-slate-700/60 ring-1 ring-black/5 text-white transition-opacity duration-700 relative">
-            <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/40 via-transparent to-transparent pointer-events-none"></div>
-            
-            {/* FULL DAY CONSOLIDATION BANNER */}
-            <div className="px-6 py-6 border-b border-indigo-500/20 bg-slate-900/50 backdrop-blur-xl relative z-10">
-                <div className="flex justify-between items-start mb-2">
-                    <h3 className="text-xl md:text-2xl font-black text-indigo-400 uppercase tracking-[0.2em] opacity-90">{machineType}</h3>
-                    <div className="bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-full shadow-lg text-[10px] font-black uppercase tracking-widest ring-1 ring-indigo-400/40">
-                        Acumulado 24H
-                    </div>
-                </div>
-                
-                <div className="flex flex-col items-center justify-center my-4">
-                    <p className="text-white/50 font-bold uppercase tracking-widest text-[10px] mb-1">Total Confirmado Hoje</p>
-                    <div className="text-6xl md:text-8xl font-black drop-shadow-[0_0_25px_rgba(99,102,241,0.2)] text-white font-mono tracking-tighter">
-                        {dailyValue.toLocaleString('pt-BR')}
-                    </div>
-                    <div className="mt-2 text-indigo-400 font-bold uppercase tracking-widest text-xs">
-                        {machineType === 'Trefila' ? 'KILOGRAMAS PROCESSADOS' : 'PEÇAS FABRICADAS'}
-                    </div>
-                </div>
-
-                {/* Global Timeline */}
-                <div className="mt-4 px-2">
-                    <div className="flex justify-between text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1.5">
-                        <span>Tempo Total Rodando: {formatDuration(totalUptime)}</span>
-                        <span>Média Diária: {piecesPerHourDay} {unit}/h</span>
-                    </div>
-                    <div className="w-full h-2 rounded-full overflow-hidden flex ring-1 ring-black/50 shadow-inner opacity-70">
-                        <div className="bg-indigo-500" style={{ width: `${globalUptimePct}%` }}></div>
-                        <div className="bg-rose-500/50" style={{ width: `${globalDowntimePct}%` }}></div>
-                    </div>
-                </div>
-            </div>
-
-            {/* LIVE SHIFT ANALYTICS */}
-            <div className="flex-1 p-5 lg:p-6 bg-slate-950/80 relative z-10 flex flex-col justify-between">
-                <div className="flex items-center gap-2 mb-4">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.8)]"></div>
-                    <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Análise do Turno Atual (Idêntico ao Painel de Produção)</h4>
-                </div>
-                
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 flex-1">
-                    {/* Performance OEE Dial Visual Block */}
-                    <div className="bg-slate-800/60 rounded-3xl p-5 border border-slate-700/50 flex flex-col items-center justify-center relative overflow-hidden group shadow-lg">
-                        <div className={`absolute inset-0 bg-gradient-to-t ${isExcellent ? 'from-emerald-500/10' : isWarning ? 'from-amber-500/10' : 'from-rose-500/10'} opacity-50`}></div>
-                        
-                        <p className="text-slate-400 font-bold uppercase tracking-widest text-[9px] mb-4 z-10 text-center">Ritmo Turno</p>
-                        
-                        <div className="relative flex items-center justify-center mb-4 z-10 w-32 h-32 md:w-40 md:h-40">
-                            {/* Simple CSS Dial Gauge */}
-                            <svg className="w-full h-full transform -rotate-90">
-                                <circle cx="50%" cy="50%" r="45%" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="8" />
-                                <circle cx="50%" cy="50%" r="45%" fill="none" 
-                                    stroke={isExcellent ? "#10b981" : isWarning ? "#f59e0b" : "#f43f5e"} 
-                                    strokeWidth="8" 
-                                    strokeDasharray={`${shiftUptimePct * 2.8} 1000`} 
-                                    className="transition-all duration-1000 drop-shadow-[0_0_8px_currentColor]" />
-                            </svg>
-                            <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                <span className="text-3xl md:text-5xl font-black font-mono tracking-tighter drop-shadow-md">
-                                    {piecesPerHourShift}
-                                </span>
-                                <span className={`text-[9px] uppercase font-black tracking-widest ${isExcellent ? 'text-emerald-500' : isWarning ? 'text-amber-500' : 'text-rose-500'}`}>
-                                    {unit}/H
-                                </span>
-                            </div>
-                        </div>
-
-                        <div className="flex justify-between w-full text-center z-10 gap-2">
-                           <div className="bg-slate-900/50 rounded-lg p-2 flex-1 border border-slate-700/50">
-                               <p className="text-[8px] uppercase text-slate-500 font-bold tracking-wider mb-1">Produzido</p>
-                               <p className="font-mono text-sm md:text-base font-black text-slate-300">{shiftProduced}</p>
-                           </div>
-                           <div className="bg-slate-900/50 rounded-lg p-2 flex-1 border border-slate-700/50">
-                               <p className="text-[8px] uppercase text-slate-500 font-bold tracking-wider mb-1">Faltam</p>
-                               <p className="font-mono text-sm md:text-base font-black text-rose-400">{neededToGoal}</p>
-                           </div>
-                        </div>
-
-                        {machineType === 'Treliça' && (
-                            <div className="mt-4 w-full bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-3 z-10 flex justify-between items-center">
-                                <div className="text-left">
-                                    <p className="text-[7px] font-black text-indigo-400 uppercase tracking-widest">Velocidade Média</p>
-                                    <p className="text-sm font-black text-indigo-100">{speedProductivePHP} <small className="text-[9px] opacity-70">pçs/h (Prod.)</small></p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-[7px] font-black text-indigo-400 uppercase tracking-widest">Ritmo p/ Meta</p>
-                                    <p className="text-sm font-black text-indigo-100">{requiredRate} <small className="text-[9px] opacity-70">{unit}/h</small></p>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Operational Efficiency (Uptime / Downtime sync) */}
-                    <div className="bg-slate-800/60 rounded-3xl p-5 border border-slate-700/50 flex flex-col justify-center relative overflow-hidden group shadow-lg">
-                        <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl opacity-50 group-hover:bg-indigo-500/20 transition-all"></div>
-                        
-                        <div className="mb-6 flex justify-between items-center relative z-10 px-1">
-                            <p className="text-slate-400 font-bold uppercase tracking-widest text-[9px]">Fim do Turno</p>
-                            <div className="flex items-center gap-2">
-                                <ClockIcon className="h-3 w-3 text-amber-500" />
-                                <p className="text-xs font-black text-white font-mono">{formatDuration(remainingTimeMs)}</p>
-                            </div>
-                        </div>
-                        
-                        <div className="flex flex-col sm:flex-row lg:flex-col gap-4 relative z-10">
-                            {/* Produtivo Item */}
-                            <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-700/50 flex-1">
-                                <div className="flex justify-between mb-2">
-                                    <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-1.5"><div className="w-2 h-2 bg-emerald-500 rounded-sm"></div> Produtivo</span>
-                                    <span className="text-lg font-mono font-black text-white">{formatDuration(shiftUptime)}</span>
-                                </div>
-                                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                                    <div className="bg-emerald-500 h-full shadow-[0_0_10px_rgba(16,185,129,0.5)]" style={{ width: `${shiftUptimePct}%` }}></div>
-                                </div>
-                                <div className="text-right mt-1.5">
-                                    <span className="text-[9px] font-black text-emerald-500/70 tracking-widest">{shiftUptimePct.toFixed(1)}% DO TEMPO</span>
-                                </div>
-                            </div>
-                            
-                            {/* Parado Item */}
-                            <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-700/50">
-                                <div className="flex justify-between mb-2">
-                                    <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest flex items-center gap-1.5"><div className="w-2 h-2 bg-rose-500 rounded-sm"></div> Parado</span>
-                                    <span className="text-lg font-mono font-black text-white">{formatDuration(shiftDowntime)}</span>
-                                </div>
-                                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                                    <div className="bg-rose-500 h-full shadow-[0_0_10px_rgba(244,63,94,0.5)]" style={{ width: `${shiftDowntimePct}%` }}></div>
-                                </div>
-                                <div className="text-right mt-1.5">
-                                    <span className="text-[9px] font-black text-rose-500/70 tracking-widest">{shiftDowntimePct.toFixed(1)}% DO TEMPO</span>
-                                </div>
+                        <div className="flex items-center gap-6">
+                            <div className="bg-emerald-500/20 p-4 rounded-3xl border border-emerald-500/20"><ArchiveIcon className="h-6 w-6 text-emerald-400" /></div>
+                            <div>
+                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Material Processado</p>
+                                <p className="text-xl font-black text-white uppercase truncate max-w-[200px]">
+                                    {machineType === 'Trefila' ? `Bitola: ${activeOrder?.targetBitola || '---'}` : `Modelo: ${activeOrder?.trelicaModel || '---'}`}
+                                </p>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            </main>
         </div>
     );
 };
@@ -975,254 +270,86 @@ interface ProductionDashboardProps {
 }
 
 const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, productionOrders, stock, currentUser }) => {
-    const [now, setNow] = useState(new Date());
-    const [shiftResets, setShiftResets] = useState<Record<string, number>>(() => {
-        const saved = localStorage.getItem('dashboard_shift_resets');
-        return saved ? JSON.parse(saved) : {};
-    });
+    const isGestor = currentUser?.role === 'gestor' || currentUser?.role === 'admin';
+    const [shiftResets, setShiftResets] = useState(() => JSON.parse(localStorage.getItem('shiftResets') || '{}'));
 
-    const handleResetShift = (machine: string) => {
-        if (!confirm(`Deseja realmente ZERAR os dados acumulados de ${machine} para este dispositivo?`)) return;
-        const newResets = { ...shiftResets, [machine]: Date.now() };
+    const handleReset = (m: MachineType) => {
+        if (!confirm(`Deseja zerar os dados de turno para a máquina ${m}? Esta ação só afeta a visualização deste dashboard.`)) return;
+        const newResets = { ...shiftResets, [m]: new Date().toISOString() };
         setShiftResets(newResets);
-        localStorage.setItem('dashboard_shift_resets', JSON.stringify(newResets));
+        localStorage.setItem('shiftResets', JSON.stringify(newResets));
     };
 
-    useEffect(() => {
-        const timer = setInterval(() => setNow(new Date()), 1000);
-        return () => clearInterval(timer);
-    }, []);
-
-    const activeTrefilaOrder = useMemo(() => {
-        const active = productionOrders.filter(o => o.machine === 'Trefila' && o.status === 'in_progress');
-        if (active.length === 0) return undefined;
-        return active.sort((a, b) => new Date(b.creationDate).getTime() - new Date(a.creationDate).getTime())[0];
-    }, [productionOrders]);
-
-    const activeTrelicaOrder = useMemo(() => {
-        const active = productionOrders.filter(o => o.machine === 'Treliça' && o.status === 'in_progress');
-        if (active.length === 0) return undefined;
-        return active.sort((a, b) => new Date(b.creationDate).getTime() - new Date(a.creationDate).getTime())[0];
-    }, [productionOrders]);
-
-    const pausedOrders = useMemo(() => {
-        if (!Array.isArray(productionOrders)) return [];
-        return productionOrders.filter(o => o.status === 'paused');
-    }, [productionOrders]);
-
-    const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor' || currentUser?.username === 'admin';
-
-    const dailyProduction = useMemo(() => {
-        const nowMs = now.getTime();
-        const todayStr = getFactoryDateString(now);
-        const currentHour = now.getHours();
-        const currentShift = (currentHour >= 5 && currentHour < 14) ? 'A' : 'B';
-
-        // Create a quick lookup map for stock items
-        const stockMap = new Map(stock.map(s => [s.id, s]));
-        let trelicaTotalMeters = 0;
-        let trefilaTotalWeight = 0;
-        let trelicaShiftPieces = 0;
-        let trefilaShiftWeight = 0;
-
-        const orders = Array.isArray(productionOrders) ? productionOrders : [];
-
-        orders.forEach(order => {
-            const machine = (order.machine || '').toLowerCase();
-            const id = order.id;
-            const machineKey = machine.includes('treli') ? 'Treliça' : 'Trefila';
-            const resetTime = shiftResets[machineKey] || 0;
-
-            if (machine.includes('treli')) {
-                const size = parseFloat(String(order.tamanho || '6').replace(',', '.'));
-                (order.operatorLogs || []).forEach((log) => {
-                    if (!log.startTime) return;
-                    const logDateStr = getFactoryDateString(log.startTime);
-                    
-                    // Daily total (Today)
-                    if (logDateStr === todayStr) {
-                        const startQty = log.startQuantity || 0;
-                        const endQty = log.endTime ? (log.endQuantity || 0) : (order.actualProducedQuantity || 0);
-                        
-                        // If log was entirely before reset, skip
-                        const logEndMs = log.endTime ? new Date(log.endTime).getTime() : nowMs;
-                        if (logEndMs <= resetTime) return;
-
-                        // Calculate pieces produced AFTER reset
-                        let pieces = Math.max(0, endQty - startQty);
-                        
-                        if (new Date(log.startTime).getTime() < resetTime) {
-                            pieces = 0; 
-                        }
-                        
-                        trelicaTotalMeters += (pieces * (size || 6));
-
-                        // Shift aggregation
-                        const startH = new Date(log.startTime).getHours();
-                        const logShift = (startH >= 5 && startH < 14) ? 'A' : 'B';
-                        if (logShift === currentShift && new Date(log.startTime).getTime() >= resetTime) {
-                            trelicaShiftPieces += pieces;
-                        }
-                    }
-                });
-            } else if (machine.includes('trefila')) {
-                (order.processedLots || []).forEach(lot => {
-                    if (lot.endTime) {
-                        const lotDateStr = getFactoryDateString(lot.endTime);
-                        const lotEndTimeMs = new Date(lot.endTime).getTime();
-                        
-                        if (lotDateStr === todayStr && lotEndTimeMs >= resetTime) {
-                            const weight = lot.finalWeight !== null ? lot.finalWeight : ((stockMap.get(lot.lotId) as StockItem)?.labelWeight || 0);
-                            trefilaTotalWeight += weight;
-
-                            const endH = new Date(lot.endTime).getHours();
-                            const lotShift = (endH >= 5 && endH < 14) ? 'A' : 'B';
-                            if (lotShift === currentShift) {
-                                trefilaShiftWeight += weight;
-                            }
-                        }
-                    }
-                });
-            }
-        });
-
-        return { 
-            trelicaMeters: trelicaTotalMeters, 
-            trefilaWeight: trefilaTotalWeight, 
-            trelicaShiftPieces, 
-            trefilaShiftWeight,
-            currentShift 
-        };
-    }, [productionOrders, stock, now]);
-
-    // Calculate pieces and goal for Treliça
-    const trelicaDisplayData = useMemo(() => {
-        const sizeStr = activeTrelicaOrder ? String(activeTrelicaOrder.tamanho || '6') : '6';
-        const modelStr = activeTrelicaOrder ? String(activeTrelicaOrder.trelicaModel || '').toUpperCase() : '';
-        const sizeValue = parseFloat(sizeStr.replace(',', '.'));
+    const getDailyValue = (m: MachineType) => {
+        const now = new Date();
+        const h = now.getHours();
+        const start = new Date(now);
+        start.setHours(h >= 5 && h < 14 ? 5 : 14, 0, 0, 0);
+        if (h < 5) start.setDate(start.getDate() - 1);
         
-        // Regras de negócio de "Meta por Turno":
-        let shiftGoal = 0;
-        if (modelStr.includes('H12') || modelStr.includes('H-12')) {
-            shiftGoal = sizeValue >= 10 ? 250 : 500;
-        } else {
-            shiftGoal = sizeValue >= 10 ? 300 : 600;
-        }
+        const resetT = shiftResets[m] ? new Date(shiftResets[m]).getTime() : 0;
+        const effective = Math.max(start.getTime(), resetT);
 
-        return {
-            value: dailyProduction.trelicaShiftPieces,
-            goal: shiftGoal,
-            shiftGoal: shiftGoal,
-            unit: sizeValue >= 10 ? 'pçs (12m)' : 'pçs (6m)'
-        };
-    }, [activeTrelicaOrder, dailyProduction.trelicaShiftPieces]);
+        return productionOrders.filter(o => o.machine === m && o.status !== 'cancelled').reduce((acc, o) => {
+            if (m === 'Trefila') {
+                const lots = (o.processedLots || []) as ProcessedLot[];
+                return acc + lots.filter(l => l.endTime && new Date(l.endTime).getTime() >= effective).reduce((s, l) => s + (l.finalWeight || 0), 0);
+            }
+            // Treliça
+            const logs = (o.operatorLogs || []) as OperatorLog[];
+            return acc + logs.reduce((s, log) => {
+                if (new Date(log.startTime).getTime() < effective) return s;
+                const endQty = log.endQuantity !== undefined && log.endQuantity !== null ? log.endQuantity : (o.status === 'completed' ? (o.actualProducedQuantity || 0) : (o.actualProducedQuantity || 0));
+                return s + Math.max(0, endQty - (log.startQuantity || 0));
+            }, 0);
+        }, 0);
+    };
+
+    const activeTrefila = productionOrders.find(o => o.machine === 'Trefila' && o.status === 'in_progress');
+    const activeTrelica = productionOrders.find(o => o.machine === 'Treliça' && o.status === 'in_progress');
 
     return (
-        <div className="space-y-4 lg:space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4 lg:gap-6 pt-2 lg:pt-4">
-                {/* Column 1: Trefila */}
-                <div className="relative">
-                    <MachineStatusView
-                        machineType="Trefila"
-                        activeOrder={activeTrefilaOrder}
-                        allOrders={productionOrders}
-                        stock={stock}
-                        dailyProducedValue={dailyProduction.trefilaShiftWeight}
-                        dailyGoal={6000}
-                        goalUnit="kg"
-                        isGestor={isGestor}
-                        onResetShift={() => handleResetShift('Trefila')}
-                    />
+        <div className="min-h-screen bg-[#0A0F1D] text-white p-4 lg:p-8 flex flex-col gap-8 font-sans">
+            <header className="flex justify-between items-center">
+                <button onClick={() => setPage('menu')} className="flex items-center gap-3 bg-white/5 hover:bg-white/10 px-6 py-3 rounded-2xl border border-white/5 transition-all text-slate-400 hover:text-white group">
+                    <ArrowLeftIcon className="h-5 w-5 transform group-hover:-translate-x-1 transition-transform" /> 
+                    <span className="font-black uppercase tracking-widest mt-0.5">Voltar ao Menu</span>
+                </button>
+                <div className="text-center">
+                    <h1 className="text-3xl font-black tracking-[0.2em] uppercase bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">Command Center</h1>
+                    <p className="text-[10px] font-black text-indigo-500/80 uppercase tracking-[0.4em] mt-2">Live Factory Monitoring System v2.6</p>
                 </div>
+                <div className="w-[180px] hidden md:block" />
+            </header>
 
-                {/* Column 2: Treliça */}
-                <div className="relative">
-                    <MachineStatusView
-                        machineType="Treliça"
-                        activeOrder={activeTrelicaOrder}
-                        allOrders={productionOrders}
-                        stock={stock}
-                        dailyProducedValue={trelicaDisplayData.value}
-                        dailyGoal={trelicaDisplayData.goal}
-                        shiftGoal={trelicaDisplayData.shiftGoal}
-                        goalUnit={trelicaDisplayData.unit}
-                        isGestor={isGestor}
-                        onResetShift={() => handleResetShift('Treliça')}
-                    />
-                </div>
+            <div className="flex-1 grid grid-cols-1 xl:grid-cols-2 gap-8 lg:gap-12 pb-8">
+                <MachineStatusView 
+                    machineType="Trefila" 
+                    activeOrder={activeTrefila} 
+                    allOrders={productionOrders} 
+                    stock={stock} 
+                    dailyProducedValue={getDailyValue('Trefila')} 
+                    dailyGoal={6000} 
+                    goalUnit="kg" 
+                    isGestor={isGestor} 
+                    onResetShift={() => handleReset('Trefila')} 
+                />
+                <MachineStatusView 
+                    machineType="Treliça" 
+                    activeOrder={activeTrelica} 
+                    allOrders={productionOrders} 
+                    stock={stock} 
+                    dailyProducedValue={getDailyValue('Treliça')} 
+                    dailyGoal={4500} 
+                    goalUnit="pçs" 
+                    isGestor={isGestor} 
+                    onResetShift={() => handleReset('Treliça')} 
+                />
             </div>
-
-            {/* SEÇÃO DE ORDENS PAUSADAS PARA O GESTOR */}
-            {isGestor && (
-                <div className="mt-10 mb-6 bg-white/40 backdrop-blur-md p-8 rounded-[2.5rem] border border-white/60 shadow-2xl relative overflow-hidden group/paused">
-                    {/* Background decorations */}
-                    <div className="absolute -right-32 -top-32 w-80 h-80 bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none group-hover/paused:bg-indigo-500/20 transition-all duration-1000"></div>
-                    <div className="absolute -left-32 -bottom-32 w-80 h-80 bg-blue-500/10 rounded-full blur-[100px] pointer-events-none group-hover/paused:bg-blue-500/20 transition-all duration-1000"></div>
-
-                    <div className="flex flex-col sm:flex-row items-center justify-between mb-8 relative z-10 gap-4">
-                        <div className="flex items-center gap-4">
-                            <div className="bg-gradient-to-br from-indigo-500 to-blue-600 p-3.5 rounded-2xl text-white shadow-xl shadow-indigo-500/20 ring-4 ring-white/20">
-                                <ArchiveIcon className="h-7 w-7 stroke-[2.5]" />
-                            </div>
-                            <div>
-                                <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tighter leading-tight">Painel de Ordens Pausadas</h3>
-                                <p className="text-[11px] font-black text-indigo-500 uppercase tracking-[0.2em]">{pausedOrders.length} ordens no arquivo temporário</p>
-                            </div>
-                        </div>
-                        <div className="bg-white/80 backdrop-blur-sm px-5 py-2 rounded-2xl text-slate-500 uppercase text-[10px] font-black tracking-widest shadow-inner border border-slate-200/50 flex items-center gap-2">
-                             <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></div>
-                             Área do Gestor
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 relative z-10">
-                        {pausedOrders.length === 0 ? (
-                            <div className="col-span-full py-12 text-center bg-white/60 rounded-[2rem] border border-dashed border-indigo-200">
-                                <ArchiveIcon className="h-10 w-10 text-indigo-200 mx-auto mb-3" />
-                                <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest leading-relaxed px-4">Não há ordens de produção pausadas ou arquivadas no momento.</p>
-                            </div>
-                        ) : pausedOrders.map(order => (
-                            <div 
-                                key={order.id} 
-                                className="bg-white/95 p-5 rounded-3xl shadow-sm border border-slate-100 hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 flex flex-col justify-between group/card"
-                            >
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className="bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-100/50 shadow-sm">
-                                        <p className="text-sm font-black text-indigo-900 tracking-tighter">#{order.orderNumber}</p>
-                                    </div>
-                                    <span className="text-[10px] font-black bg-slate-900 text-white px-3 py-1 rounded-full uppercase tracking-widest shadow-lg shadow-black/10">Pausada</span>
-                                </div>
-                                
-                                <div className="mb-6">
-                                    <div className="flex items-center gap-1.5 mb-1.5">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
-                                        <p className="text-[10px] uppercase font-black text-slate-400 tracking-[0.1em]">{order.machine}</p>
-                                    </div>
-                                    <p className="text-base font-black text-slate-800 tracking-tight leading-snug min-h-[2.5rem]">
-                                        {order.machine === 'Treliça' ? order.trelicaModel : `Trefila ${order.targetBitola}mm`}
-                                    </p>
-                                    {order.actualProducedQuantity !== undefined && (
-                                        <div className="mt-3 flex items-baseline gap-1 text-slate-500">
-                                            <span className="text-xs font-bold">{order.actualProducedQuantity}</span>
-                                            <span className="text-[10px] font-black uppercase text-slate-400 tracking-tighter">{order.machine === 'Treliça' ? 'pçs produzidas' : 'kg finalizados'}</span>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="flex items-center justify-between pt-4 border-t border-slate-50 mt-auto">
-                                    <div className="flex flex-col">
-                                        <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Criada em</span>
-                                        <span className="text-[10px] font-bold text-slate-500">{new Date(order.creationDate || '').toLocaleDateString('pt-BR')}</span>
-                                    </div>
-                                    <div className="bg-emerald-500 text-white px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tighter opacity-0 group-hover/card:opacity-100 transition-all duration-300 transform translate-x-2 group-hover/card:translate-x-0">
-                                        Pendente na Máquina
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
+            
+            <footer className="flex justify-center pb-4">
+                <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">DADOS ATUALIZADOS EM TEMPO REAL VIA SUPABASE</p>
+            </footer>
         </div>
     );
 };
