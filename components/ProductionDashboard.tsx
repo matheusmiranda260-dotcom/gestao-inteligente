@@ -167,7 +167,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="font-black text-slate-400 uppercase tracking-widest text-[10px]">Produção do Turno</h3>
                             <div className="bg-indigo-50 text-indigo-600 text-[11px] font-black px-4 py-1.5 rounded-2xl border border-indigo-100">
-                                {dailyGoal > 0 ? ((dailyProducedValue / dailyGoal) * 100).toFixed(0) : 0}% Alvo
+                                {dailyGoal > 0 ? ((dailyProducedValue / dailyGoal) * 100).toFixed(1) : 0}% Alvo
                             </div>
                         </div>
                         <div className="flex items-baseline gap-4 mb-4">
@@ -194,7 +194,12 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                         <div className="h-4 bg-slate-200 rounded-full overflow-hidden p-1">
                             <div className="h-full bg-gradient-to-r from-emerald-500 to-green-600 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(16,185,129,0.3)]" style={{ width: `${progress}%` }} />
                         </div>
-                        <p className="mt-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Disponibilidade: {(shiftUptime / (shiftUptime + shiftDowntime) * 100 || 0).toFixed(0)}%</p>
+                        <div className="mt-4 flex flex-wrap justify-between items-center gap-2">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Disponibilidade: {(shiftUptime / (shiftUptime + shiftDowntime) * 100 || 0).toFixed(1)}%</p>
+                            {activeOrder?.lastQuantityUpdate && (
+                                <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest">Último Reporte: {new Date(activeOrder.lastQuantityUpdate).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -335,7 +340,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                     allOrders={productionOrders} 
                     stock={stock} 
                     dailyProducedValue={getDailyValue('Treliça')} 
-                    dailyGoal={4500} 
+                    dailyGoal={new Date().getHours() >= 5 && new Date().getHours() < 14 ? 2500 : 2000} 
                     goalUnit="pçs" 
                     isGestor={isGestor} 
                     onResetShift={() => handleReset('Treliça')} 
