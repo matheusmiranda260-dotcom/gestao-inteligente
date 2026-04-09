@@ -145,7 +145,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     }, [allOrders, machineType, shiftStartMs, now]);
 
     return (
-        <div className="bg-[#141B2D] rounded-[3rem] shadow-2xl border border-white/5 flex flex-col overflow-hidden relative min-h-[600px] h-full">
+        <div className="bg-white rounded-[3rem] shadow-xl border border-slate-200 flex flex-col overflow-hidden relative min-h-[600px] h-full">
             <header className={`${currentStyle.bg} p-6 flex flex-col sm:flex-row justify-between items-center ${currentStyle.glow} border-b border-white/10 z-10 gap-4`}>
                 <div className="flex items-center gap-5">
                     <div className="bg-black/30 backdrop-blur-xl p-5 rounded-3xl border border-white/20">{currentStyle.icon}</div>
@@ -154,66 +154,66 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                         <p className="text-xs font-black text-white/80 uppercase mt-2 tracking-widest">{currentStyle.title} {machineStatus.reason && `• ${machineStatus.reason}`}</p>
                     </div>
                 </div>
-                <div className="bg-black/40 backdrop-blur-2xl px-8 py-4 rounded-[2.5rem] border border-white/10 flex flex-col items-center">
-                    <span className="text-[10px] font-black text-white/50 uppercase tracking-widest mb-1">Tempo no Estado</span>
-                    <span className="text-4xl lg:text-5xl font-black font-mono text-white">{formatDuration(machineStatus.durationMs)}</span>
+                <div className="bg-black/20 backdrop-blur-md px-8 py-4 rounded-[2.5rem] border border-white/10 flex flex-col items-center">
+                    <span className="text-[10px] font-black text-white/70 uppercase tracking-widest mb-1">Tempo no Estado</span>
+                    <span className="text-4xl lg:text-5xl font-black font-mono text-white tracking-wider">{formatDuration(machineStatus.durationMs)}</span>
                 </div>
             </header>
 
             <main className="flex-1 p-6 grid grid-cols-1 lg:grid-cols-2 gap-6 overflow-hidden">
                 <div className="flex flex-col gap-6">
                     {/* Meta Acumulada */}
-                    <div className="bg-slate-800/20 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white/5 flex flex-col justify-center relative overflow-hidden group">
+                    <div className="bg-slate-50 rounded-[2.5rem] p-8 border border-slate-100 flex flex-col justify-center relative overflow-hidden group shadow-sm">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="font-black text-slate-500 uppercase tracking-widest text-[10px]">Produção do Turno</h3>
-                            <div className="bg-indigo-500/20 text-indigo-400 text-[11px] font-black px-4 py-1.5 rounded-2xl border border-indigo-500/20">
+                            <h3 className="font-black text-slate-400 uppercase tracking-widest text-[10px]">Produção do Turno</h3>
+                            <div className="bg-indigo-50 text-indigo-600 text-[11px] font-black px-4 py-1.5 rounded-2xl border border-indigo-100">
                                 {dailyGoal > 0 ? ((dailyProducedValue / dailyGoal) * 100).toFixed(0) : 0}% Alvo
                             </div>
                         </div>
                         <div className="flex items-baseline gap-4 mb-4">
-                            <span className="text-7xl font-black text-white tracking-tighter leading-none">{dailyProducedValue.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
-                            <span className="text-xl font-black text-slate-500 uppercase">{goalUnit}</span>
+                            <span className="text-7xl font-black text-slate-900 tracking-tighter leading-none">{dailyProducedValue.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
+                            <span className="text-xl font-black text-slate-400 uppercase">{goalUnit}</span>
                         </div>
-                        <div className="h-4 bg-black/40 rounded-full overflow-hidden p-1">
-                            <div className="h-full bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, (dailyProducedValue / dailyGoal) * 100)}%` }} />
+                        <div className="h-4 bg-slate-200 rounded-full overflow-hidden p-1">
+                            <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(79,70,229,0.3)]" style={{ width: `${Math.min(100, (dailyProducedValue / dailyGoal) * 100)}%` }} />
                         </div>
                     </div>
 
                     {/* Ordem Ativa */}
-                    <div className="bg-slate-800/20 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white/5 flex flex-col justify-center relative overflow-hidden">
+                    <div className="bg-slate-50 rounded-[2.5rem] p-8 border border-slate-100 flex flex-col justify-center relative overflow-hidden shadow-sm">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="font-black text-slate-500 uppercase tracking-widest text-[10px]">Progresso da OP #{activeOrder?.orderNumber || '---'}</h3>
+                            <h3 className="font-black text-slate-400 uppercase tracking-widest text-[10px]">Progresso da OP #{activeOrder?.orderNumber || '---'}</h3>
                             {isGestor && onResetShift && (
-                                <button onClick={onResetShift} className="text-[10px] font-black bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 px-4 py-2 rounded-2xl border border-white/5 uppercase transition-all">Zerar Turno</button>
+                                <button onClick={onResetShift} className="text-[10px] font-black bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-600 px-4 py-2 rounded-2xl border border-slate-200 uppercase transition-all shadow-sm">Zerar Turno</button>
                             )}
                         </div>
                         <div className="flex items-baseline gap-4 mb-4">
-                            <span className="text-7xl font-black text-white tracking-tighter leading-none">{machineType === 'Trefila' ? processedLotsCount : producedQuantity}</span>
-                            <span className="text-xl font-black text-slate-500 uppercase">{machineType === 'Trefila' ? 'Lotes' : 'Peças'}</span>
+                            <span className="text-7xl font-black text-slate-900 tracking-tighter leading-none">{machineType === 'Trefila' ? processedLotsCount : producedQuantity}</span>
+                            <span className="text-xl font-black text-slate-400 uppercase">{machineType === 'Trefila' ? 'Lotes' : 'Peças'}</span>
                         </div>
-                        <div className="h-4 bg-black/40 rounded-full overflow-hidden p-1">
-                            <div className="h-full bg-gradient-to-r from-emerald-400 to-green-500 rounded-full transition-all duration-1000" style={{ width: `${progress}%` }} />
+                        <div className="h-4 bg-slate-200 rounded-full overflow-hidden p-1">
+                            <div className="h-full bg-gradient-to-r from-emerald-500 to-green-600 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(16,185,129,0.3)]" style={{ width: `${progress}%` }} />
                         </div>
-                        <p className="mt-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Disponibilidade: {(shiftUptime / (shiftUptime + shiftDowntime) * 100 || 0).toFixed(0)}%</p>
+                        <p className="mt-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Disponibilidade: {(shiftUptime / (shiftUptime + shiftDowntime) * 100 || 0).toFixed(0)}%</p>
                     </div>
                 </div>
 
                 <div className="flex flex-col gap-6 overflow-hidden">
                     {/* Lista de Paradas */}
-                    <div className="bg-slate-800/20 backdrop-blur-xl rounded-[2.5rem] border border-white/5 flex flex-col flex-1 overflow-hidden">
-                        <div className="p-5 border-b border-white/5 bg-white/5 flex justify-between items-center">
-                            <h3 className="font-black text-white/50 uppercase tracking-widest text-[10px] flex items-center gap-2"><WarningIcon className="h-4 w-4 text-rose-500" /> Histórico de Paradas</h3>
+                    <div className="bg-slate-50 rounded-[2.5rem] border border-slate-100 flex flex-col flex-1 overflow-hidden shadow-sm">
+                        <div className="p-5 border-b border-slate-100 bg-white flex justify-between items-center">
+                            <h3 className="font-black text-slate-400 uppercase tracking-widest text-[10px] flex items-center gap-2"><WarningIcon className="h-4 w-4 text-rose-500" /> Histórico de Paradas</h3>
                         </div>
                         <div className="flex-1 overflow-y-auto custom-scrollbar">
                             <table className="w-full text-left">
-                                <thead className="sticky top-0 bg-[#1e293b] z-20">
-                                    <tr className="text-[9px] uppercase font-black text-slate-500 border-b border-white/5">
+                                <thead className="sticky top-0 bg-slate-100 z-20">
+                                    <tr className="text-[9px] uppercase font-black text-slate-500 border-b border-slate-200">
                                         <th className="p-4 px-6">Duração</th>
                                         <th className="p-4">Motivo</th>
                                         <th className="p-4 text-right px-6">OP</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-white/5">
+                                <tbody className="divide-y divide-slate-100">
                                     {allOrders
                                         .filter(o => o.machine === machineType)
                                         .flatMap(o => (o.downtimeEvents || []).map((e: any) => ({ ...e, orderNumber: o.orderNumber })))
@@ -222,10 +222,10 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                         .map((e, i) => {
                                             const end = e.resumeTime ? new Date(e.resumeTime).getTime() : now.getTime();
                                             return (
-                                                <tr key={i} className="hover:bg-white/[0.02] transition-colors">
-                                                    <td className="p-4 px-6 font-mono text-rose-400 font-black text-[11px]">{formatDuration(end - new Date(e.stopTime).getTime())}</td>
-                                                    <td className="p-4 text-[10px] font-black text-slate-300 uppercase truncate max-w-[150px]">{e.reason}</td>
-                                                    <td className="p-4 text-right px-6 text-[10px] font-bold text-slate-500">#{e.orderNumber}</td>
+                                                <tr key={i} className="hover:bg-slate-50 transition-colors">
+                                                    <td className="p-4 px-6 font-mono text-rose-600 font-black text-[11px]">{formatDuration(end - new Date(e.stopTime).getTime())}</td>
+                                                    <td className="p-4 text-[10px] font-black text-slate-700 uppercase truncate max-w-[150px]">{e.reason}</td>
+                                                    <td className="p-4 text-right px-6 text-[10px] font-bold text-slate-400">#{e.orderNumber}</td>
                                                 </tr>
                                             );
                                         })}
@@ -238,19 +238,19 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                     </div>
 
                     {/* Operador / Material */}
-                    <div className="bg-slate-800/20 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white/5 flex flex-col justify-between gap-6">
+                    <div className="bg-slate-50 rounded-[2.5rem] p-8 border border-slate-100 flex flex-col justify-between gap-6 shadow-sm">
                         <div className="flex items-center gap-6">
-                            <div className="bg-indigo-500/20 p-4 rounded-3xl border border-indigo-500/20"><UserGroupIcon className="h-6 w-6 text-indigo-400" /></div>
+                            <div className="bg-indigo-100 p-4 rounded-3xl border border-indigo-200"><UserGroupIcon className="h-6 w-6 text-indigo-600" /></div>
                             <div>
-                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Operador Responsável</p>
-                                <p className="text-xl font-black text-white uppercase">{currentOperator}</p>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Operador Responsável</p>
+                                <p className="text-xl font-black text-slate-900 uppercase">{currentOperator}</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-6">
-                            <div className="bg-emerald-500/20 p-4 rounded-3xl border border-emerald-500/20"><ArchiveIcon className="h-6 w-6 text-emerald-400" /></div>
+                            <div className="bg-emerald-100 p-4 rounded-3xl border border-emerald-200"><ArchiveIcon className="h-6 w-6 text-emerald-600" /></div>
                             <div>
-                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Material Processado</p>
-                                <p className="text-xl font-black text-white uppercase truncate max-w-[200px]">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Material Processado</p>
+                                <p className="text-xl font-black text-slate-900 uppercase truncate max-w-[200px]">
                                     {machineType === 'Trefila' ? `Bitola: ${activeOrder?.targetBitola || '---'}` : `Modelo: ${activeOrder?.trelicaModel || '---'}`}
                                 </p>
                             </div>
@@ -309,17 +309,12 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
     const activeTrelica = productionOrders.find(o => o.machine === 'Treliça' && o.status === 'in_progress');
 
     return (
-        <div className="min-h-screen bg-[#0A0F1D] text-white p-4 lg:p-8 flex flex-col gap-8 font-sans">
-            <header className="flex justify-between items-center">
-                <button onClick={() => setPage('menu')} className="flex items-center gap-3 bg-white/5 hover:bg-white/10 px-6 py-3 rounded-2xl border border-white/5 transition-all text-slate-400 hover:text-white group">
-                    <ArrowLeftIcon className="h-5 w-5 transform group-hover:-translate-x-1 transition-transform" /> 
-                    <span className="font-black uppercase tracking-widest mt-0.5">Voltar ao Menu</span>
-                </button>
+        <div className="min-h-screen bg-white text-slate-900 p-4 lg:p-8 flex flex-col gap-8 font-sans">
+            <header className="flex justify-center items-center">
                 <div className="text-center">
-                    <h1 className="text-3xl font-black tracking-[0.2em] uppercase bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">Command Center</h1>
+                    <h1 className="text-3xl font-black tracking-[0.2em] uppercase bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Command Center</h1>
                     <p className="text-[10px] font-black text-indigo-500/80 uppercase tracking-[0.4em] mt-2">Live Factory Monitoring System v2.6</p>
                 </div>
-                <div className="w-[180px] hidden md:block" />
             </header>
 
             <div className="flex-1 grid grid-cols-1 xl:grid-cols-2 gap-8 lg:gap-12 pb-8">
