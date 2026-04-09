@@ -1179,24 +1179,30 @@ const OrgNode: React.FC<{
                 <div className="w-0.5 h-8 bg-slate-300 relative"></div>
             )}
 
-            {/* Children Nodes (Horizontal Layout) */}
+            {/* Children Nodes */}
             {node.children.length > 0 && (
-                <div className="relative flex justify-center">
+                <div className={`relative flex ${node.unitType === 'department' ? 'flex-col items-center' : 'justify-center'}`}>
                     {node.children.map((child, index) => {
                         const isFirst = index === 0;
                         const isLast = index === node.children.length - 1;
+                        const isVertical = node.unitType === 'department';
 
                         return (
-                            <div key={child.id} className="relative flex flex-col items-center px-3 pt-6">
+                            <div key={child.id} className={`relative flex flex-col items-center px-3 ${isVertical ? 'pt-2' : 'pt-6'}`}>
                                 {/* Connector Lines */}
-                                {/* Vertical Line Up */}
-                                <div className="absolute top-0 left-1/2 -translate-x-1/2 h-6 w-0.5 bg-slate-300"></div>
-
-                                {/* Horizontal Line Left (to connect to previous sibling) */}
-                                {!isFirst && <div className="absolute top-0 left-0 w-[50%] h-0.5 bg-slate-300"></div>}
-
-                                {/* Horizontal Line Right (to connect to next sibling) */}
-                                {!isLast && <div className="absolute top-0 right-0 w-[50%] h-0.5 bg-slate-300"></div>}
+                                {!isVertical && (
+                                    <>
+                                        {/* Vertical Line Up */}
+                                        <div className="absolute top-0 left-1/2 -translate-x-1/2 h-6 w-0.5 bg-slate-300"></div>
+                                        {/* Horizontal Line Left */}
+                                        {!isFirst && <div className="absolute top-0 left-0 w-[50%] h-0.5 bg-slate-300"></div>}
+                                        {/* Horizontal Line Right */}
+                                        {!isLast && <div className="absolute top-0 right-0 w-[50%] h-0.5 bg-slate-300"></div>}
+                                    </>
+                                )}
+                                {isVertical && (
+                                     <div className="w-0.5 h-4 bg-slate-300"></div>
+                                )}
 
                                 <OrgNode
                                     node={child}
@@ -1326,55 +1332,70 @@ const OrgChart: React.FC<{
     };
 
     const handleGenerate2Shifts = async () => {
-        if (!confirm('Deseja gerar a estrutura COMPLETA baseada no escopo (Setor Laminação > ADM > Máquinas)?')) return;
+        if (!confirm('Deseja apagar as áreas atuais e gerar a estrutura COMPLETA baseada no escopo (Setor Laminação > ADM > Máquinas)? Isso ajuda a organizar o que já foi criado.')) return;
         
         try {
+            // Optional: You could delete existing units here, but it's risky if they have many people.
+            // For now, let's just create a clean new root "ESCOPO FINAL - SETOR LAMINAÇÃO"
+            
             // 1. Root SETOR LAMINAÇÃO
             const setor = await insertItem('org_units', { name: 'SETOR LAMINAÇÃO', unitType: 'department', displayOrder: 1 } as any);
             
-            // 2. ADMINISTRAÇÃO (Child of Setor for vertical stack)
+            // 2. ADMINISTRAÇÃO (Child of Setor)
             const adm = await insertItem('org_units', { name: 'ADMINISTRAÇÃO', unitType: 'department', parentId: setor.id, displayOrder: 1 } as any);
             
+            // helper to assign employee by name
+            const assignByName = async (posId: string, name: string) => {
+                if (name.includes('?')) return;
+                const match = employees.find(e => e.name.toLowerCase().includes(name.toLowerCase()));
+                if (match) {
+                    await updateItem('employees', match.id, { orgPositionId: posId });
+                }
+            };
+
             // Adm Shifts
             const turnoAdm1 = await insertItem('org_units', { name: 'TURNO 2:00 as 11:34', unitType: 'group', parentId: adm.id, displayOrder: 1 } as any);
-            await insertItem('org_positions', { orgUnitId: turnoAdm1.id, title: 'Encarregado', isLeadership: true } as any);
+            const p1 = await insertItem('org_positions', { orgUnitId: turnoAdm1.id, title: 'encarregado', isLeadership: true } as any);
+            await assignByName(p1.id, 'EDUARDO');
 
             const turnoAdm2 = await insertItem('org_units', { name: 'TURNO 5:00 as 14:44', unitType: 'group', parentId: adm.id, displayOrder: 2 } as any);
-            await insertItem('org_positions', { orgUnitId: turnoAdm2.id, title: 'Gestor Qualidade', isLeadership: true } as any);
+            const p2 = await insertItem('org_positions', { orgUnitId: turnoAdm2.id, title: 'gestor qualidade', isLeadership: true } as any);
+            await assignByName(p2.id, 'MATHEUS');
 
-            // 3. MAQUINAS (Child of ADM for vertical stack, as per scope visual chain)
-            const maquinas = await insertItem('org_units', { name: 'MAQUINAS', unitType: 'department', parentId: adm.id, displayOrder: 2 } as any);
+            // 3. MAQUINAS (Child of ADM for vertical stack in this visual chain)
+            const maquinas = await insertItem('org_units', { name: 'MAQUINAS', unitType: 'group', parentId: adm.id, displayOrder: 3 } as any);
             
             // helper to create machine structure
-            const createMachine = async (name: string, shifts: { name: string, roles: string[] }[]) => {
+            const createMachine = async (name: string, shifts: { name: string, roles: { title: string, emp?: string }[] }[]) => {
                 const m = await insertItem('org_units', { name, unitType: 'machine', parentId: maquinas.id, displayOrder: 1 } as any);
                 for (const s of shifts) {
                     const su = await insertItem('org_units', { name: s.name, unitType: 'group', parentId: m.id, displayOrder: 1 } as any);
                     for (const role of s.roles) {
-                        await insertItem('org_positions', { orgUnitId: su.id, title: role, isLeadership: false } as any);
+                        const p = await insertItem('org_positions', { orgUnitId: su.id, title: role.title, isLeadership: false } as any);
+                        if (role.emp) await assignByName(p.id, role.emp);
                     }
                 }
             };
 
             await createMachine('TREFILA 1', [
-                { name: 'TURNO 7:45 as 17:30', roles: ['Operador', 'Auxiliar', 'Auxiliar'] }
+                { name: 'TURNO 7:45 as 17:30', roles: [{title: 'operador', emp: 'WILIAN'}, {title: 'Auxiliar', emp: 'DENIS'}, {title: 'Auxiliar', emp: 'Ryanderson'}] }
             ]);
 
             await createMachine('TRELIÇA 1', [
-                { name: 'TURNO 5:00 as 14:44', roles: ['Operador', 'Auxiliar'] },
-                { name: 'TURNO 2:00 as 11:34', roles: ['Operador', 'Auxiliar'] }
+                { name: 'TURNO 5:00 as 14:44', roles: [{title: 'operador', emp: 'ADRIAN'}, {title: 'Auxiliar', emp: 'JUNIOR'}] },
+                { name: 'TURNO 2:00 as 11:34', roles: [{title: 'operador', emp: 'Alceu'}, {title: 'Auxiliar', emp: 'Thiago'}] }
             ]);
 
             await createMachine('TRELIÇA 2', [
-                { name: 'TURNO 5:00 as 14:44', roles: ['Operador', 'Auxiliar'] },
-                { name: 'TURNO 2:00 as 11:34', roles: ['Operador', 'Auxiliar'] }
+                { name: 'TURNO 5:00 as 14:44', roles: [{title: 'operador'}, {title: 'Auxiliar'}] },
+                { name: 'TURNO 2:00 as 11:34', roles: [{title: 'operador'}, {title: 'Auxiliar'}] }
             ]);
 
             await createMachine('MALHA', [
-                { name: 'TURNO 7:45 as 17:30', roles: ['Operador', 'Auxiliar', 'Auxiliar'] }
+                { name: 'TURNO 7:45 as 17:30', roles: [{title: 'operador'}, {title: 'Auxiliar'}, {title: 'Auxiliar'}] }
             ]);
             
-            alert('Estrutura de Laminação gerada com sucesso! Agora você pode vincular os funcionários.');
+            alert('Estrutura de Laminação Final gerada com sucesso! Os funcionários foram vinculados automaticamente onde os nomes coincidiram.');
             reloadData();
         } catch (e) {
             console.error('Erro ao gerar:', e);
@@ -1471,16 +1492,16 @@ const OrgChart: React.FC<{
                         </p>
                     </div>
 
-                    <div className="flex flex-col items-center opacity-90 hover:opacity-100 transition-opacity">
+                    <div className="flex flex-col items-center opacity-95 hover:opacity-100 transition-opacity">
                         <button
                             onClick={handleGenerate2Shifts}
-                            className="w-[200px] py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl shadow-md hover:shadow-lg hover:scale-105 transition flex flex-col items-center justify-center gap-2"
+                            className="w-[200px] py-4 bg-gradient-to-r from-blue-700 to-indigo-800 text-white rounded-xl shadow-lg hover:shadow-xl hover:scale-105 transition flex flex-col items-center justify-center gap-2 border-2 border-white/20"
                         >
-                            <UserGroupIcon className="h-6 w-6" />
-                            <span className="font-bold text-sm text-center">Gerar Estrutura<br/>2 Turnos (Produção)</span>
+                            <TrophyIcon className="h-6 w-6 text-yellow-400" />
+                            <span className="font-bold text-xs text-center">REFAZER ORGANOGRAMA<br/>COMPLETO (ESCOPO)</span>
                         </button>
-                        <p className="text-[10px] text-blue-500 mt-2 text-center max-w-[180px] font-semibold">
-                            Cria: Turno A, Turno B, Encarregados e Auxiliares
+                        <p className="text-[10px] text-slate-500 mt-2 text-center max-w-[180px] font-bold">
+                            Cria exatamente o PDF: ADM, Máquinas, Turnos e Equipes
                         </p>
                     </div>
                 </div>
