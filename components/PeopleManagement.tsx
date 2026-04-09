@@ -1190,9 +1190,9 @@ const OrgChart: React.FC<{
 
             setSelectingFor(null);
             reloadData();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error assigning employee:', error);
-            alert('Falha ao vincular funcionário. Verifique sua conexão ou permissões.');
+            alert(`Falha ao vincular funcionário: ${error.message || 'Erro desconhecido'}. Verifique sua conexão ou permissões.`);
         } finally {
             setIsUpdating(false);
         }
