@@ -165,9 +165,15 @@ const AddConferencePage: React.FC<{
                                                         ...customGauges.map(g => ({ gauge: g.gauge, code: g.productCode }))
                                                     ];
 
-                                                    // Deduplicate by gauge + code
-                                                    const uniqueOptions = Array.from(new Set(allOptions.map(o => JSON.stringify(o))))
-                                                        .map(s => JSON.parse(s))
+                                                    const map = new Map();
+                                                    allOptions.forEach(opt => {
+                                                        const existing = map.get(opt.gauge);
+                                                        if (!existing || (opt.code && !existing.code)) {
+                                                            map.set(opt.gauge, opt);
+                                                        }
+                                                    });
+
+                                                    const uniqueOptions = Array.from(map.values())
                                                         .sort((a, b) => parseFloat(a.gauge.replace(',', '.')) - parseFloat(b.gauge.replace(',', '.')));
 
                                                     return uniqueOptions.map(opt => (
@@ -700,8 +706,15 @@ const EditStockItemModal: React.FC<{ item: StockItem; onClose: () => void; onSav
                                         ...customGauges.map(g => ({ gauge: g.gauge, code: g.productCode }))
                                     ];
 
-                                    const uniqueOptions = Array.from(new Set(allOptions.map(o => JSON.stringify(o))))
-                                        .map(s => JSON.parse(s))
+                                    const map = new Map();
+                                    allOptions.forEach(opt => {
+                                        const existing = map.get(opt.gauge);
+                                        if (!existing || (opt.code && !existing.code)) {
+                                            map.set(opt.gauge, opt);
+                                        }
+                                    });
+
+                                    const uniqueOptions = Array.from(map.values())
                                         .sort((a, b) => parseFloat(a.gauge.replace(',', '.')) - parseFloat(b.gauge.replace(',', '.')));
 
                                     return uniqueOptions.map(opt => (
