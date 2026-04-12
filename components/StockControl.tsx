@@ -233,6 +233,7 @@ const StockControl: React.FC<{
     const [statusFilter, setStatusFilter] = useState<string[]>([]);
     const [isStatusOpen, setIsStatusOpen] = useState(false);
     const [isMobileStatusOpen, setIsMobileStatusOpen] = useState(false);
+    const [isPrinting, setIsPrinting] = useState(false);
     
     const statusDesktopRef = useRef<HTMLDivElement>(null);
     const statusMobileRef = useRef<HTMLDivElement>(null);
@@ -245,6 +246,15 @@ const StockControl: React.FC<{
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
+
+    useEffect(() => {
+        if (isPrinting) {
+            window.print();
+            // Pequeno delay para garantir que o estado volte após a caixa de impressão fechar
+            // Em alguns browsers window.print é síncrono, em outros não.
+            setTimeout(() => setIsPrinting(false), 500);
+        }
+    }, [isPrinting]);
 
     const availableBitolas = useMemo(() => {
         let options: string[] = [];
@@ -279,10 +289,6 @@ const StockControl: React.FC<{
         const passesMaterial = materialFilter === '' || i.materialType === materialFilter;
         const passesBitola = bitolaFilter === '' || i.bitola === bitolaFilter;
         
-        // Regra de Status: 
-        // 1. Se houver filtro EXPLÍCITO de status, respeitamos ele.
-        // 2. Se NÃO houver filtro de status e NÃO houver busca, ocultamos Consumidos.
-        // 3. Se houver busca, mostramos Consumidos que batem com a busca.
         if (statusFilter.length > 0) {
             return passesSearch && passesMaterial && passesBitola && statusFilter.includes(i.status);
         } else {
@@ -294,12 +300,20 @@ const StockControl: React.FC<{
     }).sort((a, b) => {
         const lotA = parseInt(a.internalLot.replace(/\D/g, '')) || 0;
         const lotB = parseInt(b.internalLot.replace(/\D/g, '')) || 0;
-        if (lotA !== lotB) return lotB - lotA;
-        return b.internalLot.localeCompare(a.internalLot);
-    }), [stock, searchTerm, materialFilter, bitolaFilter, statusFilter]);
+        
+        if (isPrinting) {
+            // Ordem Crescente para impressão
+            if (lotA !== lotB) return lotA - lotB;
+            return a.internalLot.localeCompare(b.internalLot);
+        } else {
+            // Ordem Decrescente para visualização em tela
+            if (lotA !== lotB) return lotB - lotA;
+            return b.internalLot.localeCompare(a.internalLot);
+        }
+    }), [stock, searchTerm, materialFilter, bitolaFilter, statusFilter, isPrinting]);
 
     const handlePrint = () => {
-        window.print();
+        setIsPrinting(true);
     };
 
     const stats = useMemo(() => {
