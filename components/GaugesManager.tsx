@@ -1,19 +1,24 @@
 import React, { useState } from 'react';
 import type { StockGauge, MaterialType } from '../types';
 import { MaterialOptions } from '../types';
-import { TrashIcon, PlusIcon, CheckCircleIcon, ScaleIcon, ArrowPathIcon } from './icons';
+import { TrashIcon, PlusIcon, CheckCircleIcon, ScaleIcon, ArrowPathIcon, PencilIcon, XIcon } from './icons';
 
 interface GaugesManagerProps {
     gauges: StockGauge[];
     onAdd: (gauge: Omit<StockGauge, 'id'>) => void;
     onDelete: (id: string) => void;
+    onUpdate: (id: string, data: Partial<StockGauge>) => void;
     onRestoreDefaults: () => void;
 }
 
-const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, onRestoreDefaults }) => {
+const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, onUpdate, onRestoreDefaults }) => {
     const [newGauge, setNewGauge] = useState('');
     const [newProductCode, setNewProductCode] = useState('');
     const [materialType, setMaterialType] = useState<MaterialType>('Fio Máquina');
+    
+    // Editing states
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [editingCode, setEditingCode] = useState('');
 
     const handleAdd = () => {
         if (!newGauge) return;
@@ -42,6 +47,17 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
         });
         setNewGauge('');
         setNewProductCode('');
+    };
+
+    const handleUpdate = (id: string) => {
+        onUpdate(id, { productCode: editingCode.trim() || undefined });
+        setEditingId(null);
+        setEditingCode('');
+    };
+
+    const startEditing = (g: StockGauge) => {
+        setEditingId(g.id);
+        setEditingCode(g.productCode || '');
     };
 
     const gaugesByMaterial = MaterialOptions.reduce((acc, material) => {
@@ -134,20 +150,54 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                                     <div className="grid grid-cols-2 gap-2">
                                         {gaugesByMaterial[material].map(g => (
                                             <div key={g.id} className="group flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200 hover:border-blue-200 hover:bg-white transition-all">
-                                                <div className="flex flex-col">
+                                                <div className="flex flex-col flex-grow">
                                                     <span className="font-bold text-slate-700">{g.gauge.replace('.', ',')} mm</span>
-                                                    {g.productCode && <span className="text-[10px] text-blue-600 font-bold uppercase">{g.productCode}</span>}
+                                                    {editingId === g.id ? (
+                                                        <div className="mt-1 flex items-center gap-1">
+                                                            <input
+                                                                type="text"
+                                                                value={editingCode}
+                                                                onChange={e => setEditingCode(e.target.value)}
+                                                                className="text-[10px] w-full p-1 border rounded bg-white font-bold"
+                                                                placeholder="Cód. Produto"
+                                                                autoFocus
+                                                                onKeyPress={e => e.key === 'Enter' && handleUpdate(g.id)}
+                                                            />
+                                                            <button onClick={() => handleUpdate(g.id)} className="text-emerald-500 hover:bg-emerald-50 p-1 rounded transition">
+                                                                <CheckCircleIcon className="h-4 w-4" />
+                                                            </button>
+                                                            <button onClick={() => setEditingId(null)} className="text-slate-400 hover:bg-slate-100 p-1 rounded transition">
+                                                                <XIcon className="h-4 w-4" />
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <span className={`text-[10px] font-bold uppercase ${g.productCode ? 'text-blue-600' : 'text-slate-300 italic'}`}>
+                                                            {g.productCode || 'Sem código'}
+                                                        </span>
+                                                    )}
                                                 </div>
-                                                <button
-                                                    onClick={() => {
-                                                        if (confirm(`Deseja remover a bitola ${g.gauge.replace('.', ',')} para ${material}?`)) {
-                                                            onDelete(g.id);
-                                                        }
-                                                    }}
-                                                    className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
-                                                >
-                                                    <TrashIcon className="h-4 w-4" />
-                                                </button>
+                                                <div className="flex items-center gap-1">
+                                                    {editingId !== g.id && (
+                                                        <button
+                                                            onClick={() => startEditing(g)}
+                                                            className="p-1.5 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                                                            title="Editar Código"
+                                                        >
+                                                            <PencilIcon className="h-4 w-4" />
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={() => {
+                                                            if (confirm(`Deseja remover a bitola ${g.gauge.replace('.', ',')} para ${material}?`)) {
+                                                                onDelete(g.id);
+                                                            }
+                                                        }}
+                                                        className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
+                                                        title="Excluir Bitola"
+                                                    >
+                                                        <TrashIcon className="h-4 w-4" />
+                                                    </button>
+                                                </div>
                                             </div>
                                         ))}
                                         {gaugesByMaterial[material].length === 0 && (

@@ -402,6 +402,17 @@ const App: React.FC = () => {
         }
     };
 
+    const updateGauge = async (id: string, data: Partial<StockGauge>) => {
+        try {
+            await updateItem<StockGauge>('stock_gauges', id, data);
+            setGauges(prev => prev.map(g => g.id === id ? { ...g, ...data } : g));
+            showNotification('Bitola atualizada com sucesso!', 'success');
+        } catch (error) {
+            console.error(error);
+            showNotification('Erro ao atualizar bitola.', 'error');
+        }
+    };
+
     const restoreDefaultGauges = async () => {
         if (!confirm('Deseja restaurar as bitolas padrão do sistema? Isso adicionará as bitolas comuns se estiverem faltando.')) return;
 
@@ -2152,7 +2163,7 @@ const App: React.FC = () => {
             case 'continuousImprovement': return <ContinuousImprovement setPage={setPage} />;
             case 'workInstructions': return <WorkInstructions setPage={setPage} />;
             case 'peopleManagement': return <PeopleManagement setPage={setPage} currentUser={currentUser} />;
-            case 'gaugesManager': return <GaugesManager gauges={gauges} onAdd={addGauge} onDelete={deleteGauge} onRestoreDefaults={restoreDefaultGauges} />;
+            case 'gaugesManager': return <GaugesManager gauges={gauges} onAdd={addGauge} onDelete={deleteGauge} onUpdate={updateGauge} onRestoreDefaults={restoreDefaultGauges} />;
             case 'meetingsTasks':
                 return <MeetingsTasks
                     meetings={meetings}
