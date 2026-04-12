@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { StockGauge, MaterialType } from '../types';
 import { MaterialOptions } from '../types';
-import { TrashIcon, PlusIcon, CheckCircleIcon, ScaleIcon, ArrowPathIcon, PencilIcon, XIcon } from './icons';
+import { TrashIcon, PlusIcon, CheckCircleIcon, ScaleIcon, ArrowPathIcon, PencilIcon, XIcon, SearchIcon } from './icons';
 
 interface GaugesManagerProps {
     gauges: StockGauge[];
@@ -19,6 +19,7 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
     // Editing states
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editingCode, setEditingCode] = useState('');
+    const [searchTerm, setSearchTerm] = useState('');
 
     const handleAdd = () => {
         if (!newGauge) return;
@@ -61,7 +62,18 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
     };
 
     const gaugesByMaterial = MaterialOptions.reduce((acc, material) => {
-        acc[material] = gauges.filter(g => g.materialType === material).sort((a, b) => parseFloat(a.gauge) - parseFloat(b.gauge));
+        acc[material] = gauges
+            .filter(g => g.materialType === material)
+            .filter(g => {
+                if (!searchTerm) return true;
+                const searchLower = searchTerm.toLowerCase();
+                return (
+                    g.gauge.replace('.', ',').includes(searchLower) ||
+                    g.gauge.includes(searchLower) ||
+                    (g.productCode || '').toLowerCase().includes(searchLower)
+                );
+            })
+            .sort((a, b) => parseFloat(a.gauge) - parseFloat(b.gauge));
         return acc;
     }, {} as Record<string, StockGauge[]>);
 
@@ -132,6 +144,17 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                                 </button>
                             </div>
                         </div>
+                    </div>
+
+                    <div className="px-6 py-4 bg-white border-b border-slate-100 flex items-center gap-4">
+                        <SearchIcon className="h-5 w-5 text-slate-400" />
+                        <input
+                            type="text"
+                            placeholder="Buscar por bitola ou código de produto..."
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
+                            className="flex-grow outline-none text-sm text-slate-600 font-medium"
+                        />
                     </div>
 
                     <div className="p-6">

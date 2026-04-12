@@ -260,16 +260,14 @@ const StockControl: React.FC<{
     }, [gauges, stock, materialFilter]);
 
     const filtered = useMemo(() => stock.filter(i => {
-        const matchesSearch = searchTerm.length === 0 || (
-            i.internalLot.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            i.nfe.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (i.steelType || '').toLowerCase().includes(searchTerm.toLowerCase())
-        );
-        
+        const gauge = gauges.find(g => g.materialType === i.materialType && g.gauge === i.bitola);
+        const productCode = gauge?.productCode || '';
+
         const passesSearch = searchTerm.length > 0 ? (
             i.internalLot.toLowerCase().includes(searchTerm.toLowerCase()) ||
             i.nfe.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (i.steelType || '').toLowerCase().includes(searchTerm.toLowerCase())
+            (i.steelType || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            productCode.toLowerCase().includes(searchTerm.toLowerCase())
         ) : true;
 
         const passesMaterial = materialFilter === '' || i.materialType === materialFilter;
