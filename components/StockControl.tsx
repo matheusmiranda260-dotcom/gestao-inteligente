@@ -358,7 +358,14 @@ const StockControl: React.FC<{
                         </div>
                         <div>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Filtro Bitola</p>
-                            <p className="text-base font-black text-slate-800">{bitolaFilter || 'Todas'}</p>
+                            <p className="text-base font-black text-slate-800">
+                                {bitolaFilter || 'Todas'}
+                                {bitolaFilter && gauges.find(g => g.gauge === bitolaFilter && (materialFilter === '' || g.materialType === materialFilter))?.productCode && (
+                                    <span className="text-sm font-bold text-slate-500 ml-2">
+                                        ({gauges.find(g => g.gauge === bitolaFilter && (materialFilter === '' || g.materialType === materialFilter))?.productCode})
+                                    </span>
+                                )}
+                            </p>
                         </div>
                         <div>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status</p>
@@ -378,7 +385,7 @@ const StockControl: React.FC<{
                 </div>
             </div>
 
-            {reportView && <ConferenceReport reportData={reportView} onClose={() => setReportView(null)} />}
+            {reportView && <ConferenceReport reportData={reportView} onClose={() => setReportView(null)} gauges={gauges} />}
             {historyLot && <LotHistoryModal lot={historyLot} onClose={() => setHistoryLot(null)} />}
             {editingItem && (
                 <EditStockItemModal
@@ -560,7 +567,7 @@ const StockControl: React.FC<{
                                             <span className="font-black text-blue-600">{item.bitola.replace('.', ',')}</span>
                                             {(() => {
                                                 const gauge = gauges.find(g => g.materialType === item.materialType && g.gauge === item.bitola);
-                                                return gauge?.productCode ? <span className="text-[9px] text-slate-400 font-bold uppercase">{gauge.productCode}</span> : null;
+                                                return gauge?.productCode ? <span className="text-[9px] text-slate-500 font-black uppercase print:text-black">{gauge.productCode}</span> : null;
                                             })()}
                                         </div>
                                     </td>

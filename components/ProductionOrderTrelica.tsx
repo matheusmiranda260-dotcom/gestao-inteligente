@@ -577,7 +577,7 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
     return (
         <div className="p-4 sm:p-6 md:p-8">
             {showHistoryModal && <ProductionOrderHistoryModal orders={trelicaProductionOrders} stock={stock} onClose={() => setShowHistoryModal(false)} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} currentUser={currentUser} onShowReport={order => { setProductionReportData(order); setShowHistoryModal(false); }} />}
-            {productionReportData && <ProductionOrderReport reportData={productionReportData} stock={stock} onClose={() => setProductionReportData(null)} />}
+            {productionReportData && <ProductionOrderReport reportData={productionReportData} stock={stock} onClose={() => setProductionReportData(null)} gauges={gauges} />}
 
             <header className="flex items-center justify-between mb-8 pt-4">
                 <div className="flex items-center">

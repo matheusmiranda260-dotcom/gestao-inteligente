@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import type { ProductionOrderData, StockItem } from '../types';
+import type { ProductionOrderData, StockItem, StockGauge } from '../types';
 import { PrinterIcon } from './icons';
 
 const trelicaModels = [
@@ -26,6 +26,7 @@ interface ProductionOrderReportProps {
     reportData: ProductionOrderData;
     stock: StockItem[];
     onClose: () => void;
+    gauges: StockGauge[];
 }
 
 const formatDuration = (ms: number) => {
@@ -37,7 +38,7 @@ const formatDuration = (ms: number) => {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 };
 
-const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportData, stock, onClose }) => {
+const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportData, stock, onClose, gauges }) => {
     const {
         totalDurationMs,
         totalDowntimeMs,
@@ -404,10 +405,22 @@ const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportDat
                         {/* Product Desc Table */}
                         <div className="border-2 border-black mb-4 font-bold">
                             <div className="border-b border-black p-1 pl-2">
-                                Descrição do produto (entrada): <span className="text-red-600">{inputBitola}mm -- FIO MAQUINA--</span>
+                                Descrição do produto (entrada): <span className="text-red-600">
+                                    {inputBitola}mm -- FIO MAQUINA--
+                                    {(() => {
+                                        const gauge = gauges.find(g => g.materialType === 'Fio Máquina' && g.gauge === inputBitola);
+                                        return gauge?.productCode ? ` [${gauge.productCode}]` : '';
+                                    })()}
+                                </span>
                             </div>
                             <div className="p-1 pl-2">
-                                Descrição do produto (Saída): <span className="text-green-600">{reportData.targetBitola}mm ---CA60--</span>
+                                Descrição do produto (Saída): <span className="text-green-600">
+                                    {reportData.targetBitola}mm ---CA60--
+                                    {(() => {
+                                        const gauge = gauges.find(g => g.materialType === 'CA-60' && g.gauge === reportData.targetBitola);
+                                        return gauge?.productCode ? ` [${gauge.productCode}]` : '';
+                                    })()}
+                                </span>
                             </div>
                         </div>
 
@@ -607,11 +620,23 @@ const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportDat
                                 <>
                                     <div className="bg-white p-3 rounded-lg shadow-sm">
                                         <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Bitola Entrada</p>
-                                        <p className="text-sm font-bold text-[#0F3F5C]">{inputBitola}</p>
+                                        <p className="text-sm font-bold text-[#0F3F5C]">
+                                            {inputBitola} mm
+                                            {(() => {
+                                                const gauge = gauges.find(g => g.materialType === 'Fio Máquina' && g.gauge === inputBitola);
+                                                return gauge?.productCode ? <span className="text-[10px] text-slate-400 font-bold ml-1">({gauge.productCode})</span> : null;
+                                            })()}
+                                        </p>
                                     </div>
                                     <div className="bg-white p-3 rounded-lg shadow-sm">
                                         <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Bitola Saída</p>
-                                        <p className="text-sm font-bold text-[#0F3F5C]">{reportData.targetBitola}</p>
+                                        <p className="text-sm font-bold text-[#0F3F5C]">
+                                            {reportData.targetBitola} mm
+                                            {(() => {
+                                                const gauge = gauges.find(g => g.materialType === 'CA-60' && g.gauge === reportData.targetBitola);
+                                                return gauge?.productCode ? <span className="text-[10px] text-slate-400 font-bold ml-1">({gauge.productCode})</span> : null;
+                                            })()}
+                                        </p>
                                     </div>
                                     {averageMeasuredGauge && (
                                         <div className="bg-white p-3 rounded-lg shadow-sm">

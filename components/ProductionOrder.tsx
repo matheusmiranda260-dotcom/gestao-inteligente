@@ -150,6 +150,7 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
                     reportData={productionReportData}
                     stock={stock}
                     onClose={() => setProductionReportData(null)}
+                    gauges={gauges}
                 />
             )}
 

@@ -1,14 +1,15 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import type { ConferenceData } from '../types';
+import type { ConferenceData, StockGauge } from '../types';
 import { PrinterIcon } from './icons';
 
 interface ConferenceReportProps {
   reportData: ConferenceData;
   onClose: () => void;
+  gauges: StockGauge[];
 }
 
-const ConferenceReport: React.FC<ConferenceReportProps> = ({ reportData, onClose }) => {
+const ConferenceReport: React.FC<ConferenceReportProps> = ({ reportData, onClose, gauges }) => {
   const safeLots = (reportData.lots || []).map(lot => ({
     ...lot,
     labelWeight: Number(lot.labelWeight) || 0,
@@ -93,7 +94,15 @@ const ConferenceReport: React.FC<ConferenceReportProps> = ({ reportData, onClose
                         <td className="px-2 py-2 text-center border-l border-r border-slate-400 font-bold text-base">{index + 1}</td>
                         <td className="px-2 py-2 text-center border-r border-slate-400 font-mono font-bold text-base">{lot.supplierLot}</td>
                         <td className="px-2 py-2 text-center border-r border-slate-400 font-black text-lg text-[#0F3F5C]">{lot.internalLot}</td>
-                        <td className="px-2 py-2 text-center border-r border-slate-400 font-black text-lg">{lot.bitola}</td>
+                        <td className="px-2 py-2 text-center border-r border-slate-400">
+                          <div className="flex flex-col items-center">
+                            <span className="font-black text-lg">{lot.bitola}</span>
+                            {(() => {
+                              const gauge = gauges.find(g => g.materialType === lot.materialType && g.gauge === lot.bitola);
+                              return gauge?.productCode ? <span className="text-[9px] font-black uppercase text-slate-500">{gauge.productCode}</span> : null;
+                            })()}
+                          </div>
+                        </td>
                         <td className="px-2 py-2 text-center border-r border-slate-400 uppercase truncate max-w-[120px] font-bold text-sm" title={displaySupplier}>{displaySupplier}</td>
                         <td className="px-2 py-2 text-center border-r border-slate-400 font-mono font-bold text-base">{lot.runNumber}</td>
                         <td className="px-2 py-2 text-center border-r border-slate-400 font-bold text-lg">{lot.labelWeight.toFixed(0)}</td>
