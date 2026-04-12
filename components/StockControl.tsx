@@ -358,15 +358,16 @@ const StockControl: React.FC<{
                         </div>
                         <div>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Filtro Bitola</p>
-                            <p className="text-base font-black text-slate-800">
-                                {bitolaFilter || 'Todas'}
-                                {bitolaFilter && gauges.find(g => g.gauge === bitolaFilter && (materialFilter === '' || g.materialType === materialFilter))?.productCode && (
-                                    <span className="text-sm font-bold text-slate-500 ml-2">
-                                        ({gauges.find(g => g.gauge === bitolaFilter && (materialFilter === '' || g.materialType === materialFilter))?.productCode})
-                                    </span>
-                                )}
-                            </p>
+                            <p className="text-base font-black text-slate-800">{bitolaFilter || 'Todas'}</p>
                         </div>
+                        {bitolaFilter && gauges.find(g => g.gauge === bitolaFilter && (materialFilter === '' || g.materialType === materialFilter))?.productCode && (
+                            <div>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Cód. Produto</p>
+                                <p className="text-base font-black text-slate-800">
+                                    {gauges.find(g => g.gauge === bitolaFilter && (materialFilter === '' || g.materialType === materialFilter))?.productCode}
+                                </p>
+                            </div>
+                        )}
                         <div>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status</p>
                             <p className="text-base font-black text-slate-800 max-w-[150px] truncate">{statusFilter.length === 0 ? 'Todos' : statusFilter.join(', ')}</p>
