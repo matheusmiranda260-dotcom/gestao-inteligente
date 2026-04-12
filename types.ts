@@ -346,6 +346,7 @@ export interface StockGauge {
     materialType: MaterialType | string;
     minWeight?: number;
     idealWeight?: number;
+    productCode?: string;
 }
 
 export interface LabAnalysisEntry {

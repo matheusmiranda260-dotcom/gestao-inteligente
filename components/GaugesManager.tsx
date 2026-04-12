@@ -12,6 +12,7 @@ interface GaugesManagerProps {
 
 const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, onRestoreDefaults }) => {
     const [newGauge, setNewGauge] = useState('');
+    const [newProductCode, setNewProductCode] = useState('');
     const [materialType, setMaterialType] = useState<MaterialType>('Fio Máquina');
 
     const handleAdd = () => {
@@ -36,9 +37,11 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
 
         onAdd({
             materialType: materialType,
-            gauge: formatted
+            gauge: formatted,
+            productCode: newProductCode.trim() || undefined
         });
         setNewGauge('');
+        setNewProductCode('');
     };
 
     const gaugesByMaterial = MaterialOptions.reduce((acc, material) => {
@@ -93,6 +96,17 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                                     onKeyPress={e => e.key === 'Enter' && handleAdd()}
                                 />
                             </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Cód. Produto (Opcional)</label>
+                                <input
+                                    type="text"
+                                    value={newProductCode}
+                                    onChange={e => setNewProductCode(e.target.value)}
+                                    placeholder="Ex: CA60-001"
+                                    className="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none shadow-sm"
+                                    onKeyPress={e => e.key === 'Enter' && handleAdd()}
+                                />
+                            </div>
                             <div className="flex items-end">
                                 <button
                                     onClick={handleAdd}
@@ -120,7 +134,10 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                                     <div className="grid grid-cols-2 gap-2">
                                         {gaugesByMaterial[material].map(g => (
                                             <div key={g.id} className="group flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200 hover:border-blue-200 hover:bg-white transition-all">
-                                                <span className="font-bold text-slate-700">{g.gauge.replace('.', ',')} mm</span>
+                                                <div className="flex flex-col">
+                                                    <span className="font-bold text-slate-700">{g.gauge.replace('.', ',')} mm</span>
+                                                    {g.productCode && <span className="text-[10px] text-blue-600 font-bold uppercase">{g.productCode}</span>}
+                                                </div>
                                                 <button
                                                     onClick={() => {
                                                         if (confirm(`Deseja remover a bitola ${g.gauge.replace('.', ',')} para ${material}?`)) {

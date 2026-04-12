@@ -233,9 +233,23 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
                                     >
                                         <option value="">Selecione a bitola de entrada</option>
                                         {(() => {
-                                            const materialGaugesFromDB = gauges.filter(g => g.materialType === 'Fio Máquina').map(g => g.gauge);
-                                            const combinedOptions = [...new Set([...FioMaquinaBitolaOptions, ...materialGaugesFromDB])].sort((a, b) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')));
-                                            return combinedOptions.map(b => <option key={b} value={b}>{b.replace('.', ',')}</option>);
+                                            const baseGauges = FioMaquinaBitolaOptions;
+                                            const customGauges = gauges.filter(g => g.materialType === 'Fio Máquina');
+                                            
+                                            const allOptions = [
+                                                ...baseGauges.map(g => ({ gauge: g, code: '' })),
+                                                ...customGauges.map(g => ({ gauge: g.gauge, code: g.productCode }))
+                                            ];
+
+                                            const uniqueOptions = Array.from(new Set(allOptions.map(o => JSON.stringify(o))))
+                                                .map(s => JSON.parse(s))
+                                                .sort((a, b) => parseFloat(a.gauge.replace(',', '.')) - parseFloat(b.gauge.replace(',', '.')));
+
+                                            return uniqueOptions.map(opt => (
+                                                <option key={`${opt.gauge}-${opt.code}`} value={opt.gauge}>
+                                                    {opt.gauge.replace('.', ',')} {opt.code ? `(${opt.code})` : ''}
+                                                </option>
+                                            ));
                                         })()}
                                     </select>
                                 </div>
@@ -248,17 +262,30 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
                                         className="mt-1 p-2 w-full border border-slate-300 rounded-md bg-white"
                                     >
                                         {(() => {
-                                            const materialGaugesFromDB = gauges.filter(g => g.materialType === 'CA-60').map(g => g.gauge);
-                                            const combinedOptions = [...new Set([...TrefilaBitolaOptions, ...materialGaugesFromDB])].sort((a, b) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')));
+                                            const baseGauges = TrefilaBitolaOptions;
+                                            const customGauges = gauges.filter(g => g.materialType === 'CA-60');
+                                            
+                                            const allOptions = [
+                                                ...baseGauges.map(g => ({ gauge: g, code: '' })),
+                                                ...customGauges.map(g => ({ gauge: g.gauge, code: g.productCode }))
+                                            ];
 
-                                            return combinedOptions
-                                                .filter(b => {
+                                            const uniqueOptions = Array.from(new Set(allOptions.map(o => JSON.stringify(o))))
+                                                .map(s => JSON.parse(s))
+                                                .sort((a, b) => parseFloat(a.gauge.replace(',', '.')) - parseFloat(b.gauge.replace(',', '.')));
+
+                                            return uniqueOptions
+                                                .filter(opt => {
                                                     if (inputBitolaFilter === '') return true;
                                                     const inputBitolaNum = parseFloat(inputBitolaFilter.replace(',', '.'));
-                                                    const targetBitolaNum = parseFloat(b.replace(',', '.'));
+                                                    const targetBitolaNum = parseFloat(opt.gauge.replace(',', '.'));
                                                     return targetBitolaNum < inputBitolaNum;
                                                 })
-                                                .map(b => <option key={b} value={b}>{b.replace('.', ',')}</option>);
+                                                .map(opt => (
+                                                    <option key={`${opt.gauge}-${opt.code}`} value={opt.gauge}>
+                                                        {opt.gauge.replace('.', ',')} {opt.code ? `(${opt.code})` : ''}
+                                                    </option>
+                                                ));
                                         })()}
                                     </select>
                                 </div>

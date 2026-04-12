@@ -742,18 +742,20 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
                                     <div className="pt-4 space-y-3">
                                         <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Componentes (mm)</h4>
                                         <div className="grid grid-cols-3 gap-2">
-                                            <div className="bg-white/5 p-2 rounded-lg border border-white/5 text-center">
-                                                <div className="text-[10px] text-slate-400 font-bold">SUP</div>
-                                                <div className="font-bold">{selectedModel.superior}</div>
-                                            </div>
-                                            <div className="bg-white/5 p-2 rounded-lg border border-white/5 text-center">
-                                                <div className="text-[10px] text-slate-400 font-bold">INF</div>
-                                                <div className="font-bold">{selectedModel.inferior}</div>
-                                            </div>
-                                            <div className="bg-white/5 p-2 rounded-lg border border-white/5 text-center">
-                                                <div className="text-[10px] text-slate-400 font-bold">SENO</div>
-                                                <div className="font-bold">{selectedModel.senozoide}</div>
-                                            </div>
+                                            {[
+                                                { label: 'SUP', gauge: selectedModel.superior },
+                                                { label: 'INF', gauge: selectedModel.inferior },
+                                                { label: 'SENO', gauge: selectedModel.senozoide },
+                                            ].map((comp, idx) => (
+                                                <div key={idx} className="bg-white/5 p-2 rounded-lg border border-white/5 text-center">
+                                                    <div className="text-[10px] text-slate-400 font-bold">{comp.label}</div>
+                                                    <div className="font-bold">{comp.gauge}</div>
+                                                    {(() => {
+                                                        const g = gauges.find(g => g.materialType === 'CA-60' && normalizeBitola(g.gauge) === normalizeBitola(comp.gauge));
+                                                        return g?.productCode ? <div className="text-[8px] text-indigo-400 font-black uppercase truncate">{g.productCode}</div> : null;
+                                                    })()}
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
 

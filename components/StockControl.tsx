@@ -155,16 +155,27 @@ const AddConferencePage: React.FC<{
                                         <td className="p-2"><select value={lot.materialType} onChange={e => handleLotChange(index, 'materialType', e.target.value)} className="w-full p-2 border rounded text-center">{MaterialOptions.map(m => <option key={m} value={m}>{m}</option>)}</select></td>
                                         <td className="p-2">
                                             <select value={lot.bitola} onChange={e => handleLotChange(index, 'bitola', e.target.value)} className="w-full p-2 border rounded text-center">
-                                                {[...new Set([
-                                                    ...(lot.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions),
-                                                    ...gauges.filter(g => g.materialType === lot.materialType).map(g => g.gauge)
-                                                ])].sort((a, b) => {
-                                                    const numA = parseFloat(a.replace(',', '.'));
-                                                    const numB = parseFloat(b.replace(',', '.'));
-                                                    return numA - numB;
-                                                }).map(b => (
-                                                    <option key={b} value={b}>{b}</option>
-                                                ))}
+                                                {(() => {
+                                                    const baseGauges = lot.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions;
+                                                    const customGauges = gauges.filter(g => g.materialType === lot.materialType);
+                                                    
+                                                    // Map all to a common structure
+                                                    const allOptions = [
+                                                        ...baseGauges.map(g => ({ gauge: g, code: '' })),
+                                                        ...customGauges.map(g => ({ gauge: g.gauge, code: g.productCode }))
+                                                    ];
+
+                                                    // Deduplicate by gauge + code
+                                                    const uniqueOptions = Array.from(new Set(allOptions.map(o => JSON.stringify(o))))
+                                                        .map(s => JSON.parse(s))
+                                                        .sort((a, b) => parseFloat(a.gauge.replace(',', '.')) - parseFloat(b.gauge.replace(',', '.')));
+
+                                                    return uniqueOptions.map(opt => (
+                                                        <option key={`${opt.gauge}-${opt.code}`} value={opt.gauge}>
+                                                            {opt.gauge.replace('.', ',')} {opt.code ? `(${opt.code})` : ''}
+                                                        </option>
+                                                    ));
+                                                })()}
                                             </select>
                                         </td>
                                         <td className="p-2">
@@ -546,7 +557,15 @@ const StockControl: React.FC<{
                                     <td className="p-3 text-center font-black text-slate-900">{item.internalLot}</td>
                                     <td className="p-3 text-center font-bold text-slate-600">{item.steelType || '-'}</td>
                                     <td className="p-3 text-center text-slate-500">{item.materialType}</td>
-                                    <td className="p-3 text-center font-black text-blue-600">{item.bitola}</td>
+                                    <td className="p-3 text-center">
+                                        <div className="flex flex-col items-center">
+                                            <span className="font-black text-blue-600">{item.bitola.replace('.', ',')}</span>
+                                            {(() => {
+                                                const gauge = gauges.find(g => g.materialType === item.materialType && g.gauge === item.bitola);
+                                                return gauge?.productCode ? <span className="text-[9px] text-slate-400 font-bold uppercase">{gauge.productCode}</span> : null;
+                                            })()}
+                                        </div>
+                                    </td>
                                     <td className="p-3 text-center font-black text-slate-800">{item.remainingQuantity.toFixed(2)}</td>
                                     <td className="p-3 text-center">{getStatusBadge(item.status)}</td>
                                     <td className="p-3 flex justify-center gap-2 no-print">
@@ -666,9 +685,25 @@ const EditStockItemModal: React.FC<{ item: StockItem; onClose: () => void; onSav
                         <div className="space-y-1">
                             <label className="text-xs font-bold text-slate-500 uppercase">Bitola</label>
                             <select value={formData.bitola} onChange={e => setFormData({ ...formData, bitola: e.target.value })} className="w-full px-3 py-2 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                                {materialGauges.map(b => (
-                                    <option key={b} value={b}>{b}</option>
-                                ))}
+                                {(() => {
+                                    const baseGauges = formData.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions;
+                                    const customGauges = gauges.filter(g => g.materialType === formData.materialType);
+                                    
+                                    const allOptions = [
+                                        ...baseGauges.map(g => ({ gauge: g, code: '' })),
+                                        ...customGauges.map(g => ({ gauge: g.gauge, code: g.productCode }))
+                                    ];
+
+                                    const uniqueOptions = Array.from(new Set(allOptions.map(o => JSON.stringify(o))))
+                                        .map(s => JSON.parse(s))
+                                        .sort((a, b) => parseFloat(a.gauge.replace(',', '.')) - parseFloat(b.gauge.replace(',', '.')));
+
+                                    return uniqueOptions.map(opt => (
+                                        <option key={`${opt.gauge}-${opt.code}`} value={opt.gauge}>
+                                            {opt.gauge.replace('.', ',')} {opt.code ? `(${opt.code})` : ''}
+                                        </option>
+                                    ));
+                                })()}
                             </select>
                         </div>
                     </div>
