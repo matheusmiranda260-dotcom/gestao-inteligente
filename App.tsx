@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'; // Refresh Trigger
-import type { Page, User, Employee, StockItem, ConferenceData, ProductionOrderData, TransferRecord, Bitola, MachineType, PartsRequest, ShiftReport, ProductionRecord, TransferredLotInfo, ProcessedLot, DowntimeEvent, OperatorLog, TrelicaSelectedLots, WeighedPackage, FinishedProductItem, Ponta, PontaItem, FinishedGoodsTransferRecord, TransferredFinishedGoodInfo, KaizenProblem, Meeting, MeetingItem, MeetingCategory } from './types';
+import type { Page, User, Employee, StockItem, ConferenceData, ProductionOrderData, TransferRecord, Bitola, MachineType, PartsRequest, ShiftReport, ProductionRecord, TransferredLotInfo, ProcessedLot, DowntimeEvent, OperatorLog, TrelicaSelectedLots, WeighedPackage, FinishedProductItem, Ponta, PontaItem, FinishedGoodsTransferRecord, TransferredFinishedGoodInfo, KaizenProblem, Meeting, MeetingItem, MeetingCategory, StockMovement } from './types';
 import { FioMaquinaBitolaOptions, TrefilaBitolaOptions } from './types';
 import Login from './components/Login';
 import MainMenu from './components/MainMenu';
@@ -1849,8 +1849,9 @@ const App: React.FC = () => {
                 if (finalData.pontas) {
                     const pontasItems: PontaItem[] = finalData.pontas.map(p => ({
                         id: generateId('ponta'), productionDate: now, productionOrderId: orderId, orderNumber: orderToComplete.orderNumber,
-                        productType: 'Ponta de Treliça', model: orderToComplete.trelicaModel!, size: `${p.size} `, quantity: p.quantity, totalWeight: p.totalWeight, status: 'Disponível'
+                        productType: 'Ponta de Treliça', model: orderToComplete.trelicaModel!, size: `${p.size} `, quantity: p.quantity, physicalQuantity: 0, totalWeight: p.totalWeight, status: 'Disponível'
                     }));
+
                     for (const pi of pontasItems) await insertItem('pontas_stock', pi);
                     const allPontas = await fetchTable<PontaItem>('pontas_stock');
                     setPontasStock(allPontas.sort((a, b) => new Date(b.productionDate).getTime() - new Date(a.productionDate).getTime()));
@@ -1860,8 +1861,9 @@ const App: React.FC = () => {
                     const fg: FinishedProductItem = {
                         id: generateId('fg'), productionDate: now, productionOrderId: orderId, orderNumber: orderToComplete.orderNumber,
                         productType: 'Treliça', model: orderToComplete.trelicaModel!, size: `${orderToComplete.tamanho!} `, quantity: finalData.actualProducedQuantity || 0,
-                        totalWeight: weight, status: 'Disponível'
+                        physicalQuantity: 0, totalWeight: weight, status: 'Disponível'
                     };
+
                     await insertItem('finished_goods', fg);
                     const allFG = await fetchTable<FinishedProductItem>('finished_goods');
                     setFinishedGoods(allFG.sort((a, b) => new Date(b.productionDate).getTime() - new Date(a.productionDate).getTime()));
@@ -2111,25 +2113,43 @@ const App: React.FC = () => {
         } catch (error) { showNotification('Erro ao excluir.', 'error'); }
     };
 
-    const updateFinishedGoodQuantity = async (id: string, newQuantity: number) => {
+    const updateFinishedGood = async (id: string, updates: Partial<FinishedProductItem>, movement?: StockMovement) => {
         try {
             const item = finishedGoods.find(i => i.id === id);
             if (!item) return;
-            const weightPerPiece = item.totalWeight / item.quantity;
-            const newWeight = weightPerPiece * newQuantity;
+
+            // Mapeamento para o banco de dados (snake_case)
+            const dbUpdates: any = {};
+            if (updates.quantity !== undefined) dbUpdates.quantity = updates.quantity;
+            if (updates.physicalQuantity !== undefined) dbUpdates.physical_quantity = updates.physicalQuantity;
+            if (updates.movementHistory !== undefined) dbUpdates.movement_history = updates.movementHistory;
             
-            await updateItem('finished_goods', id, { quantity: newQuantity, total_weight: newWeight });
-            setFinishedGoods(prev => prev.map(i => i.id === id ? { ...i, quantity: newQuantity, totalWeight: newWeight } : i));
-        } catch (error) { showNotification('Erro ao atualizar quantidade.', 'error'); }
+            // Re-calcula peso se a quantidade virtual mudar
+            if (updates.quantity !== undefined) {
+                const weightPerPiece = item.totalWeight / item.quantity;
+                dbUpdates.total_weight = weightPerPiece * updates.quantity;
+                updates.totalWeight = dbUpdates.total_weight;
+            }
+
+            await updateItem('finished_goods', id, dbUpdates);
+            setFinishedGoods(prev => prev.map(i => i.id === id ? { ...i, ...updates } : i));
+            
+            if (movement) {
+                showNotification(`Movimentação de ${movement.quantity} realizada.`, 'success');
+            }
+        } catch (error) { showNotification('Erro ao atualizar.', 'error'); }
     };
+
 
     const addManualFinishedGood = async (itemData: Omit<FinishedProductItem, 'id' | 'status' | 'productionDate'>) => {
         const newItem: FinishedProductItem = {
             ...itemData,
             id: generateId('fg'),
+            physicalQuantity: 0,
             status: 'Disponível',
             productionDate: new Date().toISOString()
         };
+
         try {
             await insertItem('finished_goods', newItem);
             setFinishedGoods(prev => [newItem, ...prev]);
@@ -2188,7 +2208,8 @@ const App: React.FC = () => {
             case 'reports': return <Reports setPage={setPage} stock={stock} trefilaProduction={trefilaProduction} trelicaProduction={trelicaProduction} />;
             case 'userManagement': return <UserManagement users={users} employees={employees} addUser={addUser} updateUser={updateUser} deleteUser={deleteUser} setPage={setPage} />;
             case 'finishedGoods': return <FinishedGoods finishedGoods={finishedGoods} pontasStock={pontasStock} setPage={setPage} finishedGoodsTransfers={finishedGoodsTransfers} createFinishedGoodsTransfer={createFinishedGoodsTransfer} onDelete={deleteFinishedGoods} />;
-            case 'trelicaStock': return <TrelicaStockManager finishedGoods={finishedGoods} setPage={setPage} createFinishedGoodsTransfer={createFinishedGoodsTransfer} onDelete={deleteFinishedGoods} onUpdateQuantity={updateFinishedGoodQuantity} onAddManual={addManualFinishedGood} currentUser={currentUser} />;
+            case 'trelicaStock': return <TrelicaStockManager finishedGoods={finishedGoods} setPage={setPage} createFinishedGoodsTransfer={createFinishedGoodsTransfer} onDelete={deleteFinishedGoods} onUpdateQuantity={updateFinishedGood} onAddManual={addManualFinishedGood} currentUser={currentUser} />;
+
 
             case 'partsManager': return <SparePartsManager />;
             case 'continuousImprovement': return <ContinuousImprovement setPage={setPage} />;

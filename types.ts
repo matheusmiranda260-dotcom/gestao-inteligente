@@ -243,9 +243,12 @@ export interface FinishedProductItem {
     model: string;
     size: string;
     quantity: number;
+    physicalQuantity: number;
     totalWeight: number;
     status: 'Disponível' | 'Vendido' | 'Transferido';
+    movementHistory?: StockMovement[];
 }
+
 
 export interface Ponta {
     size: number;
@@ -263,9 +266,12 @@ export interface PontaItem {
     model: string;
     size: string;
     quantity: number;
+    physicalQuantity: number;
     totalWeight: number;
     status: 'Disponível' | 'Vendido' | 'Transferido';
+    movementHistory?: StockMovement[];
 }
+
 
 export interface TransferredFinishedGoodInfo {
     productId: string;
@@ -284,6 +290,18 @@ export interface FinishedGoodsTransferRecord {
     otherDestination?: string;
     transferredItems: TransferredFinishedGoodInfo[];
 }
+
+export interface StockMovement {
+    id: string;
+    date: string;
+    type: 'transfer' | 'out' | 'adjustment';
+    from: 'virtual' | 'physical';
+    to?: 'physical' | 'out';
+    quantity: number;
+    operator: string;
+    observations?: string;
+}
+
 
 export interface KaizenAction {
     id: string;
