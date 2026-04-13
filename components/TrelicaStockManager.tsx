@@ -93,6 +93,12 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
     const [historyItem, setHistoryItem] = useState<FinishedProductItem | null>(null);
     const [movementQty, setMovementQty] = useState(0);
     const [obs, setObs] = useState('');
+    
+    // Estados para Filtros
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedBaseModel, setSelectedBaseModel] = useState<string>('all');
+    const [onlyWithDiff, setOnlyWithDiff] = useState(false);
+    const [onlyAvailable, setOnlyAvailable] = useState(false);
 
     const stockSummarized = useMemo(() => {
         const summary: Record<string, ModelStockSummary> = {};
@@ -120,8 +126,24 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
             summary[key].lastItemIds.push(item.id);
         });
 
-        return Object.values(summary).sort((a,b) => a.model.localeCompare(b.model));
-    }, [finishedGoods]);
+        return Object.values(summary)
+            .filter(s => {
+                // Filtro de Busca
+                const matchesSearch = s.model.toLowerCase().includes(searchTerm.toLowerCase());
+                
+                // Filtro de Modelo Base (H-6, H-8...)
+                const matchesBase = selectedBaseModel === 'all' || s.model.startsWith(selectedBaseModel);
+                
+                // Filtro de Divergência
+                const hasDiff = !onlyWithDiff || (s.physicalQty !== s.virtualQty);
+
+                // Filtro de Disponibilidade (Virtual ou Físico > 0)
+                const isAvailable = !onlyAvailable || (s.virtualQty > 0 || s.physicalQty > 0);
+                
+                return matchesSearch && matchesBase && hasDiff && isAvailable;
+            })
+            .sort((a,b) => a.model.localeCompare(b.model));
+    }, [finishedGoods, searchTerm, selectedBaseModel, onlyWithDiff, onlyAvailable]);
 
     const handleAction = () => {
         if (!movingItem) return;
@@ -241,6 +263,77 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
                     <PlusIcon className="h-5 w-5" /> Nova Ordem
                 </button>
             </header>
+
+            {/* Filtros e Controles */}
+            <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 flex flex-wrap items-center gap-6">
+                <div className="flex-1 min-w-[250px]">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Buscar Modelo</label>
+                    <div className="relative">
+                        <input 
+                            type="text" 
+                            placeholder="Ex: H-8 Super Pesado..." 
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-12 pr-4 py-3 bg-slate-50 border-none rounded-2xl font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
+                        />
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300">
+                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="w-48">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Família / Modelo</label>
+                    <select 
+                        value={selectedBaseModel}
+                        onChange={(e) => setSelectedBaseModel(e.target.value)}
+                        className="w-full p-3 bg-slate-50 border-none rounded-2xl font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
+                    >
+                        <option value="all">Todos</option>
+                        <option value="H-6">Série H-6</option>
+                        <option value="H-8">Série H-8</option>
+                        <option value="H-10">Série H-10</option>
+                        <option value="H-12">Série H-12</option>
+                        <option value="H-16">Série H-16</option>
+                        <option value="H-25">Série H-25</option>
+                    </select>
+                </div>
+
+                <div className="flex items-center gap-3 pt-6">
+                    <button 
+                        type="button"
+                        onClick={() => setOnlyWithDiff(!onlyWithDiff)}
+                        className={`px-6 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all ${onlyWithDiff ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
+                    >
+                        {onlyWithDiff ? 'Exibindo: Divergências' : 'Ver Divergências'}
+                    </button>
+                    <button 
+                        type="button"
+                        onClick={() => setOnlyAvailable(!onlyAvailable)}
+                        className={`px-6 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all ${onlyAvailable ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
+                    >
+                        {onlyAvailable ? 'Exibindo: Com Estoque' : 'Apenas Com Estoque'}
+                    </button>
+                    {(searchTerm || selectedBaseModel !== 'all' || onlyWithDiff || onlyAvailable) && (
+                        <button 
+                            type="button"
+                            onClick={() => { 
+                                setSearchTerm(''); 
+                                setSelectedBaseModel('all'); 
+                                setOnlyWithDiff(false); 
+                                setOnlyAvailable(false);
+                            }}
+                            className="text-indigo-600 font-black text-[10px] uppercase hover:underline ml-2"
+                        >
+                            Limpar
+                        </button>
+                    )}
+                </div>
+                <div className="ml-auto pt-6 text-right">
+                    <span className="text-[10px] font-black text-slate-300 uppercase block">Exibindo</span>
+                    <span className="text-sm font-black text-slate-700">{stockSummarized.length} modelos</span>
+                </div>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div className="bg-slate-800 p-6 rounded-[2rem] text-white">
