@@ -14,7 +14,9 @@ import Sidebar from './components/Sidebar';
 import ProductionDashboard from './components/ProductionDashboard';
 import { trelicaModels } from './components/ProductionOrderTrelica';
 import FinishedGoods from './components/FinishedGoods';
+import TrelicaStockManager from './components/TrelicaStockManager';
 import SparePartsManager from './components/SparePartsManager';
+
 import ContinuousImprovement from './components/ContinuousImprovement';
 import WorkInstructions from './components/WorkInstructions';
 import PeopleManagement from './components/PeopleManagement';
@@ -2109,6 +2111,33 @@ const App: React.FC = () => {
         } catch (error) { showNotification('Erro ao excluir.', 'error'); }
     };
 
+    const updateFinishedGoodQuantity = async (id: string, newQuantity: number) => {
+        try {
+            const item = finishedGoods.find(i => i.id === id);
+            if (!item) return;
+            const weightPerPiece = item.totalWeight / item.quantity;
+            const newWeight = weightPerPiece * newQuantity;
+            
+            await updateItem('finished_goods', id, { quantity: newQuantity, total_weight: newWeight });
+            setFinishedGoods(prev => prev.map(i => i.id === id ? { ...i, quantity: newQuantity, totalWeight: newWeight } : i));
+        } catch (error) { showNotification('Erro ao atualizar quantidade.', 'error'); }
+    };
+
+    const addManualFinishedGood = async (itemData: Omit<FinishedProductItem, 'id' | 'status' | 'productionDate'>) => {
+        const newItem: FinishedProductItem = {
+            ...itemData,
+            id: generateId('fg'),
+            status: 'Disponível',
+            productionDate: new Date().toISOString()
+        };
+        try {
+            await insertItem('finished_goods', newItem);
+            setFinishedGoods(prev => [newItem, ...prev]);
+            showNotification('Item adicionado ao estoque.', 'success');
+        } catch (error) { showNotification('Erro ao adicionar item.', 'error'); }
+    };
+
+
     const deleteShiftReport = async (reportId: string) => {
         if (!confirm('Tem certeza que deseja excluir este relatório de turno?')) return;
         try {
@@ -2159,6 +2188,8 @@ const App: React.FC = () => {
             case 'reports': return <Reports setPage={setPage} stock={stock} trefilaProduction={trefilaProduction} trelicaProduction={trelicaProduction} />;
             case 'userManagement': return <UserManagement users={users} employees={employees} addUser={addUser} updateUser={updateUser} deleteUser={deleteUser} setPage={setPage} />;
             case 'finishedGoods': return <FinishedGoods finishedGoods={finishedGoods} pontasStock={pontasStock} setPage={setPage} finishedGoodsTransfers={finishedGoodsTransfers} createFinishedGoodsTransfer={createFinishedGoodsTransfer} onDelete={deleteFinishedGoods} />;
+            case 'trelicaStock': return <TrelicaStockManager finishedGoods={finishedGoods} setPage={setPage} createFinishedGoodsTransfer={createFinishedGoodsTransfer} onDelete={deleteFinishedGoods} onUpdateQuantity={updateFinishedGoodQuantity} onAddManual={addManualFinishedGood} currentUser={currentUser} />;
+
             case 'partsManager': return <SparePartsManager />;
             case 'continuousImprovement': return <ContinuousImprovement setPage={setPage} />;
             case 'workInstructions': return <WorkInstructions setPage={setPage} />;

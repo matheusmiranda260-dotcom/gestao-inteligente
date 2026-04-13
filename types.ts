@@ -1,6 +1,7 @@
 // types.ts
 
-export type Page = 'login' | 'menu' | 'stock' | 'stockAdd' | 'stockTransfer' | 'finishedGoods' | 'productionOrderTrelica' | 'productionOrder' | 'productionDashboard' | 'meetingsTasks' | 'continuousImprovement' | 'peopleManagement' | 'trefila' | 'trefilaInProgress' | 'trefilaPending' | 'trefilaCompleted' | 'trefilaRings' | 'trefilaReports' | 'trefilaWeighing' | 'trefilaTemplates' | 'trefilaParts' | 'trelica' | 'trelicaInProgress' | 'trelicaPending' | 'trelicaCompleted' | 'trelicaReports' | 'trelicaParts' | 'reports' | 'laboratory' | 'userManagement' | 'gaugesManager' | 'partsManager' | 'workInstructions' | 'people' | 'finished_goods' | 'spare_parts' | 'quality' | 'instructions' | 'weighing' | 'meetings';
+export type Page = 'login' | 'menu' | 'stock' | 'stockAdd' | 'stockTransfer' | 'finishedGoods' | 'trelicaStock' | 'productionOrderTrelica' | 'productionOrder' | 'productionDashboard' | 'meetingsTasks' | 'continuousImprovement' | 'peopleManagement' | 'trefila' | 'trefilaInProgress' | 'trefilaPending' | 'trefilaCompleted' | 'trefilaRings' | 'trefilaReports' | 'trefilaWeighing' | 'trefilaTemplates' | 'trefilaParts' | 'trelica' | 'trelicaInProgress' | 'trelicaPending' | 'trelicaCompleted' | 'trelicaReports' | 'trelicaParts' | 'reports' | 'laboratory' | 'userManagement' | 'gaugesManager' | 'partsManager' | 'workInstructions' | 'people' | 'finished_goods' | 'spare_parts' | 'quality' | 'instructions' | 'weighing' | 'meetings';
+
 
 export type MachineType = 'Trefila-01' | 'Trefila-02' | 'Trefila-03' | 'Trefila-04' | 'Treliça-01' | 'Treliça-02' | 'Treliça-03' | 'Treliça-04' | 'Corte-01' | 'Corte-02' | 'Trefila' | 'Treliça' | 'Geral' | 'Empilhadeira';
 

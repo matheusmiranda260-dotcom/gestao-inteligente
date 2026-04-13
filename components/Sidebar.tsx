@@ -268,7 +268,9 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                     )}
 
                     <MenuItem target="finishedGoods" label="Produto Acabado" icon={ArchiveIcon} />
+                    <MenuItem target="trelicaStock" label="Estoque de Treliça" icon={ArchiveIcon} />
                 </div>
+
 
                 {/* PESSOAS */}
                 <div className="sidebar-category">
