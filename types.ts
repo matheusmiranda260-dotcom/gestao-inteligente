@@ -294,9 +294,9 @@ export interface FinishedGoodsTransferRecord {
 export interface StockMovement {
     id: string;
     date: string;
-    type: 'transfer' | 'out' | 'adjustment';
-    from: 'virtual' | 'physical';
-    to?: 'physical' | 'out';
+    type: 'transfer' | 'adjustment' | 'out';
+    from: 'virtual' | 'physical' | 'system' | 'out';
+    to: 'virtual' | 'physical' | 'system' | 'out';
     quantity: number;
     operator: string;
     observations?: string;
