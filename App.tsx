@@ -28,6 +28,7 @@ import TrefilaWeighing from './components/TrefilaWeighing';
 import StickyNotes from './components/StickyNotes';
 import MeetingsTasks from './components/MeetingsTasks';
 import Laboratory from './components/Laboratory';
+import DocumentManager from './components/DocumentManager';
 import { supabase } from './supabaseClient';
 import type { StockGauge, StickyNote } from './types';
 
@@ -2215,6 +2216,7 @@ const App: React.FC = () => {
             case 'continuousImprovement': return <ContinuousImprovement setPage={setPage} />;
             case 'workInstructions': return <WorkInstructions setPage={setPage} />;
             case 'peopleManagement': return <PeopleManagement setPage={setPage} currentUser={currentUser} />;
+            case 'documents': return <DocumentManager setPage={setPage} currentUser={currentUser} />;
             case 'gaugesManager': return <GaugesManager gauges={gauges} onAdd={addGauge} onDelete={deleteGauge} onUpdate={updateGauge} onRestoreDefaults={restoreDefaultGauges} />;
             case 'meetingsTasks':
                 return <MeetingsTasks

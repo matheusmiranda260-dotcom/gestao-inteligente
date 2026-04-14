@@ -313,6 +313,7 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                     <div className="sidebar-category-title">{isCollapsed ? '🧰' : '🧰 Gestão'}</div>
                     <MenuItem target="reports" label="Relatórios" icon={ChartBarIcon} />
                     <MenuItem target="laboratory" label="Laboratório" icon={DocumentReportIcon} />
+                    <MenuItem target="documents" label="Documentos" icon={DocumentTextIcon} />
                     <MenuItem target="workInstructions" label="Instruções" icon={DocumentTextIcon} />
                     <MenuItem target="partsManager" label="Peças" icon={WrenchScrewdriverIcon} />
                 </div>
