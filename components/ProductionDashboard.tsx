@@ -234,7 +234,12 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                             <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-black/40 border border-white/10 ${currentStyle.color}`}>
                                 {currentOperator}
                             </span>
-                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">• {activeOrder?.targetBitola || activeOrder?.trelicaModel || '---'}</span>
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                                • {machineType === 'Trefila' 
+                                    ? (activeOrder?.targetBitola || '---') 
+                                    : (activeOrder?.trelicaModel ? `${activeOrder.trelicaModel} ${activeOrder.tamanho ? `(${activeOrder.tamanho}m)` : ''}` : '---')
+                                }
+                            </span>
                         </div>
                     </div>
                 </div>
