@@ -147,7 +147,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
         if (openEvent) {
             const reason = openEvent.reason || 'Parada';
             const dur = now.getTime() - new Date(openEvent.stopTime).getTime();
-            if (reason.includes('Prepara\u00e7\u00e3o') || reason.includes('Setup')) return { status: 'Preparacao', reason, durationMs: dur };
+            if (reason.includes('Preparação') || reason.includes('Setup')) return { status: 'Preparacao', reason, durationMs: dur };
             if (reason.includes('Turno') || !currentOperatorLog) return { status: 'Desligada', reason, durationMs: dur };
             return { status: 'Parada', reason, durationMs: dur };
         }
@@ -178,7 +178,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
 
     const { shiftDowntime, shiftUptime } = useMemo(() => {
         let dt = 0;
-        allOrders.filter(o => o.machine === machineType).forEach(o => {
+        allOrders.filter(o => o.machine.startsWith(machineType)).forEach(o => {
             (o.downtimeEvents || []).forEach((e: any) => {
                 const s = Math.max(shiftStartMs, new Date(e.stopTime).getTime());
                 const r = Math.min(now.getTime(), e.resumeTime ? new Date(e.resumeTime).getTime() : now.getTime());
@@ -190,7 +190,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     }, [allOrders, machineType, shiftStartMs, now]);
 
     const productionHistoryInShift = useMemo(() => {
-        const orders = allOrders.filter(o => o.machine === machineType);
+        const orders = allOrders.filter(o => o.machine.startsWith(machineType));
         
         if (machineType === 'Trefila') {
             return orders.flatMap(o => (o.processedLots || []).map((l: ProcessedLot) => ({
@@ -286,7 +286,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                             <span className="text-5xl font-black text-white tracking-tight tabular-nums">
                                 {machineType === 'Trefila' ? processedLotsCount : producedQuantity.toLocaleString()}
                             </span>
-                            <span className="text-lg font-bold text-slate-500 uppercase">{machineType === 'Trefila' ? 'Lotes' : 'Pe\u00e7as'}</span>
+                            <span className="text-lg font-bold text-slate-500 uppercase">{machineType === 'Trefila' ? 'Lotes' : 'Peças'}</span>
                         </div>
                         {/* Custom Bar Chart Simulation */}
                         <div className="h-24 flex items-end gap-1 mb-4">
@@ -335,7 +335,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                     </thead>
                                     <tbody className="divide-y divide-white/5">
                                         {allOrders
-                                            .filter(o => o.machine === machineType)
+                                            .filter(o => o.machine.startsWith(machineType))
                                             .flatMap(o => (o.downtimeEvents || []).map((e: any) => ({ ...e, orderNumber: o.orderNumber })))
                                             .filter(e => new Date(e.stopTime).getTime() >= shiftStartMs)
                                             .sort((a,b) => new Date(b.stopTime).getTime() - new Date(a.stopTime).getTime())
@@ -351,6 +351,9 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                                     </tr>
                                                 );
                                             })}
+                                        {allOrders.filter(o => o.machine.startsWith(machineType)).flatMap(o => o.downtimeEvents || []).filter(e => new Date(e.stopTime).getTime() >= shiftStartMs).length === 0 && (
+                                            <tr><td colSpan={3} className="p-8 text-center text-slate-500 text-[10px] font-bold uppercase tracking-widest">Nenhuma parada registrada no turno</td></tr>
+                                        )}
                                     </tbody>
                                 </table>
                             ) : (
@@ -372,6 +375,9 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                                 </td>
                                             </tr>
                                         ))}
+                                        {productionHistoryInShift.length === 0 && (
+                                            <tr><td colSpan={3} className="p-8 text-center text-slate-500 text-[10px] font-bold uppercase tracking-widest">Nenhuma produção registrada no turno</td></tr>
+                                        )}
                                     </tbody>
                                 </table>
                             )}
@@ -414,7 +420,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
     const [shiftResets, setShiftResets] = useState(() => JSON.parse(localStorage.getItem('shiftResets') || '{}'));
 
     const handleReset = (m: MachineType) => {
-        if (!confirm(`Deseja zerar os dados de turno para a m\u00e1quina ${m}? Esta a\u00e7\u00e3o s\u00f3 afeta a visualiza\u00e7\u00e3o deste dashboard.`)) return;
+        if (!confirm(`Deseja zerar os dados de turno para a máquina ${m}? Esta ação só afeta a visualização deste dashboard.`)) return;
         const newResets = { ...shiftResets, [m]: new Date().toISOString() };
         setShiftResets(newResets);
         localStorage.setItem('shiftResets', JSON.stringify(newResets));
@@ -445,7 +451,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
     };
 
     const activeTrefila = productionOrders.find(o => o.machine === 'Trefila' && o.status === 'in_progress');
-    const activeTrelica = productionOrders.find(o => o.machine === 'Treli\u00e7a' && o.status === 'in_progress');
+    const activeTrelica = productionOrders.find(o => o.machine === 'Treliça' && o.status === 'in_progress');
 
     const getTrelicaGoal = (activeOrder?: ProductionOrderData) => {
         if (!activeOrder) return 500;
@@ -499,15 +505,15 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                     onResetShift={() => handleReset('Trefila')} 
                 />
                 <MachineStatusView 
-                    machineType="Treli\u00e7a" 
+                    machineType="Treliça" 
                     activeOrder={activeTrelica} 
                     allOrders={productionOrders} 
                     stock={stock} 
-                    dailyProducedValue={getDailyValue('Treli\u00e7a')} 
+                    dailyProducedValue={getDailyValue('Treliça')} 
                     dailyGoal={getTrelicaGoal(activeTrelica)} 
-                    goalUnit="p\u00e7s" 
+                    goalUnit="pçs" 
                     isGestor={isGestor} 
-                    onResetShift={() => handleReset('Treli\u00e7a')} 
+                    onResetShift={() => handleReset('Treliça')} 
                 />
             </div>
             
