@@ -136,32 +136,32 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                             {!isCollapsed && expandedMenus.includes('trefila') && (
                                 <div className="ml-4 pl-4 border-l border-slate-700/50 flex flex-col gap-0.5 mt-1 mb-2 animate-in slide-in-from-left-2 duration-200">
                                     {hasPermission('trefilaInProgress') && (
-                                        <button onClick={() => setPage('trefilaInProgress')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaInProgress' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                        <button onClick={() => setPage('trefilaInProgress')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaInProgress' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             ⚙️ Em Produção
                                         </button>
                                     )}
                                     {hasPermission('trefilaWeighing') && (
-                                        <button onClick={() => setPage('trefilaWeighing')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaWeighing' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                        <button onClick={() => setPage('trefilaWeighing')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaWeighing' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             ⚖️ Pesagem de Rolos
                                         </button>
                                     )}
                                     {hasPermission('trefilaPending') && (
-                                        <button onClick={() => setPage('trefilaPending')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaPending' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                        <button onClick={() => setPage('trefilaPending')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaPending' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             📋 Próximas Produções
                                         </button>
                                     )}
                                     {hasPermission('trefilaCompleted') && (
-                                        <button onClick={() => setPage('trefilaCompleted')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaCompleted' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                        <button onClick={() => setPage('trefilaCompleted')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaCompleted' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             📦 Produções Finalizadas
                                         </button>
                                     )}
                                     {hasPermission('trefilaReports') && (
-                                        <button onClick={() => setPage('trefilaReports')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaReports' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                        <button onClick={() => setPage('trefilaReports')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaReports' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             📑 Relatórios de Turno
                                         </button>
                                     )}
                                     {hasPermission('trefilaRings') && (
-                                        <button onClick={() => setPage('trefilaRings')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaRings' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                        <button onClick={() => setPage('trefilaRings')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaRings' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             💍 Simulação & Anéis
                                         </button>
                                     )}
@@ -192,22 +192,22 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                             {!isCollapsed && expandedMenus.includes('trelica') && (
                                 <div className="ml-4 pl-4 border-l border-slate-700/50 flex flex-col gap-0.5 mt-1 mb-2 animate-in slide-in-from-left-2 duration-200">
                                     {hasPermission('trelicaInProgress') && (
-                                        <button onClick={() => setPage('trelicaInProgress')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelicaInProgress' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                        <button onClick={() => setPage('trelicaInProgress')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelicaInProgress' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             ⚙️ Em Produção
                                         </button>
                                     )}
                                     {hasPermission('trelicaPending') && (
-                                        <button onClick={() => setPage('trelicaPending')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelicaPending' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                        <button onClick={() => setPage('trelicaPending')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelicaPending' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             📋 Próximas Produções
                                         </button>
                                     )}
                                     {hasPermission('trelicaCompleted') && (
-                                        <button onClick={() => setPage('trelicaCompleted')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelicaCompleted' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                        <button onClick={() => setPage('trelicaCompleted')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelicaCompleted' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             📦 Produções Finalizadas
                                         </button>
                                     )}
                                     {hasPermission('trelicaReports') && (
-                                        <button onClick={() => setPage('trelicaReports')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelicaReports' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                        <button onClick={() => setPage('trelicaReports')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelicaReports' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             📑 Relatórios de Turno
                                         </button>
                                     )}
@@ -247,18 +247,18 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                             {!isCollapsed && expandedMenus.includes('stock') && (
                                 <div className="ml-4 pl-4 border-l border-slate-700/50 flex flex-col gap-0.5 mt-1 mb-2 animate-in slide-in-from-left-2 duration-200">
                                     {hasPermission('stockAdd') && (
-                                        <button onClick={() => setPage('stockAdd')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stockAdd' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                        <button onClick={() => setPage('stockAdd')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stockAdd' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             + Conferência
                                         </button>
                                     )}
                                     {hasPermission('stockTransfer') && (
-                                        <button onClick={() => setPage('stockTransfer')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stockTransfer' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                        <button onClick={() => setPage('stockTransfer')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stockTransfer' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             ➡️ Transferência
                                         </button>
                                     )}
 
                                     {hasPermission('stock') && (
-                                        <button onClick={() => setPage('stock')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stock' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                        <button onClick={() => setPage('stock')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stock' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                             ⚙️ Gestão de Lotes
                                         </button>
                                     )}
@@ -295,12 +295,12 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                     {!isCollapsed && expandedMenus.includes('people') && (
                         <div className="ml-4 pl-4 border-l border-slate-700/50 flex flex-col gap-0.5 mt-1 mb-2 animate-in slide-in-from-left-2 duration-200">
                             {hasPermission('peopleManagement') && (
-                                <button onClick={() => setPage('peopleManagement')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'peopleManagement' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                <button onClick={() => setPage('peopleManagement')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'peopleManagement' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                     👥 Gestão de Pessoas
                                 </button>
                             )}
                             {hasPermission('continuousImprovement') && (
-                                <button onClick={() => setPage('continuousImprovement')} className={`text-left text-[11px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'continuousImprovement' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                <button onClick={() => setPage('continuousImprovement')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'continuousImprovement' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
                                     ✨ Melhoria Contínua
                                 </button>
                             )}

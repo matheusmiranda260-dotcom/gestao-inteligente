@@ -196,10 +196,10 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                     {/* Produção do Turno */}
                     <div className="bg-slate-200 rounded-[2.5rem] p-8 border border-slate-300 flex flex-col justify-center relative overflow-hidden group shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)]">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="font-black text-slate-400 uppercase tracking-widest text-[10px]">Produção do Turno</h3>
+                            <h3 className="font-black text-slate-400 uppercase tracking-widest text-[11px]">Produção do Turno</h3>
                             <div className="bg-indigo-50 text-indigo-600 px-4 py-2 rounded-2xl border border-indigo-100 flex flex-col items-end min-w-[100px]">
                                 <span className="text-[14px] font-black leading-none">{dailyGoal > 0 ? ((dailyProducedValue / dailyGoal) * 100).toFixed(1) : 0}%</span>
-                                <span className="text-[8px] font-black uppercase tracking-tighter opacity-70 mt-0.5">da Meta ({dailyGoal}{goalUnit})</span>
+                                <span className="text-[9px] font-black uppercase tracking-tighter opacity-70 mt-0.5">da Meta ({dailyGoal}{goalUnit})</span>
                             </div>
                         </div>
                         <div className="flex items-baseline gap-4 mb-4">
@@ -210,7 +210,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                             <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(79,70,229,0.3)]" style={{ width: `${Math.min(100, (dailyProducedValue / dailyGoal) * 100)}%` }} />
                         </div>
                         {activeOrder?.lastQuantityUpdate && (
-                            <p className="mt-4 text-[10px] font-black text-rose-500 uppercase tracking-widest text-right">
+                            <p className="mt-4 text-[11px] font-black text-rose-500 uppercase tracking-widest text-right">
                                 Último Reporte: {new Date(activeOrder.lastQuantityUpdate).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                                 <span className="ml-2 opacity-70 italic lowercase">
                                     ({Math.max(0, Math.floor((now.getTime() - new Date(activeOrder.lastQuantityUpdate).getTime()) / 60000)) === 0 
@@ -225,20 +225,20 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                     {/* Ordem Ativa */}
                     <div className="bg-slate-200 rounded-[2.5rem] p-8 border border-slate-300 flex flex-col justify-center relative overflow-hidden shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)]">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="font-black text-slate-400 uppercase tracking-widest text-[10px]">Progresso da OP #{activeOrder?.orderNumber || '---'}</h3>
+                            <h3 className="font-black text-slate-400 uppercase tracking-widest text-[11px]">Progresso da OP #{activeOrder?.orderNumber || '---'}</h3>
                             {isGestor && onResetShift && (
                                 <button onClick={onResetShift} className="text-[10px] font-black bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-600 px-4 py-2 rounded-2xl border border-slate-200 uppercase transition-all shadow-sm">Zerar Turno</button>
                             )}
                         </div>
                         <div className="flex items-baseline gap-4 mb-4">
-                            <span className="text-7xl font-black text-slate-900 tracking-tighter leading-none">{machineType === 'Trefila' ? processedLotsCount : producedQuantity}</span>
+                            <span className="text-6xl lg:text-7xl font-black text-slate-900 tracking-tighter leading-none">{machineType === 'Trefila' ? processedLotsCount : producedQuantity}</span>
                             <span className="text-xl font-black text-slate-400 uppercase">{machineType === 'Trefila' ? 'Lotes' : 'Peças'}</span>
                         </div>
                         <div className="h-4 bg-slate-200 rounded-full overflow-hidden p-1">
                             <div className="h-full bg-gradient-to-r from-emerald-500 to-green-600 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(16,185,129,0.3)]" style={{ width: `${progress}%` }} />
                         </div>
                         <div className="mt-4 flex flex-wrap justify-between items-center gap-2">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Disponibilidade: {(shiftUptime / (shiftUptime + shiftDowntime) * 100 || 0).toFixed(1)}%</p>
+                            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Disponibilidade: {(shiftUptime / (shiftUptime + shiftDowntime) * 100 || 0).toFixed(1)}%</p>
                         </div>
                     </div>
                 </div>
@@ -250,13 +250,13 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                             <div className="flex gap-4">
                                 <button 
                                     onClick={() => setActiveTab('stops')}
-                                    className={`font-black uppercase tracking-widest text-[10px] flex items-center gap-2 transition-all ${activeTab === 'stops' ? 'text-rose-500' : 'text-slate-400 hover:text-slate-600'}`}
+                                    className={`font-black uppercase tracking-widest text-[11px] flex items-center gap-2 transition-all ${activeTab === 'stops' ? 'text-rose-500' : 'text-slate-400 hover:text-slate-600'}`}
                                 >
                                     <WarningIcon className="h-4 w-4" /> Histórico de Paradas
                                 </button>
                                 <button 
                                     onClick={() => setActiveTab('production')}
-                                    className={`font-black uppercase tracking-widest text-[10px] flex items-center gap-2 transition-all ${activeTab === 'production' ? 'text-indigo-500' : 'text-slate-400 hover:text-slate-600'}`}
+                                    className={`font-black uppercase tracking-widest text-[11px] flex items-center gap-2 transition-all ${activeTab === 'production' ? 'text-indigo-500' : 'text-slate-400 hover:text-slate-600'}`}
                                 >
                                     <ChartBarIcon className="h-4 w-4" /> Produção do Turno
                                 </button>
@@ -266,7 +266,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                             {activeTab === 'stops' ? (
                                 <table className="w-full text-left">
                                     <thead className="sticky top-0 bg-slate-100 z-20">
-                                        <tr className="text-[9px] uppercase font-black text-slate-500 border-b border-slate-200">
+                                        <tr className="text-[10px] uppercase font-black text-slate-500 border-b border-slate-200">
                                             <th className="p-4 px-6">Duração</th>
                                             <th className="p-4">Motivo</th>
                                             <th className="p-4 text-right px-6">OP</th>
@@ -282,21 +282,21 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                                 const end = e.resumeTime ? new Date(e.resumeTime).getTime() : now.getTime();
                                                 return (
                                                     <tr key={i} className="hover:bg-slate-50 transition-colors">
-                                                        <td className="p-4 px-6 font-mono text-rose-600 font-black text-[11px]">{formatDuration(end - new Date(e.stopTime).getTime())}</td>
-                                                        <td className="p-4 text-[10px] font-black text-slate-700 uppercase truncate max-w-[150px]">{e.reason}</td>
-                                                        <td className="p-4 text-right px-6 text-[10px] font-bold text-slate-400">#{e.orderNumber}</td>
+                                                        <td className="p-4 px-6 font-mono text-rose-600 font-black text-[12px]">{formatDuration(end - new Date(e.stopTime).getTime())}</td>
+                                                        <td className="p-4 text-[11px] font-black text-slate-700 uppercase truncate max-w-[150px]">{e.reason}</td>
+                                                        <td className="p-4 text-right px-6 text-[11px] font-bold text-slate-400">#{e.orderNumber}</td>
                                                     </tr>
                                                 );
                                             })}
                                         {allOrders.filter(o => o.machine === machineType).flatMap(o => o.downtimeEvents || []).filter(e => new Date(e.stopTime).getTime() >= shiftStartMs).length === 0 && (
-                                            <tr><td colSpan={3} className="p-8 text-center text-slate-600 text-[10px] font-bold uppercase tracking-[0.2em]">Nenhuma parada registrada</td></tr>
+                                            <tr><td colSpan={3} className="p-8 text-center text-slate-600 text-[11px] font-bold uppercase tracking-[0.2em]">Nenhuma parada registrada</td></tr>
                                         )}
                                     </tbody>
                                 </table>
                             ) : (
                                 <table className="w-full text-left">
                                     <thead className="sticky top-0 bg-slate-100 z-20">
-                                        <tr className="text-[9px] uppercase font-black text-slate-500 border-b border-slate-200">
+                                        <tr className="text-[10px] uppercase font-black text-slate-500 border-b border-slate-200">
                                             <th className="p-4 px-6 text-indigo-600">{machineType === 'Trefila' ? 'Lote' : 'Descrição'}</th>
                                             <th className="p-4">Peso</th>
                                             <th className="p-4">{machineType === 'Trefila' ? 'Duração' : 'Horário'}</th>
@@ -308,20 +308,20 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                             const duration = new Date(item.endTime).getTime() - new Date(item.startTime).getTime();
                                             return (
                                                 <tr key={i} className="hover:bg-slate-50 transition-colors">
-                                                    <td className="p-4 px-6 font-black text-slate-700 text-[11px] truncate max-w-[120px]">{item.label}</td>
-                                                    <td className="p-4 font-black text-emerald-600 text-[11px]">{item.weight?.toFixed(1) || '---'} <span className="text-[8px] text-slate-400">kg</span></td>
-                                                    <td className="p-4 font-mono text-slate-600 text-[11px]">
+                                                    <td className="p-4 px-6 font-black text-slate-700 text-[12px] truncate max-w-[120px]">{item.label}</td>
+                                                    <td className="p-4 font-black text-emerald-600 text-[12px]">{item.weight?.toFixed(1) || '---'} <span className="text-[8px] text-slate-400">kg</span></td>
+                                                    <td className="p-4 font-mono text-slate-600 text-[12px]">
                                                         {machineType === 'Trefila' 
                                                             ? formatDuration(duration)
                                                             : new Date(item.endTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
                                                         }
                                                     </td>
-                                                    <td className="p-4 text-right px-6 text-[10px] font-bold text-slate-400">#{item.orderNumber}</td>
+                                                    <td className="p-4 text-right px-6 text-[11px] font-bold text-slate-400">#{item.orderNumber}</td>
                                                 </tr>
                                             );
                                         })}
                                         {productionHistoryInShift.length === 0 && (
-                                            <tr><td colSpan={4} className="p-8 text-center text-slate-600 text-[10px] font-bold uppercase tracking-[0.2em]">Nenhuma produção registrada</td></tr>
+                                            <tr><td colSpan={4} className="p-8 text-center text-slate-600 text-[11px] font-bold uppercase tracking-[0.2em]">Nenhuma produção registrada</td></tr>
                                         )}
                                     </tbody>
                                 </table>
@@ -334,14 +334,14 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                         <div className="flex items-center gap-6">
                             <div className="bg-indigo-100 p-4 rounded-3xl border border-indigo-200"><UserGroupIcon className="h-6 w-6 text-indigo-600" /></div>
                             <div>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Operador Responsável</p>
+                                <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">Operador Responsável</p>
                                 <p className="text-xl font-black text-slate-900 uppercase">{currentOperator}</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-6">
                             <div className="bg-emerald-100 p-4 rounded-3xl border border-emerald-200"><ArchiveIcon className="h-6 w-6 text-emerald-600" /></div>
                             <div>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Material Processado</p>
+                                <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">Material Processado</p>
                                 <p className="text-xl font-black text-slate-900 uppercase truncate max-w-[200px]">
                                     {machineType === 'Trefila' ? `Bitola: ${activeOrder?.targetBitola || '---'}` : `Modelo: ${activeOrder?.trelicaModel || '---'}`}
                                 </p>
