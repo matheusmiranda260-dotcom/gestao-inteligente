@@ -69,6 +69,7 @@ interface MachineStatusViewProps {
 
 const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, activeOrder, allOrders, stock, dailyProducedValue, dailyGoal, goalUnit, onResetShift, isGestor }) => {
     const [now, setNow] = useState(new Date());
+    const [activeTab, setActiveTab] = useState<'stops' | 'production'>('stops');
 
     useEffect(() => {
         const timerId = setInterval(() => setNow(new Date()), 1000);
@@ -144,6 +145,36 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
         return { shiftDowntime: dt, shiftUptime: Math.max(0, total - dt) };
     }, [allOrders, machineType, shiftStartMs, now]);
 
+    const productionHistoryInShift = useMemo(() => {
+        const orders = allOrders.filter(o => o.machine === machineType);
+        
+        if (machineType === 'Trefila') {
+            return orders.flatMap(o => (o.processedLots || []).map((l: ProcessedLot) => ({
+                id: l.lotId,
+                label: stock.find(s => s.id === l.lotId)?.internalLot || l.lotId,
+                weight: l.finalWeight,
+                startTime: l.startTime,
+                endTime: l.endTime,
+                orderNumber: o.orderNumber
+            })))
+            .filter(l => l.endTime && new Date(l.endTime).getTime() >= shiftStartMs)
+            .sort((a, b) => new Date(b.endTime).getTime() - new Date(a.endTime).getTime());
+        } else {
+            // Treliça Packages
+            return orders.flatMap(o => (o.weighedPackages || []).map((p: any) => ({
+                id: p.id || p.packageNumber,
+                label: `Pacote ${p.packageNumber}`,
+                weight: p.weight,
+                startTime: p.timestamp, // Packages only have a point in time
+                endTime: p.timestamp,
+                orderNumber: o.orderNumber,
+                qty: p.quantity
+            })))
+            .filter(p => new Date(p.endTime).getTime() >= shiftStartMs)
+            .sort((a, b) => new Date(b.endTime).getTime() - new Date(a.endTime).getTime());
+        }
+    }, [allOrders, machineType, shiftStartMs, stock]);
+
     return (
         <div className="bg-slate-100 rounded-[3rem] shadow-xl border border-slate-200 flex flex-col overflow-hidden relative min-h-[600px] h-full">
             <header className={`${currentStyle.bg} p-6 flex flex-col sm:flex-row justify-between items-center ${currentStyle.glow} border-b border-white/10 z-10 gap-4`}>
@@ -213,41 +244,88 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                 </div>
 
                 <div className="flex flex-col gap-6 overflow-hidden">
-                    {/* Lista de Paradas */}
+                    {/* Lista de Paradas / Produção */}
                     <div className="bg-slate-200/70 rounded-[2.5rem] border border-slate-300 flex flex-col flex-1 overflow-hidden shadow-sm">
                         <div className="p-5 border-b border-slate-100 bg-white flex justify-between items-center">
-                            <h3 className="font-black text-slate-400 uppercase tracking-widest text-[10px] flex items-center gap-2"><WarningIcon className="h-4 w-4 text-rose-500" /> Histórico de Paradas</h3>
+                            <div className="flex gap-4">
+                                <button 
+                                    onClick={() => setActiveTab('stops')}
+                                    className={`font-black uppercase tracking-widest text-[10px] flex items-center gap-2 transition-all ${activeTab === 'stops' ? 'text-rose-500' : 'text-slate-400 hover:text-slate-600'}`}
+                                >
+                                    <WarningIcon className="h-4 w-4" /> Histórico de Paradas
+                                </button>
+                                <button 
+                                    onClick={() => setActiveTab('production')}
+                                    className={`font-black uppercase tracking-widest text-[10px] flex items-center gap-2 transition-all ${activeTab === 'production' ? 'text-indigo-500' : 'text-slate-400 hover:text-slate-600'}`}
+                                >
+                                    <ChartBarIcon className="h-4 w-4" /> Produção do Turno
+                                </button>
+                            </div>
                         </div>
                         <div className="flex-1 overflow-y-auto custom-scrollbar">
-                            <table className="w-full text-left">
-                                <thead className="sticky top-0 bg-slate-100 z-20">
-                                    <tr className="text-[9px] uppercase font-black text-slate-500 border-b border-slate-200">
-                                        <th className="p-4 px-6">Duração</th>
-                                        <th className="p-4">Motivo</th>
-                                        <th className="p-4 text-right px-6">OP</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {allOrders
-                                        .filter(o => o.machine === machineType)
-                                        .flatMap(o => (o.downtimeEvents || []).map((e: any) => ({ ...e, orderNumber: o.orderNumber })))
-                                        .filter(e => new Date(e.stopTime).getTime() >= shiftStartMs)
-                                        .sort((a,b) => new Date(b.stopTime).getTime() - new Date(a.stopTime).getTime())
-                                        .map((e, i) => {
-                                            const end = e.resumeTime ? new Date(e.resumeTime).getTime() : now.getTime();
+                            {activeTab === 'stops' ? (
+                                <table className="w-full text-left">
+                                    <thead className="sticky top-0 bg-slate-100 z-20">
+                                        <tr className="text-[9px] uppercase font-black text-slate-500 border-b border-slate-200">
+                                            <th className="p-4 px-6">Duração</th>
+                                            <th className="p-4">Motivo</th>
+                                            <th className="p-4 text-right px-6">OP</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {allOrders
+                                            .filter(o => o.machine === machineType)
+                                            .flatMap(o => (o.downtimeEvents || []).map((e: any) => ({ ...e, orderNumber: o.orderNumber })))
+                                            .filter(e => new Date(e.stopTime).getTime() >= shiftStartMs)
+                                            .sort((a,b) => new Date(b.stopTime).getTime() - new Date(a.stopTime).getTime())
+                                            .map((e, i) => {
+                                                const end = e.resumeTime ? new Date(e.resumeTime).getTime() : now.getTime();
+                                                return (
+                                                    <tr key={i} className="hover:bg-slate-50 transition-colors">
+                                                        <td className="p-4 px-6 font-mono text-rose-600 font-black text-[11px]">{formatDuration(end - new Date(e.stopTime).getTime())}</td>
+                                                        <td className="p-4 text-[10px] font-black text-slate-700 uppercase truncate max-w-[150px]">{e.reason}</td>
+                                                        <td className="p-4 text-right px-6 text-[10px] font-bold text-slate-400">#{e.orderNumber}</td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        {allOrders.filter(o => o.machine === machineType).flatMap(o => o.downtimeEvents || []).filter(e => new Date(e.stopTime).getTime() >= shiftStartMs).length === 0 && (
+                                            <tr><td colSpan={3} className="p-8 text-center text-slate-600 text-[10px] font-bold uppercase tracking-[0.2em]">Nenhuma parada registrada</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            ) : (
+                                <table className="w-full text-left">
+                                    <thead className="sticky top-0 bg-slate-100 z-20">
+                                        <tr className="text-[9px] uppercase font-black text-slate-500 border-b border-slate-200">
+                                            <th className="p-4 px-6 text-indigo-600">{machineType === 'Trefila' ? 'Lote' : 'Descrição'}</th>
+                                            <th className="p-4">Peso</th>
+                                            <th className="p-4">{machineType === 'Trefila' ? 'Duração' : 'Horário'}</th>
+                                            <th className="p-4 text-right px-6">OP</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {productionHistoryInShift.map((item, i) => {
+                                            const duration = new Date(item.endTime).getTime() - new Date(item.startTime).getTime();
                                             return (
                                                 <tr key={i} className="hover:bg-slate-50 transition-colors">
-                                                    <td className="p-4 px-6 font-mono text-rose-600 font-black text-[11px]">{formatDuration(end - new Date(e.stopTime).getTime())}</td>
-                                                    <td className="p-4 text-[10px] font-black text-slate-700 uppercase truncate max-w-[150px]">{e.reason}</td>
-                                                    <td className="p-4 text-right px-6 text-[10px] font-bold text-slate-400">#{e.orderNumber}</td>
+                                                    <td className="p-4 px-6 font-black text-slate-700 text-[11px] truncate max-w-[120px]">{item.label}</td>
+                                                    <td className="p-4 font-black text-emerald-600 text-[11px]">{item.weight?.toFixed(1) || '---'} <span className="text-[8px] text-slate-400">kg</span></td>
+                                                    <td className="p-4 font-mono text-slate-600 text-[11px]">
+                                                        {machineType === 'Trefila' 
+                                                            ? formatDuration(duration)
+                                                            : new Date(item.endTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+                                                        }
+                                                    </td>
+                                                    <td className="p-4 text-right px-6 text-[10px] font-bold text-slate-400">#{item.orderNumber}</td>
                                                 </tr>
                                             );
                                         })}
-                                    {allOrders.filter(o => o.machine === machineType).flatMap(o => o.downtimeEvents || []).filter(e => new Date(e.stopTime).getTime() >= shiftStartMs).length === 0 && (
-                                        <tr><td colSpan={3} className="p-8 text-center text-slate-600 text-[10px] font-bold uppercase tracking-[0.2em]">Nenhuma parada registrada</td></tr>
-                                    )}
-                                </tbody>
-                            </table>
+                                        {productionHistoryInShift.length === 0 && (
+                                            <tr><td colSpan={4} className="p-8 text-center text-slate-600 text-[10px] font-bold uppercase tracking-[0.2em]">Nenhuma produção registrada</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            )}
                         </div>
                     </div>
 
