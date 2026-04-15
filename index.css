@@ -458,6 +458,41 @@ tr:hover td {
   box-shadow: 0 12px 30px 0 rgba(0, 0, 0, 0.08);
 }
 
+.tactical-card {
+  background: rgba(13, 25, 41, 0.8);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+}
+
+.cyber-border {
+  position: relative;
+}
+
+.cyber-border::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  border-top: 2px solid var(--msm-cyan);
+  border-left: 2px solid var(--msm-cyan);
+}
+
+.neon-text-cyan {
+  text-shadow: 0 0 10px rgba(0, 229, 255, 0.5);
+}
+
+.neon-text-rose {
+  text-shadow: 0 0 10px rgba(244, 63, 94, 0.5);
+}
+
+.neon-glow-cyan {
+  box-shadow: 0 0 15px rgba(0, 229, 255, 0.2), inset 0 0 15px rgba(0, 229, 255, 0.1);
+}
+
 .section-title {
   position: relative;
   display: flex;

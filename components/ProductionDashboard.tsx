@@ -13,6 +13,40 @@ const PowerIcon = ({ className }: { className?: string }) => (
     </svg>
 );
 
+const TrendLine = ({ color }: { color: string }) => (
+    <div className="absolute bottom-0 left-0 right-0 h-16 opacity-30 pointer-events-none overflow-hidden">
+        <svg viewBox="0 0 400 100" className="w-full h-full preserve-3d">
+            <path 
+                d="M0,80 Q50,70 100,75 T200,60 T300,65 T400,40 L400,100 L0,100 Z" 
+                fill={`url(#gradient-${color})`} 
+                className="animate-pulse"
+            />
+            <defs>
+                <linearGradient id={`gradient-${color}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor={color} />
+                    <stop offset="100%" stopColor="transparent" />
+                </linearGradient>
+            </defs>
+        </svg>
+    </div>
+);
+
+const MiniChart = ({ color }: { color: string }) => (
+    <div className="flex items-end gap-1 h-24 mb-6">
+        {[40, 60, 45, 80, 55, 90, 70, 85].map((h, i) => (
+            <div 
+                key={i} 
+                className="flex-1 rounded-t-sm transition-all duration-1000" 
+                style={{ 
+                    height: `${h}%`, 
+                    background: `linear-gradient(to top, ${color}22, ${color})`,
+                    boxShadow: `0 0 10px ${color}44`
+                }} 
+            />
+        ))}
+    </div>
+);
+
 const formatDuration = (ms: number) => {
     if (ms < 0) ms = 0;
     const totalSeconds = Math.floor(ms / 1000);
@@ -24,33 +58,43 @@ const formatDuration = (ms: number) => {
 
 const statusStyles = {
     Produzindo: { 
-        bg: 'bg-gradient-to-br from-[#00F2FE] to-[#4FACFE]', 
-        glow: 'shadow-[0_0_20px_rgba(79,172,254,0.4)]',
-        icon: <CogIcon className="h-8 w-8 text-white animate-spin-slow drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" />, 
+        bg: 'bg-indigo-500/10', 
+        glow: 'neon-glow-cyan',
+        color: 'text-[#00E5FF]',
+        border: 'border-[#00E5FF]/30',
+        icon: <CogIcon className="h-6 w-6 text-[#00E5FF] animate-spin-slow" />, 
         title: 'EM OPERAÇÃO' 
     },
     Preparacao: { 
-        bg: 'bg-gradient-to-br from-[#A8E063] to-[#56AB2F]', 
-        glow: 'shadow-[0_0_20px_rgba(86,171,47,0.4)]',
-        icon: <WrenchScrewdriverIcon className="h-8 w-8 text-white animate-pulse drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" />, 
+        bg: 'bg-emerald-500/10', 
+        glow: 'shadow-[0_0_20px_rgba(16,185,129,0.2)]',
+        color: 'text-emerald-400',
+        border: 'border-emerald-500/30',
+        icon: <WrenchScrewdriverIcon className="h-6 w-6 text-emerald-400 animate-pulse" />, 
         title: 'PREPARAÇÃO' 
     },
     Parada: { 
-        bg: 'bg-gradient-to-br from-[#FF0844] to-[#FFB199]', 
-        glow: 'shadow-[0_0_20px_rgba(255,8,68,0.4)]',
-        icon: <PauseIcon className="h-8 w-8 text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" />, 
-        title: 'MAQUINA PARADA' 
+        bg: 'bg-rose-500/10', 
+        glow: 'shadow-[0_0_20px_rgba(244,63,94,0.2)]',
+        color: 'text-rose-400',
+        border: 'border-rose-500/30',
+        icon: <PauseIcon className="h-6 w-6 text-rose-400" />, 
+        title: 'MÁQUINA PARADA' 
     },
     Ocioso: { 
-        bg: 'bg-gradient-to-br from-[#FAD961] to-[#F76B1C]', 
-        glow: 'shadow-[0_0_20px_rgba(247,107,28,0.4)]',
-        icon: <ClockIcon className="h-8 w-8 text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" />, 
+        bg: 'bg-amber-500/10', 
+        glow: 'shadow-[0_0_20px_rgba(245,158,11,0.2)]',
+        color: 'text-amber-400',
+        border: 'border-amber-500/30',
+        icon: <ClockIcon className="h-6 w-6 text-amber-400" />, 
         title: 'EQUIP. OCIOSO' 
     },
     Desligada: { 
-        bg: 'bg-gradient-to-br from-[#1F2937] to-[#111827]', 
-        glow: 'shadow-[0_0_25px_rgba(17,24,39,0.3)]',
-        icon: <PowerIcon className="h-8 w-8 text-white" />, 
+        bg: 'bg-slate-800/50', 
+        glow: 'shadow-none',
+        color: 'text-slate-400',
+        border: 'border-slate-700',
+        icon: <PowerIcon className="h-6 w-6 text-slate-400" />, 
         title: 'DESLIGADA' 
     },
 };
@@ -103,7 +147,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
         if (openEvent) {
             const reason = openEvent.reason || 'Parada';
             const dur = now.getTime() - new Date(openEvent.stopTime).getTime();
-            if (reason.includes('Preparação') || reason.includes('Setup')) return { status: 'Preparacao', reason, durationMs: dur };
+            if (reason.includes('Prepara\u00e7\u00e3o') || reason.includes('Setup')) return { status: 'Preparacao', reason, durationMs: dur };
             if (reason.includes('Turno') || !currentOperatorLog) return { status: 'Desligada', reason, durationMs: dur };
             return { status: 'Parada', reason, durationMs: dur };
         }
@@ -114,7 +158,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     }, [activeOrder, now, currentOperatorLog, shiftStartMs]);
 
     const currentStyle = statusStyles[machineStatus.status as keyof typeof statusStyles] || statusStyles.Ocioso;
-    const currentOperator = currentOperatorLog?.operator || 'Nenhum';
+    const currentOperator = currentOperatorLog?.operator || '---';
 
     const { processedLotsCount, totalLotsCount, producedQuantity, plannedQuantity, progress } = useMemo(() => {
         let pc = 0, tc = 0, pq = 0, pl = 1, pg = 0;
@@ -160,12 +204,11 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             .filter(l => l.endTime && new Date(l.endTime).getTime() >= shiftStartMs)
             .sort((a, b) => new Date(b.endTime).getTime() - new Date(a.endTime).getTime());
         } else {
-            // Treliça Packages
             return orders.flatMap(o => (o.weighedPackages || []).map((p: any) => ({
                 id: p.id || p.packageNumber,
                 label: `Pacote ${p.packageNumber}`,
                 weight: p.weight,
-                startTime: p.timestamp, // Packages only have a point in time
+                startTime: p.timestamp, 
                 endTime: p.timestamp,
                 orderNumber: o.orderNumber,
                 qty: p.quantity
@@ -175,104 +218,122 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
         }
     }, [allOrders, machineType, shiftStartMs, stock]);
 
+    const efficiency = dailyGoal > 0 ? (dailyProducedValue / dailyGoal) * 100 : 0;
+
     return (
-        <div className="bg-slate-100 rounded-[3rem] shadow-xl border border-slate-200 flex flex-col overflow-hidden relative min-h-[600px] h-full">
-            <header className={`${currentStyle.bg} p-6 flex flex-col sm:flex-row justify-between items-center ${currentStyle.glow} border-b border-white/10 z-10 gap-4`}>
-                <div className="flex items-center gap-5">
-                    <div className="bg-black/30 backdrop-blur-xl p-5 rounded-3xl border border-white/20">{currentStyle.icon}</div>
+        <div className="tactical-card rounded-3xl border border-white/10 flex flex-col overflow-hidden relative group">
+            {/* Machine Header */}
+            <div className={`p-5 flex items-center justify-between border-b border-white/5 bg-gradient-to-r ${currentStyle.bg} to-transparent`}>
+                <div className="flex items-center gap-4">
+                    <div className={`p-3 rounded-2xl bg-black/40 border ${currentStyle.border} ${currentStyle.glow}`}>
+                        {currentStyle.icon}
+                    </div>
                     <div>
-                        <h2 className="text-4xl lg:text-5xl font-black text-white tracking-tighter uppercase leading-none">{machineType}</h2>
-                        <p className="text-xs font-black text-white/80 uppercase mt-2 tracking-widest">{currentStyle.title} {machineStatus.reason && `• ${machineStatus.reason}`}</p>
+                        <h2 className="text-3xl font-black text-white tracking-tight leading-none">{machineType.toUpperCase()}</h2>
+                        <div className="flex items-center gap-2 mt-1.5">
+                            <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-black/40 border border-white/10 ${currentStyle.color}`}>
+                                {currentOperator}
+                            </span>
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">• {activeOrder?.targetBitola || activeOrder?.trelicaModel || '---'}</span>
+                        </div>
                     </div>
                 </div>
-                <div className="bg-black/20 backdrop-blur-md px-8 py-4 rounded-[2.5rem] border border-white/10 flex flex-col items-center">
-                    <span className="text-[10px] font-black text-white/70 uppercase tracking-widest mb-1">Tempo no Estado</span>
-                    <span className="text-4xl lg:text-5xl font-black font-mono text-white tracking-wider">{formatDuration(machineStatus.durationMs)}</span>
+                <div className="text-right">
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Status do Equipamento</p>
+                    <p className={`text-sm font-black uppercase tracking-widest ${currentStyle.color}`}>{currentStyle.title}</p>
                 </div>
-            </header>
+            </div>
 
-            <main className="flex-1 p-6 grid grid-cols-1 lg:grid-cols-2 gap-6 overflow-hidden">
-                <div className="flex flex-col gap-6">
-                    {/* Produção do Turno */}
-                    <div className="bg-slate-200 rounded-[2.5rem] p-8 border border-slate-300 flex flex-col justify-center relative overflow-hidden group shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)]">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="font-black text-slate-400 uppercase tracking-widest text-[11px]">Produção do Turno</h3>
-                            <div className="bg-indigo-50 text-indigo-600 px-4 py-2 rounded-2xl border border-indigo-100 flex flex-col items-end min-w-[100px]">
-                                <span className="text-[14px] font-black leading-none">{dailyGoal > 0 ? ((dailyProducedValue / dailyGoal) * 100).toFixed(1) : 0}%</span>
-                                <span className="text-[9px] font-black uppercase tracking-tighter opacity-70 mt-0.5">da Meta ({dailyGoal}{goalUnit})</span>
+            <main className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8 ring-1 ring-white/5 inset-0 pointer-events-none">
+                <div className="flex flex-col gap-8 pointer-events-auto">
+                    {/* Shift Stats Card */}
+                    <div className="relative p-6 bg-black/30 rounded-3xl border border-white/5 overflow-hidden">
+                        <TrendLine color={efficiency > 90 ? '#10b981' : '#00E5FF'} />
+                        <div className="flex justify-between items-start relative z-10">
+                            <div>
+                                <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-3">Produção do Turno</h3>
+                                <div className="flex items-baseline gap-3">
+                                    <span className="text-6xl font-black text-white tracking-tighter tabular-nums drop-shadow-2xl">
+                                        {dailyProducedValue.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
+                                    </span>
+                                    <span className="text-xl font-bold text-slate-500 uppercase tracking-widest">{goalUnit}</span>
+                                </div>
+                            </div>
+                            <div className="bg-black/40 border border-white/10 p-4 rounded-2xl text-center backdrop-blur-sm">
+                                <p className={`text-2xl font-black ${efficiency > 90 ? 'text-emerald-400' : 'text-[#00E5FF]'} leading-none`}>{efficiency.toFixed(1)}%</p>
+                                <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter mt-1">META: {dailyGoal}{goalUnit}</p>
                             </div>
                         </div>
-                        <div className="flex items-baseline gap-4 mb-4">
-                            <span className="text-7xl font-black text-slate-900 tracking-tighter leading-none">{dailyProducedValue.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
-                            <span className="text-xl font-black text-slate-400 uppercase">{goalUnit}</span>
+                        <div className="mt-8 flex items-center justify-between gap-4 relative z-10">
+                            <div className="flex-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                Eficiência: <span className={efficiency > 90 ? 'text-emerald-400' : 'text-[#00E5FF]'}>{efficiency.toFixed(1)}%</span>
+                            </div>
+                            <div className="flex-1 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                Tendência: <span className="text-emerald-400">UP ▲</span>
+                            </div>
                         </div>
-                        <div className="h-4 bg-slate-200 rounded-full overflow-hidden p-1">
-                            <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(79,70,229,0.3)]" style={{ width: `${Math.min(100, (dailyProducedValue / dailyGoal) * 100)}%` }} />
-                        </div>
-                        {activeOrder?.lastQuantityUpdate && (
-                            <p className="mt-4 text-[11px] font-black text-rose-500 uppercase tracking-widest text-right">
-                                Último Reporte: {new Date(activeOrder.lastQuantityUpdate).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                                <span className="ml-2 opacity-70 italic lowercase">
-                                    ({Math.max(0, Math.floor((now.getTime() - new Date(activeOrder.lastQuantityUpdate).getTime()) / 60000)) === 0 
-                                        ? 'agora mesmo' 
-                                        : `${Math.max(0, Math.floor((now.getTime() - new Date(activeOrder.lastQuantityUpdate).getTime()) / 60000))} min atrás`}
-                                    )
-                                </span>
-                            </p>
-                        )}
                     </div>
 
-                    {/* Ordem Ativa */}
-                    <div className="bg-slate-200 rounded-[2.5rem] p-8 border border-slate-300 flex flex-col justify-center relative overflow-hidden shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)]">
+                    {/* Progress Card */}
+                    <div className="p-6 bg-black/30 rounded-3xl border border-white/5">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="font-black text-slate-400 uppercase tracking-widest text-[11px]">Progresso da OP #{activeOrder?.orderNumber || '---'}</h3>
+                            <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Progresso da OP #{activeOrder?.orderNumber || '---'}</h3>
                             {isGestor && onResetShift && (
-                                <button onClick={onResetShift} className="text-[10px] font-black bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-600 px-4 py-2 rounded-2xl border border-slate-200 uppercase transition-all shadow-sm">Zerar Turno</button>
+                                <button onClick={onResetShift} className="text-[9px] font-black bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 px-3 py-1.5 rounded-lg border border-white/10 uppercase transition-all">Reset Shift</button>
                             )}
                         </div>
-                        <div className="flex items-baseline gap-4 mb-4">
-                            <span className="text-6xl lg:text-7xl font-black text-slate-900 tracking-tighter leading-none">{machineType === 'Trefila' ? processedLotsCount : producedQuantity}</span>
-                            <span className="text-xl font-black text-slate-400 uppercase">{machineType === 'Trefila' ? 'Lotes' : 'Peças'}</span>
+                        <div className="flex items-baseline gap-4 mb-5">
+                            <span className="text-5xl font-black text-white tracking-tight tabular-nums">
+                                {machineType === 'Trefila' ? processedLotsCount : producedQuantity.toLocaleString()}
+                            </span>
+                            <span className="text-lg font-bold text-slate-500 uppercase">{machineType === 'Trefila' ? 'Lotes' : 'Pe\u00e7as'}</span>
                         </div>
-                        <div className="h-4 bg-slate-200 rounded-full overflow-hidden p-1">
-                            <div className="h-full bg-gradient-to-r from-emerald-500 to-green-600 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(16,185,129,0.3)]" style={{ width: `${progress}%` }} />
+                        {/* Custom Bar Chart Simulation */}
+                        <div className="h-24 flex items-end gap-1 mb-4">
+                            {[30, 45, 35, 60, 50, 80, 70, 90, 85, 100].map((h, i) => (
+                                <div key={i} className="flex-1 rounded-t-sm" style={{ 
+                                    height: `${h}%`, 
+                                    background: i < (progress / 10) ? `linear-gradient(to top, #10b98122, #10b981)` : 'rgba(255,255,255,0.05)',
+                                    boxShadow: i < (progress / 10) ? '0 0 10px #10b98144' : 'none'
+                                }} />
+                            ))}
                         </div>
-                        <div className="mt-4 flex flex-wrap justify-between items-center gap-2">
-                            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Disponibilidade: {(shiftUptime / (shiftUptime + shiftDowntime) * 100 || 0).toFixed(1)}%</p>
+                        <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-500">
+                            <span>Disponibilidade: {(shiftUptime / (shiftUptime+shiftDowntime) * 100 || 0).toFixed(1)}%</span>
+                            <span>Tempo de Estado: {formatDuration(machineStatus.durationMs)}</span>
                         </div>
                     </div>
                 </div>
 
-                <div className="flex flex-col gap-6 overflow-hidden">
-                    {/* Lista de Paradas / Produção */}
-                    <div className="bg-slate-200/70 rounded-[2.5rem] border border-slate-300 flex flex-col flex-1 overflow-hidden shadow-sm">
-                        <div className="p-5 border-b border-slate-100 bg-white flex justify-between items-center">
-                            <div className="flex gap-4">
-                                <button 
-                                    onClick={() => setActiveTab('stops')}
-                                    className={`font-black uppercase tracking-widest text-[11px] flex items-center gap-2 transition-all ${activeTab === 'stops' ? 'text-rose-500' : 'text-slate-400 hover:text-slate-600'}`}
-                                >
-                                    <WarningIcon className="h-4 w-4" /> Histórico de Paradas
-                                </button>
-                                <button 
-                                    onClick={() => setActiveTab('production')}
-                                    className={`font-black uppercase tracking-widest text-[11px] flex items-center gap-2 transition-all ${activeTab === 'production' ? 'text-indigo-500' : 'text-slate-400 hover:text-slate-600'}`}
-                                >
-                                    <ChartBarIcon className="h-4 w-4" /> Produção do Turno
-                                </button>
-                            </div>
+                <div className="flex flex-col gap-6 pointer-events-auto">
+                    {/* Activity Feed and History */}
+                    <div className="bg-black/30 rounded-3xl border border-white/5 flex flex-col flex-1 overflow-hidden min-h-[350px]">
+                        <div className="p-4 border-b border-white/5 flex gap-6 items-center bg-white/5">
+                            <button 
+                                onClick={() => setActiveTab('stops')}
+                                className={`text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2 transition-all ${activeTab === 'stops' ? 'text-rose-400 neon-text-rose' : 'text-slate-500 hover:text-slate-300'}`}
+                            >
+                                <WarningIcon className="h-3 w-3" /> Histórico de Paradas
+                            </button>
+                            <button 
+                                onClick={() => setActiveTab('production')}
+                                className={`text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2 transition-all ${activeTab === 'production' ? 'text-[#00E5FF] neon-text-cyan' : 'text-slate-500 hover:text-slate-300'}`}
+                            >
+                                <ChartBarIcon className="h-3 w-3" /> Produção do Turno
+                            </button>
                         </div>
-                        <div className="flex-1 overflow-y-auto custom-scrollbar">
+                        
+                        <div className="flex-1 overflow-y-auto custom-scrollbar bg-black/10">
                             {activeTab === 'stops' ? (
                                 <table className="w-full text-left">
-                                    <thead className="sticky top-0 bg-slate-100 z-20">
-                                        <tr className="text-[10px] uppercase font-black text-slate-500 border-b border-slate-200">
-                                            <th className="p-4 px-6">Duração</th>
-                                            <th className="p-4">Motivo</th>
-                                            <th className="p-4 text-right px-6">OP</th>
+                                    <thead className="sticky top-0 bg-black/40 backdrop-blur-md z-20">
+                                        <tr className="text-[9px] uppercase font-black text-slate-500 border-b border-white/5">
+                                            <th className="p-3 px-5">Duração</th>
+                                            <th className="p-3">Motivo</th>
+                                            <th className="p-3 text-right px-5">OP</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-slate-100">
+                                    <tbody className="divide-y divide-white/5">
                                         {allOrders
                                             .filter(o => o.machine === machineType)
                                             .flatMap(o => (o.downtimeEvents || []).map((e: any) => ({ ...e, orderNumber: o.orderNumber })))
@@ -281,75 +342,62 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                             .map((e, i) => {
                                                 const end = e.resumeTime ? new Date(e.resumeTime).getTime() : now.getTime();
                                                 return (
-                                                    <tr key={i} className="hover:bg-slate-50 transition-colors">
-                                                        <td className="p-4 px-6 font-mono text-rose-600 font-black text-[12px]">{formatDuration(end - new Date(e.stopTime).getTime())}</td>
-                                                        <td className="p-4 text-[11px] font-black text-slate-700 uppercase truncate max-w-[150px]">{e.reason}</td>
-                                                        <td className="p-4 text-right px-6 text-[11px] font-bold text-slate-400">#{e.orderNumber}</td>
+                                                    <tr key={i} className="hover:bg-white/5 transition-colors">
+                                                        <td className="p-3 px-5 font-mono text-rose-400 font-bold text-[11px]">{formatDuration(end - new Date(e.stopTime).getTime())}</td>
+                                                        <td className="p-3 flex items-center gap-2 text-[10px] font-bold text-slate-300 uppercase truncate max-w-[140px]">
+                                                            <WarningIcon className="h-3 w-3 text-amber-500 shrink-0" /> {e.reason}
+                                                        </td>
+                                                        <td className="p-3 text-right px-5 text-[9px] font-black text-slate-600">#{e.orderNumber}</td>
                                                     </tr>
                                                 );
                                             })}
-                                        {allOrders.filter(o => o.machine === machineType).flatMap(o => o.downtimeEvents || []).filter(e => new Date(e.stopTime).getTime() >= shiftStartMs).length === 0 && (
-                                            <tr><td colSpan={3} className="p-8 text-center text-slate-600 text-[11px] font-bold uppercase tracking-[0.2em]">Nenhuma parada registrada</td></tr>
-                                        )}
                                     </tbody>
                                 </table>
                             ) : (
                                 <table className="w-full text-left">
-                                    <thead className="sticky top-0 bg-slate-100 z-20">
-                                        <tr className="text-[10px] uppercase font-black text-slate-500 border-b border-slate-200">
-                                            <th className="p-4 px-6 text-indigo-600">{machineType === 'Trefila' ? 'Lote' : 'Descrição'}</th>
-                                            <th className="p-4">Peso</th>
-                                            <th className="p-4">{machineType === 'Trefila' ? 'Duração' : 'Horário'}</th>
-                                            <th className="p-4 text-right px-6">OP</th>
+                                    <thead className="sticky top-0 bg-black/40 backdrop-blur-md z-20">
+                                        <tr className="text-[9px] uppercase font-black text-slate-500 border-b border-white/5">
+                                            <th className="p-3 px-5">Lote / Peça</th>
+                                            <th className="p-3 font-mono">Peso</th>
+                                            <th className="p-3 text-right px-5 font-mono">Hora</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {productionHistoryInShift.map((item, i) => {
-                                            const duration = new Date(item.endTime).getTime() - new Date(item.startTime).getTime();
-                                            return (
-                                                <tr key={i} className="hover:bg-slate-50 transition-colors">
-                                                    <td className="p-4 px-6 font-black text-slate-700 text-[12px] truncate max-w-[120px]">{item.label}</td>
-                                                    <td className="p-4 font-black text-emerald-600 text-[12px]">{item.weight?.toFixed(1) || '---'} <span className="text-[8px] text-slate-400">kg</span></td>
-                                                    <td className="p-4 font-mono text-slate-600 text-[12px]">
-                                                        {machineType === 'Trefila' 
-                                                            ? formatDuration(duration)
-                                                            : new Date(item.endTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-                                                        }
-                                                    </td>
-                                                    <td className="p-4 text-right px-6 text-[11px] font-bold text-slate-400">#{item.orderNumber}</td>
-                                                </tr>
-                                            );
-                                        })}
-                                        {productionHistoryInShift.length === 0 && (
-                                            <tr><td colSpan={4} className="p-8 text-center text-slate-600 text-[11px] font-bold uppercase tracking-[0.2em]">Nenhuma produção registrada</td></tr>
-                                        )}
+                                    <tbody className="divide-y divide-white/5">
+                                        {productionHistoryInShift.map((item, i) => (
+                                            <tr key={i} className="hover:bg-white/5 transition-colors">
+                                                <td className="p-3 px-5 font-bold text-slate-300 text-[11px] uppercase">{item.label}</td>
+                                                <td className="p-3 font-black text-emerald-400 text-[11px]">{item.weight?.toFixed(1) || '---'}<span className="text-[8px] text-slate-600 ml-1">KG</span></td>
+                                                <td className="p-3 text-right px-5 font-mono text-[10px] text-slate-500">
+                                                    {new Date(item.endTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                                </td>
+                                            </tr>
+                                        ))}
                                     </tbody>
                                 </table>
                             )}
                         </div>
                     </div>
 
-                    {/* Operador / Material */}
-                    <div className="bg-slate-200/70 rounded-[2.5rem] p-8 border border-slate-300 flex flex-col justify-between gap-6 shadow-sm">
-                        <div className="flex items-center gap-6">
-                            <div className="bg-indigo-100 p-4 rounded-3xl border border-indigo-200"><UserGroupIcon className="h-6 w-6 text-indigo-600" /></div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="p-4 bg-black/40 rounded-[1.5rem] border border-white/5 flex items-center gap-3">
+                            <ClockIcon className="h-4 w-4 text-[#00E5FF]" />
                             <div>
-                                <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">Operador Responsável</p>
-                                <p className="text-xl font-black text-slate-900 uppercase">{currentOperator}</p>
+                                <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Tempo Uptime</p>
+                                <p className="text-xs font-bold text-white font-mono">{formatDuration(shiftUptime)}</p>
                             </div>
                         </div>
-                        <div className="flex items-center gap-6">
-                            <div className="bg-emerald-100 p-4 rounded-3xl border border-emerald-200"><ArchiveIcon className="h-6 w-6 text-emerald-600" /></div>
+                        <div className="p-4 bg-black/40 rounded-[1.5rem] border border-white/5 flex items-center gap-3">
+                            <WarningIcon className="h-4 w-4 text-rose-500" />
                             <div>
-                                <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">Material Processado</p>
-                                <p className="text-xl font-black text-slate-900 uppercase truncate max-w-[200px]">
-                                    {machineType === 'Trefila' ? `Bitola: ${activeOrder?.targetBitola || '---'}` : `Modelo: ${activeOrder?.trelicaModel || '---'}`}
-                                </p>
+                                <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Tempo Parado</p>
+                                <p className="text-xs font-bold text-white font-mono">{formatDuration(shiftDowntime)}</p>
                             </div>
                         </div>
                     </div>
                 </div>
             </main>
+            {/* Bottom Status Edge */}
+            <div className={`h-1 w-full bg-gradient-to-r from-transparent via-${currentStyle.color.replace('text-[', '').replace(']', '')} to-transparent opacity-50`} />
         </div>
     );
 };
@@ -366,7 +414,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
     const [shiftResets, setShiftResets] = useState(() => JSON.parse(localStorage.getItem('shiftResets') || '{}'));
 
     const handleReset = (m: MachineType) => {
-        if (!confirm(`Deseja zerar os dados de turno para a máquina ${m}? Esta ação só afeta a visualização deste dashboard.`)) return;
+        if (!confirm(`Deseja zerar os dados de turno para a m\u00e1quina ${m}? Esta a\u00e7\u00e3o s\u00f3 afeta a visualiza\u00e7\u00e3o deste dashboard.`)) return;
         const newResets = { ...shiftResets, [m]: new Date().toISOString() };
         setShiftResets(newResets);
         localStorage.setItem('shiftResets', JSON.stringify(newResets));
@@ -387,7 +435,6 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                 const lots = (o.processedLots || []) as ProcessedLot[];
                 return acc + lots.filter(l => l.endTime && new Date(l.endTime).getTime() >= effective).reduce((s, l) => s + (l.finalWeight || 0), 0);
             }
-            // Treliça
             const logs = (o.operatorLogs || []) as OperatorLog[];
             return acc + logs.reduce((s, log) => {
                 if (new Date(log.startTime).getTime() < effective) return s;
@@ -398,7 +445,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
     };
 
     const activeTrefila = productionOrders.find(o => o.machine === 'Trefila' && o.status === 'in_progress');
-    const activeTrelica = productionOrders.find(o => o.machine === 'Treliça' && o.status === 'in_progress');
+    const activeTrelica = productionOrders.find(o => o.machine === 'Treli\u00e7a' && o.status === 'in_progress');
 
     const getTrelicaGoal = (activeOrder?: ProductionOrderData) => {
         if (!activeOrder) return 500;
@@ -415,15 +462,31 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
     };
 
     return (
-        <div className="min-h-screen bg-slate-900 text-white p-4 lg:p-8 flex flex-col gap-8 font-sans">
-            <header className="flex justify-center items-center">
-                <div className="text-center">
-                    <h1 className="text-3xl font-black tracking-[0.2em] uppercase text-white">Dashboard Laminação</h1>
-                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.4em] mt-2">Live Factory Monitoring System v2.6</p>
+        <div className="min-h-screen bg-[#060B18] text-slate-300 p-4 lg:p-8 flex flex-col gap-6 font-sans">
+            <header className="flex justify-between items-center px-4">
+                <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(99,102,241,0.4)] border border-indigo-400">
+                        <ChartBarIcon className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                        <h1 className="text-xl font-black tracking-tight text-white uppercase italic">MSM <span className="text-indigo-400 not-italic">Tactical Dash</span></h1>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.4em]">LIVE MONITORING • VERSION 4.0</p>
+                    </div>
+                </div>
+                <div className="hidden md:flex items-center gap-8 bg-black/40 border border-white/5 py-3 px-8 rounded-2xl backdrop-blur-xl">
+                    <div className="text-right">
+                        <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Operação Geral</p>
+                        <p className="text-xs font-bold text-emerald-400 uppercase">Sistema Estável</p>
+                    </div>
+                    <div className="h-8 w-px bg-white/10" />
+                    <div className="text-right">
+                        <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Próxima Virada</p>
+                        <p className="text-xs font-bold text-white uppercase">{new Date().getHours() < 14 ? '14:00 (Turno B)' : '05:00 (Turno A)'}</p>
+                    </div>
                 </div>
             </header>
 
-            <div className="flex-1 grid grid-cols-1 xl:grid-cols-2 gap-8 lg:gap-12 pb-8">
+            <div className="flex-1 grid grid-cols-1 xl:grid-cols-2 gap-6 lg:gap-8 pb-8">
                 <MachineStatusView 
                     machineType="Trefila" 
                     activeOrder={activeTrefila} 
@@ -436,20 +499,25 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                     onResetShift={() => handleReset('Trefila')} 
                 />
                 <MachineStatusView 
-                    machineType="Treliça" 
+                    machineType="Treli\u00e7a" 
                     activeOrder={activeTrelica} 
                     allOrders={productionOrders} 
                     stock={stock} 
-                    dailyProducedValue={getDailyValue('Treliça')} 
+                    dailyProducedValue={getDailyValue('Treli\u00e7a')} 
                     dailyGoal={getTrelicaGoal(activeTrelica)} 
-                    goalUnit="pçs" 
+                    goalUnit="p\u00e7s" 
                     isGestor={isGestor} 
-                    onResetShift={() => handleReset('Treliça')} 
+                    onResetShift={() => handleReset('Treli\u00e7a')} 
                 />
             </div>
             
-            <footer className="flex justify-center pb-4">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">DADOS ATUALIZADOS EM TEMPO REAL VIA SUPABASE</p>
+            <footer className="flex justify-between items-center px-4 border-t border-white/5 pt-6 pb-2">
+                <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest">MSM GESTÃO INDUSTRIAL • 2026</p>
+                <div className="flex gap-4">
+                     <span className="flex items-center gap-2 text-[9px] font-black text-indigo-400 uppercase tracking-widest">
+                         <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" /> Conectado via WebSocket
+                     </span>
+                </div>
             </footer>
         </div>
     );
