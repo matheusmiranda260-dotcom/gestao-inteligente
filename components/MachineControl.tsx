@@ -511,7 +511,7 @@ const LotSelectionModal: React.FC<{
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <p className="font-black text-slate-600">{lot.remainingQuantity.toFixed(2)} kg</p>
+                                        <p className="font-black text-slate-600">{lot.remainingQuantity?.toFixed(2) || '-'} kg</p>
                                         <p className="text-[10px] text-slate-400 font-bold uppercase">Disponível</p>
                                     </div>
                                 </button>
@@ -1753,7 +1753,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                         <p className="text-xl font-black text-slate-800 tracking-tighter italic">{activeLotProcessingData.lotInfo.internalLot}</p>
                                                     </div>
                                                     <div className="text-right">
-                                                        <p className="text-xl font-black text-emerald-700">{activeLotProcessingData.lotInfo.labelWeight.toFixed(0)}kg</p>
+                                                        <p className="text-xl font-black text-emerald-700">{activeLotProcessingData.lotInfo.labelWeight?.toFixed(0) || '-'}kg</p>
                                                     </div>
                                                 </div>
                                             </div>
@@ -2161,7 +2161,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                 <div key={lot.id} className="p-4 border border-slate-200 rounded-xl hover:border-indigo-300 hover:shadow-md transition bg-slate-50 group">
                                                                     <div className="flex justify-between items-start mb-3">
                                                                         <span className="font-bold text-slate-700 text-lg">{lot.internalLot}</span>
-                                                                        <span className="text-xs bg-white border border-slate-200 px-2 py-1 rounded-md font-mono">{lot.initialQuantity.toFixed(1)} kg</span>
+                                                                        <span className="text-xs bg-white border border-slate-200 px-2 py-1 rounded-md font-mono">{lot.initialQuantity?.toFixed(1) || '-'} kg</span>
                                                                     </div>
                                                                     <button
                                                                         onClick={() => handleStartProcessingLot(lot.id)}
