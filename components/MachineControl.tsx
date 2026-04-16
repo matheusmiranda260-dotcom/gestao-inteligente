@@ -948,10 +948,6 @@ const MachineControl: React.FC<MachineControlProps> = ({
     const isAnyActiveShift = useMemo(() => {
         return !!currentOperatorLog && !currentOperatorLog.endTime;
     }, [currentOperatorLog]);
-    
-    // Derived state for pulsing effects
-    const isActiveProcess = currentMachineStatus === 'Produzindo' && (machineType === 'Trefila' ? !!activeLotProcessingData : true);
-    const isUnderStopAlerta = currentMachineStatus === 'Parada' || currentMachineStatus === 'Preparacao';
 
     const currentMachineStatus = useMemo(() => {
         const events = activeOrder?.downtimeEvents || [];
@@ -973,6 +969,10 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
         return 'Parada';
     }, [activeOrder, isAnyActiveShift]);
+
+    // Derived state for pulsing effects (must come AFTER currentMachineStatus declaration)
+    const isActiveProcess = currentMachineStatus === 'Produzindo' && (machineType === 'Trefila' ? !!activeLotProcessingData : true);
+    const isUnderStopAlerta = currentMachineStatus === 'Parada' || currentMachineStatus === 'Preparacao';
 
     const isMachineStopped = currentMachineStatus === 'Parada' || currentMachineStatus === 'Preparacao';
     const isEmergencyStopped = currentMachineStatus === 'Parada';
