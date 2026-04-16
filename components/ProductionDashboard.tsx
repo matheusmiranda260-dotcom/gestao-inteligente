@@ -314,6 +314,32 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             </div>
 
             <main className="p-6 relative min-h-[500px] flex flex-col">
+                {/* Massive Stop Reason Overlay */}
+                {isStopped && !isHistoryExpanded && (
+                    <div className="absolute inset-0 z-40 flex flex-col items-center justify-center p-8 pointer-events-none select-none">
+                        <div className="w-full bg-rose-950/45 backdrop-blur-xl border-y-4 border-rose-500 py-12 animate-stop-pulse flex flex-col items-center justify-center shadow-[0_0_100px_rgba(244,63,94,0.4)]">
+                            <span className="text-sm font-black text-rose-400 uppercase tracking-[0.8em] mb-6 neon-text-red">ALERTA MÁQUINA PARADA</span>
+                            <h3 className="text-4xl md:text-6xl font-black text-white text-center uppercase tracking-tighter drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)] leading-tight px-4 break-words max-w-full italic">
+                                {machineStatus.reason}
+                            </h3>
+                            
+                            {/* Real-time Stop Duration Counter */}
+                            <div className="mt-8 px-8 py-3 bg-black/60 border border-rose-500/50 rounded-2xl flex flex-col items-center">
+                                <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-1">Tempo Total de Parada</span>
+                                <span className="text-5xl font-black text-white font-mono tabular-nums tracking-tighter drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">
+                                    {formatDuration(machineStatus.durationMs)}
+                                </span>
+                            </div>
+
+                            <div className="mt-8 flex gap-4 opacity-50">
+                                <WarningIcon className="h-6 w-6 text-rose-500 animate-bounce" />
+                                <WarningIcon className="h-6 w-6 text-rose-500 animate-bounce delay-100" />
+                                <WarningIcon className="h-6 w-6 text-rose-500 animate-bounce delay-200" />
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Overlay History - FULL WIDTH when Open */}
                 {isHistoryExpanded && (
                     <div className="absolute inset-0 z-50 bg-[#060B18] flex flex-col animate-in fade-in slide-in-from-bottom-5 duration-300">
