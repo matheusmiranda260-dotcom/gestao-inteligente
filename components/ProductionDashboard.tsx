@@ -620,8 +620,11 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                         <ChartBarIcon className="w-6 h-6 text-white" />
                     </div>
                     <div>
-                        <h1 className="text-xl font-black tracking-tight text-white uppercase italic">MSM <span className="text-indigo-400 not-italic">Tactical Dash</span></h1>
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.4em]">LIVE MONITORING • VERSION 4.0</p>
+                        <h1 className="text-2xl md:text-3xl font-black tracking-[0.15em] text-white uppercase italic animate-pulse neon-text-cyan flex items-center gap-3">
+                            <div className="w-2 h-8 bg-indigo-500 rounded-full shadow-[0_0_20px_rgba(99,102,241,1)] hidden md:block" />
+                            DASHBOARD <span className="text-indigo-400 not-italic">LAMINAÇÃO</span>
+                        </h1>
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em] mt-1">MSM GESTÃO INDUSTRIAL • LIVE MONITORING</p>
                     </div>
                 </div>
                 <div className="hidden md:flex items-center gap-8 bg-black/40 border border-white/5 py-3 px-8 rounded-2xl backdrop-blur-xl">
