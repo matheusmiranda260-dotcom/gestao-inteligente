@@ -1700,8 +1700,13 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                             <div>
                                                 <h4 className="text-red-700 font-black text-lg">⚠️ Fim de Turno!</h4>
                                                 <p className="text-red-600 text-xs font-bold mt-1 leading-relaxed">
-                                                    O horário do turno atual já encerrou. Encerre o turno para liberar o equipamento.
-                                                                         {/* Card de Status Principal - Novo Design Pulsante */}
+                                                    Horário encerrado. Finalize o turno.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Card de Status Principal - Novo Design Pulsante */}
                                     <div className={`p-6 rounded-3xl border-4 transition-all duration-1000 ${
                                         isActiveProcess ? 'bg-emerald-50 border-emerald-500/50 animate-producing-pulse shadow-[0_0_30px_rgba(16,185,129,0.2)]' :
                                         isUnderStopAlerta ? 'bg-rose-50 border-rose-500/50 animate-stop-pulse shadow-[0_0_30px_rgba(244,63,94,0.2)]' :
@@ -1738,24 +1743,35 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                 </div>
                                             </div>
                                         </div>
-                   {statusStyle.label}
-                                                    </span>
-                                                </div>
-                                                {activeLotProcessingData && (
-                                                    <div className="flex flex-wrap items-center gap-2 mt-2">
-                                                        <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded ${currentMachineStatus === 'Produzindo' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>
-                                                            Lote em Processo
-                                                        </span>
-                                                        <span className="text-sm font-bold text-slate-700">
-                                                            {activeLotProcessingData.lotInfo.internalLot} ({activeLotProcessingData.lotInfo.labelWeight.toFixed(0)}kg)
-                                                        </span>
+
+                                        {activeLotProcessingData && (
+                                            <div className="mt-6 pt-6 border-t border-slate-100">
+                                                <div className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100 flex justify-between items-center shadow-sm">
+                                                    <div>
+                                                        <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Lote Atual</p>
+                                                        <p className="text-xl font-black text-slate-800 tracking-tighter italic">{activeLotProcessingData.lotInfo.internalLot}</p>
                                                     </div>
-                                                )}
+                                                    <div className="text-right">
+                                                        <p className="text-xl font-black text-emerald-700">{activeLotProcessingData.lotInfo.labelWeight.toFixed(0)}kg</p>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div className="text-right">
-                                                <p className="text-xl md:text-2xl font-black text-slate-900 tracking-tighter">#{activeOrder.orderNumber}</p>
+                                        )}
+                                    </div>
+
+                                    {/* Card OP Mini */}
+                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Ordem de Produção</p>
+                                                <p className="text-2xl font-black text-slate-900 tracking-tighter">#{activeOrder.orderNumber}</p>
+                                            </div>
+                                            <div className="h-12 w-12 bg-slate-50 rounded-2xl flex items-center justify-center">
+                                                <ClipboardListIcon className="h-6 w-6 text-slate-400" />
                                             </div>
                                         </div>
+                                    </div>
+                                </div>
 
                                         <div className="grid grid-cols-2 gap-3 md:gap-4 mt-6 p-3 md:p-4 bg-slate-50 rounded-xl">
                                             <div className="col-span-2">
