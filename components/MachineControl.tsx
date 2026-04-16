@@ -1448,68 +1448,66 @@ const MachineControl: React.FC<MachineControlProps> = ({
         <div className="p-4 sm:p-6 md:p-8">
             {/* Overlay Fixed para Parada Operacional (Sempre Visível no Topo) */}
             {isMachineStopped && activeOrder && (
-                <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md flex items-center justify-center z-[100] transition-all duration-500 overflow-y-auto p-4">
-                    <div className="text-center p-6 md:p-8 bg-white rounded-[2rem] shadow-2xl w-full max-w-sm mx-auto animate-zoom-in border border-slate-100 my-auto">
-                        {(() => {
-                            const openEvent = [...(activeOrder.downtimeEvents || [])]
-                                .sort((a,b) => new Date(b.stopTime).getTime() - new Date(a.stopTime).getTime())
-                                .find(e => !e.resumeTime);
-                            
-                            const reason = openEvent?.reason || 'Motivo não informado';
-                            const start = openEvent ? new Date(openEvent.stopTime).getTime() : now.getTime();
-                            const durationMs = now.getTime() - start;
-                            
-                            const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-                            const normReason = normalize(reason);
-                            
-                            const limitEntry = Object.entries(DOWNTIME_THRESHOLDS).find(([key]) => normReason.includes(normalize(key)));
-                            const limitMs = limitEntry ? limitEntry[1] * 60 * 1000 : (reason === 'Motivo não informado' ? null : 15 * 60 * 1000);
-                            const isOverLimit = limitMs ? durationMs > limitMs : false;
+                (() => {
+                    const openEvent = [...(activeOrder.downtimeEvents || [])]
+                        .sort((a,b) => new Date(b.stopTime).getTime() - new Date(a.stopTime).getTime())
+                        .find(e => !e.resumeTime);
+                    
+                    const reason = openEvent?.reason || 'Motivo não informado';
+                    const start = openEvent ? new Date(openEvent.stopTime).getTime() : now.getTime();
+                    const durationMs = now.getTime() - start;
+                    
+                    const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                    const normReason = normalize(reason);
+                    
+                    const limitEntry = Object.entries(DOWNTIME_THRESHOLDS).find(([key]) => normReason.includes(normalize(key)));
+                    const limitMs = limitEntry ? limitEntry[1] * 60 * 1000 : (reason === 'Motivo não informado' ? null : 15 * 60 * 1000);
+                    const isOverLimit = limitMs ? durationMs > limitMs : false;
 
-                            return (
-                                <div className={`fixed inset-0 flex items-center justify-center z-[100] p-4 transition-all duration-500 ${isOverLimit ? 'bg-rose-600/90 animate-stop-pulse' : 'bg-amber-500/90 animate-warning-pulse'} backdrop-blur-xl`}>
-                                    <div className="text-center p-8 bg-white rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] w-full max-w-sm mx-auto animate-zoom-in border border-white/20">
-                                        <PauseIcon className={`h-10 w-10 ${isOverLimit ? 'text-rose-600' : 'text-amber-600'}`} />
-                                    </div>
-                                    
-                                    <h3 className={`text-2xl font-black mb-2 tracking-tight uppercase ${isOverLimit ? 'text-rose-600' : 'text-amber-600'}`}>
-                                        {isOverLimit ? 'LIMITE ULTRAPASSADO' : 'PARADA OPERACIONAL'}
-                                    </h3>
-                                    
-                                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-6">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Motivo Atual</p>
-                                        <p className="font-bold text-slate-700 text-lg uppercase italic">{reason}</p>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 gap-3 mb-6">
-                                        <div className="bg-slate-900 p-4 rounded-2xl shadow-inner">
-                                            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Tempo Total de Parada</p>
-                                            <p className="text-3xl font-black text-white font-mono">{formatDuration(durationMs)}</p>
-                                        </div>
-                                        
-                                        {limitMs && (
-                                            <div className={`p-4 rounded-2xl border-2 transition-all ${isOverLimit ? 'bg-rose-50 border-rose-500 animate-stop-pulse' : 'bg-amber-50 border-amber-500 animate-warning-pulse'}`}>
-                                                <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${isOverLimit ? 'text-rose-600' : 'text-amber-600'}`}>
-                                                    Tempo Previsto: <span className="text-sm font-black">{limitEntry ? limitEntry[1] : 0} min</span>
-                                                </p>
-                                                <div className="w-full bg-black/10 rounded-full h-1.5 mt-2 overflow-hidden">
-                                                    <div 
-                                                        className={`h-full transition-all duration-1000 ${isOverLimit ? 'bg-rose-600' : 'bg-amber-500'}`} 
-                                                        style={{ width: `${Math.min(100, (durationMs / limitMs) * 100)}%` }}
-                                                    />
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <p className="text-slate-400 text-[10px] font-bold uppercase leading-relaxed tracking-wider">
-                                        Retome a produção assim que o problema for resolvido.
-                                    </p>
+                    return (
+                        <div className={`fixed inset-0 flex items-center justify-center z-[100] p-4 transition-all duration-500 ${isOverLimit ? 'bg-rose-600/90 animate-stop-pulse' : 'bg-amber-500/90 animate-warning-pulse'} backdrop-blur-xl`}>
+                            <div className="text-center p-8 bg-white rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] w-full max-w-sm mx-auto animate-zoom-in border border-white/20">
+                                <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg rotate-3 transition-colors ${isOverLimit ? 'bg-rose-100 border-2 border-rose-500' : 'bg-amber-100 border-2 border-amber-500 animate-warning-pulse'}`}>
+                                    <PauseIcon className={`h-10 w-10 ${isOverLimit ? 'text-rose-600' : 'text-amber-600'}`} />
                                 </div>
+                                
+                                <h3 className={`text-2xl font-black mb-2 tracking-tight uppercase ${isOverLimit ? 'text-rose-600' : 'text-amber-600'}`}>
+                                    {isOverLimit ? 'LIMITE ULTRAPASSADO' : 'PARADA OPERACIONAL'}
+                                </h3>
+                                
+                                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-6">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Motivo Atual</p>
+                                    <p className="font-bold text-slate-700 text-lg uppercase italic">{reason}</p>
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-3 mb-6">
+                                    <div className="bg-slate-900 p-4 rounded-2xl shadow-inner">
+                                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Tempo Total de Parada</p>
+                                        <p className="text-3xl font-black text-white font-mono">{formatDuration(durationMs)}</p>
+                                    </div>
+                                    
+                                    {limitMs && (
+                                        <div className={`p-4 rounded-2xl border-2 transition-all ${isOverLimit ? 'bg-rose-50 border-rose-500 animate-stop-pulse' : 'bg-amber-50 border-amber-500 animate-warning-pulse'}`}>
+                                            <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${isOverLimit ? 'text-rose-600' : 'text-amber-600'}`}>
+                                                Tempo Previsto: <span className="text-sm font-black">{limitEntry ? limitEntry[1] : 0} min</span>
+                                            </p>
+                                            <div className="w-full bg-black/10 rounded-full h-1.5 mt-2 overflow-hidden">
+                                                <div 
+                                                    className={`h-full transition-all duration-1000 ${isOverLimit ? 'bg-rose-600' : 'bg-amber-500'}`} 
+                                                    style={{ width: `${Math.min(100, (durationMs / limitMs) * 100)}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <p className="text-slate-400 text-[10px] font-bold uppercase leading-relaxed tracking-wider">
+                                    Retome a produção assim que o problema for resolvido.
+                                </p>
                             </div>
-                        );
-                    })()}
-                </>
+                        </div>
+                    );
+                })()
             )}
 
             {/* Overlay Fixed para Bloqueio de Operador */}
@@ -2628,13 +2626,10 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                             </div>
                                         </>
                                     )}
-                                </div>
                             </div>
+                        </div>
 
-                            {orderForShift && (
-                            )}
-
-                            {orderForShift && (
+                        {orderForShift && (
                                 <div className="fixed bottom-0 right-0 left-0 md:left-64 bg-white/80 backdrop-blur-xl border-t border-slate-200/50 px-3 py-2 md:p-4 shadow-[0_-8px_30px_rgb(0,0,0,0.12)] z-40 transition-all duration-500 safe-area-bottom">
                                 <div className="max-w-[1920px] mx-auto flex items-center justify-between gap-3">
 

@@ -648,7 +648,6 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
                                         </label>
                                     </div>
                                 </div>
-                            </div>
 
                             <div className="pt-8">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 px-1">Selecione o Modelo de Engenharia</label>
