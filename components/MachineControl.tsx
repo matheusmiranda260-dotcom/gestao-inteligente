@@ -65,7 +65,10 @@ const downtimeReasons = [
 const DowntimeModal: React.FC<{
     onClose: () => void;
     onSubmit: (reason: string) => void;
-}> = ({ onClose, onSubmit }) => {
+    onEndShift?: () => void;
+    onPauseOrder?: () => void;
+    canPause?: boolean;
+}> = ({ onClose, onSubmit, onEndShift, onPauseOrder, canPause }) => {
     const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
     const [otherReason, setOtherReason] = useState('');
     const [isOtherActive, setIsOtherActive] = useState(false);
@@ -96,69 +99,106 @@ const DowntimeModal: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-            <form onSubmit={handleSubmit} className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-zoom-in">
-                <div className="p-8">
-                    <div className="bg-amber-100 w-16 h-16 rounded-2xl flex items-center justify-center mb-6">
-                        <PauseIcon className="h-10 w-10 text-amber-600" />
-                    </div>
-                    <h2 className="text-2xl font-black text-slate-800 mb-2">Pausar Produção</h2>
-                    <p className="text-slate-500 mb-8 leading-relaxed">Selecione <strong>um ou mais</strong> motivos para a interrupção.</p>
-
-                    <div className="space-y-6">
-                        <div className="grid grid-cols-2 gap-3">
-                            {downtimeReasons.map(r => {
-                                const isActive = r === 'Outros' ? isOtherActive : selectedReasons.includes(r);
-                                return (
-                                    <button
-                                        key={r}
-                                        type="button"
-                                        onClick={() => toggleReason(r)}
-                                        className={`p-4 rounded-2xl border-2 transition-all text-sm font-bold flex items-center justify-center text-center leading-tight h-full ${isActive
-                                            ? 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-200 scale-[1.02]'
-                                            : 'bg-slate-50 border-slate-100 text-slate-600 hover:border-amber-200'
-                                            }`}
-                                    >
-                                        {r}
-                                    </button>
-                                );
-                            })}
-                        </div>
-
-                        {isOtherActive && (
-                            <div className="animate-fade-in block space-y-2">
-                                <label htmlFor="other-reason" className="block text-xs font-bold text-slate-400 uppercase tracking-widest">Especifique Outro Motivo</label>
-                                <input
-                                    type="text"
-                                    id="other-reason"
-                                    value={otherReason}
-                                    onChange={(e) => setOtherReason(e.target.value)}
-                                    className="w-full bg-white border-2 border-amber-200 p-4 rounded-2xl font-medium focus:border-amber-500 transition outline-none"
-                                    placeholder="Descreva o motivo..."
-                                    required
-                                    autoFocus
-                                />
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md flex items-center justify-center z-[100] p-4 sm:p-6">
+            <div className="bg-white rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] w-full max-w-xl overflow-hidden animate-zoom-in border border-slate-100">
+                
+                {/* Header */}
+                <div className="bg-slate-50 p-8 border-b border-slate-100 flex justify-between items-center bg-gradient-to-br from-white to-slate-50">
+                    <div>
+                        <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-3">
+                            <div className="p-2 bg-amber-100 rounded-xl">
+                                <PauseIcon className="h-6 w-6 text-amber-600" />
                             </div>
-                        )}
+                            MENU OPERACIONAL
+                        </h2>
+                        <p className="text-slate-400 text-sm font-bold uppercase tracking-widest mt-1">Interromper atividade ou Encerrar</p>
                     </div>
+                    <button type="button" onClick={onClose} className="p-3 hover:bg-slate-100 rounded-2xl text-slate-400 transition-all active:scale-90">
+                        <XCircleIcon className="h-8 w-8" />
+                    </button>
                 </div>
 
-                <div className="flex gap-3 p-6 bg-slate-50 border-t border-slate-100">
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="flex-1 bg-white border-2 border-slate-200 text-slate-600 font-bold py-4 rounded-2xl hover:bg-slate-100 transition active:scale-95"
-                    >
-                        CANCELAR
-                    </button>
-                    <button
-                        type="submit"
-                        className="flex-1 bg-slate-800 text-white font-black py-4 rounded-2xl hover:bg-slate-900 shadow-lg shadow-slate-200 transition active:scale-95 flex items-center justify-center gap-2"
-                    >
-                        CONFIRMAR PARADA
-                    </button>
+                <div className="p-8 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                    <div className="grid grid-cols-2 gap-4 mb-8">
+                        {downtimeReasons.map(r => {
+                            const isActive = selectedReasons.includes(r);
+                            return (
+                                <button
+                                    key={r}
+                                    type="button"
+                                    onClick={() => toggleReason(r)}
+                                    className={`flex items-center gap-3 p-5 rounded-2xl border-2 font-black text-sm transition-all active:scale-95 ${
+                                        isActive
+                                            ? 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-200'
+                                            : 'bg-white border-slate-100 text-slate-600 hover:border-slate-300'
+                                    }`}
+                                >
+                                    <div className={`w-3 h-3 rounded-full ${isActive ? 'bg-white animate-pulse' : 'bg-slate-200'}`} />
+                                    {r}
+                                </button>
+                            );
+                        })}
+                        <button
+                            type="button"
+                            onClick={() => toggleReason('Outros')}
+                            className={`flex items-center gap-3 p-5 rounded-2xl border-2 font-black text-sm transition-all active:scale-95 ${
+                                isOtherActive
+                                    ? 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-200'
+                                    : 'bg-white border-slate-100 text-slate-600 hover:border-slate-300'
+                            }`}
+                        >
+                            <div className={`w-3 h-3 rounded-full ${isOtherActive ? 'bg-white animate-pulse' : 'bg-slate-200'}`} />
+                            Outros
+                        </button>
+                    </div>
+
+                    {isOtherActive && (
+                        <div className="animate-fade-in-up mb-8">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Digite o motivo</label>
+                            <input
+                                value={otherReason}
+                                onChange={(e) => setOtherReason(e.target.value)}
+                                className="w-full p-4 border-2 border-slate-100 rounded-2xl focus:border-amber-500 focus:ring-0 transition-all font-bold text-slate-700 bg-slate-50"
+                                placeholder="..."
+                            />
+                        </div>
+                    )}
+
+                    <div className="flex flex-col gap-4">
+                        <button 
+                            type="button"
+                            onClick={handleSubmit} 
+                            disabled={selectedReasons.length === 0 && !isOtherActive}
+                            className="w-full h-16 bg-slate-900 text-white font-black rounded-3xl hover:bg-slate-800 transition-all active:scale-95 flex items-center justify-center gap-3 shadow-xl shadow-slate-200 disabled:opacity-30"
+                        >
+                            <StopIcon className="h-6 w-6" /> REGISTRAR MOTIVO E PARAR
+                        </button>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            {onEndShift && (
+                                <button
+                                    type="button"
+                                    onClick={() => { onClose(); onEndShift(); }}
+                                    className="h-20 bg-rose-50 border-2 border-rose-100 text-rose-600 font-black rounded-3xl hover:bg-rose-100 transition-all active:scale-95 flex flex-col items-center justify-center gap-1"
+                                >
+                                    <ClockIcon className="h-6 w-6" /> 
+                                    <span className="text-[10px]">ENCERRAR TURNO</span>
+                                </button>
+                            )}
+                            {canPause && onPauseOrder && (
+                                <button
+                                    type="button"
+                                    onClick={() => { onClose(); onPauseOrder(); }}
+                                    className="h-20 bg-amber-50 border-2 border-amber-100 text-amber-600 font-black rounded-3xl hover:bg-amber-100 transition-all active:scale-95 flex flex-col items-center justify-center gap-1"
+                                >
+                                    <ArchiveIcon className="h-6 w-6" /> 
+                                    <span className="text-[10px]">PAUSAR/TROCAR</span>
+                                </button>
+                            )}
+                        </div>
+                    </div>
                 </div>
-            </form>
+            </div>
         </div>
     );
 };
@@ -908,6 +948,10 @@ const MachineControl: React.FC<MachineControlProps> = ({
     const isAnyActiveShift = useMemo(() => {
         return !!currentOperatorLog && !currentOperatorLog.endTime;
     }, [currentOperatorLog]);
+    
+    // Derived state for pulsing effects
+    const isActiveProcess = currentMachineStatus === 'Produzindo' && (machineType === 'Trefila' ? !!activeLotProcessingData : true);
+    const isUnderStopAlerta = currentMachineStatus === 'Parada' || currentMachineStatus === 'Preparacao';
 
     const currentMachineStatus = useMemo(() => {
         const events = activeOrder?.downtimeEvents || [];
@@ -1383,7 +1427,20 @@ const MachineControl: React.FC<MachineControlProps> = ({
                     onCancel={() => setShowCancelManagerAuth(false)}
                 />
             )}
-            {showDowntimeModal && <DowntimeModal onClose={() => setShowDowntimeModal(false)} onSubmit={handleStopMachine} />}
+            {showDowntimeModal && (
+                <DowntimeModal 
+                    onClose={() => setShowDowntimeModal(false)} 
+                    onSubmit={handleStopMachine} 
+                    onEndShift={activeOrder ? () => handleShiftEndRequest(activeOrder.id) : undefined}
+                    onPauseOrder={activeOrder && machineType !== 'Trefila' && pauseProductionOrder ? () => {
+                        if (window.confirm('Tem certeza que deseja arquivar/pausar esta ordem para iniciar outra? Seu turno atual será encerrado e a ordem voltará para a fila de pendentes.')) {
+                            pauseProductionOrder(activeOrder.id);
+                            setView('pending');
+                        }
+                    } : undefined}
+                    canPause={machineType !== 'Trefila'}
+                />
+            )}
             {showCompletionModal && activeOrder && <CompletionModal order={activeOrder} onClose={() => setShowCompletionModal(false)} onSubmit={handleCompleteProduction} />}
             {showQuantityPrompt && promptOrder && (
                 <QuantityPromptModal
@@ -1644,30 +1701,44 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                 <h4 className="text-red-700 font-black text-lg">⚠️ Fim de Turno!</h4>
                                                 <p className="text-red-600 text-xs font-bold mt-1 leading-relaxed">
                                                     O horário do turno atual já encerrou. Encerre o turno para liberar o equipamento.
-                                                </p>
+                                                                         {/* Card de Status Principal - Novo Design Pulsante */}
+                                    <div className={`p-6 rounded-3xl border-4 transition-all duration-1000 ${
+                                        isActiveProcess ? 'bg-emerald-50 border-emerald-500/50 animate-producing-pulse shadow-[0_0_30px_rgba(16,185,129,0.2)]' :
+                                        isUnderStopAlerta ? 'bg-rose-50 border-rose-500/50 animate-stop-pulse shadow-[0_0_30px_rgba(244,63,94,0.2)]' :
+                                        'bg-white border-slate-100'
+                                    }`}>
+                                        <div className="flex items-center gap-6">
+                                            <div className={`w-20 h-20 rounded-3xl flex items-center justify-center shadow-lg transition-transform duration-500 ${
+                                                isActiveProcess ? 'bg-emerald-600 rotate-12 scale-110' :
+                                                isUnderStopAlerta ? 'bg-rose-600 -rotate-12 scale-110' :
+                                                'bg-slate-200'
+                                            }`}>
+                                                {isActiveProcess ? <PlayIcon className="h-10 w-10 text-white" /> : 
+                                                 isUnderStopAlerta ? <PauseIcon className="h-10 w-10 text-white" /> : 
+                                                 <CogIcon className="h-10 w-10 text-slate-400" />}
+                                            </div>
+                                            <div>
+                                                <p className={`text-[10px] font-black uppercase tracking-[0.2em] mb-1 ${
+                                                    isActiveProcess ? 'text-emerald-600' :
+                                                    isUnderStopAlerta ? 'text-rose-600' :
+                                                    'text-slate-400'
+                                                }`}>Status em Tempo Real</p>
+                                                <h2 className={`text-2xl font-black tracking-tighter ${
+                                                    isActiveProcess ? 'text-emerald-900' :
+                                                    isUnderStopAlerta ? 'text-rose-900' :
+                                                    'text-slate-800'
+                                                }`}>
+                                                    {isActiveProcess ? 'PRODUZINDO' : isUnderStopAlerta ? 'PARADA' : 'DESLIGADA'}
+                                                </h2>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <div className={`h-2 w-2 rounded-full animate-pulse ${isActiveProcess ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
+                                                        {statusStyle.label}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </div>
-                                    )}
-                                    {/* Card de Status Principal - Novo Design */}
-                                    <div className={`bg-white p-4 md:p-6 rounded-2xl shadow-sm border-l-[12px] ${statusStyle.border} relative overflow-hidden transition-all duration-500`}>
-                                        {currentMachineStatus === 'Produzindo' && (
-                                            <div className="absolute top-0 right-0 h-32 w-32 bg-emerald-50 rounded-full -mr-16 -mt-16 opacity-50 blur-3xl animate-pulse"></div>
-                                        )}
-                                        {currentMachineStatus === 'Preparacao' && (
-                                            <div className="absolute top-0 right-0 h-32 w-32 bg-blue-50 rounded-full -mr-16 -mt-16 opacity-50 blur-3xl animate-pulse"></div>
-                                        )}
-
-                                        <div className="flex justify-between items-start mb-6 relative z-10">
-                                            <div>
-                                                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Status do Equipamento</h3>
-                                                <div className="flex items-center gap-3">
-                                                    <div className="relative flex h-4 w-4">
-                                                        {currentMachineStatus === 'Produzindo' && <span className="animate-pulse-glow absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
-                                                        {currentMachineStatus === 'Preparacao' && <span className="animate-pulse-glow absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>}
-                                                        <span className={`relative inline-flex rounded-full h-4 w-4 ${statusStyle.bg} ${statusStyle.glow}`}></span>
-                                                    </div>
-                                                    <span className={`text-2xl md:text-3xl font-black tracking-tighter ${statusStyle.text}`}>
-                                                        {statusStyle.label}
+                   {statusStyle.label}
                                                     </span>
                                                 </div>
                                                 {activeLotProcessingData && (
@@ -2371,18 +2442,18 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                         ) : isMachineStopped ? (
                                             <button
                                                 onClick={() => logResumeProduction && logResumeProduction(activeOrder.id)}
-                                                className="w-full md:w-auto md:px-14 h-14 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl md:rounded-full font-black text-lg shadow-xl shadow-emerald-200 transition transform active:scale-90 hover:scale-[1.02] flex items-center justify-center gap-3"
+                                                className="w-full md:w-auto md:px-14 h-14 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl md:rounded-full font-black text-lg shadow-2xl shadow-emerald-500/40 transition transform active:scale-95 hover:scale-[1.02] flex items-center justify-center gap-3 animate-producing-pulse border-4 border-emerald-400"
                                             >
                                                 <PlayIcon className="h-8 w-8" />
-                                                <span className="inline tracking-tight text-sm md:text-lg">RETOMAR PRODUÇÃO</span>
+                                                <span className="inline tracking-tight text-sm md:text-lg">RETOMAR PRODUÇÃO (OK)</span>
                                             </button>
                                         ) : (
                                             <button
                                                 onClick={() => setShowDowntimeModal(true)}
-                                                className="w-full md:w-auto md:px-14 h-14 bg-amber-500 hover:bg-amber-400 text-white rounded-2xl md:rounded-full font-black text-lg shadow-xl shadow-amber-200 transition transform active:scale-90 hover:scale-[1.02] flex items-center justify-center gap-3"
+                                                className="w-full md:w-auto md:px-14 h-14 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl md:rounded-full font-black text-lg shadow-2xl shadow-rose-500/40 transition transform active:scale-95 hover:scale-[1.02] flex items-center justify-center gap-3 animate-stop-pulse border-4 border-rose-400"
                                             >
                                                 <PauseIcon className="h-8 w-8" />
-                                                <span className="inline tracking-tight">PARAR MÁQUINA</span>
+                                                <span className="inline tracking-tight">PARAR MÁQUINA (ALERTA)</span>
                                             </button>
                                         )}
                                     </div>

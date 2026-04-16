@@ -142,8 +142,6 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             return { status: 'Ocioso', reason: 'Nenhuma ordem ativa', durationMs: 0 };
         }
         const events = (activeOrder.downtimeEvents || []) as any[];
-        // CRITICAL FIX: Sort DESCENDING to pick the LATEST open event. 
-        // Old "zombie" events should not hide the current status.
         const openEvent = [...events]
             .sort((a, b) => new Date(b.stopTime).getTime() - new Date(a.stopTime).getTime())
             .find(e => !e.resumeTime);
@@ -152,7 +150,6 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             const reason = openEvent.reason || 'Parada';
             const dur = now.getTime() - new Date(openEvent.stopTime).getTime();
             
-            // Align with MachineControl.tsx prepReasons
             const isPrep = reason.includes('Preparação') || 
                            reason.includes('Setup') || 
                            reason.includes('Aguardando') || 
@@ -164,10 +161,19 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             return { status: 'Parada', reason, durationMs: dur };
         }
         
+        // NEW LOGIC: If Trefila has no lot active, it stays in Preparation
+        const trefilaNotProducing = machineType === 'Trefila' && (!activeOrder.activeLotProcessing || !activeOrder.activeLotProcessing.lotId);
+        
         const resumes = (activeOrder.downtimeEvents || []).filter((e: any) => e.resumeTime).map((e: any) => new Date(e.resumeTime!).getTime());
         const lastResume = resumes.length ? Math.max(...resumes) : new Date(activeOrder.startTime).getTime();
-        return { status: 'Produzindo', reason: '', durationMs: now.getTime() - Math.max(lastResume, shiftStartMs) };
-    }, [activeOrder, now, currentOperatorLog, shiftStartMs]);
+        const duration = now.getTime() - Math.max(lastResume, shiftStartMs);
+
+        if (trefilaNotProducing) {
+            return { status: 'Preparacao', reason: 'Aguardando Início de Lote', durationMs: duration };
+        }
+
+        return { status: 'Produzindo', reason: '', durationMs: duration };
+    }, [activeOrder, now, currentOperatorLog, shiftStartMs, machineType]);
 
     const currentStyle = statusStyles[machineStatus.status as keyof typeof statusStyles] || statusStyles.Ocioso;
     const currentOperator = currentOperatorLog?.operator || '---';
@@ -288,9 +294,11 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     }, [machineType, productionHistoryInShift, activeOrder]);
 
     const isStopped = machineStatus.status === 'Parada' || machineStatus.status === 'Preparacao';
+    const isProducingLot = machineStatus.status === 'Produzindo' && machineType === 'Trefila' && activeOrder?.activeLotProcessing;
+    const activeLotInfo = isProducingLot ? stock.find(s => s.id === activeOrder?.activeLotProcessing?.lotId) : null;
 
     return (
-        <div className={`tactical-card rounded-3xl border ${isStopped ? 'animate-stop-pulse' : 'border-white/10'} flex flex-col overflow-hidden relative group transition-all duration-500`}>
+        <div className={`tactical-card rounded-3xl border ${isStopped ? 'animate-stop-pulse' : isProducingLot ? 'animate-producing-pulse' : 'border-white/10'} flex flex-col overflow-hidden relative group transition-all duration-500`}>
             {/* Machine Header */}
             <div className={`p-5 flex items-center justify-between border-b border-white/5 bg-gradient-to-r ${currentStyle.bg} to-transparent`}>
                 <div className="flex items-center gap-4">
@@ -314,7 +322,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                 </div>
                 <div className="text-right">
                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Status do Equipamento</p>
-                    <p className={`text-sm font-black uppercase tracking-widest ${currentStyle.color} ${isStopped ? 'animate-pulse neon-text-red' : ''}`}>{currentStyle.title}</p>
+                    <p className={`text-sm font-black uppercase tracking-widest ${currentStyle.color} ${isStopped ? 'animate-pulse neon-text-red' : isProducingLot ? 'animate-pulse neon-text-green' : ''}`}>{currentStyle.title}</p>
                     {isStopped && (
                         <div className="mt-2 px-3 py-1 bg-rose-500/20 border border-rose-500/50 rounded-md animate-pulse shadow-[0_0_15px_rgba(244,63,94,0.3)]">
                             <p className="text-[9px] font-black text-rose-400 uppercase tracking-tighter">MOTIVO: {machineStatus.reason}</p>
@@ -324,6 +332,37 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             </div>
 
             <main className="p-6 relative min-h-[500px] flex flex-col">
+                {/* Massive Producing Lot Overlay */}
+                {isProducingLot && !isHistoryExpanded && (
+                    <div className="absolute inset-0 z-40 flex flex-col items-center justify-center p-8 pointer-events-none select-none">
+                        <div className="w-full bg-emerald-950/45 backdrop-blur-xl border-y-4 border-emerald-500 py-12 animate-producing-pulse flex flex-col items-center justify-center shadow-[0_0_100px_rgba(16,185,129,0.4)]">
+                            <span className="text-sm font-black text-emerald-400 uppercase tracking-[0.8em] mb-6 neon-text-green">LOTE EM PROCESSO</span>
+                            <h3 className="text-4xl md:text-7xl font-black text-white text-center uppercase tracking-tighter drop-shadow-[0_10px_30px_rgba(0,0,0,0.5)] leading-tight px-4 break-words max-w-full italic">
+                                {activeLotInfo?.internalLot || '---'}
+                            </h3>
+                            
+                            <div className="mt-10 flex gap-6">
+                                <div className="px-8 py-4 bg-black/60 border border-emerald-500/50 rounded-3xl flex flex-col items-center min-w-[200px]">
+                                    <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Peso do Lote</span>
+                                    <span className="text-5xl font-black text-white font-mono">{activeLotInfo?.initialQuantity.toFixed(1)} <span className="text-xl">kg</span></span>
+                                </div>
+                                <div className="px-8 py-4 bg-black/60 border border-emerald-500/50 rounded-3xl flex flex-col items-center min-w-[200px]">
+                                    <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Tempo de Processo</span>
+                                    <span className="text-5xl font-black text-white font-mono tabular-nums">
+                                        {formatDuration(now.getTime() - new Date(activeOrder!.activeLotProcessing!.startTime).getTime())}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="mt-8 flex gap-4 opacity-50">
+                                <CogIcon className="h-6 w-6 text-emerald-500 animate-spin-slow" />
+                                <CogIcon className="h-6 w-6 text-emerald-500 animate-spin-slow delay-150" />
+                                <CogIcon className="h-6 w-6 text-emerald-500 animate-spin-slow delay-300" />
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Massive Stop Reason Overlay */}
                 {isStopped && !isHistoryExpanded && (
                     <div className="absolute inset-0 z-40 flex flex-col items-center justify-center p-8 pointer-events-none select-none">
