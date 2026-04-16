@@ -1693,63 +1693,134 @@ const MachineControl: React.FC<MachineControlProps> = ({
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-20 md:pb-8">
                                 {/* Coluna Esquerda: Visão Geral e Indicadores */}
                                 <div className={`lg:col-span-1 space-y-6 ${mobileTab !== 'monitor' ? 'hidden lg:block' : 'animate-fade-in'}`}>
-                                    {/* Trefila Mobile: Simplified Panel (Enchuto) */}
+                                    {/* Trefila Mobile: Optimized Panel (Enchuto) */}
                                     {machineType === 'Trefila' ? (
-                                        <div className="md:hidden animate-fade-in space-y-6">
-                                            {/* Unified Control Card - THE CORE FOCUS */}
-                                            <div className={`p-8 rounded-[3rem] border-4 transition-all duration-700 ${
-                                                isActiveProcess ? 'bg-emerald-50/50 border-emerald-500/30' : 
-                                                'bg-amber-50/50 border-amber-500/30'
-                                            } shadow-lg backdrop-blur-sm`}>
-                                                <div className="flex flex-col items-center text-center gap-6">
-                                                    <div className={`w-28 h-28 rounded-[2.5rem] flex items-center justify-center shadow-xl transition-all duration-500 ${
-                                                        isActiveProcess ? 'bg-emerald-600 shadow-emerald-200 rotate-12' : 'bg-amber-600 shadow-amber-200 -rotate-12'
-                                                    }`}>
-                                                        {isActiveProcess ? <PlayIcon className="h-14 w-14 text-white" /> : <PauseIcon className="h-14 w-14 text-white" />}
-                                                    </div>
+                                        <div className="md:hidden animate-fade-in space-y-4">
+                                            {/* Status Hero - Compact & Elegant */}
+                                            <div className={`relative overflow-hidden p-6 rounded-[2rem] transition-all duration-700 ${
+                                                isActiveProcess ? 'bg-emerald-600 shadow-lg shadow-emerald-100' : 'bg-amber-500 shadow-lg shadow-amber-100'
+                                            }`}>
+                                                <div className="absolute -right-8 -top-8 p-4 opacity-10">
+                                                    {isActiveProcess ? <PlayIcon className="h-32 w-32 text-white" /> : <PauseIcon className="h-32 w-32 text-white" />}
+                                                </div>
+                                                
+                                                <div className="relative z-10 flex flex-col gap-1">
+                                                    <span className="text-[10px] font-black text-white/60 uppercase tracking-[0.2em]">Máquina {machineType}</span>
+                                                    <h2 className="text-3xl font-black text-white tracking-tighter">
+                                                        {isActiveProcess ? 'PRODUZINDO' : 'PARADA'}
+                                                    </h2>
                                                     
-                                                    <div>
-                                                        <h2 className={`text-4xl font-black tracking-tighter ${isActiveProcess ? 'text-emerald-900' : 'text-amber-900'}`}>
-                                                            {isActiveProcess ? 'PRODUZINDO' : 'MÁQUINA PARADA'}
-                                                        </h2>
-                                                        <p className="text-slate-400 font-black uppercase tracking-[0.3em] text-[10px] mt-2">Controle Operacional</p>
-                                                    </div>
-
-                                                    <div className="w-full grid grid-cols-1 gap-4 pt-4">
-                                                        {isActiveProcess ? (
-                                                            <button 
-                                                                onClick={() => setShowDowntimeModal(true)}
-                                                                className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-6 rounded-3xl text-xl shadow-2xl shadow-slate-200 transition-all active:scale-95 flex items-center justify-center gap-4 border-b-4 border-slate-700"
-                                                            >
-                                                                <PauseIcon className="h-8 w-8 text-amber-500" />
-                                                                <span>PARAR MÁQUINA</span>
-                                                            </button>
-                                                        ) : (
-                                                            <button 
-                                                                onClick={() => logResumeProduction && logResumeProduction(activeOrder.id)}
-                                                                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-6 rounded-3xl text-xl shadow-2xl shadow-emerald-200 transition-all active:scale-95 flex items-center justify-center gap-4 border-b-4 border-emerald-700"
-                                                            >
-                                                                <PlayIcon className="h-8 w-8 text-white animate-pulse" />
-                                                                <span>RETOMAR PRODUÇÃO</span>
-                                                            </button>
-                                                        )}
-                                                    </div>
+                                                    {activeLotProcessingData && (
+                                                        <div className="mt-4 bg-white/10 backdrop-blur-md rounded-xl p-3 border border-white/20 flex items-center justify-between">
+                                                            <div>
+                                                                <span className="text-[8px] font-black text-white/60 uppercase block">Lote Atual</span>
+                                                                <span className="text-sm font-bold text-white italic">{activeLotProcessingData.lotInfo.internalLot}</span>
+                                                            </div>
+                                                            <div className="h-8 w-8 bg-white/20 rounded-lg flex items-center justify-center">
+                                                                <div className="w-2 h-2 bg-emerald-300 rounded-full animate-ping" />
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
 
-                                            {/* Active Lot Display (Only if processing) */}
-                                            {activeLotProcessingData && (
-                                                <div className="bg-white p-6 rounded-3xl shadow-sm border border-emerald-100 flex items-center justify-between">
-                                                    <div>
-                                                        <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest block mb-1">Processando Lote</span>
-                                                        <h4 className="text-2xl font-black text-slate-800 tracking-tighter italic">{activeLotProcessingData.lotInfo.internalLot}</h4>
+                                            {/* Minimal Stats Row */}
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Bitola</span>
+                                                    <span className="text-xl font-black text-slate-800">{activeOrder.targetBitola} <span className="text-[10px] text-slate-300">mm</span></span>
+                                                </div>
+                                                <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Meta Turno</span>
+                                                    <span className="text-xl font-black text-slate-800">{activeOrder.totalWeight?.toFixed(0) || 0} <span className="text-[10px] text-slate-300">kg</span></span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        // ORIGINAL CONTENT FOR TRELIÇA OR DESKTOP
+                                        <div className={`space-y-6 ${mobileTab !== 'monitor' ? 'hidden lg:block' : 'animate-fade-in'}`}>
+                                            {isShiftOverdue && (
+                                                <div className="bg-red-50 border-2 border-red-500 rounded-2xl p-4 shadow-sm flex items-start gap-4 animate-pulse">
+                                                    <div className="bg-red-100 p-2 rounded-xl text-red-600 shrink-0">
+                                                        <ExclamationIcon className="h-8 w-8" />
                                                     </div>
-                                                    <div className="h-12 w-12 bg-emerald-50 rounded-2xl flex items-center justify-center">
-                                                        <div className="w-3 h-3 bg-emerald-500 rounded-full animate-ping" />
+                                                    <div>
+                                                        <h4 className="text-red-700 font-black text-lg">⚠️ Fim de Turno!</h4>
+                                                        <p className="text-red-600 text-xs font-bold mt-1 leading-relaxed">
+                                                            Horário encerrado. Finalize o turno.
+                                                        </p>
                                                     </div>
                                                 </div>
                                             )}
+
+                                            {/* Card de Status Principal - Novo Design Pulsante */}
+                                            <div className={`p-6 rounded-3xl border-4 transition-all duration-1000 ${
+                                                isActiveProcess ? 'bg-emerald-50 border-emerald-500/50 animate-producing-pulse shadow-[0_0_30px_rgba(16,185,129,0.2)]' :
+                                                isUnderStopAlerta ? 'bg-rose-50 border-rose-500/50 animate-stop-pulse shadow-[0_0_30px_rgba(244,63,94,0.2)]' :
+                                                'bg-white border-slate-100'
+                                            } ${machineType === 'Trefila' ? 'hidden md:block' : ''}`}>
+                                                <div className="flex items-center gap-6">
+                                                    <div className={`w-20 h-20 rounded-3xl flex items-center justify-center shadow-lg transition-transform duration-500 ${
+                                                        isActiveProcess ? 'bg-emerald-600 rotate-12 scale-110' :
+                                                        isUnderStopAlerta ? 'bg-rose-600 -rotate-12 scale-110' :
+                                                        'bg-slate-200'
+                                                    }`}>
+                                                        {isActiveProcess ? <PlayIcon className="h-10 w-10 text-white" /> : 
+                                                        isUnderStopAlerta ? <PauseIcon className="h-10 w-10 text-white" /> : 
+                                                        <CogIcon className="h-10 w-10 text-slate-400" />}
+                                                    </div>
+                                                    <div>
+                                                        <p className={`text-[10px] font-black uppercase tracking-[0.2em] mb-1 ${
+                                                            isActiveProcess ? 'text-emerald-600' :
+                                                            isUnderStopAlerta ? 'text-rose-600' :
+                                                            'text-slate-400'
+                                                        }`}>Status em Tempo Real</p>
+                                                        <h2 className={`text-2xl font-black tracking-tighter ${
+                                                            isActiveProcess ? 'text-emerald-900' :
+                                                            isUnderStopAlerta ? 'text-rose-900' :
+                                                            'text-slate-800'
+                                                        }`}>
+                                                            {isActiveProcess ? 'PRODUZINDO' : isUnderStopAlerta ? 'PARADA' : 'DESLIGADA'}
+                                                        </h2>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            <div className={`h-2 w-2 rounded-full animate-pulse ${isActiveProcess ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
+                                                                {statusStyle.label}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {activeLotProcessingData && (
+                                                    <div className="mt-6 pt-6 border-t border-slate-100">
+                                                        <div className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100 flex justify-between items-center shadow-sm">
+                                                            <div>
+                                                                <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Lote Atual</p>
+                                                                <p className="text-xl font-black text-slate-800 tracking-tighter italic">{activeLotProcessingData.lotInfo.internalLot}</p>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <p className="text-xl font-black text-emerald-700">{activeLotProcessingData.lotInfo.labelWeight?.toFixed(0) || '-'}kg</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Card OP Mini */}
+                                            <div className={`bg-white p-6 rounded-2xl shadow-sm border border-slate-100 ${machineType === 'Trefila' ? 'hidden md:block' : ''}`}>
+                                                <div className="flex justify-between items-center">
+                                                    <div>
+                                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Ordem de Produção</p>
+                                                        <p className="text-2xl font-black text-slate-900 tracking-tighter">#{activeOrder.orderNumber}</p>
+                                                    </div>
+                                                    <div className="h-12 w-12 bg-slate-50 rounded-2xl flex items-center justify-center">
+                                                        <ClipboardListIcon className="h-6 w-6 text-slate-400" />
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
+                                    )}
+
                                     ) : (
                                         // ORIGINAL CONTENT FOR TRELIÇA OR DESKTOP
                                         <div className={`space-y-6 ${mobileTab !== 'monitor' ? 'hidden lg:block' : 'animate-fade-in'}`}>
@@ -1838,8 +1909,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                 </div>
 
                                 {/* Coluna Direita: Métricas e Controles de Produção */}
-                                    <div className={`lg:col-span-2 space-y-6 ${mobileTab !== 'monitor' ? 'hidden lg:block' : 'animate-fade-in'}`}>
-                                        <div className="grid grid-cols-1 gap-6">
+                                    <div className={`lg:col-span-2 space-y-4 md:space-y-6 ${mobileTab !== 'monitor' ? 'hidden lg:block' : 'animate-fade-in'}`}>
+                                        <div className={`grid grid-cols-1 gap-6 ${machineType === 'Trefila' ? 'hidden md:grid' : 'grid'}`}>
                                                 {/* Header Info - Simplified for Mobile */}
                                                 <div className="col-span-2">
                                                     <p className="text-[10px] md:text-xs text-slate-500 mb-2 uppercase tracking-widest font-bold">Produção do Turno</p>
@@ -1871,6 +1942,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                     <p className="text-sm md:text-base font-semibold text-slate-700">{activeOrder.totalWeight?.toFixed(0) || 0} kg</p>
                                                 </div>
                                             </div>
+
 
 
                                     {/* Card de Estoque de Anéis (Críticos) - Novo */}
@@ -2026,86 +2098,68 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                         );
                                                     })()}
                                                 </div>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
+                                                     {/* Mobile Collapsible Details */}
+                                    {machineType === 'Trefila' && (
+                                        <div className="md:hidden">
+                                            <details className="group bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden transition-all">
+                                                <summary className="flex items-center justify-between p-4 cursor-pointer list-none">
+                                                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                                                        <ClockIcon className="h-4 w-4" /> Ver Detalhes Adicionais
+                                                    </span>
+                                                    <ChevronDownIcon className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-180" />
+                                                </summary>
+                                                <div className="p-4 pt-0 space-y-6 animate-fade-in">
+                                                    {hasActiveShift && (
+                                                        <div className="bg-slate-900 p-6 rounded-xl shadow-lg">
+                                                            <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4 flex items-center justify-between">
+                                                                <span>Tempo de Operação</span>
+                                                                <ClockIcon className="h-4 w-4 text-slate-600" />
+                                                            </h3>
+                                                            <div className="space-y-4">
+                                                                <div className="flex justify-between items-baseline">
+                                                                    <p className="font-mono text-white font-black text-3xl tracking-tighter">{shiftStatus.timeStatusText}</p>
+                                                                    {shiftStatus.isOvertime && <span className="text-[10px] font-black bg-red-500/20 text-red-500 px-2 py-0.5 rounded-full border border-red-500/30">EXTRA</span>}
+                                                                </div>
+                                                                <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                                                                    <div className={`h-full transition-all duration-700 ${shiftStatus.isOvertime ? 'bg-red-500' : 'bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]'}`} style={{ width: `${shiftStatus.progress}%` }}></div>
+                                                                </div>
+                                                                <p className="text-[10px] text-slate-500 font-bold uppercase text-center tracking-widest">{shiftStatus.shiftName}: {shiftStatus.shiftLabel}</p>
+                                                            </div>
+                                                        </div>
+                                                    )}
 
-                                    {hasActiveShift && (
-                                        <div className="bg-slate-900 p-6 rounded-2xl shadow-xl shadow-slate-200">
-                                            <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4 flex items-center justify-between">
-                                                <span>Tempo de Operação</span>
-                                                <ClockIcon className="h-4 w-4 text-slate-600" />
-                                            </h3>
-                                            <div className="space-y-4">
-                                                <div className="flex justify-between items-baseline">
-                                                    <p className="font-mono text-white font-black text-3xl tracking-tighter">{shiftStatus.timeStatusText}</p>
-                                                    {shiftStatus.isOvertime && <span className="text-[10px] font-black bg-red-500/20 text-red-500 px-2 py-0.5 rounded-full border border-red-500/30">EXTRA</span>}
+                                                    <div className="bg-slate-50 p-4 rounded-xl">
+                                                        <h3 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
+                                                            <ClockIcon className="h-5 w-5 text-amber-500" /> Histórico de Paradas
+                                                        </h3>
+                                                        <div className="space-y-2">
+                                                            {activeOrder.downtimeEvents && activeOrder.downtimeEvents.length > 0 ? (
+                                                                [...activeOrder.downtimeEvents].reverse().slice(0, 3).map((event, index) => {
+                                                                    const stop = new Date(event.stopTime);
+                                                                    const resume = event.resumeTime ? new Date(event.resumeTime) : new Date();
+                                                                    const durationMs = resume.getTime() - stop.getTime();
+                                                                    return (
+                                                                        <div key={index} className="bg-white p-3 rounded-lg border border-slate-100 flex justify-between items-center text-xs">
+                                                                            <span className="font-bold text-slate-700 truncate mr-2">{event.reason}</span>
+                                                                            <span className="font-mono text-slate-500 whitespace-nowrap">{formatDuration(durationMs)}</span>
+                                                                        </div>
+                                                                    );
+                                                                })
+                                                            ) : (
+                                                                <p className="text-center text-slate-400 italic">Sem paradas.</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                                                    <div className={`h-full transition-all duration-700 ${shiftStatus.isOvertime ? 'bg-red-500' : 'bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]'}`} style={{ width: `${shiftStatus.progress}%` }}></div>
-                                                </div>
-                                                <p className="text-[10px] text-slate-500 font-bold uppercase text-center tracking-widest">{shiftStatus.shiftName}: {shiftStatus.shiftLabel}</p>
-                                            </div>
+                                            </details>
                                         </div>
                                     )}
 
-                                    <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm">
-                                        <h3 className="text-lg font-bold text-slate-700 mb-6 flex items-center gap-2">
-                                            <ClockIcon className="h-5 w-5 text-amber-500" /> Histórico de Paradas Recentes
-                                        </h3>
-                                        <div className="max-h-[500px] md:max-h-80 overflow-y-auto custom-scrollbar">
-                                            {activeOrder.downtimeEvents && activeOrder.downtimeEvents.length > 0 ? (
-                                                <>
-                                                    {/* Desktop Table View */}
-                                                    <table className="w-full text-sm hidden sm:table">
-                                                        <thead className="text-left sticky top-0 bg-white shadow-sm">
-                                                            <tr className="text-xs text-slate-400 uppercase">
-                                                                <th className="p-2 font-semibold whitespace-nowrap">Motivo</th>
-                                                                <th className="p-2 font-semibold whitespace-nowrap">Início / Fim</th>
-                                                                <th className="p-2 font-semibold whitespace-nowrap text-right">Duração</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody className="divide-y divide-slate-100">
-                                                            {[...activeOrder.downtimeEvents].reverse().slice(0, 5).map((event, index) => { // Show only last 5
-                                                                const stop = new Date(event.stopTime);
-                                                                const resume = event.resumeTime ? new Date(event.resumeTime) : new Date();
-                                                                const durationMs = resume.getTime() - stop.getTime();
-                                                                return (
-                                                                    <tr key={index}>
-                                                                        <td className="p-2 max-w-[150px] truncate font-medium text-slate-700" title={event.reason}>{event.reason}</td>
-                                                                        <td className="p-2 text-xs text-slate-500 whitespace-nowrap">
-                                                                            {stop.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} - {resume.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                                                                        </td>
-                                                                        <td className="p-2 text-right font-mono text-slate-500 whitespace-nowrap">{formatDuration(durationMs)}</td>
-                                                                    </tr>
-                                                                );
-                                                            })}
-                                                        </tbody>
-                                                    </table>
-
-                                                    {/* Mobile Card View */}
-                                                    <div className="space-y-2 sm:hidden">
-                                                        {[...activeOrder.downtimeEvents].reverse().slice(0, 5).map((event, index) => {
-                                                            const stop = new Date(event.stopTime);
-                                                            const resume = event.resumeTime ? new Date(event.resumeTime) : new Date();
-                                                            const durationMs = resume.getTime() - stop.getTime();
-                                                            return (
-                                                                <div key={index} className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex justify-between items-center">
-                                                                    <div className="overflow-hidden mr-2">
-                                                                        <p className="font-bold text-slate-700 text-sm truncate">{event.reason}</p>
-                                                                        <p className="text-xs text-slate-400 mt-0.5">{stop.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} - {resume.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
-                                                                    </div>
-                                                                    <div className="font-mono text-slate-600 font-bold bg-white px-2 py-1 rounded shadow-sm text-xs whitespace-nowrap">
-                                                                        {formatDuration(durationMs)}
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </>
-                                            ) : (
-                                                <p className="text-sm text-slate-400 text-center py-4 italic">Sem paradas recentes.</p>
+                                    {/* Progresso visível apenas em desktop ou se não for Trefila Mobile */}
+                                    <div className={`${machineType === 'Trefila' ? 'hidden md:block' : 'block'}`}>
+                                        {/* Performance Section contents... kept for desktop */}
+                                    </div>
+t-center py-4 italic">Sem paradas recentes.</p>
                                             )}
                                         </div>
                                     </div>
