@@ -1773,7 +1773,9 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                     </div>
                                 </div>
 
-                                        <div className="grid grid-cols-2 gap-3 md:gap-4 mt-6 p-3 md:p-4 bg-slate-50 rounded-xl">
+                                {/* Coluna Direita: Métricas e Controles de Produção */}
+                                <div className={`lg:col-span-2 space-y-6 ${mobileTab !== 'monitor' ? 'hidden lg:block' : 'animate-fade-in'}`}>
+                                    <div className="grid grid-cols-1 gap-6">
                                             <div className="col-span-2">
                                                 <p className="text-[10px] md:text-xs text-slate-500 mb-2 uppercase tracking-widest font-bold">Registro de Produção do Turno</p>
                                                 {currentOperatorLog ? (
@@ -1825,7 +1827,6 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                 </>
                                             )}
                                         </div>
-                                    </div>
 
                                     {/* Card de Estoque de Anéis (Críticos) - Novo */}
                                     {machineType === 'Trefila' && ringStock.filter(r => r.quantity < 3).length > 0 && (
@@ -2425,10 +2426,10 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                     </div>
                                                 </div>
                                             </div>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
 
                             {/* Sticky Action Deck (Spotify Style) - Revised for Mobile */}
                             <div className="fixed bottom-0 right-0 left-0 md:left-64 bg-white/80 backdrop-blur-xl border-t border-slate-200/50 px-3 py-2 md:p-4 shadow-[0_-8px_30px_rgb(0,0,0,0.12)] z-40 transition-all duration-500 safe-area-bottom">
