@@ -57,7 +57,10 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
         return !!currentUser.permissions?.[targetPage];
     };
 
-    const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor';
+    const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor' || currentUser?.username === 'admin';
+    const u = currentUser?.username?.toLowerCase();
+    const isWillian = u === 'willian';
+    const isAdrian = u === 'adrian';
 
     const MenuItem = ({ target, label, icon: Icon, highlight = false }: { target: Page, label: string, icon: any, highlight?: boolean }) => {
         if (!hasPermission(target)) return null;
@@ -115,7 +118,7 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                     <div className="sidebar-category-title">{isCollapsed ? '🏭' : '🏭 Produção'}</div>
 
                     {/* Trefila Collapsible */}
-                    {(hasPermission('trefilaInProgress') || hasPermission('trefilaWeighing') || hasPermission('trefilaPending') || hasPermission('trefilaCompleted') || hasPermission('trefilaReports') || hasPermission('trefilaRings')) && (
+                    {(!isAdrian || isGestor) && (hasPermission('trefilaInProgress') || hasPermission('trefilaWeighing') || hasPermission('trefilaPending') || hasPermission('trefilaCompleted') || hasPermission('trefilaReports') || hasPermission('trefilaRings')) && (
                         <>
                             <button
                                 onClick={() => toggleMenu('trefila')}
@@ -171,7 +174,7 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                     )}
 
                     {/* Treliça Collapsible */}
-                    {(hasPermission('trelicaInProgress') || hasPermission('trelicaPending') || hasPermission('trelicaCompleted') || hasPermission('trelicaReports')) && (
+                    {(!isWillian || isGestor) && (hasPermission('trelicaInProgress') || hasPermission('trelicaPending') || hasPermission('trelicaCompleted') || hasPermission('trelicaReports')) && (
                         <>
                             <button
                                 onClick={() => toggleMenu('trelica')}

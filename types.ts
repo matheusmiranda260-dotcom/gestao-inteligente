@@ -21,7 +21,7 @@ export interface EmployeeDocument {
     createdAt?: string;
 }
 
-export type MachineType = 'Trefila-01' | 'Trefila-02' | 'Trefila-03' | 'Trefila-04' | 'Treliça-01' | 'Treliça-02' | 'Treliça-03' | 'Treliça-04' | 'Corte-01' | 'Corte-02' | 'Trefila' | 'Treliça' | 'Geral' | 'Empilhadeira';
+export type MachineType = 'Trefila 1' | 'Trefila 2' | 'Treliça 1' | 'Treliça 2' | 'Corte-01' | 'Corte-02' | 'Trefila' | 'Treliça' | 'Geral' | 'Empilhadeira';
 
 export type MaterialType = 'Arame' | 'Treliça' | 'Ponta' | 'Fio Máquina' | 'Sucata' | 'CA-60' | 'CA-50';
 

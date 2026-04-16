@@ -164,8 +164,8 @@ const App: React.FC = () => {
                 setMeetingCategories(fetchedCategories || []);
 
                 // Split production records
-                setTrefilaProduction(fetchedProductionRecords.filter(r => r.machine === 'Trefila'));
-                setTrelicaProduction(fetchedProductionRecords.filter(r => r.machine === 'Treliça'));
+                setTrefilaProduction(fetchedProductionRecords.filter(r => r.machine.startsWith('Trefila')));
+                setTrelicaProduction(fetchedProductionRecords.filter(r => r.machine.startsWith('Treliça')));
 
 
             } catch (error) {
@@ -841,7 +841,7 @@ const App: React.FC = () => {
 
             // Update stock items status
             if (!orderData.isGhostOrder) {
-                if (savedOrder.machine === 'Trefila') {
+                if (savedOrder.machine.startsWith('Trefila')) {
                     const lotIds = savedOrder.selectedLotIds as string[];
                     if (Array.isArray(lotIds)) {
                         for (const lotId of lotIds) {
@@ -854,7 +854,7 @@ const App: React.FC = () => {
                             }
                         }
                     }
-                } else if (savedOrder.machine === 'Treliça') {
+                } else if (savedOrder.machine.startsWith('Treliça')) {
                     const lots = savedOrder.selectedLotIds as TrelicaSelectedLots;
                     if (lots && typeof lots === 'object') {
                         const lotRoleMap = new Map<string, string>();
@@ -919,7 +919,7 @@ const App: React.FC = () => {
             let lotIds: string[] = [];
             const rawSelected = orderToDelete.selectedLotIds;
             
-            if (orderToDelete.machine === 'Treliça' && rawSelected && !Array.isArray(rawSelected)) {
+            if (orderToDelete.machine.startsWith('Treliça') && rawSelected && !Array.isArray(rawSelected)) {
                 const lots = rawSelected as TrelicaSelectedLots;
                 // Standard single-lot fields (old format)
                 const singleIds = [lots.superior, lots.inferior1, lots.inferior2, lots.senozoide1, lots.senozoide2].filter(Boolean);
@@ -1063,7 +1063,7 @@ const App: React.FC = () => {
 
             // Collect all lot IDs from the order
             let lotIds: string[] = [];
-            if (orderToCancel.machine === 'Treliça' && !Array.isArray(orderToCancel.selectedLotIds)) {
+            if (orderToCancel.machine.startsWith('Treliça') && !Array.isArray(orderToCancel.selectedLotIds)) {
                 const lots = orderToCancel.selectedLotIds as TrelicaSelectedLots;
                 if (lots.allSuperior && lots.allInferior && lots.allSenozoide) {
                     lotIds = [...lots.allSuperior, ...lots.allInferior, ...lots.allSenozoide];
@@ -1255,7 +1255,7 @@ const App: React.FC = () => {
 
         // For Trefila: if no active lot, add a prep event (machine needs setup)
         // NOTE: We do NOT add a stuck event for Treliça here - let the operators start directly
-        if (order.machine === 'Trefila' && (!order.activeLotProcessing || !order.activeLotProcessing.lotId)) {
+        if (order.machine.startsWith('Trefila') && (!order.activeLotProcessing || !order.activeLotProcessing.lotId)) {
             updates.downtimeEvents = [
                 ...closedEvents,
                 {
@@ -1308,7 +1308,7 @@ const App: React.FC = () => {
         let totalProducedWeight = 0;
         let totalProducedMeters = 0;
 
-        if (order.machine === 'Trefila') {
+        if (order.machine.startsWith('Trefila')) {
             totalProducedWeight = shiftProcessedLots.reduce((sum, lot) => sum + (lot.finalWeight || 0), 0);
 
             const bitolaMm = parseFloat(order.targetBitola);
@@ -1481,7 +1481,7 @@ const App: React.FC = () => {
         );
 
         // Trefila requirement: machine must be in "Troca de Rolo" if no lot is active
-        if (order.machine === 'Trefila' && (!order.activeLotProcessing || !order.activeLotProcessing.lotId)) {
+        if (order.machine.startsWith('Trefila') && (!order.activeLotProcessing || !order.activeLotProcessing.lotId)) {
             const lastClosedReason = (order.downtimeEvents || []).filter(e => !e.resumeTime).map(e => e.reason).pop();
             if (lastClosedReason !== 'Troca de Rolo / Preparação') {
                 newEvents.push({ stopTime: now, resumeTime: null, reason: 'Troca de Rolo / Preparação' });

@@ -205,7 +205,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     const { shiftDowntime, shiftUptime } = useMemo(() => {
         const intervals: { start: number; end: number }[] = [];
         allOrders
-            .filter(o => o.machine.startsWith(machineType))
+            .filter(o => o.machine === machineType || (machineType === 'Trefila 1' && o.machine === 'Trefila') || (machineType === 'Treliça 1' && o.machine === 'Treliça'))
             .forEach(o => {
                 const isActive = activeOrder && o.id === activeOrder.id;
                 (o.downtimeEvents || []).forEach((e: any) => {
@@ -612,6 +612,12 @@ interface ProductionDashboardProps {
 const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, productionOrders, stock, currentUser }) => {
     const isGestor = currentUser?.role === 'gestor' || currentUser?.role === 'admin';
     const [shiftResets, setShiftResets] = useState(() => JSON.parse(localStorage.getItem('shiftResets') || '{}'));
+    const [visibleMachines, setVisibleMachines] = useState<MachineType[]>(() => {
+        const saved = localStorage.getItem('dashboardVisibleMachines');
+        return saved ? JSON.parse(saved) : ['Trefila 1', 'Treliça 1'];
+    });
+    const allAvailableMachines: MachineType[] = ['Trefila 1', 'Trefila 2', 'Treliça 1', 'Treliça 2'];
+    const [showMachineSelector, setShowMachineSelector] = useState(false);
 
     const handleReset = (m: MachineType) => {
         if (!confirm(`Deseja zerar os dados de turno para a máquina ${m}? Esta ação só afeta a visualização deste dashboard.`)) return;
@@ -630,8 +636,8 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
         const resetT = shiftResets[m] ? new Date(shiftResets[m]).getTime() : 0;
         const effective = Math.max(start.getTime(), resetT);
 
-        return productionOrders.filter(o => o.machine.startsWith(m) && o.status !== 'cancelled').reduce((acc, o) => {
-            if (m === 'Trefila') {
+        return productionOrders.filter(o => (o.machine === m || (m === 'Trefila 1' && o.machine === 'Trefila') || (m === 'Treliça 1' && o.machine === 'Treliça')) && o.status !== 'cancelled').reduce((acc, o) => {
+            if (m.startsWith('Trefila')) {
                 const lots = (o.processedLots || []) as ProcessedLot[];
                 return acc + lots.filter(l => l.endTime && new Date(l.endTime).getTime() >= effective).reduce((s, l) => s + (l.finalWeight || 0), 0);
             }
@@ -643,9 +649,6 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
             }, 0);
         }, 0);
     };
-
-    const activeTrefila = productionOrders.find(o => o.machine.startsWith('Trefila') && o.status === 'in_progress');
-    const activeTrelica = productionOrders.find(o => o.machine.startsWith('Treliça') && o.status === 'in_progress');
 
     const getTrelicaGoal = (activeOrder?: ProductionOrderData) => {
         if (!activeOrder) return 500;
@@ -687,6 +690,48 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                 </div>
                 
                 <div className="flex items-center gap-6">
+                    {/* Machine Selector Button */}
+                    <div className="relative">
+                        <button 
+                            onClick={() => setShowMachineSelector(!showMachineSelector)}
+                            className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 hover:bg-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all text-emerald-400 hover:text-emerald-300"
+                        >
+                            MÁQUINAS: {visibleMachines.length}
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                            </svg>
+                        </button>
+
+                        {showMachineSelector && (
+                            <div className="absolute right-0 top-full mt-2 w-48 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl p-2 z-50">
+                                {allAvailableMachines.map(m => (
+                                    <label key={m} className="flex items-center gap-3 p-2 hover:bg-white/5 rounded-lg cursor-pointer">
+                                        <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${visibleMachines.includes(m) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-600'}`}>
+                                            {visibleMachines.includes(m) && (
+                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-3 h-3 text-white">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                                </svg>
+                                            )}
+                                        </div>
+                                        <span className="text-xs font-bold text-slate-300">{m}</span>
+                                        <input
+                                            type="checkbox"
+                                            className="hidden"
+                                            checked={visibleMachines.includes(m)}
+                                            onChange={(e) => {
+                                                const newVisible = e.target.checked 
+                                                    ? [...visibleMachines, m] 
+                                                    : visibleMachines.filter(v => v !== m);
+                                                setVisibleMachines(newVisible);
+                                                localStorage.setItem('dashboardVisibleMachines', JSON.stringify(newVisible));
+                                            }}
+                                        />
+                                    </label>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
                     <button 
                         onClick={toggleFullscreen}
                         className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 hover:bg-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all text-slate-400 hover:text-white"
@@ -711,29 +756,24 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                 </div>
             </header>
 
-            <div className="flex-1 grid grid-cols-1 xl:grid-cols-2 gap-6 lg:gap-8 pb-8">
-                <MachineStatusView 
-                    machineType="Trefila" 
-                    activeOrder={activeTrefila} 
-                    allOrders={productionOrders} 
-                    stock={stock} 
-                    dailyProducedValue={getDailyValue('Trefila')} 
-                    dailyGoal={new Date().getHours() >= 5 && new Date().getHours() < 14 ? 15000 : 12000} 
-                    goalUnit="kg" 
-                    isGestor={isGestor} 
-                    onResetShift={() => handleReset('Trefila')} 
-                />
-                <MachineStatusView 
-                    machineType="Treliça" 
-                    activeOrder={activeTrelica} 
-                    allOrders={productionOrders} 
-                    stock={stock} 
-                    dailyProducedValue={getDailyValue('Treliça')} 
-                    dailyGoal={getTrelicaGoal(activeTrelica)} 
-                    goalUnit="pçs" 
-                    isGestor={isGestor} 
-                    onResetShift={() => handleReset('Treliça')} 
-                />
+            <div className={`flex-1 grid grid-cols-1 ${visibleMachines.length > 1 ? 'xl:grid-cols-2' : ''} gap-6 lg:gap-8 pb-8`}>
+                {visibleMachines.map(m => {
+                    const activeOrder = productionOrders.find(o => (o.machine === m || (m === 'Trefila 1' && o.machine === 'Trefila') || (m === 'Treliça 1' && o.machine === 'Treliça')) && o.status === 'in_progress');
+                    return (
+                        <MachineStatusView 
+                            key={m}
+                            machineType={m} 
+                            activeOrder={activeOrder} 
+                            allOrders={productionOrders} 
+                            stock={stock} 
+                            dailyProducedValue={getDailyValue(m)} 
+                            dailyGoal={m.startsWith('Treliça') ? getTrelicaGoal(activeOrder) : (new Date().getHours() >= 5 && new Date().getHours() < 14 ? 15000 : 12000)} 
+                            goalUnit={m.startsWith('Treliça') ? "pçs" : "kg"} 
+                            isGestor={isGestor} 
+                            onResetShift={() => handleReset(m)} 
+                        />
+                    );
+                })}
             </div>
             
             <footer className="flex justify-between items-center px-4 border-t border-white/5 pt-6 pb-2">
