@@ -1464,6 +1464,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
                     const limitMs = limitEntry ? limitEntry[1] * 60 * 1000 : (reason === 'Motivo não informado' ? null : 15 * 60 * 1000);
                     const isOverLimit = limitMs ? durationMs > limitMs : false;
 
+                    if (currentMachineStatus === 'Preparacao' && !isOverLimit) return null;
+
                     return (
                         <div className={`fixed inset-0 flex items-center justify-center z-[100] p-4 transition-all duration-500 ${isOverLimit ? 'bg-rose-600/90 animate-stop-pulse' : 'bg-amber-500/90 animate-warning-pulse'} backdrop-blur-xl`}>
                             <div className="text-center p-8 bg-white rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] w-full max-w-sm mx-auto animate-zoom-in border border-white/20">
@@ -1500,6 +1502,18 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                         </div>
                                     )}
                                 </div>
+
+                                <button
+                                    onClick={() => logResumeProduction && logResumeProduction(activeOrder.id)}
+                                    className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all duration-300 shadow-lg flex items-center justify-center gap-3 mb-6 ${
+                                        isOverLimit 
+                                        ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-200 hover:scale-[1.02] active:scale-[0.98]' 
+                                        : 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-200 hover:scale-[1.02] active:scale-[0.98]'
+                                    }`}
+                                >
+                                    <PlayIcon className="h-5 w-5" />
+                                    Retomar Produção
+                                </button>
 
                                 <p className="text-slate-400 text-[10px] font-bold uppercase leading-relaxed tracking-wider">
                                     Retome a produção assim que o problema for resolvido.
