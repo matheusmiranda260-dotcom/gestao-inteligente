@@ -370,12 +370,11 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                             {activeTab === 'stops' ? (
                                 <table className="w-full text-left">
                                     <thead className="sticky top-0 bg-[#0D1929] backdrop-blur-md z-20">
-                                        <tr className="text-[10px] uppercase font-black text-slate-400 border-b border-white/10">
-                                            <th className="p-4 px-6">Duração</th>
-                                            <th className="p-4">Início</th>
-                                            <th className="p-4">Término</th>
-                                            <th className="p-4">Motivo da Parada</th>
-                                            <th className="p-4 text-right px-6">OP</th>
+                                        <tr className="text-[12px] uppercase font-black text-slate-400 border-b border-white/10">
+                                            <th className="p-5 px-8">Início</th>
+                                            <th className="p-5">Término</th>
+                                            <th className="p-5">Duração</th>
+                                            <th className="p-5">Motivo da Parada</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-white/5">
@@ -390,19 +389,25 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                                 const duration = (end ? end.getTime() : now.getTime()) - start.getTime();
                                                 
                                                 return (
-                                                    <tr key={i} className="hover:bg-white/5 transition-colors group/row">
-                                                        <td className="p-4 px-6 font-mono text-rose-400 font-bold text-sm">{formatDuration(duration)}</td>
-                                                        <td className="p-4 font-mono text-slate-400 text-xs">{start.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
-                                                        <td className="p-4 font-mono text-slate-400 text-xs">{end ? end.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '---'}</td>
-                                                        <td className="p-4 flex items-center gap-3 text-xs font-bold text-slate-200 uppercase">
-                                                            <div className="w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]" /> {e.reason}
+                                                    <tr key={i} className="hover:bg-indigo-500/5 transition-colors group/row">
+                                                        <td className="p-5 px-8 font-mono text-slate-200 text-sm font-bold">
+                                                            {start.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                                                         </td>
-                                                        <td className="p-4 text-right px-6 text-[11px] font-black text-slate-600 group-hover/row:text-slate-300 transition-colors">#{e.orderNumber}</td>
+                                                        <td className="p-5 font-mono text-slate-400 text-sm">
+                                                            {end ? end.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '---'}
+                                                        </td>
+                                                        <td className="p-5 font-mono text-rose-400 font-black text-base drop-shadow-[0_0_10px_rgba(244,63,94,0.2)]">
+                                                            {formatDuration(duration)}
+                                                        </td>
+                                                        <td className="p-5 flex items-center gap-4 text-sm font-black text-slate-100 uppercase tracking-tight">
+                                                            <div className="w-3 h-3 rounded-full bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.6)] shrink-0" />
+                                                            {e.reason}
+                                                        </td>
                                                     </tr>
                                                 );
                                             })}
                                         {allOrders.filter(o => o.machine.startsWith(machineType)).flatMap(o => o.downtimeEvents || []).filter(e => new Date(e.stopTime).getTime() >= shiftStartMs).length === 0 && (
-                                            <tr><td colSpan={5} className="p-12 text-center text-slate-600 text-xs font-bold uppercase tracking-[0.3em]">Nenhuma parada registrada</td></tr>
+                                            <tr><td colSpan={4} className="p-16 text-center text-slate-600 text-sm font-bold uppercase tracking-[0.4em]">Nenhuma parada registrada</td></tr>
                                         )}
                                     </tbody>
                                 </table>
