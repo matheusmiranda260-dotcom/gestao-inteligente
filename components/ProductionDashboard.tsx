@@ -858,18 +858,25 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
 
             <div className={`flex-1 grid grid-cols-1 ${visibleMachines.length > 1 ? 'xl:grid-cols-2' : ''} gap-6 lg:gap-8 pb-8`}>
                 {visibleMachines.map(m => {
-                    const activeOrder = productionOrders.find(o => {
-                const isExact = o.machine === m;
-                const isLegacyTrefilaTo1 = (o.machine === 'Trefila' && m === 'Trefila 1');
-                const isLegacyTrelicaTo1 = (o.machine === 'Treliça' && m === 'Treliça 1');
-                return (isExact || isLegacyTrefilaTo1 || isLegacyTrelicaTo1) && o.status === 'in_progress';
-            });
+                    // Strict per-machine filter — NEVER pass all orders unfiltered
+                    const machineOrders = productionOrders.filter(o => {
+                        if (o.machine === m) return true;
+                        // Legacy compatibility: generic 'Trefila' maps ONLY to 'Trefila 1'
+                        if (o.machine === 'Trefila' && m === 'Trefila 1') return true;
+                        // Legacy compatibility: generic 'Treliça' maps ONLY to 'Treliça 1'
+                        if (o.machine === 'Treliça' && m === 'Treliça 1') return true;
+                        return false;
+                    });
+
+                    // activeOrder derived from the already-filtered subset
+                    const activeOrder = machineOrders.find(o => o.status === 'in_progress');
+
                     return (
                         <MachineStatusView 
                             key={m}
                             machineType={m} 
                             activeOrder={activeOrder} 
-                            allOrders={productionOrders} 
+                            allOrders={machineOrders}
                             stock={stock} 
                             dailyProducedValue={getDailyValue(m)} 
                             dailyGoal={m.startsWith('Treliça') ? getTrelicaGoal(activeOrder) : (new Date().getHours() >= 5 && new Date().getHours() < 14 ? 15000 : 12000)} 
