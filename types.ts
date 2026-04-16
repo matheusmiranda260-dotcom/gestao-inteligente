@@ -568,3 +568,13 @@ export const FioMaquinaBitolaOptions = ['8.00', '7.00', '6.50', '6.35', '5.50'];
 export const CA60BitolaOptions = ['3.20', '3.40', '3.80', '4.20', '4.40', '4.90', '5.00', '5.50', '5.60', '5.80', '6.00', '6.35', '7.00'];
 export const TrefilaBitolaOptions = CA60BitolaOptions; // Keeping for compatibility
 export const SteelTypeOptions = ['1006', '1008', '1010', '1012', '1015', '1018', 'Outro'];
+
+export const DOWNTIME_THRESHOLDS: Record<string, number> = {
+    'Enrosco de fio': 12,
+    'Falha no sensor': 5,
+    'Quebra fio': 15,
+    'Setup': 150,
+    'Preparação': 150,
+    'Lubrificação': 8,
+    'Outros': 10
+};

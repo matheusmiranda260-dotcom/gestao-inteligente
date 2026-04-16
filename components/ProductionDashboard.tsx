@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Page, ProductionOrderData, StockItem, User, OperatorLog, MachineType, ProcessedLot } from '../types';
+import { DOWNTIME_THRESHOLDS } from '../types';
 import { 
     ArrowLeftIcon, WarningIcon, CogIcon, PauseIcon, ClockIcon, 
     CheckCircleIcon, ScaleIcon, PlayIcon, BookOpenIcon, StopIcon, 
@@ -390,17 +391,40 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                             </h3>
                             
                             {/* Real-time Stop Duration Counter */}
-                            <div className="mt-8 px-8 py-3 bg-black/60 border border-rose-500/50 rounded-2xl flex flex-col items-center">
-                                <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-1">Tempo Total de Parada</span>
-                                <span className="text-5xl font-black text-white font-mono tabular-nums tracking-tighter drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">
-                                    {formatDuration(machineStatus.durationMs)}
-                                </span>
+                            <div className="flex flex-col md:flex-row gap-6 mt-8">
+                                <div className="px-8 py-3 bg-black/60 border border-rose-500/50 rounded-2xl flex flex-col items-center min-w-[200px]">
+                                    <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-1">Tempo Total de Parada</span>
+                                    <span className="text-5xl font-black text-white font-mono tabular-nums tracking-tighter drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">
+                                        {formatDuration(machineStatus.durationMs)}
+                                    </span>
+                                </div>
+
+                                {(() => {
+                                    const limitEntry = Object.entries(DOWNTIME_THRESHOLDS).find(([key]) => machineStatus.reason.includes(key));
+                                    if (!limitEntry) return null;
+                                    
+                                    const limitMs = limitEntry[1] * 60 * 1000;
+                                    const isOverLimit = machineStatus.durationMs > limitMs;
+
+                                    return (
+                                        <div className={`px-8 py-3 bg-black/60 border rounded-2xl flex flex-col items-center min-w-[200px] transition-all duration-500 ${
+                                            isOverLimit ? 'border-rose-600 shadow-[0_0_20px_rgba(225,29,72,0.4)] animate-pulse' : 'border-amber-400/50 shadow-[0_0_20px_rgba(251,191,36,0.2)]'
+                                        }`}>
+                                            <span className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isOverLimit ? 'text-rose-500' : 'text-amber-400 animate-pulse'}`}>
+                                                {isOverLimit ? 'LIMITE ULTRAPASSADO' : 'TEMPO PREVISTO'}
+                                            </span>
+                                            <span className={`text-5xl font-black font-mono tabular-nums tracking-tighter ${isOverLimit ? 'text-rose-600' : 'text-amber-400 animate-pulse'}`}>
+                                                {formatDuration(limitMs)}
+                                            </span>
+                                        </div>
+                                    );
+                                })()}
                             </div>
 
                             <div className="mt-8 flex gap-4 opacity-50">
-                                <WarningIcon className="h-6 w-6 text-rose-500 animate-bounce" />
-                                <WarningIcon className="h-6 w-6 text-rose-500 animate-bounce delay-100" />
-                                <WarningIcon className="h-6 w-6 text-rose-500 animate-bounce delay-200" />
+                                <WarningIcon className={`h-6 w-6 animate-bounce ${machineStatus.durationMs > (Object.entries(DOWNTIME_THRESHOLDS).find(([k]) => machineStatus.reason.includes(k))?.[1] || 0) * 60000 ? 'text-rose-600' : 'text-amber-500'}`} />
+                                <WarningIcon className={`h-6 w-6 animate-bounce delay-100 ${machineStatus.durationMs > (Object.entries(DOWNTIME_THRESHOLDS).find(([k]) => machineStatus.reason.includes(k))?.[1] || 0) * 60000 ? 'text-rose-600' : 'text-amber-500'}`} />
+                                <WarningIcon className={`h-6 w-6 animate-bounce delay-200 ${machineStatus.durationMs > (Object.entries(DOWNTIME_THRESHOLDS).find(([k]) => machineStatus.reason.includes(k))?.[1] || 0) * 60000 ? 'text-rose-600' : 'text-amber-500'}`} />
                             </div>
                         </div>
                     </div>

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Page, MachineType, StockItem, ProductionOrderData, User, PartsRequest, ShiftReport, TrelicaSelectedLots, Ponta, StockGauge } from '../types';
+import { DOWNTIME_THRESHOLDS } from '../types';
 import { ArrowLeftIcon, PlayIcon, PauseIcon, ClockIcon, WarningIcon, StopIcon, CheckCircleIcon, WrenchScrewdriverIcon, ArchiveIcon, ClipboardListIcon, CogIcon, DocumentReportIcon, ScaleIcon, TrashIcon, CalculatorIcon, ChartBarIcon, ExclamationIcon, SaveIcon, XCircleIcon, ChevronDownIcon } from './icons';
 import PartsRequestModal from './PartsRequestModal';
 import ShiftReportsModal from './ShiftReportsModal';
@@ -9,6 +10,15 @@ import { trelicaModels } from './ProductionOrderTrelica';
 import TrefilaCalculation from './TrefilaCalculation';
 
 
+
+const formatDuration = (ms: number) => {
+    if (ms < 0) ms = 0;
+    const totalSeconds = Math.floor(ms / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+};
 
 const IdleActivityLogger: React.FC<{
     onLogActivity: (activity: string) => void;
@@ -2182,13 +2192,63 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                 {/* Coluna Direita: Área de Trabalho (Lotes/Pacotes) */}
                                 <div className={`lg:col-span-2 space-y-6 relative ${mobileTab === 'monitor' ? 'hidden lg:block' : 'animate-fade-in'}`}>
                                     {isMachineStopped && activeOrder && mobileTab !== 'weigh' && (
-                                        <div className="absolute inset-0 bg-slate-200/80 backdrop-blur-sm flex items-center justify-center rounded-2xl z-20 border-2 border-slate-300 border-dashed transition-all duration-500">
-                                            <div className="text-center p-8 bg-white rounded-3xl shadow-xl max-w-sm mx-auto animate-fade-in-up">
-                                                <div className="bg-amber-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-amber-50 shadow-inner">
-                                                    <PauseIcon className="h-10 w-10 text-amber-600" />
-                                                </div>
-                                                <h3 className="text-2xl font-bold text-slate-800 mb-2 tracking-tight">Produção Pausada</h3>
-                                                <p className="text-slate-500 mb-6 text-sm leading-relaxed font-medium">A máquina está parada. Utilize o painel inferior para retomar a produção quando estiver pronto.</p>
+                                        <div className="absolute inset-0 bg-slate-900/90 backdrop-blur-md flex items-center justify-center rounded-2xl z-20 transition-all duration-500">
+                                            <div className="text-center p-6 md:p-8 bg-white rounded-[2rem] shadow-2xl max-w-sm mx-auto animate-zoom-in border border-slate-100">
+                                                {(() => {
+                                                    const openEvent = [...(activeOrder.downtimeEvents || [])]
+                                                        .sort((a,b) => new Date(b.stopTime).getTime() - new Date(a.stopTime).getTime())
+                                                        .find(e => !e.resumeTime);
+                                                    
+                                                    const reason = openEvent?.reason || 'Motivo não informado';
+                                                    const start = openEvent ? new Date(openEvent.stopTime).getTime() : now.getTime();
+                                                    const durationMs = now.getTime() - start;
+                                                    
+                                                    const limitEntry = Object.entries(DOWNTIME_THRESHOLDS).find(([key]) => reason.includes(key));
+                                                    const limitMs = limitEntry ? limitEntry[1] * 60 * 1000 : null;
+                                                    const isOverLimit = limitMs ? durationMs > limitMs : false;
+
+                                                    return (
+                                                        <>
+                                                            <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg rotate-3 transition-colors ${isOverLimit ? 'bg-rose-100 border-2 border-rose-500' : 'bg-amber-100 border-2 border-amber-500'}`}>
+                                                                <PauseIcon className={`h-10 w-10 ${isOverLimit ? 'text-rose-600' : 'text-amber-600'}`} />
+                                                            </div>
+                                                            
+                                                            <h3 className={`text-2xl font-black mb-2 tracking-tight uppercase ${isOverLimit ? 'text-rose-600' : 'text-slate-800'}`}>
+                                                                {isOverLimit ? 'LIMITE ULTRAPASSADO' : 'MÁQUINA PARADA'}
+                                                            </h3>
+                                                            
+                                                            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-6">
+                                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Motivo Atual</p>
+                                                                <p className="font-bold text-slate-700 text-lg uppercase italic">{reason}</p>
+                                                            </div>
+
+                                                            <div className="grid grid-cols-1 gap-3 mb-6">
+                                                                <div className="bg-slate-900 p-4 rounded-2xl shadow-inner">
+                                                                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Tempo Total de Parada</p>
+                                                                    <p className="text-3xl font-black text-white font-mono">{formatDuration(durationMs)}</p>
+                                                                </div>
+                                                                
+                                                                {limitMs && (
+                                                                    <div className={`p-4 rounded-2xl border-2 transition-all ${isOverLimit ? 'bg-rose-50 border-rose-500 animate-stop-pulse' : 'bg-amber-50 border-amber-500 animate-producing-pulse'}`}>
+                                                                        <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${isOverLimit ? 'text-rose-600' : 'text-amber-600'}`}>
+                                                                            Tempo Previsto: <span className="text-sm font-black">{limitEntry ? limitEntry[1] : 0} min</span>
+                                                                        </p>
+                                                                        <div className="w-full bg-black/10 rounded-full h-1.5 mt-2 overflow-hidden">
+                                                                            <div 
+                                                                                className={`h-full transition-all duration-1000 ${isOverLimit ? 'bg-rose-600' : 'bg-amber-500'}`} 
+                                                                                style={{ width: `${Math.min(100, (durationMs / limitMs) * 100)}%` }}
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+
+                                                            <p className="text-slate-400 text-[10px] font-bold uppercase leading-relaxed tracking-wider">
+                                                                Retome a produção assim que o problema for resolvido.
+                                                            </p>
+                                                        </>
+                                                    );
+                                                })()}
                                             </div>
                                         </div>
                                     )}
