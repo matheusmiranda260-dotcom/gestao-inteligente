@@ -252,6 +252,14 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     }, [allOrders, machineType, shiftStartMs, stock]);
 
     const efficiency = dailyGoal > 0 ? (dailyProducedValue / dailyGoal) * 100 : 0;
+    const lastReportTime = useMemo(() => {
+        if (machineType === 'Trefila') {
+           if (productionHistoryInShift.length > 0) return productionHistoryInShift[0].endTime;
+           return activeOrder?.startTime;
+        } else {
+           return activeOrder?.lastQuantityUpdate || activeOrder?.startTime;
+        }
+    }, [machineType, productionHistoryInShift, activeOrder]);
 
     return (
         <div className="tactical-card rounded-3xl border border-white/10 flex flex-col overflow-hidden relative group">
@@ -336,9 +344,15 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                 }} />
                             ))}
                         </div>
-                        <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-500">
-                            <span>Disponibilidade: {(shiftUptime / (shiftUptime+shiftDowntime) * 100 || 0).toFixed(1)}%</span>
-                            <span>Tempo de Estado: {formatDuration(machineStatus.durationMs)}</span>
+                        <div className="flex flex-col gap-2 pt-2 border-t border-white/5">
+                            <div className="flex justify-between text-[9px] font-black uppercase tracking-widest text-slate-500">
+                                <span>Disponibilidade: {(shiftUptime / (shiftUptime+shiftDowntime) * 100 || 0).toFixed(1)}%</span>
+                                <span>Tempo de Estado: {formatDuration(machineStatus.durationMs)}</span>
+                            </div>
+                            <div className="flex justify-between text-[9px] font-black uppercase tracking-widest text-[#00E5FF]">
+                                <span>Último Reporte:</span>
+                                <span className="font-mono text-white">{lastReportTime ? new Date(lastReportTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '---'}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -474,7 +488,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
         const resetT = shiftResets[m] ? new Date(shiftResets[m]).getTime() : 0;
         const effective = Math.max(start.getTime(), resetT);
 
-        return productionOrders.filter(o => o.machine === m && o.status !== 'cancelled').reduce((acc, o) => {
+        return productionOrders.filter(o => o.machine.startsWith(m) && o.status !== 'cancelled').reduce((acc, o) => {
             if (m === 'Trefila') {
                 const lots = (o.processedLots || []) as ProcessedLot[];
                 return acc + lots.filter(l => l.endTime && new Date(l.endTime).getTime() >= effective).reduce((s, l) => s + (l.finalWeight || 0), 0);
