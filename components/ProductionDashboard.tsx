@@ -305,6 +305,11 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                 <div className="text-right">
                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Status do Equipamento</p>
                     <p className={`text-sm font-black uppercase tracking-widest ${currentStyle.color} ${isStopped ? 'animate-pulse neon-text-red' : ''}`}>{currentStyle.title}</p>
+                    {isStopped && (
+                        <div className="mt-2 px-3 py-1 bg-rose-500/20 border border-rose-500/50 rounded-md animate-pulse shadow-[0_0_15px_rgba(244,63,94,0.3)]">
+                            <p className="text-[9px] font-black text-rose-400 uppercase tracking-tighter">MOTIVO: {machineStatus.reason}</p>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -341,8 +346,10 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                     <thead className="sticky top-0 bg-[#0D1929] backdrop-blur-md z-20">
                                         <tr className="text-[10px] uppercase font-black text-slate-400 border-b border-white/10">
                                             <th className="p-4 px-6">Duração</th>
+                                            <th className="p-4">Início</th>
+                                            <th className="p-4">Término</th>
                                             <th className="p-4">Motivo da Parada</th>
-                                            <th className="p-4 text-right px-6">Ordem de Produção</th>
+                                            <th className="p-4 text-right px-6">OP</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-white/5">
@@ -352,19 +359,24 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                             .filter(e => new Date(e.stopTime).getTime() >= shiftStartMs)
                                             .sort((a,b) => new Date(b.stopTime).getTime() - new Date(a.stopTime).getTime())
                                             .map((e, i) => {
-                                                const end = e.resumeTime ? new Date(e.resumeTime).getTime() : now.getTime();
+                                                const start = new Date(e.stopTime);
+                                                const end = e.resumeTime ? new Date(e.resumeTime) : null;
+                                                const duration = (end ? end.getTime() : now.getTime()) - start.getTime();
+                                                
                                                 return (
                                                     <tr key={i} className="hover:bg-white/5 transition-colors group/row">
-                                                        <td className="p-4 px-6 font-mono text-rose-400 font-bold text-sm">{formatDuration(end - new Date(e.stopTime).getTime())}</td>
+                                                        <td className="p-4 px-6 font-mono text-rose-400 font-bold text-sm">{formatDuration(duration)}</td>
+                                                        <td className="p-4 font-mono text-slate-400 text-xs">{start.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
+                                                        <td className="p-4 font-mono text-slate-400 text-xs">{end ? end.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '---'}</td>
                                                         <td className="p-4 flex items-center gap-3 text-xs font-bold text-slate-200 uppercase">
                                                             <div className="w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]" /> {e.reason}
                                                         </td>
-                                                        <td className="p-4 text-right px-6 text-[11px] font-black text-slate-500 group-hover/row:text-slate-300 transition-colors">#{e.orderNumber}</td>
+                                                        <td className="p-4 text-right px-6 text-[11px] font-black text-slate-600 group-hover/row:text-slate-300 transition-colors">#{e.orderNumber}</td>
                                                     </tr>
                                                 );
                                             })}
                                         {allOrders.filter(o => o.machine.startsWith(machineType)).flatMap(o => o.downtimeEvents || []).filter(e => new Date(e.stopTime).getTime() >= shiftStartMs).length === 0 && (
-                                            <tr><td colSpan={3} className="p-12 text-center text-slate-600 text-xs font-bold uppercase tracking-[0.3em]">Nenhuma parada registrada</td></tr>
+                                            <tr><td colSpan={5} className="p-12 text-center text-slate-600 text-xs font-bold uppercase tracking-[0.3em]">Nenhuma parada registrada</td></tr>
                                         )}
                                     </tbody>
                                 </table>
