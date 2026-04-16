@@ -254,7 +254,10 @@ const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportDat
                                             <tr key={idx} className="bg-gray-100 border-b border-black">
                                                 <td className="border-r border-black p-0.5 w-[15%] text-red-600">{new Date(event.stopTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
                                                 <td className="border-r border-black p-0.5 w-[15%] text-green-600">{new Date(event.resumeTime!).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
-                                                <td className="border-r border-black p-0.5 italic text-gray-700 uppercase">{event.reason}</td>
+                                                <td className="border-r border-black p-0.5 italic text-gray-700 uppercase">
+                                                    {event.reason}
+                                                    {event.justification && <div className="text-[10px] lowercase text-red-500 mt-1 normal-case font-medium">Justificativa: {event.justification}</div>}
+                                                </td>
                                                 <td className="w-[15%] text-red-600 font-mono">{formatDuration(duration)}</td>
                                             </tr>
                                         )
@@ -448,7 +451,10 @@ const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportDat
                                                 <td className="border border-black p-1 text-green-600">
                                                     {new Date(event.resumeTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                                                 </td>
-                                                <td className="border border-black p-1 uppercase italic">{event.reason}</td>
+                                                <td className="border border-black p-1 uppercase italic">
+                                                    {event.reason}
+                                                    {event.justification && <div className="text-[10px] lowercase text-red-500 mt-1 normal-case font-medium">Justificativa: {event.justification}</div>}
+                                                </td>
                                                 <td className="border border-black p-1 text-red-600 font-mono">{formatDuration(duration)}</td>
                                             </tr>
                                         );
@@ -770,7 +776,10 @@ const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportDat
                                             if (duration <= 0) return null;
                                             return (
                                                 <tr key={index} className="bg-white hover:bg-slate-50">
-                                                    <td className="px-4 py-3 font-bold text-slate-800">{event.reason}</td>
+                                                    <td className="px-4 py-3 font-bold text-slate-800">
+                                                        {event.reason}
+                                                        {event.justification && <div className="text-xs text-red-500 mt-1 font-medium normal-case">Justificativa: {event.justification}</div>}
+                                                    </td>
                                                     <td className="px-4 py-3 text-right font-mono text-slate-700 font-bold">{formatDuration(duration)}</td>
                                                 </tr>
                                             )

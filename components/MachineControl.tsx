@@ -659,6 +659,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
         lowerBound: number;
         upperBound: number;
     } | null>(null);
+    const [downtimeJustification, setDowntimeJustification] = useState('');
 
     // Persistent drift to align local clock with server timestamps, persisted in localStorage
     const driftKey = `stableDrift_${machineType}`;
@@ -1503,8 +1504,31 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                     )}
                                 </div>
 
+                                {isOverLimit && (
+                                    <div className="mb-6 text-left animate-fade-in-up">
+                                        <label className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-2 block">
+                                            Justificativa do Atraso (Obrigatório)
+                                        </label>
+                                        <textarea
+                                            value={downtimeJustification}
+                                            onChange={(e) => setDowntimeJustification(e.target.value)}
+                                            placeholder="Descreva detalhadamente o motivo de ter excedido o limite..."
+                                            className="w-full p-4 bg-rose-50 border-2 border-rose-100 rounded-2xl text-slate-700 font-medium focus:border-rose-500 focus:bg-white transition-all outline-none min-h-[100px] resize-none shadow-inner"
+                                        />
+                                    </div>
+                                )}
+
                                 <button
-                                    onClick={() => logResumeProduction && logResumeProduction(activeOrder.id)}
+                                    onClick={() => {
+                                        if (isOverLimit && !downtimeJustification.trim()) {
+                                            alert('Por favor, detalhe o motivo de ter excedido o limite de tempo para prosseguir.');
+                                            return;
+                                        }
+                                        if (logResumeProduction) {
+                                            logResumeProduction(activeOrder.id, isOverLimit ? downtimeJustification : undefined);
+                                            setDowntimeJustification('');
+                                        }
+                                    }}
                                     className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all duration-300 shadow-lg flex items-center justify-center gap-3 mb-6 ${
                                         isOverLimit 
                                         ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-200 hover:scale-[1.02] active:scale-[0.98]' 

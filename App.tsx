@@ -1469,7 +1469,7 @@ const App: React.FC = () => {
         }
     };
 
-    const logResumeProduction = async (orderId: string) => {
+    const logResumeProduction = async (orderId: string, justification?: string) => {
         const now = new Date().toISOString();
         const fetchedOrders = await fetchByColumn<ProductionOrderData>('production_orders', 'id', orderId);
         const order = fetchedOrders[0];
@@ -1477,7 +1477,7 @@ const App: React.FC = () => {
 
         // Close ALL open downtime events
         const newEvents = (order.downtimeEvents || []).map(event =>
-            !event.resumeTime ? { ...event, resumeTime: now } : event
+            !event.resumeTime ? { ...event, resumeTime: now, justification } : event
         );
 
         // Trefila requirement: machine must be in "Troca de Rolo" if no lot is active

@@ -173,6 +173,7 @@ const ShiftDetails: React.FC<{ report: ShiftReport, stock: StockItem[], onPrint:
                                         <tr key={i} className="hover:bg-slate-50 transition-colors">
                                             <td className="p-4">
                                                 <span className="font-bold text-slate-700">{event.reason}</span>
+                                                {event.justification && <div className="text-[10px] text-rose-500 font-bold mt-1">Justificativa: {event.justification}</div>}
                                                 <div className="text-[10px] text-slate-400 mt-0.5">
                                                     {new Date(event.stopTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                                                     <span className="mx-1">→</span>
@@ -332,6 +333,7 @@ const ShiftReportPrintView: React.FC<{ report: ShiftReport, stock: StockItem[], 
                                         </td>
                                         <td className="border border-black p-2 px-4 italic font-bold text-slate-800 uppercase">
                                             {event.reason}
+                                            {event.justification && <div className="text-[10px] text-rose-500 font-bold normal-case mt-1 italic">Justificativa: {event.justification}</div>}
                                         </td>
                                         <td className="border border-black p-2 text-center font-black text-rose-600 tabular-nums">
                                             {formatDuration(duration)}
@@ -633,6 +635,7 @@ const ShiftReportPrintView: React.FC<{ report: ShiftReport, stock: StockItem[], 
                                         <tr key={i} className="bg-rose-50 group">
                                             <td className="py-4 px-4 rounded-l-2xl border-l-4 border-rose-600">
                                                 <span className="font-black text-rose-900 uppercase tracking-tight">{event.reason}</span>
+                                                {event.justification && <div className="text-[10px] text-rose-500 font-black normal-case mt-1 italic">Justificativa: {event.justification}</div>}
                                             </td>
                                             <td className="py-4 px-4 text-center font-mono text-rose-400 font-bold border-x border-rose-200/50">
                                                 {new Date(event.stopTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} - {event.resumeTime ? new Date(event.resumeTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'END OF SHIFT'}

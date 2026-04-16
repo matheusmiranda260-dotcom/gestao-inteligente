@@ -234,6 +234,7 @@ export interface DowntimeEvent {
     stopTime: string;
     resumeTime: string | null;
     reason: string;
+    justification?: string;
 }
 
 export interface OperatorLog {
