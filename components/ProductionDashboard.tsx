@@ -177,12 +177,16 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     }, [activeOrder, machineType]);
 
     const { shiftDowntime, shiftUptime } = useMemo(() => {
-        // Collect all downtime intervals for this machine that intersect with the current shift
         const intervals: { start: number; end: number }[] = [];
         allOrders
             .filter(o => o.machine.startsWith(machineType))
             .forEach(o => {
+                const isActive = activeOrder && o.id === activeOrder.id;
                 (o.downtimeEvents || []).forEach((e: any) => {
+                    // Only count open events if this is the ACTIVE order.
+                    // For other orders, an open event is likely a "zombie" data error.
+                    if (!e.resumeTime && !isActive) return;
+
                     const s = Math.max(shiftStartMs, new Date(e.stopTime).getTime());
                     const r = Math.min(now.getTime(), e.resumeTime ? new Date(e.resumeTime).getTime() : now.getTime());
                     if (r > s) {
@@ -191,13 +195,11 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                 });
             });
 
-        // Merge overlapping intervals to avoid double counting
         if (intervals.length === 0) {
             const total = Math.max(0, now.getTime() - shiftStartMs);
             return { shiftDowntime: 0, shiftUptime: total };
         }
 
-        // Sort by start time
         intervals.sort((a, b) => a.start - b.start);
 
         const merged: { start: number; end: number }[] = [intervals[0]];
@@ -218,7 +220,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             shiftDowntime: totalDowntime, 
             shiftUptime: Math.max(0, totalTime - totalDowntime) 
         };
-    }, [allOrders, machineType, shiftStartMs, now]);
+    }, [allOrders, machineType, shiftStartMs, now, activeOrder]);
 
     const productionHistoryInShift = useMemo(() => {
         const orders = allOrders.filter(o => o.machine.startsWith(machineType));
