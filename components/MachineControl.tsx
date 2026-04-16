@@ -1177,7 +1177,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
         let endH = 17, endM = 30;
 
         // Configuração de 2 turnos para a Treliça
-        if (activeOrder?.machine !== 'Trefila') {
+        if (activeMachine.startsWith('Treliça')) {
             if (timeVal >= 4 && timeVal < 14) { 
                 // Turno A (Inicia entre 04:00 e 13:59)
                 shiftName = 'Turno A';
@@ -1831,7 +1831,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                             <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
                                 <div>
                                     <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">Operador</p>
-                                    <p className="font-bold">{currentOperatorLog?.operator || '---'}</p>
+                                    <p className="font-bold">{isAnyActiveShift ? currentOperatorLog?.operator : (currentUser?.username || '---')}</p>
                                 </div>
                                 <div className="text-right">
                                     <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">Progresso</p>
@@ -2079,7 +2079,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                     {currentOperatorLog ? (
                                                         <div className="flex flex-wrap items-center gap-3">
                                                             <span className="text-sm md:text-base font-black text-slate-800 bg-white border border-slate-200 shadow-sm px-4 py-1.5 rounded-lg">
-                                                                {currentOperatorLog.operator}
+                                                                {isAnyActiveShift ? currentOperatorLog.operator : (currentUser?.username || 'Sem operador')}
                                                             </span>
                                                             <span className="text-xs font-black bg-indigo-50 text-indigo-800 px-3 py-2 rounded-lg border border-indigo-200 uppercase tracking-widest shadow-sm">
                                                                 {shiftStatus.shiftName}
