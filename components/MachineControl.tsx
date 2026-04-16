@@ -2200,12 +2200,12 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
                                                     return (
                                                         <>
-                                                            <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg rotate-3 transition-colors ${isOverLimit ? 'bg-rose-100 border-2 border-rose-500' : 'bg-amber-100 border-2 border-amber-500'}`}>
+                                                            <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg rotate-3 transition-colors ${isOverLimit ? 'bg-rose-100 border-2 border-rose-500' : 'bg-amber-100 border-2 border-amber-500 animate-warning-pulse'}`}>
                                                                 <PauseIcon className={`h-10 w-10 ${isOverLimit ? 'text-rose-600' : 'text-amber-600'}`} />
                                                             </div>
                                                             
-                                                            <h3 className={`text-2xl font-black mb-2 tracking-tight uppercase ${isOverLimit ? 'text-rose-600' : 'text-slate-800'}`}>
-                                                                {isOverLimit ? 'LIMITE ULTRAPASSADO' : 'MÁQUINA PARADA'}
+                                                            <h3 className={`text-2xl font-black mb-2 tracking-tight uppercase ${isOverLimit ? 'text-rose-600' : 'text-amber-600'}`}>
+                                                                {isOverLimit ? 'LIMITE ULTRAPASSADO' : 'PARADA OPERACIONAL'}
                                                             </h3>
                                                             
                                                             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-6">
@@ -2220,7 +2220,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                 </div>
                                                                 
                                                                 {limitMs && (
-                                                                    <div className={`p-4 rounded-2xl border-2 transition-all ${isOverLimit ? 'bg-rose-50 border-rose-500 animate-stop-pulse' : 'bg-amber-50 border-amber-500 animate-producing-pulse'}`}>
+                                                                    <div className={`p-4 rounded-2xl border-2 transition-all ${isOverLimit ? 'bg-rose-50 border-rose-500 animate-stop-pulse' : 'bg-amber-50 border-amber-500 animate-warning-pulse'}`}>
                                                                         <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${isOverLimit ? 'text-rose-600' : 'text-amber-600'}`}>
                                                                             Tempo Previsto: <span className="text-sm font-black">{limitEntry ? limitEntry[1] : 0} min</span>
                                                                         </p>
