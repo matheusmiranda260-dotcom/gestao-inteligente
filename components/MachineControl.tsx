@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Page, MachineType, StockItem, ProductionOrderData, User, PartsRequest, ShiftReport, TrelicaSelectedLots, Ponta, StockGauge } from '../types';
-import { ArrowLeftIcon, PlayIcon, PauseIcon, ClockIcon, WarningIcon, StopIcon, CheckCircleIcon, WrenchScrewdriverIcon, ArchiveIcon, ClipboardListIcon, CogIcon, DocumentReportIcon, ScaleIcon, TrashIcon, CalculatorIcon, ChartBarIcon, ExclamationIcon, SaveIcon, XCircleIcon } from './icons';
+import { ArrowLeftIcon, PlayIcon, PauseIcon, ClockIcon, WarningIcon, StopIcon, CheckCircleIcon, WrenchScrewdriverIcon, ArchiveIcon, ClipboardListIcon, CogIcon, DocumentReportIcon, ScaleIcon, TrashIcon, CalculatorIcon, ChartBarIcon, ExclamationIcon, SaveIcon, XCircleIcon, ChevronDownIcon } from './icons';
 import PartsRequestModal from './PartsRequestModal';
 import ShiftReportsModal from './ShiftReportsModal';
 import ProductionOrderReport from './ProductionOrderReport';
@@ -843,6 +843,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
     const [showManagerAuthForShiftEnd, setShowManagerAuthForShiftEnd] = useState(false);
     const [lastPromptShownAt, setLastPromptShownAt] = useState<number>(0);
     const [showLotSelectionModal, setShowLotSelectionModal] = useState(false);
+    const [showMobileActions, setShowMobileActions] = useState(false);
 
     const hasPermission = (targetPage: Page): boolean => {
         if (!currentUser) return false;
@@ -1805,7 +1806,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                     </div>
                                                 )}
                                             </div>
-
+                                        </div>
+                                    )}
                                             {/* Card OP Mini */}
                                             <div className={`bg-white p-6 rounded-2xl shadow-sm border border-slate-100 ${machineType === 'Trefila' ? 'hidden md:block' : ''}`}>
                                                 <div className="flex justify-between items-center">
@@ -1818,95 +1820,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    )}
-
-                                    ) : (
-                                        // ORIGINAL CONTENT FOR TRELIÇA OR DESKTOP
-                                        <div className={`space-y-6 ${mobileTab !== 'monitor' ? 'hidden lg:block' : 'animate-fade-in'}`}>
-                                            {isShiftOverdue && (
-                                                <div className="bg-red-50 border-2 border-red-500 rounded-2xl p-4 shadow-sm flex items-start gap-4 animate-pulse">
-                                                    <div className="bg-red-100 p-2 rounded-xl text-red-600 shrink-0">
-                                                        <ExclamationIcon className="h-8 w-8" />
-                                                    </div>
-                                                    <div>
-                                                        <h4 className="text-red-700 font-black text-lg">⚠️ Fim de Turno!</h4>
-                                                        <p className="text-red-600 text-xs font-bold mt-1 leading-relaxed">
-                                                            Horário encerrado. Finalize o turno.
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Card de Status Principal - Novo Design Pulsante */}
-                                            <div className={`p-6 rounded-3xl border-4 transition-all duration-1000 ${
-                                                isActiveProcess ? 'bg-emerald-50 border-emerald-500/50 animate-producing-pulse shadow-[0_0_30px_rgba(16,185,129,0.2)]' :
-                                                isUnderStopAlerta ? 'bg-rose-50 border-rose-500/50 animate-stop-pulse shadow-[0_0_30px_rgba(244,63,94,0.2)]' :
-                                                'bg-white border-slate-100'
-                                            } ${machineType === 'Trefila' ? 'hidden md:block' : ''}`}>
-                                                <div className="flex items-center gap-6">
-                                                    <div className={`w-20 h-20 rounded-3xl flex items-center justify-center shadow-lg transition-transform duration-500 ${
-                                                        isActiveProcess ? 'bg-emerald-600 rotate-12 scale-110' :
-                                                        isUnderStopAlerta ? 'bg-rose-600 -rotate-12 scale-110' :
-                                                        'bg-slate-200'
-                                                    }`}>
-                                                        {isActiveProcess ? <PlayIcon className="h-10 w-10 text-white" /> : 
-                                                        isUnderStopAlerta ? <PauseIcon className="h-10 w-10 text-white" /> : 
-                                                        <CogIcon className="h-10 w-10 text-slate-400" />}
-                                                    </div>
-                                                    <div>
-                                                        <p className={`text-[10px] font-black uppercase tracking-[0.2em] mb-1 ${
-                                                            isActiveProcess ? 'text-emerald-600' :
-                                                            isUnderStopAlerta ? 'text-rose-600' :
-                                                            'text-slate-400'
-                                                        }`}>Status em Tempo Real</p>
-                                                        <h2 className={`text-2xl font-black tracking-tighter ${
-                                                            isActiveProcess ? 'text-emerald-900' :
-                                                            isUnderStopAlerta ? 'text-rose-900' :
-                                                            'text-slate-800'
-                                                        }`}>
-                                                            {isActiveProcess ? 'PRODUZINDO' : isUnderStopAlerta ? 'PARADA' : 'DESLIGADA'}
-                                                        </h2>
-                                                        <div className="flex items-center gap-2 mt-1">
-                                                            <div className={`h-2 w-2 rounded-full animate-pulse ${isActiveProcess ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
-                                                                {statusStyle.label}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                {activeLotProcessingData && (
-                                                    <div className="mt-6 pt-6 border-t border-slate-100">
-                                                        <div className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100 flex justify-between items-center shadow-sm">
-                                                            <div>
-                                                                <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Lote Atual</p>
-                                                                <p className="text-xl font-black text-slate-800 tracking-tighter italic">{activeLotProcessingData.lotInfo.internalLot}</p>
-                                                            </div>
-                                                            <div className="text-right">
-                                                                <p className="text-xl font-black text-emerald-700">{activeLotProcessingData.lotInfo.labelWeight?.toFixed(0) || '-'}kg</p>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* Card OP Mini */}
-                                            <div className={`bg-white p-6 rounded-2xl shadow-sm border border-slate-100 ${machineType === 'Trefila' ? 'hidden md:block' : ''}`}>
-                                                <div className="flex justify-between items-center">
-                                                    <div>
-                                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Ordem de Produção</p>
-                                                        <p className="text-2xl font-black text-slate-900 tracking-tighter">#{activeOrder.orderNumber}</p>
-                                                    </div>
-                                                    <div className="h-12 w-12 bg-slate-50 rounded-2xl flex items-center justify-center">
-                                                        <ClipboardListIcon className="h-6 w-6 text-slate-400" />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                </div>
+                                    </div>
 
                                 {/* Coluna Direita: Métricas e Controles de Produção */}
                                     <div className={`lg:col-span-2 space-y-4 md:space-y-6 ${mobileTab !== 'monitor' ? 'hidden lg:block' : 'animate-fade-in'}`}>
@@ -2098,7 +2012,12 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                         );
                                                     })()}
                                                 </div>
-                                                     {/* Mobile Collapsible Details */}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Mobile Collapsible Details */}
                                     {machineType === 'Trefila' && (
                                         <div className="md:hidden">
                                             <details className="group bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden transition-all">
@@ -2159,12 +2078,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                     <div className={`${machineType === 'Trefila' ? 'hidden md:block' : 'block'}`}>
                                         {/* Performance Section contents... kept for desktop */}
                                     </div>
-t-center py-4 italic">Sem paradas recentes.</p>
-                                            )}
-                                        </div>
                                     </div>
-                                </div>
-
                                 {/* Coluna Direita: Área de Trabalho (Lotes/Pacotes) */}
                                 <div className={`lg:col-span-2 space-y-6 relative ${mobileTab === 'monitor' ? 'hidden lg:block' : 'animate-fade-in'}`}>
                                     {isMachineStopped && activeOrder && mobileTab !== 'weigh' && (
@@ -2178,21 +2092,7 @@ t-center py-4 italic">Sem paradas recentes.</p>
                                             </div>
                                         </div>
                                     )}
-                                    {!hasActiveShift && !isAnyActiveShift && activeOrder && mobileTab !== 'weigh' && (
-                                        <div className="absolute inset-0 bg-slate-200/90 backdrop-blur-sm flex items-center justify-center rounded-2xl z-20 transition-all duration-500">
-                                            <div className="text-center p-8 bg-white rounded-3xl shadow-xl max-w-md mx-auto animate-fade-in-up">
-                                                <div className="bg-emerald-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-emerald-50 shadow-inner">
-                                                    <PlayIcon className="h-10 w-10 text-emerald-600" />
-                                                </div>
-                                                <h3 className="text-2xl font-bold text-slate-800 mb-2 tracking-tight">Turno Não Iniciado</h3>
-                                                <p className="text-slate-500 mb-6 text-sm leading-relaxed font-medium">Esta máquina está aguardando um operador. Inicie seu turno para liberar os controles.</p>
-                                                <button onClick={handleStartShift} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 px-6 rounded-2xl transition-all text-lg shadow-xl shadow-emerald-100 flex items-center justify-center gap-3 transform active:scale-95 group">
-                                                    <PlayIcon className="h-7 w-7 group-hover:scale-110 transition-transform" />
-                                                    <span className="tracking-tight uppercase">INICIAR MEU TURNO</span>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
+
                                     {!hasActiveShift && isAnyActiveShift && activeOrder && mobileTab !== 'weigh' && (
                                         <div className="absolute inset-0 bg-slate-200/90 backdrop-blur-sm flex items-center justify-center rounded-2xl z-20 transition-all duration-500">
                                             <div className="text-center p-8 bg-white rounded-3xl shadow-xl max-w-md mx-auto animate-fade-in-up border-2 border-red-50">
@@ -2566,39 +2466,91 @@ t-center py-4 italic">Sem paradas recentes.</p>
                                         </div>
                                     </div>
 
-                                    {/* Centro: Controles Principais (Expanded on mobile) */}
+                                    {/* Centro: Controles Principais e Mobile Menu */}
                                     <div className="flex-1 md:flex-none flex items-center justify-center md:w-1/2">
                                         {!isAnyActiveShift ? (
                                             <button
                                                 onClick={handleStartShift}
-                                                className="w-full md:w-auto md:px-14 h-14 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl md:rounded-full font-black text-lg shadow-xl shadow-emerald-200 transition transform active:scale-90 hover:scale-[1.02] flex items-center justify-center gap-3 animate-pulse"
+                                                className="w-full md:w-auto md:px-14 h-14 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl md:rounded-full font-black text-lg shadow-xl shadow-emerald-200 transition transform active:scale-90 flex items-center justify-center gap-3 animate-pulse"
                                             >
                                                 <PlayIcon className="h-8 w-8" />
                                                 <span className="inline tracking-tight">INICIAR TURNO</span>
                                             </button>
-                                        ) : isMachineStopped ? (
-                                            <button
-                                                onClick={() => logResumeProduction && logResumeProduction(orderForShift.id)}
-                                                className="w-full md:w-auto md:px-14 h-14 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl md:rounded-full font-black text-lg shadow-2xl shadow-emerald-500/40 transition transform active:scale-95 hover:scale-[1.02] flex items-center justify-center gap-3 animate-producing-pulse border-4 border-emerald-400"
-                                            >
-                                                <PlayIcon className="h-8 w-8" />
-                                                <span className="inline tracking-tight text-sm md:text-lg">RETOMAR PRODUÇÃO (OK)</span>
-                                            </button>
                                         ) : (
-                                            <button
-                                                onClick={() => setShowDowntimeModal(true)}
-                                                className="w-full md:w-auto md:px-14 h-14 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl md:rounded-full font-black text-lg shadow-2xl shadow-rose-500/40 transition transform active:scale-95 hover:scale-[1.02] flex items-center justify-center gap-3 animate-stop-pulse border-4 border-rose-400"
-                                            >
-                                                <PauseIcon className="h-8 w-8" />
-                                                <span className="inline tracking-tight">PARAR MÁQUINA (ALERTA)</span>
-                                            </button>
+                                            <div className="w-full md:w-auto flex relative items-center">
+                                                <button
+                                                    onClick={isMachineStopped ? (() => logResumeProduction && logResumeProduction(orderForShift.id)) : (() => setShowDowntimeModal(true))}
+                                                    className={`flex-1 md:w-auto md:px-14 h-14 font-black text-lg transition transform active:scale-95 flex items-center justify-center gap-3 border-4 md:rounded-full ${
+                                                        isMachineStopped 
+                                                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-2xl shadow-emerald-500/40 animate-producing-pulse border-emerald-400 rounded-l-2xl md:rounded-r-none'
+                                                            : 'bg-rose-600 hover:bg-rose-500 text-white shadow-2xl shadow-rose-500/40 animate-stop-pulse border-rose-400 rounded-l-2xl md:rounded-r-none'
+                                                    }`}
+                                                >
+                                                    {isMachineStopped ? <PlayIcon className="h-8 w-8" /> : <PauseIcon className="h-8 w-8" />}
+                                                    <span className="inline tracking-tight text-[15px] sm:text-lg">
+                                                        {isMachineStopped ? 'RETOMAR PRODUÇÃO' : 'PARAR MÁQUINA'}
+                                                    </span>
+                                                </button>
+                                                
+                                                {/* Botão Split (Seta) Menu para Mobile da Trefila */}
+                                                <button
+                                                    onClick={() => setShowMobileActions(!showMobileActions)}
+                                                    className={`h-14 w-12 md:hidden border-4 border-l-0 flex items-center justify-center rounded-r-2xl transition-colors ${
+                                                        isMachineStopped 
+                                                            ? 'bg-emerald-700 hover:bg-emerald-600 border-emerald-400 shadow-emerald-500/40 text-emerald-100'
+                                                            : 'bg-rose-700 hover:bg-rose-600 border-rose-400 shadow-rose-500/40 text-rose-100'
+                                                    }`}
+                                                >
+                                                    <ChevronDownIcon className={`w-8 h-8 transition-transform ${showMobileActions ? 'rotate-180' : ''}`} />
+                                                </button>
+
+                                                {/* Dropdown Menu Mobile */}
+                                                {showMobileActions && (
+                                                    <div className="absolute bottom-full right-0 mb-3 bg-white p-2 rounded-2xl shadow-[0_-10px_40px_rgba(0,0,0,0.15)] flex flex-col min-w-[220px] border border-slate-100 divide-y divide-slate-100 animate-fade-in-up z-50">
+                                                        <button
+                                                            onClick={() => {
+                                                                setShowMobileActions(false);
+                                                                if (machineType === 'Trefila') handleTrefilaComplete();
+                                                                else setShowCompletionModal(true);
+                                                            }}
+                                                            disabled={isCompletionDisabled}
+                                                            className="p-3 text-slate-700 hover:bg-slate-50 font-bold flex items-center gap-3 transition disabled:opacity-30 rounded-t-xl"
+                                                        >
+                                                            <CheckCircleIcon className="h-6 w-6 text-slate-500" />
+                                                            <span>Fechar OP</span>
+                                                        </button>
+
+                                                        <button
+                                                            onClick={() => {
+                                                                setShowMobileActions(false);
+                                                                handleShiftEndRequest(orderForShift.id);
+                                                            }}
+                                                            className="p-3 text-amber-600 hover:bg-amber-50/50 font-bold flex items-center gap-3 transition"
+                                                        >
+                                                            <ClockIcon className="h-6 w-6 text-amber-500" />
+                                                            <span>Encerrar Turno</span>
+                                                        </button>
+
+                                                        {isGestor && cancelProductionOrder && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    setShowMobileActions(false);
+                                                                    setShowCancelConfirmation(true);
+                                                                }}
+                                                                className="p-3 text-rose-600 hover:bg-rose-50/50 font-bold flex items-center gap-3 transition rounded-b-xl"
+                                                            >
+                                                                <XCircleIcon className="h-6 w-6 text-rose-500" />
+                                                                <span>Cancelar OP</span>
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
 
-                                    {/* Direita: Ações Secundárias */}
-                                    <div className="flex items-center justify-end gap-1 sm:gap-4 w-auto md:w-1/4">
-
-
+                                    {/* Direita: Ações Secundárias (Visível apenas no MD/Desktop) */}
+                                    <div className="hidden md:flex items-center justify-end gap-1 sm:gap-4 w-auto md:w-1/4">
                                         <div className="h-8 w-px bg-slate-200/60 hidden md:block"></div>
 
                                         <button
@@ -2613,20 +2565,7 @@ t-center py-4 italic">Sem paradas recentes.</p>
                                             <span>FECHAR ORDEM</span>
                                         </button>
 
-                                        {/* Mobile Finish Button (Icon Only) */}
-                                        <button
-                                            onClick={() => {
-                                                if (machineType === 'Trefila') handleTrefilaComplete();
-                                                else setShowCompletionModal(true);
-                                            }}
-                                            disabled={isCompletionDisabled}
-                                            className="md:hidden p-3.5 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition disabled:opacity-30 active:scale-90 shadow-lg shadow-slate-200"
-                                            title="Finalizar Ordem"
-                                        >
-                                            <CheckCircleIcon className="h-7 w-7" />
-                                        </button>
-
-                                        {hasActiveShift ? (
+                                        {hasActiveShift && (
                                             <button
                                                 onClick={() => handleShiftEndRequest(orderForShift.id)}
                                                 className="p-3.5 text-red-500 hover:bg-red-50/50 rounded-2xl transition active:scale-90 flex flex-col items-center gap-0.5"
@@ -2635,24 +2574,14 @@ t-center py-4 italic">Sem paradas recentes.</p>
                                                 <ClockIcon className="h-7 w-7" />
                                                 <span className="text-[8px] font-black uppercase">Encerrar</span>
                                             </button>
-                                        ) : (
-                                            <button
-                                                onClick={handleStartShift}
-                                                className="p-3.5 text-emerald-600 hover:bg-emerald-50 rounded-2xl transition active:scale-90 flex flex-col items-center gap-0.5"
-                                                title="Iniciar Turno"
-                                            >
-                                                <PlayIcon className="h-7 w-7" />
-                                                <span className="text-[8px] font-black uppercase">Iniciar</span>
-                                            </button>
                                         )}
 
-                                        {/* Botão Pausar Ordem (Arquivar/Trocar) */}
                                         {machineType !== 'Trefila' && pauseProductionOrder && (
                                             <button
                                                 onClick={() => {
                                                     if (window.confirm('Tem certeza que deseja arquivar/pausar esta ordem para iniciar outra? Seu turno atual será encerrado e a ordem voltará para a fila de pendentes.')) {
                                                         pauseProductionOrder(orderForShift.id);
-                                                        setView('pending'); // Auto redireciona para a aba Pendentes
+                                                        setView('pending');
                                                     }
                                                 }}
                                                 className="p-3.5 text-amber-500 hover:text-amber-600 hover:bg-amber-50/50 rounded-2xl transition active:scale-90 flex flex-col items-center gap-0.5"
@@ -2663,7 +2592,6 @@ t-center py-4 italic">Sem paradas recentes.</p>
                                             </button>
                                         )}
 
-                                        {/* Botão Cancelar Ordem - Requer ser Gestor */}
                                         {isGestor && cancelProductionOrder && (
                                             <button
                                                 onClick={() => setShowCancelConfirmation(true)}
