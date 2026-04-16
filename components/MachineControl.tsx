@@ -1183,8 +1183,9 @@ const MachineControl: React.FC<MachineControlProps> = ({
         const processedLotIds = new Set(activeOrder.processedLots?.map(p => p.lotId) || []);
 
         // Para ordens fantasma, selectedLotIds pode começar vazio e lotes são adicionados dinamicamente
-        // Combina os lotes originais com os lotes dos processedLots (que podem ter sido adicionados depois)
-        const selectedIds = Array.isArray(activeOrder.selectedLotIds) ? activeOrder.selectedLotIds as string[] : [];
+        const selectedIds = Array.isArray(activeOrder.selectedLotIds) 
+            ? activeOrder.selectedLotIds.map((l: any) => typeof l === 'string' ? l : l.lotId).filter(Boolean)
+            : [];
         const processedIds = (activeOrder.processedLots || []).map(p => p.lotId);
         const allKnownLotIds = [...new Set([...selectedIds, ...processedIds])];
 
@@ -1921,30 +1922,50 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                             </div>
                                         ) : (
                                             <div className="space-y-6">
-                                                <div className="flex items-start justify-between">
-                                                    <div>
-                                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Produzido</p>
-                                                        <div className="flex items-baseline gap-1">
-                                                            <span className="text-4xl font-black text-slate-900 tracking-tighter">
-                                                                {(activeOrder.processedLots || []).reduce((acc, lot) => acc + (lot.finalWeight || 0), 0).toFixed(0)}
+                                                <div className="relative pt-2">
+                                                    <div className="flex items-end justify-between mb-3">
+                                                        <div>
+                                                            <div className="flex flex-col">
+                                                                <span className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] mb-1">KG no Turno</span>
+                                                                <div className="flex items-baseline gap-3">
+                                                                    <span className="text-6xl font-black text-slate-900 tracking-tighter leading-none">
+                                                                        {(() => {
+                                                                            if (!currentOperatorLog) return 0;
+                                                                            const shiftStart = new Date(currentOperatorLog.startTime).getTime();
+                                                                            const shiftLots = (activeOrder.processedLots || []).filter(l => l.endTime && new Date(l.endTime).getTime() >= shiftStart);
+                                                                            return shiftLots.reduce((acc, lot) => acc + (lot.finalWeight || 0), 0).toFixed(0);
+                                                                        })()}
+                                                                    </span>
+                                                                    <span className="text-2xl font-black text-slate-300 uppercase tracking-widest">kg</span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-3 mt-4 pt-4 border-t border-slate-50">
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Progresso da Ordem</span>
+                                                                    <div className="flex items-baseline gap-1.5">
+                                                                        <span className="text-lg font-black text-slate-600">
+                                                                            {(activeOrder.processedLots || []).reduce((acc, lot) => acc + (lot.finalWeight || 0), 0).toFixed(0)}
+                                                                        </span>
+                                                                        <span className="text-xs font-bold text-slate-300">/ {activeOrder.totalWeight?.toFixed(0) || 0} kg</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex flex-col items-end">
+                                                            <span className="text-[10px] font-black text-indigo-500 uppercase tracking-wider bg-indigo-50 px-2 py-1 rounded-md mb-1">
+                                                                Lotes Concluídos
                                                             </span>
-                                                            <span className="text-lg text-slate-300">kg</span>
+                                                            <div className="flex items-baseline gap-1">
+                                                                <span className="text-2xl font-black text-slate-700 tracking-tighter">{(activeOrder.processedLots || []).length}</span>
+                                                                <span className="text-xs font-bold text-slate-300">
+                                                                    / {(() => {
+                                                                        const raw = activeOrder.selectedLotIds || [];
+                                                                        return Array.isArray(raw) ? raw.length : 0;
+                                                                    })()}
+                                                                </span>
+                                                            </div>
                                                         </div>
-                                                        {currentOperatorLog && (
-                                                            <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mt-1">
-                                                                No Turno: {(activeOrder.processedLots || []).filter(l => new Date(l.endTime).getTime() >= new Date(currentOperatorLog.startTime).getTime()).length} Lotes
-                                                            </p>
-                                                        )}
                                                     </div>
-                                                    <div className="text-right">
-                                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Lotes Totais</p>
-                                                        <div className="flex items-baseline justify-end gap-1">
-                                                            <span className="text-2xl font-black text-slate-700 tracking-tighter">{(activeOrder.processedLots || []).length}</span>
-                                                            <span className="text-xs font-bold text-slate-300">/ {(activeOrder.selectedLotIds as string[]).length}</span>
-                                                        </div>
-                                                        <p className="text-[11px] font-bold text-slate-400 mt-1">Meta: {activeOrder.totalWeight.toFixed(0)} kg</p>
-                                                    </div>
-                                                </div>
                                                 <div className="w-full bg-slate-100 rounded-2xl h-8 overflow-hidden p-1 border border-slate-50">
                                                     {(() => {
                                                         const produced = (activeOrder.processedLots || []).reduce((acc, lot) => acc + (lot.finalWeight || 0), 0);
@@ -1960,6 +1981,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                             </div>
                                                         );
                                                     })()}
+                                                </div>
                                                 </div>
                                             </div>
                                         )}
