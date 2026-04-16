@@ -139,9 +139,15 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                             {!isCollapsed && expandedMenus.includes('trefila') && (
                                 <div className="ml-4 pl-4 border-l border-slate-700/50 flex flex-col gap-0.5 mt-1 mb-2 animate-in slide-in-from-left-2 duration-200">
                                     {hasPermission('trefilaInProgress') && (
-                                        <button onClick={() => setPage('trefilaInProgress')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaInProgress' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                            ⚙️ Em Produção
-                                        </button>
+                                        <>
+                                            <button onClick={() => setPage('trefilaInProgress')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaInProgress' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                                ⚙️ Em Produção (Geral)
+                                            </button>
+                                            <div className="flex gap-1 px-3 mb-2">
+                                                <button onClick={() => { localStorage.setItem('msm_active_machine', 'Trefila 1'); setPage('trefilaInProgress'); }} className="text-[9px] font-black bg-white/5 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 px-2 py-1 rounded border border-white/5 uppercase transition-all flex-1">Máquina 1</button>
+                                                <button onClick={() => { localStorage.setItem('msm_active_machine', 'Trefila 2'); setPage('trefilaInProgress'); }} className="text-[9px] font-black bg-white/5 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 px-2 py-1 rounded border border-white/5 uppercase transition-all flex-1">Máquina 2</button>
+                                            </div>
+                                        </>
                                     )}
                                     {hasPermission('trefilaWeighing') && (
                                         <button onClick={() => setPage('trefilaWeighing')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaWeighing' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
@@ -195,9 +201,15 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                             {!isCollapsed && expandedMenus.includes('trelica') && (
                                 <div className="ml-4 pl-4 border-l border-slate-700/50 flex flex-col gap-0.5 mt-1 mb-2 animate-in slide-in-from-left-2 duration-200">
                                     {hasPermission('trelicaInProgress') && (
-                                        <button onClick={() => setPage('trelicaInProgress')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelicaInProgress' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                            ⚙️ Em Produção
-                                        </button>
+                                        <>
+                                            <button onClick={() => setPage('trelicaInProgress')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelicaInProgress' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                                ⚙️ Em Produção (Geral)
+                                            </button>
+                                            <div className="flex gap-1 px-3 mb-2">
+                                                <button onClick={() => { localStorage.setItem('msm_active_machine', 'Treliça 1'); setPage('trelicaInProgress'); }} className="text-[9px] font-black bg-white/5 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 px-2 py-1 rounded border border-white/5 uppercase transition-all flex-1">Máquina 1</button>
+                                                <button onClick={() => { localStorage.setItem('msm_active_machine', 'Treliça 2'); setPage('trelicaInProgress'); }} className="text-[9px] font-black bg-white/5 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 px-2 py-1 rounded border border-white/5 uppercase transition-all flex-1">Máquina 2</button>
+                                            </div>
+                                        </>
                                     )}
                                     {hasPermission('trelicaPending') && (
                                         <button onClick={() => setPage('trelicaPending')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelicaPending' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>

@@ -606,6 +606,11 @@ const MachineControl: React.FC<MachineControlProps> = ({
     cancelProductionOrder, pauseProductionOrder, addLotToOrder, initialView, initialModal, gauges = []
 }) => {
     const [activeMachine, setActiveMachine] = useState<MachineType>(() => {
+        const saved = localStorage.getItem('msm_active_machine');
+        if (saved && (saved.startsWith(machineType) || (machineType === 'Trefila' && saved.startsWith('Trefila')) || (machineType === 'Treliça' && saved.startsWith('Treliça')))) {
+            return saved as MachineType;
+        }
+
         const user = currentUser?.username?.toLowerCase();
         if (user === 'willian' && machineType === 'Trefila') return 'Trefila 1';
         if (user === 'adrian' && machineType === 'Treliça') return 'Treliça 1';
@@ -614,6 +619,12 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
     // Reset active machine when the main machine category (trefila/trelica) changes from props
     useEffect(() => {
+        const saved = localStorage.getItem('msm_active_machine');
+        if (saved && (saved.startsWith(machineType) || (machineType === 'Trefila' && saved.startsWith('Trefila')) || (machineType === 'Treliça' && saved.startsWith('Treliça')))) {
+            setActiveMachine(saved as MachineType);
+            return;
+        }
+
         const user = currentUser?.username?.toLowerCase();
         if (user === 'willian' && machineType === 'Trefila') {
             setActiveMachine('Trefila 1');

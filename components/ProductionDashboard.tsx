@@ -233,7 +233,12 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     const { shiftDowntime, shiftUptime } = useMemo(() => {
         const intervals: { start: number; end: number }[] = [];
         allOrders
-            .filter(o => o.machine === machineType || (o.machine === 'Trefila' && machineType === 'Trefila 1') || (o.machine === 'Treliça' && machineType === 'Treliça 1'))
+            .filter(o => {
+                const isExact = o.machine === machineType;
+                const isLegacyTrefilaTo1 = (o.machine === 'Trefila' && machineType === 'Trefila 1');
+                const isLegacyTrelicaTo1 = (o.machine === 'Treliça' && machineType === 'Treliça 1');
+                return isExact || isLegacyTrefilaTo1 || isLegacyTrelicaTo1;
+            })
             .forEach(o => {
                 const isActive = activeOrder && o.id === activeOrder.id;
                 (o.downtimeEvents || []).forEach((e: any) => {
@@ -283,11 +288,12 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     }, [allOrders, machineType, shiftStartMs, now, activeOrder, isCurrentlyProducing, lastResumeTime]);
 
     const productionHistoryInShift = useMemo(() => {
-        const orders = allOrders.filter(o => 
-            o.machine === machineType || 
-            (o.machine === 'Trefila' && machineType === 'Trefila 1') || 
-            (o.machine === 'Treliça' && machineType === 'Treliça 1')
-        );
+        const orders = allOrders.filter(o => {
+            const isExact = o.machine === machineType;
+            const isLegacyTrefilaTo1 = (o.machine === 'Trefila' && machineType === 'Trefila 1');
+            const isLegacyTrelicaTo1 = (o.machine === 'Treliça' && machineType === 'Treliça 1');
+            return isExact || isLegacyTrefilaTo1 || isLegacyTrelicaTo1;
+        });
         
         if (machineType.startsWith('Trefila')) {
             return orders.flatMap(o => (o.processedLots || []).map((l: ProcessedLot) => ({
@@ -341,7 +347,12 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                         {currentStyle.icon}
                     </div>
                     <div>
-                        <h2 className="text-3xl font-black text-white tracking-tight leading-none">{machineType.toUpperCase()}</h2>
+                        <div className="flex items-center gap-2">
+                            <h2 className="text-3xl font-black text-white tracking-tight leading-none">{machineType.toUpperCase()}</h2>
+                             {activeOrder && activeOrder.machine !== machineType && (
+                                <span className="bg-red-500/20 text-red-500 text-[8px] font-black px-1.5 py-0.5 rounded border border-red-500/30 font-mono">ID: {activeOrder.machine}</span>
+                             )}
+                        </div>
                         <div className="flex items-center gap-2 mt-1.5">
                             <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-black/40 border border-white/10 ${currentStyle.color}`}>
                                 {currentOperator}
@@ -500,7 +511,12 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                     </thead>
                                     <tbody className="divide-y divide-white/5">
                                         {allOrders
-                                            .filter(o => o.machine === machineType || (o.machine === 'Trefila' && machineType === 'Trefila 1') || (o.machine === 'Treliça' && machineType === 'Treliça 1'))
+                                            .filter(o => {
+                                                const isExact = o.machine === machineType;
+                                                const isLegacyTrefilaTo1 = (o.machine === 'Trefila' && machineType === 'Trefila 1');
+                                                const isLegacyTrelicaTo1 = (o.machine === 'Treliça' && machineType === 'Treliça 1');
+                                                return isExact || isLegacyTrefilaTo1 || isLegacyTrelicaTo1;
+                                            })
                                             .flatMap(o => (o.downtimeEvents || []).map((e: any) => ({ ...e, orderNumber: o.orderNumber })))
                                             .filter(e => new Date(e.stopTime).getTime() >= shiftStartMs)
                                             .sort((a,b) => new Date(b.stopTime).getTime() - new Date(a.stopTime).getTime())
@@ -527,7 +543,12 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                                     </tr>
                                                 );
                                             })}
-                                        {allOrders.filter(o => o.machine === machineType || (o.machine === 'Trefila' && machineType === 'Trefila 1') || (o.machine === 'Treliça' && machineType === 'Treliça 1')).flatMap(o => o.downtimeEvents || []).filter(e => new Date(e.stopTime).getTime() >= shiftStartMs).length === 0 && (
+                                        {allOrders.filter(o => {
+                                            const isExact = o.machine === machineType;
+                                            const isLegacyTrefilaTo1 = (o.machine === 'Trefila' && machineType === 'Trefila 1');
+                                            const isLegacyTrelicaTo1 = (o.machine === 'Treliça' && machineType === 'Treliça 1');
+                                            return isExact || isLegacyTrefilaTo1 || isLegacyTrelicaTo1;
+                                        }).flatMap(o => o.downtimeEvents || []).filter(e => new Date(e.stopTime).getTime() >= shiftStartMs).length === 0 && (
                                             <tr><td colSpan={4} className="p-16 text-center text-slate-600 text-sm font-bold uppercase tracking-[0.4em]">Nenhuma parada registrada</td></tr>
                                         )}
                                     </tbody>
@@ -708,7 +729,14 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
         const resetT = shiftResets[m] ? new Date(shiftResets[m]).getTime() : 0;
         const effective = Math.max(start.getTime(), resetT);
 
-        return productionOrders.filter(o => (o.machine === m || (o.machine === 'Trefila' && m === 'Trefila 1') || (o.machine === 'Treliça' && m === 'Treliça 1')) && o.status !== 'cancelled').reduce((acc, o) => {
+        const machineOrders = productionOrders.filter(o => {
+            const isExact = o.machine === m;
+            const isLegacyTrefilaTo1 = (o.machine === 'Trefila' && m === 'Trefila 1');
+            const isLegacyTrelicaTo1 = (o.machine === 'Treliça' && m === 'Treliça 1');
+            return isExact || isLegacyTrefilaTo1 || isLegacyTrelicaTo1;
+        });
+
+        return machineOrders.filter(o => o.status !== 'cancelled').reduce((acc, o) => {
             if (m.startsWith('Trefila')) {
                 const lots = (o.processedLots || []) as ProcessedLot[];
                 return acc + lots.filter(l => l.endTime && new Date(l.endTime).getTime() >= effective).reduce((s, l) => s + (l.finalWeight || 0), 0);
@@ -830,7 +858,12 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
 
             <div className={`flex-1 grid grid-cols-1 ${visibleMachines.length > 1 ? 'xl:grid-cols-2' : ''} gap-6 lg:gap-8 pb-8`}>
                 {visibleMachines.map(m => {
-                    const activeOrder = productionOrders.find(o => (o.machine === m || (o.machine === 'Trefila' && m === 'Trefila 1') || (o.machine === 'Treliça' && m === 'Treliça 1')) && o.status === 'in_progress');
+                    const activeOrder = productionOrders.find(o => {
+                const isExact = o.machine === m;
+                const isLegacyTrefilaTo1 = (o.machine === 'Trefila' && m === 'Trefila 1');
+                const isLegacyTrelicaTo1 = (o.machine === 'Treliça' && m === 'Treliça 1');
+                return (isExact || isLegacyTrefilaTo1 || isLegacyTrelicaTo1) && o.status === 'in_progress';
+            });
                     return (
                         <MachineStatusView 
                             key={m}

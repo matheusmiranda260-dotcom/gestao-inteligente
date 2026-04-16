@@ -228,7 +228,7 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
         localStorage.setItem('trelica-machine-speed', machineSpeed.toString());
     }, [machineSpeed]);
 
-    const trelicaProductionOrders = useMemo(() => productionOrders.filter(o => o.machine === 'Treliça'), [productionOrders]);
+    const trelicaProductionOrders = useMemo(() => productionOrders.filter(o => o.machine === 'Treliça' || o.machine === 'Treliça 1' || o.machine === 'Treliça 2'), [productionOrders]);
 
     const availableCa60Stock = useMemo(() => {
         return stock
