@@ -1844,7 +1844,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                 isActiveProcess ? 'bg-emerald-50 border-emerald-500/50 animate-producing-pulse shadow-[0_0_30px_rgba(16,185,129,0.2)]' :
                                                 isUnderStopAlerta ? 'bg-rose-50 border-rose-500/50 animate-stop-pulse shadow-[0_0_30px_rgba(244,63,94,0.2)]' :
                                                 'bg-white border-slate-100'
-                                            } ${activeMachine.startsWith('Trefila') ? 'hidden md:block' : ''}`}>
+                                            } hidden md:block`}>
                                                 <div className="flex items-center gap-6">
                                                     <div className={`w-20 h-20 rounded-3xl flex items-center justify-center shadow-lg transition-transform duration-500 ${
                                                         isActiveProcess ? 'bg-emerald-600 rotate-12 scale-110' :
