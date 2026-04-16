@@ -176,6 +176,14 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
         return { processedLotsCount: pc, totalLotsCount: tc, producedQuantity: pq, plannedQuantity: pl, progress: Math.min(100, pg) };
     }, [activeOrder, machineType]);
 
+    const lastResumeTime = useMemo(() => {
+        if (!activeOrder) return 0;
+        const resumes = (activeOrder.downtimeEvents || []).filter((e: any) => e.resumeTime).map((e: any) => new Date(e.resumeTime!).getTime());
+        return resumes.length ? Math.max(...resumes) : new Date(activeOrder.startTime).getTime();
+    }, [activeOrder]);
+
+    const isCurrentlyProducing = machineStatus.status === 'Produzindo' || machineStatus.status === 'Preparacao';
+
     const { shiftDowntime, shiftUptime } = useMemo(() => {
         const intervals: { start: number; end: number }[] = [];
         allOrders
@@ -184,11 +192,17 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                 const isActive = activeOrder && o.id === activeOrder.id;
                 (o.downtimeEvents || []).forEach((e: any) => {
                     // Only count open events if this is the ACTIVE order.
-                    // For other orders, an open event is likely a "zombie" data error.
                     if (!e.resumeTime && !isActive) return;
 
                     const s = Math.max(shiftStartMs, new Date(e.stopTime).getTime());
-                    const r = Math.min(now.getTime(), e.resumeTime ? new Date(e.resumeTime).getTime() : now.getTime());
+                    
+                    // SAFEGUARD: If the machine is producing, an open event cannot be ticking past the last resume.
+                    let endTime = e.resumeTime ? new Date(e.resumeTime).getTime() : now.getTime();
+                    if (!e.resumeTime && isCurrentlyProducing) {
+                        endTime = Math.min(endTime, lastResumeTime);
+                    }
+
+                    const r = Math.min(now.getTime(), endTime);
                     if (r > s) {
                         intervals.push({ start: s, end: r });
                     }
@@ -220,7 +234,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             shiftDowntime: totalDowntime, 
             shiftUptime: Math.max(0, totalTime - totalDowntime) 
         };
-    }, [allOrders, machineType, shiftStartMs, now, activeOrder]);
+    }, [allOrders, machineType, shiftStartMs, now, activeOrder, isCurrentlyProducing, lastResumeTime]);
 
     const productionHistoryInShift = useMemo(() => {
         const orders = allOrders.filter(o => o.machine.startsWith(machineType));
@@ -502,8 +516,8 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
         }, 0);
     };
 
-    const activeTrefila = productionOrders.find(o => o.machine === 'Trefila' && o.status === 'in_progress');
-    const activeTrelica = productionOrders.find(o => o.machine === 'Treliça' && o.status === 'in_progress');
+    const activeTrefila = productionOrders.find(o => o.machine.startsWith('Trefila') && o.status === 'in_progress');
+    const activeTrelica = productionOrders.find(o => o.machine.startsWith('Treliça') && o.status === 'in_progress');
 
     const getTrelicaGoal = (activeOrder?: ProductionOrderData) => {
         if (!activeOrder) return 500;
