@@ -177,16 +177,47 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     }, [activeOrder, machineType]);
 
     const { shiftDowntime, shiftUptime } = useMemo(() => {
-        let dt = 0;
-        allOrders.filter(o => o.machine.startsWith(machineType)).forEach(o => {
-            (o.downtimeEvents || []).forEach((e: any) => {
-                const s = Math.max(shiftStartMs, new Date(e.stopTime).getTime());
-                const r = Math.min(now.getTime(), e.resumeTime ? new Date(e.resumeTime).getTime() : now.getTime());
-                if (r > s) dt += (r - s);
+        // Collect all downtime intervals for this machine that intersect with the current shift
+        const intervals: { start: number; end: number }[] = [];
+        allOrders
+            .filter(o => o.machine.startsWith(machineType))
+            .forEach(o => {
+                (o.downtimeEvents || []).forEach((e: any) => {
+                    const s = Math.max(shiftStartMs, new Date(e.stopTime).getTime());
+                    const r = Math.min(now.getTime(), e.resumeTime ? new Date(e.resumeTime).getTime() : now.getTime());
+                    if (r > s) {
+                        intervals.push({ start: s, end: r });
+                    }
+                });
             });
-        });
-        const total = Math.max(0, now.getTime() - shiftStartMs);
-        return { shiftDowntime: dt, shiftUptime: Math.max(0, total - dt) };
+
+        // Merge overlapping intervals to avoid double counting
+        if (intervals.length === 0) {
+            const total = Math.max(0, now.getTime() - shiftStartMs);
+            return { shiftDowntime: 0, shiftUptime: total };
+        }
+
+        // Sort by start time
+        intervals.sort((a, b) => a.start - b.start);
+
+        const merged: { start: number; end: number }[] = [intervals[0]];
+        for (let i = 1; i < intervals.length; i++) {
+            const last = merged[merged.length - 1];
+            const current = intervals[i];
+            if (current.start <= last.end) {
+                last.end = Math.max(last.end, current.end);
+            } else {
+                merged.push(current);
+            }
+        }
+
+        const totalDowntime = merged.reduce((acc, curr) => acc + (curr.end - curr.start), 0);
+        const totalTime = Math.max(0, now.getTime() - shiftStartMs);
+        
+        return { 
+            shiftDowntime: totalDowntime, 
+            shiftUptime: Math.max(0, totalTime - totalDowntime) 
+        };
     }, [allOrders, machineType, shiftStartMs, now]);
 
     const productionHistoryInShift = useMemo(() => {
