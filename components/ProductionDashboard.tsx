@@ -176,7 +176,34 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
         return { status: 'Produzindo', reason: '', durationMs: duration };
     }, [activeOrder, now, currentOperatorLog, shiftStartMs, machineType]);
 
-    const currentStyle = statusStyles[machineStatus.status as keyof typeof statusStyles] || statusStyles.Ocioso;
+    let currentStyle = statusStyles[machineStatus.status as keyof typeof statusStyles] || statusStyles.Ocioso;
+    
+    // Check if stopped and over limit to adjust styles dynamically
+    const limitEntryForStyle = Object.entries(DOWNTIME_THRESHOLDS).find(([key]) => machineStatus.reason.includes(key));
+    const isOverLimitForStyle = limitEntryForStyle ? machineStatus.durationMs > (limitEntryForStyle[1] * 60 * 1000) : false;
+
+    if (machineStatus.status === 'Parada' || machineStatus.status === 'Preparacao') {
+        if (!isOverLimitForStyle && limitEntryForStyle) {
+            // Within limit: Yellow/Amber
+            currentStyle = {
+                ...statusStyles.Parada,
+                bg: 'bg-amber-500/10',
+                glow: 'shadow-[0_0_20px_rgba(245,158,11,0.2)]',
+                color: 'text-amber-400',
+                border: 'border-amber-500/30'
+            };
+        } else if (isOverLimitForStyle) {
+            // Over limit: Intense Red
+            currentStyle = {
+                ...statusStyles.Parada,
+                bg: 'bg-rose-600/20',
+                glow: 'shadow-[0_0_30px_rgba(225,29,72,0.4)]',
+                color: 'text-rose-500',
+                border: 'border-rose-600'
+            };
+        }
+    }
+
     const currentOperator = currentOperatorLog?.operator || '---';
 
     const { processedLotsCount, totalLotsCount, producedQuantity, plannedQuantity, progress } = useMemo(() => {
@@ -329,11 +356,15 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                     </div>
                 </div>
                 <div className="text-right">
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Status do Equipamento</p>
-                    <p className={`text-sm font-black uppercase tracking-widest ${currentStyle.color} ${isStopped ? 'animate-pulse neon-text-red' : isProducingLot ? 'animate-pulse neon-text-green' : ''}`}>{currentStyle.title}</p>
+                    <p className={`text-sm font-black uppercase tracking-widest ${currentStyle.color} ${isStopped ? (isOverLimitForStyle ? 'animate-pulse neon-text-red' : 'animate-pulse text-amber-500') : isProducingLot ? 'animate-pulse neon-text-green' : ''}`}>
+                        {isOverLimitForStyle ? 'LIMITE EXCEDIDO' : currentStyle.title}
+                    </p>
                     {isStopped && (
-                        <div className="mt-2 px-3 py-1 bg-rose-500/20 border border-rose-500/50 rounded-md animate-pulse shadow-[0_0_15px_rgba(244,63,94,0.3)]">
-                            <p className="text-[9px] font-black text-rose-400 uppercase tracking-tighter">MOTIVO: {machineStatus.reason}</p>
+                        <div className={`mt-2 px-3 py-1 border rounded-md animate-pulse ${isOverLimitForStyle ? 'bg-rose-500/20 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.3)]' : 'bg-amber-500/10 border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.2)]'}`}>
+                            <p className={`text-[9px] font-black uppercase tracking-tighter ${isOverLimitForStyle ? 'text-rose-400' : 'text-amber-500'}`}>
+                                MOTIVO: {machineStatus.reason} 
+                                {limitEntryForStyle && ` • ${formatDuration(machineStatus.durationMs)} / ${limitEntryForStyle[1]}m`}
+                            </p>
                         </div>
                     )}
                 </div>
