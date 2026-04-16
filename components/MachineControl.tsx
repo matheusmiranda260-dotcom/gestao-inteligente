@@ -990,7 +990,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
         const openEvent = [...events].reverse().find(e => !e.resumeTime);
 
         if (!openEvent) {
-            return isAnyActiveShift ? 'Produzindo' : 'Desligada';
+            return isAnyActiveShift ? 'Produzindo' : 'Ocioso';
         }
 
         const prepReasons = ['Aguardando Início da Produção', 'Troca de Rolo / Preparação', 'Setup', 'Ajuste', 'Setup + Preparação'];
@@ -998,7 +998,9 @@ const MachineControl: React.FC<MachineControlProps> = ({
             return 'Preparacao';
         }
 
-        if (openEvent.reason === 'Final de Turno' || !isAnyActiveShift) {
+        // Se é final de turno, está desligada. Caso contrário, se não há turno ativo mas há um evento, 
+        // deixamos cair no retorno 'Parada' ou 'Preparacao' acima para ser mais informativo.
+        if (openEvent.reason === 'Final de Turno' || openEvent.reason.includes('Turno')) {
             return 'Desligada';
         }
 

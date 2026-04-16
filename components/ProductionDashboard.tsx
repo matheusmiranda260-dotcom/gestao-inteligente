@@ -158,8 +158,8 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
 
             if (isPrep) return { status: 'Preparacao', reason, durationMs: dur };
             
-            // If it's a shift change, or if nobody is logged in, it's definitively "Desligada"
-            if (reason.includes('Turno') || !currentOperatorLog) {
+            // If it's a shift change, it's definitively "Desligada" (Off)
+            if (reason.includes('Turno') || reason.includes('Final de Turno')) {
                 return { status: 'Desligada', reason, durationMs: dur };
             }
             
@@ -178,7 +178,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
         }
 
         if (!currentOperatorLog) {
-            return { status: 'Desligada', reason: 'Aguardando Login', durationMs: duration };
+            return { status: 'Ocioso', reason: 'Aguardando Operador', durationMs: duration };
         }
 
         return { status: 'Produzindo', reason: '', durationMs: duration };
@@ -870,7 +870,12 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
 
             <div className={`flex-1 grid grid-cols-1 ${visibleMachines.length > 1 ? 'xl:grid-cols-2' : ''} gap-6 lg:gap-8 pb-8`}>
                 {visibleMachines.map(m => {
-                    const machineOrders = productionOrders.filter(o => o.machine === m);
+                    const machineOrders = productionOrders.filter(o => {
+                        const isExact = o.machine === m;
+                        const isLegacyTrefilaTo1 = (o.machine === 'Trefila' && m === 'Trefila 1');
+                        const isLegacyTrelicaTo1 = (o.machine === 'Treliça' && m === 'Treliça 1');
+                        return isExact || isLegacyTrefilaTo1 || isLegacyTrelicaTo1;
+                    });
 
                     // activeOrder derived from the already-filtered subset
                     const activeOrder = machineOrders.find(o => o.status === 'in_progress');
