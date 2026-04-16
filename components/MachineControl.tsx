@@ -625,8 +625,6 @@ const MachineControl: React.FC<MachineControlProps> = ({
         }
 
         const user = currentUser?.username?.toLowerCase();
-        if (user === 'willian' && machineType === 'Trefila') return 'Trefila 1';
-        if (user === 'adrian' && machineType === 'Treliça') return 'Treliça 1';
         return (machineType === 'Trefila' ? 'Trefila 1' : machineType === 'Treliça' ? 'Treliça 1' : machineType) as MachineType;
     });
 
@@ -638,14 +636,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
             return;
         }
 
-        const user = currentUser?.username?.toLowerCase();
-        if (user === 'willian' && machineType === 'Trefila') {
-            setActiveMachine('Trefila 1');
-        } else if (user === 'adrian' && machineType === 'Treliça') {
-            setActiveMachine('Treliça 1');
-        } else {
-            setActiveMachine(machineType === 'Trefila' ? 'Trefila 1' : machineType === 'Treliça' ? 'Treliça 1' : machineType as MachineType);
-        }
+        setActiveMachine(machineType === 'Trefila' ? 'Trefila 1' : machineType === 'Treliça' ? 'Treliça 1' : machineType as MachineType);
     }, [machineType, currentUser?.username]);
     const [pendingWeights, setPendingWeights] = useState<Map<string, string>>(new Map());
     const [pendingGauges, setPendingGauges] = useState<Map<string, string>>(new Map()); // Novo estado para bitolas
@@ -1559,8 +1550,17 @@ const MachineControl: React.FC<MachineControlProps> = ({
                         <p className="text-slate-500 mb-6 text-sm leading-relaxed font-medium">
                             A máquina está sendo operada por <strong className="text-slate-800">{currentOperatorLog?.operator}</strong>. Ele(a) precisa encerrar o turno atual para que você possa assumir.
                         </p>
-                        <div className="w-full bg-slate-100/80 text-slate-500 font-black py-4 px-6 rounded-2xl uppercase text-sm flex items-center justify-center gap-3 tracking-widest">
-                            AGUARDANDO LIBERAÇÃO
+                        <div className="flex flex-col gap-3">
+                            <div className="w-full bg-slate-100/80 text-slate-500 font-black py-4 px-6 rounded-2xl uppercase text-sm flex items-center justify-center gap-3 tracking-widest">
+                                AGUARDANDO LIBERAÇÃO
+                            </div>
+                            <button
+                                onClick={() => startOperatorShift && startOperatorShift(activeOrder.id)}
+                                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 px-6 rounded-2xl uppercase text-sm flex items-center justify-center gap-3 tracking-widest transition-all shadow-lg shadow-indigo-100"
+                            >
+                                <PlayIcon className="h-5 w-5" />
+                                Assumir Turno Agora
+                            </button>
                         </div>
                     </div>
                 </div>

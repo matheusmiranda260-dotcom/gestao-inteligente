@@ -157,7 +157,11 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                            reason.includes('Ajuste');
 
             if (isPrep) return { status: 'Preparacao', reason, durationMs: dur };
-            if (reason.includes('Turno') || !currentOperatorLog) return { status: 'Desligada', reason, durationMs: dur };
+            
+            // If it's a shift change, or if nobody is logged in, it's definitively "Desligada"
+            if (reason.includes('Turno') || !currentOperatorLog) {
+                return { status: 'Desligada', reason, durationMs: dur };
+            }
             
             return { status: 'Parada', reason, durationMs: dur };
         }
@@ -171,6 +175,10 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
 
         if (trefilaNotProducing) {
             return { status: 'Preparacao', reason: 'Aguardando Início de Lote', durationMs: duration };
+        }
+
+        if (!currentOperatorLog) {
+            return { status: 'Desligada', reason: 'Aguardando Login', durationMs: duration };
         }
 
         return { status: 'Produzindo', reason: '', durationMs: duration };
@@ -235,12 +243,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     const { shiftDowntime, shiftUptime } = useMemo(() => {
         const intervals: { start: number; end: number }[] = [];
         allOrders
-            .filter(o => {
-                const isExact = o.machine === machineType;
-                const isLegacyTrefilaTo1 = (o.machine === 'Trefila' && machineType === 'Trefila 1');
-                const isLegacyTrelicaTo1 = (o.machine === 'Treliça' && machineType === 'Treliça 1');
-                return isExact || isLegacyTrefilaTo1 || isLegacyTrelicaTo1;
-            })
+            .filter(o => o.machine === machineType)
             .forEach(o => {
                 const isActive = activeOrder && o.id === activeOrder.id;
                 (o.downtimeEvents || []).forEach((e: any) => {
@@ -867,15 +870,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
 
             <div className={`flex-1 grid grid-cols-1 ${visibleMachines.length > 1 ? 'xl:grid-cols-2' : ''} gap-6 lg:gap-8 pb-8`}>
                 {visibleMachines.map(m => {
-                    // Strict per-machine filter — NEVER pass all orders unfiltered
-                    const machineOrders = productionOrders.filter(o => {
-                        if (o.machine === m) return true;
-                        // Legacy compatibility: generic 'Trefila' maps ONLY to 'Trefila 1'
-                        if (o.machine === 'Trefila' && m === 'Trefila 1') return true;
-                        // Legacy compatibility: generic 'Treliça' maps ONLY to 'Treliça 1'
-                        if (o.machine === 'Treliça' && m === 'Treliça 1') return true;
-                        return false;
-                    });
+                    const machineOrders = productionOrders.filter(o => o.machine === m);
 
                     // activeOrder derived from the already-filtered subset
                     const activeOrder = machineOrders.find(o => o.status === 'in_progress');
