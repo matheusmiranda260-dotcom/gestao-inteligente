@@ -1807,7 +1807,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                     </div>
                                                     <div>
                                                         <p className="text-[10px] md:text-xs text-slate-500 mb-1">Meta</p>
-                                                        <p className="text-sm md:text-base font-semibold text-slate-700">{activeOrder.totalWeight.toFixed(0)} kg</p>
+                                                        <p className="text-sm md:text-base font-semibold text-slate-700">{activeOrder.totalWeight?.toFixed(0) || 0} kg</p>
                                                     </div>
                                                     <div className="col-span-2 pt-2">
                                                         <button
@@ -2201,7 +2201,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                 return (
                                                                     <tr key={lot.lotId} className="hover:bg-slate-50/50 transition-colors">
                                                                         <td className="p-3 font-bold text-slate-700">{lot.lotInfo?.internalLot}</td>
-                                                                        <td className="p-3 text-right text-slate-500 font-medium">{lot.lotInfo?.initialQuantity.toFixed(0)} kg</td>
+                                                                        <td className="p-3 text-right text-slate-500 font-medium">{lot.lotInfo?.initialQuantity?.toFixed(0) || '-'} kg</td>
                                                                         <td className="p-3">
                                                                             {lot.finalWeight == null ? (
                                                                                 <div className="flex items-center gap-1">
@@ -2280,7 +2280,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                     <div className="flex justify-between items-start">
                                                                         <div>
                                                                             <h4 className="font-black text-slate-800 text-xl">{lot.lotInfo?.internalLot}</h4>
-                                                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Entrada: {lot.lotInfo?.initialQuantity.toFixed(0)} kg</p>
+                                                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Entrada: {lot.lotInfo?.initialQuantity?.toFixed(0) || '-'} kg</p>
                                                                         </div>
                                                                         {isWaiting && (
                                                                             <div className="text-right">
@@ -2660,7 +2660,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                     ) : null}
                                                 </td>
                                                 <td className="px-6 py-4">{machineType === 'Trefila' ? order.targetBitola : `${order.trelicaModel} (${order.quantityToProduce} pçs)`}</td>
-                                                <td className="px-6 py-4 text-right">{order.totalWeight.toFixed(2)}</td>
+                                                <td className="px-6 py-4 text-right">{order.totalWeight?.toFixed(2) || 0}</td>
                                                 <td className="px-6 py-4 text-center">
                                                     <button onClick={() => {
                                                         if(startProductionOrder) startProductionOrder(order.id);
@@ -2706,7 +2706,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                 <td className="px-6 py-4">{order.endTime ? new Date(order.endTime).toLocaleDateString('pt-BR') : '-'}</td>
                                                 <td className="px-6 py-4 font-medium text-slate-900">{order.orderNumber}</td>
                                                 <td className="px-6 py-4">{machineType === 'Trefila' ? order.targetBitola : `${order.trelicaModel} (${order.actualProducedQuantity} pçs)`}</td>
-                                                <td className="px-6 py-4 text-right">{machineType === 'Trefila' ? order.totalWeight.toFixed(2) : order.plannedOutputWeight?.toFixed(2) || 'N/A'}</td>
+                                                <td className="px-6 py-4 text-right">{machineType === 'Trefila' ? (order.totalWeight?.toFixed(2) || 0) : (order.plannedOutputWeight?.toFixed(2) || 'N/A')}</td>
                                                 <td className="px-6 py-4 text-right font-bold text-emerald-700">{order.actualProducedWeight?.toFixed(2) || 'N/A'}</td>
                                                 <td className="px-6 py-4 text-center">
                                                     <button onClick={() => setProductionReportData(order)} className="text-emerald-600 hover:text-emerald-800 font-semibold py-1 px-3 rounded-md text-xs bg-emerald-50 border border-emerald-200">
