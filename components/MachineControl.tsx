@@ -1730,46 +1730,45 @@ const MachineControl: React.FC<MachineControlProps> = ({
                 <>
                     {/* Mobile Tab Switcher */}
                     {(activeOrder || postProductionOrder) && (
-                        <div className="flex md:hidden mb-6 bg-slate-100 p-1.5 rounded-2xl border border-slate-200 shadow-inner">
+                        <div className="flex md:hidden mb-6 bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-inner">
                             <button
                                 onClick={() => setMobileTab('monitor')}
-                                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all duration-200 ${mobileTab === 'monitor' ? 'bg-white shadow-md text-slate-900 border border-slate-100' : 'text-slate-500'}`}
+                                className={`flex-1 flex items-center justify-center gap-1 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-tight transition-all duration-200 ${mobileTab === 'monitor' ? 'bg-white shadow-md text-slate-900 border border-slate-100' : 'text-slate-500'}`}
                             >
-                                <ChartBarIcon className={`h-4 w-4 ${mobileTab === 'monitor' ? 'text-indigo-500' : 'text-slate-400'}`} />
-                                <span className="hidden sm:inline">Monitoramento</span>
-                                <span className="sm:hidden">Painel</span>
+                                <ChartBarIcon className={`h-3.5 w-3.5 ${mobileTab === 'monitor' ? 'text-indigo-500' : 'text-slate-400'}`} />
+                                PAINEL
                             </button>
                             {activeMachine.startsWith('Trefila') ? (
                                 <>
                                     <button
                                         onClick={() => setMobileTab('process')}
-                                        className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all duration-200 ${mobileTab === 'process' ? 'bg-white shadow-md text-slate-900 border border-slate-100' : 'text-slate-500'}`}
+                                        className={`flex-1 flex items-center justify-center gap-1 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-tight transition-all duration-200 ${mobileTab === 'process' ? 'bg-white shadow-md text-slate-900 border border-slate-100' : 'text-slate-500'}`}
                                     >
-                                        <PlayIcon className={`h-4 w-4 ${mobileTab === 'process' ? 'text-indigo-500' : 'text-slate-400'}`} />
+                                        <PlayIcon className={`h-3.5 w-3.5 ${mobileTab === 'process' ? 'text-indigo-500' : 'text-slate-400'}`} />
                                         Processar
                                     </button>
                                     <button
                                         onClick={() => setMobileTab('weigh')}
-                                        className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all duration-200 ${mobileTab === 'weigh' ? 'bg-white shadow-md text-slate-900 border border-slate-100' : 'text-slate-500'}`}
+                                        className={`flex-1 flex items-center justify-center gap-1 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-tight transition-all duration-200 ${mobileTab === 'weigh' ? 'bg-white shadow-md text-slate-900 border border-slate-100' : 'text-slate-500'}`}
                                     >
-                                        <ScaleIcon className={`h-4 w-4 ${mobileTab === 'weigh' ? 'text-indigo-500' : 'text-slate-400'}`} />
+                                        <ScaleIcon className={`h-3.5 w-3.5 ${mobileTab === 'weigh' ? 'text-indigo-500' : 'text-slate-400'}`} />
                                         Pesagem
                                     </button>
                                 </>
                             ) : (
                                 <button
                                     onClick={() => setMobileTab('work')}
-                                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all duration-200 ${mobileTab === 'work' ? 'bg-white shadow-md text-slate-900 border border-slate-100' : 'text-slate-500'}`}
+                                    className={`flex-1 flex items-center justify-center gap-1 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-tight transition-all duration-200 ${mobileTab === 'work' ? 'bg-white shadow-md text-slate-900 border border-slate-100' : 'text-slate-500'}`}
                                 >
-                                    <ScaleIcon className={`h-4 w-4 ${mobileTab === 'work' ? 'text-indigo-500' : 'text-slate-400'}`} />
+                                    <ScaleIcon className={`h-3.5 w-3.5 ${mobileTab === 'work' ? 'text-indigo-500' : 'text-slate-400'}`} />
                                     Pesagem
                                 </button>
                             )}
                             <button
                                 onClick={() => setMobileTab('performance')}
-                                className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all duration-200 ${mobileTab === 'performance' ? 'bg-white shadow-md text-slate-900 border border-slate-100' : 'text-slate-500'}`}
+                                className={`flex-1 flex items-center justify-center gap-1 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-tight transition-all duration-200 ${mobileTab === 'performance' ? 'bg-white shadow-md text-slate-900 border border-slate-100' : 'text-slate-500'}`}
                             >
-                                <ChartBarIcon className={`h-4 w-4 ${mobileTab === 'performance' ? 'text-indigo-500' : 'text-slate-400'}`} />
+                                <ChartBarIcon className={`h-3.5 w-3.5 ${mobileTab === 'performance' ? 'text-indigo-500' : 'text-slate-400'}`} />
                                 Performance
                             </button>
                         </div>
