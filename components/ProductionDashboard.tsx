@@ -613,15 +613,16 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
     };
 
     const toggleFullscreen = () => {
+        const element = document.getElementById('dashboard-main-container');
         if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen().catch(err => console.error(err));
+            element?.requestFullscreen().catch(err => console.error(err));
         } else {
             document.exitFullscreen();
         }
     };
 
     return (
-        <div className="min-h-screen bg-[#060B18] text-slate-300 p-4 lg:p-8 flex flex-col gap-6 font-sans overflow-x-hidden">
+        <div id="dashboard-main-container" className="min-h-screen bg-[#060B18] text-slate-300 p-4 lg:p-8 flex flex-col gap-6 font-sans overflow-x-hidden overflow-y-auto custom-scrollbar">
             <header className="flex justify-between items-center px-4">
                 <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-indigo-500 rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(99,102,241,0.4)] border border-indigo-400">
