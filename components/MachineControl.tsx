@@ -2424,12 +2424,13 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                             </div>
                                                         ))}
                                                     </div>
+                                                </div>
                                             </div>
-                                        </div>
-                                    </>
-                                ) : (
+                                        </>
+                                    )}
+                                </div>
+                            </div>
 
-                            {/* Sticky Action Deck (Spotify Style) - Revised for Mobile */}
                             <div className="fixed bottom-0 right-0 left-0 md:left-64 bg-white/80 backdrop-blur-xl border-t border-slate-200/50 px-3 py-2 md:p-4 shadow-[0_-8px_30px_rgb(0,0,0,0.12)] z-40 transition-all duration-500 safe-area-bottom">
                                 <div className="max-w-[1920px] mx-auto flex items-center justify-between gap-3">
 
