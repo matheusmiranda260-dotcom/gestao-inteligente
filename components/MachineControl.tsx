@@ -1818,7 +1818,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                 </div>
                                                 <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
                                                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Meta Turno</span>
-                                                    <span className="text-xl font-black text-slate-800">{activeOrder.totalWeight?.toFixed(0) || 0} <span className="text-[10px] text-slate-300">kg</span></span>
+                                                    <span className="text-xl font-black text-slate-800">20.000 <span className="text-[10px] text-slate-300">kg</span> <span className="text-[10px] text-slate-400 ml-1">/ 10 Lts</span></span>
                                                 </div>
                                             </div>
                                         </div>
@@ -1938,7 +1938,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                 </div>
                                                 <div className="hidden md:block">
                                                     <p className="text-[10px] md:text-xs text-slate-500 mb-1">Meta</p>
-                                                    <p className="text-sm md:text-base font-semibold text-slate-700">{activeOrder.totalWeight?.toFixed(0) || 0} kg</p>
+                                                    <p className="text-sm md:text-base font-semibold text-slate-700">{activeMachine.startsWith('Trefila') ? '20.000' : activeOrder.totalWeight?.toFixed(0) || 0} kg</p>
                                                 </div>
                                             </div>
 
@@ -2076,7 +2076,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                         <span className="text-lg font-black text-slate-600">
                                                                             {(activeOrder.processedLots || []).reduce((acc, lot) => acc + (lot.finalWeight || 0), 0).toFixed(0)}
                                                                         </span>
-                                                                        <span className="text-xs font-bold text-slate-300">/ {activeOrder.totalWeight?.toFixed(0) || 0} kg</span>
+                                                                        <span className="text-xs font-bold text-slate-300">/ {activeMachine.startsWith('Trefila') ? '20.000' : activeOrder.totalWeight?.toFixed(0) || 0} kg</span>
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -2579,21 +2579,29 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                         ) : (
                                             <div className="w-full md:w-auto flex relative items-center">
                                                 <button
-                                                    onClick={isMachineStopped ? (() => logResumeProduction && logResumeProduction(orderForShift.id)) : (() => setShowDowntimeModal(true))}
-                                                    className={`flex-1 md:w-auto md:px-14 h-16 md:h-14 font-black text-lg transition transform active:scale-95 flex items-center justify-center gap-3 border-4 md:rounded-full ${
-                                                        isMachineStopped 
-                                                            ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-2xl shadow-rose-500/40 animate-stop-pulse border-rose-400 rounded-l-2xl md:rounded-r-none'
-                                                            : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-2xl shadow-emerald-500/40 animate-producing-pulse border-emerald-400 rounded-l-2xl md:rounded-r-none'
-                                                    }`}
+                                                    onClick={isMachineStopped ? (() => logResumeProduction && logResumeProduction(activeOrder.id)) : (() => setShowDowntimeModal(true))}
+                                                    className={`w-full h-24 md:h-20 rounded-3xl flex flex-col items-center justify-center gap-1 transition-all duration-500 shadow-2xl relative overflow-hidden group border-[3px]
+                                                        ${isMachineStopped 
+                                                            ? 'bg-rose-600 shadow-rose-200 animate-stop-pulse border-rose-400 active:scale-95' 
+                                                            : 'bg-emerald-600 shadow-emerald-200 animate-producing-pulse border-emerald-400 active:scale-95'
+                                                        }`}
                                                 >
-                                                    <div className="flex flex-col items-center justify-center leading-none">
-                                                        <div className="flex items-center gap-2">
-                                                            {isMachineStopped ? <PlayIcon className="h-7 w-7" /> : <PauseIcon className="h-7 w-7" />}
-                                                            <span className="inline tracking-tight text-[16px] sm:text-lg">
-                                                                {isMachineStopped ? 'RETOMAR PRODUÇÃO' : 'PARAR MÁQUINA'}
-                                                            </span>
-                                                        </div>
-                                                        <span className="text-[10px] font-black opacity-80 mt-1 font-mono tracking-widest">{statusDurationString}</span>
+                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+                                                    <div className="relative z-10 flex items-center gap-3">
+                                                        {isMachineStopped ? (
+                                                            <PlayIcon className="h-10 w-10 text-white animate-bounce-horizontal" />
+                                                        ) : (
+                                                            <PauseIcon className="h-10 w-10 text-white" />
+                                                        )}
+                                                        <span className="text-2xl font-black text-white uppercase tracking-tighter">
+                                                            {isMachineStopped ? 'RETOMAR PRODUÇÃO' : 'PARAR MÁQUINA'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="relative z-10 flex items-center gap-2 px-4 py-1.5 bg-black/20 rounded-full backdrop-blur-md border border-white/10">
+                                                        <ClockIcon className="h-5 w-5 text-white/80" />
+                                                        <span className="text-lg font-black text-white font-mono tracking-widest">
+                                                            {statusDurationString}
+                                                        </span>
                                                     </div>
                                                 </button>
                                                 
