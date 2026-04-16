@@ -142,15 +142,25 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             return { status: 'Ocioso', reason: 'Nenhuma ordem ativa', durationMs: 0 };
         }
         const events = (activeOrder.downtimeEvents || []) as any[];
+        // CRITICAL FIX: Sort DESCENDING to pick the LATEST open event. 
+        // Old "zombie" events should not hide the current status.
         const openEvent = [...events]
-            .sort((a, b) => new Date(a.stopTime).getTime() - new Date(b.stopTime).getTime())
+            .sort((a, b) => new Date(b.stopTime).getTime() - new Date(a.stopTime).getTime())
             .find(e => !e.resumeTime);
 
         if (openEvent) {
             const reason = openEvent.reason || 'Parada';
             const dur = now.getTime() - new Date(openEvent.stopTime).getTime();
-            if (reason.includes('Preparação') || reason.includes('Setup')) return { status: 'Preparacao', reason, durationMs: dur };
+            
+            // Align with MachineControl.tsx prepReasons
+            const isPrep = reason.includes('Preparação') || 
+                           reason.includes('Setup') || 
+                           reason.includes('Aguardando') || 
+                           reason.includes('Ajuste');
+
+            if (isPrep) return { status: 'Preparacao', reason, durationMs: dur };
             if (reason.includes('Turno') || !currentOperatorLog) return { status: 'Desligada', reason, durationMs: dur };
+            
             return { status: 'Parada', reason, durationMs: dur };
         }
         
