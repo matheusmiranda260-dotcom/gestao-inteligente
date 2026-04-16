@@ -229,8 +229,11 @@ td {
 }
 
 tr:hover td {
-  background: #F8FAFC;
-  /* Slate 50 */
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.tactical-card tr:hover td {
+  background: rgba(255, 255, 255, 0.05) !important;
 }
 
 /* Utility to force text visibility if needed */
