@@ -994,6 +994,35 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
     const isMachineStopped = currentMachineStatus === 'Parada' || currentMachineStatus === 'Preparacao';
     const isEmergencyStopped = currentMachineStatus === 'Parada';
+    const statusStartTime = useMemo(() => {
+        if (!activeOrder) return null;
+        if (isMachineStopped) {
+            const events = activeOrder.downtimeEvents || [];
+            const openEvent = [...events].reverse().find(e => !e.resumeTime);
+            return openEvent ? new Date(openEvent.stopTime) : null;
+        } else if (isActiveProcess) {
+            const events = activeOrder.downtimeEvents || [];
+            const sortedResumes = events.filter(e => e.resumeTime).sort((a,b) => new Date(b.resumeTime!).getTime() - new Date(a.resumeTime!).getTime());
+            const lastResume = sortedResumes[0]?.resumeTime;
+            const shiftStart = currentOperatorLog?.startTime;
+            
+            if (lastResume && shiftStart) {
+                return new Date(Math.max(new Date(lastResume).getTime(), new Date(shiftStart).getTime()));
+            }
+            return lastResume ? new Date(lastResume) : shiftStart ? new Date(shiftStart) : null;
+        }
+        return null;
+    }, [activeOrder, isMachineStopped, isActiveProcess, currentOperatorLog]);
+
+    const statusDurationString = useMemo(() => {
+        if (!statusStartTime) return '--:--:--';
+        const diff = Math.max(0, now.getTime() - statusStartTime.getTime());
+        const hours = Math.floor(diff / 3600000);
+        const minutes = Math.floor((diff % 3600000) / 60000);
+        const seconds = Math.floor((diff % 60000) / 1000);
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }, [statusStartTime, now]);
+
     const statusConfig = {
         Produzindo: {
             color: 'emerald',
@@ -1747,8 +1776,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                     {/* Trefila Mobile: Optimized Panel (Enchuto) */}
                                     {activeMachine.startsWith('Trefila') ? (
                                         <div className="md:hidden animate-fade-in space-y-4">
-                                            {/* Status Hero - Compact & Elegant */}
-                                            <div className={`relative overflow-hidden p-6 rounded-[2rem] transition-all duration-700 ${
+                                            {/* Status Hero - Hidden on mobile as per user request (will move info to bottom button) */}
+                                            <div className={`hidden md:relative overflow-hidden p-6 rounded-[2rem] transition-all duration-700 ${
                                                 isActiveProcess ? 'bg-emerald-600 shadow-lg shadow-emerald-100' : 'bg-amber-500 shadow-lg shadow-amber-100'
                                             }`}>
                                                 <div className="absolute -right-8 -top-8 p-4 opacity-10">
@@ -1948,9 +1977,24 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                             <ChartBarIcon className="h-16 w-16" />
                                         </div>
 
-                                        <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
-                                            Performance de Produção
+                                        <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
+                                                Performance de Produção
+                                            </div>
+                                            {/* Mobile Compact Stats Highlights */}
+                                            <div className="md:hidden flex gap-3">
+                                                <div className="flex items-center gap-1">
+                                                    <span className="text-[8px] font-bold text-slate-400 uppercase">Lotes:</span>
+                                                    <span className="text-[10px] font-black text-slate-700">{(activeOrder.processedLots || []).length}</span>
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    <span className="text-[8px] font-bold text-slate-400 uppercase">KG:</span>
+                                                    <span className="text-[10px] font-black text-emerald-600">
+                                                        {(activeOrder.processedLots || []).reduce((acc, lot) => acc + (lot.finalWeight || 0), 0).toFixed(0)}
+                                                    </span>
+                                                </div>
+                                            </div>
                                         </h3>
 
                                         {activeMachine.startsWith('Treliça') ? (
@@ -2530,25 +2574,30 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                             <div className="w-full md:w-auto flex relative items-center">
                                                 <button
                                                     onClick={isMachineStopped ? (() => logResumeProduction && logResumeProduction(orderForShift.id)) : (() => setShowDowntimeModal(true))}
-                                                    className={`flex-1 md:w-auto md:px-14 h-14 font-black text-lg transition transform active:scale-95 flex items-center justify-center gap-3 border-4 md:rounded-full ${
+                                                    className={`flex-1 md:w-auto md:px-14 h-16 md:h-14 font-black text-lg transition transform active:scale-95 flex items-center justify-center gap-3 border-4 md:rounded-full ${
                                                         isMachineStopped 
-                                                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-2xl shadow-emerald-500/40 animate-producing-pulse border-emerald-400 rounded-l-2xl md:rounded-r-none'
-                                                            : 'bg-rose-600 hover:bg-rose-500 text-white shadow-2xl shadow-rose-500/40 animate-stop-pulse border-rose-400 rounded-l-2xl md:rounded-r-none'
+                                                            ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-2xl shadow-rose-500/40 animate-stop-pulse border-rose-400 rounded-l-2xl md:rounded-r-none'
+                                                            : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-2xl shadow-emerald-500/40 animate-producing-pulse border-emerald-400 rounded-l-2xl md:rounded-r-none'
                                                     }`}
                                                 >
-                                                    {isMachineStopped ? <PlayIcon className="h-8 w-8" /> : <PauseIcon className="h-8 w-8" />}
-                                                    <span className="inline tracking-tight text-[15px] sm:text-lg">
-                                                        {isMachineStopped ? 'RETOMAR PRODUÇÃO' : 'PARAR MÁQUINA'}
-                                                    </span>
+                                                    <div className="flex flex-col items-center justify-center leading-none">
+                                                        <div className="flex items-center gap-2">
+                                                            {isMachineStopped ? <PlayIcon className="h-7 w-7" /> : <PauseIcon className="h-7 w-7" />}
+                                                            <span className="inline tracking-tight text-[16px] sm:text-lg">
+                                                                {isMachineStopped ? 'RETOMAR PRODUÇÃO' : 'PARAR MÁQUINA'}
+                                                            </span>
+                                                        </div>
+                                                        <span className="text-[10px] font-black opacity-80 mt-1 font-mono tracking-widest">{statusDurationString}</span>
+                                                    </div>
                                                 </button>
                                                 
                                                 {/* Botão Split (Seta) Menu para Mobile da Trefila */}
                                                 <button
                                                     onClick={() => setShowMobileActions(!showMobileActions)}
-                                                    className={`h-14 w-12 md:hidden border-4 border-l-0 flex items-center justify-center rounded-r-2xl transition-colors ${
+                                                    className={`h-16 md:h-14 w-12 md:hidden border-4 border-l-0 flex items-center justify-center rounded-r-2xl transition-colors ${
                                                         isMachineStopped 
-                                                            ? 'bg-emerald-700 hover:bg-emerald-600 border-emerald-400 shadow-emerald-500/40 text-emerald-100'
-                                                            : 'bg-rose-700 hover:bg-rose-600 border-rose-400 shadow-rose-500/40 text-rose-100'
+                                                            ? 'bg-rose-700 hover:bg-rose-600 border-rose-400 shadow-rose-500/40 text-rose-100'
+                                                            : 'bg-emerald-700 hover:bg-emerald-600 border-emerald-400 shadow-emerald-500/40 text-emerald-100'
                                                     }`}
                                                 >
                                                     <ChevronDownIcon className={`w-8 h-8 transition-transform ${showMobileActions ? 'rotate-180' : ''}`} />
