@@ -123,33 +123,46 @@ const DowntimeModal: React.FC<{
                     <div className="grid grid-cols-2 gap-4 mb-8">
                         {downtimeReasons.map(r => {
                             const isActive = selectedReasons.includes(r);
+                            const limit = DOWNTIME_THRESHOLDS[r];
                             return (
                                 <button
                                     key={r}
                                     type="button"
                                     onClick={() => toggleReason(r)}
-                                    className={`flex items-center gap-3 p-5 rounded-2xl border-2 font-black text-sm transition-all active:scale-95 ${
+                                    className={`flex flex-col items-start gap-1 p-5 rounded-2xl border-2 font-black text-sm transition-all active:scale-95 ${
                                         isActive
                                             ? 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-200'
                                             : 'bg-white border-slate-100 text-slate-600 hover:border-slate-300'
                                     }`}
                                 >
-                                    <div className={`w-3 h-3 rounded-full ${isActive ? 'bg-white animate-pulse' : 'bg-slate-200'}`} />
-                                    {r}
+                                    <div className="flex items-center gap-3 w-full">
+                                        <div className={`w-3 h-3 rounded-full flex-shrink-0 ${isActive ? 'bg-white animate-pulse' : 'bg-slate-200'}`} />
+                                        <span className="truncate">{r}</span>
+                                    </div>
+                                    {limit && (
+                                        <span className={`text-[8px] uppercase tracking-widest mt-1 px-1.5 py-0.5 rounded ${isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                                            Limite: {limit >= 60 ? `${limit/60}h` : `${limit}min`}
+                                        </span>
+                                    )}
                                 </button>
                             );
                         })}
                         <button
                             type="button"
                             onClick={() => toggleReason('Outros')}
-                            className={`flex items-center gap-3 p-5 rounded-2xl border-2 font-black text-sm transition-all active:scale-95 ${
+                            className={`flex flex-col items-start gap-1 p-5 rounded-2xl border-2 font-black text-sm transition-all active:scale-95 ${
                                 isOtherActive
                                     ? 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-200'
                                     : 'bg-white border-slate-100 text-slate-600 hover:border-slate-300'
                             }`}
                         >
-                            <div className={`w-3 h-3 rounded-full ${isOtherActive ? 'bg-white animate-pulse' : 'bg-slate-200'}`} />
-                            Outros
+                            <div className="flex items-center gap-3">
+                                <div className={`w-3 h-3 rounded-full ${isOtherActive ? 'bg-white animate-pulse' : 'bg-slate-200'}`} />
+                                Outros
+                            </div>
+                            <span className={`text-[8px] uppercase tracking-widest mt-1 px-1.5 py-0.5 rounded ${isOtherActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                                Limite: 15min
+                            </span>
                         </button>
                     </div>
 
@@ -1446,13 +1459,16 @@ const MachineControl: React.FC<MachineControlProps> = ({
                             const start = openEvent ? new Date(openEvent.stopTime).getTime() : now.getTime();
                             const durationMs = now.getTime() - start;
                             
-                            const limitEntry = Object.entries(DOWNTIME_THRESHOLDS).find(([key]) => reason.includes(key));
-                            const limitMs = limitEntry ? limitEntry[1] * 60 * 1000 : null;
+                            const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                            const normReason = normalize(reason);
+                            
+                            const limitEntry = Object.entries(DOWNTIME_THRESHOLDS).find(([key]) => normReason.includes(normalize(key)));
+                            const limitMs = limitEntry ? limitEntry[1] * 60 * 1000 : (reason === 'Motivo não informado' ? null : 15 * 60 * 1000);
                             const isOverLimit = limitMs ? durationMs > limitMs : false;
 
                             return (
-                                <>
-                                    <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg rotate-3 transition-colors ${isOverLimit ? 'bg-rose-100 border-2 border-rose-500' : 'bg-amber-100 border-2 border-amber-500 animate-warning-pulse'}`}>
+                                <div className={`fixed inset-0 flex items-center justify-center z-[100] p-4 transition-all duration-500 ${isOverLimit ? 'bg-rose-600/90 animate-stop-pulse' : 'bg-amber-500/90 animate-warning-pulse'} backdrop-blur-xl`}>
+                                    <div className="text-center p-8 bg-white rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] w-full max-w-sm mx-auto animate-zoom-in border border-white/20">
                                         <PauseIcon className={`h-10 w-10 ${isOverLimit ? 'text-rose-600' : 'text-amber-600'}`} />
                                     </div>
                                     
@@ -1489,11 +1505,11 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                     <p className="text-slate-400 text-[10px] font-bold uppercase leading-relaxed tracking-wider">
                                         Retome a produção assim que o problema for resolvido.
                                     </p>
-                                </>
-                            );
-                        })()}
-                    </div>
-                </div>
+                                </div>
+                            </div>
+                        );
+                    })()}
+                </>
             )}
 
             {/* Overlay Fixed para Bloqueio de Operador */}

@@ -179,7 +179,9 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     let currentStyle = statusStyles[machineStatus.status as keyof typeof statusStyles] || statusStyles.Ocioso;
     
     // Check if stopped and over limit to adjust styles dynamically
-    const limitEntryForStyle = Object.entries(DOWNTIME_THRESHOLDS).find(([key]) => machineStatus.reason.includes(key));
+    const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const normReasonForStyle = normalize(machineStatus.reason);
+    const limitEntryForStyle = Object.entries(DOWNTIME_THRESHOLDS).find(([key]) => normReasonForStyle.includes(normalize(key)));
     const isOverLimitForStyle = limitEntryForStyle ? machineStatus.durationMs > (limitEntryForStyle[1] * 60 * 1000) : false;
 
     if (machineStatus.status === 'Parada' || machineStatus.status === 'Preparacao') {
@@ -339,7 +341,11 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     const activeLotInfo = (isProducingLot && machineType.startsWith('Trefila')) ? stock.find(s => s.id === activeOrder?.activeLotProcessing?.lotId) : null;
 
     return (
-        <div className={`tactical-card rounded-3xl border ${isStopped ? (isOverLimitForStyle ? 'animate-stop-pulse' : 'animate-warning-pulse') : isProducingLot ? 'animate-producing-pulse' : 'border-white/10'} flex flex-col overflow-hidden relative group transition-all duration-500`}>
+        <div className={`tactical-card rounded-[2.5rem] border ${isStopped ? (isOverLimitForStyle ? 'animate-stop-pulse border-rose-500' : 'animate-warning-pulse border-amber-500') : isProducingLot ? 'animate-producing-pulse border-emerald-500/30' : 'border-white/10'} flex flex-col overflow-hidden relative group transition-all duration-700 h-full`}>
+            {isStopped && (
+                <div className={`absolute inset-0 pointer-events-none opacity-20 ${isOverLimitForStyle ? 'bg-rose-500 animate-stop-flash' : 'bg-amber-500 animate-warning-flash'}`} />
+            )}
+            
             {/* Machine Header */}
             <div className={`p-5 flex items-center justify-between border-b border-white/5 bg-gradient-to-r ${currentStyle.bg} to-transparent`}>
                 <div className="flex items-center gap-4">
@@ -442,7 +448,10 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                 </div>
 
                                 {(() => {
-                                    const limitEntry = Object.entries(DOWNTIME_THRESHOLDS).find(([key]) => machineStatus.reason.includes(key));
+                                    const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                                    const normReason = normalize(machineStatus.reason);
+                                    const limitEntry = Object.entries(DOWNTIME_THRESHOLDS).find(([key]) => normReason.includes(normalize(key)));
+                                    
                                     if (!limitEntry) return null;
                                     
                                     const limitMs = limitEntry[1] * 60 * 1000;
