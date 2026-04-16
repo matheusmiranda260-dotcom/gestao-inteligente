@@ -304,7 +304,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                 </div>
             </div>
 
-            <main className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8 ring-1 ring-white/5 inset-0 pointer-events-none">
+            <main className="p-6 grid grid-cols-1 md:grid-cols-[40%_60%] gap-8 ring-1 ring-white/5 inset-0 pointer-events-none">
                 <div className="flex flex-col gap-8 pointer-events-auto">
                     {/* Shift Stats Card */}
                     <div className="relative p-6 bg-black/30 rounded-3xl border border-white/5 overflow-hidden">
@@ -410,7 +410,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                                 return (
                                                     <tr key={i} className="hover:bg-white/5 transition-colors">
                                                         <td className="p-3 px-5 font-mono text-rose-400 font-bold text-[11px]">{formatDuration(end - new Date(e.stopTime).getTime())}</td>
-                                                        <td className="p-3 flex items-center gap-2 text-[10px] font-bold text-slate-300 uppercase truncate max-w-[140px]">
+                                                        <td className="p-3 flex items-center gap-2 text-[10px] font-bold text-slate-300 uppercase truncate">
                                                             <WarningIcon className="h-3 w-3 text-amber-500 shrink-0" /> {e.reason}
                                                         </td>
                                                         <td className="p-3 text-right px-5 text-[9px] font-black text-slate-600">#{e.orderNumber}</td>
