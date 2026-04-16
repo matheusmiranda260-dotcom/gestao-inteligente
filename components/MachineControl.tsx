@@ -911,14 +911,15 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
     const currentMachineStatus = useMemo(() => {
         const events = activeOrder?.downtimeEvents || [];
-        const openEvent = events.find(e => !e.resumeTime);
+        // CRITICAL: Always pick the LATEST open event
+        const openEvent = [...events].reverse().find(e => !e.resumeTime);
 
         if (!openEvent) {
             return isAnyActiveShift ? 'Produzindo' : 'Desligada';
         }
 
-        const prepReasons = ['Aguardando Início da Produção', 'Troca de Rolo / Preparação', 'Setup'];
-        if (prepReasons.includes(openEvent.reason)) {
+        const prepReasons = ['Aguardando Início da Produção', 'Troca de Rolo / Preparação', 'Setup', 'Ajuste', 'Setup + Preparação'];
+        if (prepReasons.some(r => openEvent.reason?.includes(r))) {
             return 'Preparacao';
         }
 
@@ -929,7 +930,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
         return 'Parada';
     }, [activeOrder, isAnyActiveShift]);
 
-    const isMachineStopped = currentMachineStatus === 'Parada';
+    const isMachineStopped = currentMachineStatus === 'Parada' || currentMachineStatus === 'Preparacao';
+    const isEmergencyStopped = currentMachineStatus === 'Parada';
     const statusConfig = {
         Produzindo: {
             color: 'emerald',
@@ -1200,11 +1202,11 @@ const MachineControl: React.FC<MachineControlProps> = ({
     }, [trelicaPackages, activeOrder, machineType]);
 
     const isCompletionDisabled = useMemo(() => {
-        if (isMachineStopped || !hasActiveShift) return true;
+        if (isEmergencyStopped || !hasActiveShift) return true;
         if (machineType === 'Treliça') return !allPackagesWeighed;
         if (machineType === 'Trefila') return !allTrefilaLotsProcessed;
         return true;
-    }, [isMachineStopped, hasActiveShift, machineType, allPackagesWeighed, allTrefilaLotsProcessed]);
+    }, [isEmergencyStopped, hasActiveShift, machineType, allPackagesWeighed, allTrefilaLotsProcessed]);
 
     const handleStopMachine = (reason: string) => {
         if (activeOrder && logDowntime) {
@@ -2016,7 +2018,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                     <ClockIcon className="h-4 w-4" /> Iniciado às {new Date(activeLotProcessingData.startTime).toLocaleTimeString('pt-BR')}
                                                                 </p>
                                                             </div>
-                                                            <button onClick={handleFinishLotProcess} disabled={isMachineStopped || !hasActiveShift} className="w-full md:w-auto bg-indigo-600 text-white font-bold py-3 px-6 rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition flex items-center justify-center gap-2 disabled:bg-slate-300 disabled:shadow-none">
+                                                            <button onClick={handleFinishLotProcess} disabled={isEmergencyStopped || !hasActiveShift} className="w-full md:w-auto bg-indigo-600 text-white font-bold py-3 px-6 rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition flex items-center justify-center gap-2 disabled:bg-slate-300 disabled:shadow-none">
                                                                 <CheckCircleIcon className="h-5 w-5" /> Finalizar Lote
                                                             </button>
                                                         </div>
@@ -2053,7 +2055,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                     </div>
                                                                     <button
                                                                         onClick={() => handleStartProcessingLot(lot.id)}
-                                                                        disabled={!!activeLotProcessingData || isMachineStopped || !hasActiveShift}
+                                                                        disabled={!!activeLotProcessingData || isEmergencyStopped || !hasActiveShift}
                                                                         className="w-full bg-white border-2 border-slate-200 text-slate-600 group-hover:border-indigo-500 group-hover:text-indigo-600 font-bold py-2 px-4 rounded-lg text-sm transition disabled:opacity-50 disabled:cursor-not-allowed">
                                                                         Processar
                                                                     </button>

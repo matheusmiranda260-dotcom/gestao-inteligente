@@ -287,7 +287,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
         }
     }, [machineType, productionHistoryInShift, activeOrder]);
 
-    const isStopped = machineStatus.status === 'Parada';
+    const isStopped = machineStatus.status === 'Parada' || machineStatus.status === 'Preparacao';
 
     return (
         <div className={`tactical-card rounded-3xl border ${isStopped ? 'animate-stop-pulse' : 'border-white/10'} flex flex-col overflow-hidden relative group transition-all duration-500`}>
