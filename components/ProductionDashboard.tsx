@@ -612,12 +612,20 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
         }
     };
 
+    const toggleFullscreen = () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => console.error(err));
+        } else {
+            document.exitFullscreen();
+        }
+    };
+
     return (
-        <div className="min-h-screen bg-[#060B18] text-slate-300 p-4 lg:p-8 flex flex-col gap-6 font-sans">
+        <div className="min-h-screen bg-[#060B18] text-slate-300 p-4 lg:p-8 flex flex-col gap-6 font-sans overflow-x-hidden">
             <header className="flex justify-between items-center px-4">
                 <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(99,102,241,0.4)] border border-indigo-400">
-                        <ChartBarIcon className="w-6 h-6 text-white" />
+                    <div className="w-12 h-12 bg-indigo-500 rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(99,102,241,0.4)] border border-indigo-400">
+                        <ChartBarIcon className="w-8 h-8 text-white" />
                     </div>
                     <div>
                         <h1 className="text-2xl md:text-3xl font-black tracking-[0.15em] text-white uppercase italic animate-pulse neon-text-cyan flex items-center gap-3">
@@ -627,15 +635,28 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                         <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em] mt-1">MSM GESTÃO INDUSTRIAL • LIVE MONITORING</p>
                     </div>
                 </div>
-                <div className="hidden md:flex items-center gap-8 bg-black/40 border border-white/5 py-3 px-8 rounded-2xl backdrop-blur-xl">
-                    <div className="text-right">
-                        <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Operação Geral</p>
-                        <p className="text-xs font-bold text-emerald-400 uppercase">Sistema Estável</p>
-                    </div>
-                    <div className="h-8 w-px bg-white/10" />
-                    <div className="text-right">
-                        <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Próxima Virada</p>
-                        <p className="text-xs font-bold text-white uppercase">{new Date().getHours() < 14 ? '14:00 (Turno B)' : '05:00 (Turno A)'}</p>
+                
+                <div className="flex items-center gap-6">
+                    <button 
+                        onClick={toggleFullscreen}
+                        className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 hover:bg-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all text-slate-400 hover:text-white"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                        </svg>
+                        TELA CHEIA
+                    </button>
+
+                    <div className="hidden xl:flex items-center gap-8 bg-black/40 border border-white/5 py-2.5 px-8 rounded-2xl backdrop-blur-xl">
+                        <div className="text-right">
+                            <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Operação Geral</p>
+                            <p className="text-xs font-bold text-emerald-400 uppercase">Sistema Estável</p>
+                        </div>
+                        <div className="h-8 w-px bg-white/10" />
+                        <div className="text-right">
+                            <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Próxima Virada</p>
+                            <p className="text-xs font-bold text-white uppercase">{new Date().getHours() < 14 ? '14:00 (Turno B)' : '05:00 (Turno A)'}</p>
+                        </div>
                     </div>
                 </div>
             </header>
