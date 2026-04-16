@@ -286,7 +286,7 @@ const CompletionModal: React.FC<{
                                     </div>
                                     <div className="col-span-3 text-right">
                                         <label className="text-xs block">Peso Calc. (kg)</label>
-                                        <span className="font-bold text-slate-800">{calculatePontaWeight(ponta).toFixed(2)}</span>
+                                        <span className="font-bold text-slate-800">{calculatePontaWeight(ponta)?.toFixed(2) || '0.00'}</span>
                                     </div>
                                     <div className="col-span-1 text-center">
                                         <button type="button" onClick={() => handleRemovePonta(index)} className="p-1 text-red-500 hover:text-red-700"><TrashIcon className="h-4 w-4" /></button>
@@ -379,7 +379,7 @@ const ManagerOverrideModal: React.FC<{
                     <WarningIcon className="h-16 w-16 mx-auto text-amber-500 mb-4" />
                     <h2 className="text-2xl font-bold text-slate-800 mb-4">Alerta de Peso Incomum</h2>
                     <p className="text-slate-600 mb-6">
-                        O peso inserido de <strong className="text-slate-800">{data.actualWeight.toFixed(2)} kg</strong> está fora da tolerância de peso esperada (entre <strong className="text-slate-800">{data.lowerBound.toFixed(2)} kg</strong> e <strong className="text-slate-800">{data.upperBound.toFixed(2)} kg</strong>).
+                        O peso inserido de <strong className="text-slate-800">{data.actualWeight?.toFixed(2) || '0.00'} kg</strong> está fora da tolerância de peso esperada (entre <strong className="text-slate-800">{data.lowerBound?.toFixed(2) || '0.00'} kg</strong> e <strong className="text-slate-800">{data.upperBound?.toFixed(2) || '0.00'} kg</strong>).
                     </p>
                     <p className="text-sm font-bold text-slate-700 mb-4">É necessária autorização de um gestor para prosseguir.</p>
                 </div>
@@ -2216,7 +2216,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                                     <span className="text-[10px] font-bold text-slate-400">kg</span>
                                                                                 </div>
                                                                             ) : (
-                                                                                <div className="text-right font-black text-slate-900">{lot.finalWeight.toFixed(1)} kg</div>
+                                                                                <div className="text-right font-black text-slate-900">{lot.finalWeight?.toFixed(1) || '-'} kg</div>
                                                                             )}
                                                                         </td>
                                                                         <td className="p-3">
@@ -2233,7 +2233,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                                     <span className="text-[10px] font-bold text-slate-400">mm</span>
                                                                                 </div>
                                                                             ) : (
-                                                                                <div className="text-center font-bold text-slate-700">{lot.measuredGauge.toFixed(2)} mm</div>
+                                                                                <div className="text-center font-bold text-slate-700">{lot.measuredGauge?.toFixed(2) || '-'} mm</div>
                                                                             )}
                                                                         </td>
                                                                         <td className="p-3 text-center">
@@ -2303,7 +2303,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                                     onChange={e => handlePendingWeightChange(lot.lotId, e.target.value)}
                                                                                 />
                                                                             ) : (
-                                                                                <div className="p-3 bg-slate-50 rounded-xl text-center font-black text-slate-800 text-lg">{lot.finalWeight.toFixed(1)}</div>
+                                                                                <div className="p-3 bg-slate-50 rounded-xl text-center font-black text-slate-800 text-lg">{lot.finalWeight?.toFixed(1) || '-'}</div>
                                                                             )}
                                                                         </div>
                                                                         <div className="space-y-1">
@@ -2318,7 +2318,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                                     onChange={e => handlePendingGaugeChange(lot.lotId, e.target.value)}
                                                                                 />
                                                                             ) : (
-                                                                                <div className="p-3 bg-slate-50 rounded-xl text-center font-black text-slate-800 text-lg">{lot.measuredGauge.toFixed(2)}</div>
+                                                                                <div className="p-3 bg-slate-50 rounded-xl text-center font-black text-slate-800 text-lg">{lot.measuredGauge?.toFixed(2) || '-'}</div>
                                                                             )}
                                                                         </div>
                                                                     </div>
@@ -2453,7 +2453,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                 </div>
                             </div>
 
-                            <div className="fixed bottom-0 right-0 left-0 md:left-64 bg-white/80 backdrop-blur-xl border-t border-slate-200/50 px-3 py-2 md:p-4 shadow-[0_-8px_30px_rgb(0,0,0,0.12)] z-40 transition-all duration-500 safe-area-bottom">
+                            {orderForShift && (
+                                <div className="fixed bottom-0 right-0 left-0 md:left-64 bg-white/80 backdrop-blur-xl border-t border-slate-200/50 px-3 py-2 md:p-4 shadow-[0_-8px_30px_rgb(0,0,0,0.12)] z-40 transition-all duration-500 safe-area-bottom">
                                 <div className="max-w-[1920px] mx-auto flex items-center justify-between gap-3">
 
                                     {/* Esquerda: Info Rápida (Desktop only) */}
@@ -2479,7 +2480,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                             </button>
                                         ) : isMachineStopped ? (
                                             <button
-                                                onClick={() => logResumeProduction && logResumeProduction(activeOrder.id)}
+                                                onClick={() => logResumeProduction && logResumeProduction(orderForShift.id)}
                                                 className="w-full md:w-auto md:px-14 h-14 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl md:rounded-full font-black text-lg shadow-2xl shadow-emerald-500/40 transition transform active:scale-95 hover:scale-[1.02] flex items-center justify-center gap-3 animate-producing-pulse border-4 border-emerald-400"
                                             >
                                                 <PlayIcon className="h-8 w-8" />
@@ -2529,7 +2530,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
                                         {hasActiveShift ? (
                                             <button
-                                                onClick={() => handleShiftEndRequest(activeOrder.id)}
+                                                onClick={() => handleShiftEndRequest(orderForShift.id)}
                                                 className="p-3.5 text-red-500 hover:bg-red-50/50 rounded-2xl transition active:scale-90 flex flex-col items-center gap-0.5"
                                                 title="Finalizar Turno"
                                             >
@@ -2552,7 +2553,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                             <button
                                                 onClick={() => {
                                                     if (window.confirm('Tem certeza que deseja arquivar/pausar esta ordem para iniciar outra? Seu turno atual será encerrado e a ordem voltará para a fila de pendentes.')) {
-                                                        pauseProductionOrder(activeOrder.id);
+                                                        pauseProductionOrder(orderForShift.id);
                                                         setView('pending'); // Auto redireciona para a aba Pendentes
                                                     }
                                                 }}
@@ -2578,6 +2579,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                     </div>
                                 </div>
                             </div>
+                        )}
                         </>
                     ) : postProductionOrder ? (
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-24">
