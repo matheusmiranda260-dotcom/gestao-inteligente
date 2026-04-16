@@ -202,6 +202,7 @@ const MultiLotSelector: React.FC<MultiLotSelectorProps> = ({ label, subLabel, av
 const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage, stock, productionOrders, addProductionOrder, showNotification, updateProductionOrder, deleteProductionOrder, gauges, currentUser }) => {
     const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor';
     const [orderNumber, setOrderNumber] = useState('');
+    const [selectedMachine, setSelectedMachine] = useState<MachineType>('Treliça 1');
     const [selectedModel, setSelectedModel] = useState<TrelicaModel | null>(null);
     const [quantity, setQuantity] = useState(1);
     const [machineSpeed, setMachineSpeed] = useState(() => {
@@ -485,7 +486,7 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
 
         addProductionOrder({
             orderNumber: orderNumber,
-            machine: 'Treliça',
+            machine: selectedMachine,
             targetBitola: normalizeBitola(selectedModel.superior) as Bitola,
             trelicaModel: selectedModel.modelo,
             tamanho: selectedModel.tamanho,
@@ -610,11 +611,24 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                     <div className="lg:col-span-3">
                         <div className="glass-card p-8 rounded-[2rem] border-slate-200/60 bg-white/80">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pb-6 border-b border-slate-100">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pb-6 border-b border-slate-100">
                                 <div>
+                                    <label htmlFor="machine" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Máquina Destino</label>
+                                    <select
+                                        id="machine"
+                                        value={selectedMachine}
+                                        onChange={(e) => setSelectedMachine(e.target.value as MachineType)}
+                                        className="w-full text-lg font-bold p-4 bg-slate-50/50 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-indigo-600"
+                                    >
+                                        <option value="Treliça 1">Treliça 1</option>
+                                        <option value="Treliça 2">Treliça 2</option>
+                                    </select>
+                                </div>
+                                <div className="lg:col-span-2">
                                     <label htmlFor="orderNumber" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Número do Lote Interno / OP</label>
                                     <input type="text" id="orderNumber" value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} className="w-full text-lg font-bold p-4 bg-slate-50/50" placeholder="Ex: LOT-2025-001" required />
                                 </div>
+                             </div>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div>
                                         <label htmlFor="quantity" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Qtd. Peças</label>

@@ -233,7 +233,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     const { shiftDowntime, shiftUptime } = useMemo(() => {
         const intervals: { start: number; end: number }[] = [];
         allOrders
-            .filter(o => o.machine === machineType || (machineType.startsWith('Trefila') && o.machine === 'Trefila') || (machineType.startsWith('Treliça') && o.machine === 'Treliça'))
+            .filter(o => o.machine === machineType || (o.machine === 'Trefila' && machineType === 'Trefila 1') || (o.machine === 'Treliça' && machineType === 'Treliça 1'))
             .forEach(o => {
                 const isActive = activeOrder && o.id === activeOrder.id;
                 (o.downtimeEvents || []).forEach((e: any) => {
@@ -285,8 +285,8 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     const productionHistoryInShift = useMemo(() => {
         const orders = allOrders.filter(o => 
             o.machine === machineType || 
-            (machineType.startsWith('Trefila') && o.machine === 'Trefila') || 
-            (machineType.startsWith('Treliça') && o.machine === 'Treliça')
+            (o.machine === 'Trefila' && machineType === 'Trefila 1') || 
+            (o.machine === 'Treliça' && machineType === 'Treliça 1')
         );
         
         if (machineType.startsWith('Trefila')) {
@@ -500,7 +500,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                     </thead>
                                     <tbody className="divide-y divide-white/5">
                                         {allOrders
-                                            .filter(o => o.machine.startsWith(machineType))
+                                            .filter(o => o.machine === machineType || (o.machine === 'Trefila' && machineType === 'Trefila 1') || (o.machine === 'Treliça' && machineType === 'Treliça 1'))
                                             .flatMap(o => (o.downtimeEvents || []).map((e: any) => ({ ...e, orderNumber: o.orderNumber })))
                                             .filter(e => new Date(e.stopTime).getTime() >= shiftStartMs)
                                             .sort((a,b) => new Date(b.stopTime).getTime() - new Date(a.stopTime).getTime())
@@ -527,7 +527,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                                     </tr>
                                                 );
                                             })}
-                                        {allOrders.filter(o => o.machine.startsWith(machineType)).flatMap(o => o.downtimeEvents || []).filter(e => new Date(e.stopTime).getTime() >= shiftStartMs).length === 0 && (
+                                        {allOrders.filter(o => o.machine === machineType || (o.machine === 'Trefila' && machineType === 'Trefila 1') || (o.machine === 'Treliça' && machineType === 'Treliça 1')).flatMap(o => o.downtimeEvents || []).filter(e => new Date(e.stopTime).getTime() >= shiftStartMs).length === 0 && (
                                             <tr><td colSpan={4} className="p-16 text-center text-slate-600 text-sm font-bold uppercase tracking-[0.4em]">Nenhuma parada registrada</td></tr>
                                         )}
                                     </tbody>
@@ -708,7 +708,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
         const resetT = shiftResets[m] ? new Date(shiftResets[m]).getTime() : 0;
         const effective = Math.max(start.getTime(), resetT);
 
-        return productionOrders.filter(o => (o.machine === m || (m.startsWith('Trefila') && o.machine === 'Trefila') || (m.startsWith('Treliça') && o.machine === 'Treliça')) && o.status !== 'cancelled').reduce((acc, o) => {
+        return productionOrders.filter(o => (o.machine === m || (o.machine === 'Trefila' && m === 'Trefila 1') || (o.machine === 'Treliça' && m === 'Treliça 1')) && o.status !== 'cancelled').reduce((acc, o) => {
             if (m.startsWith('Trefila')) {
                 const lots = (o.processedLots || []) as ProcessedLot[];
                 return acc + lots.filter(l => l.endTime && new Date(l.endTime).getTime() >= effective).reduce((s, l) => s + (l.finalWeight || 0), 0);
@@ -830,7 +830,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
 
             <div className={`flex-1 grid grid-cols-1 ${visibleMachines.length > 1 ? 'xl:grid-cols-2' : ''} gap-6 lg:gap-8 pb-8`}>
                 {visibleMachines.map(m => {
-                    const activeOrder = productionOrders.find(o => (o.machine === m || (m.startsWith('Trefila') && o.machine === 'Trefila') || (m.startsWith('Treliça') && o.machine === 'Treliça')) && o.status === 'in_progress');
+                    const activeOrder = productionOrders.find(o => (o.machine === m || (o.machine === 'Trefila' && m === 'Trefila 1') || (o.machine === 'Treliça' && m === 'Treliça 1')) && o.status === 'in_progress');
                     return (
                         <MachineStatusView 
                             key={m}

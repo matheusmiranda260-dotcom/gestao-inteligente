@@ -20,6 +20,7 @@ interface ProductionOrderProps {
 const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, productionOrders, addProductionOrder, showNotification, updateProductionOrder, deleteProductionOrder, gauges, currentUser }) => {
     const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor';
     const [orderNumber, setOrderNumber] = useState('');
+    const [selectedMachine, setSelectedMachine] = useState<MachineType>('Trefila 1');
     const [isGhostOrder, setIsGhostOrder] = useState(false);
     const [ghostTargetWeight, setGhostTargetWeight] = useState('');
 
@@ -114,7 +115,7 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
 
         addProductionOrder({
             orderNumber,
-            machine: 'Trefila',
+            machine: selectedMachine,
             targetBitola,
             selectedLotIds: selectedLotIds,
             totalWeight: isGhostOrder ? parseFloat(ghostTargetWeight.replace(',', '.')) : totalSelectedWeight,
@@ -185,6 +186,18 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
                         <div className="bg-white p-6 rounded-xl shadow-sm">
                             <h2 className="text-xl font-semibold text-slate-700 mb-4">Dados da Ordem</h2>
                             <div className="space-y-4">
+                                <div>
+                                    <label htmlFor="machine" className="block text-sm font-medium text-slate-700">Máquina Destino</label>
+                                    <select
+                                        id="machine"
+                                        value={selectedMachine}
+                                        onChange={(e) => setSelectedMachine(e.target.value as MachineType)}
+                                        className="mt-1 p-2 w-full border border-slate-300 rounded-md bg-white font-bold text-indigo-600"
+                                    >
+                                        <option value="Trefila 1">Trefila 1</option>
+                                        <option value="Trefila 2">Trefila 2</option>
+                                    </select>
+                                </div>
                                 <div>
                                     <label htmlFor="orderNumber" className="block text-sm font-medium text-slate-700">Número da Ordem</label>
                                     <input
