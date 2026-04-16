@@ -115,6 +115,8 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     const [now, setNow] = useState(new Date());
     const [activeTab, setActiveTab] = useState<'stops' | 'production'>('stops');
 
+    const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
+
     useEffect(() => {
         const timerId = setInterval(() => setNow(new Date()), 1000);
         return () => clearInterval(timerId);
@@ -275,8 +277,10 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
         }
     }, [machineType, productionHistoryInShift, activeOrder]);
 
+    const isStopped = machineStatus.status === 'Parada';
+
     return (
-        <div className="tactical-card rounded-3xl border border-white/10 flex flex-col overflow-hidden relative group">
+        <div className={`tactical-card rounded-3xl border ${isStopped ? 'animate-stop-pulse' : 'border-white/10'} flex flex-col overflow-hidden relative group transition-all duration-500`}>
             {/* Machine Header */}
             <div className={`p-5 flex items-center justify-between border-b border-white/5 bg-gradient-to-r ${currentStyle.bg} to-transparent`}>
                 <div className="flex items-center gap-4">
@@ -300,103 +304,45 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                 </div>
                 <div className="text-right">
                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Status do Equipamento</p>
-                    <p className={`text-sm font-black uppercase tracking-widest ${currentStyle.color}`}>{currentStyle.title}</p>
+                    <p className={`text-sm font-black uppercase tracking-widest ${currentStyle.color} ${isStopped ? 'animate-pulse neon-text-red' : ''}`}>{currentStyle.title}</p>
                 </div>
             </div>
 
-            <main className="p-6 grid grid-cols-1 md:grid-cols-[40%_60%] gap-8 ring-1 ring-white/5 inset-0 pointer-events-none">
-                <div className="flex flex-col gap-8 pointer-events-auto">
-                    {/* Shift Stats Card */}
-                    <div className="relative p-6 bg-black/30 rounded-3xl border border-white/5 overflow-hidden">
-                        <TrendLine color={efficiency > 90 ? '#10b981' : '#00E5FF'} />
-                        <div className="flex justify-between items-start relative z-10">
-                            <div>
-                                <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-3">Produção do Turno</h3>
-                                <div className="flex items-baseline gap-3">
-                                    <span className="text-6xl font-black text-white tracking-tighter tabular-nums drop-shadow-2xl">
-                                        {dailyProducedValue.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
-                                    </span>
-                                    <span className="text-xl font-bold text-slate-500 uppercase tracking-widest">{goalUnit}</span>
-                                </div>
+            <main className="p-6 relative min-h-[500px] flex flex-col">
+                {/* Overlay History - FULL WIDTH when Open */}
+                {isHistoryExpanded && (
+                    <div className="absolute inset-0 z-50 bg-[#060B18] flex flex-col animate-in fade-in slide-in-from-bottom-5 duration-300">
+                        <div className="p-4 border-b border-white/5 flex gap-6 items-center bg-white/5 justify-between">
+                            <div className="flex gap-6">
+                                <button 
+                                    onClick={() => setActiveTab('stops')}
+                                    className={`text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2 transition-all ${activeTab === 'stops' ? 'text-rose-400 neon-text-rose' : 'text-slate-500 hover:text-slate-300'}`}
+                                >
+                                    <WarningIcon className="h-3 w-3" /> Histórico de Paradas
+                                </button>
+                                <button 
+                                    onClick={() => setActiveTab('production')}
+                                    className={`text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2 transition-all ${activeTab === 'production' ? 'text-[#00E5FF] neon-text-cyan' : 'text-slate-500 hover:text-slate-300'}`}
+                                >
+                                    <ChartBarIcon className="h-3 w-3" /> Produção do Turno
+                                </button>
                             </div>
-                            <div className="bg-black/40 border border-white/10 p-4 rounded-2xl text-center backdrop-blur-sm">
-                                <p className={`text-2xl font-black ${efficiency > 90 ? 'text-emerald-400' : 'text-[#00E5FF]'} leading-none`}>{efficiency.toFixed(1)}%</p>
-                                <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter mt-1">META: {dailyGoal}{goalUnit}</p>
-                            </div>
-                        </div>
-                        <div className="mt-8 flex items-center justify-between gap-4 relative z-10">
-                            <div className="flex-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                Eficiência: <span className={efficiency > 90 ? 'text-emerald-400' : 'text-[#00E5FF]'}>{efficiency.toFixed(1)}%</span>
-                            </div>
-                            <div className="flex-1 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                Tendência: <span className="text-emerald-400">UP ▲</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Progress Card */}
-                    <div className="p-6 bg-black/30 rounded-3xl border border-white/5">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Progresso da OP #{activeOrder?.orderNumber || '---'}</h3>
-                            {isGestor && onResetShift && (
-                                <button onClick={onResetShift} className="text-[9px] font-black bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 px-3 py-1.5 rounded-lg border border-white/10 uppercase transition-all">Reset Shift</button>
-                            )}
-                        </div>
-                        <div className="flex items-baseline gap-4 mb-5">
-                            <span className="text-5xl font-black text-white tracking-tight tabular-nums">
-                                {machineType === 'Trefila' ? processedLotsCount : producedQuantity.toLocaleString()}
-                            </span>
-                            <span className="text-lg font-bold text-slate-500 uppercase">{machineType === 'Trefila' ? 'Lotes' : 'Peças'}</span>
-                        </div>
-                        {/* Custom Bar Chart Simulation */}
-                        <div className="h-24 flex items-end gap-1 mb-4">
-                            {[30, 45, 35, 60, 50, 80, 70, 90, 85, 100].map((h, i) => (
-                                <div key={i} className="flex-1 rounded-t-sm" style={{ 
-                                    height: `${h}%`, 
-                                    background: i < (progress / 10) ? `linear-gradient(to top, #10b98122, #10b981)` : 'rgba(255,255,255,0.05)',
-                                    boxShadow: i < (progress / 10) ? '0 0 10px #10b98144' : 'none'
-                                }} />
-                            ))}
-                        </div>
-                        <div className="flex flex-col gap-2 pt-2 border-t border-white/5">
-                            <div className="flex justify-between text-[9px] font-black uppercase tracking-widest text-slate-500">
-                                <span>Disponibilidade: {(shiftUptime / (shiftUptime+shiftDowntime) * 100 || 0).toFixed(1)}%</span>
-                                <span>Tempo de Estado: {formatDuration(machineStatus.durationMs)}</span>
-                            </div>
-                            <div className="flex justify-between text-[9px] font-black uppercase tracking-widest text-[#00E5FF]">
-                                <span>Último Reporte:</span>
-                                <span className="font-mono text-white">{lastReportTime ? new Date(lastReportTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '---'}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="flex flex-col gap-6 pointer-events-auto">
-                    {/* Activity Feed and History */}
-                    <div className="bg-black/30 rounded-3xl border border-white/5 flex flex-col flex-1 overflow-hidden min-h-[350px]">
-                        <div className="p-4 border-b border-white/5 flex gap-6 items-center bg-white/5">
                             <button 
-                                onClick={() => setActiveTab('stops')}
-                                className={`text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2 transition-all ${activeTab === 'stops' ? 'text-rose-400 neon-text-rose' : 'text-slate-500 hover:text-slate-300'}`}
+                                onClick={() => setIsHistoryExpanded(false)}
+                                className="text-[10px] font-black bg-rose-500 hover:bg-rose-600 text-white px-4 py-1.5 rounded-full shadow-lg shadow-rose-500/20 uppercase transition-all"
                             >
-                                <WarningIcon className="h-3 w-3" /> Histórico de Paradas
-                            </button>
-                            <button 
-                                onClick={() => setActiveTab('production')}
-                                className={`text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2 transition-all ${activeTab === 'production' ? 'text-[#00E5FF] neon-text-cyan' : 'text-slate-500 hover:text-slate-300'}`}
-                            >
-                                <ChartBarIcon className="h-3 w-3" /> Produção do Turno
+                                FECHAR PAINEL ✕
                             </button>
                         </div>
                         
-                        <div className="flex-1 overflow-y-auto custom-scrollbar bg-black/10">
+                        <div className="flex-1 overflow-y-auto custom-scrollbar bg-black/40">
                             {activeTab === 'stops' ? (
                                 <table className="w-full text-left">
-                                    <thead className="sticky top-0 bg-black/40 backdrop-blur-md z-20">
-                                        <tr className="text-[9px] uppercase font-black text-slate-500 border-b border-white/5">
-                                            <th className="p-3 px-5">Duração</th>
-                                            <th className="p-3">Motivo</th>
-                                            <th className="p-3 text-right px-5">OP</th>
+                                    <thead className="sticky top-0 bg-[#0D1929] backdrop-blur-md z-20">
+                                        <tr className="text-[10px] uppercase font-black text-slate-400 border-b border-white/10">
+                                            <th className="p-4 px-6">Duração</th>
+                                            <th className="p-4">Motivo da Parada</th>
+                                            <th className="p-4 text-right px-6">Ordem de Produção</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-white/5">
@@ -408,61 +354,151 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                             .map((e, i) => {
                                                 const end = e.resumeTime ? new Date(e.resumeTime).getTime() : now.getTime();
                                                 return (
-                                                    <tr key={i} className="hover:bg-white/5 transition-colors">
-                                                        <td className="p-3 px-5 font-mono text-rose-400 font-bold text-[11px]">{formatDuration(end - new Date(e.stopTime).getTime())}</td>
-                                                        <td className="p-3 flex items-center gap-2 text-[10px] font-bold text-slate-300 uppercase truncate">
-                                                            <WarningIcon className="h-3 w-3 text-amber-500 shrink-0" /> {e.reason}
+                                                    <tr key={i} className="hover:bg-white/5 transition-colors group/row">
+                                                        <td className="p-4 px-6 font-mono text-rose-400 font-bold text-sm">{formatDuration(end - new Date(e.stopTime).getTime())}</td>
+                                                        <td className="p-4 flex items-center gap-3 text-xs font-bold text-slate-200 uppercase">
+                                                            <div className="w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]" /> {e.reason}
                                                         </td>
-                                                        <td className="p-3 text-right px-5 text-[9px] font-black text-slate-600">#{e.orderNumber}</td>
+                                                        <td className="p-4 text-right px-6 text-[11px] font-black text-slate-500 group-hover/row:text-slate-300 transition-colors">#{e.orderNumber}</td>
                                                     </tr>
                                                 );
                                             })}
                                         {allOrders.filter(o => o.machine.startsWith(machineType)).flatMap(o => o.downtimeEvents || []).filter(e => new Date(e.stopTime).getTime() >= shiftStartMs).length === 0 && (
-                                            <tr><td colSpan={3} className="p-8 text-center text-slate-500 text-[10px] font-bold uppercase tracking-widest">Nenhuma parada registrada no turno</td></tr>
+                                            <tr><td colSpan={3} className="p-12 text-center text-slate-600 text-xs font-bold uppercase tracking-[0.3em]">Nenhuma parada registrada</td></tr>
                                         )}
                                     </tbody>
                                 </table>
                             ) : (
                                 <table className="w-full text-left">
-                                    <thead className="sticky top-0 bg-black/40 backdrop-blur-md z-20">
-                                        <tr className="text-[9px] uppercase font-black text-slate-500 border-b border-white/5">
-                                            <th className="p-3 px-5">Lote / Peça</th>
-                                            <th className="p-3 font-mono">Peso</th>
-                                            <th className="p-3 text-right px-5 font-mono">Hora</th>
+                                    <thead className="sticky top-0 bg-[#0D1929] backdrop-blur-md z-20">
+                                        <tr className="text-[10px] uppercase font-black text-slate-400 border-b border-white/10">
+                                            <th className="p-4 px-6">Lote / Registro</th>
+                                            <th className="p-4 font-mono">Peso Produzido</th>
+                                            <th className="p-4 text-right px-6 font-mono">Horário do Reporte</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-white/5">
                                         {productionHistoryInShift.map((item, i) => (
-                                            <tr key={i} className="hover:bg-white/5 transition-colors">
-                                                <td className="p-3 px-5 font-bold text-slate-300 text-[11px] uppercase">{item.label}</td>
-                                                <td className="p-3 font-black text-emerald-400 text-[11px]">{item.weight?.toFixed(1) || '---'}<span className="text-[8px] text-slate-600 ml-1">KG</span></td>
-                                                <td className="p-3 text-right px-5 font-mono text-[10px] text-slate-500">
-                                                    {new Date(item.endTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                            <tr key={i} className="hover:bg-white/5 transition-colors group/row">
+                                                <td className="p-4 px-6 font-bold text-slate-200 text-sm uppercase">{item.label}</td>
+                                                <td className="p-4 font-black text-emerald-400 text-sm">{item.weight?.toFixed(2) || '---'}<span className="text-[9px] text-slate-600 ml-1.5 uppercase tracking-widest">kg</span></td>
+                                                <td className="p-4 text-right px-6 font-mono text-xs text-slate-500 group-hover/row:text-slate-300">
+                                                    {new Date(item.endTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                                                 </td>
                                             </tr>
                                         ))}
                                         {productionHistoryInShift.length === 0 && (
-                                            <tr><td colSpan={3} className="p-8 text-center text-slate-500 text-[10px] font-bold uppercase tracking-widest">Nenhuma produção registrada no turno</td></tr>
+                                            <tr><td colSpan={3} className="p-12 text-center text-slate-600 text-xs font-bold uppercase tracking-[0.3em]">Nenhuma produção registrada</td></tr>
                                         )}
                                     </tbody>
                                 </table>
                             )}
                         </div>
                     </div>
+                )}
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="p-4 bg-black/40 rounded-[1.5rem] border border-white/5 flex items-center gap-3">
-                            <ClockIcon className="h-4 w-4 text-[#00E5FF]" />
-                            <div>
-                                <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Tempo Uptime</p>
-                                <p className="text-xs font-bold text-white font-mono">{formatDuration(shiftUptime)}</p>
+                <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-8 ring-1 ring-white/5 inset-0 pointer-events-none">
+                    <div className="flex flex-col gap-8 pointer-events-auto">
+                        {/* Shift Stats Card */}
+                        <div className="relative p-6 bg-black/30 rounded-3xl border border-white/5 overflow-hidden">
+                            <TrendLine color={efficiency > 90 ? '#10b981' : '#00E5FF'} />
+                            <div className="flex justify-between items-start relative z-10">
+                                <div>
+                                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-3">Produção do Turno</h3>
+                                    <div className="flex items-baseline gap-3">
+                                        <span className="text-6xl font-black text-white tracking-tighter tabular-nums drop-shadow-2xl">
+                                            {dailyProducedValue.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
+                                        </span>
+                                        <span className="text-xl font-bold text-slate-500 uppercase tracking-widest">{goalUnit}</span>
+                                    </div>
+                                </div>
+                                <div className="bg-black/40 border border-white/10 p-4 rounded-2xl text-center backdrop-blur-sm">
+                                    <p className={`text-2xl font-black ${efficiency > 90 ? 'text-emerald-400' : 'text-[#00E5FF]'} leading-none`}>{efficiency.toFixed(1)}%</p>
+                                    <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter mt-1">META: {dailyGoal}{goalUnit}</p>
+                                </div>
+                            </div>
+                            <div className="mt-8 flex items-center justify-between gap-4 relative z-10">
+                                <div className="flex-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                    Eficiência: <span className={efficiency > 90 ? 'text-emerald-400' : 'text-[#00E5FF]'}>{efficiency.toFixed(1)}%</span>
+                                </div>
+                                <div className="flex-1 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                    Tendência: <span className="text-emerald-400">UP ▲</span>
+                                </div>
                             </div>
                         </div>
-                        <div className="p-4 bg-black/40 rounded-[1.5rem] border border-white/5 flex items-center gap-3">
-                            <WarningIcon className="h-4 w-4 text-rose-500" />
+
+                        {/* Progress Card */}
+                        <div className="p-6 bg-black/30 rounded-3xl border border-white/5 h-full flex flex-col justify-between">
                             <div>
-                                <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Tempo Parado</p>
-                                <p className="text-xs font-bold text-white font-mono">{formatDuration(shiftDowntime)}</p>
+                                <div className="flex justify-between items-center mb-6">
+                                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Progresso da OP #{activeOrder?.orderNumber || '---'}</h3>
+                                    {isGestor && onResetShift && (
+                                        <button onClick={onResetShift} className="text-[9px] font-black bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 px-3 py-1.5 rounded-lg border border-white/10 uppercase transition-all">Reset Shift</button>
+                                    )}
+                                </div>
+                                <div className="flex items-baseline gap-4 mb-5">
+                                    <span className="text-5xl font-black text-white tracking-tight tabular-nums">
+                                        {machineType === 'Trefila' ? processedLotsCount : producedQuantity.toLocaleString()}
+                                    </span>
+                                    <span className="text-lg font-bold text-slate-500 uppercase">{machineType === 'Trefila' ? 'Lotes' : 'Peças'}</span>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                {/* Custom Bar Chart Simulation */}
+                                <div className="h-20 flex items-end gap-1 mb-4">
+                                    {[30, 45, 35, 60, 50, 80, 70, 90, 85, 100].map((h, i) => (
+                                        <div key={i} className="flex-1 rounded-t-sm" style={{ 
+                                            height: `${h}%`, 
+                                            background: i < (progress / 10) ? `linear-gradient(to top, #10b98122, #10b981)` : 'rgba(255,255,255,0.05)',
+                                            boxShadow: i < (progress / 10) ? '0 0 10px #10b98144' : 'none'
+                                        }} />
+                                    ))}
+                                </div>
+                                <div className="flex flex-col gap-2 pt-2 border-t border-white/5">
+                                    <div className="flex justify-between text-[9px] font-black uppercase tracking-widest text-slate-500">
+                                        <span>Disponibilidade: {(shiftUptime / (shiftUptime+shiftDowntime) * 100 || 0).toFixed(1)}%</span>
+                                        <span>Tempo de Estado: {formatDuration(machineStatus.durationMs)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-[9px] font-black uppercase tracking-widest text-[#00E5FF]">
+                                        <span>Último Reporte:</span>
+                                        <span className="font-mono text-white">{lastReportTime ? new Date(lastReportTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '---'}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col gap-6 pointer-events-auto items-center justify-center">
+                        {/* THE NEW TOGGLE BUTTON FOR FULL HISTORY */}
+                        <div 
+                            onClick={() => setIsHistoryExpanded(true)}
+                            className="w-full flex-1 group/history relative cursor-pointer overflow-hidden rounded-[2rem] border border-white/5 bg-black/40 hover:bg-white/5 transition-all duration-500 flex flex-col items-center justify-center gap-6"
+                        >
+                            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-transparent opacity-0 group-hover/history:opacity-100 transition-opacity" />
+                            <div className="p-8 bg-indigo-500/20 border border-indigo-500/40 rounded-full group-hover/history:scale-110 transition-transform duration-500 group-hover/history:shadow-[0_0_40px_rgba(99,102,241,0.3)]">
+                                <BookOpenIcon className="h-16 w-16 text-indigo-400" />
+                            </div>
+                            <div className="text-center z-10 px-6">
+                                <h4 className="text-2xl font-black text-white tracking-widest uppercase mb-2">Histórico Completo</h4>
+                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.4em]">Paradas • Produção • Ocorrências</p>
+                                <div className="mt-6 inline-flex items-center gap-2 text-[10px] font-black px-6 py-2 bg-indigo-500 text-white rounded-full shadow-lg shadow-indigo-500/30 group-hover/history:bg-indigo-400 transition-colors">
+                                    ABRIR RELATÓRIO <ArrowLeftIcon className="h-3 w-3 rotate-180" />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Quick Totals */}
+                        <div className="grid grid-cols-2 gap-4 w-full">
+                            <div className="p-6 bg-black/40 rounded-[1.5rem] border border-white/5 flex flex-col items-center justify-center gap-2">
+                                <ClockIcon className="h-6 w-6 text-[#00E5FF]" />
+                                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Total Uptime</p>
+                                <p className="text-xl font-bold text-white font-mono">{formatDuration(shiftUptime)}</p>
+                            </div>
+                            <div className="p-6 bg-black/40 rounded-[1.5rem] border border-white/5 flex flex-col items-center justify-center gap-2">
+                                <WarningIcon className="h-6 w-6 text-rose-500" />
+                                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Total Parado</p>
+                                <p className="text-xl font-bold text-white font-mono">{formatDuration(shiftDowntime)}</p>
                             </div>
                         </div>
                     </div>
