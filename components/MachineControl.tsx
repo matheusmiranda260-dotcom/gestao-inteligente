@@ -1693,141 +1693,185 @@ const MachineControl: React.FC<MachineControlProps> = ({
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-20 md:pb-8">
                                 {/* Coluna Esquerda: Visão Geral e Indicadores */}
                                 <div className={`lg:col-span-1 space-y-6 ${mobileTab !== 'monitor' ? 'hidden lg:block' : 'animate-fade-in'}`}>
-                                    {isShiftOverdue && (
-                                        <div className="bg-red-50 border-2 border-red-500 rounded-2xl p-4 shadow-sm flex items-start gap-4 animate-pulse">
-                                            <div className="bg-red-100 p-2 rounded-xl text-red-600 shrink-0">
-                                                <ExclamationIcon className="h-8 w-8" />
+                                    {/* Trefila Mobile: Simplified Panel (Enchuto) */}
+                                    {machineType === 'Trefila' ? (
+                                        <div className="md:hidden animate-fade-in space-y-6">
+                                            {/* Unified Control Card - THE CORE FOCUS */}
+                                            <div className={`p-8 rounded-[3rem] border-4 transition-all duration-700 ${
+                                                isActiveProcess ? 'bg-emerald-50/50 border-emerald-500/30' : 
+                                                'bg-amber-50/50 border-amber-500/30'
+                                            } shadow-lg backdrop-blur-sm`}>
+                                                <div className="flex flex-col items-center text-center gap-6">
+                                                    <div className={`w-28 h-28 rounded-[2.5rem] flex items-center justify-center shadow-xl transition-all duration-500 ${
+                                                        isActiveProcess ? 'bg-emerald-600 shadow-emerald-200 rotate-12' : 'bg-amber-600 shadow-amber-200 -rotate-12'
+                                                    }`}>
+                                                        {isActiveProcess ? <PlayIcon className="h-14 w-14 text-white" /> : <PauseIcon className="h-14 w-14 text-white" />}
+                                                    </div>
+                                                    
+                                                    <div>
+                                                        <h2 className={`text-4xl font-black tracking-tighter ${isActiveProcess ? 'text-emerald-900' : 'text-amber-900'}`}>
+                                                            {isActiveProcess ? 'PRODUZINDO' : 'MÁQUINA PARADA'}
+                                                        </h2>
+                                                        <p className="text-slate-400 font-black uppercase tracking-[0.3em] text-[10px] mt-2">Controle Operacional</p>
+                                                    </div>
+
+                                                    <div className="w-full grid grid-cols-1 gap-4 pt-4">
+                                                        {isActiveProcess ? (
+                                                            <button 
+                                                                onClick={() => setShowDowntimeModal(true)}
+                                                                className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-6 rounded-3xl text-xl shadow-2xl shadow-slate-200 transition-all active:scale-95 flex items-center justify-center gap-4 border-b-4 border-slate-700"
+                                                            >
+                                                                <PauseIcon className="h-8 w-8 text-amber-500" />
+                                                                <span>PARAR MÁQUINA</span>
+                                                            </button>
+                                                        ) : (
+                                                            <button 
+                                                                onClick={() => logResumeProduction && logResumeProduction(activeOrder.id)}
+                                                                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-6 rounded-3xl text-xl shadow-2xl shadow-emerald-200 transition-all active:scale-95 flex items-center justify-center gap-4 border-b-4 border-emerald-700"
+                                                            >
+                                                                <PlayIcon className="h-8 w-8 text-white animate-pulse" />
+                                                                <span>RETOMAR PRODUÇÃO</span>
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <h4 className="text-red-700 font-black text-lg">⚠️ Fim de Turno!</h4>
-                                                <p className="text-red-600 text-xs font-bold mt-1 leading-relaxed">
-                                                    Horário encerrado. Finalize o turno.
-                                                </p>
+
+                                            {/* Active Lot Display (Only if processing) */}
+                                            {activeLotProcessingData && (
+                                                <div className="bg-white p-6 rounded-3xl shadow-sm border border-emerald-100 flex items-center justify-between">
+                                                    <div>
+                                                        <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest block mb-1">Processando Lote</span>
+                                                        <h4 className="text-2xl font-black text-slate-800 tracking-tighter italic">{activeLotProcessingData.lotInfo.internalLot}</h4>
+                                                    </div>
+                                                    <div className="h-12 w-12 bg-emerald-50 rounded-2xl flex items-center justify-center">
+                                                        <div className="w-3 h-3 bg-emerald-500 rounded-full animate-ping" />
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        // ORIGINAL CONTENT FOR TRELIÇA OR DESKTOP
+                                        <div className={`space-y-6 ${mobileTab !== 'monitor' ? 'hidden lg:block' : 'animate-fade-in'}`}>
+                                            {isShiftOverdue && (
+                                                <div className="bg-red-50 border-2 border-red-500 rounded-2xl p-4 shadow-sm flex items-start gap-4 animate-pulse">
+                                                    <div className="bg-red-100 p-2 rounded-xl text-red-600 shrink-0">
+                                                        <ExclamationIcon className="h-8 w-8" />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="text-red-700 font-black text-lg">⚠️ Fim de Turno!</h4>
+                                                        <p className="text-red-600 text-xs font-bold mt-1 leading-relaxed">
+                                                            Horário encerrado. Finalize o turno.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Card de Status Principal - Novo Design Pulsante */}
+                                            <div className={`p-6 rounded-3xl border-4 transition-all duration-1000 ${
+                                                isActiveProcess ? 'bg-emerald-50 border-emerald-500/50 animate-producing-pulse shadow-[0_0_30px_rgba(16,185,129,0.2)]' :
+                                                isUnderStopAlerta ? 'bg-rose-50 border-rose-500/50 animate-stop-pulse shadow-[0_0_30px_rgba(244,63,94,0.2)]' :
+                                                'bg-white border-slate-100'
+                                            } ${machineType === 'Trefila' ? 'hidden md:block' : ''}`}>
+                                                <div className="flex items-center gap-6">
+                                                    <div className={`w-20 h-20 rounded-3xl flex items-center justify-center shadow-lg transition-transform duration-500 ${
+                                                        isActiveProcess ? 'bg-emerald-600 rotate-12 scale-110' :
+                                                        isUnderStopAlerta ? 'bg-rose-600 -rotate-12 scale-110' :
+                                                        'bg-slate-200'
+                                                    }`}>
+                                                        {isActiveProcess ? <PlayIcon className="h-10 w-10 text-white" /> : 
+                                                        isUnderStopAlerta ? <PauseIcon className="h-10 w-10 text-white" /> : 
+                                                        <CogIcon className="h-10 w-10 text-slate-400" />}
+                                                    </div>
+                                                    <div>
+                                                        <p className={`text-[10px] font-black uppercase tracking-[0.2em] mb-1 ${
+                                                            isActiveProcess ? 'text-emerald-600' :
+                                                            isUnderStopAlerta ? 'text-rose-600' :
+                                                            'text-slate-400'
+                                                        }`}>Status em Tempo Real</p>
+                                                        <h2 className={`text-2xl font-black tracking-tighter ${
+                                                            isActiveProcess ? 'text-emerald-900' :
+                                                            isUnderStopAlerta ? 'text-rose-900' :
+                                                            'text-slate-800'
+                                                        }`}>
+                                                            {isActiveProcess ? 'PRODUZINDO' : isUnderStopAlerta ? 'PARADA' : 'DESLIGADA'}
+                                                        </h2>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            <div className={`h-2 w-2 rounded-full animate-pulse ${isActiveProcess ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
+                                                                {statusStyle.label}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {activeLotProcessingData && (
+                                                    <div className="mt-6 pt-6 border-t border-slate-100">
+                                                        <div className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100 flex justify-between items-center shadow-sm">
+                                                            <div>
+                                                                <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Lote Atual</p>
+                                                                <p className="text-xl font-black text-slate-800 tracking-tighter italic">{activeLotProcessingData.lotInfo.internalLot}</p>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <p className="text-xl font-black text-emerald-700">{activeLotProcessingData.lotInfo.labelWeight?.toFixed(0) || '-'}kg</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Card OP Mini */}
+                                            <div className={`bg-white p-6 rounded-2xl shadow-sm border border-slate-100 ${machineType === 'Trefila' ? 'hidden md:block' : ''}`}>
+                                                <div className="flex justify-between items-center">
+                                                    <div>
+                                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Ordem de Produção</p>
+                                                        <p className="text-2xl font-black text-slate-900 tracking-tighter">#{activeOrder.orderNumber}</p>
+                                                    </div>
+                                                    <div className="h-12 w-12 bg-slate-50 rounded-2xl flex items-center justify-center">
+                                                        <ClipboardListIcon className="h-6 w-6 text-slate-400" />
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     )}
 
-                                    {/* Card de Status Principal - Novo Design Pulsante */}
-                                    <div className={`p-6 rounded-3xl border-4 transition-all duration-1000 ${
-                                        isActiveProcess ? 'bg-emerald-50 border-emerald-500/50 animate-producing-pulse shadow-[0_0_30px_rgba(16,185,129,0.2)]' :
-                                        isUnderStopAlerta ? 'bg-rose-50 border-rose-500/50 animate-stop-pulse shadow-[0_0_30px_rgba(244,63,94,0.2)]' :
-                                        'bg-white border-slate-100'
-                                    }`}>
-                                        <div className="flex items-center gap-6">
-                                            <div className={`w-20 h-20 rounded-3xl flex items-center justify-center shadow-lg transition-transform duration-500 ${
-                                                isActiveProcess ? 'bg-emerald-600 rotate-12 scale-110' :
-                                                isUnderStopAlerta ? 'bg-rose-600 -rotate-12 scale-110' :
-                                                'bg-slate-200'
-                                            }`}>
-                                                {isActiveProcess ? <PlayIcon className="h-10 w-10 text-white" /> : 
-                                                 isUnderStopAlerta ? <PauseIcon className="h-10 w-10 text-white" /> : 
-                                                 <CogIcon className="h-10 w-10 text-slate-400" />}
-                                            </div>
-                                            <div>
-                                                <p className={`text-[10px] font-black uppercase tracking-[0.2em] mb-1 ${
-                                                    isActiveProcess ? 'text-emerald-600' :
-                                                    isUnderStopAlerta ? 'text-rose-600' :
-                                                    'text-slate-400'
-                                                }`}>Status em Tempo Real</p>
-                                                <h2 className={`text-2xl font-black tracking-tighter ${
-                                                    isActiveProcess ? 'text-emerald-900' :
-                                                    isUnderStopAlerta ? 'text-rose-900' :
-                                                    'text-slate-800'
-                                                }`}>
-                                                    {isActiveProcess ? 'PRODUZINDO' : isUnderStopAlerta ? 'PARADA' : 'DESLIGADA'}
-                                                </h2>
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <div className={`h-2 w-2 rounded-full animate-pulse ${isActiveProcess ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
-                                                        {statusStyle.label}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {activeLotProcessingData && (
-                                            <div className="mt-6 pt-6 border-t border-slate-100">
-                                                <div className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100 flex justify-between items-center shadow-sm">
-                                                    <div>
-                                                        <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Lote Atual</p>
-                                                        <p className="text-xl font-black text-slate-800 tracking-tighter italic">{activeLotProcessingData.lotInfo.internalLot}</p>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <p className="text-xl font-black text-emerald-700">{activeLotProcessingData.lotInfo.labelWeight?.toFixed(0) || '-'}kg</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Card OP Mini */}
-                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                                        <div className="flex justify-between items-center">
-                                            <div>
-                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Ordem de Produção</p>
-                                                <p className="text-2xl font-black text-slate-900 tracking-tighter">#{activeOrder.orderNumber}</p>
-                                            </div>
-                                            <div className="h-12 w-12 bg-slate-50 rounded-2xl flex items-center justify-center">
-                                                <ClipboardListIcon className="h-6 w-6 text-slate-400" />
-                                            </div>
-                                        </div>
-                                    </div>
                                 </div>
 
                                 {/* Coluna Direita: Métricas e Controles de Produção */}
-                                <div className={`lg:col-span-2 space-y-6 ${mobileTab !== 'monitor' ? 'hidden lg:block' : 'animate-fade-in'}`}>
-                                    <div className="grid grid-cols-1 gap-6">
-                                            <div className="col-span-2">
-                                                <p className="text-[10px] md:text-xs text-slate-500 mb-2 uppercase tracking-widest font-bold">Registro de Produção do Turno</p>
-                                                {currentOperatorLog ? (
-                                                    <div className="flex flex-wrap items-center gap-3">
-                                                        <span className="text-sm md:text-base font-black text-slate-800 bg-white border border-slate-200 shadow-sm px-4 py-1.5 rounded-lg">
-                                                            {currentOperatorLog.operator}
-                                                        </span>
-                                                        <span className="text-xs font-black bg-indigo-100 text-indigo-800 px-3 py-2 rounded-lg border border-indigo-200 uppercase tracking-widest shadow-sm">
-                                                            {(() => {
-                                                                const h = new Date(currentOperatorLog.startTime).getHours();
-                                                                return (h >= 5 && h < 14) ? 'Turno A (Manhã)' : 'Turno B (Tarde)';
-                                                            })()}
-                                                        </span>
-                                                        <span className="text-xs font-bold text-slate-500 flex items-center gap-1">
-                                                            <ClockIcon className="h-3 w-3" />
-                                                            Início às {new Date(currentOperatorLog.startTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                                                        </span>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-sm font-bold text-slate-400 bg-white border px-3 py-1 rounded-lg">Sem operador em turno</span>
-                                                )}
+                                    <div className={`lg:col-span-2 space-y-6 ${mobileTab !== 'monitor' ? 'hidden lg:block' : 'animate-fade-in'}`}>
+                                        <div className="grid grid-cols-1 gap-6">
+                                                {/* Header Info - Simplified for Mobile */}
+                                                <div className="col-span-2">
+                                                    <p className="text-[10px] md:text-xs text-slate-500 mb-2 uppercase tracking-widest font-bold">Produção do Turno</p>
+                                                    {currentOperatorLog ? (
+                                                        <div className="flex flex-wrap items-center gap-3">
+                                                            <span className="text-sm md:text-base font-black text-slate-800 bg-white border border-slate-200 shadow-sm px-4 py-1.5 rounded-lg">
+                                                                {currentOperatorLog.operator}
+                                                            </span>
+                                                            <span className="text-xs font-black bg-indigo-50 text-indigo-800 px-3 py-2 rounded-lg border border-indigo-200 uppercase tracking-widest shadow-sm">
+                                                                {(() => {
+                                                                    const h = new Date(currentOperatorLog.startTime).getHours();
+                                                                    return (h >= 5 && h < 14) ? 'Turno A' : 'Turno B';
+                                                                })()}
+                                                            </span>
+                                                            <span className="md:hidden text-lg font-black text-slate-800 bg-white border border-slate-200 px-4 py-1.5 rounded-lg shadow-sm">
+                                                                {machineType === 'Trefila' ? `${activeOrder.targetBitola} mm` : activeOrder.trelicaModel}
+                                                            </span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-sm font-bold text-slate-400 bg-white border px-3 py-1 rounded-lg">Sem operador</span>
+                                                    )}
+                                                </div>
+                                                <div className="hidden md:block">
+                                                    <p className="text-[10px] md:text-xs text-slate-500 mb-1">Bitola Saída</p>
+                                                    <p className="text-sm md:text-base font-semibold text-slate-700">{activeOrder.targetBitola}</p>
+                                                </div>
+                                                <div className="hidden md:block">
+                                                    <p className="text-[10px] md:text-xs text-slate-500 mb-1">Meta</p>
+                                                    <p className="text-sm md:text-base font-semibold text-slate-700">{activeOrder.totalWeight?.toFixed(0) || 0} kg</p>
+                                                </div>
                                             </div>
-                                            {machineType === 'Trefila' ? (
-                                                <>
-                                                    <div>
-                                                        <p className="text-[10px] md:text-xs text-slate-500 mb-1">Bitola Saída</p>
-                                                        <p className="text-sm md:text-base font-semibold text-slate-700">{activeOrder.targetBitola}</p>
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-[10px] md:text-xs text-slate-500 mb-1">Meta</p>
-                                                        <p className="text-sm md:text-base font-semibold text-slate-700">{activeOrder.totalWeight?.toFixed(0) || 0} kg</p>
-                                                    </div>
-                                                    <div className="col-span-2 pt-2">
-                                                        <button
-                                                            onClick={() => setShowTrefilaCalculation(true)}
-                                                            className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl border border-blue-100 transition-all font-bold text-xs"
-                                                        >
-                                                            <CalculatorIcon className="h-4 w-4" />
-                                                            VER SIMULAÇÃO E GRÁFICOS
-                                                        </button>
-                                                    </div>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <div className="col-span-2">
-                                                        <p className="text-[10px] md:text-xs text-slate-500 mb-1">Produto</p>
-                                                        <p className="text-sm md:text-base font-semibold text-slate-700 truncate">{activeOrder.trelicaModel} ({activeOrder.tamanho}m)</p>
-                                                    </div>
-                                                </>
-                                            )}
-                                        </div>
+
 
                                     {/* Card de Estoque de Anéis (Críticos) - Novo */}
                                     {machineType === 'Trefila' && ringStock.filter(r => r.quantity < 3).length > 0 && (
