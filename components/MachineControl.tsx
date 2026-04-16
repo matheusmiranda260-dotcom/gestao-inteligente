@@ -1225,7 +1225,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
 
     const { waitingLots, completedLots } = useMemo(() => {
-        if (!activeOrder || activeOrder.machine !== 'Trefila') return { waitingLots: [], completedLots: [] };
+        if (!activeOrder || !activeOrder.machine.startsWith('Trefila')) return { waitingLots: [], completedLots: [] };
 
         const processedLotIds = new Set(activeOrder.processedLots?.map(p => p.lotId) || []);
 
@@ -1249,7 +1249,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
     }, [activeOrder, stock, activeLotProcessingData]);
 
     const trelicaPackages = useMemo(() => {
-        if (!activeOrder || activeOrder.machine !== 'Treliça') return [];
+        if (!activeOrder || !activeOrder.machine.startsWith('Treliça')) return [];
 
         const PACKAGE_SIZE = 200;
         const totalQuantity = activeOrder.quantityToProduce || 0;
@@ -1271,7 +1271,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
     }, [activeOrder]);
 
     const allTrefilaLotsProcessed = useMemo(() => {
-        if (!activeOrder || activeOrder.machine !== 'Trefila') return false;
+        if (!activeOrder || !activeOrder.machine.startsWith('Trefila')) return false;
 
         // Para ordens fantasma sem lotes selecionados inicialmente:
         // Permite fechar se ao menos 1 lote foi processado e pesado, OU se não há lotes em nenhum estado
@@ -1506,7 +1506,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
             )}
             {showShiftReportsModal && (
                 <ShiftReportsModal
-                    reports={(shiftReports || []).filter(r => (r.machine === activeMachine || (activeMachine === 'Trefila 1' && r.machine === 'Trefila') || (activeMachine === 'Treliça 1' && r.machine === 'Treliça')))}
+                    reports={(shiftReports || []).filter(r => (r.machine === activeMachine || (activeMachine.startsWith('Trefila') && r.machine === 'Trefila') || (activeMachine.startsWith('Treliça') && r.machine === 'Treliça')))}
                     stock={stock}
                     onClose={() => setShowShiftReportsModal(false)}
                     onDelete={deleteShiftReport}

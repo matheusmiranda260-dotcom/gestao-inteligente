@@ -162,7 +162,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
         }
         
         // NEW LOGIC: If Trefila has no lot active, it stays in Preparation
-        const trefilaNotProducing = machineType === 'Trefila' && (!activeOrder.activeLotProcessing || !activeOrder.activeLotProcessing.lotId);
+        const trefilaNotProducing = machineType.startsWith('Trefila') && (!activeOrder.activeLotProcessing || !activeOrder.activeLotProcessing.lotId);
         
         const resumes = (activeOrder.downtimeEvents || []).filter((e: any) => e.resumeTime).map((e: any) => new Date(e.resumeTime!).getTime());
         const lastResume = resumes.length ? Math.max(...resumes) : new Date(activeOrder.startTime).getTime();
@@ -181,7 +181,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     const { processedLotsCount, totalLotsCount, producedQuantity, plannedQuantity, progress } = useMemo(() => {
         let pc = 0, tc = 0, pq = 0, pl = 1, pg = 0;
         if (activeOrder) {
-            if (activeOrder.machine === 'Trefila' || machineType === 'Trefila') {
+            if (activeOrder.machine.startsWith('Trefila') || machineType.startsWith('Trefila')) {
                 pc = (activeOrder.processedLots || []).length;
                 tc = Array.isArray(activeOrder.selectedLotIds) ? activeOrder.selectedLotIds.length : 0;
                 pg = tc > 0 ? (pc / tc) * 100 : 0;
@@ -205,7 +205,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     const { shiftDowntime, shiftUptime } = useMemo(() => {
         const intervals: { start: number; end: number }[] = [];
         allOrders
-            .filter(o => o.machine === machineType || (machineType === 'Trefila 1' && o.machine === 'Trefila') || (machineType === 'Treliça 1' && o.machine === 'Treliça'))
+            .filter(o => o.machine === machineType || (machineType.startsWith('Trefila') && o.machine === 'Trefila') || (machineType.startsWith('Treliça') && o.machine === 'Treliça'))
             .forEach(o => {
                 const isActive = activeOrder && o.id === activeOrder.id;
                 (o.downtimeEvents || []).forEach((e: any) => {
@@ -255,9 +255,13 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     }, [allOrders, machineType, shiftStartMs, now, activeOrder, isCurrentlyProducing, lastResumeTime]);
 
     const productionHistoryInShift = useMemo(() => {
-        const orders = allOrders.filter(o => o.machine.startsWith(machineType));
+        const orders = allOrders.filter(o => 
+            o.machine === machineType || 
+            (machineType.startsWith('Trefila') && o.machine === 'Trefila') || 
+            (machineType.startsWith('Treliça') && o.machine === 'Treliça')
+        );
         
-        if (machineType === 'Trefila') {
+        if (machineType.startsWith('Trefila')) {
             return orders.flatMap(o => (o.processedLots || []).map((l: ProcessedLot) => ({
                 id: l.lotId,
                 label: stock.find(s => s.id === l.lotId)?.internalLot || l.lotId,
@@ -285,7 +289,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
 
     const efficiency = dailyGoal > 0 ? (dailyProducedValue / dailyGoal) * 100 : 0;
     const lastReportTime = useMemo(() => {
-        if (machineType === 'Trefila') {
+        if (machineType.startsWith('Trefila')) {
            if (productionHistoryInShift.length > 0) return productionHistoryInShift[0].endTime;
            return activeOrder?.startTime;
         } else {
@@ -294,8 +298,11 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     }, [machineType, productionHistoryInShift, activeOrder]);
 
     const isStopped = machineStatus.status === 'Parada' || machineStatus.status === 'Preparacao';
-    const isProducingLot = machineStatus.status === 'Produzindo' && machineType === 'Trefila' && activeOrder?.activeLotProcessing;
-    const activeLotInfo = isProducingLot ? stock.find(s => s.id === activeOrder?.activeLotProcessing?.lotId) : null;
+    const isProducingLot = machineStatus.status === 'Produzindo' && (
+        (machineType.startsWith('Trefila') && activeOrder?.activeLotProcessing) ||
+        (machineType.startsWith('Treliça'))
+    );
+    const activeLotInfo = (isProducingLot && machineType.startsWith('Trefila')) ? stock.find(s => s.id === activeOrder?.activeLotProcessing?.lotId) : null;
 
     return (
         <div className={`tactical-card rounded-3xl border ${isStopped ? 'animate-stop-pulse' : isProducingLot ? 'animate-producing-pulse' : 'border-white/10'} flex flex-col overflow-hidden relative group transition-all duration-500`}>
@@ -312,7 +319,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                 {currentOperator}
                             </span>
                             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                                • {machineType === 'Trefila' 
+                                • {machineType.startsWith('Trefila') 
                                     ? (activeOrder?.targetBitola || '---') 
                                     : (activeOrder?.trelicaModel ? `${activeOrder.trelicaModel} ${activeOrder.tamanho ? `(${activeOrder.tamanho}m)` : ''}` : '---')
                                 }
@@ -336,20 +343,30 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                 {isProducingLot && !isHistoryExpanded && (
                     <div className="absolute inset-0 z-40 flex flex-col items-center justify-center p-8 pointer-events-none select-none">
                         <div className="w-full bg-emerald-950/45 backdrop-blur-xl border-y-4 border-emerald-500 py-12 animate-producing-pulse flex flex-col items-center justify-center shadow-[0_0_100px_rgba(16,185,129,0.4)]">
-                            <span className="text-sm font-black text-emerald-400 uppercase tracking-[0.8em] mb-6 neon-text-green">LOTE EM PROCESSO</span>
+                            <span className="text-sm font-black text-emerald-400 uppercase tracking-[0.8em] mb-6 neon-text-green">
+                                {machineType.startsWith('Trefila') ? 'LOTE EM PROCESSO' : 'MÁQUINA EM OPERAÇÃO'}
+                            </span>
                             <h3 className="text-4xl md:text-7xl font-black text-white text-center uppercase tracking-tighter drop-shadow-[0_10px_30px_rgba(0,0,0,0.5)] leading-tight px-4 break-words max-w-full italic">
-                                {activeLotInfo?.internalLot || '---'}
+                                {machineType.startsWith('Trefila') ? (activeLotInfo?.internalLot || '---') : (activeOrder?.trelicaModel || '---')}
                             </h3>
                             
                             <div className="mt-10 flex gap-6">
                                 <div className="px-8 py-4 bg-black/60 border border-emerald-500/50 rounded-3xl flex flex-col items-center min-w-[200px]">
-                                    <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Peso do Lote</span>
-                                    <span className="text-5xl font-black text-white font-mono">{activeLotInfo?.initialQuantity.toFixed(1)} <span className="text-xl">kg</span></span>
+                                    <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">
+                                        {machineType.startsWith('Trefila') ? 'Peso do Lote' : 'Peças Produzidas'}
+                                    </span>
+                                    <span className="text-5xl font-black text-white font-mono">
+                                        {machineType.startsWith('Trefila') ? (activeLotInfo?.initialQuantity?.toFixed(1) || '0.0') : (producedQuantity.toLocaleString())} 
+                                        <span className="text-xl"> {machineType.startsWith('Trefila') ? 'kg' : 'pçs'}</span>
+                                    </span>
                                 </div>
                                 <div className="px-8 py-4 bg-black/60 border border-emerald-500/50 rounded-3xl flex flex-col items-center min-w-[200px]">
                                     <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Tempo de Processo</span>
                                     <span className="text-5xl font-black text-white font-mono tabular-nums">
-                                        {formatDuration(now.getTime() - new Date(activeOrder!.activeLotProcessing!.startTime).getTime())}
+                                        {machineType.startsWith('Trefila') 
+                                            ? formatDuration(now.getTime() - new Date(activeOrder!.activeLotProcessing!.startTime).getTime())
+                                            : formatDuration(now.getTime() - lastResumeTime)
+                                        }
                                     </span>
                                 </div>
                             </div>
@@ -530,9 +547,9 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                 </div>
                                 <div className="flex items-baseline gap-4 mb-5">
                                     <span className="text-5xl font-black text-white tracking-tight tabular-nums">
-                                        {machineType === 'Trefila' ? processedLotsCount : producedQuantity.toLocaleString()}
+                                        {machineType.startsWith('Trefila') ? processedLotsCount : producedQuantity.toLocaleString()}
                                     </span>
-                                    <span className="text-lg font-bold text-slate-500 uppercase">{machineType === 'Trefila' ? 'Lotes' : 'Peças'}</span>
+                                    <span className="text-lg font-bold text-slate-500 uppercase">{machineType.startsWith('Trefila') ? 'Lotes' : 'Peças'}</span>
                                 </div>
                             </div>
                             
@@ -636,7 +653,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
         const resetT = shiftResets[m] ? new Date(shiftResets[m]).getTime() : 0;
         const effective = Math.max(start.getTime(), resetT);
 
-        return productionOrders.filter(o => (o.machine === m || (m === 'Trefila 1' && o.machine === 'Trefila') || (m === 'Treliça 1' && o.machine === 'Treliça')) && o.status !== 'cancelled').reduce((acc, o) => {
+        return productionOrders.filter(o => (o.machine === m || (m.startsWith('Trefila') && o.machine === 'Trefila') || (m.startsWith('Treliça') && o.machine === 'Treliça')) && o.status !== 'cancelled').reduce((acc, o) => {
             if (m.startsWith('Trefila')) {
                 const lots = (o.processedLots || []) as ProcessedLot[];
                 return acc + lots.filter(l => l.endTime && new Date(l.endTime).getTime() >= effective).reduce((s, l) => s + (l.finalWeight || 0), 0);
@@ -758,7 +775,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
 
             <div className={`flex-1 grid grid-cols-1 ${visibleMachines.length > 1 ? 'xl:grid-cols-2' : ''} gap-6 lg:gap-8 pb-8`}>
                 {visibleMachines.map(m => {
-                    const activeOrder = productionOrders.find(o => (o.machine === m || (m === 'Trefila 1' && o.machine === 'Trefila') || (m === 'Treliça 1' && o.machine === 'Treliça')) && o.status === 'in_progress');
+                    const activeOrder = productionOrders.find(o => (o.machine === m || (m.startsWith('Trefila') && o.machine === 'Trefila') || (m.startsWith('Treliça') && o.machine === 'Treliça')) && o.status === 'in_progress');
                     return (
                         <MachineStatusView 
                             key={m}
