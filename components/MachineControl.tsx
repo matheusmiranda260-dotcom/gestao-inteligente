@@ -1163,10 +1163,12 @@ const MachineControl: React.FC<MachineControlProps> = ({
     const shiftStatus = useMemo(() => {
         const currentTime = now;
         
+        // The shift metadata (Name/Label) should always reflect the ACTUAL current time
+        // whereas the progress/overtime logic depends on when the operator actually started.
         const actualStart = currentOperatorLog ? new Date(currentOperatorLog.startTime) : null;
-        const referenceTime = actualStart || currentTime;
-        const refHour = referenceTime.getHours();
-        const refMinutes = referenceTime.getMinutes();
+        
+        const refHour = currentTime.getHours();
+        const refMinutes = currentTime.getMinutes();
         const timeVal = refHour + refMinutes / 60;
 
         let shiftName = 'Turno Padrão';
@@ -1191,10 +1193,10 @@ const MachineControl: React.FC<MachineControlProps> = ({
             }
         }
 
-        const shiftStart = new Date(referenceTime);
+        const shiftStart = new Date(currentTime);
         shiftStart.setHours(startH, startM, 0, 0);
 
-        const shiftEnd = new Date(referenceTime);
+        const shiftEnd = new Date(currentTime);
         shiftEnd.setHours(endH, endM, 59, 999);
 
         // Ajuste caso o Turno B ultrapasse a meia-noite (para turnos noturnos no futuro)
@@ -1541,26 +1543,38 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
             {/* Overlay Fixed para Bloqueio de Operador */}
             {!hasActiveShift && isAnyActiveShift && activeOrder && (
-                <div className="fixed inset-0 bg-slate-200/90 backdrop-blur-sm flex items-center justify-center z-[100] transition-all duration-500 p-4">
-                    <div className="text-center p-8 bg-white rounded-3xl shadow-xl w-full max-w-md mx-auto animate-fade-in-up border-2 border-red-50">
-                        <div className="bg-red-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-red-100 shadow-inner">
-                            <CogIcon className="h-10 w-10 text-red-500 animate-spin-slow" />
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center z-[100] transition-all duration-500 p-4">
+                    <div className="text-center p-8 bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md mx-auto animate-fade-in-up border-4 border-amber-400/50 overflow-hidden relative">
+                        <div className="absolute top-0 inset-x-0 h-2 bg-gradient-to-r from-amber-400 via-amber-200 to-amber-400"></div>
+                        
+                        <div className="bg-amber-50 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-white shadow-xl">
+                            <CogIcon className="h-12 w-12 text-amber-500 animate-spin-slow" />
                         </div>
-                        <h3 className="text-2xl font-bold text-slate-800 mb-2 tracking-tight">Equipamento Bloqueado</h3>
-                        <p className="text-slate-500 mb-6 text-sm leading-relaxed font-medium">
-                            A máquina está sendo operada por <strong className="text-slate-800">{currentOperatorLog?.operator}</strong>. Ele(a) precisa encerrar o turno atual para que você possa assumir.
+                        
+                        <h3 className="text-3xl font-black text-slate-900 mb-2 tracking-tight uppercase">Máquina Ocupada</h3>
+                        
+                        <div className="bg-slate-50 rounded-2xl p-4 mb-6 border border-slate-100">
+                            <p className="text-slate-500 text-sm leading-relaxed font-bold">
+                                O operador <span className="text-amber-600 font-black uppercase text-base">{currentOperatorLog?.operator}</span> ainda possui um turno ativo nesta máquina.
+                            </p>
+                        </div>
+
+                        <p className="text-slate-400 mb-8 text-xs font-black uppercase tracking-widest leading-relaxed">
+                            Se você é <span className="text-indigo-600 font-black">{currentUser?.username}</span> e vai iniciar seu turno agora,<br/>clique no botão abaixo:
                         </p>
-                        <div className="flex flex-col gap-3">
-                            <div className="w-full bg-slate-100/80 text-slate-500 font-black py-4 px-6 rounded-2xl uppercase text-sm flex items-center justify-center gap-3 tracking-widest">
-                                AGUARDANDO LIBERAÇÃO
-                            </div>
+
+                        <div className="flex flex-col gap-4">
                             <button
                                 onClick={() => startOperatorShift && startOperatorShift(activeOrder.id)}
-                                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 px-6 rounded-2xl uppercase text-sm flex items-center justify-center gap-3 tracking-widest transition-all shadow-lg shadow-indigo-100"
+                                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-5 px-8 rounded-2xl uppercase text-sm flex items-center justify-center gap-3 tracking-[0.1em] transition-all shadow-xl shadow-indigo-100 active:scale-[0.97]"
                             >
-                                <PlayIcon className="h-5 w-5" />
-                                Assumir Turno Agora
+                                <PlayIcon className="h-6 w-6" />
+                                Assumir Turno de {currentUser?.username || 'Hoje'}
                             </button>
+                            
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
+                                Ao clicar, o turno de {currentOperatorLog?.operator} será encerrado automaticamente.
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -1725,9 +1739,14 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
             {/* Machine Header for better context on mobile */}
             <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
+                <div className="flex flex-col">
                     <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tighter uppercase">{machineHeader}</h1>
-                    <div className="h-1 w-12 bg-indigo-500 rounded-full mt-2"></div>
+                    <div className="flex items-center gap-2 mt-1">
+                        <div className="h-1 w-8 bg-indigo-500 rounded-full"></div>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                            Logado como: <span className="text-indigo-600 font-black">{currentUser?.username}</span>
+                        </span>
+                    </div>
                 </div>
                 
                 {/* Machine Selector Dropdown - ONLY SHOWN FOR GESTORS */}
@@ -2063,10 +2082,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                 {currentOperatorLog.operator}
                                                             </span>
                                                             <span className="text-xs font-black bg-indigo-50 text-indigo-800 px-3 py-2 rounded-lg border border-indigo-200 uppercase tracking-widest shadow-sm">
-                                                                {(() => {
-                                                                    const h = new Date(currentOperatorLog.startTime).getHours();
-                                                                    return (h >= 5 && h < 14) ? 'Turno A' : 'Turno B';
-                                                                })()}
+                                                                {shiftStatus.shiftName}
                                                             </span>
                                                             <span className="md:hidden text-lg font-black text-slate-800 bg-white border border-slate-200 px-4 py-1.5 rounded-lg shadow-sm">
                                                                 {activeMachine.startsWith('Trefila') ? `${activeOrder.targetBitola} mm` : activeOrder.trelicaModel}
