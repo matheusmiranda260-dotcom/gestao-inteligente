@@ -626,7 +626,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
     const [pendingGauges, setPendingGauges] = useState<Map<string, string>>(new Map()); // Novo estado para bitolas
     const [pendingPackageWeights, setPendingPackageWeights] = useState<Map<number, string>>(new Map());
     const [justCompletedOrderId, setJustCompletedOrderId] = useState<string | null>(null);
-    const [mobileTab, setMobileTab] = useState<'monitor' | 'work' | 'process' | 'weigh'>(activeMachine.startsWith('Treliça') ? 'work' : 'monitor');
+    const [mobileTab, setMobileTab] = useState<'monitor' | 'work' | 'process' | 'weigh' | 'performance'>(activeMachine.startsWith('Treliça') ? 'work' : 'monitor');
     const [managerOverrideData, setManagerOverrideData] = useState<{
         packageNumber: number;
         quantity: number;
@@ -1762,9 +1762,16 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                     className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all duration-200 ${mobileTab === 'work' ? 'bg-white shadow-md text-slate-900 border border-slate-100' : 'text-slate-500'}`}
                                 >
                                     <ScaleIcon className={`h-4 w-4 ${mobileTab === 'work' ? 'text-indigo-500' : 'text-slate-400'}`} />
-                                    Pesagem de Pacotes
+                                    Pesagem
                                 </button>
                             )}
+                            <button
+                                onClick={() => setMobileTab('performance')}
+                                className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all duration-200 ${mobileTab === 'performance' ? 'bg-white shadow-md text-slate-900 border border-slate-100' : 'text-slate-500'}`}
+                            >
+                                <ChartBarIcon className={`h-4 w-4 ${mobileTab === 'performance' ? 'text-indigo-500' : 'text-slate-400'}`} />
+                                Performance
+                            </button>
                         </div>
                     )}
 
@@ -1902,7 +1909,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                     </div>
 
                                 {/* Coluna Direita: Métricas e Controles de Produção */}
-                                    <div className={`lg:col-span-2 space-y-4 md:space-y-6 ${mobileTab !== 'monitor' ? 'hidden lg:block' : 'animate-fade-in'}`}>
+                                    <div className={`lg:col-span-2 space-y-4 md:space-y-6 ${(mobileTab !== 'monitor' && mobileTab !== 'performance') ? 'hidden lg:block' : 'animate-fade-in'}`}>
                                         <div className={`grid grid-cols-1 gap-6 ${activeMachine.startsWith('Trefila') ? 'hidden md:grid' : 'grid'}`}>
                                                 {/* Header Info - Simplified for Mobile */}
                                                 <div className="col-span-2">
@@ -1971,8 +1978,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                         </div>
                                     )}
 
-                                    {/* Progresso de Produção - Promovido para destaque - VISÍVEL EM TODOS OS DISPOSITIVOS */}
-                                    <div className="bg-white p-6 rounded-2xl shadow-sm relative overflow-hidden group">
+                                    {/* Progresso de Produção - VISÍVEL APENAS NA ABA DE PERFORMANCE NO MOBILE OU SEMPRE NO DESKTOP */}
+                                    <div className={`bg-white p-6 rounded-2xl shadow-sm relative overflow-hidden group ${mobileTab === 'performance' ? 'block' : 'hidden lg:block'}`}>
                                         <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition">
                                             <ChartBarIcon className="h-16 w-16" />
                                         </div>
