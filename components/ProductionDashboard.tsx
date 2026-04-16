@@ -333,7 +333,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     const activeLotInfo = (isProducingLot && machineType.startsWith('Trefila')) ? stock.find(s => s.id === activeOrder?.activeLotProcessing?.lotId) : null;
 
     return (
-        <div className={`tactical-card rounded-3xl border ${isStopped ? 'animate-stop-pulse' : isProducingLot ? 'animate-producing-pulse' : 'border-white/10'} flex flex-col overflow-hidden relative group transition-all duration-500`}>
+        <div className={`tactical-card rounded-3xl border ${isStopped ? (isOverLimitForStyle ? 'animate-stop-pulse' : 'animate-warning-pulse') : isProducingLot ? 'animate-producing-pulse' : 'border-white/10'} flex flex-col overflow-hidden relative group transition-all duration-500`}>
             {/* Machine Header */}
             <div className={`p-5 flex items-center justify-between border-b border-white/5 bg-gradient-to-r ${currentStyle.bg} to-transparent`}>
                 <div className="flex items-center gap-4">

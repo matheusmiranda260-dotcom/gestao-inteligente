@@ -59,7 +59,8 @@ const downtimeReasons = [
     'Setup',
     'Lubrificação',
     'Falta de energia',
-    'Outros'
+    'Outros',
+    'Preparação'
 ];
 
 const DowntimeModal: React.FC<{

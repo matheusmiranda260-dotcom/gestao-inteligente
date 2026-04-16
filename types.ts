@@ -570,11 +570,11 @@ export const TrefilaBitolaOptions = CA60BitolaOptions; // Keeping for compatibil
 export const SteelTypeOptions = ['1006', '1008', '1010', '1012', '1015', '1018', 'Outro'];
 
 export const DOWNTIME_THRESHOLDS: Record<string, number> = {
-    'Enrosco de fio': 12,
-    'Falha no sensor': 5,
-    'Quebra fio': 15,
-    'Setup': 150,
-    'Preparação': 150,
-    'Lubrificação': 8,
-    'Outros': 10
+    'Enrosco de fio': 15,
+    'Falha no sensor': 10,
+    'Quebra fio': 20,
+    'Setup': 180,
+    'Lubrificação': 10,
+    'Outros': 15,
+    'Preparação': 15
 };
