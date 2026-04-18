@@ -69,7 +69,8 @@ const DowntimeModal: React.FC<{
     onEndShift?: () => void;
     onPauseOrder?: () => void;
     canPause?: boolean;
-}> = ({ onClose, onSubmit, onEndShift, onPauseOrder, canPause }) => {
+    downtimeEvents?: any[];
+}> = ({ onClose, onSubmit, onEndShift, onPauseOrder, canPause, downtimeEvents }) => {
     const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
     const [otherReason, setOtherReason] = useState('');
     const [isOtherActive, setIsOtherActive] = useState(false);
@@ -83,7 +84,6 @@ const DowntimeModal: React.FC<{
             prev.includes(r) ? prev.filter(item => item !== r) : [...prev, r]
         );
     };
-
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const reasons = [...selectedReasons];
@@ -92,11 +92,30 @@ const DowntimeModal: React.FC<{
         }
 
         const finalReason = reasons.join(' + ');
-        if (finalReason) {
-            onSubmit(finalReason);
-        } else {
+        if (!finalReason) {
             alert('Por favor, selecione pelo menos um motivo.');
+            return;
         }
+
+        // Check for repeat reasons (excluding ADMINISTRATIVE reasons like Shift End)
+        const administrativeReasons = ['Aguardando Início da Produção', 'Final de Turno'];
+        const repeatReasons = reasons.filter(r => 
+            !administrativeReasons.includes(r) && 
+            (downtimeEvents || []).some(e => e.reason && e.reason.includes(r))
+        );
+
+        if (repeatReasons.length > 0) {
+            const count = (downtimeEvents || []).filter(e => repeatReasons.some(r => e.reason && e.reason.includes(r))).length;
+            const confirmed = window.confirm(
+                `⚠️ ATENÇÃO OPERADOR!\n\n` +
+                `Motivo(s) recorrente(s): ${repeatReasons.join(', ')}\n` +
+                `Já tivemos ${count} parada(s) por esse(s) motivo(s) nesta ordem.\n\n` +
+                `Você já tomou a iniciativa necessária para que isso não aconteça novamente?`
+            );
+            if (!confirmed) return;
+        }
+
+        onSubmit(finalReason);
     };
 
     return (
@@ -1752,6 +1771,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                         }
                     } : undefined}
                     canPause={(!activeMachine.startsWith('Trefila'))}
+                    downtimeEvents={activeOrder?.downtimeEvents || []}
                 />
             )}
             {showCompletionModal && activeOrder && <CompletionModal order={activeOrder} onClose={() => setShowCompletionModal(false)} onSubmit={handleCompleteProduction} />}
