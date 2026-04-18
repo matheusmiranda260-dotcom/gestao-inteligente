@@ -2476,7 +2476,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                     <CogIcon className="h-6 w-6 text-slate-400" /> Lote em Processamento
                                                 </h3>
                                                 {activeLotProcessingData ? (
-                                                    <div className={`p-6 border rounded-xl transition-all duration-500 ${activeLotProcessingData.isDelayed ? 'bg-red-50 border-red-200 animate-pulse-red' : 'bg-gradient-to-br from-indigo-50 to-blue-50 border-indigo-100'}`}>
+                                                    <div className={`p-6 border rounded-xl transition-all duration-500 ${activeLotProcessingData.isDelayed ? 'bg-red-50 border-red-200 shadow-sm shadow-red-100' : 'bg-gradient-to-br from-indigo-50 to-blue-50 border-indigo-100'}`}>
                                                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                                                             <div>
                                                                 <span className={`text-xs font-bold px-2 py-1 rounded uppercase tracking-wide ${activeLotProcessingData.isDelayed ? 'bg-red-500 text-white' : 'text-indigo-500 bg-indigo-100'}`}>

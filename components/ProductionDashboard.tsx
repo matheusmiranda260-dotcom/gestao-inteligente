@@ -385,7 +385,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     }, [machineType, activeOrder, activeLotInfo, now]);
 
     return (
-        <div className={`tactical-card rounded-[2.5rem] border ${isStopped ? (isOverLimitForStyle ? 'animate-stop-pulse border-rose-500' : 'animate-warning-pulse border-amber-500') : isProducingLot ? 'animate-producing-pulse border-emerald-500/30' : 'border-white/10'} flex flex-col overflow-hidden relative group transition-all duration-700 h-full`}>
+        <div className={`tactical-card rounded-[2.5rem] border ${isStopped ? (isOverLimitForStyle ? 'animate-stop-pulse border-rose-500' : 'animate-warning-pulse border-amber-500') : isProducingLot ? (trefilaEstimation.isDelayed ? 'border-rose-500/50 shadow-[0_0_30px_rgba(244,63,94,0.2)]' : 'border-emerald-500/30 shadow-[0_0_30px_rgba(16,185,129,0.1)]') : 'border-white/10'} flex flex-col overflow-hidden relative group transition-all duration-700 h-full`}>
             {isStopped && (
                 <div className={`absolute inset-0 pointer-events-none opacity-20 ${isOverLimitForStyle ? 'bg-rose-500 animate-stop-flash' : 'bg-amber-500 animate-warning-flash'}`} />
             )}
@@ -435,8 +435,8 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                 {/* Massive Producing Lot Overlay */}
                 {isProducingLot && !isHistoryExpanded && (
                     <div className="absolute inset-0 z-40 flex flex-col items-center justify-center p-8 pointer-events-none select-none">
-                        <div className={`w-full backdrop-blur-xl border-y-4 py-12 animate-producing-pulse flex flex-col items-center justify-center transition-all duration-500 ${trefilaEstimation.isDelayed ? 'bg-rose-950/60 border-rose-500 shadow-[0_0_100px_rgba(244,63,94,0.6)]' : 'bg-emerald-950/45 border-emerald-500 shadow-[0_0_100px_rgba(16,185,129,0.4)]'}`}>
-                            <span className={`text-sm font-black uppercase tracking-[0.8em] mb-6 animate-pulse ${trefilaEstimation.isDelayed ? 'text-rose-400 neon-text-red' : 'text-emerald-400 neon-text-green'}`}>
+                        <div className={`w-full backdrop-blur-xl border-y-4 py-12 flex flex-col items-center justify-center transition-all duration-500 ${trefilaEstimation.isDelayed ? 'bg-rose-950/60 border-rose-500 shadow-[0_0_100px_rgba(244,63,94,0.6)]' : 'bg-emerald-950/45 border-emerald-500 shadow-[0_0_100px_rgba(16,185,129,0.4)]'}`}>
+                            <span className={`text-sm font-black uppercase tracking-[0.8em] mb-6 ${trefilaEstimation.isDelayed ? 'text-rose-400 neon-text-red animate-pulse' : 'text-emerald-400 neon-text-green'}`}>
                                 {trefilaEstimation.isDelayed ? '⚠ LOTE ATRASADO' : (machineType.startsWith('Trefila') ? 'LOTE EM PROCESSO' : 'MÁQUINA EM OPERAÇÃO')}
                             </span>
                             <h3 className="text-4xl md:text-7xl font-black text-white text-center uppercase tracking-tighter drop-shadow-[0_10px_30px_rgba(0,0,0,0.5)] leading-tight px-4 break-words max-w-full italic">
@@ -465,7 +465,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                 </div>
 
                                 {machineType.startsWith('Trefila') && trefilaEstimation.remainingSeconds !== null && (
-                                    <div className={`px-8 py-4 bg-black/60 border rounded-3xl flex flex-col items-center min-w-[240px] animate-pulse ${trefilaEstimation.isDelayed ? 'border-rose-600 shadow-[0_0_20px_rgba(244,63,94,0.3)]' : 'border-emerald-500/50'}`}>
+                                    <div className={`px-8 py-4 bg-black/60 border rounded-3xl flex flex-col items-center min-w-[240px] ${trefilaEstimation.isDelayed ? 'border-rose-600 shadow-[0_0_20px_rgba(244,63,94,0.3)]' : 'border-emerald-500/50'}`}>
                                         <span className={`text-[10px] font-black uppercase tracking-widest mb-1 ${trefilaEstimation.isDelayed ? 'text-rose-400' : 'text-emerald-500'}`}>
                                             {trefilaEstimation.isDelayed ? 'Tempo de Atraso' : 'Estimativa Restante'}
                                         </span>
