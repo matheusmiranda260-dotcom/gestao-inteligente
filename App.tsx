@@ -1497,7 +1497,7 @@ const App: React.FC = () => {
         }
     };
 
-    const startLotProcessing = async (orderId: string, lotId: string) => {
+    const startLotProcessing = async (orderId: string, lotId: string, speed?: number) => {
         const now = new Date().toISOString();
         const fetchedOrders = await fetchByColumn<ProductionOrderData>('production_orders', 'id', orderId);
         const order = fetchedOrders[0];
@@ -1509,7 +1509,7 @@ const App: React.FC = () => {
         );
 
         const updates: Partial<ProductionOrderData> = {
-            activeLotProcessing: { lotId, startTime: now },
+            activeLotProcessing: { lotId, startTime: now, speed },
             downtimeEvents: newEvents
         };
 

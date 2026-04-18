@@ -136,7 +136,7 @@ export interface ProductionOrderData {
     processedLots?: any[];
     downtimeEvents?: any[];
     operatorLogs?: any[];
-    activeLotProcessing?: { lotId: string; startTime: string };
+    activeLotProcessing?: { lotId: string; startTime: string; speed?: number };
     pontas?: Ponta[];
     lastQuantityUpdate?: string;
     scrapWeight?: number;
