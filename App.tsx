@@ -2251,7 +2251,7 @@ const App: React.FC = () => {
                             <button onClick={() => setIsMobileMenuOpen(true)} className="mobile-menu-btn">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
                             </button>
-                            <span className="text-slate-400 text-sm font-black uppercase tracking-widest flex items-center gap-2">
+                            <span className="hidden sm:flex text-slate-400 text-sm font-black uppercase tracking-widest items-center gap-2">
                                 <div className="w-1.5 h-1.5 rounded-full bg-slate-400"></div>
                                 {page === 'trefilaInProgress' ? 'Produção Trefila' :
                                     page === 'trelicaInProgress' ? 'Produção Treliça' :
@@ -2260,17 +2260,18 @@ const App: React.FC = () => {
                             </span>
                         </div>
                         
-                        <div className="hidden lg:flex flex-1 justify-center mx-4 overflow-hidden">
-                            <div className="flex items-center gap-3 px-6 py-1.5 bg-gradient-to-r from-blue-50 to-slate-50 rounded-full border border-blue-100 shadow-sm h-[36px]">
-                                <span className="text-lg leading-none">💡</span>
-                                <span key={fraseIndex} className="text-[#0F3F5C] text-xs font-bold italic tracking-wide truncate animate-fade-in">
+                        
+                        <div className="flex-1 flex justify-center px-2 sm:mx-4 overflow-hidden h-[32px] sm:h-[36px]">
+                            <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-6 py-1 bg-gradient-to-r from-blue-50 to-slate-50 rounded-full border border-blue-100 shadow-sm w-full max-w-[500px]">
+                                <span className="text-sm sm:text-lg leading-none">💡</span>
+                                <span key={fraseIndex} className="text-[#0F3F5C] text-[10px] sm:text-xs font-bold italic tracking-tight sm:tracking-wide truncate animate-fade-in flex-1 text-center">
                                     "{motivacionais[fraseIndex]}"
                                 </span>
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-6 shrink-0">
-                            <div className="flex flex-col items-end">
+                        <div className="flex items-center gap-3 sm:gap-6 shrink-0">
+                            <div className="hidden sm:flex flex-col items-end">
                                 <span className="text-sm font-bold text-slate-800">{currentUser?.username}</span>
                                 <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">{currentUser?.role}</span>
                             </div>
