@@ -1029,26 +1029,35 @@ const MachineControl: React.FC<MachineControlProps> = ({
             if (!lotInfo) return null;
 
             let estimatedTimeSeconds = null;
+            let isDelayed = false;
             if (activeOrder.activeLotProcessing?.speed && activeOrder.targetBitola) {
                 const bitola = parseFloat(activeOrder.targetBitola.replace(',', '.'));
                 const speed = activeOrder.activeLotProcessing.speed; // m/s
                 const linearMass = bitola * bitola * 0.006162; // kg/m
                 const massPerSecond = speed * linearMass; // kg/s
-                const remainingWeight = lotInfo.remainingQuantity || lotInfo.initialQuantity || 0;
+                const initialWeight = lotInfo.initialQuantity || 0;
+                const remainingWeight = lotInfo.remainingQuantity || initialWeight;
                 
                 if (massPerSecond > 0) {
                     estimatedTimeSeconds = remainingWeight / massPerSecond;
+                    
+                    // Delay check
+                    const startTime = new Date(activeOrder.activeLotProcessing.startTime).getTime();
+                    const totalEstimatedDurationMs = (initialWeight / massPerSecond) * 1000;
+                    const elapsedMs = now.getTime() - startTime;
+                    isDelayed = elapsedMs > totalEstimatedDurationMs;
                 }
             }
 
             return { 
                 ...activeOrder.activeLotProcessing, 
                 lotInfo,
-                estimatedTimeSeconds
+                estimatedTimeSeconds,
+                isDelayed
             };
         }
         return null;
-    }, [activeOrder, stock]);
+    }, [activeOrder, stock, now]);
 
 
     const isAnyActiveShift = useMemo(() => {
@@ -2431,29 +2440,34 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                     <CogIcon className="h-6 w-6 text-slate-400" /> Lote em Processamento
                                                 </h3>
                                                 {activeLotProcessingData ? (
-                                                    <div className="p-6 bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100 rounded-xl">
+                                                    <div className={`p-6 border rounded-xl transition-all duration-500 ${activeLotProcessingData.isDelayed ? 'bg-red-50 border-red-200 animate-pulse-red' : 'bg-gradient-to-br from-indigo-50 to-blue-50 border-indigo-100'}`}>
                                                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                                                             <div>
-                                                                <span className="text-xs font-bold text-indigo-500 bg-indigo-100 px-2 py-1 rounded uppercase tracking-wide">Em Andamento</span>
-                                                                <h4 className="text-2xl font-bold text-slate-800 mt-2">{activeLotProcessingData.lotInfo.internalLot}</h4>
+                                                                <span className={`text-xs font-bold px-2 py-1 rounded uppercase tracking-wide ${activeLotProcessingData.isDelayed ? 'bg-red-500 text-white' : 'text-indigo-500 bg-indigo-100'}`}>
+                                                                    {activeLotProcessingData.isDelayed ? '⚠ LOTE ATRASADO' : 'Em Andamento'}
+                                                                </span>
+                                                                <h4 className={`text-2xl font-bold mt-2 ${activeLotProcessingData.isDelayed ? 'text-red-700' : 'text-slate-800'}`}>{activeLotProcessingData.lotInfo.internalLot}</h4>
                                                                 <div className="flex flex-wrap gap-4 mt-2">
                                                                     <p className="text-sm text-slate-500 flex items-center gap-2">
                                                                         <ClockIcon className="h-4 w-4" /> Iniciado às {new Date(activeLotProcessingData.startTime).toLocaleTimeString('pt-BR')}
                                                                     </p>
                                                                     {activeLotProcessingData.speed && (
-                                                                        <p className="text-sm text-indigo-600 font-bold flex items-center gap-2">
+                                                                        <p className={`text-sm font-bold flex items-center gap-2 ${activeLotProcessingData.isDelayed ? 'text-red-600' : 'text-indigo-600'}`}>
                                                                             <ChartBarIcon className="h-4 w-4" /> {activeLotProcessingData.speed.toString().replace('.', ',')} m/s
                                                                         </p>
                                                                     )}
-                                                                    {activeLotProcessingData.estimatedTimeSeconds && (
-                                                                        <p className="text-sm text-emerald-600 font-black flex items-center gap-2 bg-emerald-50 px-3 py-1 rounded-lg border border-emerald-100">
-                                                                            <ClockIcon className="h-4 w-4 text-emerald-500" /> 
-                                                                            Tempo Est.: {formatDuration(activeLotProcessingData.estimatedTimeSeconds * 1000)}
+                                                                    {activeLotProcessingData.estimatedTimeSeconds !== null && (
+                                                                        <p className={`text-sm font-black flex items-center gap-2 px-3 py-1 rounded-lg border ${activeLotProcessingData.isDelayed ? 'text-red-700 bg-red-100 border-red-200' : 'text-emerald-600 bg-emerald-50 border-emerald-100'}`}>
+                                                                            <ClockIcon className="h-4 w-4" /> 
+                                                                            {activeLotProcessingData.isDelayed ? 'Atraso: ' : 'Tempo Est.: '}
+                                                                            {activeLotProcessingData.isDelayed 
+                                                                                ? formatDuration(now.getTime() - (new Date(activeLotProcessingData.startTime).getTime() + (activeLotProcessingData.lotInfo.initialQuantity / (parseFloat(activeOrder!.targetBitola!.replace(',', '.'))**2 * 0.006162 * activeLotProcessingData.speed) * 1000)))
+                                                                                : formatDuration(activeLotProcessingData.estimatedTimeSeconds * 1000)}
                                                                         </p>
                                                                     )}
                                                                 </div>
                                                             </div>
-                                                            <button onClick={handleFinishLotProcess} disabled={isEmergencyStopped || !hasActiveShift} className="w-full md:w-auto bg-indigo-600 text-white font-bold py-3 px-6 rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition flex items-center justify-center gap-2 disabled:bg-slate-300 disabled:shadow-none">
+                                                            <button onClick={handleFinishLotProcess} disabled={isEmergencyStopped || !hasActiveShift} className={`w-full md:w-auto font-bold py-3 px-6 rounded-xl shadow-lg transition flex items-center justify-center gap-2 disabled:bg-slate-300 disabled:shadow-none ${activeLotProcessingData.isDelayed ? 'bg-red-600 text-white hover:bg-red-700 shadow-red-200' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200'}`}>
                                                                 <CheckCircleIcon className="h-5 w-5" /> Finalizar Lote
                                                             </button>
                                                         </div>

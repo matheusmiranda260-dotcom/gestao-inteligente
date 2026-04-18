@@ -343,6 +343,28 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     );
     const activeLotInfo = (isProducingLot && machineType.startsWith('Trefila')) ? stock.find(s => s.id === activeOrder?.activeLotProcessing?.lotId) : null;
 
+    const trefilaEstimation = useMemo(() => {
+        if (!machineType.startsWith('Trefila') || !activeOrder?.activeLotProcessing?.speed || !activeOrder.targetBitola || !activeLotInfo) {
+            return { remainingSeconds: null, isDelayed: false };
+        }
+
+        const bitola = parseFloat(activeOrder.targetBitola.replace(',', '.'));
+        const speed = activeOrder.activeLotProcessing.speed;
+        const linearMass = bitola * bitola * 0.006162;
+        const massPerSecond = speed * linearMass;
+        const initialWeight = activeLotInfo.initialQuantity || 0;
+        const remainingWeight = activeLotInfo.remainingQuantity || initialWeight;
+
+        if (massPerSecond <= 0) return { remainingSeconds: null, isDelayed: false };
+
+        const remainingSeconds = remainingWeight / massPerSecond;
+        const startTime = new Date(activeOrder.activeLotProcessing.startTime).getTime();
+        const totalDurationMs = (initialWeight / massPerSecond) * 1000;
+        const isDelayed = (now.getTime() - startTime) > totalDurationMs;
+
+        return { remainingSeconds, isDelayed };
+    }, [machineType, activeOrder, activeLotInfo, now]);
+
     return (
         <div className={`tactical-card rounded-[2.5rem] border ${isStopped ? (isOverLimitForStyle ? 'animate-stop-pulse border-rose-500' : 'animate-warning-pulse border-amber-500') : isProducingLot ? 'animate-producing-pulse border-emerald-500/30' : 'border-white/10'} flex flex-col overflow-hidden relative group transition-all duration-700 h-full`}>
             {isStopped && (
@@ -394,17 +416,17 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                 {/* Massive Producing Lot Overlay */}
                 {isProducingLot && !isHistoryExpanded && (
                     <div className="absolute inset-0 z-40 flex flex-col items-center justify-center p-8 pointer-events-none select-none">
-                        <div className="w-full bg-emerald-950/45 backdrop-blur-xl border-y-4 border-emerald-500 py-12 animate-producing-pulse flex flex-col items-center justify-center shadow-[0_0_100px_rgba(16,185,129,0.4)]">
-                            <span className="text-sm font-black text-emerald-400 uppercase tracking-[0.8em] mb-6 neon-text-green">
-                                {machineType.startsWith('Trefila') ? 'LOTE EM PROCESSO' : 'MÁQUINA EM OPERAÇÃO'}
+                        <div className={`w-full backdrop-blur-xl border-y-4 py-12 animate-producing-pulse flex flex-col items-center justify-center transition-all duration-500 ${trefilaEstimation.isDelayed ? 'bg-rose-950/60 border-rose-500 shadow-[0_0_100px_rgba(244,63,94,0.6)]' : 'bg-emerald-950/45 border-emerald-500 shadow-[0_0_100px_rgba(16,185,129,0.4)]'}`}>
+                            <span className={`text-sm font-black uppercase tracking-[0.8em] mb-6 animate-pulse ${trefilaEstimation.isDelayed ? 'text-rose-400 neon-text-red' : 'text-emerald-400 neon-text-green'}`}>
+                                {trefilaEstimation.isDelayed ? '⚠ LOTE ATRASADO' : (machineType.startsWith('Trefila') ? 'LOTE EM PROCESSO' : 'MÁQUINA EM OPERAÇÃO')}
                             </span>
                             <h3 className="text-4xl md:text-7xl font-black text-white text-center uppercase tracking-tighter drop-shadow-[0_10px_30px_rgba(0,0,0,0.5)] leading-tight px-4 break-words max-w-full italic">
                                 {machineType.startsWith('Trefila') ? (activeLotInfo?.internalLot || '---') : (activeOrder?.trelicaModel || '---')}
                             </h3>
                             
-                            <div className="mt-10 flex gap-6">
-                                <div className="px-8 py-4 bg-black/60 border border-emerald-500/50 rounded-3xl flex flex-col items-center min-w-[200px]">
-                                    <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">
+                            <div className="mt-10 flex flex-wrap justify-center gap-6">
+                                <div className={`px-8 py-4 bg-black/60 border rounded-3xl flex flex-col items-center min-w-[200px] ${trefilaEstimation.isDelayed ? 'border-rose-500/50' : 'border-emerald-500/50'}`}>
+                                    <span className={`text-[10px] font-black uppercase tracking-widest mb-1 ${trefilaEstimation.isDelayed ? 'text-rose-500' : 'text-emerald-500'}`}>
                                         {machineType.startsWith('Trefila') ? 'Peso do Lote' : 'Peças Produzidas'}
                                     </span>
                                     <span className="text-5xl font-black text-white font-mono">
@@ -412,8 +434,9 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                         <span className="text-xl"> {machineType.startsWith('Trefila') ? 'kg' : 'pçs'}</span>
                                     </span>
                                 </div>
-                                <div className="px-8 py-4 bg-black/60 border border-emerald-500/50 rounded-3xl flex flex-col items-center min-w-[200px]">
-                                    <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Tempo de Processo</span>
+                                
+                                <div className={`px-8 py-4 bg-black/60 border rounded-3xl flex flex-col items-center min-w-[200px] ${trefilaEstimation.isDelayed ? 'border-rose-500/50' : 'border-emerald-500/50'}`}>
+                                    <span className={`text-[10px] font-black uppercase tracking-widest mb-1 ${trefilaEstimation.isDelayed ? 'text-rose-500' : 'text-emerald-500'}`}>Tempo de Processo</span>
                                     <span className="text-5xl font-black text-white font-mono tabular-nums">
                                         {machineType.startsWith('Trefila') 
                                             ? formatDuration(now.getTime() - new Date(activeOrder!.activeLotProcessing!.startTime).getTime())
@@ -421,12 +444,26 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                         }
                                     </span>
                                 </div>
+
+                                {machineType.startsWith('Trefila') && trefilaEstimation.remainingSeconds !== null && (
+                                    <div className={`px-8 py-4 bg-black/60 border rounded-3xl flex flex-col items-center min-w-[240px] animate-pulse ${trefilaEstimation.isDelayed ? 'border-rose-600 shadow-[0_0_20px_rgba(244,63,94,0.3)]' : 'border-emerald-500/50'}`}>
+                                        <span className={`text-[10px] font-black uppercase tracking-widest mb-1 ${trefilaEstimation.isDelayed ? 'text-rose-400' : 'text-emerald-500'}`}>
+                                            {trefilaEstimation.isDelayed ? 'Tempo de Atraso' : 'Estimativa Restante'}
+                                        </span>
+                                        <span className={`text-5xl font-black font-mono tabular-nums ${trefilaEstimation.isDelayed ? 'text-rose-500' : 'text-white'}`}>
+                                            {trefilaEstimation.isDelayed 
+                                                ? formatDuration(now.getTime() - (new Date(activeOrder!.activeLotProcessing!.startTime).getTime() + (activeLotInfo!.initialQuantity / (parseFloat(activeOrder!.targetBitola!.replace(',', '.'))**2 * 0.006162 * activeOrder!.activeLotProcessing!.speed) * 1000)))
+                                                : formatDuration(trefilaEstimation.remainingSeconds * 1000)
+                                            }
+                                        </span>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="mt-8 flex gap-4 opacity-50">
-                                <CogIcon className="h-6 w-6 text-emerald-500 animate-spin-slow" />
-                                <CogIcon className="h-6 w-6 text-emerald-500 animate-spin-slow delay-150" />
-                                <CogIcon className="h-6 w-6 text-emerald-500 animate-spin-slow delay-300" />
+                                <CogIcon className={`h-6 w-6 animate-spin-slow ${trefilaEstimation.isDelayed ? 'text-rose-500' : 'text-emerald-500'}`} />
+                                <CogIcon className={`h-6 w-6 animate-spin-slow delay-150 ${trefilaEstimation.isDelayed ? 'text-rose-500' : 'text-emerald-500'}`} />
+                                <CogIcon className={`h-6 w-6 animate-spin-slow delay-300 ${trefilaEstimation.isDelayed ? 'text-rose-500' : 'text-emerald-500'}`} />
                             </div>
                         </div>
                     </div>
