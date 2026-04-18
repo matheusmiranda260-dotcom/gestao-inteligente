@@ -345,24 +345,43 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
 
     const trefilaEstimation = useMemo(() => {
         if (!machineType.startsWith('Trefila') || !activeOrder?.activeLotProcessing?.speed || !activeOrder.targetBitola || !activeLotInfo) {
-            return { remainingSeconds: null, isDelayed: false };
+            return { remainingSeconds: null, isDelayed: false, elapsedUptimeSeconds: 0 };
         }
 
+        const lotStartTime = new Date(activeOrder.activeLotProcessing.startTime).getTime();
         const bitola = parseFloat(activeOrder.targetBitola.replace(',', '.'));
         const speed = activeOrder.activeLotProcessing.speed;
         const linearMass = bitola * bitola * 0.006162;
         const massPerSecond = speed * linearMass;
         const initialWeight = activeLotInfo.initialQuantity || 0;
-        const remainingWeight = activeLotInfo.remainingQuantity || initialWeight;
 
-        if (massPerSecond <= 0) return { remainingSeconds: null, isDelayed: false };
+        if (massPerSecond <= 0) return { remainingSeconds: null, isDelayed: false, elapsedUptimeSeconds: 0 };
 
-        const remainingSeconds = remainingWeight / massPerSecond;
-        const startTime = new Date(activeOrder.activeLotProcessing.startTime).getTime();
-        const totalDurationMs = (initialWeight / massPerSecond) * 1000;
-        const isDelayed = (now.getTime() - startTime) > totalDurationMs;
+        const totalDurationSeconds = initialWeight / massPerSecond;
 
-        return { remainingSeconds, isDelayed };
+        // Calculate downtime specifically for this lot
+        const lotDowntimeMs = (activeOrder.downtimeEvents || []).reduce((acc, e: any) => {
+            const stop = new Date(e.stopTime).getTime();
+            if (stop < lotStartTime) {
+                if (!e.resumeTime) return acc; // Open event started before lot? Rare but handleable
+                const resume = new Date(e.resumeTime).getTime();
+                if (resume <= lotStartTime) return acc;
+                // Stopped before lot, resumed after lot start
+                return acc + (resume - lotStartTime);
+            }
+            // Stopped after lot start
+            const resume = e.resumeTime ? new Date(e.resumeTime).getTime() : now.getTime();
+            return acc + (resume - stop);
+        }, 0);
+
+        const totalElapsedMs = now.getTime() - lotStartTime;
+        const elapsedUptimeMs = Math.max(0, totalElapsedMs - lotDowntimeMs);
+        const elapsedUptimeSeconds = elapsedUptimeMs / 1000;
+
+        const remainingSeconds = Math.max(0, totalDurationSeconds - elapsedUptimeSeconds);
+        const isDelayed = elapsedUptimeSeconds > totalDurationSeconds;
+
+        return { remainingSeconds, isDelayed, elapsedUptimeSeconds };
     }, [machineType, activeOrder, activeLotInfo, now]);
 
     return (
@@ -452,7 +471,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                         </span>
                                         <span className={`text-5xl font-black font-mono tabular-nums ${trefilaEstimation.isDelayed ? 'text-rose-500' : 'text-white'}`}>
                                             {trefilaEstimation.isDelayed 
-                                                ? formatDuration(now.getTime() - (new Date(activeOrder!.activeLotProcessing!.startTime).getTime() + (activeLotInfo!.initialQuantity / (parseFloat(activeOrder!.targetBitola!.replace(',', '.'))**2 * 0.006162 * activeOrder!.activeLotProcessing!.speed) * 1000)))
+                                                ? formatDuration((trefilaEstimation.elapsedUptimeSeconds - (activeLotInfo.initialQuantity / (parseFloat(activeOrder?.targetBitola?.replace(',', '.') || '1')**2 * 0.006162 * activeOrder!.activeLotProcessing!.speed))) * 1000)
                                                 : formatDuration(trefilaEstimation.remainingSeconds * 1000)
                                             }
                                         </span>
