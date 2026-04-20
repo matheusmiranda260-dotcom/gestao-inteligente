@@ -213,8 +213,7 @@ const DowntimeConfigManager: React.FC<DowntimeConfigManagerProps> = ({ onBack, s
                             </div>
                         ) : configs.filter(c => 
                             filterMachine === 'Todas' || 
-                            c.machineType === filterMachine || 
-                            (filterMachine !== 'Geral' && c.machineType === 'Geral')
+                            c.machineType === filterMachine
                         ).length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-20 bg-slate-900/20 border border-dashed border-white/10 rounded-3xl gap-4">
                                 <ExclamationCircleIcon className="h-12 w-12 text-slate-600" />
@@ -236,8 +235,7 @@ const DowntimeConfigManager: React.FC<DowntimeConfigManagerProps> = ({ onBack, s
                                         {configs
                                             .filter(c => 
                                                 filterMachine === 'Todas' || 
-                                                c.machineType === filterMachine || 
-                                                (filterMachine !== 'Geral' && filterMachine !== 'Todas' && c.machineType === 'Geral')
+                                                c.machineType === filterMachine
                                             )
                                             .map(config => (
                                                 <tr key={config.id} className={`group transition-all hover:bg-white/[0.02] ${!config.isActive ? 'opacity-40 grayscale' : ''}`}>
