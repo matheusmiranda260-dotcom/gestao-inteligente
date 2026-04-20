@@ -438,7 +438,16 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
         const remainingSeconds = Math.max(0, totalDurationSeconds - elapsedUptimeSeconds);
         const isDelayed = elapsedUptimeSeconds > totalDurationSeconds;
 
-        return { remainingSeconds, isDelayed, elapsedUptimeSeconds };
+        // Calcula a hora estimada de término (Hora atual + Segundos restantes)
+        const finishTime = new Date(now.getTime() + (remainingSeconds * 1000));
+
+        return { 
+            remainingSeconds, 
+            isDelayed, 
+            elapsedUptimeSeconds,
+            lotDowntimeMs,
+            estimatedFinishTime: finishTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+        };
     }, [machineType, activeOrder, activeLotInfo, now]);
 
     return (
@@ -533,15 +542,27 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
 
                                 {machineType.startsWith('Trefila') && trefilaEstimation.remainingSeconds !== null && (
                                     <div className={`px-8 py-4 bg-black/60 border rounded-3xl flex flex-col items-center min-w-[240px] ${trefilaEstimation.isDelayed ? 'border-rose-600 shadow-[0_0_20px_rgba(244,63,94,0.3)]' : 'border-emerald-500/50'}`}>
-                                        <span className={`text-[10px] font-black uppercase tracking-widest mb-1 ${trefilaEstimation.isDelayed ? 'text-rose-400' : 'text-emerald-500'}`}>
-                                            {trefilaEstimation.isDelayed ? 'Tempo de Atraso' : 'Estimativa Restante'}
-                                        </span>
-                                        <span className={`text-5xl font-black font-mono tabular-nums ${trefilaEstimation.isDelayed ? 'text-rose-500' : 'text-white'}`}>
-                                            {trefilaEstimation.isDelayed 
-                                                ? formatDuration((trefilaEstimation.elapsedUptimeSeconds - (activeLotInfo.initialQuantity / (parseFloat(activeOrder?.targetBitola?.replace(',', '.') || '1')**2 * 0.006162 * activeOrder!.activeLotProcessing!.speed))) * 1000)
-                                                : formatDuration(trefilaEstimation.remainingSeconds * 1000)
-                                            }
-                                        </span>
+                                        <div className="flex flex-col items-center">
+                                            <span className={`text-[10px] font-black uppercase tracking-widest mb-1 ${trefilaEstimation.isDelayed ? 'text-rose-400' : 'text-emerald-500'}`}>
+                                                {trefilaEstimation.isDelayed ? 'Tempo de Atraso' : 'Estimativa Restante'}
+                                            </span>
+                                            <span className={`text-5xl font-black font-mono tabular-nums ${trefilaEstimation.isDelayed ? 'text-rose-500' : 'text-white'}`}>
+                                                {trefilaEstimation.isDelayed 
+                                                    ? formatDuration((trefilaEstimation.elapsedUptimeSeconds - (activeLotInfo.initialQuantity / (parseFloat(activeOrder?.targetBitola?.replace(',', '.') || '1')**2 * 0.006162 * activeOrder!.activeLotProcessing!.speed))) * 1000)
+                                                    : formatDuration(trefilaEstimation.remainingSeconds * 1000)
+                                                }
+                                            </span>
+                                        </div>
+                                        <div className="mt-3 pt-3 border-t border-white/5 w-full flex justify-between items-center px-2">
+                                            <div className="flex flex-col items-start">
+                                                <span className="text-[8px] font-black text-slate-500 uppercase tracking-wider">Parada (Lote)</span>
+                                                <span className="text-xs font-bold text-rose-400 font-mono italic">{formatDuration(trefilaEstimation.lotDowntimeMs)}</span>
+                                            </div>
+                                            <div className="flex flex-col items-end">
+                                                <span className="text-[8px] font-black text-slate-500 uppercase tracking-wider">Termina às</span>
+                                                <span className="text-xs font-bold text-emerald-400 font-mono italic">{trefilaEstimation.estimatedFinishTime}</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 )}
                             </div>
