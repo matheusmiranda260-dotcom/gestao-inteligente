@@ -152,7 +152,21 @@ const DowntimeModal: React.FC<{
                     <div className="grid grid-cols-2 gap-4 mb-8">
                         {dynamicDowntimeReasons.map(r => {
                             const isActive = selectedReasons.includes(r);
-                            const config = (downtimeConfigs || []).find(c => c.reason === r);
+                            
+                            // Normalização para busca robusta
+                            const normalize = (s: string) => s.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                            const normR = normalize(r);
+                            const machineCategory = machineType.toLowerCase().includes('trefila') ? 'trefila' : 
+                                               machineType.toLowerCase().includes('trelica') ? 'trelica' : 
+                                               machineType.toLowerCase().trim();
+
+                            const config = (downtimeConfigs || []).find(c => {
+                                const normConfigR = normalize(c.reason);
+                                const configCategory = normalize(c.machineType);
+                                return normR === normConfigR && 
+                                       (configCategory === 'geral' || configCategory === machineCategory);
+                            });
+                            
                             const limit = config ? config.thresholdMinutes : (DOWNTIME_THRESHOLDS[r] || 15);
                             
                             return (

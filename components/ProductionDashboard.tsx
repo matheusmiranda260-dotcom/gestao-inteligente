@@ -230,9 +230,21 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     let currentStyle = statusStyles[machineStatus.status as keyof typeof statusStyles] || statusStyles.Ocioso;
     
     // Check if stopped and over limit to adjust styles dynamically
-    const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const normalize = (s: string) => s.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     const normReasonForStyle = normalize(machineStatus.reason);
-    const matchingConfigForStyle = (downtimeConfigs || []).find(c => normReasonForStyle.includes(normalize(c.reason)));
+    
+    // Normaliza o tipo da máquina para bater com a categoria (Trefila 1 -> Trefila)
+    const machineCategory = machineType.toLowerCase().includes('trefila') ? 'trefila' : 
+                            machineType.toLowerCase().includes('trelica') ? 'trelica' : 
+                            machineType.toLowerCase().trim();
+
+    const matchingConfigForStyle = (downtimeConfigs || []).find(c => {
+        const normConfigReason = normalize(c.reason);
+        const configCategory = normalize(c.machineType);
+        return normReasonForStyle === normConfigReason && 
+               (configCategory === 'geral' || configCategory === machineCategory);
+    });
+
     const thresholdMinutesForStyle = matchingConfigForStyle ? matchingConfigForStyle.thresholdMinutes : (DOWNTIME_THRESHOLDS[machineStatus.reason] || 15);
     const limitMsForStyle = thresholdMinutesForStyle * 60 * 1000;
     const isOverLimitForStyle = machineStatus.durationMs > limitMsForStyle;
