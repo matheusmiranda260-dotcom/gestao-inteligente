@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type { Page, ProductionOrderData, StockItem, User, OperatorLog, MachineType, ProcessedLot } from '../types';
+import type { Page, ProductionOrderData, StockItem, User, OperatorLog, MachineType, ProcessedLot, DowntimeConfig } from '../types';
 import { DOWNTIME_THRESHOLDS } from '../types';
 import { 
     ArrowLeftIcon, WarningIcon, CogIcon, PauseIcon, ClockIcon, 
     CheckCircleIcon, ScaleIcon, PlayIcon, BookOpenIcon, StopIcon, 
     WrenchScrewdriverIcon, ArchiveIcon, UserGroupIcon, ChartBarIcon 
 } from './icons';
+import { fetchTable, insertItem, updateItem, deleteItem } from '../services/supabaseService';
+import { trelicaModels } from './ProductionOrderTrelica';
 
 // Custom Power Icon
 const PowerIcon = ({ className }: { className?: string }) => (
