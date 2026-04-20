@@ -143,14 +143,19 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
         if (!activeOrder) {
             return { status: 'Ocioso', reason: 'Nenhuma ordem ativa', durationMs: 0 };
         }
+        
+        const parseDate = (d: any) => d ? new Date(d).getTime() : 0;
+        const nowMs = now.getTime();
+
         const events = (activeOrder.downtimeEvents || []) as any[];
         const openEvent = [...events]
-            .sort((a, b) => new Date(b.stopTime).getTime() - new Date(a.stopTime).getTime())
+            .sort((a, b) => parseDate(b.stopTime) - parseDate(a.stopTime))
             .find(e => !e.resumeTime);
 
         if (openEvent) {
             const reason = openEvent.reason || 'Parada';
-            const dur = Math.max(0, now.getTime() - new Date(openEvent.stopTime).getTime());
+            const stopMs = parseDate(openEvent.stopTime);
+            const dur = stopMs > 0 ? Math.max(0, nowMs - stopMs) : 0;
             
             const isPrep = reason.includes('Preparação') || 
                            reason.includes('Setup') || 
@@ -159,7 +164,6 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
 
             if (isPrep) return { status: 'Preparacao', reason, durationMs: dur };
             
-            // If it's a shift change, it's definitively "Desligada" (Off)
             if (reason.includes('Turno') || reason.includes('Final de Turno')) {
                 return { status: 'Desligada', reason, durationMs: dur };
             }
@@ -167,12 +171,15 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             return { status: 'Parada', reason, durationMs: dur };
         }
         
-        // NEW LOGIC: If Trefila has no lot active, it stays in Preparation
         const trefilaNotProducing = machineType.startsWith('Trefila') && (!activeOrder.activeLotProcessing || !activeOrder.activeLotProcessing.lotId);
         
-        const resumes = (activeOrder.downtimeEvents || []).filter((e: any) => e.resumeTime).map((e: any) => new Date(e.resumeTime!).getTime());
-        const lastResume = resumes.length ? Math.max(...resumes) : new Date(activeOrder.startTime).getTime();
-        const duration = Math.max(0, now.getTime() - Math.max(lastResume, shiftStartMs));
+        const resumes = (activeOrder.downtimeEvents || [])
+            .filter((e: any) => e.resumeTime)
+            .map((e: any) => parseDate(e.resumeTime));
+            
+        const lastResume = resumes.length ? Math.max(...resumes) : parseDate(activeOrder.startTime);
+        const refTime = Math.max(lastResume, shiftStartMs);
+        const duration = refTime > 0 ? Math.max(0, nowMs - refTime) : 0;
 
         if (trefilaNotProducing) {
             return { status: 'Preparacao', reason: 'Aguardando Início de Lote', durationMs: duration };
