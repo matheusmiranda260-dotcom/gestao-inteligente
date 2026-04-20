@@ -1893,30 +1893,40 @@ const MachineControl: React.FC<MachineControlProps> = ({
                 
                 {/* Machine Selector Dropdown - ONLY SHOWN FOR GESTORS */}
                 {isGestor && (
-                    <div className="flex items-center gap-2">
-                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Maq:</label>
-                        <div className="relative">
-                            <select
-                                value={activeMachine}
-                                onChange={(e) => setActiveMachine(e.target.value as MachineType)}
-                                className="appearance-none bg-slate-100 hover:bg-slate-200 border-none rounded-xl py-2 px-4 pr-10 text-sm font-black text-slate-800 focus:ring-2 focus:ring-indigo-500 transition-colors shadow-sm cursor-pointer outline-none"
-                            >
-                                {machineType.startsWith('Trefila') ? (
-                                    <>
-                                        <option value="Trefila 1">TREFILA 1</option>
-                                        <option value="Trefila 2">TREFILA 2</option>
-                                    </>
-                                ) : machineType.startsWith('Treliça') ? (
-                                    <>
-                                        <option value="Treliça 1">TRELIÇA 1</option>
-                                        <option value="Treliça 2">TRELIÇA 2</option>
-                                    </>
-                                ) : (
-                                    <option value={machineType}>{machineType}</option>
-                                )}
-                            </select>
-                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500">
-                                <ChevronDownIcon className="w-4 h-4" />
+                    <div className="flex items-center gap-4">
+                        <button 
+                            onClick={() => setPage('downtimeConfigs')}
+                            className="flex items-center gap-2 px-4 py-2 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all text-indigo-700 shadow-sm whitespace-nowrap"
+                        >
+                            <AdjustmentsIcon className="h-4 w-4" />
+                            Configurar Paradas
+                        </button>
+
+                        <div className="flex items-center gap-2">
+                            <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Maq:</label>
+                            <div className="relative">
+                                <select
+                                    value={activeMachine}
+                                    onChange={(e) => setActiveMachine(e.target.value as MachineType)}
+                                    className="appearance-none bg-slate-100 hover:bg-slate-200 border-none rounded-xl py-2 px-4 pr-10 text-sm font-black text-slate-800 focus:ring-2 focus:ring-indigo-500 transition-colors shadow-sm cursor-pointer outline-none"
+                                >
+                                    {machineType.startsWith('Trefila') ? (
+                                        <>
+                                            <option value="Trefila 1">TREFILA 1</option>
+                                            <option value="Trefila 2">TREFILA 2</option>
+                                        </>
+                                    ) : machineType.startsWith('Treliça') ? (
+                                        <>
+                                            <option value="Treliça 1">TRELIÇA 1</option>
+                                            <option value="Treliça 2">TRELIÇA 2</option>
+                                        </>
+                                    ) : (
+                                        <option value={machineType}>{machineType}</option>
+                                    )}
+                                </select>
+                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500">
+                                    <ChevronDownIcon className="w-4 h-4" />
+                                </div>
                             </div>
                         </div>
                     </div>
