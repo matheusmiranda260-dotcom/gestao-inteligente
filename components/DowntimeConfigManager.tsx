@@ -24,12 +24,19 @@ const DowntimeConfigManager: React.FC<DowntimeConfigManagerProps> = ({ onBack, s
     const [isEditing, setIsEditing] = useState<string | null>(null);
     const [editForm, setEditForm] = useState<Partial<DowntimeConfig>>({});
     const [isAdding, setIsAdding] = useState(false);
+    const [filterMachine, setFilterMachine] = useState<string>('Todas');
     const [newForm, setNewForm] = useState<Partial<DowntimeConfig>>({
         reason: '',
         thresholdMinutes: 15,
         machineType: 'Geral',
         isActive: true
     });
+
+    useEffect(() => {
+        if (filterMachine !== 'Todas') {
+            setNewForm(prev => ({ ...prev, machineType: filterMachine }));
+        }
+    }, [filterMachine]);
 
     useEffect(() => {
         loadConfigs();
@@ -74,7 +81,7 @@ const DowntimeConfigManager: React.FC<DowntimeConfigManagerProps> = ({ onBack, s
             await insertItem('downtime_configs', newForm as DowntimeConfig);
             showNotification('Nova parada adicionada com sucesso.', 'success');
             setIsAdding(false);
-            setNewForm({ reason: '', thresholdMinutes: 15, machineType: 'Geral', isActive: true });
+            setNewForm({ reason: '', thresholdMinutes: 15, machineType: filterMachine !== 'Todas' ? filterMachine : 'Geral', isActive: true });
             loadConfigs();
         } catch (error) {
             showNotification('Erro ao adicionar parada.', 'error');
@@ -118,6 +125,29 @@ const DowntimeConfigManager: React.FC<DowntimeConfigManagerProps> = ({ onBack, s
             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                 <div className="max-w-6xl mx-auto space-y-8">
                     
+                    {/* Machine Selector Tabs */}
+                    <div className="flex items-center gap-2 p-1.5 bg-[#0D1929]/80 border border-white/5 rounded-2xl w-fit">
+                        {[
+                            { id: 'Todas', icon: '🌍' },
+                            { id: 'Geral', icon: '⚙️' },
+                            { id: 'Trefila', icon: '🌀' },
+                            { id: 'Treliça', icon: '🏗️' }
+                        ].map((m) => (
+                            <button
+                                key={m.id}
+                                onClick={() => setFilterMachine(m.id)}
+                                className={`px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 ${
+                                    filterMachine === m.id 
+                                    ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' 
+                                    : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+                                }`}
+                            >
+                                <span className="text-xs">{m.icon}</span>
+                                {m.id}
+                            </button>
+                        ))}
+                    </div>
+                    
                     {/* Floating Add Card */}
                     <div className="bg-gradient-to-br from-indigo-600/10 to-transparent border border-indigo-500/20 rounded-3xl p-8 backdrop-blur-sm relative overflow-hidden group">
                         <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
@@ -142,20 +172,20 @@ const DowntimeConfigManager: React.FC<DowntimeConfigManagerProps> = ({ onBack, s
                                         type="number"
                                         className="w-full bg-slate-900/50 border border-white/10 rounded-2xl pl-12 pr-6 py-4 text-white focus:outline-none focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/10 transition-all font-mono font-bold"
                                         value={newForm.thresholdMinutes}
-                                        onChange={e => setNewForm({...newForm, thresholdMinutes: parseInt(e.target.value)})}
+                                        onChange={e => setNewForm({...newForm, thresholdMinutes: parseInt(e.target.value) || 0})}
                                     />
                                 </div>
                             </div>
                             <div className="w-full md:w-48 space-y-2">
                                 <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest px-1">Tipo de Máquina</label>
                                 <select 
-                                    className="w-full bg-slate-900/50 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-indigo-500/50 transition-all appearance-none cursor-pointer font-bold"
+                                    className="w-full !bg-slate-900 !text-white border border-white/10 rounded-2xl px-6 py-4 focus:outline-none focus:border-indigo-500/50 transition-all appearance-none cursor-pointer font-bold"
                                     value={newForm.machineType}
                                     onChange={e => setNewForm({...newForm, machineType: e.target.value})}
                                 >
-                                    <option value="Geral">Geral</option>
-                                    <option value="Trefila">Trefila</option>
-                                    <option value="Treliça">Treliça</option>
+                                    <option value="Geral" className="bg-slate-900 text-white">Geral</option>
+                                    <option value="Trefila" className="bg-slate-900 text-white">Trefila</option>
+                                    <option value="Treliça" className="bg-slate-900 text-white">Treliça</option>
                                 </select>
                             </div>
                             <button 
@@ -179,14 +209,24 @@ const DowntimeConfigManager: React.FC<DowntimeConfigManagerProps> = ({ onBack, s
                                 <CogIcon className="h-12 w-12 animate-spin text-indigo-400" />
                                 <span className="text-xs font-black uppercase tracking-widest">Sincronizando Banco de Dados...</span>
                             </div>
-                        ) : configs.length === 0 ? (
+                        ) : configs.filter(c => 
+                            filterMachine === 'Todas' || 
+                            c.machineType === filterMachine || 
+                            (filterMachine !== 'Geral' && c.machineType === 'Geral')
+                        ).length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-20 bg-slate-900/20 border border-dashed border-white/10 rounded-3xl gap-4">
                                 <ExclamationCircleIcon className="h-12 w-12 text-slate-600" />
-                                <span className="text-sm font-bold text-slate-500 italic">Nenhuma configuração encontrada.</span>
+                                <span className="text-sm font-bold text-slate-500 italic">Nenhuma configuração encontrada para {filterMachine}.</span>
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {configs.map(config => (
+                                {configs
+                                    .filter(c => 
+                                        filterMachine === 'Todas' || 
+                                        c.machineType === filterMachine || 
+                                        (filterMachine !== 'Geral' && filterMachine !== 'Todas' && c.machineType === 'Geral')
+                                    )
+                                    .map(config => (
                                     <div key={config.id} className="group relative">
                                         <div className={`h-full bg-[#0D1929]/80 border transition-all duration-500 p-6 rounded-[2.5rem] relative z-10 overflow-hidden ${
                                             isEditing === config.id ? 'border-indigo-500/50 ring-4 ring-indigo-500/5 shadow-2xl scale-[1.02]' : 'border-white/5 hover:border-white/10 hover:shadow-xl hover:shadow-black/20'

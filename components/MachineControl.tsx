@@ -76,8 +76,15 @@ const DowntimeModal: React.FC<{
                 'Falta de energia', 'Outros', 'Preparação'
             ];
         }
+        // Show 'Geral' configs always + machine-specific configs that match
         const filtered = downtimeConfigs
-            .filter(c => c.isActive && (c.machineType === 'Geral' || machineType.includes(c.machineType)))
+            .filter(c => {
+                if (!c.isActive) return false;
+                if (c.machineType === 'Geral') return true;
+                // machineType can be 'Trefila 1', 'Trefila 2', 'Treliça 1', 'Treliça 2'
+                // c.machineType is 'Trefila' or 'Treliça'
+                return machineType.startsWith(c.machineType);
+            })
             .map(c => c.reason);
         if (!filtered.includes('Outros')) filtered.push('Outros');
         return filtered;
@@ -697,7 +704,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
     logDowntime, logResumeProduction, startLotProcessing, finishLotProcessing,
     recordLotWeight, recordPackageWeight, completeProduction, addPartsRequest,
     logPostProductionActivity, updateProducedQuantity, deleteShiftReport,
-    cancelProductionOrder, pauseProductionOrder, addLotToOrder, initialView, initialModal, gauges = []
+    cancelProductionOrder, pauseProductionOrder, addLotToOrder, initialView, initialModal, gauges = [],
+    downtimeConfigs = []
 }) => {
     const [activeMachine, setActiveMachine] = useState<MachineType>(() => {
         const saved = localStorage.getItem('msm_active_machine');
@@ -1449,7 +1457,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
     }, [isEmergencyStopped, hasActiveShift, machineType, allPackagesWeighed, allTrefilaLotsProcessed]);
 
     const handleStopMachine = (reason: string) => {
-        if (activeOrder && logDowntime) {
+        if (!activeOrder) return;
+        if (logDowntime) {
             logDowntime(activeOrder.id, reason);
             setShowDowntimeModal(false);
         }
@@ -2881,7 +2890,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                         ) : (
                                             <div className="w-full md:w-auto flex relative items-center">
                                                 <button
-                                                    onClick={isMachineStopped ? (() => logResumeProduction && logResumeProduction(activeOrder.id)) : (() => setShowDowntimeModal(true))}
+                                                    onClick={isMachineStopped ? (() => { if (activeOrder && logResumeProduction) logResumeProduction(activeOrder.id); }) : (() => setShowDowntimeModal(true))}
                                                     className={`w-full h-24 md:h-20 rounded-3xl flex flex-col items-center justify-center gap-1 transition-all duration-500 shadow-2xl relative overflow-hidden group border-[3px]
                                                         ${isMachineStopped 
                                                             ? 'bg-rose-600 shadow-rose-200 animate-stop-pulse border-rose-400 active:scale-95' 
