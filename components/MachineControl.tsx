@@ -1080,7 +1080,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
             let elapsedUptimeSeconds = 0;
             if (activeOrder.activeLotProcessing?.speed && activeOrder.targetBitola) {
                 const lotStartTime = new Date(activeOrder.activeLotProcessing.startTime).getTime();
-                const bitola = parseFloat(activeOrder.targetBitola.replace(',', '.'));
+                const bitola = activeOrder.targetBitola ? parseFloat(activeOrder.targetBitola.replace(',', '.')) : 1;
                 const speed = activeOrder.activeLotProcessing.speed; // m/s
                 const linearMass = bitola * bitola * 0.006162; // kg/m
                 const massPerSecond = speed * linearMass; // kg/s
