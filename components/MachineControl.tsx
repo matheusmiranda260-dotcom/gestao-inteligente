@@ -77,6 +77,7 @@ const DowntimeModal: React.FC<{
                 if (c.machineType === 'Geral') return true;
                 // machineType pode ser 'Trefila 1', 'Trefila 2', 'Treliça 1', 'Treliça 2'
                 // c.machineType é 'Trefila' ou 'Treliça'
+                if (!machineType || !c.machineType) return false;
                 return machineType.startsWith(c.machineType);
             })
             .map(c => c.reason);
@@ -740,7 +741,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
     const [pendingGauges, setPendingGauges] = useState<Map<string, string>>(new Map()); // Novo estado para bitolas
     const [pendingPackageWeights, setPendingPackageWeights] = useState<Map<number, string>>(new Map());
     const [justCompletedOrderId, setJustCompletedOrderId] = useState<string | null>(null);
-    const [mobileTab, setMobileTab] = useState<'monitor' | 'work' | 'process' | 'weigh' | 'performance'>(activeMachine.startsWith('Treliça') ? 'work' : 'monitor');
+    const [mobileTab, setMobileTab] = useState<'monitor' | 'work' | 'process' | 'weigh' | 'performance'>((activeMachine && typeof activeMachine === 'string' && activeMachine.startsWith('Treliça')) ? 'work' : 'monitor');
     const [managerOverrideData, setManagerOverrideData] = useState<{
         packageNumber: number;
         quantity: number;
@@ -990,7 +991,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
     };
 
     const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor' || currentUser?.username === 'admin';
-    const machinePrefix = activeMachine.startsWith('Trefila') ? 'trefila' : 'trelica';
+    const machinePrefix = (activeMachine && typeof activeMachine === 'string' && activeMachine.startsWith('Trefila')) ? 'trefila' : 'trelica';
 
     const [productionReportData, setProductionReportData] = useState<ProductionOrderData | null>(null);
 
