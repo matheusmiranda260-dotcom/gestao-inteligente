@@ -332,11 +332,12 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                 </div>
 
                 {/* SISTEMA */}
-                {(hasPermission('userManagement') || hasPermission('gaugesManager')) && (
+                {(hasPermission('userManagement') || hasPermission('gaugesManager') || hasPermission('downtimeConfigs')) && (
                     <div className="sidebar-category">
                         <div className="sidebar-category-title">{isCollapsed ? '⚙️' : '⚙️ Sistema'}</div>
                         <MenuItem target="userManagement" label="Usuários" icon={UserGroupIcon} />
                         <MenuItem target="gaugesManager" label="Bitolas" icon={AdjustmentsIcon} />
+                        <MenuItem target="downtimeConfigs" label="Paradas" icon={AdjustmentsIcon} />
                     </div>
                 )}
             </div>

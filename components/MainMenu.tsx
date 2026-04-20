@@ -375,6 +375,15 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser }) =
                                 color="indigo"
                             />
                         )}
+                        {hasPermission('downtimeConfigs') && (
+                            <MenuButton
+                                onClick={() => setPage('downtimeConfigs')}
+                                label="Configuração de Máquinas"
+                                description="Gerencie motivos de paradas e tempos previstos."
+                                icon={<AdjustmentsIcon />}
+                                color="indigo"
+                            />
+                        )}
                     </div>
                 </section>
             </main>

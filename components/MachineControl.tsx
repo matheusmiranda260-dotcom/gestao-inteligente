@@ -52,18 +52,7 @@ const IdleActivityLogger: React.FC<{
     );
 };
 
-const downtimeReasons = [
-    'Enrosco de fio',
-    'Falha no sensor',
-    'Quebra fio',
-    'Setup',
-    'Lubrificação',
-    'Limpeza de eletrodos',
-    'Manutenção',
-    'Falta de energia',
-    'Outros',
-    'Preparação'
-];
+// Hardcoded fallback reasons removed in favor of dynamic configs from DB
 
 const DowntimeModal: React.FC<{
     onClose: () => void;
@@ -72,10 +61,27 @@ const DowntimeModal: React.FC<{
     onPauseOrder?: () => void;
     canPause?: boolean;
     downtimeEvents?: any[];
-}> = ({ onClose, onSubmit, onEndShift, onPauseOrder, canPause, downtimeEvents }) => {
+    downtimeConfigs?: DowntimeConfig[];
+    machineType?: string;
+}> = ({ onClose, onSubmit, onEndShift, onPauseOrder, canPause, downtimeEvents, downtimeConfigs = [], machineType = 'Geral' }) => {
     const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
     const [otherReason, setOtherReason] = useState('');
     const [isOtherActive, setIsOtherActive] = useState(false);
+    
+    const dynamicDowntimeReasons = useMemo(() => {
+        if (!downtimeConfigs || downtimeConfigs.length === 0) {
+            return [
+                'Enrosco de fio', 'Falha no sensor', 'Quebra fio', 'Setup', 
+                'Lubrificação', 'Limpeza de eletrodos', 'Manutenção', 
+                'Falta de energia', 'Outros', 'Preparação'
+            ];
+        }
+        const filtered = downtimeConfigs
+            .filter(c => c.isActive && (c.machineType === 'Geral' || machineType.includes(c.machineType)))
+            .map(c => c.reason);
+        if (!filtered.includes('Outros')) filtered.push('Outros');
+        return filtered;
+    }, [downtimeConfigs, machineType]);
 
     const toggleReason = (r: string) => {
         if (r === 'Outros') {
@@ -142,9 +148,11 @@ const DowntimeModal: React.FC<{
 
                 <div className="p-8 max-h-[70vh] overflow-y-auto custom-scrollbar">
                     <div className="grid grid-cols-2 gap-4 mb-8">
-                        {downtimeReasons.map(r => {
+                        {dynamicDowntimeReasons.map(r => {
                             const isActive = selectedReasons.includes(r);
-                            const limit = DOWNTIME_THRESHOLDS[r];
+                            const config = (downtimeConfigs || []).find(c => c.reason === r);
+                            const limit = config ? config.thresholdMinutes : (DOWNTIME_THRESHOLDS[r] || 15);
+                            
                             return (
                                 <button
                                     key={r}
@@ -158,13 +166,14 @@ const DowntimeModal: React.FC<{
                                 >
                                     <div className="flex items-center gap-3 w-full">
                                         <div className={`w-3 h-3 rounded-full flex-shrink-0 ${isActive ? 'bg-white animate-pulse' : 'bg-slate-200'}`} />
-                                        <span className="truncate">{r}</span>
+                                        <span className="flex-1 uppercase italic tracking-tight truncate">{r}</span>
                                     </div>
-                                    {limit && (
-                                        <span className={`text-[8px] uppercase tracking-widest mt-1 px-1.5 py-0.5 rounded ${isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-400'}`}>
-                                            Limite: {limit >= 60 ? `${limit/60}h` : `${limit}min`}
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <ClockIcon className={`h-3 w-3 ${isActive ? 'text-amber-100' : 'text-slate-400'}`} />
+                                        <span className={`text-[10px] font-bold ${isActive ? 'text-amber-100' : 'text-slate-400'}`}>
+                                            Limite: {limit} min
                                         </span>
-                                    )}
+                                    </div>
                                 </button>
                             );
                         })}
@@ -645,6 +654,7 @@ interface MachineControlProps {
     initialModal?: 'reports' | 'parts' | 'rings' | null;
     gauges?: StockGauge[];
     addLotToOrder?: (orderId: string, lotId: string) => void;
+    downtimeConfigs?: DowntimeConfig[];
 }
 
 const formatDuration = (ms: number) => {
@@ -1582,9 +1592,10 @@ const MachineControl: React.FC<MachineControlProps> = ({
                     const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
                     const normReason = normalize(reason);
                     
-                    const limitEntry = Object.entries(DOWNTIME_THRESHOLDS).find(([key]) => normReason.includes(normalize(key)));
-                    const limitMs = limitEntry ? limitEntry[1] * 60 * 1000 : (reason === 'Motivo não informado' ? null : 15 * 60 * 1000);
-                    const isOverLimit = limitMs ? durationMs > limitMs : false;
+                    const matchingConfig = (downtimeConfigs || []).find(c => normReason.includes(normalize(c.reason)));
+                    const limitMinutes = matchingConfig ? matchingConfig.thresholdMinutes : (DOWNTIME_THRESHOLDS[reason] || 15);
+                    const limitMs = limitMinutes * 60 * 1000;
+                    const isOverLimit = durationMs > limitMs;
 
                     if (currentMachineStatus === 'Preparacao' && !isOverLimit) return null;
 
@@ -1613,7 +1624,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                     {limitMs && (
                                         <div className={`p-4 rounded-2xl border-2 transition-all ${isOverLimit ? 'bg-rose-50 border-rose-500 animate-stop-pulse' : 'bg-amber-50 border-amber-500 animate-warning-pulse'}`}>
                                             <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${isOverLimit ? 'text-rose-600' : 'text-amber-600'}`}>
-                                                Tempo Previsto: <span className="text-sm font-black">{limitEntry ? limitEntry[1] : 0} min</span>
+                                                Tempo Previsto: <span className="text-sm font-black">{limitMinutes} min</span>
                                             </p>
                                             <div className="w-full bg-black/10 rounded-full h-1.5 mt-2 overflow-hidden">
                                                 <div 
@@ -1774,6 +1785,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
                     } : undefined}
                     canPause={(!activeMachine.startsWith('Trefila'))}
                     downtimeEvents={activeOrder?.downtimeEvents || []}
+                    downtimeConfigs={downtimeConfigs}
+                    machineType={activeMachine}
                 />
             )}
             {showCompletionModal && activeOrder && <CompletionModal order={activeOrder} onClose={() => setShowCompletionModal(false)} onSubmit={handleCompleteProduction} />}

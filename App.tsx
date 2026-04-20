@@ -29,6 +29,7 @@ import StickyNotes from './components/StickyNotes';
 import MeetingsTasks from './components/MeetingsTasks';
 import Laboratory from './components/Laboratory';
 import DocumentManager from './components/DocumentManager';
+import DowntimeConfigManager from './components/DowntimeConfigManager';
 import { supabase } from './supabaseClient';
 import type { StockGauge, StickyNote } from './types';
 
@@ -74,6 +75,7 @@ const App: React.FC = () => {
     const [stickyNotes, setStickyNotes] = useState<StickyNote[]>([]);
     const [meetings, setMeetings] = useState<Meeting[]>([]);
     const [meetingCategories, setMeetingCategories] = useState<MeetingCategory[]>([]);
+    const [downtimeConfigs, setDowntimeConfigs] = useState<DowntimeConfig[]>([]);
 
     const [pendingKaizenCount, setPendingKaizenCount] = useState(0);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -125,7 +127,7 @@ const App: React.FC = () => {
                 const [
                     fetchedUsers, fetchedEmployees, fetchedStock, fetchedConferences, fetchedTransfers,
                     fetchedOrders, fetchedFinishedGoods, fetchedPontas, fetchedFGTransfers,
-                    fetchedParts, fetchedReports, fetchedProductionRecords, fetchedGauges, fetchedNotes, fetchedMeetings, fetchedCategories
+                    fetchedParts, fetchedReports, fetchedProductionRecords, fetchedGauges, fetchedNotes, fetchedMeetings, fetchedCategories, fetchedDowntimeConfigs
                 ] = await Promise.all([
                     fetchTable<User>('app_users'),
                     fetchTable<Employee>('employees'),
@@ -143,7 +145,8 @@ const App: React.FC = () => {
                     fetchTable<StockGauge>('stock_gauges').catch(() => []),
                     fetchTable<StickyNote>('sticky_notes').catch(() => []),
                     fetchTable<Meeting>('meetings').catch(() => []),
-                    fetchTable<MeetingCategory>('meeting_categories').catch(() => [])
+                    fetchTable<MeetingCategory>('meeting_categories').catch(() => []),
+                    fetchTable<DowntimeConfig>('downtime_configs').catch(() => [])
                 ]);
 
                 setUsers(fetchedUsers);
@@ -162,6 +165,7 @@ const App: React.FC = () => {
                 setStickyNotes(fetchedNotes || []);
                 setMeetings(fetchedMeetings || []);
                 setMeetingCategories(fetchedCategories || []);
+                setDowntimeConfigs(fetchedDowntimeConfigs || []);
 
                 // Split production records
                 setTrefilaProduction(fetchedProductionRecords.filter(r => r.machine.startsWith('Trefila')));
@@ -2176,7 +2180,7 @@ const App: React.FC = () => {
             logResumeProduction, startLotProcessing, finishLotProcessing, recordLotWeight,
             addPartsRequest, logPostProductionActivity, completeProduction, recordPackageWeight,
             updateProducedQuantity, users, deleteShiftReport, gauges, cancelProductionOrder,
-            pauseProductionOrder, addLotToOrder
+            pauseProductionOrder, addLotToOrder, downtimeConfigs
         };
 
         switch (page) {
@@ -2205,7 +2209,7 @@ const App: React.FC = () => {
 
             case 'productionOrder': return <ProductionOrder setPage={setPage} stock={stock} productionOrders={productionOrders} addProductionOrder={addProductionOrder} showNotification={showNotification} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} gauges={gauges} currentUser={currentUser} />;
             case 'productionOrderTrelica': return <ProductionOrderTrelica setPage={setPage} stock={stock} productionOrders={productionOrders} addProductionOrder={addProductionOrder} showNotification={showNotification} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} gauges={gauges} currentUser={currentUser} />;
-            case 'productionDashboard': return <ProductionDashboard setPage={setPage} productionOrders={productionOrders} stock={stock} currentUser={currentUser} />;
+            case 'productionDashboard': return <ProductionDashboard setPage={setPage} productionOrders={productionOrders} stock={stock} currentUser={currentUser} downtimeConfigs={downtimeConfigs} />;
             case 'reports': return <Reports setPage={setPage} stock={stock} trefilaProduction={trefilaProduction} trelicaProduction={trelicaProduction} />;
             case 'userManagement': return <UserManagement users={users} employees={employees} addUser={addUser} updateUser={updateUser} deleteUser={deleteUser} setPage={setPage} />;
             case 'finishedGoods': return <FinishedGoods finishedGoods={finishedGoods} pontasStock={pontasStock} setPage={setPage} finishedGoodsTransfers={finishedGoodsTransfers} createFinishedGoodsTransfer={createFinishedGoodsTransfer} onDelete={deleteFinishedGoods} />;
@@ -2231,6 +2235,7 @@ const App: React.FC = () => {
                     onDeleteCategory={handleDeleteMeetingCategory}
                 />;
             case 'laboratory': return <Laboratory setPage={setPage} currentUser={currentUser} gauges={gauges} />;
+            case 'downtimeConfigs': return <DowntimeConfigManager onBack={() => setPage('menu')} showNotification={showNotification} />;
             default: return <Login onLogin={handleLogin} error={null} />;
         }
     };

@@ -110,9 +110,10 @@ interface MachineStatusViewProps {
     goalUnit: string;
     onResetShift?: () => void;
     isGestor?: boolean;
+    downtimeConfigs: DowntimeConfig[];
 }
 
-const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, activeOrder, allOrders, stock, dailyProducedValue, dailyGoal, goalUnit, onResetShift, isGestor }) => {
+const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, activeOrder, allOrders, stock, dailyProducedValue, dailyGoal, goalUnit, onResetShift, isGestor, downtimeConfigs }) => {
     const [now, setNow] = useState(new Date());
     const [activeTab, setActiveTab] = useState<'stops' | 'production'>('stops');
 
@@ -189,11 +190,13 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     // Check if stopped and over limit to adjust styles dynamically
     const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     const normReasonForStyle = normalize(machineStatus.reason);
-    const limitEntryForStyle = Object.entries(DOWNTIME_THRESHOLDS).find(([key]) => normReasonForStyle.includes(normalize(key)));
-    const isOverLimitForStyle = limitEntryForStyle ? machineStatus.durationMs > (limitEntryForStyle[1] * 60 * 1000) : false;
+    const matchingConfigForStyle = (downtimeConfigs || []).find(c => normReasonForStyle.includes(normalize(c.reason)));
+    const thresholdMinutesForStyle = matchingConfigForStyle ? matchingConfigForStyle.thresholdMinutes : (DOWNTIME_THRESHOLDS[machineStatus.reason] || 15);
+    const limitMsForStyle = thresholdMinutesForStyle * 60 * 1000;
+    const isOverLimitForStyle = machineStatus.durationMs > limitMsForStyle;
 
     if (machineStatus.status === 'Parada' || machineStatus.status === 'Preparacao') {
-        if (!isOverLimitForStyle && limitEntryForStyle) {
+        if (!isOverLimitForStyle && thresholdMinutesForStyle) {
             // Within limit: Yellow/Amber
             currentStyle = {
                 ...statusStyles.Parada,
@@ -424,7 +427,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                         <div className={`mt-2 px-3 py-1 border rounded-md animate-pulse ${isOverLimitForStyle ? 'bg-rose-500/20 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.3)]' : 'bg-amber-500/10 border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.2)]'}`}>
                             <p className={`text-[9px] font-black uppercase tracking-tighter ${isOverLimitForStyle ? 'text-rose-400' : 'text-amber-500'}`}>
                                 MOTIVO: {machineStatus.reason} 
-                                {limitEntryForStyle && ` • ${formatDuration(machineStatus.durationMs)} / ${limitEntryForStyle[1]}m`}
+                                {thresholdMinutesForStyle && ` • ${formatDuration(machineStatus.durationMs)} / ${thresholdMinutesForStyle}m`}
                             </p>
                         </div>
                     )}
@@ -776,9 +779,10 @@ interface ProductionDashboardProps {
     productionOrders: ProductionOrderData[];
     stock: StockItem[];
     currentUser: User | null;
+    downtimeConfigs: DowntimeConfig[];
 }
 
-const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, productionOrders, stock, currentUser }) => {
+const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, productionOrders, stock, currentUser, downtimeConfigs }) => {
     const isGestor = currentUser?.role === 'gestor' || currentUser?.role === 'admin';
     const [shiftResets, setShiftResets] = useState(() => JSON.parse(localStorage.getItem('shiftResets') || '{}'));
     const [visibleMachines, setVisibleMachines] = useState<MachineType[]>(() => {
@@ -956,6 +960,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                             goalUnit={m.startsWith('Treliça') ? "pçs" : "kg"} 
                             isGestor={isGestor} 
                             onResetShift={() => handleReset(m)} 
+                            downtimeConfigs={downtimeConfigs}
                         />
                     );
                 })}
