@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { 
-    CogIcon, 
+    Cog6ToothIcon as CogIcon, 
     PlusIcon, 
     PencilIcon, 
     TrashIcon, 
     CheckIcon, 
-    XIcon, 
+    XMarkIcon as XIcon, 
     ClockIcon,
     ExclamationCircleIcon,
-    AdjustmentsIcon
-} from '@heroicons/react/outline';
-import { fetchTable, insertItem, updateItem, deleteItem } from '../supabaseClient';
+    AdjustmentsHorizontalIcon as AdjustmentsIcon
+} from '@heroicons/react/24/outline';
+import { fetchTable, insertItem, updateItem, deleteItem } from '../services/supabaseService';
 import { DowntimeConfig } from '../types';
 
 interface DowntimeConfigManagerProps {
