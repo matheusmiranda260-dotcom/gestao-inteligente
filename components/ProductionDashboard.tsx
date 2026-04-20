@@ -473,12 +473,19 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                             <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-black/40 border border-white/10 ${currentStyle.color}`}>
                                 {currentOperator}
                             </span>
-                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none">
                                 • {machineType.startsWith('Trefila') 
                                     ? (activeOrder?.targetBitola || '---') 
                                     : (activeOrder?.trelicaModel ? `${activeOrder.trelicaModel} ${activeOrder.tamanho ? `(${activeOrder.tamanho}m)` : ''}` : '---')
                                 }
                             </span>
+                            {!machineType.startsWith('Trefila') && activeOrder?.trelicaModel && (
+                                <div className="flex gap-2 ml-1">
+                                    <span className="text-[8px] font-black text-slate-600 bg-white/5 px-1.5 py-0.5 rounded uppercase">S: {activeOrder.trelicaSuperior || '-'}</span>
+                                    <span className="text-[8px] font-black text-slate-600 bg-white/5 px-1.5 py-0.5 rounded uppercase">I: {activeOrder.trelicaInferior || '-'}</span>
+                                    <span className="text-[8px] font-black text-slate-600 bg-white/5 px-1.5 py-0.5 rounded uppercase">Z: {activeOrder.trelicaSinusoide || '-'}</span>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -505,11 +512,29 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                             <span className={`text-sm font-black uppercase tracking-[0.8em] mb-6 ${trefilaEstimation.isDelayed ? 'text-rose-400 neon-text-red animate-pulse' : 'text-emerald-400 neon-text-green'}`}>
                                 {trefilaEstimation.isDelayed ? '⚠ LOTE ATRASADO' : (machineType.startsWith('Trefila') ? 'LOTE EM PROCESSO' : 'MÁQUINA EM OPERAÇÃO')}
                             </span>
-                            <h3 className="text-4xl md:text-7xl font-black text-white text-center uppercase tracking-tighter drop-shadow-[0_10px_30px_rgba(0,0,0,0.5)] leading-tight px-4 break-words max-w-full italic">
-                                {machineType.startsWith('Trefila') 
-                                    ? `${activeLotInfo?.internalLot || '---'} ${activeLotInfo?.initialQuantity ? `• ${activeLotInfo.initialQuantity} KG` : ''}` 
-                                    : (activeOrder?.trelicaModel || '---')}
-                            </h3>
+                            <div className="flex flex-col items-center gap-2">
+                                <h3 className="text-4xl md:text-7xl font-black text-white text-center uppercase tracking-tighter drop-shadow-[0_10px_30px_rgba(0,0,0,0.5)] leading-tight px-4 break-words max-w-full italic">
+                                    {machineType.startsWith('Trefila') 
+                                        ? `${activeLotInfo?.internalLot || '---'} ${activeLotInfo?.initialQuantity ? `• ${activeLotInfo.initialQuantity} KG` : ''}` 
+                                        : `${activeOrder?.trelicaModel || '---'} ${activeOrder?.tamanho ? `(${activeOrder.tamanho}M)` : ''}`}
+                                </h3>
+                                {!machineType.startsWith('Trefila') && activeOrder?.trelicaModel && (
+                                    <div className="flex gap-6 mt-2 px-8 py-2 bg-black/40 border border-white/5 rounded-full backdrop-blur-md">
+                                        <div className="flex flex-col items-center">
+                                            <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Superior</span>
+                                            <span className="text-sm font-black text-white">{activeOrder.trelicaSuperior || '-'}</span>
+                                        </div>
+                                        <div className="flex flex-col items-center">
+                                            <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Inferior</span>
+                                            <span className="text-sm font-black text-white">{activeOrder.trelicaInferior || '-'}</span>
+                                        </div>
+                                        <div className="flex flex-col items-center">
+                                            <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Sinusoide</span>
+                                            <span className="text-sm font-black text-white">{activeOrder.trelicaSinusoide || '-'}</span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                             
                             <div className="mt-10 flex flex-wrap justify-center gap-6">
                                 <div className={`px-8 py-4 bg-black/60 border rounded-3xl flex flex-col items-center min-w-[200px] ${trefilaEstimation.isDelayed ? 'border-rose-500/50' : 'border-emerald-500/50'}`}>
