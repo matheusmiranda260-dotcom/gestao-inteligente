@@ -719,23 +719,34 @@ const MachineControl: React.FC<MachineControlProps> = ({
 }) => {
     const [activeMachine, setActiveMachine] = useState<MachineType>(() => {
         const saved = localStorage.getItem('msm_active_machine');
-        if (saved && (saved.startsWith(machineType) || (machineType === 'Trefila' && saved.startsWith('Trefila')) || (machineType === 'Treliça' && saved.startsWith('Treliça')))) {
+        const safeMachineType = machineType || 'Trefila';
+        
+        if (saved && (
+            (typeof safeMachineType === 'string' && saved.startsWith(safeMachineType)) || 
+            (safeMachineType === 'Trefila' && saved.startsWith('Trefila')) || 
+            (safeMachineType === 'Treliça' && saved.startsWith('Treliça'))
+        )) {
             return saved as MachineType;
         }
 
-        const user = currentUser?.username?.toLowerCase();
-        return (machineType === 'Trefila' ? 'Trefila 1' : machineType === 'Treliça' ? 'Treliça 1' : machineType) as MachineType;
+        return (safeMachineType === 'Trefila' ? 'Trefila 1' : safeMachineType === 'Treliça' ? 'Treliça 1' : safeMachineType) as MachineType;
     });
 
     // Reset active machine when the main machine category (trefila/trelica) changes from props
     useEffect(() => {
         const saved = localStorage.getItem('msm_active_machine');
-        if (saved && (saved.startsWith(machineType) || (machineType === 'Trefila' && saved.startsWith('Trefila')) || (machineType === 'Treliça' && saved.startsWith('Treliça')))) {
+        const safeType = machineType || '';
+        
+        if (saved && (
+            (safeType && saved.startsWith(safeType)) || 
+            (safeType === 'Trefila' && saved.startsWith('Trefila')) || 
+            (safeType === 'Treliça' && saved.startsWith('Treliça'))
+        )) {
             setActiveMachine(saved as MachineType);
             return;
         }
 
-        setActiveMachine(machineType === 'Trefila' ? 'Trefila 1' : machineType === 'Treliça' ? 'Treliça 1' : machineType as MachineType);
+        setActiveMachine(safeType === 'Trefila' ? 'Trefila 1' : safeType === 'Treliça' ? 'Treliça 1' : (safeType as MachineType || 'Trefila 1'));
     }, [machineType, currentUser?.username]);
     const [pendingWeights, setPendingWeights] = useState<Map<string, string>>(new Map());
     const [pendingGauges, setPendingGauges] = useState<Map<string, string>>(new Map()); // Novo estado para bitolas
