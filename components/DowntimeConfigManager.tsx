@@ -159,7 +159,8 @@ const DowntimeConfigManager: React.FC<DowntimeConfigManagerProps> = ({ onBack, s
                                 <input 
                                     type="text"
                                     placeholder="Ex: Quebra de agulha, Troca de rolo..."
-                                    className="w-full bg-slate-900 border border-white/10 rounded-2xl px-6 py-4 text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all font-bold"
+                                    className="w-full bg-slate-900 border border-white/20 rounded-2xl px-6 py-4 text-white placeholder:text-slate-600 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:bg-slate-900 transition-all font-bold"
+                                    style={{ colorScheme: 'dark' }}
                                     value={newForm.reason}
                                     onChange={e => setNewForm({...newForm, reason: e.target.value})}
                                 />
@@ -170,7 +171,8 @@ const DowntimeConfigManager: React.FC<DowntimeConfigManagerProps> = ({ onBack, s
                                     <ClockIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500" />
                                     <input 
                                         type="number"
-                                        className="w-full bg-slate-900/50 border border-white/10 rounded-2xl pl-12 pr-6 py-4 text-white focus:outline-none focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/10 transition-all font-mono font-bold"
+                                        className="w-full bg-slate-900 border border-white/20 rounded-2xl pl-12 pr-6 py-4 text-white focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:bg-slate-900 transition-all font-mono font-bold"
+                                        style={{ colorScheme: 'dark' }}
                                         value={newForm.thresholdMinutes}
                                         onChange={e => setNewForm({...newForm, thresholdMinutes: parseInt(e.target.value) || 0})}
                                     />
