@@ -240,6 +240,7 @@ const App: React.FC = () => {
         setStickyNotes,
         setMeetings,
         setMeetingCategories,
+        setDowntimeConfigs,
     }), []);
 
     useAllRealtimeSubscriptions(realtimeSetters, !!currentUser);
