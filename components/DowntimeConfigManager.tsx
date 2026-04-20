@@ -336,7 +336,6 @@ const DowntimeConfigManager: React.FC<DowntimeConfigManagerProps> = ({ onBack, s
                                             ))}
                                     </tbody>
                                 </table>
-                            </div>      ))}
                             </div>
                         )}
                     </div>
