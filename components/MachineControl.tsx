@@ -2532,7 +2532,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                 </h4>
                                                                 <div className="flex flex-wrap gap-4 mt-2">
                                                                     <p className="text-sm text-slate-500 flex items-center gap-2">
-                                                                        <ClockIcon className="h-4 w-4" /> Iniciado às {new Date(activeLotProcessingData.startTime).toLocaleTimeString('pt-BR')}
+                                                                        <ClockIcon className="h-4 w-4" /> Iniciado às {activeLotProcessingData.startTime ? new Date(activeLotProcessingData.startTime).toLocaleTimeString('pt-BR') : '--:--'}
                                                                     </p>
                                                                     {activeLotProcessingData.speed && (
                                                                         <p className={`text-sm font-bold flex items-center gap-2 ${activeLotProcessingData.isDelayed ? 'text-red-600' : 'text-indigo-600'}`}>
@@ -2544,7 +2544,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                             <ClockIcon className="h-4 w-4" /> 
                                                                             {activeLotProcessingData.isDelayed ? 'Atraso: ' : 'Tempo Est.: '}
                                                                             {activeLotProcessingData.isDelayed 
-                                                                                ? formatDuration((activeLotProcessingData.elapsedUptimeSeconds - (activeLotProcessingData.lotInfo.initialQuantity / (parseFloat(activeOrder!.targetBitola!.replace(',', '.'))**2 * 0.006162 * activeLotProcessingData.speed))) * 1000)
+                                                                                ? formatDuration((activeLotProcessingData.elapsedUptimeSeconds - ((activeLotProcessingData.lotInfo?.initialQuantity || 0) / (parseFloat(activeOrder?.targetBitola?.replace(',', '.') || '1')**2 * 0.006162 * (activeLotProcessingData.speed || 1)))) * 1000)
                                                                                 : formatDuration(activeLotProcessingData.estimatedTimeSeconds * 1000)}
                                                                         </p>
                                                                     )}
