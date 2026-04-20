@@ -446,12 +446,20 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                             <div className="mt-10 flex flex-wrap justify-center gap-6">
                                 <div className={`px-8 py-4 bg-black/60 border rounded-3xl flex flex-col items-center min-w-[200px] ${trefilaEstimation.isDelayed ? 'border-rose-500/50' : 'border-emerald-500/50'}`}>
                                     <span className={`text-[10px] font-black uppercase tracking-widest mb-1 ${trefilaEstimation.isDelayed ? 'text-rose-500' : 'text-emerald-500'}`}>
-                                        {machineType.startsWith('Trefila') ? 'Peso do Lote' : 'Peças Produzidas'}
+                                        {machineType.startsWith('Trefila') ? 'Produção do Turno' : 'Peças Produzidas (Turno)'}
                                     </span>
                                     <span className="text-5xl font-black text-white font-mono">
-                                        {machineType.startsWith('Trefila') ? (activeLotInfo?.initialQuantity?.toFixed(1) || '0.0') : (producedQuantity.toLocaleString())} 
-                                        <span className="text-xl"> {machineType.startsWith('Trefila') ? 'kg' : 'pçs'}</span>
+                                        {dailyProducedValue.toLocaleString('pt-BR', { 
+                                            maximumFractionDigits: machineType.startsWith('Trefila') ? 1 : 0 
+                                        })} 
+                                        <span className="text-xl"> {goalUnit}</span>
                                     </span>
+                                    <div className="mt-2 flex items-center gap-1.5 opacity-60">
+                                        <ClockIcon className="h-3 w-3 text-slate-400" />
+                                        <span className="text-[9px] font-bold uppercase tracking-tighter text-slate-300">
+                                            Última atualização: {lastReportTime ? new Date(lastReportTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '---'}
+                                        </span>
+                                    </div>
                                 </div>
                                 
                                 <div className={`px-8 py-4 bg-black/60 border rounded-3xl flex flex-col items-center min-w-[200px] ${trefilaEstimation.isDelayed ? 'border-rose-500/50' : 'border-emerald-500/50'}`}>
