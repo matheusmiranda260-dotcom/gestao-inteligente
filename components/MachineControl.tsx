@@ -1071,50 +1071,9 @@ const MachineControl: React.FC<MachineControlProps> = ({
     }, [currentOperatorLog, currentUser]);
 
 
-    const activeLotProcessingData = useMemo(() => {
-        if (activeOrder?.activeLotProcessing?.lotId) {
-            const lotInfo = stock.find(s => s.id === activeOrder.activeLotProcessing!.lotId);
-            if (!lotInfo) return null;
-
-            let estimatedTimeSeconds = null;
-            let isDelayed = false;
-            let elapsedUptimeSeconds = 0;
-            if (activeOrder.activeLotProcessing?.speed && activeOrder.targetBitola) {
-                const lotStartTime = new Date(activeOrder.activeLotProcessing.startTime).getTime();
-                const bitola = parseFloat(activeOrder.targetBitola.replace(',', '.'));
-                const speed = activeOrder.activeLotProcessing.speed; // m/s
-                const linearMass = bitola * bitola * 0.006162; // kg/m
-                const massPerSecond = speed * linearMass; // kg/s
-                const initialWeight = lotInfo.initialQuantity || 0;
-                
-                if (massPerSecond > 0) {
-                    const totalDurationSeconds = initialWeight / massPerSecond;
-
-                    // Calculate downtime specifically for this lot
-                    const lotDowntimeMs = (activeOrder.downtimeEvents || []).reduce((acc, e) => {
-                        const stop = new Date(e.stopTime).getTime();
-                        if (stop < lotStartTime) {
-                            if (!e.resumeTime) return acc;
-                            const resume = new Date(e.resumeTime).getTime();
-                            if (resume <= lotStartTime) return acc;
-                            return acc + (resume - lotStartTime);
-                        }
-                        const resume = e.resumeTime ? new Date(e.resumeTime).getTime() : now.getTime();
-                        return acc + (resume - stop);
-                    }, 0);
-
-                    const totalElapsedMs = now.getTime() - lotStartTime;
-                    const elapsedUptimeMs = Math.max(0, totalElapsedMs - lotDowntimeMs);
-                    elapsedUptimeSeconds = elapsedUptimeMs / 1000;
-
-                    estimatedTimeSeconds = Math.max(0, totalDurationSeconds - elapsedUptimeSeconds);
-                    isDelayed = elapsedUptimeSeconds > totalDurationSeconds;
-                }
-            }
-
             return { 
                 ...activeOrder.activeLotProcessing, 
-                lotInfo,
+                lotInfo: lotInfo || { internalLot: activeOrder.activeLotProcessing.lotId, initialQuantity: 0 },
                 estimatedTimeSeconds,
                 isDelayed,
                 elapsedUptimeSeconds
@@ -2526,9 +2485,9 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                     {activeLotProcessingData.isDelayed ? '⚠ LOTE ATRASADO' : 'Em Andamento'}
                                                                 </span>
                                                                 <h4 className={`text-2xl font-bold mt-2 ${activeLotProcessingData.isDelayed ? 'text-red-700' : 'text-slate-800'}`}>
-                                                                    {activeLotProcessingData.lotInfo.internalLot} 
+                                                                    {activeLotProcessingData.lotInfo?.internalLot || activeLotProcessingData.lotId} 
                                                                     <span className="text-sm font-black text-slate-400 ml-2 italic">
-                                                                        • {activeLotProcessingData.lotInfo.initialQuantity?.toLocaleString('pt-BR')} KG
+                                                                        • {activeLotProcessingData.lotInfo?.initialQuantity?.toLocaleString('pt-BR') || '0'} KG
                                                                     </span>
                                                                 </h4>
                                                                 <div className="flex flex-wrap gap-4 mt-2">
