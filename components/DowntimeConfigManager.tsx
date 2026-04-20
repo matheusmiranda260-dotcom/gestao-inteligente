@@ -158,8 +158,8 @@ const DowntimeConfigManager: React.FC<DowntimeConfigManagerProps> = ({ onBack, s
                                 <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest px-1">Novo Motivo de Parada</label>
                                 <input 
                                     type="text"
-                                    placeholder="Ex: Quebra de agulha, Troca de ferramenta..."
-                                    className="w-full bg-slate-900/50 border border-white/10 rounded-2xl px-6 py-4 text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium"
+                                    placeholder="Ex: Quebra de agulha, Troca de rolo..."
+                                    className="w-full bg-slate-900 border border-white/10 rounded-2xl px-6 py-4 text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all font-bold"
                                     value={newForm.reason}
                                     onChange={e => setNewForm({...newForm, reason: e.target.value})}
                                 />
@@ -217,120 +217,126 @@ const DowntimeConfigManager: React.FC<DowntimeConfigManagerProps> = ({ onBack, s
                             <div className="flex flex-col items-center justify-center py-20 bg-slate-900/20 border border-dashed border-white/10 rounded-3xl gap-4">
                                 <ExclamationCircleIcon className="h-12 w-12 text-slate-600" />
                                 <span className="text-sm font-bold text-slate-500 italic">Nenhuma configuração encontrada para {filterMachine}.</span>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {configs
-                                    .filter(c => 
-                                        filterMachine === 'Todas' || 
-                                        c.machineType === filterMachine || 
-                                        (filterMachine !== 'Geral' && filterMachine !== 'Todas' && c.machineType === 'Geral')
-                                    )
-                                    .map(config => (
-                                    <div key={config.id} className="group relative">
-                                        <div className={`h-full bg-[#0D1929]/80 border transition-all duration-500 p-6 rounded-[2.5rem] relative z-10 overflow-hidden ${
-                                            isEditing === config.id ? 'border-indigo-500/50 ring-4 ring-indigo-500/5 shadow-2xl scale-[1.02]' : 'border-white/5 hover:border-white/10 hover:shadow-xl hover:shadow-black/20'
-                                        }`}>
-                                            
-                                            {/* Accent lines */}
-                                            <div className="absolute top-0 right-10 w-16 h-1 bg-white/5 rounded-full" />
-                                            <div className="absolute top-0 right-10 w-8 h-1 bg-indigo-500/20 rounded-full" />
-
-                                            <div className="flex flex-col h-full justify-between gap-6">
-                                                <div className="space-y-4">
-                                                    {isEditing === config.id ? (
-                                                        <input 
-                                                            type="text"
-                                                            className="w-full bg-slate-800/80 border border-indigo-500/30 rounded-xl px-4 py-3 text-white focus:outline-none font-bold"
-                                                            value={editForm.reason}
-                                                            onChange={e => setEditForm({...editForm, reason: e.target.value})}
-                                                        />
-                                                    ) : (
-                                                        <h3 className="text-lg font-black text-white uppercase italic tracking-tight leading-tight min-h-[3.5rem]">
-                                                            {config.reason}
-                                                        </h3>
-                                                    )}
-
-                                                    <div className="flex items-center gap-6">
-                                                        <div className="space-y-1">
-                                                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Tempo Previsto</span>
-                                                            <div className="flex items-center gap-2">
-                                                                <ClockIcon className="h-4 w-4 text-indigo-400/60" />
-                                                                {isEditing === config.id ? (
-                                                                    <input 
-                                                                        type="number"
-                                                                        className="w-20 bg-slate-800/80 border border-indigo-500/30 rounded-lg px-2 py-1 text-white text-sm font-mono font-bold"
-                                                                        value={editForm.thresholdMinutes}
-                                                                        onChange={e => setEditForm({...editForm, thresholdMinutes: parseInt(e.target.value)})}
-                                                                    />
-                                                                ) : (
-                                                                    <span className="text-xl font-mono font-black text-white tabular-nums">
-                                                                        {config.thresholdMinutes}<span className="text-[10px] text-slate-500 ml-1 italic underline decoration-indigo-500/30">min</span>
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                        <div className="h-8 w-px bg-white/5" />
-                                                        <div className="space-y-1">
-                                                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Máquina</span>
+                                                    <div className="bg-[#0D1929]/80 border border-white/5 rounded-[2rem] overflow-hidden shadow-2xl">
+                                <table className="w-full text-left">
+                                    <thead>
+                                        <tr className="bg-black/20 border-b border-white/5">
+                                            <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">Status</th>
+                                            <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">Motivo da Parada</th>
+                                            <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Tempo Previsto</th>
+                                            <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Máquina</th>
+                                            <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/5">
+                                        {configs
+                                            .filter(c => 
+                                                filterMachine === 'Todas' || 
+                                                c.machineType === filterMachine || 
+                                                (filterMachine !== 'Geral' && filterMachine !== 'Todas' && c.machineType === 'Geral')
+                                            )
+                                            .map(config => (
+                                                <tr key={config.id} className={`group transition-all hover:bg-white/[0.02] ${!config.isActive ? 'opacity-40 grayscale' : ''}`}>
+                                                    <td className="px-8 py-5">
+                                                        <button 
+                                                            onClick={() => handleToggleActive(config)}
+                                                            className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-tighter transition-all ${
+                                                                config.isActive 
+                                                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                                                                    : 'bg-slate-800 text-slate-500 border border-white/5'
+                                                            }`}
+                                                        >
+                                                            {config.isActive ? 'Ativo' : 'Inativo'}
+                                                        </button>
+                                                    </td>
+                                                    <td className="px-8 py-5">
+                                                        {isEditing === config.id ? (
+                                                            <input 
+                                                                type="text"
+                                                                className="w-full bg-slate-800 border border-indigo-500/50 rounded-lg px-3 py-2 text-white font-bold uppercase text-sm"
+                                                                value={editForm.reason}
+                                                                onChange={e => setEditForm({...editForm, reason: e.target.value})}
+                                                            />
+                                                        ) : (
+                                                            <span className="text-sm font-black text-white uppercase italic tracking-tight">{config.reason}</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-8 py-5 text-center">
+                                                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-black/40 rounded-lg border border-white/5">
+                                                            <ClockIcon className="h-4 w-4 text-indigo-400/60" />
                                                             {isEditing === config.id ? (
-                                                                <select 
-                                                                    className="bg-slate-800/80 border border-indigo-500/30 rounded-lg px-2 py-1 text-white text-xs font-bold"
-                                                                    value={editForm.machineType}
-                                                                    onChange={e => setEditForm({...editForm, machineType: e.target.value})}
-                                                                >
-                                                                    <option value="Geral">Geral</option>
-                                                                    <option value="Trefila">Trefila</option>
-                                                                    <option value="Treliça">Treliça</option>
-                                                                </select>
+                                                                <input 
+                                                                    type="number"
+                                                                    className="w-16 bg-slate-800 border border-indigo-500/50 rounded px-1 py-0.5 text-white text-xs font-mono font-bold"
+                                                                    value={editForm.thresholdMinutes}
+                                                                    onChange={e => setEditForm({...editForm, thresholdMinutes: parseInt(e.target.value) || 0})}
+                                                                />
                                                             ) : (
-                                                                <div className="px-3 py-1 bg-indigo-500/10 border border-indigo-500/20 rounded-lg inline-block">
-                                                                    <span className="text-[10px] font-black text-indigo-400 uppercase italic">
-                                                                        {config.machineType}
-                                                                    </span>
-                                                                </div>
+                                                                <span className="text-sm font-mono font-black text-white">{config.thresholdMinutes}<span className="text-[10px] text-slate-500 ml-1">min</span></span>
                                                             )}
                                                         </div>
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex items-center justify-end gap-2 pt-4 border-t border-white/5">
-                                                    {isEditing === config.id ? (
-                                                        <>
-                                                            <button 
-                                                                onClick={() => setIsEditing(null)}
-                                                                className="p-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition-all active:scale-95 border border-white/5"
+                                                    </td>
+                                                    <td className="px-8 py-5 text-center">
+                                                        {isEditing === config.id ? (
+                                                            <select 
+                                                                className="bg-slate-800 border border-indigo-500/50 rounded px-2 py-1 text-white text-xs font-bold"
+                                                                value={editForm.machineType}
+                                                                onChange={e => setEditForm({...editForm, machineType: e.target.value})}
                                                             >
-                                                                <XIcon className="h-5 w-5" />
-                                                            </button>
-                                                            <button 
-                                                                onClick={handleSaveEdit}
-                                                                className="p-3 bg-green-600 hover:bg-green-500 text-white rounded-xl transition-all active:scale-95 shadow-lg shadow-green-600/20"
-                                                            >
-                                                                <CheckIcon className="h-5 w-5" />
-                                                            </button>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <button 
-                                                                onClick={() => handleEdit(config)}
-                                                                className="p-3 bg-slate-800/50 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 rounded-xl transition-all active:scale-95 border border-white/10 group/btn"
-                                                            >
-                                                                <PencilIcon className="h-5 w-5 group-hover/btn:scale-110" />
-                                                            </button>
-                                                            <button 
-                                                                onClick={() => handleDelete(config.id)}
-                                                                className="p-3 bg-slate-800/50 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 rounded-xl transition-all active:scale-95 border border-white/10 group/btn"
-                                                            >
-                                                                <TrashIcon className="h-5 w-5 group-hover/btn:scale-110" />
-                                                            </button>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
+                                                                <option value="Geral">Geral</option>
+                                                                <option value="Trefila">Trefila</option>
+                                                                <option value="Treliça">Treliça</option>
+                                                            </select>
+                                                        ) : (
+                                                            <span className="px-2.5 py-1 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-black rounded-md uppercase italic">
+                                                                {config.machineType}
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-8 py-5 text-right">
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            {isEditing === config.id ? (
+                                                                <>
+                                                                    <button 
+                                                                        onClick={handleSaveEdit}
+                                                                        className="p-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-all"
+                                                                        title="Salvar"
+                                                                    >
+                                                                        <CheckIcon className="h-4 w-4" />
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={() => setIsEditing(null)}
+                                                                        className="p-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-all"
+                                                                        title="Cancelar"
+                                                                    >
+                                                                        <XIcon className="h-4 w-4" />
+                                                                    </button>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <button 
+                                                                        onClick={() => handleEdit(config)}
+                                                                        className="p-3 bg-slate-800/50 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 rounded-xl transition-all border border-white/10"
+                                                                        title="Editar"
+                                                                    >
+                                                                        <PencilIcon className="h-4 w-4" />
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={() => handleDelete(config.id)}
+                                                                        className="p-3 bg-slate-800/50 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 rounded-xl transition-all border border-white/10"
+                                                                        title="Excluir"
+                                                                    >
+                                                                        <TrashIcon className="h-4 w-4" />
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                    </tbody>
+                                </table>
+                            </div>      ))}
                             </div>
                         )}
                     </div>
