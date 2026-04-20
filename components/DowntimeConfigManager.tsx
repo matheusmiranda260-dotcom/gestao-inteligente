@@ -217,7 +217,9 @@ const DowntimeConfigManager: React.FC<DowntimeConfigManagerProps> = ({ onBack, s
                             <div className="flex flex-col items-center justify-center py-20 bg-slate-900/20 border border-dashed border-white/10 rounded-3xl gap-4">
                                 <ExclamationCircleIcon className="h-12 w-12 text-slate-600" />
                                 <span className="text-sm font-bold text-slate-500 italic">Nenhuma configuração encontrada para {filterMachine}.</span>
-                                                    <div className="bg-[#0D1929]/80 border border-white/5 rounded-[2rem] overflow-hidden shadow-2xl">
+                            </div>
+                        ) : (
+                            <div className="bg-[#0D1929]/80 border border-white/5 rounded-[2rem] overflow-hidden shadow-2xl">
                                 <table className="w-full text-left">
                                     <thead>
                                         <tr className="bg-black/20 border-b border-white/5">
