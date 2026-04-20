@@ -131,6 +131,38 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     if (!isShiftA && h < 5) shiftStart.setDate(shiftStart.getDate() - 1);
     const shiftStartMs = shiftStart.getTime();
 
+    const [drift, setDrift] = useState(0);
+
+    // Sincroniza o relógio local com os eventos do banco (evita delay de fuso/drift)
+    useEffect(() => {
+        if (!activeOrder) return;
+        
+        const timestamps = [
+            activeOrder.startTime,
+            activeOrder.lastQuantityUpdate,
+            ...(activeOrder.downtimeEvents || []).map(e => e.stopTime),
+            ...(activeOrder.downtimeEvents || []).map(e => e.resumeTime),
+            activeOrder.activeLotProcessing?.startTime
+        ].filter(Boolean) as string[];
+
+        let maxDrift = drift;
+        const nowMs = Date.now();
+
+        timestamps.forEach(ts => {
+            const serverMs = new Date(ts).getTime();
+            if (serverMs > nowMs + maxDrift) {
+                // Se o evento está no "futuro", ajustamos o drift para alcançar
+                maxDrift = serverMs - nowMs + 1000; // +1s de margem
+            }
+        });
+
+        if (maxDrift !== drift) {
+            setDrift(maxDrift);
+        }
+    }, [activeOrder, drift]);
+
+    const syncedNow = useMemo(() => new Date(now.getTime() + drift), [now, drift]);
+
     const currentOperatorLog = useMemo(() => {
         if (!activeOrder?.operatorLogs || activeOrder.operatorLogs.length === 0) return null;
         const logs = activeOrder.operatorLogs as OperatorLog[];
@@ -145,7 +177,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
         }
         
         const parseDate = (d: any) => d ? new Date(d).getTime() : 0;
-        const nowMs = now.getTime();
+        const nowMs = syncedNow.getTime();
 
         const events = (activeOrder.downtimeEvents || []) as any[];
         const openEvent = [...events]
@@ -190,7 +222,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
         }
 
         return { status: 'Produzindo', reason: '', durationMs: duration };
-    }, [activeOrder, now, currentOperatorLog, shiftStartMs, machineType]);
+    }, [activeOrder, syncedNow, currentOperatorLog, shiftStartMs, machineType]);
 
     let currentStyle = statusStyles[machineStatus.status as keyof typeof statusStyles] || statusStyles.Ocioso;
     
