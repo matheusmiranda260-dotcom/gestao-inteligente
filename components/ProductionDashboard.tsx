@@ -114,6 +114,7 @@ interface MachineStatusViewProps {
 }
 
 const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, activeOrder, allOrders, stock, dailyProducedValue, dailyGoal, goalUnit, onResetShift, isGestor, downtimeConfigs }) => {
+    const [drift, setDrift] = useState(0);
     const [now, setNow] = useState(new Date());
     const [activeTab, setActiveTab] = useState<'stops' | 'production'>('stops');
 
@@ -131,9 +132,8 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     if (!isShiftA && h < 5) shiftStart.setDate(shiftStart.getDate() - 1);
     const shiftStartMs = shiftStart.getTime();
 
-    const [drift, setDrift] = useState(0);
-
     // Sincroniza o relógio local com os eventos do banco (evita delay de fuso/drift)
+    // Se a diferença for de exatamente ~3 horas, ignoramos, pois é erro de fuso horário, não drift de relógio
     useEffect(() => {
         if (!activeOrder) return;
         
@@ -150,9 +150,12 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
 
         timestamps.forEach(ts => {
             const serverMs = new Date(ts).getTime();
-            if (serverMs > nowMs + maxDrift) {
-                // Se o evento está no "futuro", ajustamos o drift para alcançar
-                maxDrift = serverMs - nowMs + 1000; // +1s de margem
+            const diff = serverMs - nowMs;
+            
+            // Se o evento está no futuro, mas NÃO é uma diferença de fuso horário (ex: 3h, 2h)
+            // Consideramos drift real apenas se for uma diferença pequena (menos de 1 hora)
+            if (diff > maxDrift && diff < 3600000) { 
+                maxDrift = diff + 1000;
             }
         });
 
