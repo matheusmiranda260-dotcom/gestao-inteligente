@@ -149,7 +149,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
 
         if (openEvent) {
             const reason = openEvent.reason || 'Parada';
-            const dur = now.getTime() - new Date(openEvent.stopTime).getTime();
+            const dur = Math.max(0, now.getTime() - new Date(openEvent.stopTime).getTime());
             
             const isPrep = reason.includes('Preparação') || 
                            reason.includes('Setup') || 
@@ -171,7 +171,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
         
         const resumes = (activeOrder.downtimeEvents || []).filter((e: any) => e.resumeTime).map((e: any) => new Date(e.resumeTime!).getTime());
         const lastResume = resumes.length ? Math.max(...resumes) : new Date(activeOrder.startTime).getTime();
-        const duration = now.getTime() - Math.max(lastResume, shiftStartMs);
+        const duration = Math.max(0, now.getTime() - Math.max(lastResume, shiftStartMs));
 
         if (trefilaNotProducing) {
             return { status: 'Preparacao', reason: 'Aguardando Início de Lote', durationMs: duration };

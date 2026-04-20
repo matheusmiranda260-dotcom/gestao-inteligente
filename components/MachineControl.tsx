@@ -58,6 +58,8 @@ const downtimeReasons = [
     'Quebra fio',
     'Setup',
     'Lubrificação',
+    'Limpeza de eletrodos',
+    'Manutenção',
     'Falta de energia',
     'Outros',
     'Preparação'

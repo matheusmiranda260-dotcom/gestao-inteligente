@@ -576,6 +576,12 @@ export const DOWNTIME_THRESHOLDS: Record<string, number> = {
     'Quebra fio': 20,
     'Setup': 180,
     'Lubrificação': 10,
+    'Limpeza de eletrodos': 15,
+    'Limpar eletrodos': 15,
+    'Limpeza': 15,
+    'Manutenção': 60,
+    'Mecanica': 60,
+    'Eletrica': 60,
     'Outros': 15,
     'Preparação': 15
 };
