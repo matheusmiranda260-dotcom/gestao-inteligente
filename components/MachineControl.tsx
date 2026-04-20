@@ -69,23 +69,18 @@ const DowntimeModal: React.FC<{
     const [isOtherActive, setIsOtherActive] = useState(false);
     
     const dynamicDowntimeReasons = useMemo(() => {
-        if (!downtimeConfigs || downtimeConfigs.length === 0) {
-            return [
-                'Enrosco de fio', 'Falha no sensor', 'Quebra fio', 'Setup', 
-                'Lubrificação', 'Limpeza de eletrodos', 'Manutenção', 
-                'Falta de energia', 'Outros', 'Preparação'
-            ];
-        }
-        // Show 'Geral' configs always + machine-specific configs that match
-        const filtered = downtimeConfigs
+        // 100% banco de dados - sem fallback hardcoded
+        // Se o banco estiver vazio, apenas 'Outros' aparece
+        const filtered = (downtimeConfigs || [])
             .filter(c => {
                 if (!c.isActive) return false;
                 if (c.machineType === 'Geral') return true;
-                // machineType can be 'Trefila 1', 'Trefila 2', 'Treliça 1', 'Treliça 2'
-                // c.machineType is 'Trefila' or 'Treliça'
+                // machineType pode ser 'Trefila 1', 'Trefila 2', 'Treliça 1', 'Treliça 2'
+                // c.machineType é 'Trefila' ou 'Treliça'
                 return machineType.startsWith(c.machineType);
             })
             .map(c => c.reason);
+        // 'Outros' sempre disponível como campo livre
         if (!filtered.includes('Outros')) filtered.push('Outros');
         return filtered;
     }, [downtimeConfigs, machineType]);
