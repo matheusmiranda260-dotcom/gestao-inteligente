@@ -2525,7 +2525,12 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                 <span className={`text-xs font-bold px-2 py-1 rounded uppercase tracking-wide ${activeLotProcessingData.isDelayed ? 'bg-red-500 text-white' : 'text-indigo-500 bg-indigo-100'}`}>
                                                                     {activeLotProcessingData.isDelayed ? '⚠ LOTE ATRASADO' : 'Em Andamento'}
                                                                 </span>
-                                                                <h4 className={`text-2xl font-bold mt-2 ${activeLotProcessingData.isDelayed ? 'text-red-700' : 'text-slate-800'}`}>{activeLotProcessingData.lotInfo.internalLot}</h4>
+                                                                <h4 className={`text-2xl font-bold mt-2 ${activeLotProcessingData.isDelayed ? 'text-red-700' : 'text-slate-800'}`}>
+                                                                    {activeLotProcessingData.lotInfo.internalLot} 
+                                                                    <span className="text-sm font-black text-slate-400 ml-2 italic">
+                                                                        • {activeLotProcessingData.lotInfo.initialQuantity?.toLocaleString('pt-BR')} KG
+                                                                    </span>
+                                                                </h4>
                                                                 <div className="flex flex-wrap gap-4 mt-2">
                                                                     <p className="text-sm text-slate-500 flex items-center gap-2">
                                                                         <ClockIcon className="h-4 w-4" /> Iniciado às {new Date(activeLotProcessingData.startTime).toLocaleTimeString('pt-BR')}

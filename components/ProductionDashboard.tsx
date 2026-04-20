@@ -497,7 +497,9 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                 {trefilaEstimation.isDelayed ? '⚠ LOTE ATRASADO' : (machineType.startsWith('Trefila') ? 'LOTE EM PROCESSO' : 'MÁQUINA EM OPERAÇÃO')}
                             </span>
                             <h3 className="text-4xl md:text-7xl font-black text-white text-center uppercase tracking-tighter drop-shadow-[0_10px_30px_rgba(0,0,0,0.5)] leading-tight px-4 break-words max-w-full italic">
-                                {machineType.startsWith('Trefila') ? (activeLotInfo?.internalLot || '---') : (activeOrder?.trelicaModel || '---')}
+                                {machineType.startsWith('Trefila') 
+                                    ? `${activeLotInfo?.internalLot || '---'} ${activeLotInfo?.initialQuantity ? `• ${activeLotInfo.initialQuantity} KG` : ''}` 
+                                    : (activeOrder?.trelicaModel || '---')}
                             </h3>
                             
                             <div className="mt-10 flex flex-wrap justify-center gap-6">
