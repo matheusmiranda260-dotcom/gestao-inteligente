@@ -461,8 +461,7 @@ const App: React.FC = () => {
     const addConference = async (data: ConferenceData) => {
         // Prevent duplicate conference number
         if (conferences.some(c => c.conferenceNumber === data.conferenceNumber)) {
-            showNotification('Esta conferência já foi registrada!', 'error');
-            return;
+            throw new Error('Esta conferência já foi registrada no sistema!');
         }
 
         try {
@@ -502,8 +501,9 @@ const App: React.FC = () => {
                 await insertItem<StockItem>('stock_items', item);
             }
             showNotification('Conferência salva com sucesso!', 'success');
-        } catch (error) {
-            showNotification('Erro ao salvar conferência.', 'error');
+        } catch (error: any) {
+            console.error('Error adding conference:', error);
+            throw new Error(error.message || 'Erro ao salvar conferência no banco de dados.');
         }
     };
 

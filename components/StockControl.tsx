@@ -50,6 +50,21 @@ const AddConferencePage: React.FC<{
     }]);
     const [duplicateErrors, setDuplicateErrors] = useState<Record<number, string>>({});
     const [historyOpen, setHistoryOpen] = useState(false);
+    const [conferenceNumberError, setConferenceNumberError] = useState<string>('');
+    const [submitResult, setSubmitResult] = useState<{type: 'success' | 'error', message: string} | null>(null);
+
+    useEffect(() => {
+        if (!conferenceData.conferenceNumber) {
+            setConferenceNumberError('');
+            return;
+        }
+        const existingConf = conferences.find(c => Boolean(c.conferenceNumber) && c.conferenceNumber.trim().toLowerCase() === conferenceData.conferenceNumber.trim().toLowerCase());
+        if (existingConf) {
+            setConferenceNumberError(`A conferência '${conferenceData.conferenceNumber}' já consta no sistema.`);
+        } else {
+            setConferenceNumberError('');
+        }
+    }, [conferenceData.conferenceNumber, conferences]);
 
     useEffect(() => {
         const newErrors: Record<number, string> = {};
@@ -105,18 +120,78 @@ const AddConferencePage: React.FC<{
 
     const handleFinalSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (isSubmitting || Object.keys(duplicateErrors).length) return;
+        
+        if (isSubmitting) return;
+
+        if (Object.keys(duplicateErrors).length > 0) {
+            setSubmitResult({ type: 'error', message: 'Existem lotes duplicados ou já cadastrados. Corrija-os antes de finalizar.' });
+            return;
+        }
+
+        if (conferenceNumberError) {
+            setSubmitResult({ type: 'error', message: conferenceNumberError });
+            return;
+        }
+
         const validLots = lots.filter(l => !!l.internalLot) as ConferenceLotData[];
-        if (!validLots.length) return alert('Adicione lotes');
+        if (!validLots.length) {
+            setSubmitResult({ type: 'error', message: 'Por favor, adicione pelo menos um lote válido.' });
+            return;
+        }
+
         setIsSubmitting(true);
         try {
             const final = { ...conferenceData, lots: validLots } as ConferenceData;
-            await onSubmit(final); onShowReport(final); onClose();
-        } catch (e) { setIsSubmitting(false); }
+            await onSubmit(final); 
+            setSubmitResult({ type: 'success', message: 'Conferência registrada no sistema com sucesso!' });
+        } catch (error: any) { 
+            setIsSubmitting(false); 
+            setSubmitResult({ type: 'error', message: error.message || 'Erro ao registrar conferência.' });
+        }
     };
 
     return (
         <div className="min-h-screen bg-slate-50 p-4 md:p-8 animate-fadeIn">
+            {submitResult && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden p-6 text-center animate-in fade-in zoom-in">
+                        {submitResult.type === 'success' ? (
+                            <CheckCircleIcon className="h-16 w-16 text-emerald-500 mx-auto mb-4" />
+                        ) : (
+                            <XIcon className="h-16 w-16 text-red-500 mx-auto mb-4" />
+                        )}
+                        <h3 className="text-xl font-bold text-slate-800 mb-2">
+                            {submitResult.type === 'success' ? 'Sucesso!' : 'Atenção!'}
+                        </h3>
+                        <p className="text-sm font-medium text-slate-600 mb-6">
+                            {submitResult.message}
+                        </p>
+                        {submitResult.type === 'success' ? (
+                            <button 
+                                type="button"
+                                onClick={() => {
+                                    setSubmitResult(null);
+                                    const validLots = lots.filter(l => !!l.internalLot) as ConferenceLotData[];
+                                    const final = { ...conferenceData, lots: validLots } as ConferenceData;
+                                    onShowReport(final);
+                                    onClose();
+                                }}
+                                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-4 rounded-xl transition-colors"
+                            >
+                                OK
+                            </button>
+                        ) : (
+                            <button 
+                                type="button"
+                                onClick={() => setSubmitResult(null)}
+                                className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 px-4 rounded-xl transition-colors mb-2"
+                            >
+                                Voltar e Corrigir
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
             {historyOpen && <FinishedConferencesModal conferences={conferences} stock={stock} onClose={() => setHistoryOpen(false)} onShowReport={onShowReport} onEditConference={onEditConference} onDeleteConference={onDeleteConference} />}
             <div className="max-w-7xl mx-auto space-y-6">
                 <div className="flex items-center justify-between">
@@ -128,7 +203,9 @@ const AddConferencePage: React.FC<{
                         <div className="text-center"><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Data</label><input type="date" value={conferenceData.entryDate} onChange={e => setConferenceData({ ...conferenceData, entryDate: e.target.value })} className="w-full p-2 border rounded text-center" required /></div>
                         <div className="text-center"><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Fornecedor</label><input type="text" value={conferenceData.supplier} onChange={e => setConferenceData({ ...conferenceData, supplier: e.target.value })} className="w-full p-2 border rounded text-center" required /></div>
                         <div className="text-center"><label className="block text-xs font-bold text-slate-500 uppercase mb-1">NFe</label><input type="text" value={conferenceData.nfe} onChange={e => setConferenceData({ ...conferenceData, nfe: e.target.value })} className="w-full p-2 border rounded text-center" required /></div>
-                        <div className="text-center"><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nº Conf.</label><input type="text" value={conferenceData.conferenceNumber} onChange={e => setConferenceData({ ...conferenceData, conferenceNumber: e.target.value })} className="w-full p-2 border rounded text-center" required /></div>
+                        <div className="text-center relative"><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nº Conf.</label><input type="text" value={conferenceData.conferenceNumber} onChange={e => setConferenceData({ ...conferenceData, conferenceNumber: e.target.value })} className={`w-full p-2 border rounded text-center ${conferenceNumberError ? 'border-red-500 bg-red-50' : ''}`} required />
+                        {conferenceNumberError && <p className="text-red-500 text-[10px] font-bold absolute -bottom-5 w-full left-0">{conferenceNumberError}</p>}
+                        </div>
                     </div>
                     <div className="p-4 flex justify-end">
                         <input type="file" accept="image/*" capture="environment" className="hidden" id="scan-ia" onChange={handleGlobalScan} />
