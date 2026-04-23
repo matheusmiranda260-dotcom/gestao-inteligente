@@ -500,6 +500,11 @@ const App: React.FC = () => {
             for (const item of newStockItems) {
                 await insertItem<StockItem>('stock_items', item);
             }
+            
+            // Atualizar estado local imediatamente para não depender do delay do Realtime
+            setConferences(prev => [...prev, data as ConferenceData]);
+            setStock(prev => [...prev, ...newStockItems]);
+
             showNotification('Conferência salva com sucesso!', 'success');
         } catch (error: any) {
             console.error('Error adding conference:', error);
@@ -573,6 +578,10 @@ const App: React.FC = () => {
                 await insertItem<StockItem>('stock_items', item);
             }
 
+            // Atualizar localmente
+            setConferences(prev => prev.map(c => c.conferenceNumber === conferenceNumber ? updatedData : c));
+            setStock(prev => [...prev.filter(s => s.conferenceNumber !== conferenceNumber), ...newStockItems]);
+
             showNotification('Conferência editada com sucesso!', 'success');
         } catch (error: any) {
             console.error('Error editing conference:', error);
@@ -601,6 +610,10 @@ const App: React.FC = () => {
 
             // Delete conference itself
             await deleteItemByColumn('conferences', 'conference_number', conferenceNumber);
+
+            // Atualizar localmente
+            setConferences(prev => prev.filter(c => c.conferenceNumber !== conferenceNumber));
+            setStock(prev => prev.filter(s => s.conferenceNumber !== conferenceNumber));
 
             showNotification('Conferência excluída com sucesso!', 'success');
         } catch (error: any) {

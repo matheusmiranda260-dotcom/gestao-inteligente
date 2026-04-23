@@ -367,11 +367,12 @@ const StockControl: React.FC<{
         const gauge = gauges.find(g => g.materialType === i.materialType && g.gauge === i.bitola);
         const productCode = gauge?.productCode || '';
 
-        const passesSearch = searchTerm.length > 0 ? (
-            i.internalLot.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            i.nfe.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (i.steelType || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-            productCode.toLowerCase().includes(searchTerm.toLowerCase())
+        const searchLower = searchTerm.trim().toLowerCase();
+        const passesSearch = searchLower.length > 0 ? (
+            (i.internalLot || '').toLowerCase().includes(searchLower) ||
+            (i.nfe || '').toLowerCase().includes(searchLower) ||
+            (i.steelType || '').toLowerCase().includes(searchLower) ||
+            (productCode || '').toLowerCase().includes(searchLower)
         ) : true;
 
         const passesMaterial = materialFilter === '' || i.materialType === materialFilter;
@@ -380,10 +381,7 @@ const StockControl: React.FC<{
         if (statusFilter.length > 0) {
             return passesSearch && passesMaterial && passesBitola && statusFilter.includes(i.status);
         } else {
-            if (searchTerm.length > 0) {
-                return passesSearch && passesMaterial && passesBitola;
-            }
-            return i.status !== 'Consumido' && passesMaterial && passesBitola;
+            return passesSearch && passesMaterial && passesBitola && i.status !== 'Consumido';
         }
     }).sort((a, b) => {
         const lotA = parseInt(a.internalLot.replace(/\D/g, '')) || 0;
