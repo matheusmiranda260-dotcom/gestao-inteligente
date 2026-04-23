@@ -192,7 +192,18 @@ const AddConferencePage: React.FC<{
                     </div>
                 </div>
             )}
-            {historyOpen && <FinishedConferencesModal conferences={conferences} stock={stock} onClose={() => setHistoryOpen(false)} onShowReport={onShowReport} onEditConference={onEditConference} onDeleteConference={onDeleteConference} />}
+            {historyOpen && <FinishedConferencesModal 
+                conferences={conferences} 
+                stock={stock} 
+                onClose={() => setHistoryOpen(false)} 
+                onShowReport={(conf) => {
+                    onShowReport(conf);
+                    setHistoryOpen(false);
+                    onClose();
+                }} 
+                onEditConference={onEditConference} 
+                onDeleteConference={onDeleteConference} 
+            />}
             <div className="max-w-7xl mx-auto space-y-6">
                 <div className="flex items-center justify-between">
                     <button onClick={onClose} className="bg-white p-2 rounded-full shadow-sm hover:bg-slate-100 flex items-center gap-2 px-4 font-bold"><ArrowLeftIcon className="h-5 w-5" /> Voltar</button>
