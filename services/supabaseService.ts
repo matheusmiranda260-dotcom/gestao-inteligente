@@ -16,12 +16,31 @@ import {
 
 /** Generic fetch function returning raw data */
 export const fetchData = async <T>(table: string): Promise<T[]> => {
-    const { data, error } = await supabase.from(table).select('*');
-    if (error) {
-        console.error(`Error fetching ${table}:`, error);
-        return [];
+    let allData: any[] = [];
+    let from = 0;
+    const limit = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+        const { data, error } = await supabase
+            .from(table)
+            .select('*')
+            .range(from, from + limit - 1);
+            
+        if (error) {
+            console.error(`Error fetching ${table}:`, error);
+            return [];
+        }
+        
+        if (data && data.length > 0) {
+            allData = [...allData, ...data];
+            from += limit;
+            hasMore = data.length === limit;
+        } else {
+            hasMore = false;
+        }
     }
-    return data as T[];
+    return allData as T[];
 };
 
 /** Generic insert function returning the inserted row */
