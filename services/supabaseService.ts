@@ -82,22 +82,61 @@ const mapToSnakeCase = (obj: any): any => {
 
 /** Fetch table with camelCase conversion */
 export const fetchTable = async <T>(table: string): Promise<T[]> => {
-    const { data, error } = await supabase.from(table).select('*');
-    if (error) {
-        console.error(`Error fetching ${table}:`, error);
-        throw error;
+    let allData: any[] = [];
+    let from = 0;
+    const limit = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+        const { data, error } = await supabase
+            .from(table)
+            .select('*')
+            .range(from, from + limit - 1);
+            
+        if (error) {
+            console.error(`Error fetching ${table}:`, error);
+            throw error;
+        }
+        
+        if (data && data.length > 0) {
+            allData = [...allData, ...data];
+            from += limit;
+            hasMore = data.length === limit;
+        } else {
+            hasMore = false;
+        }
     }
-    return mapToCamelCase(data) as T[];
+    return mapToCamelCase(allData) as T[];
 };
 
 /** Fetch items by column value */
 export const fetchByColumn = async <T>(table: string, column: string, value: string): Promise<T[]> => {
-    const { data, error } = await supabase.from(table).select('*').eq(column, value);
-    if (error) {
-        console.error(`Error fetching ${table} by ${column}:`, error);
-        throw error;
+    let allData: any[] = [];
+    let from = 0;
+    const limit = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+        const { data, error } = await supabase
+            .from(table)
+            .select('*')
+            .eq(column, value)
+            .range(from, from + limit - 1);
+            
+        if (error) {
+            console.error(`Error fetching ${table} by ${column}:`, error);
+            throw error;
+        }
+        
+        if (data && data.length > 0) {
+            allData = [...allData, ...data];
+            from += limit;
+            hasMore = data.length === limit;
+        } else {
+            hasMore = false;
+        }
     }
-    return mapToCamelCase(data) as T[];
+    return mapToCamelCase(allData) as T[];
 };
 
 /** Insert item with automatic UUID generation for missing id */
