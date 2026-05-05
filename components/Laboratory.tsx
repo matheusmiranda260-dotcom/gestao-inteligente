@@ -74,6 +74,8 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
     };
 
     const [form, setForm] = useState(initialForm);
+    const [opMode, setOpMode] = useState<'new' | 'existing' | null>(null);
+    const [selectedExistingOp, setSelectedExistingOp] = useState<string>('');
     const [aiDiagnosisMsg, setAiDiagnosisMsg] = useState<string>('');
 
     useEffect(() => {
@@ -285,6 +287,8 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
             setEntries(prev => [newEntry, ...prev]);
             setForm(initialForm);
             setAiDiagnosisMsg('');
+            setOpMode(null);
+            setSelectedExistingOp('');
             setStep(0);
             alert('Relatório de análise salvo e gerado com sucesso!');
         } catch (err) {
@@ -780,7 +784,7 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
             <div className="max-w-4xl mx-auto py-8">
                 {/* WIZARD HEADER */}
                 <div className="mb-8">
-                    <button onClick={() => { setStep(0); setAiDiagnosisMsg(''); setForm(initialForm); }} className="text-slate-400 font-bold text-sm flex items-center gap-2 hover:text-indigo-600 mb-6 transition">
+                    <button onClick={() => { setStep(0); setAiDiagnosisMsg(''); setForm(initialForm); setOpMode(null); setSelectedExistingOp(''); }} className="text-slate-400 font-bold text-sm flex items-center gap-2 hover:text-indigo-600 mb-6 transition">
                         <ArrowLeftIcon className="h-4 w-4" /> Cancelar e Voltar
                     </button>
                     <div className="flex justify-between relative">
@@ -798,8 +802,162 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
                     {/* STEP 1 */}
                     {step === 1 && (
                         <div>
-                            <h2 className="text-3xl font-black text-slate-800 mb-2">1º Passo: Identificação</h2>
-                            <p className="text-slate-500 text-lg mb-8">Qual a bitola da matéria prima e seu fornecedor?</p>
+                            {opMode === null ? (
+                                <div className="text-center animate-fade-in-up py-8">
+                                    <h2 className="text-3xl md:text-4xl font-black text-slate-800 mb-4">Iniciar Nova Análise</h2>
+                                    <p className="text-slate-500 text-lg mb-12">Como você deseja iniciar este teste de laboratório?</p>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
+                                        <button 
+                                            onClick={() => setOpMode('new')}
+                                            className="bg-white border-2 border-indigo-100 hover:border-indigo-500 hover:bg-indigo-50 p-8 rounded-3xl flex flex-col items-center justify-center transition-all group shadow-sm hover:shadow-xl hover:shadow-indigo-100 relative overflow-hidden"
+                                        >
+                                            <div className="w-20 h-20 bg-indigo-600 text-white rounded-2xl flex items-center justify-center text-4xl mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-indigo-200">
+                                                🆕
+                                            </div>
+                                            <h3 className="text-2xl font-black text-slate-800 mb-2 group-hover:text-indigo-700 transition-colors">Nova Produção</h3>
+                                            <p className="text-sm font-semibold text-slate-500 text-center">Criar um teste do zero para uma OP que ainda não foi analisada.</p>
+                                        </button>
+                                        
+                                        <button 
+                                            onClick={() => setOpMode('existing')}
+                                            className="bg-white border-2 border-emerald-100 hover:border-emerald-500 hover:bg-emerald-50 p-8 rounded-3xl flex flex-col items-center justify-center transition-all group shadow-sm hover:shadow-xl hover:shadow-emerald-100 relative overflow-hidden"
+                                        >
+                                            <div className="w-20 h-20 bg-emerald-500 text-white rounded-2xl flex items-center justify-center text-4xl mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-emerald-200">
+                                                🔄
+                                            </div>
+                                            <h3 className="text-2xl font-black text-slate-800 mb-2 group-hover:text-emerald-700 transition-colors">OP Já Iniciada</h3>
+                                            <p className="text-sm font-semibold text-slate-500 text-center">Puxar dados do último teste de uma OP para evolução de aprendizado.</p>
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : opMode === 'existing' ? (
+                                <div className="animate-fade-in-up py-4">
+                                    <div className="flex items-center gap-4 mb-8">
+                                        <button onClick={() => { setOpMode(null); setSelectedExistingOp(''); }} className="w-12 h-12 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-indigo-600 transition shadow-sm">
+                                            <ArrowLeftIcon className="w-5 h-5" />
+                                        </button>
+                                        <div>
+                                            <h2 className="text-2xl md:text-3xl font-black text-slate-800">Continuar OP Existente</h2>
+                                            <p className="text-slate-500 text-sm mt-1 font-medium">Selecione a Ordem de Produção para buscar os parâmetros do último teste.</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="max-w-xl mx-auto space-y-6">
+                                        <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                                            <label className="block text-sm font-bold text-slate-600 mb-3 uppercase tracking-widest flex items-center gap-2">
+                                                <span className="text-indigo-500">🔍</span> Selecione a Ordem de Produção (OP)
+                                            </label>
+                                            <select 
+                                                value={selectedExistingOp}
+                                                onChange={e => setSelectedExistingOp(e.target.value)}
+                                                className="w-full p-4 border-2 border-slate-200 rounded-xl text-lg font-bold focus:border-indigo-500 focus:ring-0 transition shadow-sm appearance-none bg-white"
+                                            >
+                                                <option value="">-- Selecione uma OP Ativa --</option>
+                                                {Array.from(new Set(entries.filter(e => e.productionOrderNumber).map(e => e.productionOrderNumber))).map(opNum => (
+                                                    <option key={opNum} value={opNum}>OP: {opNum}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        {selectedExistingOp && (() => {
+                                            const opEntries = entries.filter(e => e.productionOrderNumber === selectedExistingOp).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                                            const lastEntry = opEntries[0];
+                                            
+                                            return (
+                                                <div className="bg-white border-2 border-emerald-100 rounded-2xl p-6 shadow-sm animate-fade-in-up">
+                                                    <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
+                                                        <h3 className="text-lg font-black text-emerald-800 flex items-center gap-2">
+                                                            <span className="bg-emerald-100 text-emerald-600 w-8 h-8 rounded-lg flex items-center justify-center text-sm">📊</span> 
+                                                            Último Teste: Lote {lastEntry.lote}
+                                                        </h3>
+                                                        <span className="text-[10px] font-bold uppercase tracking-widest bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full border border-emerald-100/50">Dados Importados</span>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-2 gap-6 mb-6">
+                                                        <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                                            <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Bitola MP</span> 
+                                                            <span className="font-black text-slate-800 text-lg">{lastEntry.bitola_mp} mm</span>
+                                                        </div>
+                                                        <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                                            <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Fornecedor</span> 
+                                                            <span className="font-black text-slate-800 text-lg">{lastEntry.fornecedor}</span>
+                                                        </div>
+                                                        <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                                            <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Última Resistência</span> 
+                                                            <span className="font-black text-slate-800 text-lg">{lastEntry.resistencia || '—'}</span>
+                                                        </div>
+                                                        <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                                            <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Última Relação</span> 
+                                                            <span className="font-black text-slate-800 text-lg">{calcRelacao(Number(lastEntry.resistencia), Number(lastEntry.escoamento))?.toFixed(2) || '—'}</span>
+                                                        </div>
+                                                    </div>
+
+                                                    {(lastEntry.actionTaken || lastEntry.actionResult) && (
+                                                        <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-5 mb-6 shadow-inner">
+                                                            <div className="font-black text-indigo-900 mb-3 flex items-center gap-2">
+                                                                <span>🧠</span> Aprendizado do Último Lote:
+                                                            </div>
+                                                            {lastEntry.actionResult && <div className="mb-2 text-sm"><span className="font-bold text-indigo-600 uppercase tracking-wide text-xs">Efeito Observado:</span> <span className="font-medium text-slate-700">{lastEntry.actionResult}</span></div>}
+                                                            {lastEntry.actionTaken && <div className="text-sm"><span className="font-bold text-emerald-600 uppercase tracking-wide text-xs">Ajuste Realizado:</span> <span className="font-medium text-slate-700">{lastEntry.actionTaken}</span></div>}
+                                                        </div>
+                                                    )}
+
+                                                    <button 
+                                                        onClick={() => {
+                                                            const newLoteNumber = !isNaN(Number(lastEntry.lote)) ? String(Number(lastEntry.lote) + 1) : '';
+                                                            setForm({
+                                                                ...initialForm,
+                                                                lote: newLoteNumber,
+                                                                fornecedor: lastEntry.fornecedor || '',
+                                                                bitola_mp: lastEntry.bitola_mp || '',
+                                                                bitola_saida_ideal: lastEntry.bitola_saida_ideal || '',
+                                                                qtd_k7_ideal: lastEntry.qtd_k7_ideal || '',
+                                                                k7_1_ideal: lastEntry.k7_1_ideal?.toString().replace('.',',') || '',
+                                                                k7_2_ideal: lastEntry.k7_2_ideal?.toString().replace('.',',') || '',
+                                                                k7_3_ideal: lastEntry.k7_3_ideal?.toString().replace('.',',') || '',
+                                                                k7_4_ideal: lastEntry.k7_4_ideal?.toString().replace('.',',') || '',
+                                                                k7_1_entrada: lastEntry.k7_1_entrada?.toString().replace('.',',') || '',
+                                                                k7_1_saida: lastEntry.k7_1_saida?.toString().replace('.',',') || '',
+                                                                k7_2_entrada: lastEntry.k7_2_entrada?.toString().replace('.',',') || '',
+                                                                k7_2_saida: lastEntry.k7_2_saida?.toString().replace('.',',') || '',
+                                                                k7_3_entrada: lastEntry.k7_3_entrada?.toString().replace('.',',') || '',
+                                                                k7_3_saida: lastEntry.k7_3_saida?.toString().replace('.',',') || '',
+                                                                k7_4_entrada: lastEntry.k7_4_entrada?.toString().replace('.',',') || '',
+                                                                k7_4_saida: lastEntry.k7_4_saida?.toString().replace('.',',') || '',
+                                                                productionOrderId: selectedExistingOp,
+                                                                productionOrderNumber: selectedExistingOp,
+                                                                setupProfile: lastEntry.setupProfile || 'descrescente'
+                                                            });
+                                                            setSelectedExistingOp('');
+                                                            
+                                                            if (lastEntry.actionTaken || lastEntry.actionResult) {
+                                                                setAiDiagnosisMsg(`⚠️ MODO DE APRENDIZADO DE SETUP ATIVADO\n\nNo último lote (${lastEntry.lote}), você reportou que o efeito foi "${lastEntry.actionResult}" após ajustar "${lastEntry.actionTaken}".\n\nO que você fará diferente neste novo lote para melhorar os resultados?\nContinue para registrar as novas reduções (K7) feitas no Setup Real.`);
+                                                            } else {
+                                                                setAiDiagnosisMsg(`ℹ️ Os parâmetros de Setup Ideal e as medidas reais dos laminadores (K7) do último lote (${lastEntry.lote}) foram importados com sucesso.\n\nAltere APENAS as medidas dos discos K7 que você precisou ajustar neste novo teste.`);
+                                                            }
+                                                            setStep(2);
+                                                        }}
+                                                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 rounded-xl transition shadow-lg shadow-emerald-200 flex items-center justify-center gap-2 active:scale-95"
+                                                    >
+                                                        Continuar (Puxar Parâmetros e Avançar) <ArrowLeftIcon className="w-4 h-4 rotate-180" />
+                                                    </button>
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="animate-fade-in-up">
+                                    <div className="flex items-center gap-4 mb-6">
+                                        <button onClick={() => setOpMode(null)} className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-200 transition">
+                                            <ArrowLeftIcon className="w-4 h-4" />
+                                        </button>
+                                        <h2 className="text-3xl font-black text-slate-800 flex items-center gap-2">
+                                            <span className="bg-indigo-100 text-indigo-600 w-8 h-8 rounded-lg flex items-center justify-center text-sm">1</span> Identificação & Setup Ideal
+                                        </h2>
+                                    </div>
+                                    <p className="text-slate-500 text-lg mb-8 md:ml-14 font-medium">Qual a bitola da matéria prima e seu fornecedor para essa nova OP?</p>
 
                             <div className="space-y-6">
                                 <div>
@@ -930,6 +1088,8 @@ export const Laboratory: React.FC<LaboratoryProps> = ({ setPage, currentUser, ga
                                     Avançar
                                 </button>
                             </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
