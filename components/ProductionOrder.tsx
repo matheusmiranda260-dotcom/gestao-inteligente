@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Page, StockItem, ProductionOrderData, Bitola, StockGauge, User } from '../types';
+import type { Page, StockItem, ProductionOrderData, Bitola, StockGauge, User, MachineType } from '../types';
 import { TrefilaBitolaOptions, FioMaquinaBitolaOptions } from '../types';
 import { ArrowLeftIcon, WarningIcon, ClipboardListIcon, PencilIcon, TrashIcon, AdjustmentsIcon } from './icons';
 import ProductionOrderHistoryModal from './ProductionOrderHistoryModal';

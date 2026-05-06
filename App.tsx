@@ -841,7 +841,7 @@ const App: React.FC = () => {
     };
 
     const addProductionOrder = async (orderData: Omit<ProductionOrderData, 'id' | 'status' | 'creationDate'>) => {
-        const { isGhostOrder, inputBitola, ...orderDataToSave } = orderData;
+        const { isGhostOrder, inputBitola, trelicaSuperior, trelicaInferior, trelicaSinusoide, ...orderDataToSave } = orderData;
         const newOrder: Partial<ProductionOrderData> = {
             ...orderDataToSave,
             // id is NOT set here to allow insertItem to generate a proper UUID for Supabase
