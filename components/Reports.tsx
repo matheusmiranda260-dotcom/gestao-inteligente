@@ -12,22 +12,22 @@ interface ReportsProps {
 // Interfaces locais para estruturação do Relatório da Treliça
 interface StopRow {
     id: string;
-    inicio: string; // "hh:mm" ou "hh:mm:ss"
-    fim: string;    // "hh:mm" ou "hh:mm:ss"
+    inicio: string; // "hh:mm:ss"
+    fim: string;    // "hh:mm:ss"
     motivo: string;
 }
 
 interface ShiftStats {
     horasTrabalhadas: string; // Padrão "09:00:00"
     pecasProduzidas: number;
-    tamanhoPeca: number;      // Metros por peça (ex: 6)
+    tamanhoPeca: number;      // Metros por peça (ex: 6 ou 12)
 }
 
 interface ProductionUpdateRow {
     id: string;
     qnt: number;
     peso: number;
-    data: string; // ex: "01-04"
+    data: string; // ex: "1-04"
 }
 
 // Tipo de Notificação
@@ -41,8 +41,7 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
     // 1. Estados de Controle da Página
     const [selectedMachine, setSelectedMachine] = useState<'Treliça 1' | 'Treliça 2'>('Treliça 1');
     const [selectedDate, setSelectedDate] = useState<string>(() => {
-        // Data de hoje em fuso local AAAA-MM-DD
-        return new Date().toLocaleDateString('sv');
+        return new Date().toLocaleDateString('sv'); // Data local YYYY-MM-DD
     });
     const [loading, setLoading] = useState<boolean>(false);
     const [reportId, setReportId] = useState<string | null>(null);
@@ -64,7 +63,7 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
     const [statsShiftA, setStatsShiftA] = useState<ShiftStats>({
         horasTrabalhadas: '09:00:00',
         pecasProduzidas: 0,
-        tamanhoPeca: 6
+        tamanhoPeca: 12
     });
     const [statsShiftB, setStatsShiftB] = useState<ShiftStats>({
         horasTrabalhadas: '09:00:00',
@@ -78,7 +77,7 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
     // Estado para guiar se o banco está ativo ou usando localStorage
     const [dbAvailable, setDbAvailable] = useState<boolean>(true);
 
-    // 3. Sistema Dinâmico de Toasts
+    // 3. Sistema de Toasts
     const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
         const id = Math.random().toString(36).substring(2, 9);
         setToasts(prev => [...prev, { message, type, id }]);
@@ -109,25 +108,28 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
     const calculateStopDurationSeconds = (inicio: string, fim: string): number => {
         if (!inicio || !fim) return 0;
         let diff = timeToSeconds(fim) - timeToSeconds(inicio);
-        // Se a hora fim for menor que a hora início, assume que cruzou a meia-noite
-        if (diff < 0) diff += 24 * 3600;
+        if (diff < 0) diff += 24 * 3600; // Dobra de meia-noite
         return diff;
     };
 
-    // Formata data por extenso em português (ex: "quarta-feira, 1 de abril de 2026")
+    // Formata data em português abreviado conforme a foto (ex: "qua, 1 de abril de 2026")
     const formattedProductionDate = useMemo(() => {
         if (!selectedDate) return '';
         const parts = selectedDate.split('-');
         const dateObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-        return dateObj.toLocaleDateString('pt-BR', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
+        
+        // Obter dia da semana abreviado
+        const weekdays = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+        const dayName = weekdays[dateObj.getDay()];
+        
+        const day = dateObj.getDate();
+        const year = dateObj.getFullYear();
+        const monthName = dateObj.toLocaleDateString('pt-BR', { month: 'long' });
+        
+        return `${dayName}, ${day} de ${monthName} de ${year}`;
     }, [selectedDate]);
 
-    // 5. Cálculos em Tempo Real das Tabelas de Paradas e Estatísticas
+    // 5. Cálculos em Tempo Real
     const calculatedData = useMemo(() => {
         // Soma as paradas do Turno A
         const secondsParadoA = stopsShiftA.reduce((sum, stop) => {
@@ -139,16 +141,16 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
             return sum + calculateStopDurationSeconds(stop.inicio, stop.fim);
         }, 0);
 
-        // Total do turno trabalhado (padrão 9 horas = 32400 segundos)
+        // Horas totais trabalhadas
         const totalWorkedA = timeToSeconds(statsShiftA.horasTrabalhadas) || 9 * 3600;
         const totalWorkedB = timeToSeconds(statsShiftB.horasTrabalhadas) || 9 * 3600;
 
-        // Porcentagens do Turno A
+        // Turno A
         const percentParadoA = totalWorkedA > 0 ? (secondsParadoA / totalWorkedA) * 100 : 0;
         const secondsEfetivoA = Math.max(0, totalWorkedA - secondsParadoA);
         const percentEfetivoA = totalWorkedA > 0 ? (secondsEfetivoA / totalWorkedA) * 100 : 0;
 
-        // Porcentagens do Turno B
+        // Turno B
         const percentParadoB = totalWorkedB > 0 ? (secondsParadoB / totalWorkedB) * 100 : 0;
         const secondsEfetivoB = Math.max(0, totalWorkedB - secondsParadoB);
         const percentEfetivoB = totalWorkedB > 0 ? (secondsEfetivoB / totalWorkedB) * 100 : 0;
@@ -165,7 +167,7 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
         const velocidadeMinutoA = secondsEfetivoA > 0 ? (metrosProduzidosA / (secondsEfetivoA / 60)) : 0;
         const velocidadeMinutoB = secondsEfetivoB > 0 ? (metrosProduzidosB / (secondsEfetivoB / 60)) : 0;
 
-        // Soma das peças produzidas no dia
+        // Soma total das peças
         const totalPecasProduzidas = statsShiftA.pecasProduzidas + statsShiftB.pecasProduzidas;
 
         return {
@@ -176,7 +178,6 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                 tempoEfetivoStr: secondsToTime(secondsEfetivoA),
                 percentEfetivo: percentEfetivoA.toFixed(1).replace('.', ','),
                 metrosProduzidos: metrosProduzidosA,
-                metrosProduzidosStr: `${metrosProduzidosA} metros`,
                 tempoPorPecaStr: secondsToTime(Math.floor(tempoPorPecaSecondsA)),
                 velocidadeStr: `${velocidadeMinutoA.toFixed(1).replace('.', ',')} metros/ minuto`
             },
@@ -185,19 +186,18 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                 percentParado: percentParadoB.toFixed(1).replace('.', ','),
                 tempoEfetivoStr: secondsToTime(secondsEfetivoB),
                 percentEfetivo: percentEfetivoB.toFixed(1).replace('.', ','),
-                metrosProduzidosStr: `${metrosProduzidosB} metros`,
+                metrosProduzidos: metrosProduzidosB,
                 tempoPorPecaStr: secondsToTime(Math.floor(tempoPorPecaSecondsB)),
                 velocidadeStr: `${velocidadeMinutoB.toFixed(1).replace('.', ',')} metros/ minuto`
             }
         };
     }, [stopsShiftA, stopsShiftB, statsShiftA, statsShiftB]);
 
-    // 6. Efeito para carregar relatório ao alterar data ou máquina
+    // 6. Efeito para carregar relatório do banco ou localStorage
     useEffect(() => {
         const loadReport = async () => {
             setLoading(true);
             try {
-                // Tenta carregar do Supabase
                 const { data, error } = await supabase
                     .from('trelica_daily_reports')
                     .select('*')
@@ -206,7 +206,6 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                     .maybeSingle();
 
                 if (error) {
-                    // Se for erro de tabela inexistente (42P01), desativa dbAvailable e carrega localmente
                     if (error.code === '42P01') {
                         setDbAvailable(false);
                         loadLocalReport();
@@ -223,16 +222,15 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                     setPiecesToProduce(Number(data.pieces_to_produce ?? 4500));
                     setStopsShiftA(data.stops_shift_a || []);
                     setStopsShiftB(data.stops_shift_b || []);
-                    setStatsShiftA(data.stats_shift_a || { horasTrabalhadas: '09:00:00', pecasProduzidas: 0, tamanhoPeca: 6 });
+                    setStatsShiftA(data.stats_shift_a || { horasTrabalhadas: '09:00:00', pecasProduzidas: 0, tamanhoPeca: 12 });
                     setStatsShiftB(data.stats_shift_b || { horasTrabalhadas: '09:00:00', pecasProduzidas: 0, tamanhoPeca: 6 });
                     setProductionUpdates(data.production_updates || []);
-                    showToast(`Relatório de ${selectedMachine} para ${selectedDate} carregado da nuvem.`, 'success');
+                    showToast(`Relatório de ${selectedMachine} carregado da nuvem.`, 'success');
                 } else {
-                    // Sem dados no Supabase, tenta o localStorage
                     loadLocalReport();
                 }
             } catch (err: any) {
-                console.error('Erro ao conectar ao Supabase:', err);
+                console.error(err);
                 setDbAvailable(false);
                 loadLocalReport();
             } finally {
@@ -254,10 +252,10 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                     setPiecesToProduce(Number(parsed.pieces_to_produce ?? 4500));
                     setStopsShiftA(parsed.stops_shift_a || []);
                     setStopsShiftB(parsed.stops_shift_b || []);
-                    setStatsShiftA(parsed.stats_shift_a || { horasTrabalhadas: '09:00:00', pecasProduzidas: 0, tamanhoPeca: 6 });
+                    setStatsShiftA(parsed.stats_shift_a || { horasTrabalhadas: '09:00:00', pecasProduzidas: 0, tamanhoPeca: 12 });
                     setStatsShiftB(parsed.stats_shift_b || { horasTrabalhadas: '09:00:00', pecasProduzidas: 0, tamanhoPeca: 6 });
                     setProductionUpdates(parsed.production_updates || []);
-                    showToast(`Relatório carregado localmente (Offline).`, 'info');
+                    showToast(`Relatório carregado offline.`, 'info');
                 } catch (e) {
                     resetFormToDefault();
                 }
@@ -269,7 +267,6 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
         loadReport();
     }, [selectedMachine, selectedDate]);
 
-    // Reseta o formulário para padrões limpos
     const resetFormToDefault = () => {
         setReportId(null);
         setProductionOrder('');
@@ -279,12 +276,12 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
         setPiecesToProduce(4500);
         setStopsShiftA([]);
         setStopsShiftB([]);
-        setStatsShiftA({ horasTrabalhadas: '09:00:00', pecasProduzidas: 0, tamanhoPeca: 6 });
+        setStatsShiftA({ horasTrabalhadas: '09:00:00', pecasProduzidas: 0, tamanhoPeca: 12 });
         setStatsShiftB({ horasTrabalhadas: '09:00:00', pecasProduzidas: 0, tamanhoPeca: 6 });
         setProductionUpdates([]);
     };
 
-    // 7. Salvar relatório (Nuvem com Fallback Local)
+    // Salvar relatório
     const handleSaveReport = async () => {
         setIsSaving(true);
         const reportData = {
@@ -302,13 +299,11 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
             production_updates: productionUpdates,
         };
 
-        // Salva sempre no localStorage primeiro como redundância instantânea
         const localKey = `trelica_report_${selectedMachine}_${selectedDate}`;
         localStorage.setItem(localKey, JSON.stringify({ id: reportId || `local_${Date.now()}`, ...reportData }));
 
         try {
             if (dbAvailable) {
-                // Tenta salvar no Supabase via upsert
                 const payload = reportId ? { id: reportId, ...reportData } : reportData;
                 const { data, error } = await supabase
                     .from('trelica_daily_reports')
@@ -316,38 +311,33 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                     .select()
                     .single();
 
-                if (error) {
-                    throw error;
-                }
-
+                if (error) throw error;
                 if (data) {
                     setReportId(data.id);
-                    // Atualiza o ID no localStorage para manter sincronizado
                     localStorage.setItem(localKey, JSON.stringify(data));
                 }
-                showToast(`Relatório da ${selectedMachine} salvo em nuvem com sucesso!`, 'success');
+                showToast(`Salvo na nuvem com sucesso!`, 'success');
             } else {
-                // Se já sabemos que o DB não está disponível
-                showToast(`Salvo localmente! Para sincronizar em nuvem, execute o script SQL no Supabase.`, 'warning');
+                showToast(`Salvo localmente (Offline).`, 'warning');
             }
         } catch (err: any) {
-            console.error('Erro ao salvar relatório no banco de dados:', err);
+            console.error(err);
             setDbAvailable(false);
-            showToast(`Salvo localmente! Houve um erro ao salvar na nuvem: ${err.message || 'Verifique sua conexão.'}`, 'warning');
+            showToast(`Erro ao salvar online. Salvo offline.`, 'warning');
         } finally {
             setIsSaving(false);
         }
     };
 
-    // 8. Carregar Dados de Exemplo (WOW Factor - dados idênticos aos da imagem!)
+    // Preencher exatamente com os dados da foto
     const handleLoadSampleData = () => {
-        setProductionOrder('OP-2026-0401');
+        setSelectedDate('2026-04-01');
+        setProductionOrder('');
         setOperatorShiftA('Adrian/ junior');
         setOperatorShiftB('Alceu/ thiago');
         setProductDescription('TRELIÇA H-12 LEVE 6 MTS');
         setPiecesToProduce(4500);
 
-        // Paradas Turno B (Esquerdo no modelo físico)
         setStopsShiftB([
             { id: 'sb-1', inicio: '15:15:00', fim: '15:28:00', motivo: 'troca de rolo inferior lado direito' },
             { id: 'sb-2', inicio: '15:33:00', fim: '15:43:00', motivo: 'alinhamento da peça' },
@@ -358,7 +348,6 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
             { id: 'sb-7', inicio: '22:11:00', fim: '22:38:00', motivo: 'enrosco no pisador de dobra fixa' }
         ]);
 
-        // Paradas Turno A (Direito no modelo físico)
         setStopsShiftA([
             { id: 'sa-1', inicio: '05:00:00', fim: '05:18:00', motivo: 'lubrificação' },
             { id: 'sa-2', inicio: '05:22:00', fim: '05:48:00', motivo: 'enrosco no fio sinuzoide' },
@@ -368,30 +357,27 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
             { id: 'sa-6', inicio: '11:10:00', fim: '11:18:00', motivo: 'enrosco no pisador de dobra fixa' }
         ]);
 
-        // Estatísticas Turno A
         setStatsShiftA({
             horasTrabalhadas: '09:00:00',
             pecasProduzidas: 488,
-            tamanhoPeca: 6
+            tamanhoPeca: 12
         });
 
-        // Estatísticas Turno B
         setStatsShiftB({
             horasTrabalhadas: '09:00:00',
             pecasProduzidas: 493,
             tamanhoPeca: 6
         });
 
-        // Atualização de produção
         setProductionUpdates([
-            { id: 'pu-1', qnt: 981, peso: 3453, data: '01-04' },
-            { id: 'pu-2', qnt: 981, peso: 3453, data: '01-04' }
+            { id: 'pu-1', qnt: 981, peso: 3453, data: '1-04' },
+            { id: 'pu-2', qnt: 981, peso: 3453, data: '' }
         ]);
 
-        showToast('Dados de exemplo idênticos aos da foto carregados com sucesso!', 'success');
+        showToast('Dados do modelo da foto carregados!', 'success');
     };
 
-    // 9. Operações das Tabelas (Adição e Remoção)
+    // Operações de linhas de tabelas
     const addStopRow = (shift: 'A' | 'B') => {
         const newStop: StopRow = {
             id: Math.random().toString(36).substring(2, 9),
@@ -399,37 +385,27 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
             fim: '00:00:00',
             motivo: ''
         };
-        if (shift === 'A') {
-            setStopsShiftA([...stopsShiftA, newStop]);
-        } else {
-            setStopsShiftB([...stopsShiftB, newStop]);
-        }
+        if (shift === 'A') setStopsShiftA([...stopsShiftA, newStop]);
+        else setStopsShiftB([...stopsShiftB, newStop]);
     };
 
     const removeStopRow = (shift: 'A' | 'B', id: string) => {
-        if (shift === 'A') {
-            setStopsShiftA(stopsShiftA.filter(r => r.id !== id));
-        } else {
-            setStopsShiftB(stopsShiftB.filter(r => r.id !== id));
-        }
+        if (shift === 'A') setStopsShiftA(stopsShiftA.filter(r => r.id !== id));
+        else setStopsShiftB(stopsShiftB.filter(r => r.id !== id));
     };
 
     const updateStopField = (shift: 'A' | 'B', id: string, field: keyof StopRow, value: string) => {
         const updater = (rows: StopRow[]) => rows.map(r => r.id === id ? { ...r, [field]: value } : r);
-        if (shift === 'A') {
-            setStopsShiftA(updater);
-        } else {
-            setStopsShiftB(updater);
-        }
+        if (shift === 'A') setStopsShiftA(updater);
+        else setStopsShiftB(updater);
     };
 
     const addProductionUpdateRow = () => {
-        const totalPcs = calculatedData.totalPecasProduzidas || 0;
         const newRow: ProductionUpdateRow = {
             id: Math.random().toString(36).substring(2, 9),
-            qnt: totalPcs,
-            peso: 0,
-            data: selectedDate ? selectedDate.split('-').slice(1, 3).reverse().join('-') : '' // DD-MM
+            qnt: calculatedData.totalPecasProduzidas || 981,
+            peso: 3453,
+            data: '1-04'
         };
         setProductionUpdates([...productionUpdates, newRow]);
     };
@@ -443,185 +419,142 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
     };
 
     return (
-        <div className="p-4 sm:p-6 md:p-8 bg-slate-50 min-h-screen font-sans text-slate-800 print-modal-container relative">
+        <div className="p-4 sm:p-6 md:p-8 bg-slate-50 min-h-screen font-mono text-slate-800 relative select-none">
             
-            {/* CSS de Impressão de alta fidelidade e estilos customizados */}
+            {/* CSS de Alta Fidelidade com o Layout impresso da foto */}
             <style dangerouslySetInnerHTML={{ __html: `
+                @media screen {
+                    .screen-input {
+                        border-bottom: 1px dashed #cbd5e1 !important;
+                        transition: all 0.2s;
+                    }
+                    .screen-input:focus {
+                        border-bottom: 2px solid #000 !important;
+                        background-color: #f8fafc !important;
+                    }
+                }
                 @media print {
                     body {
                         background: white !important;
                         color: black !important;
+                        font-family: 'Arial', 'Helvetica', sans-serif !important;
                     }
                     .no-print {
                         display: none !important;
                     }
-                    .print-section {
+                    .print-sheet {
                         padding: 0 !important;
                         margin: 0 !important;
-                        background: white !important;
                         border: none !important;
                         box-shadow: none !important;
                     }
-                    .print-compact-table {
-                        width: 100% !important;
-                        border-collapse: collapse !important;
-                        margin-bottom: 8px !important;
-                    }
-                    .print-compact-table th, .print-compact-table td {
-                        border: 1px solid #334155 !important;
-                        padding: 2px 4px !important;
-                        font-size: 10px !important;
-                        color: black !important;
-                        text-align: center !important;
-                    }
-                    .print-compact-table th {
-                        background-color: #f1f5f9 !important;
-                        -webkit-print-color-adjust: exact;
-                        print-color-adjust: exact;
-                    }
-                    .input-print-mode {
+                    input {
                         border: none !important;
                         background: transparent !important;
                         padding: 0 !important;
-                        font-weight: bold !important;
-                        color: black !important;
                         box-shadow: none !important;
-                        width: 100% !important;
+                        pointer-events: none !important;
+                        text-align: left !important;
+                    }
+                    .input-center {
                         text-align: center !important;
                     }
-                    .card-print {
-                        border: 1px solid #94a3b8 !important;
-                        border-radius: 4px !important;
-                        padding: 8px !important;
-                        margin-bottom: 8px !important;
-                        background: transparent !important;
-                        box-shadow: none !important;
-                    }
-                    .grid-print {
-                        display: grid !important;
-                        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-                        gap: 12px !important;
-                    }
-                    .title-print {
-                        font-size: 14px !important;
-                        text-transform: uppercase !important;
-                    }
+                }
+                
+                /* Layout Fita Preta Estilo Formulário Papel */
+                .worksheet-container {
+                    font-family: 'Arial', 'Helvetica', sans-serif;
+                }
+                .worksheet-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                }
+                .worksheet-table td, .worksheet-table th {
+                    border: 1px solid #1e293b;
+                    padding: 5px 10px;
+                    font-size: 13px;
+                }
+                .stops-grid-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                }
+                .stops-grid-table td {
+                    border: 1px solid #94a3b8;
+                    padding: 3px 6px;
+                    font-size: 11px;
+                }
+                .stats-container-box {
+                    border: 1.5px solid #1e293b;
+                    padding: 10px 15px;
+                    font-size: 13px;
+                    line-height: 1.6;
                 }
             `}} />
 
-            {/* Toasts de Notificação Premium */}
+            {/* Toasts de Notificação */}
             <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none no-print">
                 {toasts.map(t => (
                     <div 
                         key={t.id} 
-                        className={`p-4 rounded-xl shadow-lg border text-white font-medium flex items-center gap-3 animate-slide-in pointer-events-auto max-w-sm ${
+                        className={`p-3 rounded shadow border text-white font-bold text-xs flex items-center gap-2 pointer-events-auto max-w-sm ${
                             t.type === 'success' ? 'bg-emerald-600 border-emerald-500' :
                             t.type === 'error' ? 'bg-rose-600 border-rose-500' :
-                            t.type === 'warning' ? 'bg-amber-500 border-amber-400 text-slate-900' :
                             'bg-slate-800 border-slate-700'
                         }`}
                     >
-                        {t.type === 'success' && (
-                            <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                        )}
-                        {t.type === 'error' && (
-                            <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                        )}
-                        {t.type === 'warning' && (
-                            <svg className="w-5 h-5 flex-shrink-0 text-slate-900" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                            </svg>
-                        )}
-                        <span className="text-sm">{t.message}</span>
+                        <span>{t.message}</span>
                     </div>
                 ))}
             </div>
 
-            {/* Painel Administrativo de Ações - No Print */}
-            <header className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 pb-6 border-b border-slate-200 no-print gap-4">
+            {/* Menu Admin - No Print */}
+            <header className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 pb-4 border-b border-slate-200 no-print gap-4">
                 <div>
-                    <h1 className="text-3xl font-extrabold text-slate-800 flex items-center gap-2">
-                        <svg className="w-8 h-8 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 2v-6m-9-3h18c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H3c-1.1 0-2-.9-2-2V5c0-1.1.9-2 2-2z" />
-                        </svg>
-                        Controle de Produção Diária
+                    <h1 className="text-xl font-black text-slate-800 flex items-center gap-2 uppercase">
+                        📋 Formato Ficha de Papel Treliça
                     </h1>
-                    <p className="text-slate-500 text-sm mt-1">Gere, edite e acompanhe relatórios diários das máquinas Treliça 1 e 2.</p>
                 </div>
                 
                 <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-                    {/* Botão de Exemplo */}
                     <button
                         onClick={handleLoadSampleData}
-                        className="bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold py-2 px-4 rounded-lg transition-all flex items-center gap-2 text-sm border border-amber-300 shadow-sm"
-                        title="Preencher com os dados idênticos aos da foto de demonstração."
+                        className="bg-amber-500 hover:bg-amber-600 text-white font-bold py-1.5 px-3 rounded text-xs shadow"
                     >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                        Carregar Exemplo
+                        ⭐ Carregar Modelo da Foto
                     </button>
 
                     <button
                         onClick={() => window.print()}
-                        className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2 px-4 rounded-lg transition-all flex items-center gap-2 text-sm shadow-sm"
+                        className="bg-slate-700 hover:bg-slate-800 text-white font-bold py-1.5 px-3 rounded text-xs shadow"
                     >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                        </svg>
-                        Imprimir
+                        🖨️ Imprimir Ficha
                     </button>
 
                     <button
                         onClick={handleSaveReport}
                         disabled={isSaving}
-                        className={`font-bold py-2 px-5 rounded-lg transition-all flex items-center gap-2 text-sm shadow-md ${
-                            isSaving 
-                                ? 'bg-slate-400 text-slate-200 cursor-not-allowed' 
-                                : 'bg-slate-800 hover:bg-slate-900 text-white'
-                        }`}
+                        className="bg-slate-900 hover:bg-black text-white font-bold py-1.5 px-3 rounded text-xs shadow"
                     >
-                        {isSaving ? (
-                            <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                            </svg>
-                        ) : (
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                            </svg>
-                        )}
-                        {isSaving ? 'Salvando...' : 'Salvar Relatório'}
+                        {isSaving ? 'Salvando...' : '💾 Salvar Relatório'}
                     </button>
 
                     <button
-                        onClick={() => {
-                            if(window.confirm('Deseja realmente limpar todos os campos deste relatório?')) {
-                                resetFormToDefault();
-                                showToast('Formulário limpo.', 'info');
-                            }
-                        }}
-                        className="bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold py-2 px-3 rounded-lg transition-all text-sm border border-rose-300 shadow-sm"
-                        title="Limpar formulário atual"
+                        onClick={resetFormToDefault}
+                        className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-1.5 px-2 rounded text-xs"
                     >
                         Limpar
                     </button>
                 </div>
             </header>
 
-            {/* Controles de Filtros e Abas de Seleção - No Print */}
-            <section className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm mb-6 flex flex-col sm:flex-row items-center justify-between gap-4 no-print">
-                {/* Seletor de Máquina Treliça 1 e 2 */}
-                <div className="flex bg-slate-100 p-1.5 rounded-xl border border-slate-200 w-full sm:w-auto">
+            {/* Filtros - No Print */}
+            <section className="bg-white p-4 rounded border border-slate-200 shadow-sm mb-4 flex flex-col sm:flex-row items-center justify-between gap-4 no-print">
+                <div className="flex bg-slate-100 p-1 rounded border border-slate-200 w-full sm:w-auto">
                     {(['Treliça 1', 'Treliça 2'] as const).map(machine => (
                         <button
                             key={machine}
                             onClick={() => setSelectedMachine(machine)}
-                            className={`py-2 px-6 rounded-lg font-bold text-sm transition-all w-1/2 sm:w-auto text-center ${
+                            className={`py-1 px-4 rounded font-bold text-xs transition-all ${
                                 selectedMachine === machine
                                     ? 'bg-white text-slate-900 shadow-sm'
                                     : 'text-slate-500 hover:text-slate-800'
@@ -632,519 +565,512 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                     ))}
                 </div>
 
-                {/* Filtro por Data */}
-                <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-                    <label htmlFor="report-date" className="font-bold text-slate-700 text-sm whitespace-nowrap">Data do Relatório:</label>
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    <span className="font-bold text-slate-700 text-xs">Data:</span>
                     <input
                         type="date"
-                        id="report-date"
                         value={selectedDate}
                         onChange={e => setSelectedDate(e.target.value)}
-                        className="p-2 border border-slate-300 rounded-lg text-sm text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-slate-500"
+                        className="p-1 border border-slate-300 rounded text-xs font-bold text-slate-800"
                     />
                 </div>
             </section>
 
-            {/* Mensagem Informativa de Status de Conexão - No Print */}
-            {!dbAvailable && (
-                <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-xl mb-6 shadow-sm flex items-start gap-3 no-print">
-                    <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    <div>
-                        <h4 className="font-bold text-amber-800 text-sm">Modo de Persistência Local (Offline) Ativo</h4>
-                        <p className="text-amber-700 text-xs mt-0.5">
-                            O sistema está salvando seus relatórios com total segurança no navegador. Para compartilhar esses relatórios em nuvem com os demais usuários, peça ao seu administrador para executar o arquivo <strong>supabase_trelica_daily_reports.sql</strong> no painel do Supabase.
-                        </p>
-                    </div>
-                </div>
-            )}
-
-            {/* Corpo do Relatório - Área de Impressão e Formulário */}
+            {/* Ficha Técnica de Papel - ALTA FIDELIDADE */}
             {loading ? (
-                <div className="bg-white rounded-3xl p-16 border border-slate-200 shadow-sm flex flex-col items-center justify-center min-h-[400px]">
-                    <svg className="animate-spin h-10 w-10 text-slate-600 mb-4" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    <span className="text-slate-600 font-bold">Buscando informações do relatório...</span>
+                <div className="bg-white p-16 border rounded shadow-sm text-center font-bold">
+                    Carregando dados...
                 </div>
             ) : (
-                <div className="bg-white rounded-3xl border border-slate-200 shadow-md p-6 sm:p-8 md:p-10 print-section">
+                <div className="bg-white p-6 md:p-10 shadow-lg border border-slate-300 max-w-5xl mx-auto worksheet-container print-sheet">
                     
-                    {/* Cabeçalho de Impressão Identitário */}
-                    <div className="flex flex-col md:flex-row items-center justify-between pb-4 border-b-2 border-slate-800 mb-6 gap-4">
-                        <div className="flex items-center gap-3">
-                            {/* Logo Corporativo Simulado */}
-                            <div className="bg-slate-900 text-white font-black px-4 py-2 rounded text-base flex flex-col items-center justify-center leading-none tracking-tight">
-                                <span className="text-xs font-semibold text-slate-400">GRUPO</span>
-                                <span className="text-sm font-black">ITA AÇOS</span>
-                            </div>
-                            <div className="border-l border-slate-300 pl-3">
-                                <h2 className="text-lg md:text-xl font-extrabold text-slate-950 uppercase tracking-tight leading-tight">Controle de Produção Diária - Setor Laminação</h2>
-                                <h3 className="text-xs md:text-sm font-bold text-slate-700 tracking-wider">MÁQUINA: <span className="text-slate-950 underline">{selectedMachine.toUpperCase()}</span></h3>
-                            </div>
-                        </div>
-                        <div className="text-right flex flex-col md:items-end justify-center">
-                            <span className="text-xs font-bold text-slate-500 uppercase">Ficha Técnica Oficial</span>
-                            <span className="text-xs md:text-sm font-extrabold text-slate-950 bg-slate-100 py-1 px-3 rounded mt-0.5 border border-slate-200">
-                                {reportId ? `Nº: ${reportId.slice(0,8).toUpperCase()}` : 'CRIANDO NOVO RELATÓRIO'}
-                            </span>
-                        </div>
-                    </div>
+                    {/* Tabela do Cabeçalho - Idêntica à Foto */}
+                    <table className="worksheet-table mb-6">
+                        <tbody>
+                            {/* Linha 1: Logo e Título */}
+                            <tr>
+                                <td style={{ width: '180px', verticalAlign: 'middle', textAlign: 'center' }} className="p-2">
+                                    <div className="flex flex-col items-center justify-center border border-blue-900 p-1.5 rounded bg-white">
+                                        <div className="flex items-center gap-1">
+                                            {/* Logo Estilizado Azul e Vermelho */}
+                                            <span className="bg-blue-900 text-white font-black text-xs px-1 rounded-sm">GR</span>
+                                            <span className="text-[10px] font-black text-blue-950">ITA AÇOS</span>
+                                        </div>
+                                        <span className="text-[8px] font-bold text-slate-500 tracking-tighter mt-0.5">SISTEMA INTELIGENTE</span>
+                                    </div>
+                                </td>
+                                <td className="text-center font-black p-2 text-slate-900" style={{ fontSize: '15px', textTransform: 'uppercase', lineHeight: '1.2' }}>
+                                    CONTROLE DE PRODUÇÃO DIARIA- SETOR LAMINAÇÃO <br />
+                                    <span style={{ fontSize: '14px' }}>TRELIÇA</span>
+                                </td>
+                            </tr>
 
-                    {/* Metadados e Informações Gerais da Ordem de Produção */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 card-print">
-                        <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 flex flex-col">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Ordem de Produção :</label>
-                            <input
-                                type="text"
-                                value={productionOrder}
-                                onChange={e => setProductionOrder(e.target.value)}
-                                placeholder="Insira a OP..."
-                                className="mt-1 bg-transparent border-b border-slate-300 focus:border-slate-800 focus:outline-none font-bold text-slate-900 input-print-mode"
-                            />
-                        </div>
-
-                        <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 flex flex-col md:col-span-1 lg:col-span-1">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Data da Produção :</label>
-                            <span className="text-slate-900 font-extrabold text-sm mt-2 capitalize">{formattedProductionDate}</span>
-                        </div>
-
-                        <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 flex flex-col">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Operador/Auxiliar Turno A :</label>
-                            <input
-                                type="text"
-                                value={operatorShiftA}
-                                onChange={e => setOperatorShiftA(e.target.value)}
-                                placeholder="Ex: Adrian / Junior..."
-                                className="mt-1 bg-transparent border-b border-slate-300 focus:border-slate-800 focus:outline-none font-bold text-slate-900 input-print-mode"
-                            />
-                        </div>
-
-                        <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 flex flex-col">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Operador/Auxiliar Turno B :</label>
-                            <input
-                                type="text"
-                                value={operatorShiftB}
-                                onChange={e => setOperatorShiftB(e.target.value)}
-                                placeholder="Ex: Alceu / Thiago..."
-                                className="mt-1 bg-transparent border-b border-slate-300 focus:border-slate-800 focus:outline-none font-bold text-slate-900 input-print-mode"
-                            />
-                        </div>
-
-                        <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 flex flex-col lg:col-span-2">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Descrição do Produto :</label>
-                                    <input
-                                        type="text"
-                                        value={productDescription}
-                                        onChange={e => setProductDescription(e.target.value)}
-                                        placeholder="Ex: TRELIÇA H-12 LEVE 6 MTS..."
-                                        className="mt-1 w-full bg-transparent border-b border-slate-300 focus:border-slate-800 focus:outline-none font-bold text-slate-900 input-print-mode"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Peças Produzidas :</label>
-                                    <p className="text-xl font-black text-slate-950 mt-1">{calculatedData.totalPecasProduzidas} peças</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* SEÇÃO DE PARADAS E MOTIVOS: TURNO B (Esquerdo) E TURNO A (Direito) */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 grid-print">
-                        
-                        {/* TURNO B */}
-                        <div className="border border-slate-200 rounded-2xl p-4 bg-white flex flex-col justify-between card-print">
-                            <div>
-                                <div className="flex items-center justify-between border-b border-slate-200 pb-2 mb-3">
-                                    <h4 className="font-extrabold text-sm text-slate-950 tracking-wider flex items-center gap-1.5 uppercase title-print">
-                                        <span className="w-2 h-2 rounded-full bg-slate-900" />
-                                        Paradas e Seus Motivos: Turno B
-                                    </h4>
-                                    <button
-                                        onClick={() => addStopRow('B')}
-                                        className="bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs py-1 px-3 rounded transition-all no-print flex items-center gap-1 btn-action-row"
-                                    >
-                                        + Adicionar Parada
-                                    </button>
-                                </div>
-
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-xs text-left text-slate-600 print-compact-table">
-                                        <thead className="text-slate-700 bg-slate-100 uppercase font-bold">
-                                            <tr>
-                                                <th scope="col" className="px-2 py-2 text-center w-20 border border-slate-200">Hr Inicial</th>
-                                                <th scope="col" className="px-2 py-2 text-center w-20 border border-slate-200">Hr Final</th>
-                                                <th scope="col" className="px-3 py-2 border border-slate-200">Motivo da Parada</th>
-                                                <th scope="col" className="px-2 py-2 text-center w-20 border border-slate-200">Duração</th>
-                                                <th scope="col" className="px-1 py-1 text-center w-8 no-print border border-slate-200 btn-action-row">Ações</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {stopsShiftB.length === 0 ? (
-                                                <tr>
-                                                    <td colSpan={5} className="text-center py-4 text-slate-400 font-bold italic border border-slate-200">
-                                                        Nenhuma parada registrada para o Turno B.
-                                                    </td>
-                                                </tr>
-                                            ) : (
-                                                stopsShiftB.map(stop => {
-                                                    const duracaoSeconds = calculateStopDurationSeconds(stop.inicio, stop.fim);
-                                                    return (
-                                                        <tr key={stop.id} className="border-b border-slate-200 hover:bg-slate-50 transition-all">
-                                                            <td className="p-1 border border-slate-200 text-center">
-                                                                <input
-                                                                    type="text"
-                                                                    value={stop.inicio}
-                                                                    onChange={e => updateStopField('B', stop.id, 'inicio', e.target.value)}
-                                                                    placeholder="00:00:00"
-                                                                    className="text-center w-full bg-transparent border-none font-semibold focus:ring-0 text-slate-800 input-print-mode"
-                                                                />
-                                                            </td>
-                                                            <td className="p-1 border border-slate-200 text-center">
-                                                                <input
-                                                                    type="text"
-                                                                    value={stop.fim}
-                                                                    onChange={e => updateStopField('B', stop.id, 'fim', e.target.value)}
-                                                                    placeholder="00:00:00"
-                                                                    className="text-center w-full bg-transparent border-none font-semibold focus:ring-0 text-slate-800 input-print-mode"
-                                                                />
-                                                            </td>
-                                                            <td className="p-1 border border-slate-200 text-left">
-                                                                <input
-                                                                    type="text"
-                                                                    value={stop.motivo}
-                                                                    onChange={e => updateStopField('B', stop.id, 'motivo', e.target.value)}
-                                                                    placeholder="Descreva o motivo..."
-                                                                    className="text-left w-full bg-transparent border-none font-semibold focus:ring-0 text-slate-800 input-print-mode"
-                                                                />
-                                                            </td>
-                                                            <td className="p-1 border border-slate-200 text-center font-bold text-slate-900">
-                                                                {secondsToTime(duracaoSeconds)}
-                                                            </td>
-                                                            <td className="p-1 border border-slate-200 text-center no-print btn-action-row">
-                                                                <button
-                                                                    onClick={() => removeStopRow('B', stop.id)}
-                                                                    className="text-rose-600 hover:text-rose-800 font-extrabold hover:bg-rose-50 p-1 rounded"
-                                                                    title="Remover linha"
-                                                                >
-                                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                                    </svg>
-                                                                </button>
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-
-                            {/* Estatísticas do Turno B */}
-                            <div className="mt-4 pt-4 border-t border-slate-200">
-                                <h5 className="font-extrabold text-xs text-slate-950 uppercase tracking-widest text-center mb-3">Estatística do Turno B:</h5>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
-                                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-center">
-                                        <span className="block text-[10px] font-bold text-slate-500 uppercase">Horas Trabalhadas</span>
+                            {/* Linha 2: Ordem de Produção */}
+                            <tr>
+                                <td colSpan={2} className="p-1">
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-bold text-xs text-slate-800 whitespace-nowrap pl-2">Ordem de produção :</span>
                                         <input
                                             type="text"
-                                            value={statsShiftB.horasTrabalhadas}
-                                            onChange={e => setStatsShiftB({ ...statsShiftB, horasTrabalhadas: e.target.value })}
-                                            className="font-extrabold text-sm text-slate-900 text-center w-full bg-transparent border-none p-0 focus:ring-0 input-print-mode mt-0.5"
+                                            value={productionOrder}
+                                            onChange={e => setProductionOrder(e.target.value)}
+                                            className="w-full bg-transparent border-none font-bold text-xs p-0 focus:outline-none focus:ring-0 text-slate-800 screen-input"
+                                            placeholder="Digite..."
                                         />
                                     </div>
-                                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-center">
-                                        <span className="block text-[10px] font-bold text-slate-500 uppercase">Tempo Parada</span>
-                                        <span className="font-extrabold text-sm text-rose-600 block mt-0.5">
-                                            {calculatedData.turnoB.tempoParadoStr} <span className="text-xs font-black text-rose-500">({calculatedData.turnoB.percentParado}%)</span>
-                                        </span>
+                                </td>
+                            </tr>
+
+                            {/* Linha 3: Data de Produção */}
+                            <tr>
+                                <td colSpan={2} className="p-1">
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-bold text-xs text-slate-800 whitespace-nowrap pl-2">Data da produção:</span>
+                                        <span className="font-bold text-xs text-slate-800">{formattedProductionDate}</span>
                                     </div>
-                                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-center">
-                                        <span className="block text-[10px] font-bold text-slate-500 uppercase">Tempo Efetivo</span>
-                                        <span className="font-extrabold text-sm text-emerald-600 block mt-0.5">
-                                            {calculatedData.turnoB.tempoEfetivoStr} <span className="text-xs font-black text-emerald-500">({calculatedData.turnoB.percentEfetivo}%)</span>
-                                        </span>
+                                </td>
+                            </tr>
+
+                            {/* Linha 4: Operador Turno A */}
+                            <tr>
+                                <td colSpan={2} className="p-1">
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-bold text-xs text-slate-800 whitespace-nowrap pl-2">Operador/auxiliar turno A:</span>
+                                        <input
+                                            type="text"
+                                            value={operatorShiftA}
+                                            onChange={e => setOperatorShiftA(e.target.value)}
+                                            className="w-full bg-transparent border-none font-bold text-xs p-0 focus:outline-none focus:ring-0 text-slate-800 screen-input"
+                                            placeholder="Insira..."
+                                        />
                                     </div>
-                                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-center">
-                                        <span className="block text-[10px] font-bold text-slate-500 uppercase">Quant. Peças Produzidas</span>
+                                </td>
+                            </tr>
+
+                            {/* Linha 5: Operador Turno B */}
+                            <tr>
+                                <td colSpan={2} className="p-1">
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-bold text-xs text-slate-800 whitespace-nowrap pl-2">Operador/auxiliar turno B:</span>
+                                        <input
+                                            type="text"
+                                            value={operatorShiftB}
+                                            onChange={e => setOperatorShiftB(e.target.value)}
+                                            className="w-full bg-transparent border-none font-bold text-xs p-0 focus:outline-none focus:ring-0 text-slate-800 screen-input"
+                                            placeholder="Insira..."
+                                        />
+                                    </div>
+                                </td>
+                            </tr>
+
+                            {/* Linha 6: Descrição do produto */}
+                            <tr>
+                                <td colSpan={2} className="p-1">
+                                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between pl-2 pr-4 gap-2 py-0.5">
+                                        <div className="flex items-center gap-1.5 w-full md:w-auto">
+                                            <span className="font-bold text-xs text-slate-800 whitespace-nowrap">Descrição do produto:</span>
+                                            <input
+                                                type="text"
+                                                value={productDescription}
+                                                onChange={e => setProductDescription(e.target.value)}
+                                                className="w-full md:w-80 bg-transparent border-none font-bold text-xs p-0 focus:outline-none focus:ring-0 text-slate-800 screen-input"
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-1 text-xs">
+                                            <span className="font-bold text-slate-800 whitespace-nowrap">Qnt. De peças produzidas:</span>
+                                            <span className="font-black text-slate-950 text-lg underline ml-1">{calculatedData.totalPecasProduzidas} peças</span>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    {/* SEÇÃO DE PARADAS LADO A LADO - IDÊNTICA À FOTO */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+                        
+                        {/* PARADAS TURNO B (LADO ESQUERDO) */}
+                        <div className="flex flex-col">
+                            <div className="flex items-center justify-between mb-1">
+                                <h4 className="text-center font-bold text-xs uppercase underline tracking-wider w-full pr-8">
+                                    PARADAS E SEUS MOTIVOS: TURNO B
+                                </h4>
+                                <button
+                                    onClick={() => addStopRow('B')}
+                                    className="bg-slate-800 hover:bg-black text-white font-bold text-[10px] px-2 py-0.5 rounded no-print whitespace-nowrap flex-shrink-0"
+                                >
+                                    + Linha B
+                                </button>
+                            </div>
+
+                            <table className="stops-grid-table">
+                                <tbody>
+                                    {stopsShiftB.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={4} className="text-center py-4 text-slate-400 italic font-bold">
+                                                Nenhuma parada no Turno B (Clique em "+ Linha B")
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        stopsShiftB.map(stop => {
+                                            const durationSecs = calculateStopDurationSeconds(stop.inicio, stop.fim);
+                                            return (
+                                                <tr key={stop.id} className="hover:bg-slate-50">
+                                                    {/* Hora Inicial (Vermelho na foto) */}
+                                                    <td style={{ width: '70px', textAlign: 'center' }} className="p-0.5">
+                                                        <input
+                                                            type="text"
+                                                            value={stop.inicio}
+                                                            onChange={e => updateStopField('B', stop.id, 'inicio', e.target.value)}
+                                                            className="text-center w-full bg-transparent border-none p-0 focus:ring-0 text-[#dc2626] font-bold input-center text-xs"
+                                                            placeholder="00:00:00"
+                                                        />
+                                                    </td>
+                                                    {/* Hora Final (Verde na foto) */}
+                                                    <td style={{ width: '70px', textAlign: 'center' }} className="p-0.5">
+                                                        <input
+                                                            type="text"
+                                                            value={stop.fim}
+                                                            onChange={e => updateStopField('B', stop.id, 'fim', e.target.value)}
+                                                            className="text-center w-full bg-transparent border-none p-0 focus:ring-0 text-[#16a34a] font-bold input-center text-xs"
+                                                            placeholder="00:00:00"
+                                                        />
+                                                    </td>
+                                                    {/* Motivo (Texto normal) */}
+                                                    <td className="p-0.5 text-left pl-2">
+                                                        <input
+                                                            type="text"
+                                                            value={stop.motivo}
+                                                            onChange={e => updateStopField('B', stop.id, 'motivo', e.target.value)}
+                                                            className="text-left w-full bg-transparent border-none p-0 focus:ring-0 text-slate-800 font-medium text-xs screen-input"
+                                                            placeholder="Motivo..."
+                                                        />
+                                                    </td>
+                                                    {/* Duração (Vermelho na foto) */}
+                                                    <td style={{ width: '75px', textAlign: 'center', color: '#dc2626' }} className="p-0.5 font-bold text-center text-xs">
+                                                        <div className="flex items-center justify-between px-1">
+                                                            <span className="w-full text-center">{secondsToTime(durationSecs)}</span>
+                                                            <button
+                                                                onClick={() => removeStopRow('B', stop.id)}
+                                                                className="text-rose-600 hover:text-rose-800 font-extrabold no-print ml-1"
+                                                                title="Remover parada"
+                                                            >
+                                                                ×
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* PARADAS TURNO A (LADO DIREITO) */}
+                        <div className="flex flex-col">
+                            <div className="flex items-center justify-between mb-1">
+                                <h4 className="text-center font-bold text-xs uppercase underline tracking-wider w-full pr-8">
+                                    PARADAS E SEUS MOTIVOS: TURNO A
+                                </h4>
+                                <button
+                                    onClick={() => addStopRow('A')}
+                                    className="bg-slate-800 hover:bg-black text-white font-bold text-[10px] px-2 py-0.5 rounded no-print whitespace-nowrap flex-shrink-0"
+                                >
+                                    + Linha A
+                                </button>
+                            </div>
+
+                            <table className="stops-grid-table">
+                                <tbody>
+                                    {stopsShiftA.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={4} className="text-center py-4 text-slate-400 italic font-bold">
+                                                Nenhuma parada no Turno A (Clique em "+ Linha A")
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        stopsShiftA.map(stop => {
+                                            const durationSecs = calculateStopDurationSeconds(stop.inicio, stop.fim);
+                                            return (
+                                                <tr key={stop.id} className="hover:bg-slate-50">
+                                                    {/* Hora Inicial (Vermelho na foto) */}
+                                                    <td style={{ width: '70px', textAlign: 'center' }} className="p-0.5">
+                                                        <input
+                                                            type="text"
+                                                            value={stop.inicio}
+                                                            onChange={e => updateStopField('A', stop.id, 'inicio', e.target.value)}
+                                                            className="text-center w-full bg-transparent border-none p-0 focus:ring-0 text-[#dc2626] font-bold input-center text-xs"
+                                                            placeholder="00:00:00"
+                                                        />
+                                                    </td>
+                                                    {/* Hora Final (Verde na foto) */}
+                                                    <td style={{ width: '70px', textAlign: 'center' }} className="p-0.5">
+                                                        <input
+                                                            type="text"
+                                                            value={stop.fim}
+                                                            onChange={e => updateStopField('A', stop.id, 'fim', e.target.value)}
+                                                            className="text-center w-full bg-transparent border-none p-0 focus:ring-0 text-[#16a34a] font-bold input-center text-xs"
+                                                            placeholder="00:00:00"
+                                                        />
+                                                    </td>
+                                                    {/* Motivo (Texto normal) */}
+                                                    <td className="p-0.5 text-left pl-2">
+                                                        <input
+                                                            type="text"
+                                                            value={stop.motivo}
+                                                            onChange={e => updateStopField('A', stop.id, 'motivo', e.target.value)}
+                                                            className="text-left w-full bg-transparent border-none p-0 focus:ring-0 text-slate-800 font-medium text-xs screen-input"
+                                                            placeholder="Motivo..."
+                                                        />
+                                                    </td>
+                                                    {/* Duração (Vermelho na foto) */}
+                                                    <td style={{ width: '75px', textAlign: 'center', color: '#dc2626' }} className="p-0.5 font-bold text-center text-xs">
+                                                        <div className="flex items-center justify-between px-1">
+                                                            <span className="w-full text-center">{secondsToTime(durationSecs)}</span>
+                                                            <button
+                                                                onClick={() => removeStopRow('A', stop.id)}
+                                                                className="text-rose-600 hover:text-rose-800 font-extrabold no-print ml-1"
+                                                                title="Remover parada"
+                                                            >
+                                                                ×
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                    </div>
+
+                    {/* SEÇÃO DE ESTATÍSTICA DO DIA LADO A LADO - IDÊNTICA À FOTO */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+                        
+                        {/* ESTATÍSTICA DO DIA TURNO B */}
+                        <div className="stats-container-box">
+                            <h4 className="text-center font-bold text-xs uppercase underline tracking-wider mb-3">
+                                ESTATÍSTICA DO DIA:
+                            </h4>
+                            <div className="space-y-1.5 text-xs">
+                                <div className="flex justify-between items-center">
+                                    <span className="font-bold text-slate-800">Horas (Turno trabalhados):</span>
+                                    <input
+                                        type="text"
+                                        value={statsShiftB.horasTrabalhadas}
+                                        onChange={e => setStatsShiftB({ ...statsShiftB, horasTrabalhadas: e.target.value })}
+                                        className="font-bold text-right text-slate-900 w-24 bg-transparent border-none p-0 focus:ring-0 text-xs text-right"
+                                    />
+                                </div>
+                                
+                                <div className="flex justify-between items-center text-[#dc2626] font-bold">
+                                    <span>Tempo de maquina (parada) :</span>
+                                    <div className="flex gap-4">
+                                        <span>{calculatedData.turnoB.tempoParadoStr}</span>
+                                        <span className="w-12 text-right">{calculatedData.turnoB.percentParado}%</span>
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-between items-center text-[#16a34a] font-bold">
+                                    <span>Tempo de maquina (Efetivo) :</span>
+                                    <div className="flex gap-4">
+                                        <span>{calculatedData.turnoB.tempoEfetivoStr}</span>
+                                        <span className="w-12 text-right">{calculatedData.turnoB.percentEfetivo}%</span>
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-between items-center">
+                                    <span className="font-bold text-slate-800">Quant. de peças produzidas:</span>
+                                    <div className="flex items-center gap-1 justify-end font-bold text-slate-900">
                                         <input
                                             type="number"
                                             value={statsShiftB.pecasProduzidas || ''}
                                             onChange={e => setStatsShiftB({ ...statsShiftB, pecasProduzidas: parseInt(e.target.value, 10) || 0 })}
-                                            className="font-extrabold text-sm text-slate-900 text-center w-full bg-transparent border-none p-0 focus:ring-0 input-print-mode mt-0.5"
+                                            className="w-12 bg-transparent border-none p-0 focus:ring-0 text-xs font-bold text-right mr-1"
                                         />
-                                    </div>
-                                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-center">
-                                        <span className="block text-[10px] font-bold text-slate-500 uppercase">Tamanho (mts/pç)</span>
+                                        <span>peças de</span>
                                         <input
                                             type="number"
                                             value={statsShiftB.tamanhoPeca || ''}
                                             onChange={e => setStatsShiftB({ ...statsShiftB, tamanhoPeca: parseFloat(e.target.value) || 0 })}
-                                            className="font-extrabold text-sm text-slate-900 text-center w-full bg-transparent border-none p-0 focus:ring-0 input-print-mode mt-0.5"
+                                            className="w-10 bg-transparent border-none p-0 focus:ring-0 text-xs font-bold text-center"
                                         />
+                                        <span>metros</span>
                                     </div>
-                                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-center col-span-2 md:col-span-1">
-                                        <span className="block text-[10px] font-bold text-slate-500 uppercase">Metros Produzidos</span>
-                                        <span className="font-extrabold text-sm text-slate-900 block mt-0.5">{calculatedData.turnoB.metrosProduzidosStr}</span>
-                                    </div>
-                                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-center col-span-1">
-                                        <span className="block text-[10px] font-bold text-slate-500 uppercase">Tempo por Peça</span>
-                                        <span className="font-extrabold text-sm text-slate-900 block mt-0.5">{calculatedData.turnoB.tempoPorPecaStr}</span>
-                                    </div>
-                                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-center col-span-2">
-                                        <span className="block text-[10px] font-bold text-slate-500 uppercase">Velocidade da Máquina</span>
-                                        <span className="font-extrabold text-sm text-slate-900 block mt-0.5">{calculatedData.turnoB.velocidadeStr}</span>
-                                    </div>
+                                </div>
+
+                                <div className="flex justify-between items-center font-bold">
+                                    <span className="text-slate-800">Quant. de metros produzidos:</span>
+                                    <span className="text-slate-950 text-right">{statsShiftB.pecasProduzidas * statsShiftB.tamanhoPeca} metros</span>
+                                </div>
+
+                                <div className="flex justify-between items-center">
+                                    <span className="font-bold text-slate-800">Tempo por peça:</span>
+                                    <span className="font-bold text-slate-900 text-right">{calculatedData.turnoB.tempoPorPecaStr}</span>
+                                </div>
+
+                                <div className="flex justify-between items-center">
+                                    <span className="font-bold text-slate-800">Velocidade:</span>
+                                    <span className="font-bold text-slate-900 text-right">{calculatedData.turnoB.velocidadeStr}</span>
                                 </div>
                             </div>
                         </div>
 
-                        {/* TURNO A */}
-                        <div className="border border-slate-200 rounded-2xl p-4 bg-white flex flex-col justify-between card-print">
-                            <div>
-                                <div className="flex items-center justify-between border-b border-slate-200 pb-2 mb-3">
-                                    <h4 className="font-extrabold text-sm text-slate-950 tracking-wider flex items-center gap-1.5 uppercase title-print">
-                                        <span className="w-2 h-2 rounded-full bg-slate-900" />
-                                        Paradas e Seus Motivos: Turno A
-                                    </h4>
-                                    <button
-                                        onClick={() => addStopRow('A')}
-                                        className="bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs py-1 px-3 rounded transition-all no-print flex items-center gap-1 btn-action-row"
-                                    >
-                                        + Adicionar Parada
-                                    </button>
+                        {/* ESTATÍSTICA DO DIA TURNO A */}
+                        <div className="stats-container-box">
+                            <h4 className="text-center font-bold text-xs uppercase underline tracking-wider mb-3">
+                                ESTATÍSTICA DO DIA:
+                            </h4>
+                            <div className="space-y-1.5 text-xs">
+                                <div className="flex justify-between items-center">
+                                    <span className="font-bold text-slate-800">Horas (Turno trabalhados):</span>
+                                    <input
+                                        type="text"
+                                        value={statsShiftA.horasTrabalhadas}
+                                        onChange={e => setStatsShiftA({ ...statsShiftA, horasTrabalhadas: e.target.value })}
+                                        className="font-bold text-right text-slate-900 w-24 bg-transparent border-none p-0 focus:ring-0 text-xs text-right"
+                                    />
+                                </div>
+                                
+                                <div className="flex justify-between items-center text-[#dc2626] font-bold">
+                                    <span>Tempo de maquina (parada) :</span>
+                                    <div className="flex gap-4">
+                                        <span>{calculatedData.turnoA.tempoParadoStr}</span>
+                                        <span className="w-12 text-right">{calculatedData.turnoA.percentParado}%</span>
+                                    </div>
                                 </div>
 
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-xs text-left text-slate-600 print-compact-table">
-                                        <thead className="text-slate-700 bg-slate-100 uppercase font-bold">
-                                            <tr>
-                                                <th scope="col" className="px-2 py-2 text-center w-20 border border-slate-200">Hr Inicial</th>
-                                                <th scope="col" className="px-2 py-2 text-center w-20 border border-slate-200">Hr Final</th>
-                                                <th scope="col" className="px-3 py-2 border border-slate-200">Motivo da Parada</th>
-                                                <th scope="col" className="px-2 py-2 text-center w-20 border border-slate-200">Duração</th>
-                                                <th scope="col" className="px-1 py-1 text-center w-8 no-print border border-slate-200 btn-action-row">Ações</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {stopsShiftA.length === 0 ? (
-                                                <tr>
-                                                    <td colSpan={5} className="text-center py-4 text-slate-400 font-bold italic border border-slate-200">
-                                                        Nenhuma parada registrada para o Turno A.
-                                                    </td>
-                                                </tr>
-                                            ) : (
-                                                stopsShiftA.map(stop => {
-                                                    const duracaoSeconds = calculateStopDurationSeconds(stop.inicio, stop.fim);
-                                                    return (
-                                                        <tr key={stop.id} className="border-b border-slate-200 hover:bg-slate-50 transition-all">
-                                                            <td className="p-1 border border-slate-200 text-center">
-                                                                <input
-                                                                    type="text"
-                                                                    value={stop.inicio}
-                                                                    onChange={e => updateStopField('A', stop.id, 'inicio', e.target.value)}
-                                                                    placeholder="00:00:00"
-                                                                    className="text-center w-full bg-transparent border-none font-semibold focus:ring-0 text-slate-800 input-print-mode"
-                                                                />
-                                                            </td>
-                                                            <td className="p-1 border border-slate-200 text-center">
-                                                                <input
-                                                                    type="text"
-                                                                    value={stop.fim}
-                                                                    onChange={e => updateStopField('A', stop.id, 'fim', e.target.value)}
-                                                                    placeholder="00:00:00"
-                                                                    className="text-center w-full bg-transparent border-none font-semibold focus:ring-0 text-slate-800 input-print-mode"
-                                                                />
-                                                            </td>
-                                                            <td className="p-1 border border-slate-200 text-left">
-                                                                <input
-                                                                    type="text"
-                                                                    value={stop.motivo}
-                                                                    onChange={e => updateStopField('A', stop.id, 'motivo', e.target.value)}
-                                                                    placeholder="Descreva o motivo..."
-                                                                    className="text-left w-full bg-transparent border-none font-semibold focus:ring-0 text-slate-800 input-print-mode"
-                                                                />
-                                                            </td>
-                                                            <td className="p-1 border border-slate-200 text-center font-bold text-slate-900">
-                                                                {secondsToTime(duracaoSeconds)}
-                                                            </td>
-                                                            <td className="p-1 border border-slate-200 text-center no-print btn-action-row">
-                                                                <button
-                                                                    onClick={() => removeStopRow('A', stop.id)}
-                                                                    className="text-rose-600 hover:text-rose-800 font-extrabold hover:bg-rose-50 p-1 rounded"
-                                                                    title="Remover linha"
-                                                                >
-                                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                                    </svg>
-                                                                </button>
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })
-                                            )}
-                                        </tbody>
-                                    </table>
+                                <div className="flex justify-between items-center text-[#16a34a] font-bold">
+                                    <span>Tempo de maquina (Efetivo) :</span>
+                                    <div className="flex gap-4">
+                                        <span>{calculatedData.turnoA.tempoEfetivoStr}</span>
+                                        <span className="w-12 text-right">{calculatedData.turnoA.percentEfetivo}%</span>
+                                    </div>
                                 </div>
-                            </div>
 
-                            {/* Estatísticas do Turno A */}
-                            <div className="mt-4 pt-4 border-t border-slate-200">
-                                <h5 className="font-extrabold text-xs text-slate-950 uppercase tracking-widest text-center mb-3">Estatística do Turno A:</h5>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
-                                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-center">
-                                        <span className="block text-[10px] font-bold text-slate-500 uppercase">Horas Trabalhadas</span>
-                                        <input
-                                            type="text"
-                                            value={statsShiftA.horasTrabalhadas}
-                                            onChange={e => setStatsShiftA({ ...statsShiftA, horasTrabalhadas: e.target.value })}
-                                            className="font-extrabold text-sm text-slate-900 text-center w-full bg-transparent border-none p-0 focus:ring-0 input-print-mode mt-0.5"
-                                        />
-                                    </div>
-                                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-center">
-                                        <span className="block text-[10px] font-bold text-slate-500 uppercase">Tempo Parada</span>
-                                        <span className="font-extrabold text-sm text-rose-600 block mt-0.5">
-                                            {calculatedData.turnoA.tempoParadoStr} <span className="text-xs font-black text-rose-500">({calculatedData.turnoA.percentParado}%)</span>
-                                        </span>
-                                    </div>
-                                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-center">
-                                        <span className="block text-[10px] font-bold text-slate-500 uppercase">Tempo Efetivo</span>
-                                        <span className="font-extrabold text-sm text-emerald-600 block mt-0.5">
-                                            {calculatedData.turnoA.tempoEfetivoStr} <span className="text-xs font-black text-emerald-500">({calculatedData.turnoA.percentEfetivo}%)</span>
-                                        </span>
-                                    </div>
-                                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-center">
-                                        <span className="block text-[10px] font-bold text-slate-500 uppercase">Quant. Peças Produzidas</span>
+                                <div className="flex justify-between items-center">
+                                    <span className="font-bold text-slate-800">Quant. de peças produzidas:</span>
+                                    <div className="flex items-center gap-1 justify-end font-bold text-slate-900">
                                         <input
                                             type="number"
                                             value={statsShiftA.pecasProduzidas || ''}
                                             onChange={e => setStatsShiftA({ ...statsShiftA, pecasProduzidas: parseInt(e.target.value, 10) || 0 })}
-                                            className="font-extrabold text-sm text-slate-900 text-center w-full bg-transparent border-none p-0 focus:ring-0 input-print-mode mt-0.5"
+                                            className="w-12 bg-transparent border-none p-0 focus:ring-0 text-xs font-bold text-right mr-1"
                                         />
-                                    </div>
-                                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-center">
-                                        <span className="block text-[10px] font-bold text-slate-500 uppercase">Tamanho (mts/pç)</span>
+                                        <span>peças de</span>
                                         <input
                                             type="number"
                                             value={statsShiftA.tamanhoPeca || ''}
                                             onChange={e => setStatsShiftA({ ...statsShiftA, tamanhoPeca: parseFloat(e.target.value) || 0 })}
-                                            className="font-extrabold text-sm text-slate-900 text-center w-full bg-transparent border-none p-0 focus:ring-0 input-print-mode mt-0.5"
+                                            className="w-10 bg-transparent border-none p-0 focus:ring-0 text-xs font-bold text-center"
                                         />
+                                        <span>metros</span>
                                     </div>
-                                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-center col-span-2 md:col-span-1">
-                                        <span className="block text-[10px] font-bold text-slate-500 uppercase">Metros Produzidos</span>
-                                        <span className="font-extrabold text-sm text-slate-900 block mt-0.5">{calculatedData.turnoA.metrosProduzidosStr}</span>
-                                    </div>
-                                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-center col-span-1">
-                                        <span className="block text-[10px] font-bold text-slate-500 uppercase">Tempo por Peça</span>
-                                        <span className="font-extrabold text-sm text-slate-900 block mt-0.5">{calculatedData.turnoA.tempoPorPecaStr}</span>
-                                    </div>
-                                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-center col-span-2">
-                                        <span className="block text-[10px] font-bold text-slate-500 uppercase">Velocidade da Máquina</span>
-                                        <span className="font-extrabold text-sm text-slate-900 block mt-0.5">{calculatedData.turnoA.velocidadeStr}</span>
-                                    </div>
+                                </div>
+
+                                <div className="flex justify-between items-center font-bold">
+                                    <span className="text-slate-800">Quant. de metros produzidos:</span>
+                                    <span className="text-slate-950 text-right">{statsShiftA.pecasProduzidas * statsShiftA.tamanhoPeca} metros</span>
+                                </div>
+
+                                <div className="flex justify-between items-center">
+                                    <span className="font-bold text-slate-800">Tempo por peça:</span>
+                                    <span className="font-bold text-slate-900 text-right">{calculatedData.turnoA.tempoPorPecaStr}</span>
+                                </div>
+
+                                <div className="flex justify-between items-center">
+                                    <span className="font-bold text-slate-800">Velocidade:</span>
+                                    <span className="font-bold text-slate-900 text-right">{calculatedData.turnoA.velocidadeStr}</span>
                                 </div>
                             </div>
                         </div>
 
                     </div>
 
-                    {/* SEÇÃO RODAPÉ: ATUALIZAÇÃO DA PRODUÇÃO */}
-                    <div className="border border-slate-200 rounded-2xl p-5 bg-white card-print mt-4">
-                        <div className="flex flex-col md:flex-row items-start md:items-center justify-between border-b border-slate-200 pb-3 mb-4 gap-4">
-                            <h4 className="font-extrabold text-sm text-slate-950 uppercase tracking-widest title-print flex items-center gap-1.5">
-                                <span className="w-2.5 h-2.5 rounded bg-slate-900 animate-pulse" />
-                                Atualização da Produção
-                            </h4>
-                            
-                            <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
-                                <div className="flex items-center gap-2">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase whitespace-nowrap">Quantidade a produzir :</label>
-                                    <input
-                                        type="number"
-                                        value={piecesToProduce}
-                                        onChange={e => setPiecesToProduce(parseInt(e.target.value, 10) || 0)}
-                                        className="w-24 p-1 bg-slate-50 border border-slate-300 rounded font-extrabold text-slate-900 text-center input-print-mode text-xs"
-                                    />
-                                    <span className="text-xs font-bold text-slate-600 uppercase">treliças</span>
-                                </div>
-                                <button
-                                    onClick={addProductionUpdateRow}
-                                    className="bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs py-1.5 px-3 rounded-lg transition-all no-print ml-auto btn-action-row"
-                                >
-                                    + Adicionar Registro
-                                </button>
-                            </div>
+                    {/* SEÇÃO RODAPÉ: ATUALIZAÇÃO DA PRODUÇÃO - IDÊNTICA À FOTO */}
+                    <div className="border-1.5 border-[#1e293b] p-4 text-center rounded bg-white" style={{ border: '1.5px solid #1e293b' }}>
+                        <h4 className="text-center font-bold text-xs uppercase underline tracking-wider mb-1">
+                            ATUALIZAÇÃO DA PRODUÇÃO:
+                        </h4>
+                        <div className="flex items-center justify-center gap-1.5 font-bold text-xs mb-3 text-center w-full">
+                            <span>Qntidade de peças a produzir:</span>
+                            <input
+                                type="number"
+                                value={piecesToProduce}
+                                onChange={e => setPiecesToProduce(parseInt(e.target.value, 10) || 0)}
+                                className="w-16 bg-transparent border-none p-0 focus:ring-0 text-center font-bold text-xs screen-input text-[#000]"
+                            />
+                            <span>treliças</span>
+                            <button
+                                onClick={addProductionUpdateRow}
+                                className="bg-slate-800 hover:bg-black text-white text-[9px] py-0.5 px-2 rounded-md ml-3 no-print"
+                            >
+                                + Registrar Peso
+                            </button>
                         </div>
 
-                        {/* Tabela de Pesagem e Lotes */}
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-xs text-center text-slate-600 print-compact-table">
-                                <thead className="text-slate-700 bg-slate-100 uppercase font-bold">
-                                    <tr>
-                                        <th scope="col" className="px-4 py-2 border border-slate-200">Quantidade (Pç)</th>
-                                        <th scope="col" className="px-4 py-2 border border-slate-200">Peso Total (Kg)</th>
-                                        <th scope="col" className="px-4 py-2 border border-slate-200">Peso Médio por Peça (Kg)</th>
-                                        <th scope="col" className="px-4 py-2 border border-slate-200">Data</th>
-                                        <th scope="col" className="px-2 py-1 no-print border border-slate-200 btn-action-row" style={{ width: '60px' }}>Ações</th>
+                        {/* Tabela de Lotes com case e estilo IDÊNTICOS à foto */}
+                        <div className="max-w-xl mx-auto overflow-x-auto">
+                            <table className="w-full text-center" style={{ borderCollapse: 'collapse', border: '1px solid #1e293b' }}>
+                                <thead>
+                                    <tr className="bg-slate-50 font-bold" style={{ fontSize: '12px' }}>
+                                        <th style={{ border: '1px solid #1e293b', padding: '4px' }}>Qnt.</th>
+                                        <th style={{ border: '1px solid #1e293b', padding: '4px' }}>peso</th>
+                                        <th style={{ border: '1px solid #1e293b', padding: '4px' }}>media</th>
+                                        <th style={{ border: '1px solid #1e293b', padding: '4px' }}>Data</th>
+                                        <th style={{ border: '1px solid #1e293b', padding: '2px' }} className="no-print">Ações</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {productionUpdates.length === 0 ? (
                                         <tr>
-                                            <td colSpan={5} className="text-center py-4 text-slate-400 font-bold italic border border-slate-200">
-                                                Nenhuma pesagem/lote registrado na tabela de atualização.
+                                            <td colSpan={5} className="py-3 text-slate-400 italic font-bold border border-slate-300 text-xs">
+                                                Nenhum lote registrado. Clique em "+ Registrar Peso"
                                             </td>
                                         </tr>
                                     ) : (
                                         productionUpdates.map(row => {
                                             const weightAverage = row.qnt > 0 ? (row.peso / row.qnt) : 0;
                                             return (
-                                                <tr key={row.id} className="border-b border-slate-200 hover:bg-slate-50 transition-all">
-                                                    <td className="p-1.5 border border-slate-200">
+                                                <tr key={row.id} style={{ fontSize: '12px' }}>
+                                                    <td style={{ border: '1px solid #1e293b', padding: '3px' }}>
                                                         <input
                                                             type="number"
                                                             value={row.qnt || ''}
                                                             onChange={e => updateProductionUpdateField(row.id, 'qnt', parseInt(e.target.value, 10) || 0)}
-                                                            placeholder="Total de peças"
-                                                            className="text-center w-full bg-transparent border-none font-bold text-slate-850 input-print-mode"
+                                                            className="text-center w-full bg-transparent border-none p-0 focus:ring-0 text-xs font-semibold input-center"
                                                         />
                                                     </td>
-                                                    <td className="p-1.5 border border-slate-200">
+                                                    <td style={{ border: '1px solid #1e293b', padding: '3px' }}>
                                                         <input
                                                             type="number"
                                                             value={row.peso || ''}
                                                             onChange={e => updateProductionUpdateField(row.id, 'peso', parseFloat(e.target.value) || 0)}
-                                                            placeholder="Insira o peso em Kg"
-                                                            className="text-center w-full bg-transparent border-none font-extrabold text-slate-850 input-print-mode"
+                                                            className="text-center w-full bg-transparent border-none p-0 focus:ring-0 text-xs font-semibold input-center"
                                                         />
                                                     </td>
-                                                    <td className="p-1.5 border border-slate-200 font-black text-slate-900 bg-slate-50">
-                                                        {weightAverage.toFixed(2).replace('.', ',')} Kg
+                                                    <td style={{ border: '1px solid #1e293b', padding: '3px' }} className="font-bold text-slate-900">
+                                                        {weightAverage > 0 ? weightAverage.toFixed(2).replace('.', ',') : ''}
                                                     </td>
-                                                    <td className="p-1.5 border border-slate-200">
+                                                    <td style={{ border: '1px solid #1e293b', padding: '3px' }}>
                                                         <input
                                                             type="text"
                                                             value={row.data}
                                                             onChange={e => updateProductionUpdateField(row.id, 'data', e.target.value)}
-                                                            placeholder="DD-MM"
-                                                            className="text-center w-full bg-transparent border-none font-bold text-slate-800 input-print-mode"
+                                                            className="text-center w-full bg-transparent border-none p-0 focus:ring-0 text-xs font-semibold input-center"
+                                                            placeholder="Ex: 1-04"
                                                         />
                                                     </td>
-                                                    <td className="p-1.5 border border-slate-200 text-center no-print btn-action-row">
+                                                    <td style={{ border: '1px solid #1e293b', padding: '3px' }} className="no-print">
                                                         <button
                                                             onClick={() => removeProductionUpdateRow(row.id)}
-                                                            className="text-rose-600 hover:text-rose-800 font-extrabold hover:bg-rose-50 p-1.5 rounded"
-                                                            title="Excluir Registro"
+                                                            className="text-rose-600 hover:text-rose-800 font-bold hover:bg-rose-50 px-1 rounded text-xs"
+                                                            title="Remover"
                                                         >
-                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                            </svg>
+                                                            ×
                                                         </button>
                                                     </td>
                                                 </tr>
@@ -1156,15 +1082,15 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                         </div>
                     </div>
 
-                    {/* Linhas Oficiais de Assinatura de Responsabilidade - Apenas Visíveis na Impressão ou rodapé da Ficha */}
-                    <div className="mt-8 pt-8 grid grid-cols-2 gap-8 text-center text-xs font-bold border-t border-dashed border-slate-300 card-print">
+                    {/* Assinaturas Diárias */}
+                    <div className="mt-8 pt-8 grid grid-cols-2 gap-8 text-center text-[10px] font-bold border-t border-dashed border-slate-300">
                         <div className="flex flex-col items-center">
-                            <div className="w-48 border-b-2 border-slate-900 mb-1" />
-                            <span className="text-slate-500 uppercase text-[9px] tracking-wider">Assinatura Encarregado / Operador Turno A</span>
+                            <div className="w-48 border-b border-slate-900 mb-1" />
+                            <span className="text-slate-500 uppercase tracking-wider">Assinatura Encarregado / Operador Turno A</span>
                         </div>
                         <div className="flex flex-col items-center">
-                            <div className="w-48 border-b-2 border-slate-900 mb-1" />
-                            <span className="text-slate-500 uppercase text-[9px] tracking-wider">Assinatura Encarregado / Operador Turno B</span>
+                            <div className="w-48 border-b border-slate-900 mb-1" />
+                            <span className="text-slate-500 uppercase tracking-wider">Assinatura Encarregado / Operador Turno B</span>
                         </div>
                     </div>
 
