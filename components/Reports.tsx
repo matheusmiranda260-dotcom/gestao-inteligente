@@ -690,14 +690,14 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                         <tbody>
                             {/* Linha 1: Logo e Título */}
                             <tr>
-                                <td style={{ width: '180px', verticalAlign: 'middle', textAlign: 'center' }} className="p-2">
-                                    <div className="flex flex-col items-center justify-center border border-blue-900 p-1.5 rounded bg-white">
-                                        <div className="flex items-center gap-1">
-                                            {/* Logo Estilizado Azul e Vermelho */}
-                                            <span className="bg-blue-900 text-white font-black text-xs px-1 rounded-sm">GR</span>
-                                            <span className="text-[10px] font-black text-blue-950">ITA AÇOS</span>
-                                        </div>
-                                        <span className="text-[8px] font-bold text-slate-500 tracking-tighter mt-0.5">SISTEMA INTELIGENTE</span>
+                                <td style={{ width: '180px', verticalAlign: 'middle', textAlign: 'center' }} className="p-1">
+                                    <div className="flex items-center justify-center bg-white">
+                                        <img 
+                                            src="/ita-acos-logo.png" 
+                                            alt="Logo Grupo Ita Aços" 
+                                            className="h-10 object-contain mx-auto" 
+                                            style={{ maxHeight: '42px', display: 'block' }}
+                                        />
                                     </div>
                                 </td>
                                 <td className="text-center font-black p-2 text-slate-900" style={{ fontSize: '15px', textTransform: 'uppercase', lineHeight: '1.2' }}>
