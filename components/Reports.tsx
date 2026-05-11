@@ -1011,18 +1011,18 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                                 </div>
                                 
                                 {/* TEMPO MAQUINA PARADA: MAIOR E MAIS NEGRITO */}
-                                <div className="flex justify-between items-center text-[#dc2626] font-black text-sm pb-1 border-b border-rose-100">
+                                <div className="flex justify-between items-center text-[#dc2626] font-black text-xs pb-1 border-b border-rose-100">
                                     <span className="uppercase tracking-tight">Tempo de maquina (parada) :</span>
-                                    <div className="flex gap-4 font-black text-sm">
+                                    <div className="flex gap-4 font-black text-xs">
                                         <span>{calculatedData.turnoA.tempoParadoStr}</span>
                                         <span className="w-12 text-right">{calculatedData.turnoA.percentParado}%</span>
                                     </div>
                                 </div>
 
                                 {/* TEMPO MAQUINA EFETIVO: MAIOR E MAIS NEGRITO */}
-                                <div className="flex justify-between items-center text-[#16a34a] font-black text-sm pb-1 border-b border-emerald-100">
+                                <div className="flex justify-between items-center text-[#16a34a] font-black text-xs pb-1 border-b border-emerald-100">
                                     <span className="uppercase tracking-tight">Tempo de maquina (Efetivo) :</span>
-                                    <div className="flex gap-4 font-black text-sm">
+                                    <div className="flex gap-4 font-black text-xs">
                                         <span>{calculatedData.turnoA.tempoEfetivoStr}</span>
                                         <span className="w-12 text-right">{calculatedData.turnoA.percentEfetivo}%</span>
                                     </div>
@@ -1093,18 +1093,18 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                                 </div>
                                 
                                 {/* TEMPO MAQUINA PARADA: MAIOR E MAIS NEGRITO */}
-                                <div className="flex justify-between items-center text-[#dc2626] font-black text-sm pb-1 border-b border-rose-100">
+                                <div className="flex justify-between items-center text-[#dc2626] font-black text-xs pb-1 border-b border-rose-100">
                                     <span className="uppercase tracking-tight">Tempo de maquina (parada) :</span>
-                                    <div className="flex gap-4 font-black text-sm">
+                                    <div className="flex gap-4 font-black text-xs">
                                         <span>{calculatedData.turnoB.tempoParadoStr}</span>
                                         <span className="w-12 text-right">{calculatedData.turnoB.percentParado}%</span>
                                     </div>
                                 </div>
 
                                 {/* TEMPO MAQUINA EFETIVO: MAIOR E MAIS NEGRITO */}
-                                <div className="flex justify-between items-center text-[#16a34a] font-black text-sm pb-1 border-b border-emerald-100">
+                                <div className="flex justify-between items-center text-[#16a34a] font-black text-xs pb-1 border-b border-emerald-100">
                                     <span className="uppercase tracking-tight">Tempo de maquina (Efetivo) :</span>
-                                    <div className="flex gap-4 font-black text-sm">
+                                    <div className="flex gap-4 font-black text-xs">
                                         <span>{calculatedData.turnoB.tempoEfetivoStr}</span>
                                         <span className="w-12 text-right">{calculatedData.turnoB.percentEfetivo}%</span>
                                     </div>
