@@ -424,13 +424,21 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
             {/* CSS de Alta Fidelidade com o Layout impresso da foto */}
             <style dangerouslySetInnerHTML={{ __html: `
                 @media screen {
-                    .screen-input {
-                        border-bottom: 1px dashed #cbd5e1 !important;
+                    .worksheet-input {
+                        border: 1px solid #cbd5e1 !important;
+                        background-color: #ffffff !important;
+                        border-radius: 4px !important;
+                        padding: 3px 6px !important;
+                        font-weight: bold !important;
+                        font-family: inherit !important;
+                        font-size: 12px !important;
                         transition: all 0.2s;
                     }
-                    .screen-input:focus {
-                        border-bottom: 2px solid #000 !important;
+                    .worksheet-input:focus {
+                        border-color: #3b82f6 !important;
+                        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15) !important;
                         background-color: #f8fafc !important;
+                        outline: none !important;
                     }
                 }
                 @media print {
@@ -454,7 +462,14 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                         padding: 0 !important;
                         box-shadow: none !important;
                         pointer-events: none !important;
-                        text-align: left !important;
+                    }
+                    .worksheet-input {
+                        border: none !important;
+                        background: transparent !important;
+                        padding: 0 !important;
+                        box-shadow: none !important;
+                        pointer-events: none !important;
+                        font-size: 12px !important;
                     }
                     .input-center {
                         text-align: center !important;
@@ -604,17 +619,16 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                                     <span style={{ fontSize: '14px' }}>TRELIÇA</span>
                                 </td>
                             </tr>
-
                             {/* Linha 2: Ordem de Produção */}
                             <tr>
                                 <td colSpan={2} className="p-1">
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-bold text-xs text-slate-800 whitespace-nowrap pl-2">Ordem de produção :</span>
+                                    <div className="flex items-center gap-2 pl-2">
+                                        <span className="font-bold text-xs text-slate-800 whitespace-nowrap">Ordem de produção :</span>
                                         <input
                                             type="text"
                                             value={productionOrder}
                                             onChange={e => setProductionOrder(e.target.value)}
-                                            className="w-full bg-transparent border-none font-bold text-xs p-0 focus:outline-none focus:ring-0 text-slate-800 screen-input"
+                                            className="w-full worksheet-input"
                                             placeholder="Digite..."
                                         />
                                     </div>
@@ -624,8 +638,8 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                             {/* Linha 3: Data de Produção */}
                             <tr>
                                 <td colSpan={2} className="p-1">
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-bold text-xs text-slate-800 whitespace-nowrap pl-2">Data da produção:</span>
+                                    <div className="flex items-center gap-2 pl-2 py-1">
+                                        <span className="font-bold text-xs text-slate-800 whitespace-nowrap">Data da produção:</span>
                                         <span className="font-bold text-xs text-slate-800">{formattedProductionDate}</span>
                                     </div>
                                 </td>
@@ -634,13 +648,13 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                             {/* Linha 4: Operador Turno A */}
                             <tr>
                                 <td colSpan={2} className="p-1">
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-bold text-xs text-slate-800 whitespace-nowrap pl-2">Operador/auxiliar turno A:</span>
+                                    <div className="flex items-center gap-2 pl-2">
+                                        <span className="font-bold text-xs text-slate-800 whitespace-nowrap">Operador/auxiliar turno A:</span>
                                         <input
                                             type="text"
                                             value={operatorShiftA}
                                             onChange={e => setOperatorShiftA(e.target.value)}
-                                            className="w-full bg-transparent border-none font-bold text-xs p-0 focus:outline-none focus:ring-0 text-slate-800 screen-input"
+                                            className="w-full worksheet-input"
                                             placeholder="Insira..."
                                         />
                                     </div>
@@ -650,20 +664,18 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                             {/* Linha 5: Operador Turno B */}
                             <tr>
                                 <td colSpan={2} className="p-1">
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-bold text-xs text-slate-800 whitespace-nowrap pl-2">Operador/auxiliar turno B:</span>
+                                    <div className="flex items-center gap-2 pl-2">
+                                        <span className="font-bold text-xs text-slate-800 whitespace-nowrap">Operador/auxiliar turno B:</span>
                                         <input
                                             type="text"
                                             value={operatorShiftB}
                                             onChange={e => setOperatorShiftB(e.target.value)}
-                                            className="w-full bg-transparent border-none font-bold text-xs p-0 focus:outline-none focus:ring-0 text-slate-800 screen-input"
+                                            className="w-full worksheet-input"
                                             placeholder="Insira..."
                                         />
                                     </div>
                                 </td>
-                            </tr>
-
-                            {/* Linha 6: Descrição do produto */}
+                            </tr>                            {/* Linha 6: Descrição do produto */}
                             <tr>
                                 <td colSpan={2} className="p-1">
                                     <div className="flex flex-col md:flex-row items-start md:items-center justify-between pl-2 pr-4 gap-2 py-0.5">
@@ -673,7 +685,7 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                                                 type="text"
                                                 value={productDescription}
                                                 onChange={e => setProductDescription(e.target.value)}
-                                                className="w-full md:w-80 bg-transparent border-none font-bold text-xs p-0 focus:outline-none focus:ring-0 text-slate-800 screen-input"
+                                                className="w-full md:w-80 worksheet-input"
                                             />
                                         </div>
                                         <div className="flex items-center gap-1 text-xs">
@@ -685,89 +697,10 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                             </tr>
                         </tbody>
                     </table>
-
                     {/* SEÇÃO DE PARADAS LADO A LADO - IDÊNTICA À FOTO */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
                         
-                        {/* PARADAS TURNO B (LADO ESQUERDO) */}
-                        <div className="flex flex-col">
-                            <div className="flex items-center justify-between mb-1">
-                                <h4 className="text-center font-bold text-xs uppercase underline tracking-wider w-full pr-8">
-                                    PARADAS E SEUS MOTIVOS: TURNO B
-                                </h4>
-                                <button
-                                    onClick={() => addStopRow('B')}
-                                    className="bg-slate-800 hover:bg-black text-white font-bold text-[10px] px-2 py-0.5 rounded no-print whitespace-nowrap flex-shrink-0"
-                                >
-                                    + Linha B
-                                </button>
-                            </div>
-
-                            <table className="stops-grid-table">
-                                <tbody>
-                                    {stopsShiftB.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={4} className="text-center py-4 text-slate-400 italic font-bold">
-                                                Nenhuma parada no Turno B (Clique em "+ Linha B")
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        stopsShiftB.map(stop => {
-                                            const durationSecs = calculateStopDurationSeconds(stop.inicio, stop.fim);
-                                            return (
-                                                <tr key={stop.id} className="hover:bg-slate-50">
-                                                    {/* Hora Inicial (Vermelho na foto) */}
-                                                    <td style={{ width: '70px', textAlign: 'center' }} className="p-0.5">
-                                                        <input
-                                                            type="text"
-                                                            value={stop.inicio}
-                                                            onChange={e => updateStopField('B', stop.id, 'inicio', e.target.value)}
-                                                            className="text-center w-full bg-transparent border-none p-0 focus:ring-0 text-[#dc2626] font-bold input-center text-xs"
-                                                            placeholder="00:00:00"
-                                                        />
-                                                    </td>
-                                                    {/* Hora Final (Verde na foto) */}
-                                                    <td style={{ width: '70px', textAlign: 'center' }} className="p-0.5">
-                                                        <input
-                                                            type="text"
-                                                            value={stop.fim}
-                                                            onChange={e => updateStopField('B', stop.id, 'fim', e.target.value)}
-                                                            className="text-center w-full bg-transparent border-none p-0 focus:ring-0 text-[#16a34a] font-bold input-center text-xs"
-                                                            placeholder="00:00:00"
-                                                        />
-                                                    </td>
-                                                    {/* Motivo (Texto normal) */}
-                                                    <td className="p-0.5 text-left pl-2">
-                                                        <input
-                                                            type="text"
-                                                            value={stop.motivo}
-                                                            onChange={e => updateStopField('B', stop.id, 'motivo', e.target.value)}
-                                                            className="text-left w-full bg-transparent border-none p-0 focus:ring-0 text-slate-800 font-medium text-xs screen-input"
-                                                            placeholder="Motivo..."
-                                                        />
-                                                    </td>
-                                                    {/* Duração (Vermelho na foto) */}
-                                                    <td style={{ width: '75px', textAlign: 'center', color: '#dc2626' }} className="p-0.5 font-bold text-center text-xs">
-                                                        <div className="flex items-center justify-between px-1">
-                                                            <span className="w-full text-center">{secondsToTime(durationSecs)}</span>
-                                                            <button
-                                                                onClick={() => removeStopRow('B', stop.id)}
-                                                                className="text-rose-600 hover:text-rose-800 font-extrabold no-print ml-1"
-                                                                title="Remover parada"
-                                                            >
-                                                                ×
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* PARADAS TURNO A (LADO DIREITO) */}
+                        {/* PARADAS TURNO A (LADO ESQUERDO) */}
                         <div className="flex flex-col">
                             <div className="flex items-center justify-between mb-1">
                                 <h4 className="text-center font-bold text-xs uppercase underline tracking-wider w-full pr-8">
@@ -795,22 +728,22 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                                             return (
                                                 <tr key={stop.id} className="hover:bg-slate-50">
                                                     {/* Hora Inicial (Vermelho na foto) */}
-                                                    <td style={{ width: '70px', textAlign: 'center' }} className="p-0.5">
+                                                    <td style={{ width: '85px', textAlign: 'center' }} className="p-0.5">
                                                         <input
                                                             type="text"
                                                             value={stop.inicio}
                                                             onChange={e => updateStopField('A', stop.id, 'inicio', e.target.value)}
-                                                            className="text-center w-full bg-transparent border-none p-0 focus:ring-0 text-[#dc2626] font-bold input-center text-xs"
+                                                            className="text-center w-20 worksheet-input text-[#dc2626]"
                                                             placeholder="00:00:00"
                                                         />
                                                     </td>
                                                     {/* Hora Final (Verde na foto) */}
-                                                    <td style={{ width: '70px', textAlign: 'center' }} className="p-0.5">
+                                                    <td style={{ width: '85px', textAlign: 'center' }} className="p-0.5">
                                                         <input
                                                             type="text"
                                                             value={stop.fim}
                                                             onChange={e => updateStopField('A', stop.id, 'fim', e.target.value)}
-                                                            className="text-center w-full bg-transparent border-none p-0 focus:ring-0 text-[#16a34a] font-bold input-center text-xs"
+                                                            className="text-center w-20 worksheet-input text-[#16a34a]"
                                                             placeholder="00:00:00"
                                                         />
                                                     </td>
@@ -820,7 +753,7 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                                                             type="text"
                                                             value={stop.motivo}
                                                             onChange={e => updateStopField('A', stop.id, 'motivo', e.target.value)}
-                                                            className="text-left w-full bg-transparent border-none p-0 focus:ring-0 text-slate-800 font-medium text-xs screen-input"
+                                                            className="text-left w-full worksheet-input text-slate-800"
                                                             placeholder="Motivo..."
                                                         />
                                                     </td>
@@ -845,84 +778,93 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                             </table>
                         </div>
 
+                        {/* PARADAS TURNO B (LADO DIREITO) */}
+                        <div className="flex flex-col">
+                            <div className="flex items-center justify-between mb-1">
+                                <h4 className="text-center font-bold text-xs uppercase underline tracking-wider w-full pr-8">
+                                    PARADAS E SEUS MOTIVOS: TURNO B
+                                </h4>
+                                <button
+                                    onClick={() => addStopRow('B')}
+                                    className="bg-slate-800 hover:bg-black text-white font-bold text-[10px] px-2 py-0.5 rounded no-print whitespace-nowrap flex-shrink-0"
+                                >
+                                    + Linha B
+                                </button>
+                            </div>
+
+                            <table className="stops-grid-table">
+                                <tbody>
+                                    {stopsShiftB.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={4} className="text-center py-4 text-slate-400 italic font-bold">
+                                                Nenhuma parada no Turno B (Clique em "+ Linha B")
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        stopsShiftB.map(stop => {
+                                            const durationSecs = calculateStopDurationSeconds(stop.inicio, stop.fim);
+                                            return (
+                                                <tr key={stop.id} className="hover:bg-slate-50">
+                                                    {/* Hora Inicial (Vermelho na foto) */}
+                                                    <td style={{ width: '85px', textAlign: 'center' }} className="p-0.5">
+                                                        <input
+                                                            type="text"
+                                                            value={stop.inicio}
+                                                            onChange={e => updateStopField('B', stop.id, 'inicio', e.target.value)}
+                                                            className="text-center w-20 worksheet-input text-[#dc2626]"
+                                                            placeholder="00:00:00"
+                                                        />
+                                                    </td>
+                                                    {/* Hora Final (Verde na foto) */}
+                                                    <td style={{ width: '85px', textAlign: 'center' }} className="p-0.5">
+                                                        <input
+                                                            type="text"
+                                                            value={stop.fim}
+                                                            onChange={e => updateStopField('B', stop.id, 'fim', e.target.value)}
+                                                            className="text-center w-20 worksheet-input text-[#16a34a]"
+                                                            placeholder="00:00:00"
+                                                        />
+                                                    </td>
+                                                    {/* Motivo (Texto normal) */}
+                                                    <td className="p-0.5 text-left pl-2">
+                                                        <input
+                                                            type="text"
+                                                            value={stop.motivo}
+                                                            onChange={e => updateStopField('B', stop.id, 'motivo', e.target.value)}
+                                                            className="text-left w-full worksheet-input text-slate-800"
+                                                            placeholder="Motivo..."
+                                                        />
+                                                    </td>
+                                                    {/* Duração (Vermelho na foto) */}
+                                                    <td style={{ width: '75px', textAlign: 'center', color: '#dc2626' }} className="p-0.5 font-bold text-center text-xs">
+                                                        <div className="flex items-center justify-between px-1">
+                                                            <span className="w-full text-center">{secondsToTime(durationSecs)}</span>
+                                                            <button
+                                                                onClick={() => removeStopRow('B', stop.id)}
+                                                                className="text-rose-600 hover:text-rose-800 font-extrabold no-print ml-1"
+                                                                title="Remover parada"
+                                                            >
+                                                                ×
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
                     </div>
 
                     {/* SEÇÃO DE ESTATÍSTICA DO DIA LADO A LADO - IDÊNTICA À FOTO */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
                         
-                        {/* ESTATÍSTICA DO DIA TURNO B */}
-                        <div className="stats-container-box">
-                            <h4 className="text-center font-bold text-xs uppercase underline tracking-wider mb-3">
-                                ESTATÍSTICA DO DIA:
-                            </h4>
-                            <div className="space-y-1.5 text-xs">
-                                <div className="flex justify-between items-center">
-                                    <span className="font-bold text-slate-800">Horas (Turno trabalhados):</span>
-                                    <input
-                                        type="text"
-                                        value={statsShiftB.horasTrabalhadas}
-                                        onChange={e => setStatsShiftB({ ...statsShiftB, horasTrabalhadas: e.target.value })}
-                                        className="font-bold text-right text-slate-900 w-24 bg-transparent border-none p-0 focus:ring-0 text-xs text-right"
-                                    />
-                                </div>
-                                
-                                <div className="flex justify-between items-center text-[#dc2626] font-bold">
-                                    <span>Tempo de maquina (parada) :</span>
-                                    <div className="flex gap-4">
-                                        <span>{calculatedData.turnoB.tempoParadoStr}</span>
-                                        <span className="w-12 text-right">{calculatedData.turnoB.percentParado}%</span>
-                                    </div>
-                                </div>
-
-                                <div className="flex justify-between items-center text-[#16a34a] font-bold">
-                                    <span>Tempo de maquina (Efetivo) :</span>
-                                    <div className="flex gap-4">
-                                        <span>{calculatedData.turnoB.tempoEfetivoStr}</span>
-                                        <span className="w-12 text-right">{calculatedData.turnoB.percentEfetivo}%</span>
-                                    </div>
-                                </div>
-
-                                <div className="flex justify-between items-center">
-                                    <span className="font-bold text-slate-800">Quant. de peças produzidas:</span>
-                                    <div className="flex items-center gap-1 justify-end font-bold text-slate-900">
-                                        <input
-                                            type="number"
-                                            value={statsShiftB.pecasProduzidas || ''}
-                                            onChange={e => setStatsShiftB({ ...statsShiftB, pecasProduzidas: parseInt(e.target.value, 10) || 0 })}
-                                            className="w-12 bg-transparent border-none p-0 focus:ring-0 text-xs font-bold text-right mr-1"
-                                        />
-                                        <span>peças de</span>
-                                        <input
-                                            type="number"
-                                            value={statsShiftB.tamanhoPeca || ''}
-                                            onChange={e => setStatsShiftB({ ...statsShiftB, tamanhoPeca: parseFloat(e.target.value) || 0 })}
-                                            className="w-10 bg-transparent border-none p-0 focus:ring-0 text-xs font-bold text-center"
-                                        />
-                                        <span>metros</span>
-                                    </div>
-                                </div>
-
-                                <div className="flex justify-between items-center font-bold">
-                                    <span className="text-slate-800">Quant. de metros produzidos:</span>
-                                    <span className="text-slate-950 text-right">{statsShiftB.pecasProduzidas * statsShiftB.tamanhoPeca} metros</span>
-                                </div>
-
-                                <div className="flex justify-between items-center">
-                                    <span className="font-bold text-slate-800">Tempo por peça:</span>
-                                    <span className="font-bold text-slate-900 text-right">{calculatedData.turnoB.tempoPorPecaStr}</span>
-                                </div>
-
-                                <div className="flex justify-between items-center">
-                                    <span className="font-bold text-slate-800">Velocidade:</span>
-                                    <span className="font-bold text-slate-900 text-right">{calculatedData.turnoB.velocidadeStr}</span>
-                                </div>
-                            </div>
-                        </div>
-
                         {/* ESTATÍSTICA DO DIA TURNO A */}
                         <div className="stats-container-box">
                             <h4 className="text-center font-bold text-xs uppercase underline tracking-wider mb-3">
-                                ESTATÍSTICA DO DIA:
+                                ESTATÍSTICA DO DIA: TURNO A
                             </h4>
                             <div className="space-y-1.5 text-xs">
                                 <div className="flex justify-between items-center">
@@ -931,7 +873,7 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                                         type="text"
                                         value={statsShiftA.horasTrabalhadas}
                                         onChange={e => setStatsShiftA({ ...statsShiftA, horasTrabalhadas: e.target.value })}
-                                        className="font-bold text-right text-slate-900 w-24 bg-transparent border-none p-0 focus:ring-0 text-xs text-right"
+                                        className="font-bold text-center text-slate-900 w-24 worksheet-input text-xs"
                                     />
                                 </div>
                                 
@@ -958,14 +900,16 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                                             type="number"
                                             value={statsShiftA.pecasProduzidas || ''}
                                             onChange={e => setStatsShiftA({ ...statsShiftA, pecasProduzidas: parseInt(e.target.value, 10) || 0 })}
-                                            className="w-12 bg-transparent border-none p-0 focus:ring-0 text-xs font-bold text-right mr-1"
+                                            className="w-16 worksheet-input text-xs font-bold text-center mr-1"
+                                            placeholder="Qnt."
                                         />
                                         <span>peças de</span>
                                         <input
                                             type="number"
                                             value={statsShiftA.tamanhoPeca || ''}
                                             onChange={e => setStatsShiftA({ ...statsShiftA, tamanhoPeca: parseFloat(e.target.value) || 0 })}
-                                            className="w-10 bg-transparent border-none p-0 focus:ring-0 text-xs font-bold text-center"
+                                            className="w-16 worksheet-input text-xs font-bold text-center mr-1"
+                                            placeholder="Tam."
                                         />
                                         <span>metros</span>
                                     </div>
@@ -988,6 +932,77 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                             </div>
                         </div>
 
+                        {/* ESTATÍSTICA DO DIA TURNO B */}
+                        <div className="stats-container-box">
+                            <h4 className="text-center font-bold text-xs uppercase underline tracking-wider mb-3">
+                                ESTATÍSTICA DO DIA: TURNO B
+                            </h4>
+                            <div className="space-y-1.5 text-xs">
+                                <div className="flex justify-between items-center">
+                                    <span className="font-bold text-slate-800">Horas (Turno trabalhados):</span>
+                                    <input
+                                        type="text"
+                                        value={statsShiftB.horasTrabalhadas}
+                                        onChange={e => setStatsShiftB({ ...statsShiftB, horasTrabalhadas: e.target.value })}
+                                        className="font-bold text-center text-slate-900 w-24 worksheet-input text-xs"
+                                    />
+                                </div>
+                                
+                                <div className="flex justify-between items-center text-[#dc2626] font-bold">
+                                    <span>Tempo de maquina (parada) :</span>
+                                    <div className="flex gap-4">
+                                        <span>{calculatedData.turnoB.tempoParadoStr}</span>
+                                        <span className="w-12 text-right">{calculatedData.turnoB.percentParado}%</span>
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-between items-center text-[#16a34a] font-bold">
+                                    <span>Tempo de maquina (Efetivo) :</span>
+                                    <div className="flex gap-4">
+                                        <span>{calculatedData.turnoB.tempoEfetivoStr}</span>
+                                        <span className="w-12 text-right">{calculatedData.turnoB.percentEfetivo}%</span>
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-between items-center">
+                                    <span className="font-bold text-slate-800">Quant. de peças produzidas:</span>
+                                    <div className="flex items-center gap-1 justify-end font-bold text-slate-900">
+                                        <input
+                                            type="number"
+                                            value={statsShiftB.pecasProduzidas || ''}
+                                            onChange={e => setStatsShiftB({ ...statsShiftB, pecasProduzidas: parseInt(e.target.value, 10) || 0 })}
+                                            className="w-16 worksheet-input text-xs font-bold text-center mr-1"
+                                            placeholder="Qnt."
+                                        />
+                                        <span>peças de</span>
+                                        <input
+                                            type="number"
+                                            value={statsShiftB.tamanhoPeca || ''}
+                                            onChange={e => setStatsShiftB({ ...statsShiftB, tamanhoPeca: parseFloat(e.target.value) || 0 })}
+                                            className="w-16 worksheet-input text-xs font-bold text-center mr-1"
+                                            placeholder="Tam."
+                                        />
+                                        <span>metros</span>
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-between items-center font-bold">
+                                    <span className="text-slate-800">Quant. de metros produzidos:</span>
+                                    <span className="text-slate-950 text-right">{statsShiftB.pecasProduzidas * statsShiftB.tamanhoPeca} metros</span>
+                                </div>
+
+                                <div className="flex justify-between items-center">
+                                    <span className="font-bold text-slate-800">Tempo por peça:</span>
+                                    <span className="font-bold text-slate-900 text-right">{calculatedData.turnoB.tempoPorPecaStr}</span>
+                                </div>
+
+                                <div className="flex justify-between items-center">
+                                    <span className="font-bold text-slate-800">Velocidade:</span>
+                                    <span className="font-bold text-slate-900 text-right">{calculatedData.turnoB.velocidadeStr}</span>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
 
                     {/* SEÇÃO RODAPÉ: ATUALIZAÇÃO DA PRODUÇÃO - IDÊNTICA À FOTO */}
@@ -1001,7 +1016,7 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                                 type="number"
                                 value={piecesToProduce}
                                 onChange={e => setPiecesToProduce(parseInt(e.target.value, 10) || 0)}
-                                className="w-16 bg-transparent border-none p-0 focus:ring-0 text-center font-bold text-xs screen-input text-[#000]"
+                                className="w-20 text-center worksheet-input"
                             />
                             <span>treliças</span>
                             <button
@@ -1041,7 +1056,7 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                                                             type="number"
                                                             value={row.qnt || ''}
                                                             onChange={e => updateProductionUpdateField(row.id, 'qnt', parseInt(e.target.value, 10) || 0)}
-                                                            className="text-center w-full bg-transparent border-none p-0 focus:ring-0 text-xs font-semibold input-center"
+                                                            className="text-center w-full worksheet-input"
                                                         />
                                                     </td>
                                                     <td style={{ border: '1px solid #1e293b', padding: '3px' }}>
@@ -1049,7 +1064,7 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                                                             type="number"
                                                             value={row.peso || ''}
                                                             onChange={e => updateProductionUpdateField(row.id, 'peso', parseFloat(e.target.value) || 0)}
-                                                            className="text-center w-full bg-transparent border-none p-0 focus:ring-0 text-xs font-semibold input-center"
+                                                            className="text-center w-full worksheet-input"
                                                         />
                                                     </td>
                                                     <td style={{ border: '1px solid #1e293b', padding: '3px' }} className="font-bold text-slate-900">
@@ -1060,7 +1075,7 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                                                             type="text"
                                                             value={row.data}
                                                             onChange={e => updateProductionUpdateField(row.id, 'data', e.target.value)}
-                                                            className="text-center w-full bg-transparent border-none p-0 focus:ring-0 text-xs font-semibold input-center"
+                                                            className="text-center w-full worksheet-input"
                                                             placeholder="Ex: 1-04"
                                                         />
                                                     </td>
