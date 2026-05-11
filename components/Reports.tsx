@@ -996,33 +996,33 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                             <h4 className="text-center font-bold text-xs uppercase underline tracking-wider mb-3">
                                 ESTATÍSTICA DO DIA: TURNO A
                             </h4>
-                            <div className="space-y-1.5 text-xs">
+                            <div className="space-y-1.5 text-sm">
                                 <div className="flex justify-between items-center pb-1 border-b border-slate-100">
                                     <span className="font-bold text-slate-800">Horas (Turno trabalhados):</span>
                                     <input
                                         type="text"
                                         value={statsShiftA.horasTrabalhadas}
                                         onChange={e => setStatsShiftA({ ...statsShiftA, horasTrabalhadas: e.target.value })}
-                                        className="font-bold text-center text-slate-900 w-24 worksheet-input text-xs capture-hide"
+                                        className="font-bold text-center text-slate-900 w-24 worksheet-input text-sm capture-hide"
                                     />
-                                    <span className="capture-show hidden font-bold text-xs text-slate-900">
+                                    <span className="capture-show hidden font-bold text-sm text-slate-900">
                                         {statsShiftA.horasTrabalhadas}
                                     </span>
                                 </div>
                                 
                                 {/* TEMPO MAQUINA PARADA: MAIOR E MAIS NEGRITO */}
-                                <div className="flex justify-between items-center text-[#dc2626] font-black text-xs pb-1 border-b border-rose-100">
+                                <div className="flex justify-between items-center text-[#dc2626] font-black text-sm pb-1 border-b border-rose-100">
                                     <span className="uppercase tracking-tight">Tempo de maquina (parada) :</span>
-                                    <div className="flex gap-4 font-black text-xs">
+                                    <div className="flex gap-4 font-black text-sm">
                                         <span>{calculatedData.turnoA.tempoParadoStr}</span>
                                         <span className="w-12 text-right">{calculatedData.turnoA.percentParado}%</span>
                                     </div>
                                 </div>
 
                                 {/* TEMPO MAQUINA EFETIVO: MAIOR E MAIS NEGRITO */}
-                                <div className="flex justify-between items-center text-[#16a34a] font-black text-xs pb-1 border-b border-emerald-100">
+                                <div className="flex justify-between items-center text-[#16a34a] font-black text-sm pb-1 border-b border-emerald-100">
                                     <span className="uppercase tracking-tight">Tempo de maquina (Efetivo) :</span>
-                                    <div className="flex gap-4 font-black text-xs">
+                                    <div className="flex gap-4 font-black text-sm">
                                         <span>{calculatedData.turnoA.tempoEfetivoStr}</span>
                                         <span className="w-12 text-right">{calculatedData.turnoA.percentEfetivo}%</span>
                                     </div>
@@ -1035,10 +1035,10 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                                             type="number"
                                             value={statsShiftA.pecasProduzidas || ''}
                                             onChange={e => setStatsShiftA({ ...statsShiftA, pecasProduzidas: parseInt(e.target.value, 10) || 0 })}
-                                            className="w-16 worksheet-input text-xs font-bold text-center mr-1 capture-hide"
+                                            className="w-16 worksheet-input text-sm font-bold text-center mr-1 capture-hide"
                                             placeholder="Qnt."
                                         />
-                                        <span className="capture-show hidden font-bold text-xs text-slate-900 mr-2">
+                                        <span className="capture-show hidden font-bold text-sm text-slate-900 mr-2">
                                             {statsShiftA.pecasProduzidas}
                                         </span>
                                         <span>peças de</span>
@@ -1046,10 +1046,10 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                                             type="number"
                                             value={statsShiftA.tamanhoPeca || ''}
                                             onChange={e => setStatsShiftA({ ...statsShiftA, tamanhoPeca: parseFloat(e.target.value) || 0 })}
-                                            className="w-16 worksheet-input text-xs font-bold text-center mr-1 capture-hide"
+                                            className="w-16 worksheet-input text-sm font-bold text-center mr-1 capture-hide"
                                             placeholder="Tam."
                                         />
-                                        <span className="capture-show hidden font-bold text-xs text-slate-900 mx-2">
+                                        <span className="capture-show hidden font-bold text-sm text-slate-900 mx-2">
                                             {statsShiftA.tamanhoPeca}
                                         </span>
                                         <span>metros</span>
@@ -1078,33 +1078,33 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                             <h4 className="text-center font-bold text-xs uppercase underline tracking-wider mb-3">
                                 ESTATÍSTICA DO DIA: TURNO B
                             </h4>
-                            <div className="space-y-1.5 text-xs">
+                            <div className="space-y-1.5 text-sm">
                                 <div className="flex justify-between items-center pb-1 border-b border-slate-100">
                                     <span className="font-bold text-slate-800">Horas (Turno trabalhados):</span>
                                     <input
                                         type="text"
                                         value={statsShiftB.horasTrabalhadas}
                                         onChange={e => setStatsShiftB({ ...statsShiftB, horasTrabalhadas: e.target.value })}
-                                        className="font-bold text-center text-slate-900 w-24 worksheet-input text-xs capture-hide"
+                                        className="font-bold text-center text-slate-900 w-24 worksheet-input text-sm capture-hide"
                                     />
-                                    <span className="capture-show hidden font-bold text-xs text-slate-900">
+                                    <span className="capture-show hidden font-bold text-sm text-slate-900">
                                         {statsShiftB.horasTrabalhadas}
                                     </span>
                                 </div>
                                 
                                 {/* TEMPO MAQUINA PARADA: MAIOR E MAIS NEGRITO */}
-                                <div className="flex justify-between items-center text-[#dc2626] font-black text-xs pb-1 border-b border-rose-100">
+                                <div className="flex justify-between items-center text-[#dc2626] font-black text-sm pb-1 border-b border-rose-100">
                                     <span className="uppercase tracking-tight">Tempo de maquina (parada) :</span>
-                                    <div className="flex gap-4 font-black text-xs">
+                                    <div className="flex gap-4 font-black text-sm">
                                         <span>{calculatedData.turnoB.tempoParadoStr}</span>
                                         <span className="w-12 text-right">{calculatedData.turnoB.percentParado}%</span>
                                     </div>
                                 </div>
 
                                 {/* TEMPO MAQUINA EFETIVO: MAIOR E MAIS NEGRITO */}
-                                <div className="flex justify-between items-center text-[#16a34a] font-black text-xs pb-1 border-b border-emerald-100">
+                                <div className="flex justify-between items-center text-[#16a34a] font-black text-sm pb-1 border-b border-emerald-100">
                                     <span className="uppercase tracking-tight">Tempo de maquina (Efetivo) :</span>
-                                    <div className="flex gap-4 font-black text-xs">
+                                    <div className="flex gap-4 font-black text-sm">
                                         <span>{calculatedData.turnoB.tempoEfetivoStr}</span>
                                         <span className="w-12 text-right">{calculatedData.turnoB.percentEfetivo}%</span>
                                     </div>
@@ -1117,10 +1117,10 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                                             type="number"
                                             value={statsShiftB.pecasProduzidas || ''}
                                             onChange={e => setStatsShiftB({ ...statsShiftB, pecasProduzidas: parseInt(e.target.value, 10) || 0 })}
-                                            className="w-16 worksheet-input text-xs font-bold text-center mr-1 capture-hide"
+                                            className="w-16 worksheet-input text-sm font-bold text-center mr-1 capture-hide"
                                             placeholder="Qnt."
                                         />
-                                        <span className="capture-show hidden font-bold text-xs text-slate-900 mr-2">
+                                        <span className="capture-show hidden font-bold text-sm text-slate-900 mr-2">
                                             {statsShiftB.pecasProduzidas}
                                         </span>
                                         <span>peças de</span>
@@ -1128,10 +1128,10 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                                             type="number"
                                             value={statsShiftB.tamanhoPeca || ''}
                                             onChange={e => setStatsShiftB({ ...statsShiftB, tamanhoPeca: parseFloat(e.target.value) || 0 })}
-                                            className="w-16 worksheet-input text-xs font-bold text-center mr-1 capture-hide"
+                                            className="w-16 worksheet-input text-sm font-bold text-center mr-1 capture-hide"
                                             placeholder="Tam."
                                         />
-                                        <span className="capture-show hidden font-bold text-xs text-slate-900 mx-2">
+                                        <span className="capture-show hidden font-bold text-sm text-slate-900 mx-2">
                                             {statsShiftB.tamanhoPeca}
                                         </span>
                                         <span>metros</span>
