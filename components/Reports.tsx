@@ -997,7 +997,7 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                                 ESTATÍSTICA DO DIA: TURNO A
                             </h4>
                             <div className="space-y-1.5 text-xs">
-                                <div className="flex justify-between items-center">
+                                <div className="flex justify-between items-center pb-1 border-b border-slate-100">
                                     <span className="font-bold text-slate-800">Horas (Turno trabalhados):</span>
                                     <input
                                         type="text"
@@ -1010,23 +1010,25 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                                     </span>
                                 </div>
                                 
-                                <div className="flex justify-between items-center text-[#dc2626] font-bold">
-                                    <span>Tempo de maquina (parada) :</span>
-                                    <div className="flex gap-4">
+                                {/* TEMPO MAQUINA PARADA: MAIOR E MAIS NEGRITO */}
+                                <div className="flex justify-between items-center text-[#dc2626] font-black text-sm pb-1 border-b border-rose-100">
+                                    <span className="uppercase tracking-tight">Tempo de maquina (parada) :</span>
+                                    <div className="flex gap-4 font-black text-sm">
                                         <span>{calculatedData.turnoA.tempoParadoStr}</span>
                                         <span className="w-12 text-right">{calculatedData.turnoA.percentParado}%</span>
                                     </div>
                                 </div>
 
-                                <div className="flex justify-between items-center text-[#16a34a] font-bold">
-                                    <span>Tempo de maquina (Efetivo) :</span>
-                                    <div className="flex gap-4">
+                                {/* TEMPO MAQUINA EFETIVO: MAIOR E MAIS NEGRITO */}
+                                <div className="flex justify-between items-center text-[#16a34a] font-black text-sm pb-1 border-b border-emerald-100">
+                                    <span className="uppercase tracking-tight">Tempo de maquina (Efetivo) :</span>
+                                    <div className="flex gap-4 font-black text-sm">
                                         <span>{calculatedData.turnoA.tempoEfetivoStr}</span>
                                         <span className="w-12 text-right">{calculatedData.turnoA.percentEfetivo}%</span>
                                     </div>
                                 </div>
 
-                                <div className="flex justify-between items-center">
+                                <div className="flex justify-between items-center pb-1 border-b border-slate-100">
                                     <span className="font-bold text-slate-800">Quant. de peças produzidas:</span>
                                     <div className="flex items-center gap-1 justify-end font-bold text-slate-900">
                                         <input
@@ -1054,12 +1056,12 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                                     </div>
                                 </div>
 
-                                <div className="flex justify-between items-center font-bold">
+                                <div className="flex justify-between items-center font-bold pb-1 border-b border-slate-100">
                                     <span className="text-slate-800">Quant. de metros produzidos:</span>
                                     <span className="text-slate-950 text-right">{statsShiftA.pecasProduzidas * statsShiftA.tamanhoPeca} metros</span>
                                 </div>
 
-                                <div className="flex justify-between items-center">
+                                <div className="flex justify-between items-center pb-1 border-b border-slate-100">
                                     <span className="font-bold text-slate-800">Tempo por peça:</span>
                                     <span className="font-bold text-slate-900 text-right">{calculatedData.turnoA.tempoPorPecaStr}</span>
                                 </div>
@@ -1077,7 +1079,7 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                                 ESTATÍSTICA DO DIA: TURNO B
                             </h4>
                             <div className="space-y-1.5 text-xs">
-                                <div className="flex justify-between items-center">
+                                <div className="flex justify-between items-center pb-1 border-b border-slate-100">
                                     <span className="font-bold text-slate-800">Horas (Turno trabalhados):</span>
                                     <input
                                         type="text"
@@ -1090,23 +1092,25 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                                     </span>
                                 </div>
                                 
-                                <div className="flex justify-between items-center text-[#dc2626] font-bold">
-                                    <span>Tempo de maquina (parada) :</span>
-                                    <div className="flex gap-4">
+                                {/* TEMPO MAQUINA PARADA: MAIOR E MAIS NEGRITO */}
+                                <div className="flex justify-between items-center text-[#dc2626] font-black text-sm pb-1 border-b border-rose-100">
+                                    <span className="uppercase tracking-tight">Tempo de maquina (parada) :</span>
+                                    <div className="flex gap-4 font-black text-sm">
                                         <span>{calculatedData.turnoB.tempoParadoStr}</span>
                                         <span className="w-12 text-right">{calculatedData.turnoB.percentParado}%</span>
                                     </div>
                                 </div>
 
-                                <div className="flex justify-between items-center text-[#16a34a] font-bold">
-                                    <span>Tempo de maquina (Efetivo) :</span>
-                                    <div className="flex gap-4">
+                                {/* TEMPO MAQUINA EFETIVO: MAIOR E MAIS NEGRITO */}
+                                <div className="flex justify-between items-center text-[#16a34a] font-black text-sm pb-1 border-b border-emerald-100">
+                                    <span className="uppercase tracking-tight">Tempo de maquina (Efetivo) :</span>
+                                    <div className="flex gap-4 font-black text-sm">
                                         <span>{calculatedData.turnoB.tempoEfetivoStr}</span>
                                         <span className="w-12 text-right">{calculatedData.turnoB.percentEfetivo}%</span>
                                     </div>
                                 </div>
 
-                                <div className="flex justify-between items-center">
+                                <div className="flex justify-between items-center pb-1 border-b border-slate-100">
                                     <span className="font-bold text-slate-800">Quant. de peças produzidas:</span>
                                     <div className="flex items-center gap-1 justify-end font-bold text-slate-900">
                                         <input
@@ -1134,12 +1138,12 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                                     </div>
                                 </div>
 
-                                <div className="flex justify-between items-center font-bold">
+                                <div className="flex justify-between items-center font-bold pb-1 border-b border-slate-100">
                                     <span className="text-slate-800">Quant. de metros produzidos:</span>
                                     <span className="text-slate-950 text-right">{statsShiftB.pecasProduzidas * statsShiftB.tamanhoPeca} metros</span>
                                 </div>
 
-                                <div className="flex justify-between items-center">
+                                <div className="flex justify-between items-center pb-1 border-b border-slate-100">
                                     <span className="font-bold text-slate-800">Tempo por peça:</span>
                                     <span className="font-bold text-slate-900 text-right">{calculatedData.turnoB.tempoPorPecaStr}</span>
                                 </div>
@@ -1183,11 +1187,11 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                                 <table className="w-full text-center" style={{ borderCollapse: 'collapse', border: '1px solid #1e293b' }}>
                                     <thead>
                                         <tr className="bg-slate-50 font-bold" style={{ fontSize: '12px' }}>
-                                            <th style={{ border: '1px solid #1e293b', padding: '4px' }}>Qnt.</th>
-                                            <th style={{ border: '1px solid #1e293b', padding: '4px' }}>peso</th>
-                                            <th style={{ border: '1px solid #1e293b', padding: '4px' }}>media</th>
-                                            <th style={{ border: '1px solid #1e293b', padding: '4px' }}>Data</th>
-                                            <th style={{ border: '1px solid #1e293b', padding: '2px' }} className="no-print">Ações</th>
+                                            <th style={{ border: '1px solid #1e293b', padding: '4px', textAlign: 'center' }} className="text-center uppercase font-bold">Qnt.</th>
+                                            <th style={{ border: '1px solid #1e293b', padding: '4px', textAlign: 'center' }} className="text-center uppercase font-bold">peso</th>
+                                            <th style={{ border: '1px solid #1e293b', padding: '4px', textAlign: 'center' }} className="text-center uppercase font-bold">media</th>
+                                            <th style={{ border: '1px solid #1e293b', padding: '4px', textAlign: 'center' }} className="text-center uppercase font-bold">Data</th>
+                                            <th style={{ border: '1px solid #1e293b', padding: '2px', textAlign: 'center' }} className="no-print text-center uppercase font-bold">Ações</th>
                                         </tr>
                                     </thead>
                                     <tbody>
