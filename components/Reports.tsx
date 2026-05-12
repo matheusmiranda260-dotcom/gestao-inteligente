@@ -274,58 +274,17 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
         };
     }, [stopsShiftA, stopsShiftB, statsShiftA, statsShiftB]);
 
-    // 6. Efeito para carregar relatório do banco ou localStorage
+    // 6. Efeito para carregar o rascunho salvo ao abrir a tela
     useEffect(() => {
-        const loadReport = async () => {
+        const loadDraft = () => {
             setLoading(true);
-            try {
-                const { data, error } = await supabase
-                    .from('trelica_daily_reports')
-                    .select('*')
-                    .eq('date', selectedDate)
-                    .eq('machine_type', selectedMachine)
-                    .maybeSingle();
-
-                if (error) {
-                    if (error.code === '42P01') {
-                        setDbAvailable(false);
-                        loadLocalReport();
-                    } else {
-                        throw error;
-                    }
-                } else if (data) {
-                    setDbAvailable(true);
-                    setReportId(data.id);
-                    setProductionOrder(data.production_order || '');
-                    setOperatorShiftA(data.operator_shift_a || '');
-                    setOperatorShiftB(data.operator_shift_b || '');
-                    setProductDescription(data.product_description || 'TRELIÇA H-12 LEVE 6 MTS');
-                    setPiecesToProduce(Number(data.pieces_to_produce ?? 4500));
-                    setStopsShiftA(data.stops_shift_a || []);
-                    setStopsShiftB(data.stops_shift_b || []);
-                    setStatsShiftA(data.stats_shift_a || { horasTrabalhadas: '09:00:00', pecasProduzidas: 0, tamanhoPeca: 12 });
-                    setStatsShiftB(data.stats_shift_b || { horasTrabalhadas: '09:00:00', pecasProduzidas: 0, tamanhoPeca: 6 });
-                    setProductionUpdates(data.production_updates || []);
-                    showToast(`Relatório de ${selectedMachine} carregado da nuvem.`, 'success');
-                } else {
-                    loadLocalReport();
-                }
-            } catch (err: any) {
-                console.error(err);
-                setDbAvailable(false);
-                loadLocalReport();
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        const loadLocalReport = () => {
-            const localKey = `trelica_report_${selectedMachine}_${selectedDate}`;
-            const localData = localStorage.getItem(localKey);
-            if (localData) {
+            const draft = localStorage.getItem('trelica_report_draft');
+            if (draft) {
                 try {
-                    const parsed = JSON.parse(localData);
+                    const parsed = JSON.parse(draft);
                     setReportId(parsed.id || null);
+                    if (parsed.machine_type) setSelectedMachine(parsed.machine_type);
+                    if (parsed.date) setSelectedDate(parsed.date);
                     setProductionOrder(parsed.production_order || '');
                     setOperatorShiftA(parsed.operator_shift_a || '');
                     setOperatorShiftB(parsed.operator_shift_b || '');
@@ -336,17 +295,18 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                     setStatsShiftA(parsed.stats_shift_a || { horasTrabalhadas: '09:00:00', pecasProduzidas: 0, tamanhoPeca: 12 });
                     setStatsShiftB(parsed.stats_shift_b || { horasTrabalhadas: '09:00:00', pecasProduzidas: 0, tamanhoPeca: 6 });
                     setProductionUpdates(parsed.production_updates || []);
-                    showToast(`Relatório carregado offline.`, 'info');
+                    showToast(`Rascunho recuperado.`, 'info');
                 } catch (e) {
                     resetFormToDefault();
                 }
             } else {
                 resetFormToDefault();
             }
+            setLoading(false);
         };
 
-        loadReport();
-    }, [selectedMachine, selectedDate]);
+        loadDraft();
+    }, []);
 
     const resetFormToDefault = () => {
         setReportId(null);
@@ -397,7 +357,7 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
             production_updates: currentData.productionUpdates,
         };
 
-        const localKey = `trelica_report_${machine}_${date}`;
+        const localKey = 'trelica_report_draft';
         // Salva síncronamente no localStorage IMEDIATAMENTE (nunca perde dados)
         const localId = currentData.reportId || `local_${Date.now()}`;
         localStorage.setItem(localKey, JSON.stringify({ id: localId, ...reportData }));
@@ -421,7 +381,7 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                 if (data) {
                     setReportId(data.id);
                     reportIdRef.current = data.id;
-                    localStorage.setItem(localKey, JSON.stringify(data));
+                    localStorage.setItem(localKey, JSON.stringify({ ...reportData, id: data.id }));
                 }
                 if (options?.showToastAlert) {
                     showToast(`Salvo na nuvem com sucesso!`, 'success');
@@ -461,7 +421,7 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
 
         if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
         autoSaveTimerRef.current = setTimeout(() => {
-            const localKey = `trelica_report_${selectedMachine}_${selectedDate}`;
+            const localKey = 'trelica_report_draft';
             const reportData = {
                 id: reportIdRef.current || `local_${Date.now()}`,
                 date: selectedDate,
@@ -496,78 +456,29 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
         setIsSaving(false);
     };
 
-    // Troca de máquina: salva o estado atual ANTES de trocar
-    const handleSwitchMachine = async (newMachine: 'Treliça 1' | 'Treliça 2') => {
+    // Troca de máquina: apenas atualiza o estado (o autosave cuida de salvar no rascunho)
+    const handleSwitchMachine = (newMachine: 'Treliça 1' | 'Treliça 2') => {
         if (selectedMachine === newMachine) return;
-        // Salva síncronamente no localStorage antes de qualquer mudança de estado
-        const localKey = `trelica_report_${selectedMachine}_${selectedDate}`;
-        const reportData = {
-            id: reportIdRef.current || `local_${Date.now()}`,
-            date: selectedDate,
-            machine_type: selectedMachine,
-            production_order: productionOrder,
-            operator_shift_a: operatorShiftA,
-            operator_shift_b: operatorShiftB,
-            product_description: productDescription,
-            pieces_to_produce: piecesToProduce,
-            stops_shift_a: stopsShiftA,
-            stops_shift_b: stopsShiftB,
-            stats_shift_a: statsShiftA,
-            stats_shift_b: statsShiftB,
-            production_updates: productionUpdates,
-        };
-        localStorage.setItem(localKey, JSON.stringify(reportData));
-        // Depois troca a máquina (o useEffect de load vai carregar os dados da nova máquina)
         setSelectedMachine(newMachine);
     };
 
-    // Troca de data: salva o estado atual ANTES de trocar
-    const handleSwitchDate = async (newDate: string) => {
+    // Troca de data: apenas atualiza o estado (o autosave cuida de salvar no rascunho)
+    const handleSwitchDate = (newDate: string) => {
         if (selectedDate === newDate) return;
-        const localKey = `trelica_report_${selectedMachine}_${selectedDate}`;
-        const reportData = {
-            id: reportIdRef.current || `local_${Date.now()}`,
-            date: selectedDate,
-            machine_type: selectedMachine,
-            production_order: productionOrder,
-            operator_shift_a: operatorShiftA,
-            operator_shift_b: operatorShiftB,
-            product_description: productDescription,
-            pieces_to_produce: piecesToProduce,
-            stops_shift_a: stopsShiftA,
-            stops_shift_b: stopsShiftB,
-            stats_shift_a: statsShiftA,
-            stats_shift_b: statsShiftB,
-            production_updates: productionUpdates,
-        };
-        localStorage.setItem(localKey, JSON.stringify(reportData));
         setSelectedDate(newDate);
     };
 
     // Limpar e apagar o relatório de forma explícita com confirmação do usuário
     const handleClearReport = async () => {
-        const confirmDelete = window.confirm("Deseja realmente limpar e APAGAR permanentemente este relatório da tela e do banco de dados?");
+        const confirmDelete = window.confirm("Deseja realmente limpar a tela e começar um novo formulário em branco?");
         if (!confirmDelete) return;
 
         setLoading(true);
         try {
-            const localKey = `trelica_report_${selectedMachine}_${selectedDate}`;
-            localStorage.removeItem(localKey);
-
-            if (dbAvailable && reportId) {
-                const { error } = await supabase
-                    .from('trelica_daily_reports')
-                    .delete()
-                    .eq('id', reportId);
-                
-                if (error) throw error;
-                showToast('Relatório apagado com sucesso na nuvem e local!', 'success');
-            } else {
-                showToast('Relatório apagado localmente.', 'success');
-            }
+            localStorage.removeItem('trelica_report_draft');
+            showToast('Tela limpa com sucesso!', 'success');
         } catch (err) {
-            console.error("Erro ao apagar relatório:", err);
-            showToast('Erro ao apagar relatório da nuvem.', 'error');
+            console.error("Erro ao limpar:", err);
         } finally {
             resetFormToDefault();
             setLoading(false);
