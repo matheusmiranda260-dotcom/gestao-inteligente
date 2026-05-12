@@ -1410,17 +1410,17 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                                         })
                                     )}
                                     {productionUpdates.length > 0 && (
-                                        <tr className="bg-slate-100 font-black text-[#002060] text-xs border-t-2 border-[#002060]">
-                                            <td className="p-2 border-r border-slate-200 text-center font-extrabold text-[#002060]">
+                                        <tr className="bg-[#002060] font-black text-white text-xs border-t-2 border-[#002060]">
+                                            <td className="p-2 border-r border-slate-700 text-center font-black text-white">
                                                 {calculatedData.totalUpdateQnt}
                                             </td>
-                                            <td className="p-2 border-r border-slate-200 text-center font-extrabold text-[#002060]">
+                                            <td className="p-2 border-r border-slate-700 text-center font-black text-white">
                                                 {calculatedData.totalUpdateWeight > 0 ? calculatedData.totalUpdateWeight.toLocaleString('pt-BR') : '0'}
                                             </td>
-                                            <td className="p-2 border-r border-slate-200 text-center text-emerald-700 font-black">
+                                            <td className="p-2 border-r border-slate-700 text-center font-black text-white">
                                                 {calculatedData.totalUpdateAverage > 0 ? calculatedData.totalUpdateAverage.toFixed(2).replace('.', ',') : '0,00'}
                                             </td>
-                                            <td className="p-2 border-r border-slate-200 text-center text-slate-500 uppercase tracking-wider text-[9px] font-black">
+                                            <td className="p-2 border-r border-slate-700 text-center uppercase tracking-wider text-[10px] font-black text-white">
                                                 TOTAL / MÉDIA
                                             </td>
                                             <td className="p-2 text-center no-print"></td>
