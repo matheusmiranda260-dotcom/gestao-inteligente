@@ -609,12 +609,14 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                         div.className = input.className;
                         div.textContent = input.getAttribute('value') || '';
                         
-                        // Garante que o div se comporte como o input mas force render do texto
+                        // Garante que o div se comporte como o input mas force render do texto sem cortar
                         div.style.display = 'inline-block';
-                        div.style.minHeight = '1.2em';
-                        div.style.lineHeight = 'normal'; // herda o que precisava
+                        div.style.minHeight = '1.5em';
+                        div.style.lineHeight = '1.4';
+                        div.style.paddingTop = '2px';
+                        div.style.paddingBottom = '4px';
                         div.style.whiteSpace = 'nowrap';
-                        div.style.overflow = 'hidden';
+                        div.style.overflow = 'visible';
                         
                         input.parentNode?.replaceChild(div, input);
                     });
@@ -711,7 +713,9 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                         border-bottom: none !important;
                         background: transparent !important;
                         pointer-events: none !important;
-                        padding: 0 !important;
+                        padding-top: 2px !important;
+                        padding-bottom: 4px !important;
+                        line-height: 1.4 !important;
                     }
                 }
 
@@ -731,7 +735,9 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                     border-bottom: none !important;
                     background: transparent !important;
                     pointer-events: none !important;
-                    padding: 0 !important;
+                    padding-top: 2px !important;
+                    padding-bottom: 4px !important;
+                    line-height: 1.4 !important;
                 }
             `}} />
 
