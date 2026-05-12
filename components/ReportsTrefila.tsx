@@ -187,11 +187,28 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({ setPage }) => {
 
         const pctParada = turnoSec > 0 ? (paradasSec / turnoSec) * 100 : 0;
         const pctEfetivo = turnoSec > 0 ? (efetivoSec / turnoSec) * 100 : 0;
-        const pctSucata = stats.pesoEntrada > 0 ? (stats.sucata / stats.pesoEntrada) * 100 : 0;
 
         const totalKgEntrada = productionUpdates.reduce((acc, row) => acc + (row.kgEntrada || 0), 0);
         const totalKgSaida = productionUpdates.reduce((acc, row) => acc + (row.saida || 0), 0);
-        const totalKgAverage = totalKgEntrada > 0 ? (totalKgSaida / productionUpdates.length) : 0; // Exemplo de média de saída
+        const totalKgAverage = totalKgEntrada > 0 ? (totalKgSaida / productionUpdates.length) : 0;
+
+        const sucataKg = Math.max(0, totalKgEntrada - totalKgSaida);
+        const pctSucata = totalKgEntrada > 0 ? (sucataKg / totalKgEntrada) * 100 : 0;
+
+        // Calcular metros totais baseados no peso de saída e bitola linear mass (CA-60 / CA-50)
+        let totalMeters = 0;
+        productionUpdates.forEach(row => {
+            const bitolaStr = row.bitola || '';
+            const cleaned = bitolaStr.toLowerCase().replace('mm', '').replace(/\s+/g, '').replace(',', '.');
+            const bitolaNum = parseFloat(cleaned) || 0;
+            const linearMass = bitolaNum * bitolaNum * 0.006162; // kg/m
+            const meters = linearMass > 0 ? (row.saida / linearMass) : 0;
+            totalMeters += meters;
+        });
+
+        // Velocidade média em metros por minuto (m/min) e metros por segundo (m/s)
+        const velocidadeMS = efetivoSec > 0 ? (totalMeters / efetivoSec) : 0;
+        const velocidadeMinuto = velocidadeMS * 60;
 
         return {
             tempoParadoSec: paradasSec,
@@ -202,13 +219,17 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({ setPage }) => {
             tempoEfetivoStr: secondsToTime(efetivoSec),
             percentEfetivo: pctEfetivo.toFixed(1).replace('.', ','),
 
+            sucataKg,
             percentSucata: pctSucata.toFixed(2).replace('.', ','),
 
             totalKgEntrada,
             totalKgSaida,
-            totalKgAverage
+            totalKgAverage,
+            totalMeters,
+            velocidadeMS,
+            velocidadeMinuto
         };
-    }, [stops, stats, productionUpdates]);
+    }, [stops, stats.horasTrabalhadas, productionUpdates]);
 
     // 6. Persistência de Dados (Local Storage)
     const DRAFT_KEY = 'trefila_report_draft';
@@ -603,7 +624,7 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({ setPage }) => {
                         <div className="col-span-1 md:col-span-3 p-4 flex flex-col justify-center items-center text-center bg-slate-50">
                             <div className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-1">PESO TOTAL PRODUZIDO</div>
                             <div className="flex items-baseline gap-1">
-                                <span className="text-4xl font-black text-[#002060] tracking-tight">{stats.pesoSaida || 0}</span>
+                                <span className="text-4xl font-black text-[#002060] tracking-tight">{calculatedData.totalKgSaida || 0}</span>
                                 <span className="text-sm font-bold text-slate-600">kg</span>
                             </div>
                         </div>
@@ -704,10 +725,7 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({ setPage }) => {
                                         <LayersIcon className="h-4 w-4 text-slate-400" />
                                         <span className="text-sm font-extrabold text-slate-700">Peso entrada</span>
                                     </div>
-                                    <div className="flex items-center gap-1 font-bold text-sm text-slate-950">
-                                        <input type="number" value={stats.pesoEntrada || ''} onChange={e => setStats({ ...stats, pesoEntrada: parseInt(e.target.value, 10) || 0 })} className="modern-editable-input text-right w-16 text-slate-950 font-black text-sm" placeholder="0" />
-                                        <span className="text-slate-500 font-bold text-xs">kg</span>
-                                    </div>
+                                    <span className="text-sm font-black text-[#002060]">{calculatedData.totalKgEntrada.toLocaleString('pt-BR')} kg</span>
                                 </div>
                                 {/* Peso Saída */}
                                 <div className="flex items-center justify-between py-2.5">
@@ -715,10 +733,7 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({ setPage }) => {
                                         <LayersIcon className="h-4 w-4 text-slate-400" />
                                         <span className="text-sm font-extrabold text-slate-700">Peso saida</span>
                                     </div>
-                                    <div className="flex items-center gap-1 font-bold text-sm text-slate-950">
-                                        <input type="number" value={stats.pesoSaida || ''} onChange={e => setStats({ ...stats, pesoSaida: parseInt(e.target.value, 10) || 0 })} className="modern-editable-input text-right w-16 text-slate-950 font-black text-sm" placeholder="0" />
-                                        <span className="text-slate-500 font-bold text-xs">kg</span>
-                                    </div>
+                                    <span className="text-sm font-black text-[#002060]">{calculatedData.totalKgSaida.toLocaleString('pt-BR')} kg</span>
                                 </div>
                                 {/* Sucata */}
                                 <div className="flex items-center justify-between py-2.5">
@@ -726,12 +741,9 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({ setPage }) => {
                                         <LayersIcon className="h-4 w-4 text-slate-400" />
                                         <span className="text-sm font-extrabold text-slate-700">Sucata</span>
                                     </div>
-                                    <div className="flex items-center gap-4 font-bold text-sm text-slate-950">
-                                        <div className="flex items-center gap-1">
-                                            <input type="number" value={stats.sucata || ''} onChange={e => setStats({ ...stats, sucata: parseInt(e.target.value, 10) || 0 })} className="modern-editable-input text-right w-12 text-slate-950 font-black text-sm" placeholder="0" />
-                                            <span className="text-slate-500 font-bold text-xs">kg</span>
-                                        </div>
-                                        <span className="text-rose-600 font-black text-xs w-14 text-right">{calculatedData.percentSucata}%</span>
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-sm font-black text-[#002060]">{calculatedData.sucataKg.toLocaleString('pt-BR')} kg</span>
+                                        <span className="text-rose-600 font-black text-xs bg-rose-50 border border-rose-100 rounded px-1.5 py-0.5">{calculatedData.percentSucata}%</span>
                                     </div>
                                 </div>
                                 {/* Quant. Metros */}
@@ -740,18 +752,15 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({ setPage }) => {
                                         <RulerIcon className="h-4 w-4 text-slate-400" />
                                         <span className="text-sm font-extrabold text-slate-700">Quant. metros produzidos</span>
                                     </div>
-                                    <div className="flex items-center gap-1 font-bold text-sm text-slate-950">
-                                        <input type="number" value={stats.metrosProduzidos || ''} onChange={e => setStats({ ...stats, metrosProduzidos: parseInt(e.target.value, 10) || 0 })} className="modern-editable-input text-right w-20 text-slate-950 font-black text-sm" placeholder="0" />
-                                        <span className="text-slate-500 font-bold text-xs">metros</span>
-                                    </div>
+                                    <span className="text-sm font-black text-[#002060]">{Math.round(calculatedData.totalMeters).toLocaleString('pt-BR')} metros</span>
                                 </div>
                                 {/* Velocidade */}
                                 <div className="flex items-center justify-between py-2.5">
                                     <div className="flex items-center gap-2">
                                         <GaugeIcon className="h-4 w-4 text-slate-400" />
-                                        <span className="text-sm font-extrabold text-slate-700">Velocidade</span>
+                                        <span className="text-sm font-extrabold text-slate-700">Velocidade (média)</span>
                                     </div>
-                                    <input type="number" step="0.01" value={stats.velocidade || ''} onChange={e => setStats({ ...stats, velocidade: parseFloat(e.target.value) || 0 })} className="modern-editable-input text-right w-16 text-slate-950 font-black text-sm" placeholder="0" />
+                                    <span className="text-sm font-black text-[#002060]">{calculatedData.velocidadeMS.toFixed(2).replace('.', ',')} m/s ({calculatedData.velocidadeMinuto.toFixed(1).replace('.', ',')} m/min)</span>
                                 </div>
                             </div>
                         </div>
