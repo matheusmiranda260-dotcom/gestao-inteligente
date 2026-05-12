@@ -1192,28 +1192,28 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                                     </div>
                                 </div>
                                 {/* Peças Produzidas (Editáveis) */}
-                                <div className="flex items-center justify-between py-2">
+                                <div className="flex items-center justify-between py-2.5">
                                     <div className="flex items-center gap-2 mr-2">
                                         <LayersIcon className="h-4 w-4 text-slate-400" />
-                                        <span className="text-xs font-bold text-slate-600">Quantidade de peças produzidas</span>
+                                        <span className="text-sm font-extrabold text-slate-700">Quantidade de peças produzidas</span>
                                     </div>
-                                    <div className="flex items-center gap-0.5 font-bold text-xs text-slate-900 shrink-0 whitespace-nowrap">
+                                    <div className="flex items-center gap-1 font-bold text-sm text-slate-950 shrink-0 whitespace-nowrap">
                                         <input
                                             type="number"
                                             value={statsShiftA.pecasProduzidas || ''}
                                             onChange={e => setStatsShiftA({ ...statsShiftA, pecasProduzidas: parseInt(e.target.value, 10) || 0 })}
-                                            className="modern-editable-input text-center w-10 text-slate-900 border-b border-slate-200 font-black text-xs"
+                                            className="modern-editable-input text-center w-11 text-slate-950 border-b border-slate-200 font-black text-sm"
                                             placeholder="0"
                                         />
-                                        <span className="text-slate-400 font-semibold text-[11px] px-0.5">peças de</span>
+                                        <span className="text-slate-500 font-bold text-xs px-0.5">peças de</span>
                                         <input
                                             type="number"
                                             value={statsShiftA.tamanhoPeca || ''}
                                             onChange={e => setStatsShiftA({ ...statsShiftA, tamanhoPeca: parseFloat(e.target.value) || 0 })}
-                                            className="modern-editable-input text-center w-7 text-slate-900 border-b border-slate-200 font-black text-xs"
+                                            className="modern-editable-input text-center w-8 text-slate-950 border-b border-slate-200 font-black text-sm"
                                             placeholder="0"
                                         />
-                                        <span className="text-slate-400 font-semibold text-[11px] pl-0.5">metros</span>
+                                        <span className="text-slate-500 font-bold text-xs pl-0.5">metros</span>
                                     </div>
                                 </div>
                                 {/* Metros Produzidos */}
@@ -1286,28 +1286,28 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                                     </div>
                                 </div>
                                 {/* Peças Produzidas (Editáveis) */}
-                                <div className="flex items-center justify-between py-2">
+                                <div className="flex items-center justify-between py-2.5">
                                     <div className="flex items-center gap-2 mr-2">
                                         <LayersIcon className="h-4 w-4 text-slate-400" />
-                                        <span className="text-xs font-bold text-slate-600">Quantidade de peças produzidas</span>
+                                        <span className="text-sm font-extrabold text-slate-700">Quantidade de peças produzidas</span>
                                     </div>
-                                    <div className="flex items-center gap-0.5 font-bold text-xs text-slate-900 shrink-0 whitespace-nowrap">
+                                    <div className="flex items-center gap-1 font-bold text-sm text-slate-950 shrink-0 whitespace-nowrap">
                                         <input
                                             type="number"
                                             value={statsShiftB.pecasProduzidas || ''}
                                             onChange={e => setStatsShiftB({ ...statsShiftB, pecasProduzidas: parseInt(e.target.value, 10) || 0 })}
-                                            className="modern-editable-input text-center w-10 text-slate-900 border-b border-slate-200 font-black text-xs"
+                                            className="modern-editable-input text-center w-11 text-slate-950 border-b border-slate-200 font-black text-sm"
                                             placeholder="0"
                                         />
-                                        <span className="text-slate-400 font-semibold text-[11px] px-0.5">peças de</span>
+                                        <span className="text-slate-500 font-bold text-xs px-0.5">peças de</span>
                                         <input
                                             type="number"
                                             value={statsShiftB.tamanhoPeca || ''}
                                             onChange={e => setStatsShiftB({ ...statsShiftB, tamanhoPeca: parseFloat(e.target.value) || 0 })}
-                                            className="modern-editable-input text-center w-7 text-slate-900 border-b border-slate-200 font-black text-xs"
+                                            className="modern-editable-input text-center w-8 text-slate-950 border-b border-slate-200 font-black text-sm"
                                             placeholder="0"
                                         />
-                                        <span className="text-slate-400 font-semibold text-[11px] pl-0.5">metros</span>
+                                        <span className="text-slate-500 font-bold text-xs pl-0.5">metros</span>
                                     </div>
                                 </div>
                                 {/* Metros Produzidos */}
