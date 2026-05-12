@@ -581,6 +581,12 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
             
             showToast('Gerando imagem de alta resolução...', 'info');
             
+            // WORKAROUND HTML2CANVAS: Sincronizar o .value para o atributo HTML para o cloneNode pegá-lo
+            const inputsToSync = element.querySelectorAll('input.modern-editable-input');
+            inputsToSync.forEach((input: any) => {
+                input.setAttribute('value', input.value);
+            });
+            
             // Ativa o estilo de captura limpo (idêntico à impressão)
             element.classList.add('is-capturing');
             
@@ -591,7 +597,28 @@ const Reports: React.FC<ReportsProps> = ({ stock, setPage }) => {
                 scale: 2, // Alta resolução para legibilidade perfeita no WhatsApp
                 useCORS: true,
                 logging: false,
-                backgroundColor: '#ffffff'
+                backgroundColor: '#ffffff',
+                onclone: (clonedDoc) => {
+                    // SUBSTITUIR INPUTS POR DIVS NO CLONE PARA EVITAR CORTE DE TEXTO
+                    const clonedElement = clonedDoc.getElementById('trelica-report-sheet');
+                    if (!clonedElement) return;
+                    
+                    const clonedInputs = clonedElement.querySelectorAll('input.modern-editable-input');
+                    clonedInputs.forEach((input: any) => {
+                        const div = clonedDoc.createElement('div');
+                        div.className = input.className;
+                        div.textContent = input.getAttribute('value') || '';
+                        
+                        // Garante que o div se comporte como o input mas force render do texto
+                        div.style.display = 'inline-block';
+                        div.style.minHeight = '1.2em';
+                        div.style.lineHeight = 'normal'; // herda o que precisava
+                        div.style.whiteSpace = 'nowrap';
+                        div.style.overflow = 'hidden';
+                        
+                        input.parentNode?.replaceChild(div, input);
+                    });
+                }
             });
             
             // Remove o estilo de captura imediatamente após gerar o canvas
