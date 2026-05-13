@@ -620,21 +620,21 @@ const ReportsOPTrefila: React.FC<ReportsOPTrefilaProps> = ({ stock = [], setPage
                             <table className="w-full border-collapse text-center table-fixed">
                                 <thead>
                                     <tr className="bg-slate-50 border-b border-[#002060] text-[9.5px] font-black text-slate-700 uppercase">
-                                        <th rowSpan={2} className="border-r border-[#002060] py-1 text-center w-[16%] font-extrabold text-[#002060]">passes</th>
-                                        <th colSpan={2} className="border-r border-[#002060] py-0.5 text-center font-extrabold text-[#002060]">1º Passe</th>
-                                        <th colSpan={2} className="border-r border-[#002060] py-0.5 text-center font-extrabold text-[#002060]">2º Passe</th>
-                                        <th colSpan={2} className="border-r border-[#002060] py-0.5 text-center font-extrabold text-[#002060]">3º Passe</th>
-                                        <th colSpan={2} className="py-0.5 text-center font-extrabold text-[#002060]">4º Passe</th>
+                                        <th rowSpan={2} className="border-r border-[#002060] p-1 align-middle text-center w-[16%] font-extrabold text-[#002060]">passes</th>
+                                        <th colSpan={2} className="border-r border-[#002060] p-1 align-middle text-center font-extrabold text-[#002060]">1º Passe</th>
+                                        <th colSpan={2} className="border-r border-[#002060] p-1 align-middle text-center font-extrabold text-[#002060]">2º Passe</th>
+                                        <th colSpan={2} className="border-r border-[#002060] p-1 align-middle text-center font-extrabold text-[#002060]">3º Passe</th>
+                                        <th colSpan={2} className="p-1 align-middle text-center font-extrabold text-[#002060]">4º Passe</th>
                                     </tr>
                                     <tr className="bg-slate-100 border-b border-[#002060] text-[8.5px] font-bold text-slate-600 uppercase text-center">
-                                        <th className="border-r border-[#002060] py-0.5 w-[10.5%]">entrada</th>
-                                        <th className="border-r border-[#002060] py-0.5 w-[10.5%]">saída</th>
-                                        <th className="border-r border-[#002060] py-0.5 w-[10.5%]">entrada</th>
-                                        <th className="border-r border-[#002060] py-0.5 w-[10.5%]">saída</th>
-                                        <th className="border-r border-[#002060] py-0.5 w-[10.5%]">entrada</th>
-                                        <th className="border-r border-[#002060] py-0.5 w-[10.5%]">saída</th>
-                                        <th className="border-r border-[#002060] py-0.5 w-[10.5%]">entrada</th>
-                                        <th className="py-0.5 w-[10.5%]">saída</th>
+                                        <th className="border-r border-[#002060] p-1 align-middle w-[10.5%]">entrada</th>
+                                        <th className="border-r border-[#002060] p-1 align-middle w-[10.5%]">saída</th>
+                                        <th className="border-r border-[#002060] p-1 align-middle w-[10.5%]">entrada</th>
+                                        <th className="border-r border-[#002060] p-1 align-middle w-[10.5%]">saída</th>
+                                        <th className="border-r border-[#002060] p-1 align-middle w-[10.5%]">entrada</th>
+                                        <th className="border-r border-[#002060] p-1 align-middle w-[10.5%]">saída</th>
+                                        <th className="border-r border-[#002060] p-1 align-middle w-[10.5%]">entrada</th>
+                                        <th className="p-1 align-middle w-[10.5%]">saída</th>
                                     </tr>
                                 </thead>
                                 <tbody className="text-xs font-black text-[#002060]">
@@ -712,33 +712,34 @@ const ReportsOPTrefila: React.FC<ReportsOPTrefilaProps> = ({ stock = [], setPage
                                     </th>
                                 </tr>
                                 {/* Sub-cabeçalho de colunas */}
-                                <tr className="bg-slate-100 border-b border-[#002060] text-[7.8px] font-black text-slate-700 uppercase text-center leading-tight">
-                                    <th rowSpan={2} className="border-r border-slate-300 py-3.5 px-0.5 align-middle">Data</th>
-                                    <th rowSpan={2} className="border-r border-slate-300 py-3.5 px-0.5 align-middle">Lote (copex)</th>
-                                    <th rowSpan={2} className="border-r border-slate-300 py-3.5 px-0.5 align-middle">Fornecedor</th>
-                                    <th rowSpan={2} className="border-r border-slate-300 py-3.5 px-0.5 align-middle">Nº Certif.</th>
-                                    <th rowSpan={2} className="border-r border-slate-300 py-3.5 px-0.5 align-middle">Nº Corrida</th>
-                                    <th rowSpan={2} className="border-r border-slate-300 py-3.5 px-0.5 align-middle">Nota Fiscal</th>
-                                    <th colSpan={3} className="border-r border-slate-300 py-2.5 text-center align-middle">Peso (kg)</th>
+                                {/* Sub-cabeçalho de colunas */}
+                                <tr className="bg-slate-100 border-b border-[#002060] text-[8px] font-black text-slate-700 uppercase text-center">
+                                    <th rowSpan={2} className="border-r border-slate-300 p-1 align-middle">Data</th>
+                                    <th rowSpan={2} className="border-r border-slate-300 p-1 align-middle">Lote (copex)</th>
+                                    <th rowSpan={2} className="border-r border-slate-300 p-1 align-middle">Fornecedor</th>
+                                    <th rowSpan={2} className="border-r border-slate-300 p-1 align-middle">Nº Certif.</th>
+                                    <th rowSpan={2} className="border-r border-slate-300 p-1 align-middle">Nº Corrida</th>
+                                    <th rowSpan={2} className="border-r border-slate-300 p-1 align-middle">Nota Fiscal</th>
+                                    <th colSpan={3} className="border-r border-slate-300 p-1 text-center align-middle">Peso (kg)</th>
                                     
-                                    <th colSpan={2} className="border-r border-slate-300 py-2.5 text-center align-middle">Dimensional</th>
-                                    <th colSpan={3} className="border-r border-slate-300 py-2.5 text-center align-middle">Ensaio Tração</th>
-                                    <th rowSpan={2} className="border-r border-slate-300 py-3.5 px-0.5 text-[7.5px] align-middle">Caract. Geom.</th>
-                                    <th rowSpan={2} className="border-r border-slate-300 py-3.5 px-0.5 text-[7.5px] align-middle">Dobram.</th>
-                                    <th rowSpan={2} className="border-r border-slate-300 py-3.5 px-0.5 text-[7.5px] align-middle">Verif. Marcação</th>
-                                    <th rowSpan={2} className="border-r border-slate-300 py-3.5 px-0.5 text-[7.5px] align-middle">Alonga.</th>
-                                    <th rowSpan={2} className="py-3.5 px-0.5 align-middle">Aprovação</th>
+                                    <th colSpan={2} className="border-r border-slate-300 p-1 text-center align-middle">Dimensional</th>
+                                    <th colSpan={3} className="border-r border-slate-300 p-1 text-center align-middle">Ensaio Tração</th>
+                                    <th rowSpan={2} className="border-r border-slate-300 p-1 text-[7.5px] align-middle">Caract. Geom.</th>
+                                    <th rowSpan={2} className="border-r border-slate-300 p-1 text-[7.5px] align-middle">Dobram.</th>
+                                    <th rowSpan={2} className="border-r border-slate-300 p-1 text-[7.5px] align-middle">Verif. Marcação</th>
+                                    <th rowSpan={2} className="border-r border-slate-300 p-1 text-[7.5px] align-middle">Alonga.</th>
+                                    <th rowSpan={2} className="p-1 align-middle">Aprovação</th>
                                 </tr>
-                                <tr className="bg-slate-50 border-b border-[#002060] text-[6px] font-black text-slate-600 uppercase text-center leading-none tracking-tighter">
-                                    <th className="border-r border-slate-300 py-2 px-0.5 align-middle">etiqueta</th>
-                                    <th className="border-r border-slate-300 py-2 px-0.5 align-middle">balança</th>
-                                    <th className="border-r border-slate-300 py-2 px-0.5 align-middle">diferença</th>
+                                <tr className="bg-slate-50 border-b border-[#002060] text-[7px] font-bold text-slate-600 uppercase text-center">
+                                    <th className="border-r border-slate-300 p-1 align-middle">etiqueta</th>
+                                    <th className="border-r border-slate-300 p-1 align-middle">balança</th>
+                                    <th className="border-r border-slate-300 p-1 align-middle">diferença</th>
                                     
-                                    <th className="border-r border-slate-300 py-2 px-0.5 align-middle">massa linear</th>
-                                    <th className="border-r border-slate-300 py-2 px-0.5 align-middle">bitola (mm)</th>
-                                    <th className="border-r border-slate-300 py-2 px-0.5 align-middle">R.T</th>
-                                    <th className="border-r border-slate-300 py-2 px-0.5 align-middle">L.E</th>
-                                    <th className="border-r border-slate-300 py-2 px-0.5 align-middle">RT/LE</th>
+                                    <th className="border-r border-slate-300 p-1 align-middle">massa linear</th>
+                                    <th className="border-r border-slate-300 p-1 align-middle">bitola (mm)</th>
+                                    <th className="border-r border-slate-300 p-1 align-middle">R.T</th>
+                                    <th className="border-r border-slate-300 p-1 align-middle">L.E</th>
+                                    <th className="border-r border-slate-300 p-1 align-middle">RT/LE</th>
                                 </tr>
                             </thead>
                             <tbody>
