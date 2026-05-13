@@ -681,20 +681,20 @@ const ReportsOPTrefila: React.FC<ReportsOPTrefilaProps> = ({ stock = [], setPage
                     <div className="border border-[#002060] rounded overflow-hidden relative mb-3">
                         <table className="w-full border-collapse text-left text-[10px] table-fixed">
                             <colgroup>
-                                <col style={{ width: '4%' }} />
-                                <col style={{ width: '8%' }} />
-                                <col style={{ width: '10%' }} />
-                                <col style={{ width: '7%' }} />
-                                <col style={{ width: '7%' }} />
+                                <col style={{ width: '3.5%' }} />
+                                <col style={{ width: '6.5%' }} />
+                                <col style={{ width: '9.5%' }} />
+                                <col style={{ width: '5.5%' }} />
+                                <col style={{ width: '7.5%' }} />
+                                <col style={{ width: '4.5%' }} />
                                 <col style={{ width: '5%' }} />
-                                <col style={{ width: '4.5%' }} />
-                                <col style={{ width: '4.5%' }} />
-                                <col style={{ width: '4.5%' }} />
-                                <col style={{ width: '4.5%' }} />
-                                <col style={{ width: '4.5%' }} />
-                                <col style={{ width: '3.5%' }} />
-                                <col style={{ width: '3.5%' }} />
-                                <col style={{ width: '3.5%' }} />
+                                <col style={{ width: '5%' }} />
+                                <col style={{ width: '5%' }} />
+                                <col style={{ width: '5%' }} />
+                                <col style={{ width: '5%' }} />
+                                <col style={{ width: '4%' }} />
+                                <col style={{ width: '4%' }} />
+                                <col style={{ width: '4%' }} />
                                 <col style={{ width: '4.5%' }} />
                                 <col style={{ width: '4.5%' }} />
                                 <col style={{ width: '5.5%' }} />
@@ -703,7 +703,7 @@ const ReportsOPTrefila: React.FC<ReportsOPTrefilaProps> = ({ stock = [], setPage
                             </colgroup>
                             <thead>
                                 {/* Cabeçalho de Grupos */}
-                                <tr className="bg-[#002060] text-white text-[9.5px] font-black uppercase text-center border-b border-[#002060]">
+                                <tr className="bg-[#002060] text-white text-[8px] font-black uppercase text-center border-b border-[#002060]">
                                     <th colSpan={9} className="border-r border-[#002060] py-1.5 text-center font-black tracking-wider">
                                         Controle da Matéria Prima (Aços entrada)
                                     </th>
@@ -712,33 +712,33 @@ const ReportsOPTrefila: React.FC<ReportsOPTrefilaProps> = ({ stock = [], setPage
                                     </th>
                                 </tr>
                                 {/* Sub-cabeçalho de colunas */}
-                                <tr className="bg-slate-100 border-b border-[#002060] text-[8.5px] font-black text-slate-700 uppercase text-center leading-tight">
-                                    <th rowSpan={2} className="border-r border-slate-300 py-4 px-0.5 align-middle">Data</th>
-                                    <th rowSpan={2} className="border-r border-slate-300 py-4 px-0.5 align-middle">Lote (copex)</th>
-                                    <th rowSpan={2} className="border-r border-slate-300 py-4 px-0.5 align-middle">Fornecedor</th>
-                                    <th rowSpan={2} className="border-r border-slate-300 py-4 px-0.5 align-middle">Nº Certif.</th>
-                                    <th rowSpan={2} className="border-r border-slate-300 py-4 px-0.5 align-middle">Nº Corrida</th>
-                                    <th rowSpan={2} className="border-r border-slate-300 py-4 px-0.5 align-middle">Nota Fiscal</th>
-                                    <th colSpan={3} className="border-r border-slate-300 py-3 text-center align-middle">Peso (kg)</th>
+                                <tr className="bg-slate-100 border-b border-[#002060] text-[7.8px] font-black text-slate-700 uppercase text-center leading-tight">
+                                    <th rowSpan={2} className="border-r border-slate-300 py-3.5 px-0.5 align-middle">Data</th>
+                                    <th rowSpan={2} className="border-r border-slate-300 py-3.5 px-0.5 align-middle">Lote (copex)</th>
+                                    <th rowSpan={2} className="border-r border-slate-300 py-3.5 px-0.5 align-middle">Fornecedor</th>
+                                    <th rowSpan={2} className="border-r border-slate-300 py-3.5 px-0.5 align-middle">Nº Certif.</th>
+                                    <th rowSpan={2} className="border-r border-slate-300 py-3.5 px-0.5 align-middle">Nº Corrida</th>
+                                    <th rowSpan={2} className="border-r border-slate-300 py-3.5 px-0.5 align-middle">Nota Fiscal</th>
+                                    <th colSpan={3} className="border-r border-slate-300 py-2.5 text-center align-middle">Peso (kg)</th>
                                     
-                                    <th colSpan={2} className="border-r border-slate-300 py-3 text-center align-middle">Dimensional</th>
-                                    <th colSpan={3} className="border-r border-slate-300 py-3 text-center align-middle">Ensaio Tração</th>
-                                    <th rowSpan={2} className="border-r border-slate-300 py-4 px-0.5 text-[8px] align-middle">Caract. Geom.</th>
-                                    <th rowSpan={2} className="border-r border-slate-300 py-4 px-0.5 text-[8px] align-middle">Dobram.</th>
-                                    <th rowSpan={2} className="border-r border-slate-300 py-4 px-0.5 text-[8px] align-middle">Verif. Marcação</th>
-                                    <th rowSpan={2} className="border-r border-slate-300 py-4 px-0.5 text-[8px] align-middle">Alonga.</th>
-                                    <th rowSpan={2} className="py-4 px-0.5 align-middle">Aprovação</th>
+                                    <th colSpan={2} className="border-r border-slate-300 py-2.5 text-center align-middle">Dimensional</th>
+                                    <th colSpan={3} className="border-r border-slate-300 py-2.5 text-center align-middle">Ensaio Tração</th>
+                                    <th rowSpan={2} className="border-r border-slate-300 py-3.5 px-0.5 text-[7.5px] align-middle">Caract. Geom.</th>
+                                    <th rowSpan={2} className="border-r border-slate-300 py-3.5 px-0.5 text-[7.5px] align-middle">Dobram.</th>
+                                    <th rowSpan={2} className="border-r border-slate-300 py-3.5 px-0.5 text-[7.5px] align-middle">Verif. Marcação</th>
+                                    <th rowSpan={2} className="border-r border-slate-300 py-3.5 px-0.5 text-[7.5px] align-middle">Alonga.</th>
+                                    <th rowSpan={2} className="py-3.5 px-0.5 align-middle">Aprovação</th>
                                 </tr>
-                                <tr className="bg-slate-50 border-b border-[#002060] text-[6.8px] font-black text-slate-600 uppercase text-center leading-none tracking-tighter">
-                                    <th className="border-r border-slate-300 py-2.5 px-0.5 align-middle">etiqueta</th>
-                                    <th className="border-r border-slate-300 py-2.5 px-0.5 align-middle">balança</th>
-                                    <th className="border-r border-slate-300 py-2.5 px-0.5 align-middle">diferença</th>
+                                <tr className="bg-slate-50 border-b border-[#002060] text-[6px] font-black text-slate-600 uppercase text-center leading-none tracking-tighter">
+                                    <th className="border-r border-slate-300 py-2 px-0.5 align-middle">etiqueta</th>
+                                    <th className="border-r border-slate-300 py-2 px-0.5 align-middle">balança</th>
+                                    <th className="border-r border-slate-300 py-2 px-0.5 align-middle">diferença</th>
                                     
-                                    <th className="border-r border-slate-300 py-2.5 px-0.5 align-middle">massa linear</th>
-                                    <th className="border-r border-slate-300 py-2.5 px-0.5 align-middle">bitola (mm)</th>
-                                    <th className="border-r border-slate-300 py-2.5 px-0.5 align-middle">R.T</th>
-                                    <th className="border-r border-slate-300 py-2.5 px-0.5 align-middle">L.E</th>
-                                    <th className="border-r border-slate-300 py-2.5 px-0.5 align-middle">RT/LE</th>
+                                    <th className="border-r border-slate-300 py-2 px-0.5 align-middle">massa linear</th>
+                                    <th className="border-r border-slate-300 py-2 px-0.5 align-middle">bitola (mm)</th>
+                                    <th className="border-r border-slate-300 py-2 px-0.5 align-middle">R.T</th>
+                                    <th className="border-r border-slate-300 py-2 px-0.5 align-middle">L.E</th>
+                                    <th className="border-r border-slate-300 py-2 px-0.5 align-middle">RT/LE</th>
                                 </tr>
                             </thead>
                             <tbody>
