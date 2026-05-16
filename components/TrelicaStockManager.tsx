@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { Page, FinishedProductItem, User, FinishedGoodsTransferRecord, StockMovement } from '../types';
-import { ArchiveIcon, TruckIcon, PlusIcon, MinusIcon, TrashIcon, SwitchHorizontalIcon, ClockIcon, CalculatorIcon, CheckCircleIcon } from './icons';
+import { ArchiveIcon, SwitchHorizontalIcon, ClockIcon, CalculatorIcon, PlusIcon } from './icons';
 import { trelicaModels } from './ProductionOrderTrelica';
 
 interface TrelicaStockManagerProps {
@@ -13,75 +13,6 @@ interface TrelicaStockManagerProps {
     currentUser: User | null;
 }
 
-interface ModelStockSummary {
-    model: string;
-    size: string;
-    virtualQty: number;
-    physicalQty: number;
-    totalWeight: number;
-    lastItemIds: string[];
-}
-
-const HistoryModal: React.FC<{
-    item: FinishedProductItem;
-    onClose: () => void;
-}> = ({ item, onClose }) => (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[80] flex items-center justify-center p-4">
-        <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-2xl overflow-hidden animate-modal-in border border-white/20">
-            <div className="p-6 bg-slate-100 border-b flex justify-between items-center">
-                <div>
-                    <h3 className="text-xl font-black tracking-tight text-slate-800 flex items-center gap-2">
-                        <ClockIcon className="h-6 w-6 text-slate-500" />
-                        Histórico de Movimentações
-                    </h3>
-                    <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">{item.model} - {item.size}m</p>
-                </div>
-                <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-all">
-                    <PlusIcon className="h-5 w-5 rotate-45 text-slate-500" />
-                </button>
-            </div>
-            
-            <div className="p-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
-                {item.movementHistory && item.movementHistory.length > 0 ? (
-                    <div className="space-y-4">
-                        {item.movementHistory.slice().reverse().map((m, idx) => (
-                            <div key={idx} className="flex gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">
-                                <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center shadow-sm">
-                                    {m.type === 'transfer' ? <SwitchHorizontalIcon className="h-5 w-5 text-indigo-600" /> : <CalculatorIcon className="h-5 w-5 text-emerald-500" />}
-                                </div>
-                                <div className="flex-1">
-                                    <div className="flex justify-between items-start">
-                                        <p className="font-black text-slate-800 uppercase text-[10px]">
-                                            {m.type === 'transfer' ? 'Virtual → Físico' : 'Ajuste de Saldo'}
-                                        </p>
-                                        <span className="text-[10px] font-bold text-slate-400">{new Date(m.date).toLocaleString('pt-BR')}</span>
-                                    </div>
-                                    <p className="text-sm font-bold text-slate-700 mt-1">
-                                        Qtd: <span className="text-indigo-600">{m.quantity}</span>
-                                        <span className="mx-2 text-slate-300">|</span>
-                                        Destino: <span className="text-slate-500 uppercase">{m.to === 'virtual' ? 'Virtual' : 'Físico'}</span>
-                                    </p>
-                                    {m.observations && <p className="text-xs text-slate-500 italic mt-1 font-medium italic">"{m.observations}"</p>}
-                                    <p className="text-[9px] font-black text-slate-300 uppercase mt-2 tracking-widest">Operador: {m.operator}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="text-center py-10">
-                        <ArchiveIcon className="h-12 w-12 text-slate-200 mx-auto mb-2" />
-                        <p className="text-slate-400 font-bold uppercase text-xs tracking-widest">Nenhuma movimentação</p>
-                    </div>
-                )}
-            </div>
-            
-            <div className="p-6 bg-slate-50 border-t flex justify-end">
-                <button onClick={onClose} className="px-8 py-3 bg-slate-800 text-white font-black rounded-xl hover:bg-slate-900 transition-all uppercase text-xs tracking-widest">Fechar</button>
-            </div>
-        </div>
-    </div>
-);
-
 const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({ 
     finishedGoods, 
     setPage, 
@@ -89,61 +20,44 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
     onAddManual,
     currentUser 
 }) => {
-    const [movingItem, setMovingItem] = useState<{ model: string; size: string; type: 'transfer' | 'audit' | 'virtual_audit' } | null>(null);
-    const [historyItem, setHistoryItem] = useState<FinishedProductItem | null>(null);
+    const [selectedModelKey, setSelectedModelKey] = useState<string>('');
+    const [movingItem, setMovingItem] = useState<{ model: string; size: string; type: 'transfer' | 'audit' | 'virtual_audit' | 'add_virtual' } | null>(null);
     const [movementQty, setMovementQty] = useState(0);
     const [obs, setObs] = useState('');
     
-    // Estados para Filtros
-    const [searchTerm, setSearchTerm] = useState('');
-    const [selectedBaseModel, setSelectedBaseModel] = useState<string>('all');
-    const [onlyWithDiff, setOnlyWithDiff] = useState(false);
-    const [onlyAvailable, setOnlyAvailable] = useState(false);
-
-    const stockSummarized = useMemo(() => {
-        const summary: Record<string, ModelStockSummary> = {};
+    // Calcula o resumo do item selecionado
+    const selectedSummary = useMemo(() => {
+        if (!selectedModelKey) return null;
         
-        trelicaModels.forEach(m => {
-            const key = `${m.modelo}_${m.tamanho}`;
-            summary[key] = {
-                model: m.modelo,
-                size: m.tamanho,
-                virtualQty: 0,
-                physicalQty: 0,
-                totalWeight: 0,
-                lastItemIds: []
-            };
-        });
-
-        finishedGoods.filter(i => i.productType === 'Treliça').forEach(item => {
-            const key = `${item.model}_${item.size.trim()}`;
-            if (!summary[key]) {
-                summary[key] = { model: item.model, size: item.size, virtualQty: 0, physicalQty: 0, totalWeight: 0, lastItemIds: [] };
+        const [model, size] = selectedModelKey.split('_');
+        
+        let virtualQty = 0;
+        let physicalQty = 0;
+        let totalWeight = 0;
+        let allMovements: StockMovement[] = [];
+        
+        finishedGoods.filter(i => i.productType === 'Treliça' && i.model === model && i.size.trim() === size.trim()).forEach(item => {
+            virtualQty += item.quantity;
+            physicalQty += (item.physicalQuantity || 0);
+            totalWeight += item.totalWeight;
+            if (item.movementHistory) {
+                allMovements = [...allMovements, ...item.movementHistory];
             }
-            summary[key].virtualQty += item.quantity;
-            summary[key].physicalQty += (item.physicalQuantity || 0);
-            summary[key].totalWeight += item.totalWeight;
-            summary[key].lastItemIds.push(item.id);
         });
-
-        return Object.values(summary)
-            .filter(s => {
-                // Filtro de Busca
-                const matchesSearch = s.model.toLowerCase().includes(searchTerm.toLowerCase());
-                
-                // Filtro de Modelo Base (H-6, H-8...)
-                const matchesBase = selectedBaseModel === 'all' || s.model.startsWith(selectedBaseModel);
-                
-                // Filtro de Divergência
-                const hasDiff = !onlyWithDiff || (s.physicalQty !== s.virtualQty);
-
-                // Filtro de Disponibilidade (Virtual ou Físico > 0)
-                const isAvailable = !onlyAvailable || (s.virtualQty > 0 || s.physicalQty > 0);
-                
-                return matchesSearch && matchesBase && hasDiff && isAvailable;
-            })
-            .sort((a,b) => a.model.localeCompare(b.model));
-    }, [finishedGoods, searchTerm, selectedBaseModel, onlyWithDiff, onlyAvailable]);
+        
+        // Ordena movimentações da mais recente para a mais antiga
+        allMovements.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        
+        return {
+            model,
+            size,
+            virtualQty,
+            physicalQty,
+            totalWeight,
+            diff: physicalQty - virtualQty,
+            movements: allMovements
+        };
+    }, [finishedGoods, selectedModelKey]);
 
     const handleAction = () => {
         if (!movingItem) return;
@@ -170,12 +84,12 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
         const movement: StockMovement = {
             id: Math.random().toString(36).substr(2, 9),
             date: new Date().toISOString(),
-            type: movingItem.type === 'transfer' ? 'transfer' : 'adjustment',
-            from: movingItem.type === 'transfer' ? 'virtual' : movingItem.type === 'virtual_audit' ? 'system' : 'physical',
-            to: movingItem.type === 'transfer' ? 'physical' : movingItem.type === 'virtual_audit' ? 'virtual' : 'out',
+            type: movingItem.type === 'transfer' ? 'transfer' : movingItem.type === 'add_virtual' ? 'addition' : 'adjustment',
+            from: movingItem.type === 'transfer' ? 'virtual' : movingItem.type === 'add_virtual' ? 'production' : movingItem.type === 'virtual_audit' ? 'system' : 'physical',
+            to: movingItem.type === 'transfer' ? 'physical' : (movingItem.type === 'virtual_audit' || movingItem.type === 'add_virtual') ? 'virtual' : 'out',
             quantity: movementQty,
             operator: currentUser?.username || 'Sistema',
-            observations: obs || (movingItem.type === 'audit' ? 'Ajuste de estoque físico' : movingItem.type === 'virtual_audit' ? 'Ajuste de estoque virtual' : 'Transferência para o pátio')
+            observations: obs || (movingItem.type === 'audit' ? 'Ajuste de estoque físico' : movingItem.type === 'add_virtual' ? 'Entrada de estoque' : movingItem.type === 'virtual_audit' ? 'Ajuste de estoque virtual' : 'Transferência para o pátio')
         };
 
         const updates: Partial<FinishedProductItem> = {};
@@ -184,6 +98,8 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
             updates.physicalQuantity = (currentItem.physicalQuantity || 0) + movementQty;
         } else if (movingItem.type === 'virtual_audit') {
             updates.quantity = movementQty;
+        } else if (movingItem.type === 'add_virtual') {
+            updates.quantity = (currentItem.quantity || 0) + movementQty;
         } else {
             updates.physicalQuantity = movementQty;
         }
@@ -199,18 +115,18 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
         <div className="p-4 sm:p-6 md:p-8 space-y-8 animate-fade-in">
             {movingItem && (
                 <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[70] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden border border-white/20">
-                        <div className={`p-8 ${movingItem.type === 'transfer' ? 'bg-indigo-600' : movingItem.type === 'virtual_audit' ? 'bg-slate-700' : 'bg-emerald-600'} text-white`}>
+                    <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden border border-white/20 animate-modal-in">
+                        <div className={`p-8 ${movingItem.type === 'transfer' ? 'bg-indigo-600' : movingItem.type === 'virtual_audit' ? 'bg-slate-700' : movingItem.type === 'add_virtual' ? 'bg-emerald-500' : 'bg-emerald-600'} text-white`}>
                             <h3 className="text-2xl font-black flex items-center gap-3">
-                                {movingItem.type === 'transfer' ? <SwitchHorizontalIcon className="h-7 w-7" /> : <CalculatorIcon className="h-7 w-7" />}
-                                {movingItem.type === 'transfer' ? 'Transferir para Físico' : movingItem.type === 'virtual_audit' ? 'Ajustar Saldo Virtual' : 'Ajustar Contagem Física'}
+                                {movingItem.type === 'transfer' ? <SwitchHorizontalIcon className="h-7 w-7" /> : movingItem.type === 'add_virtual' ? <PlusIcon className="h-7 w-7" /> : <CalculatorIcon className="h-7 w-7" />}
+                                {movingItem.type === 'transfer' ? 'Transferir para Físico' : movingItem.type === 'add_virtual' ? 'Adicionar Estoque' : movingItem.type === 'virtual_audit' ? 'Ajustar Saldo Virtual' : 'Ajustar Contagem Física'}
                             </h3>
                             <p className="text-white/70 font-bold uppercase text-xs tracking-widest mt-2">{movingItem.model} - {movingItem.size}m</p>
                         </div>
                         <div className="p-8 space-y-6">
                             <div>
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
-                                    {movingItem.type === 'transfer' ? 'Quantidade a Transferir' : movingItem.type === 'virtual_audit' ? 'Novo Saldo Virtual (Sistema)' : 'Nova Contagem Física Real (Galpão)'}
+                                    {movingItem.type === 'transfer' ? 'Quantidade a Transferir' : movingItem.type === 'add_virtual' ? 'Quantidade a Adicionar' : movingItem.type === 'virtual_audit' ? 'Novo Saldo Virtual (Sistema)' : 'Nova Contagem Física Real (Galpão)'}
                                 </label>
                                 <input 
                                     type="number" 
@@ -264,246 +180,147 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
                 </button>
             </header>
 
-            {/* Filtros e Controles */}
-            <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 flex flex-wrap items-center gap-6">
-                <div className="flex-1 min-w-[250px]">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Buscar Modelo</label>
-                    <div className="relative">
-                        <input 
-                            type="text" 
-                            placeholder="Ex: H-8 Super Pesado..." 
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-12 pr-4 py-3 bg-slate-50 border-none rounded-2xl font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
-                        />
-                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300">
-                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+            {/* Seletor de Modelo */}
+            <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100">
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Selecione o Modelo de Treliça</label>
+                <select 
+                    value={selectedModelKey}
+                    onChange={(e) => setSelectedModelKey(e.target.value)}
+                    className="w-full p-4 sm:p-5 text-lg sm:text-xl bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-slate-700 focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-300 transition-all outline-none cursor-pointer hover:bg-slate-100"
+                >
+                    <option value="">-- Escolha um modelo para visualizar --</option>
+                    {trelicaModels.map((m, idx) => (
+                        <option key={idx} value={`${m.modelo}_${m.tamanho}`}>
+                            {m.modelo} - {m.tamanho}m
+                        </option>
+                    ))}
+                </select>
+            </div>
+
+            {selectedSummary && (
+                <div className="space-y-8 animate-fade-in">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <div className="bg-slate-800 p-6 rounded-[2rem] text-white flex flex-col justify-between">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Estoque Virtual</p>
+                            <p className="text-4xl font-black">{selectedSummary.virtualQty} <span className="text-sm opacity-50 uppercase">pçs</span></p>
+                        </div>
+                        <div className="bg-indigo-600 p-6 rounded-[2rem] text-white shadow-xl shadow-indigo-100 flex flex-col justify-between">
+                            <p className="text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1">Estoque Físico</p>
+                            <p className="text-4xl font-black">{selectedSummary.physicalQty} <span className="text-sm opacity-50 uppercase">pçs</span></p>
+                        </div>
+                        <div className="bg-white p-6 rounded-[2rem] border-2 border-slate-100 flex flex-col justify-between">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Diferença Geral</p>
+                            <p className={`text-4xl font-black ${selectedSummary.diff < 0 ? 'text-red-500' : selectedSummary.diff > 0 ? 'text-emerald-500' : 'text-slate-300'}`}>
+                                {selectedSummary.diff > 0 ? `+${selectedSummary.diff}` : selectedSummary.diff}
+                            </p>
+                            {selectedSummary.diff !== 0 && (
+                                <span className={`text-[10px] font-black uppercase mt-2 ${selectedSummary.diff < 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                                    {selectedSummary.diff < 0 ? 'Falta no Físico' : 'Sobra no Físico'}
+                                </span>
+                            )}
+                        </div>
+                        <div className="bg-white p-6 rounded-[2rem] border-2 border-slate-100 flex flex-col justify-between">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Peso Estimado</p>
+                            <p className="text-4xl font-black text-slate-800">{selectedSummary.totalWeight.toFixed(0)} <span className="text-sm opacity-50 uppercase">kg</span></p>
+                        </div>
+                    </div>
+
+                    {/* Botões de Ação Rapida */}
+                    <div className="flex flex-wrap gap-4 bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
+                        <button 
+                            onClick={() => {
+                                setMovingItem({ model: selectedSummary.model, size: selectedSummary.size, type: 'add_virtual' });
+                                setMovementQty(0);
+                            }}
+                            className="flex-1 flex items-center justify-center gap-2 py-4 px-6 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl text-xs font-black uppercase transition-all border border-indigo-100"
+                        >
+                            <PlusIcon className="h-5 w-5" /> Adicionar
+                        </button>
+                        <button 
+                            onClick={() => {
+                                setMovingItem({ model: selectedSummary.model, size: selectedSummary.size, type: 'virtual_audit' });
+                                setMovementQty(selectedSummary.virtualQty);
+                            }}
+                            className="flex-1 flex items-center justify-center gap-2 py-4 px-6 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl text-xs font-black uppercase transition-all"
+                        >
+                            <CalculatorIcon className="h-5 w-5" /> Ajustar Virtual
+                        </button>
+                        <button 
+                            onClick={() => {
+                                setMovingItem({ model: selectedSummary.model, size: selectedSummary.size, type: 'audit' });
+                                setMovementQty(selectedSummary.physicalQty);
+                            }}
+                            className="flex-1 flex items-center justify-center gap-2 py-4 px-6 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl text-xs font-black uppercase transition-all"
+                        >
+                            <CalculatorIcon className="h-5 w-5" /> Ajustar Físico
+                        </button>
+                        <button 
+                            onClick={() => setMovingItem({ model: selectedSummary.model, size: selectedSummary.size, type: 'transfer' })}
+                            className="flex-1 flex items-center justify-center gap-2 py-4 px-6 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl text-xs font-black uppercase shadow-lg shadow-indigo-100 transition-all active:scale-95"
+                        >
+                            <SwitchHorizontalIcon className="h-5 w-5" /> Transferir P/ Físico
+                        </button>
+                    </div>
+
+                    {/* Histórico na Tela */}
+                    <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
+                        <div className="p-6 sm:p-8 border-b border-slate-100 flex items-center gap-3">
+                            <div className="p-3 bg-slate-100 rounded-xl text-slate-500">
+                                <ClockIcon className="h-6 w-6" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-black tracking-tight text-slate-800">Histórico de Movimentações</h3>
+                                <p className="text-slate-500 text-xs font-bold mt-1">Registros de transferências e ajustes para {selectedSummary.model} - {selectedSummary.size}m</p>
+                            </div>
+                        </div>
+                        
+                        <div className="p-6 sm:p-8">
+                            {selectedSummary.movements.length > 0 ? (
+                                <div className="space-y-4">
+                                    {selectedSummary.movements.map((m, idx) => (
+                                        <div key={idx} className="flex flex-col sm:flex-row sm:items-center gap-4 p-5 rounded-2xl bg-slate-50 border border-slate-100 hover:bg-slate-100/50 transition-colors">
+                                            <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center shadow-sm">
+                                                {m.type === 'transfer' ? <SwitchHorizontalIcon className="h-6 w-6 text-indigo-600" /> : <CalculatorIcon className="h-6 w-6 text-emerald-500" />}
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
+                                                    <div>
+                                                        <p className="font-black text-slate-800 uppercase text-xs">
+                                                            {m.type === 'transfer' ? 'Virtual → Físico' : m.type === 'addition' ? 'Adição de Estoque' : m.from === 'system' ? 'Ajuste de Saldo Virtual' : 'Ajuste de Saldo Físico'}
+                                                        </p>
+                                                        <p className="text-sm font-bold text-slate-700 mt-1">
+                                                            Quantidade: <span className={m.type === 'transfer' ? 'text-indigo-600' : 'text-emerald-600'}>{m.quantity}</span>
+                                                        </p>
+                                                    </div>
+                                                    <div className="text-left sm:text-right">
+                                                        <span className="text-xs font-bold text-slate-400 bg-white px-3 py-1 rounded-lg border border-slate-200 block w-fit sm:ml-auto">
+                                                            {new Date(m.date).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                                                        </span>
+                                                        <p className="text-[10px] font-black text-slate-400 uppercase mt-2 tracking-widest">
+                                                            Operador: <span className="text-slate-600">{m.operator}</span>
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                {m.observations && (
+                                                    <p className="text-sm text-slate-600 mt-3 p-3 bg-white rounded-xl border border-slate-100 font-medium">
+                                                        "{m.observations}"
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center py-16 px-4 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                                    <ArchiveIcon className="h-16 w-16 text-slate-300 mx-auto mb-4" />
+                                    <h4 className="text-lg font-black text-slate-700 mb-2">Nenhuma movimentação registrada</h4>
+                                    <p className="text-slate-500 font-medium max-w-md mx-auto text-sm">Este modelo ainda não possui histórico de transferências ou ajustes de estoque.</p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
-
-                <div className="w-48">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Família / Modelo</label>
-                    <select 
-                        value={selectedBaseModel}
-                        onChange={(e) => setSelectedBaseModel(e.target.value)}
-                        className="w-full p-3 bg-slate-50 border-none rounded-2xl font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
-                    >
-                        <option value="all">Todos</option>
-                        <option value="H-6">Série H-6</option>
-                        <option value="H-8">Série H-8</option>
-                        <option value="H-10">Série H-10</option>
-                        <option value="H-12">Série H-12</option>
-                        <option value="H-16">Série H-16</option>
-                        <option value="H-25">Série H-25</option>
-                    </select>
-                </div>
-
-                <div className="flex items-center gap-3 pt-6">
-                    <button 
-                        type="button"
-                        onClick={() => setOnlyWithDiff(!onlyWithDiff)}
-                        className={`px-6 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all ${onlyWithDiff ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
-                    >
-                        {onlyWithDiff ? 'Exibindo: Divergências' : 'Ver Divergências'}
-                    </button>
-                    <button 
-                        type="button"
-                        onClick={() => setOnlyAvailable(!onlyAvailable)}
-                        className={`px-6 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all ${onlyAvailable ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
-                    >
-                        {onlyAvailable ? 'Exibindo: Com Estoque' : 'Apenas Com Estoque'}
-                    </button>
-                    {(searchTerm || selectedBaseModel !== 'all' || onlyWithDiff || onlyAvailable) && (
-                        <button 
-                            type="button"
-                            onClick={() => { 
-                                setSearchTerm(''); 
-                                setSelectedBaseModel('all'); 
-                                setOnlyWithDiff(false); 
-                                setOnlyAvailable(false);
-                            }}
-                            className="text-indigo-600 font-black text-[10px] uppercase hover:underline ml-2"
-                        >
-                            Limpar
-                        </button>
-                    )}
-                </div>
-                <div className="ml-auto pt-6 text-right">
-                    <span className="text-[10px] font-black text-slate-300 uppercase block">Exibindo</span>
-                    <span className="text-sm font-black text-slate-700">{stockSummarized.length} modelos</span>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div className="bg-slate-800 p-6 rounded-[2rem] text-white">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Virtual</p>
-                    <p className="text-3xl font-black">{stockSummarized.reduce((acc, s) => acc + s.virtualQty, 0)} <span className="text-sm opacity-50 uppercase">pçs</span></p>
-                </div>
-                <div className="bg-indigo-600 p-6 rounded-[2rem] text-white shadow-xl shadow-indigo-100">
-                    <p className="text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1">Total Físico</p>
-                    <p className="text-3xl font-black">{stockSummarized.reduce((acc, s) => acc + s.physicalQty, 0)} <span className="text-sm opacity-50 uppercase">pçs</span></p>
-                </div>
-                <div className="bg-white p-6 rounded-[2rem] border-2 border-slate-100">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Diferença Geral</p>
-                    <p className={`text-3xl font-black ${stockSummarized.reduce((acc, s) => acc + (s.physicalQty - s.virtualQty), 0) < 0 ? 'text-red-500' : 'text-emerald-500'}`}>
-                        {stockSummarized.reduce((acc, s) => acc + (s.physicalQty - s.virtualQty), 0)}
-                    </p>
-                </div>
-                <div className="bg-white p-6 rounded-[2rem] border-2 border-slate-100">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Peso Estimado</p>
-                    <p className="text-3xl font-black text-slate-800">{stockSummarized.reduce((acc, s) => acc + s.totalWeight, 0).toFixed(0)} <span className="text-sm opacity-50 uppercase">kg</span></p>
-                </div>
-            </div>
-
-            <div className="bg-white rounded-[2.5rem] shadow-2xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left border-collapse">
-                        <thead>
-                            <tr className="bg-slate-50 border-b border-slate-100 uppercase text-[10px] tracking-widest font-black text-slate-400">
-                                <th className="px-8 py-5">Modelo / Especificação</th>
-                                <th className="px-6 py-5 text-center">Tamanho</th>
-                                <th className="px-6 py-5 text-center bg-slate-100/30">Estoque Virtual</th>
-                                <th className="px-6 py-5 text-center bg-indigo-50/20 border-x border-indigo-50">Estoque Físico</th>
-                                <th className="px-6 py-5 text-center">Saldo (Dif.)</th>
-                                <th className="px-8 py-5 text-right">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50 text-slate-700">
-                            {stockSummarized.map((s, idx) => {
-                                const diff = s.physicalQty - s.virtualQty;
-                                return (
-                                    <tr key={idx} className="group hover:bg-slate-50/50 transition-all">
-                                        <td className="px-8 py-6">
-                                            <div className="flex flex-col">
-                                                <span className="font-black text-xl text-slate-800 tracking-tighter uppercase">{s.model}</span>
-                                                <span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest">Produto Acabado</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-6 text-center">
-                                            <span className="px-3 py-1 bg-white border border-slate-200 rounded-lg font-black text-slate-600">{s.size}m</span>
-                                        </td>
-                                        
-                                        {/* Coluna Virtual Editável */}
-                                        <td className="px-6 py-6 text-center bg-slate-50/30">
-                                            <div className="flex flex-col items-center gap-1 group/vqty">
-                                                <div className="flex items-center gap-2">
-                                                    <button 
-                                                        onClick={() => {
-                                                            setMovingItem({ model: s.model, size: s.size, type: 'virtual_audit' });
-                                                            setMovementQty(Math.max(0, s.virtualQty - 1));
-                                                        }}
-                                                        className="p-1 text-slate-300 hover:text-slate-600 transition-colors opacity-0 group-hover/vqty:opacity-100"
-                                                    >
-                                                        <MinusIcon className="h-4 w-4" />
-                                                    </button>
-                                                    
-                                                    <span 
-                                                        onClick={() => {
-                                                            setMovingItem({ model: s.model, size: s.size, type: 'virtual_audit' });
-                                                            setMovementQty(s.virtualQty);
-                                                        }}
-                                                        className="text-2xl font-black text-slate-400 cursor-pointer hover:text-slate-900 transition-colors"
-                                                    >
-                                                        {s.virtualQty}
-                                                    </span>
-
-                                                    <button 
-                                                        onClick={() => {
-                                                            setMovingItem({ model: s.model, size: s.size, type: 'virtual_audit' });
-                                                            setMovementQty(s.virtualQty + 1);
-                                                        }}
-                                                        className="p-1 text-slate-300 hover:text-slate-600 transition-colors opacity-0 group-hover/vqty:opacity-100"
-                                                    >
-                                                        <PlusIcon className="h-4 w-4" />
-                                                    </button>
-                                                </div>
-                                                <span className="text-[8px] font-black text-slate-300 uppercase opacity-0 group-hover/vqty:opacity-100 transition-all">Editar Virtual</span>
-                                            </div>
-                                        </td>
-
-                                        {/* Coluna Física Editável */}
-                                        <td className="px-6 py-6 text-center bg-indigo-50/10 border-x border-indigo-50">
-                                            <div className="flex flex-col items-center gap-1 group/pqty">
-                                                <div className="flex items-center gap-2">
-                                                    <button 
-                                                        onClick={() => {
-                                                            setMovingItem({ model: s.model, size: s.size, type: 'audit' });
-                                                            setMovementQty(Math.max(0, s.physicalQty - 1));
-                                                        }}
-                                                        className="p-1 text-indigo-300 hover:text-indigo-600 transition-colors opacity-0 group-hover/pqty:opacity-100"
-                                                    >
-                                                        <MinusIcon className="h-4 w-4" />
-                                                    </button>
-                                                    
-                                                    <span 
-                                                        onClick={() => {
-                                                            setMovingItem({ model: s.model, size: s.size, type: 'audit' });
-                                                            setMovementQty(s.physicalQty);
-                                                        }}
-                                                        className="text-3xl font-black text-indigo-700 cursor-pointer hover:scale-110 transition-transform"
-                                                    >
-                                                        {s.physicalQty}
-                                                    </span>
-
-                                                    <button 
-                                                        onClick={() => {
-                                                            setMovingItem({ model: s.model, size: s.size, type: 'audit' });
-                                                            setMovementQty(s.physicalQty + 1);
-                                                        }}
-                                                        className="p-1 text-indigo-300 hover:text-indigo-600 transition-colors opacity-0 group-hover/pqty:opacity-100"
-                                                    >
-                                                        <PlusIcon className="h-4 w-4" />
-                                                    </button>
-                                                </div>
-                                                <span className="text-[8px] font-black text-indigo-300 uppercase opacity-0 group-hover/pqty:opacity-100 transition-all">Editar Físico</span>
-                                            </div>
-                                        </td>
-
-                                        <td className="px-6 py-6 text-center">
-                                            <div className="flex flex-col items-center">
-                                                <span className={`text-xl font-black ${diff < 0 ? 'text-red-500' : diff > 0 ? 'text-emerald-500' : 'text-slate-300'}`}>
-                                                    {diff > 0 ? `+${diff}` : diff}
-                                                </span>
-                                                {diff !== 0 && (
-                                                    <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${diff < 0 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                                                        {diff < 0 ? 'Falta Físico' : 'Sobra Físico'}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        
-                                        <td className="px-8 py-6 text-right">
-                                            <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                                                <button 
-                                                    onClick={() => setMovingItem({ model: s.model, size: s.size, type: 'transfer' })}
-                                                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all active:scale-95"
-                                                >
-                                                    <SwitchHorizontalIcon className="h-4 w-4" /> Transferir
-                                                </button>
-                                                {s.lastItemIds.length > 0 && (
-                                                    <button 
-                                                        onClick={() => {
-                                                            const item = finishedGoods.find(i => i.id === s.lastItemIds[0]);
-                                                            if (item) setHistoryItem(item);
-                                                        }}
-                                                        className="p-3 text-slate-400 hover:text-slate-900 border border-slate-100 rounded-xl transition-all"
-                                                        title="Histórico"
-                                                    >
-                                                        <ClockIcon className="h-5 w-5" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            {historyItem && <HistoryModal item={historyItem} onClose={() => setHistoryItem(null)} />}
+            )}
         </div>
     );
 };
