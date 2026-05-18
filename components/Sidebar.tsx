@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import type { Page, User } from '../types';
+import type { Page, User, Employee } from '../types';
+import { fetchByColumn } from '../services/supabaseService';
 import {
     ChartBarIcon,
     CogIcon,
@@ -28,6 +29,23 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificationCount, isMobileMenuOpen, onLogout }) => {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [expandedMenus, setExpandedMenus] = useState<string[]>(['stock']); // Default open
+    const [assignedMachine, setAssignedMachine] = useState<string | null>(null);
+
+    const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor' || currentUser?.username === 'admin';
+
+    React.useEffect(() => {
+        if (!isGestor && currentUser?.employeeId) {
+            fetchByColumn<Employee>('employees', 'id', currentUser.employeeId)
+                .then(emps => {
+                    if (emps && emps.length > 0 && emps[0].assignedMachine) {
+                        setAssignedMachine(emps[0].assignedMachine);
+                    }
+                })
+                .catch(err => console.error("Error fetching employee assigned machine in Sidebar:", err));
+        } else {
+            setAssignedMachine(null);
+        }
+    }, [currentUser, isGestor]);
 
     const toggleMenu = (menu: string) => {
         setExpandedMenus(prev => prev.includes(menu) ? prev.filter(m => m !== menu) : [...prev, menu]);
@@ -57,7 +75,6 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
         return !!currentUser.permissions?.[targetPage];
     };
 
-    const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor' || currentUser?.username === 'admin';
     const u = currentUser?.username?.toLowerCase();
 
     const MenuItem = ({ target, label, icon: Icon, highlight = false }: { target: Page, label: string, icon: any, highlight?: boolean }) => {
@@ -142,8 +159,12 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                                                 ⚙️ Em Produção (Geral)
                                             </button>
                                             <div className="flex gap-1 px-3 mb-2">
-                                                <button onClick={() => { localStorage.setItem('msm_active_machine', 'Trefila 1'); setPage('trefilaInProgress'); }} className="text-[9px] font-black bg-white/5 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 px-2 py-1 rounded border border-white/5 uppercase transition-all flex-1">Máquina 1</button>
-                                                <button onClick={() => { localStorage.setItem('msm_active_machine', 'Trefila 2'); setPage('trefilaInProgress'); }} className="text-[9px] font-black bg-white/5 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 px-2 py-1 rounded border border-white/5 uppercase transition-all flex-1">Máquina 2</button>
+                                                {(!assignedMachine || assignedMachine === 'Trefila 1') && (
+                                                    <button onClick={() => { localStorage.setItem('msm_active_machine', 'Trefila 1'); setPage('trefilaInProgress'); }} className="text-[9px] font-black bg-white/5 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 px-2 py-1 rounded border border-white/5 uppercase transition-all flex-1">Máquina 1</button>
+                                                )}
+                                                {(!assignedMachine || assignedMachine === 'Trefila 2') && (
+                                                    <button onClick={() => { localStorage.setItem('msm_active_machine', 'Trefila 2'); setPage('trefilaInProgress'); }} className="text-[9px] font-black bg-white/5 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 px-2 py-1 rounded border border-white/5 uppercase transition-all flex-1">Máquina 2</button>
+                                                )}
                                             </div>
                                         </>
                                     )}
@@ -207,8 +228,12 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                                                 ⚙️ Em Produção (Geral)
                                             </button>
                                             <div className="flex gap-1 px-3 mb-2">
-                                                <button onClick={() => { localStorage.setItem('msm_active_machine', 'Treliça 1'); setPage('trelicaInProgress'); }} className="text-[9px] font-black bg-white/5 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 px-2 py-1 rounded border border-white/5 uppercase transition-all flex-1">Máquina 1</button>
-                                                <button onClick={() => { localStorage.setItem('msm_active_machine', 'Treliça 2'); setPage('trelicaInProgress'); }} className="text-[9px] font-black bg-white/5 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 px-2 py-1 rounded border border-white/5 uppercase transition-all flex-1">Máquina 2</button>
+                                                {(!assignedMachine || assignedMachine === 'Treliça 1') && (
+                                                    <button onClick={() => { localStorage.setItem('msm_active_machine', 'Treliça 1'); setPage('trelicaInProgress'); }} className="text-[9px] font-black bg-white/5 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 px-2 py-1 rounded border border-white/5 uppercase transition-all flex-1">Máquina 1</button>
+                                                )}
+                                                {(!assignedMachine || assignedMachine === 'Treliça 2') && (
+                                                    <button onClick={() => { localStorage.setItem('msm_active_machine', 'Treliça 2'); setPage('trelicaInProgress'); }} className="text-[9px] font-black bg-white/5 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 px-2 py-1 rounded border border-white/5 uppercase transition-all flex-1">Máquina 2</button>
+                                                )}
                                             </div>
                                         </>
                                     )}

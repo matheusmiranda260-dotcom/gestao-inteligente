@@ -1,11 +1,11 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import type { Page, MachineType, StockItem, ProductionOrderData, User, PartsRequest, ShiftReport, TrelicaSelectedLots, Ponta, StockGauge } from '../types';
+import type { Page, MachineType, StockItem, ProductionOrderData, User, PartsRequest, ShiftReport, TrelicaSelectedLots, Ponta, StockGauge, Employee } from '../types';
 import { DOWNTIME_THRESHOLDS } from '../types';
 import { ArrowLeftIcon, PlayIcon, PauseIcon, ClockIcon, WarningIcon, StopIcon, CheckCircleIcon, WrenchScrewdriverIcon, ArchiveIcon, ClipboardListIcon, CogIcon, DocumentReportIcon, ScaleIcon, TrashIcon, CalculatorIcon, ChartBarIcon, ExclamationIcon, SaveIcon, XCircleIcon, ChevronDownIcon, AdjustmentsIcon, ChevronRightIcon } from './icons';
 import PartsRequestModal from './PartsRequestModal';
 import ShiftReportsModal from './ShiftReportsModal';
 import ProductionOrderReport from './ProductionOrderReport';
-import { insertItem, deleteItem, updateItem, fetchTable } from '../services/supabaseService';
+import { insertItem, deleteItem, updateItem, fetchTable, fetchByColumn } from '../services/supabaseService';
 import { trelicaModels } from './ProductionOrderTrelica';
 import TrefilaCalculation from './TrefilaCalculation';
 
@@ -810,6 +810,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
     cancelProductionOrder, pauseProductionOrder, addLotToOrder, initialView, initialModal, gauges = [],
     downtimeConfigs = []
 }) => {
+    const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor' || currentUser?.username === 'admin';
     const [activeMachine, setActiveMachine] = useState<MachineType>(() => {
         const saved = localStorage.getItem('msm_active_machine');
         const safeMachineType = machineType || 'Trefila';
@@ -841,6 +842,27 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
         setActiveMachine(safeType === 'Trefila' ? 'Trefila 1' : safeType === 'Treliça' ? 'Treliça 1' : (safeType as MachineType || 'Trefila 1'));
     }, [machineType, currentUser?.username]);
+
+    useEffect(() => {
+        if (!isGestor && currentUser?.employeeId) {
+            fetchByColumn<Employee>('employees', 'id', currentUser.employeeId)
+                .then(emps => {
+                    if (emps && emps.length > 0 && emps[0].assignedMachine) {
+                        const machine = emps[0].assignedMachine as MachineType;
+                        const safeType = machineType || '';
+                        if (
+                            (safeType && machine.startsWith(safeType)) ||
+                            (safeType === 'Trefila' && machine.startsWith('Trefila')) ||
+                            (safeType === 'Treliça' && machine.startsWith('Treliça'))
+                        ) {
+                            setActiveMachine(machine);
+                            localStorage.setItem('msm_active_machine', machine);
+                        }
+                    }
+                })
+                .catch(err => console.error("Error fetching employee assigned machine in MachineControl:", err));
+        }
+    }, [currentUser, machineType, isGestor]);
     const [pendingWeights, setPendingWeights] = useState<Map<string, string>>(new Map());
     const [pendingGauges, setPendingGauges] = useState<Map<string, string>>(new Map()); // Novo estado para bitolas
     const [pendingPackageWeights, setPendingPackageWeights] = useState<Map<number, string>>(new Map());
@@ -1095,7 +1117,6 @@ const MachineControl: React.FC<MachineControlProps> = ({
         return !!currentUser.permissions?.[targetPage];
     };
 
-    const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor' || currentUser?.username === 'admin';
     const machinePrefix = (activeMachine && typeof activeMachine === 'string' && activeMachine.startsWith('Trefila')) ? 'trefila' : 'trelica';
 
     const [productionReportData, setProductionReportData] = useState<ProductionOrderData | null>(null);
