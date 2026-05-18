@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Page, StockItem, ProductionOrderData, Bitola, StockGauge, User, MachineType } from '../types';
+import type { Page, StockItem, ProductionOrderData, Bitola, StockGauge, User, MachineType, Employee } from '../types';
+import { fetchByColumn } from '../services/supabaseService';
 import { TrefilaBitolaOptions, FioMaquinaBitolaOptions } from '../types';
 import { ArrowLeftIcon, WarningIcon, ClipboardListIcon, PencilIcon, TrashIcon, AdjustmentsIcon } from './icons';
 import ProductionOrderHistoryModal from './ProductionOrderHistoryModal';
@@ -23,6 +24,23 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
     const [selectedMachine, setSelectedMachine] = useState<MachineType>('Trefila 1');
     const [isGhostOrder, setIsGhostOrder] = useState(false);
     const [ghostTargetWeight, setGhostTargetWeight] = useState('');
+    const [assignedMachine, setAssignedMachine] = useState<MachineType | null>(null);
+
+    useEffect(() => {
+        if (!isGestor && currentUser?.employeeId) {
+            fetchByColumn<Employee>('employees', 'id', currentUser.employeeId)
+                .then(emps => {
+                    if (emps && emps.length > 0 && emps[0].assignedMachine) {
+                        const machine = emps[0].assignedMachine as MachineType;
+                        setAssignedMachine(machine);
+                        if (machine === 'Trefila 1' || machine === 'Trefila 2') {
+                            setSelectedMachine(machine);
+                        }
+                    }
+                })
+                .catch(err => console.error("Error fetching employee assigned machine:", err));
+        }
+    }, [currentUser, isGestor]);
 
     const initialTargetBitola = useMemo(() => {
         const trefilaGauges = gauges.filter(g => g.materialType === 'CA-60').map(g => g.gauge);
@@ -192,10 +210,17 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
                                         id="machine"
                                         value={selectedMachine}
                                         onChange={(e) => setSelectedMachine(e.target.value as MachineType)}
-                                        className="mt-1 p-2 w-full border border-slate-300 rounded-md bg-white font-bold text-indigo-600"
+                                        disabled={!!assignedMachine && !isGestor}
+                                        className={`mt-1 p-2 w-full border border-slate-300 rounded-md font-bold ${assignedMachine && !isGestor ? 'bg-slate-100 text-slate-500' : 'bg-white text-indigo-600'}`}
                                     >
-                                        <option value="Trefila 1">Trefila 1</option>
-                                        <option value="Trefila 2">Trefila 2</option>
+                                        {assignedMachine && !isGestor ? (
+                                            <option value={assignedMachine}>{assignedMachine}</option>
+                                        ) : (
+                                            <>
+                                                <option value="Trefila 1">Trefila 1</option>
+                                                <option value="Trefila 2">Trefila 2</option>
+                                            </>
+                                        )}
                                     </select>
                                 </div>
                                 <div>

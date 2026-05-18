@@ -64,6 +64,7 @@ export interface Employee {
     email?: string;
     managerId?: string;
     orgPositionId?: string;
+    assignedMachine?: string;
 }
 
 export interface StockItem {

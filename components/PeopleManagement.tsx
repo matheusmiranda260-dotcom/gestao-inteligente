@@ -736,6 +736,21 @@ const EmployeeDetailModal: React.FC<{
                                             <label className="block text-xs font-semibold text-slate-500 uppercase">Setor (Exibição)</label>
                                             <input type="text" disabled={readOnly} className="w-full mt-1 p-2 border rounded-lg disabled:bg-slate-100" value={empData.sector} onChange={e => setEmpData({ ...empData, sector: e.target.value })} />
                                         </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-500 uppercase">Máquina Atribuída (Para Ordem de Produção)</label>
+                                            <select
+                                                disabled={readOnly}
+                                                className="w-full mt-1 p-2 border rounded-lg disabled:bg-slate-100"
+                                                value={empData.assignedMachine || ''}
+                                                onChange={e => setEmpData({ ...empData, assignedMachine: e.target.value })}
+                                            >
+                                                <option value="">Sem máquina específica (Todas permitidas)</option>
+                                                <option value="Trefila 1">Trefila 1</option>
+                                                <option value="Trefila 2">Trefila 2</option>
+                                                <option value="Treliça 1">Treliça 1</option>
+                                                <option value="Treliça 2">Treliça 2</option>
+                                            </select>
+                                        </div>
                                     </div>
                                     {!readOnly && <div className="pt-4 flex justify-end"><button type="submit" className="bg-[#0F3F5C] text-white font-bold py-2 px-6 rounded-lg hover:bg-[#0A2A3D] transition">Salvar Alterações</button></div>}
                                 </div>

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Page, StockItem, ProductionOrderData, Bitola, StockGauge, User, MachineType } from '../types';
+import type { Page, StockItem, ProductionOrderData, Bitola, StockGauge, User, MachineType, Employee } from '../types';
+import { fetchByColumn } from '../services/supabaseService';
 import { ArrowLeftIcon, WarningIcon, ClipboardListIcon, DocumentReportIcon, CheckCircleIcon, AdjustmentsIcon } from './icons';
 import ProductionOrderHistoryModal from './ProductionOrderHistoryModal';
 import ProductionOrderReport from './ProductionOrderReport';
@@ -203,6 +204,24 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
     const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor';
     const [orderNumber, setOrderNumber] = useState('');
     const [selectedMachine, setSelectedMachine] = useState<MachineType>('Treliça 1');
+    const [assignedMachine, setAssignedMachine] = useState<MachineType | null>(null);
+
+    useEffect(() => {
+        if (!isGestor && currentUser?.employeeId) {
+            fetchByColumn<Employee>('employees', 'id', currentUser.employeeId)
+                .then(emps => {
+                    if (emps && emps.length > 0 && emps[0].assignedMachine) {
+                        const machine = emps[0].assignedMachine as MachineType;
+                        setAssignedMachine(machine);
+                        if (machine === 'Treliça 1' || machine === 'Treliça 2') {
+                            setSelectedMachine(machine);
+                        }
+                    }
+                })
+                .catch(err => console.error("Error fetching employee assigned machine:", err));
+        }
+    }, [currentUser, isGestor]);
+
     const [selectedModel, setSelectedModel] = useState<TrelicaModel | null>(null);
     const [quantity, setQuantity] = useState(1);
     const [machineSpeed, setMachineSpeed] = useState(() => {
@@ -621,10 +640,17 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
                                         id="machine"
                                         value={selectedMachine}
                                         onChange={(e) => setSelectedMachine(e.target.value as MachineType)}
-                                        className="w-full text-lg font-bold p-4 bg-slate-50/50 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-indigo-600"
+                                        disabled={!!assignedMachine && !isGestor}
+                                        className={`w-full text-lg font-bold p-4 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 ${assignedMachine && !isGestor ? 'bg-slate-100 text-slate-500' : 'bg-slate-50/50 text-indigo-600'}`}
                                     >
-                                        <option value="Treliça 1">Treliça 1</option>
-                                        <option value="Treliça 2">Treliça 2</option>
+                                        {assignedMachine && !isGestor ? (
+                                            <option value={assignedMachine}>{assignedMachine}</option>
+                                        ) : (
+                                            <>
+                                                <option value="Treliça 1">Treliça 1</option>
+                                                <option value="Treliça 2">Treliça 2</option>
+                                            </>
+                                        )}
                                     </select>
                                 </div>
                                 <div className="lg:col-span-2">
