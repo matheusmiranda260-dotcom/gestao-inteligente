@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { Page, FinishedProductItem, User, FinishedGoodsTransferRecord, StockMovement, ProductionOrderData, StockItem } from '../types';
-import { ArchiveIcon, SwitchHorizontalIcon, ClockIcon, CalculatorIcon, PlusIcon, PlayIcon, PauseIcon, CheckCircleIcon } from './icons';
+import { ArchiveIcon, SwitchHorizontalIcon, ClockIcon, CalculatorIcon, PlusIcon, PlayIcon, PauseIcon, CheckCircleIcon, ArrowLeftIcon } from './icons';
 import { trelicaModels } from './ProductionOrderTrelica';
 
 interface TrelicaStockManagerProps {
@@ -25,7 +25,7 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
     stock = []
 }) => {
     const [activeTab, setActiveTab] = useState<'floor' | 'production' | 'ca60' | 'history'>('floor');
-    const [movingItem, setMovingItem] = useState<{ model: string; size: string; type: 'transfer' | 'audit' | 'virtual_audit' | 'add_virtual' } | null>(null);
+    const [movingItem, setMovingItem] = useState<{ model: string; size: string; type: 'transfer' | 'audit' | 'virtual_audit' | 'add_virtual' | 'dispatch' } | null>(null);
     const [movementQty, setMovementQty] = useState(0);
     const [obs, setObs] = useState('');
 
@@ -33,19 +33,22 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
     const overallStats = useMemo(() => {
         let totalVirtual = 0;
         let totalPhysical = 0;
+        let totalPending = 0;
         let totalWeight = 0;
         
         finishedGoods.filter(i => i.productType === 'Treliça').forEach(item => {
             totalVirtual += item.quantity;
             totalPhysical += (item.physicalQuantity || 0);
+            totalPending += (item.pendingTransferQuantity || 0);
             totalWeight += item.totalWeight;
         });
 
         return {
             totalVirtual,
             totalPhysical,
+            totalPending,
             totalWeight,
-            totalDiff: totalPhysical - totalVirtual
+            totalDiff: totalPhysical - totalVirtual - totalPending
         };
     }, [finishedGoods]);
 
@@ -54,6 +57,7 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
         return trelicaModels.map(m => {
             let virtualQty = 0;
             let physicalQty = 0;
+            let pendingTransferQty = 0;
             let totalWeight = 0;
             let id = '';
             
@@ -68,6 +72,7 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
                 relevantItems.forEach(item => {
                     virtualQty += item.quantity;
                     physicalQty += (item.physicalQuantity || 0);
+                    pendingTransferQty += (item.pendingTransferQuantity || 0);
                     totalWeight += item.totalWeight;
                 });
             }
@@ -78,8 +83,9 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
                 size: m.tamanho,
                 virtualQty,
                 physicalQty,
+                pendingTransferQty,
                 totalWeight,
-                diff: physicalQty - virtualQty,
+                diff: physicalQty - virtualQty - pendingTransferQty,
                 theoreticalWeightPerPiece: parseFloat(m.pesoFinal.replace(',', '.'))
             };
         });
@@ -162,12 +168,12 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
         const movement: StockMovement = {
             id: Math.random().toString(36).substring(2, 11),
             date: new Date().toISOString(),
-            type: movingItem.type === 'transfer' ? 'transfer' : movingItem.type === 'add_virtual' ? 'addition' : 'adjustment',
+            type: movingItem.type === 'transfer' ? 'transfer' : movingItem.type === 'add_virtual' ? 'addition' : movingItem.type === 'dispatch' ? 'out' : 'adjustment',
             from: movingItem.type === 'transfer' ? 'virtual' : movingItem.type === 'add_virtual' ? 'production' : movingItem.type === 'virtual_audit' ? 'system' : 'physical',
             to: movingItem.type === 'transfer' ? 'physical' : (movingItem.type === 'virtual_audit' || movingItem.type === 'add_virtual') ? 'virtual' : 'out',
             quantity: movementQty,
             operator: currentUser?.username || 'Sistema',
-            observations: obs || (movingItem.type === 'audit' ? 'Ajuste de estoque físico' : movingItem.type === 'add_virtual' ? 'Entrada de estoque' : movingItem.type === 'virtual_audit' ? 'Ajuste de estoque virtual' : 'Transferência para o pátio')
+            observations: obs || (movingItem.type === 'audit' ? 'Ajuste de estoque físico' : movingItem.type === 'add_virtual' ? 'Entrada de estoque' : movingItem.type === 'virtual_audit' ? 'Ajuste de estoque virtual' : movingItem.type === 'dispatch' ? 'Despacho físico de treliça' : 'Transferência para o pátio')
         };
 
         const updates: Partial<FinishedProductItem> = {};
@@ -178,6 +184,9 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
             updates.quantity = movementQty;
         } else if (movingItem.type === 'add_virtual') {
             updates.quantity = (currentItem.quantity || 0) + movementQty;
+        } else if (movingItem.type === 'dispatch') {
+            updates.physicalQuantity = Math.max(0, (currentItem.physicalQuantity || 0) - movementQty);
+            updates.pendingTransferQuantity = Math.max(0, (currentItem.pendingTransferQuantity || 0) - movementQty);
         } else {
             updates.physicalQuantity = movementQty;
         }
@@ -189,23 +198,33 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
         setObs('');
     };
 
+    const currentItemForModal = movingItem
+        ? finishedGoods.find(i => i.model === movingItem.model && i.size.trim() === movingItem.size.trim())
+        : null;
+
     return (
         <div className="p-4 sm:p-6 md:p-8 space-y-8 animate-fade-in">
             {/* Modal de Movimentação */}
             {movingItem && (
                 <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[70] flex items-center justify-center p-4">
                     <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden border border-white/20 animate-modal-in">
-                        <div className={`p-8 ${movingItem.type === 'transfer' ? 'bg-indigo-600' : movingItem.type === 'virtual_audit' ? 'bg-slate-700' : movingItem.type === 'add_virtual' ? 'bg-emerald-500' : 'bg-emerald-600'} text-white`}>
+                        <div className={`p-8 ${movingItem.type === 'transfer' ? 'bg-indigo-600' : movingItem.type === 'virtual_audit' ? 'bg-slate-700' : movingItem.type === 'add_virtual' ? 'bg-emerald-500' : movingItem.type === 'dispatch' ? 'bg-amber-600' : 'bg-emerald-600'} text-white`}>
                             <h3 className="text-2xl font-black flex items-center gap-3">
-                                {movingItem.type === 'transfer' ? <SwitchHorizontalIcon className="h-7 w-7" /> : movingItem.type === 'add_virtual' ? <PlusIcon className="h-7 w-7" /> : <CalculatorIcon className="h-7 w-7" />}
-                                {movingItem.type === 'transfer' ? 'Transferir para Físico' : movingItem.type === 'add_virtual' ? 'Adicionar Estoque' : movingItem.type === 'virtual_audit' ? 'Ajustar Saldo Virtual' : 'Ajustar Contagem Física'}
+                                {movingItem.type === 'transfer' ? <SwitchHorizontalIcon className="h-7 w-7" /> : movingItem.type === 'add_virtual' ? <PlusIcon className="h-7 w-7" /> : movingItem.type === 'dispatch' ? <ArrowLeftIcon className="h-7 w-7" /> : <CalculatorIcon className="h-7 w-7" />}
+                                {movingItem.type === 'transfer' ? 'Transferir para Físico' : movingItem.type === 'add_virtual' ? 'Adicionar Estoque' : movingItem.type === 'virtual_audit' ? 'Ajustar Saldo Virtual' : movingItem.type === 'dispatch' ? 'Despachar Físico (Baixa Pendente)' : 'Ajustar Contagem Física'}
                             </h3>
                             <p className="text-white/70 font-bold uppercase text-xs tracking-widest mt-2">{movingItem.model} - {movingItem.size}m</p>
                         </div>
                         <div className="p-8 space-y-6">
+                            {movingItem.type === 'dispatch' && currentItemForModal && (
+                                <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-xs font-semibold text-amber-800 flex justify-between">
+                                    <span>Pendente Retirada: <strong>{currentItemForModal.pendingTransferQuantity || 0} pçs</strong></span>
+                                    <span>Disponível no Físico: <strong>{currentItemForModal.physicalQuantity || 0} pçs</strong></span>
+                                </div>
+                            )}
                             <div>
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
-                                    {movingItem.type === 'transfer' ? 'Quantidade a Transferir' : movingItem.type === 'add_virtual' ? 'Quantidade a Adicionar' : movingItem.type === 'virtual_audit' ? 'Novo Saldo Virtual (Sistema)' : 'Nova Contagem Física Real (Galpão)'}
+                                    {movingItem.type === 'transfer' ? 'Quantidade a Transferir' : movingItem.type === 'add_virtual' ? 'Quantidade a Adicionar' : movingItem.type === 'virtual_audit' ? 'Novo Saldo Virtual (Sistema)' : movingItem.type === 'dispatch' ? 'Quantidade a Despachar Fisicamente' : 'Nova Contagem Física Real (Galpão)'}
                                 </label>
                                 <input 
                                     type="number" 
@@ -234,7 +253,7 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
                                 <button 
                                     onClick={handleAction} 
                                     disabled={!obs.trim()}
-                                    className={`flex-1 py-4 font-black text-white rounded-2xl shadow-lg transition-all uppercase text-xs disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none ${movingItem.type === 'transfer' ? 'bg-indigo-600' : movingItem.type === 'virtual_audit' ? 'bg-slate-700' : 'bg-emerald-600'}`}
+                                    className={`flex-1 py-4 font-black text-white rounded-2xl shadow-lg transition-all uppercase text-xs disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none ${movingItem.type === 'transfer' ? 'bg-indigo-600' : movingItem.type === 'virtual_audit' ? 'bg-slate-700' : movingItem.type === 'dispatch' ? 'bg-amber-600' : 'bg-emerald-600'}`}
                                 >
                                     Confirmar
                                 </button>
@@ -310,7 +329,7 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
             {activeTab === 'floor' && (
                 <div className="space-y-6">
                     {/* Cards Resumo Geral */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
                         <div className="bg-slate-800 p-6 rounded-[2rem] text-white flex flex-col justify-between shadow-sm">
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Estoque Virtual Total</p>
                             <p className="text-4xl font-black">{overallStats.totalVirtual} <span className="text-sm opacity-50 uppercase">pçs</span></p>
@@ -318,6 +337,10 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
                         <div className="bg-indigo-600 p-6 rounded-[2rem] text-white shadow-xl shadow-indigo-100 flex flex-col justify-between">
                             <p className="text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1">Estoque Físico Total</p>
                             <p className="text-4xl font-black">{overallStats.totalPhysical} <span className="text-sm opacity-50 uppercase">pçs</span></p>
+                        </div>
+                        <div className="bg-amber-600 p-6 rounded-[2rem] text-white flex flex-col justify-between shadow-sm">
+                            <p className="text-[10px] font-black text-amber-200 uppercase tracking-widest mb-1">Aguardando Retirada</p>
+                            <p className="text-4xl font-black">{overallStats.totalPending} <span className="text-sm opacity-50 uppercase">pçs</span></p>
                         </div>
                         <div className="bg-white p-6 rounded-[2rem] border-2 border-slate-100 flex flex-col justify-between shadow-sm">
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Diferença Geral</p>
@@ -345,6 +368,7 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
                                         <th scope="col" className="px-6 py-4 text-center">Virtual (Sistema)</th>
                                         <th scope="col" className="px-6 py-4 text-center">Físico (Galpão)</th>
                                         <th scope="col" className="px-6 py-4 text-center">Diferença</th>
+                                        <th scope="col" className="px-6 py-4 text-center">Aguardando Retirada</th>
                                         <th scope="col" className="px-6 py-4 text-right">Peso Est. (kg)</th>
                                         <th scope="col" className="px-6 py-4 text-center">Ações de Estoque</th>
                                     </tr>
@@ -367,6 +391,15 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
                                                 }`}>
                                                     {item.diff > 0 ? `+${item.diff}` : item.diff}
                                                 </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-center font-bold">
+                                                {item.pendingTransferQty > 0 ? (
+                                                    <span className="px-2.5 py-1 rounded-full text-xs bg-amber-50 text-amber-700 font-bold border border-amber-200">
+                                                        {item.pendingTransferQty} pçs
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-slate-300 font-medium">-</span>
+                                                )}
                                             </td>
                                             <td className="px-6 py-4 text-right font-semibold text-slate-600">{(item.totalWeight).toFixed(0)} kg</td>
                                             <td className="px-6 py-4">
@@ -401,6 +434,18 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
                                                     >
                                                         Físico
                                                     </button>
+                                                    {item.pendingTransferQty > 0 && (
+                                                        <button 
+                                                            onClick={() => {
+                                                                setMovingItem({ model: item.model, size: item.size, type: 'dispatch' });
+                                                                setMovementQty(0);
+                                                            }}
+                                                            className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[10px] font-black uppercase transition-all"
+                                                            title="Despachar fisicamente as peças transferidas"
+                                                        >
+                                                            Despachar
+                                                        </button>
+                                                    )}
                                                     <button 
                                                         onClick={() => {
                                                             setMovingItem({ model: item.model, size: item.size, type: 'transfer' });
@@ -626,8 +671,10 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
                                                 <SwitchHorizontalIcon className="h-6 w-6 text-indigo-600" />
                                             ) : m.movement.type === 'addition' ? (
                                                 <PlusIcon className="h-6 w-6 text-emerald-500" />
+                                            ) : m.movement.type === 'out' ? (
+                                                <ArrowLeftIcon className="h-6 w-6 text-amber-500" />
                                             ) : (
-                                                <CalculatorIcon className="h-6 w-6 text-amber-500" />
+                                                <CalculatorIcon className="h-6 w-6 text-slate-500" />
                                             )}
                                         </div>
                                         <div className="flex-1">
@@ -637,13 +684,15 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
                                                         Treliça {m.model} ({m.size}m) &mdash; {
                                                             m.movement.type === 'transfer' ? 'Virtual → Físico' : 
                                                             m.movement.type === 'addition' ? 'Adição de Estoque' : 
+                                                            m.movement.type === 'out' ? 'Despacho Físico (Retirada)' :
                                                             m.movement.from === 'system' ? 'Ajuste de Saldo Virtual' : 'Ajuste de Saldo Físico'
                                                         }
                                                     </p>
                                                     <p className="text-sm font-bold text-slate-700 mt-1">
                                                         Quantidade: <span className={
                                                             m.movement.type === 'transfer' ? 'text-indigo-600' : 
-                                                            m.movement.type === 'addition' ? 'text-emerald-600' : 'text-amber-600'
+                                                            m.movement.type === 'addition' ? 'text-emerald-600' : 
+                                                            m.movement.type === 'out' ? 'text-amber-600' : 'text-slate-600'
                                                         }>{m.movement.quantity} pçs</span>
                                                     </p>
                                                 </div>

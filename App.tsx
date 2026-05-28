@@ -850,12 +850,14 @@ const App: React.FC = () => {
                 });
 
                 const newQuantity = item.quantity - transferQty;
+                const newPending = (item.pendingTransferQuantity || 0) + transferQty;
                 if (newQuantity > 0) {
                     finishedGoodsUpdates.push({
                         id: item.id,
                         changes: {
                             quantity: newQuantity,
-                            totalWeight: item.totalWeight - transferredWeight
+                            totalWeight: item.totalWeight - transferredWeight,
+                            pendingTransferQuantity: newPending
                         }
                     });
                 } else {
@@ -864,7 +866,8 @@ const App: React.FC = () => {
                         changes: {
                             quantity: 0,
                             totalWeight: 0,
-                            status: 'Transferido'
+                            status: 'Transferido',
+                            pendingTransferQuantity: newPending
                         }
                     });
                 }
@@ -888,12 +891,14 @@ const App: React.FC = () => {
                 });
 
                 const newQuantity = item.quantity - transferQty;
+                const newPending = (item.pendingTransferQuantity || 0) + transferQty;
                 if (newQuantity > 0) {
                     pontasUpdates.push({
                         id: item.id,
                         changes: {
                             quantity: newQuantity,
-                            totalWeight: item.totalWeight - transferredWeight
+                            totalWeight: item.totalWeight - transferredWeight,
+                            pendingTransferQuantity: newPending
                         }
                     });
                 } else {
@@ -902,7 +907,8 @@ const App: React.FC = () => {
                         changes: {
                             quantity: 0,
                             totalWeight: 0,
-                            status: 'Transferido'
+                            status: 'Transferido',
+                            pendingTransferQuantity: newPending
                         }
                     });
                 }
@@ -1969,7 +1975,7 @@ const App: React.FC = () => {
                 if (finalData.pontas) {
                     const pontasItems: PontaItem[] = finalData.pontas.map(p => ({
                         id: generateId('ponta'), productionDate: now, productionOrderId: orderId, orderNumber: orderToComplete.orderNumber,
-                        productType: 'Ponta de Treliça', model: orderToComplete.trelicaModel!, size: `${p.size} `, quantity: p.quantity, physicalQuantity: 0, totalWeight: p.totalWeight, status: 'Disponível'
+                        productType: 'Ponta de Treliça', model: orderToComplete.trelicaModel!, size: `${p.size} `, quantity: p.quantity, physicalQuantity: 0, pendingTransferQuantity: 0, totalWeight: p.totalWeight, status: 'Disponível'
                     }));
 
                     for (const pi of pontasItems) await insertItem('pontas_stock', pi);
@@ -1981,7 +1987,7 @@ const App: React.FC = () => {
                     const fg: FinishedProductItem = {
                         id: generateId('fg'), productionDate: now, productionOrderId: orderId, orderNumber: orderToComplete.orderNumber,
                         productType: 'Treliça', model: orderToComplete.trelicaModel!, size: `${orderToComplete.tamanho!} `, quantity: finalData.actualProducedQuantity || 0,
-                        physicalQuantity: 0, totalWeight: weight, status: 'Disponível'
+                        physicalQuantity: 0, pendingTransferQuantity: 0, totalWeight: weight, status: 'Disponível'
                     };
 
                     await insertItem('finished_goods', fg);
@@ -2242,6 +2248,7 @@ const App: React.FC = () => {
             const dbUpdates: any = {};
             if (updates.quantity !== undefined) dbUpdates.quantity = updates.quantity;
             if (updates.physicalQuantity !== undefined) dbUpdates.physical_quantity = updates.physicalQuantity;
+            if (updates.pendingTransferQuantity !== undefined) dbUpdates.pending_transfer_quantity = updates.pendingTransferQuantity;
             if (updates.movementHistory !== undefined) dbUpdates.movement_history = updates.movementHistory;
             
             // Re-calcula peso se a quantidade virtual mudar
@@ -2266,6 +2273,7 @@ const App: React.FC = () => {
             ...itemData,
             id: generateId('fg'),
             physicalQuantity: 0,
+            pendingTransferQuantity: 0,
             status: 'Disponível',
             productionDate: new Date().toISOString()
         };

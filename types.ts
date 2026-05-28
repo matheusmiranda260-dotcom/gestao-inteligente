@@ -278,6 +278,7 @@ export interface FinishedProductItem {
     size: string;
     quantity: number;
     physicalQuantity: number;
+    pendingTransferQuantity?: number;
     totalWeight: number;
     status: 'Disponível' | 'Vendido' | 'Transferido';
     movementHistory?: StockMovement[];
@@ -301,6 +302,7 @@ export interface PontaItem {
     size: string;
     quantity: number;
     physicalQuantity: number;
+    pendingTransferQuantity?: number;
     totalWeight: number;
     status: 'Disponível' | 'Vendido' | 'Transferido';
     movementHistory?: StockMovement[];
