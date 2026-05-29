@@ -92,17 +92,30 @@ const getAvailablePeriods = (admissionDateStr: string | null | undefined): strin
         const parts = admissionDateStr.split('-');
         if (parts.length === 3) {
             const admYear = parseInt(parts[0]);
-            for (let y = admYear - 1; y <= currentYear + 1; y++) {
-                periods.push(`${y}-${y + 1}`);
+            for (let y = admYear; y <= currentYear + 1; y++) {
+                periods.push(y.toString());
             }
             return periods.reverse();
         }
     }
 
     for (let y = currentYear - 3; y <= currentYear + 1; y++) {
-        periods.push(`${y}-${y + 1}`);
+        periods.push(y.toString());
     }
     return periods.reverse();
+};
+
+const getPeriodDeadline = (admissionDateStr: string | null | undefined, periodYearStr: string): Date | null => {
+    if (!admissionDateStr || !periodYearStr) return null;
+    const parts = admissionDateStr.split('-');
+    if (parts.length !== 3) return null;
+    const admMonth = parseInt(parts[1]) - 1;
+    const admDay = parseInt(parts[2]);
+    const periodYear = parseInt(periodYearStr);
+    
+    const deadline = new Date(periodYear + 2, admMonth, admDay);
+    deadline.setDate(deadline.getDate() - 1);
+    return deadline;
 };
 
 const MobileFriendlyDateInput: React.FC<{
@@ -275,19 +288,15 @@ const DashboardRH: React.FC<{ employees: Employee[], absences: EmployeeAbsence[]
                 deadline.setDate(deadline.getDate() - 1); // Deadline is usually the day before the anniversary of the 2nd year
 
                 const startYear = periodStart.getFullYear();
-                const endYear = periodEnd.getFullYear();
-                const periodStr = `${startYear}-${endYear}`;
+                const periodStr = startYear.toString();
 
                 // Find all vacations for this employee that match this period
                 const empVacations = vacations.filter(v => {
                     if (v.employeeId !== emp.id) return false;
                     if (!v.period) return false;
                     
-                    const normPeriod = v.period.replace(/\s+/g, '').replace(/\//g, '-');
-                    const p1 = `${startYear}-${endYear}`;
-                    const p2 = `${startYear.toString().slice(-2)}-${endYear.toString().slice(-2)}`;
-                    
-                    return normPeriod.includes(p1) || normPeriod.includes(p2) || normPeriod.includes(startYear.toString());
+                    const normPeriod = v.period.trim();
+                    return normPeriod === periodStr || normPeriod.startsWith(periodStr);
                 });
 
                 // Calculate total days taken/scheduled/sold
@@ -1348,26 +1357,83 @@ const EmployeeDetailModal: React.FC<{
                                             ).map(([period, stats]) => {
                                                 const totalUsed = stats.gozados + stats.agendados + stats.vendidos;
                                                 const balance = 30 - totalUsed;
+                                                
+                                                // Cálculos de alerta de vencimento
+                                                const deadline = getPeriodDeadline(employee.admissionDate, period);
+                                                const now = new Date();
+                                                let deadlineAlert = null;
+                                                
+                                                if (deadline && balance > 0) {
+                                                    const diffTime = deadline.getTime() - now.getTime();
+                                                    const daysToDeadline = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                                    if (diffTime < 0) {
+                                                        deadlineAlert = { type: 'overdue', label: 'VENCIDAS ⚠️' };
+                                                    } else if (daysToDeadline <= 90) {
+                                                        deadlineAlert = { type: 'warning', label: `Vence em ${daysToDeadline} dias` };
+                                                    }
+                                                }
+
                                                 return (
-                                                    <div key={period} className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm flex flex-col justify-between">
-                                                        <div className="flex justify-between items-center mb-2">
-                                                            <span className="font-extrabold text-slate-700">{period}</span>
-                                                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                                                                balance <= 0 ? 'bg-green-100 text-green-700' : balance === 30 ? 'bg-slate-100 text-slate-600' : 'bg-blue-100 text-blue-700'
-                                                            }`}>
-                                                                {balance <= 0 ? 'Quitado' : `${balance} dias em haver`}
-                                                            </span>
-                                                        </div>
-                                                        <div className="text-xs text-slate-500 space-y-1">
-                                                            <div className="flex justify-between"><span>Gozados (Tirados):</span> <span className="font-semibold text-slate-700">{stats.gozados} dias</span></div>
-                                                            <div className="flex justify-between"><span>Agendados:</span> <span className="font-semibold text-slate-700">{stats.agendados} dias</span></div>
-                                                            <div className="flex justify-between"><span>Vendidos (Abono):</span> <span className="font-semibold text-slate-700">{stats.vendidos} dias</span></div>
-                                                            <div className="w-full bg-slate-100 h-1.5 rounded-full mt-2 overflow-hidden flex">
-                                                                <div className="bg-emerald-500 h-full" style={{ width: `${(stats.gozados / 30) * 100}%` }} title={`Gozados: ${stats.gozados} dias`}></div>
-                                                                <div className="bg-blue-500 h-full" style={{ width: `${(stats.agendados / 30) * 100}%` }} title={`Agendados: ${stats.agendados} dias`}></div>
-                                                                <div className="bg-amber-500 h-full" style={{ width: `${(stats.vendidos / 30) * 100}%` }} title={`Vendidos: ${stats.vendidos} dias`}></div>
+                                                    <div key={period} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                                                        <div>
+                                                            <div className="flex justify-between items-center mb-2">
+                                                                <span className="font-extrabold text-slate-700">Período {period}</span>
+                                                                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                                                                    balance <= 0 ? 'bg-green-100 text-green-700' : balance === 30 ? 'bg-slate-100 text-slate-600' : 'bg-blue-100 text-blue-700'
+                                                                }`}>
+                                                                    {balance <= 0 ? 'Quitado' : `${balance} dias em haver`}
+                                                                </span>
+                                                            </div>
+                                                            {deadlineAlert && (
+                                                                <div className="mb-2">
+                                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${
+                                                                        deadlineAlert.type === 'overdue' ? 'bg-red-100 text-red-700 animate-pulse' : 'bg-amber-100 text-amber-700'
+                                                                    }`}>
+                                                                        {deadlineAlert.label}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                            <div className="text-xs text-slate-500 space-y-1">
+                                                                <div className="flex justify-between"><span>Gozados (Tirados):</span> <span className="font-semibold text-slate-700">{stats.gozados} dias</span></div>
+                                                                <div className="flex justify-between"><span>Agendados:</span> <span className="font-semibold text-slate-700">{stats.agendados} dias</span></div>
+                                                                <div className="flex justify-between"><span>Vendidos (Abono):</span> <span className="font-semibold text-slate-700">{stats.vendidos} dias</span></div>
+                                                                <div className="w-full bg-slate-100 h-1.5 rounded-full mt-2 overflow-hidden flex">
+                                                                    <div className="bg-emerald-500 h-full" style={{ width: `${(stats.gozados / 30) * 100}%` }} title={`Gozados: ${stats.gozados} dias`}></div>
+                                                                    <div className="bg-blue-500 h-full" style={{ width: `${(stats.agendados / 30) * 100}%` }} title={`Agendados: ${stats.agendados} dias`}></div>
+                                                                    <div className="bg-amber-500 h-full" style={{ width: `${(stats.vendidos / 30) * 100}%` }} title={`Vendidos: ${stats.vendidos} dias`}></div>
+                                                                </div>
                                                             </div>
                                                         </div>
+
+                                                        {/* Atalhos Rápidos de Ação */}
+                                                        {balance > 0 && !readOnly && (
+                                                            <div className="mt-4 pt-3 border-t border-dashed border-slate-100 flex gap-2">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setNewVacation(prev => ({
+                                                                            ...prev,
+                                                                            period: period,
+                                                                            status: 'Agendada'
+                                                                        }));
+                                                                    }}
+                                                                    className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] font-bold py-1.5 px-2 rounded-lg border border-blue-100 transition text-center"
+                                                                >
+                                                                    Agendar Restante
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setNewVacation(prev => ({
+                                                                            ...prev,
+                                                                            period: period,
+                                                                            status: 'Vendida'
+                                                                        }));
+                                                                    }}
+                                                                    className="flex-1 bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-bold py-1.5 px-2 rounded-lg border border-amber-100 transition text-center"
+                                                                >
+                                                                    Vender Restante
+                                                                </button>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 );
                                             })}
