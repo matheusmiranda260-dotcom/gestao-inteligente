@@ -52,6 +52,59 @@ const resizeImage = (file: File, maxWidth = 1200, quality = 0.7): Promise<File> 
     });
 };
 
+// Funções utilitárias para evitar bugs de fuso horário (timezone shift) no JavaScript
+const formatDbDate = (dateStr: string | null | undefined): string => {
+    if (!dateStr) return '-';
+    const parts = dateStr.split('T')[0].split('-');
+    if (parts.length === 3) {
+        const [y, m, d] = parts;
+        return `${d}/${m}/${y}`;
+    }
+    return new Date(dateStr).toLocaleDateString('pt-BR');
+};
+
+const getDurationDays = (startStr: string, endStr: string): number => {
+    if (!startStr || !endStr) return 0;
+    const startParts = startStr.split('T')[0].split('-');
+    const endParts = endStr.split('T')[0].split('-');
+    if (startParts.length === 3 && endParts.length === 3) {
+        const startDate = new Date(Number(startParts[0]), Number(startParts[1]) - 1, Number(startParts[2]));
+        const endDate = new Date(Number(endParts[0]), Number(endParts[1]) - 1, Number(endParts[2]));
+        return Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    }
+    return 0;
+};
+
+const isDateWithinRange = (dateStr: string, startStr: string, endStr: string): boolean => {
+    if (!dateStr || !startStr || !endStr) return false;
+    const date = new Date(dateStr.split('T')[0] + 'T00:00:00');
+    const start = new Date(startStr.split('T')[0] + 'T00:00:00');
+    const end = new Date(endStr.split('T')[0] + 'T00:00:00');
+    return date >= start && date <= end;
+};
+
+const getAvailablePeriods = (admissionDateStr: string | null | undefined): string[] => {
+    const periods: string[] = [];
+    const now = new Date();
+    const currentYear = now.getFullYear();
+
+    if (admissionDateStr) {
+        const parts = admissionDateStr.split('-');
+        if (parts.length === 3) {
+            const admYear = parseInt(parts[0]);
+            for (let y = admYear - 1; y <= currentYear + 1; y++) {
+                periods.push(`${y}-${y + 1}`);
+            }
+            return periods.reverse();
+        }
+    }
+
+    for (let y = currentYear - 3; y <= currentYear + 1; y++) {
+        periods.push(`${y}-${y + 1}`);
+    }
+    return periods.reverse();
+};
+
 const MobileFriendlyDateInput: React.FC<{
     label: string;
     value: string | null | undefined;
@@ -140,8 +193,8 @@ const DashboardRH: React.FC<{ employees: Employee[], absences: EmployeeAbsence[]
     // Simple analysis
     const currentlyOnVacation = vacations.filter(v => {
         if (v.status !== 'Gozada' && v.status !== 'Agendada' && v.status !== 'Programada') return false;
-        const now = new Date();
-        return new Date(v.startDate) <= now && new Date(v.endDate) >= now;
+        const todayStr = new Date().toISOString().split('T')[0];
+        return isDateWithinRange(todayStr, v.startDate, v.endDate);
     }).length;
 
     const recentAbsences = absences.length; // Could filter by date
@@ -241,7 +294,7 @@ const DashboardRH: React.FC<{ employees: Employee[], absences: EmployeeAbsence[]
                 let daysUsed = 0;
                 empVacations.forEach(v => {
                     if (v.status === 'Cancelada') return;
-                    const days = Math.round((new Date(v.endDate).getTime() - new Date(v.startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                    const days = getDurationDays(v.startDate, v.endDate);
                     if (!isNaN(days)) {
                         daysUsed += days;
                     }
@@ -375,7 +428,8 @@ const DashboardRH: React.FC<{ employees: Employee[], absences: EmployeeAbsence[]
                 <h3 className="font-bold text-slate-700 mb-4">Colaboradores em Férias</h3>
                 {vacations.filter(v => {
                     if (v.status !== 'Gozada' && v.status !== 'Agendada' && v.status !== 'Programada') return false;
-                    return new Date(v.endDate) >= new Date();
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    return v.endDate >= todayStr;
                 }).length > 0 ? (
                     <table className="w-full text-sm">
                         <thead className="text-left bg-slate-50 text-slate-500 uppercase text-xs">
@@ -384,14 +438,15 @@ const DashboardRH: React.FC<{ employees: Employee[], absences: EmployeeAbsence[]
                         <tbody>
                             {vacations.filter(v => {
                                 if (v.status !== 'Gozada' && v.status !== 'Agendada' && v.status !== 'Programada') return false;
-                                return new Date(v.endDate) >= new Date();
+                                const todayStr = new Date().toISOString().split('T')[0];
+                                return v.endDate >= todayStr;
                             }).map(v => {
                                 const emp = employees.find(e => e.id === v.employeeId);
                                 return (
                                     <tr key={v.id} className="border-b">
                                         <td className="p-2 font-bold">{emp?.name || 'Desconhecido'}</td>
-                                        <td className="p-2">{new Date(v.startDate).toLocaleDateString()}</td>
-                                        <td className="p-2">{new Date(v.endDate).toLocaleDateString()}</td>
+                                        <td className="p-2">{formatDbDate(v.startDate)}</td>
+                                        <td className="p-2">{formatDbDate(v.endDate)}</td>
                                         <td className="p-2">
                                             <span className={`px-2 py-0.5 rounded text-xs font-bold border ${
                                                 v.status === 'Gozada' 
@@ -531,7 +586,8 @@ const EmployeeDetailModal: React.FC<{
     // HR Form State
     const [newAbsence, setNewAbsence] = useState({ type: 'Falta Injustificada', startDate: '', endDate: '', reason: '' });
     const [absenceFile, setAbsenceFile] = useState<File | null>(null);
-    const [newVacation, setNewVacation] = useState({ period: '', startDate: '', endDate: '', status: 'Agendada' });
+    const periodsOptions = useMemo(() => getAvailablePeriods(employee.admissionDate), [employee.admissionDate]);
+    const [newVacation, setNewVacation] = useState({ period: periodsOptions[0] || '', startDate: '', endDate: '', status: 'Agendada' });
 
     // Handlers for HR
     const handleAddAbsence = async () => {
@@ -579,7 +635,7 @@ const EmployeeDetailModal: React.FC<{
                 status: newVacation.status || 'Agendada'
             } as any);
             alert('Férias registradas com sucesso!');
-            setNewVacation({ period: '', startDate: '', endDate: '', status: 'Agendada' });
+            setNewVacation({ period: periodsOptions[0] || '', startDate: '', endDate: '', status: 'Agendada' });
             loadDetails();
         } catch (e) { alert('Erro ao registrar férias'); }
     };
@@ -1193,7 +1249,12 @@ const EmployeeDetailModal: React.FC<{
                                     <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4 bg-blue-50/50 border border-blue-100 p-4 rounded-xl">
                                         <div>
                                             <label className="text-xs font-bold text-slate-500 uppercase">Período Aquisitivo</label>
-                                            <input type="text" placeholder="Ex: 2024-2025" className="w-full mt-1 p-2 border rounded-lg bg-white" value={newVacation.period} onChange={e => setNewVacation({ ...newVacation, period: e.target.value })} />
+                                            <select className="w-full mt-1 p-2 border rounded-lg bg-white" value={newVacation.period} onChange={e => setNewVacation({ ...newVacation, period: e.target.value })}>
+                                                <option value="">Selecione</option>
+                                                {periodsOptions.map(p => (
+                                                    <option key={p} value={p}>{p}</option>
+                                                ))}
+                                            </select>
                                         </div>
                                         <div>
                                             <MobileFriendlyDateInput label="Início do Gozo" value={newVacation.startDate} onChange={v => setNewVacation({ ...newVacation, startDate: v })} disabled={readOnly} />
@@ -1229,12 +1290,12 @@ const EmployeeDetailModal: React.FC<{
                                         </thead>
                                         <tbody>
                                             {vacations.map(vac => {
-                                                const durationDays = Math.round((new Date(vac.endDate).getTime() - new Date(vac.startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                                                const durationDays = getDurationDays(vac.startDate, vac.endDate);
                                                 return (
                                                     <tr key={vac.id} className="border-b hover:bg-slate-50">
                                                         <td className="p-3 font-semibold text-slate-700">{vac.period}</td>
                                                         <td className="p-3 text-slate-600">
-                                                            {new Date(vac.startDate).toLocaleDateString()} a {new Date(vac.endDate).toLocaleDateString()}
+                                                            {formatDbDate(vac.startDate)} a {formatDbDate(vac.endDate)}
                                                         </td>
                                                         <td className="p-3 text-slate-600 font-medium">
                                                             {isNaN(durationDays) ? '-' : `${durationDays} ${durationDays === 1 ? 'dia' : 'dias'}`}
@@ -1272,7 +1333,7 @@ const EmployeeDetailModal: React.FC<{
                                                 vacations.reduce((acc, vac) => {
                                                     const p = vac.period || 'Sem Período';
                                                     if (!acc[p]) acc[p] = { gozados: 0, agendados: 0, vendidos: 0 };
-                                                    const days = Math.round((new Date(vac.endDate).getTime() - new Date(vac.startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                                                    const days = getDurationDays(vac.startDate, vac.endDate);
                                                     if (!isNaN(days) && vac.status !== 'Cancelada') {
                                                         if (vac.status === 'Gozada') {
                                                             acc[p].gozados += days;
