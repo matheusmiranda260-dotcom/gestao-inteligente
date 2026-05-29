@@ -274,18 +274,18 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
             return;
         }
 
-        // Validação no despacho
+        // Validação na retirada
         if (movingItem.type === 'dispatch') {
             const currentItem = relevantItems[0];
             if (currentItem) {
                 const pendingQty = currentItem.pendingTransferQuantity || 0;
                 const physicalQty = currentItem.physicalQuantity || 0;
                 if (movementQty > pendingQty) {
-                    alert(`Não é possível despachar mais do que o saldo aguardando retirada (${pendingQty} pçs).`);
+                    alert(`Não é possível retirar mais do que o saldo aguardando retirada (${pendingQty} pçs).`);
                     return;
                 }
                 if (movementQty > physicalQty) {
-                    alert(`Não é possível despachar mais do que o saldo físico em pátio (${physicalQty} pçs).`);
+                    alert(`Não é possível retirar mais do que o saldo físico em pátio (${physicalQty} pçs).`);
                     return;
                 }
             }
@@ -413,7 +413,7 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
                         <div className={`p-8 ${movingItem.type === 'transfer' ? 'bg-indigo-600' : movingItem.type === 'virtual_audit' ? 'bg-slate-700' : movingItem.type === 'add_virtual' ? 'bg-emerald-500' : movingItem.type === 'dispatch' ? 'bg-amber-600' : 'bg-emerald-600'} text-white`}>
                             <h3 className="text-2xl font-black flex items-center gap-3">
                                 {movingItem.type === 'transfer' ? <SwitchHorizontalIcon className="h-7 w-7" /> : movingItem.type === 'add_virtual' ? <PlusIcon className="h-7 w-7" /> : movingItem.type === 'dispatch' ? <ArrowLeftIcon className="h-7 w-7" /> : <CalculatorIcon className="h-7 w-7" />}
-                                {movingItem.type === 'transfer' ? 'Transferir para Setor (Aguardando Retirada)' : movingItem.type === 'add_virtual' ? 'Adicionar Estoque' : movingItem.type === 'virtual_audit' ? 'Ajustar Saldo Virtual' : movingItem.type === 'dispatch' ? 'Despachar Físico (Baixa Pendente)' : 'Ajustar Contagem Física'}
+                                {movingItem.type === 'transfer' ? 'Transferir para Setor (Aguardando Retirada)' : movingItem.type === 'add_virtual' ? 'Adicionar Estoque' : movingItem.type === 'virtual_audit' ? 'Ajustar Saldo Virtual' : movingItem.type === 'dispatch' ? 'Realizar Retirada (Baixa do Reservado)' : 'Ajustar Contagem Física'}
                             </h3>
                             <p className="text-white/70 font-bold uppercase text-xs tracking-widest mt-2">{movingItem.model} - {movingItem.size}m</p>
                         </div>
@@ -437,7 +437,7 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
                             {/* Synced quantity inputs */}
                             <div className="space-y-2">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                    {movingItem.type === 'transfer' ? 'Quantidade a Transferir' : movingItem.type === 'add_virtual' ? 'Quantidade a Adicionar' : movingItem.type === 'virtual_audit' ? 'Novo Saldo Virtual (Sistema)' : movingItem.type === 'dispatch' ? 'Quantidade a Despachar Fisicamente' : 'Nova Contagem Física Real (Galpão)'}
+                                    {movingItem.type === 'transfer' ? 'Quantidade a Transferir' : movingItem.type === 'add_virtual' ? 'Quantidade a Adicionar' : movingItem.type === 'virtual_audit' ? 'Novo Saldo Virtual (Sistema)' : movingItem.type === 'dispatch' ? 'Quantidade a Retirar' : 'Nova Contagem Física Real (Galpão)'}
                                 </label>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
@@ -997,9 +997,9 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
                                                                 setMovementQty(0);
                                                             }}
                                                             className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-black uppercase transition-all shadow-md animate-pulse"
-                                                            title="Dar baixa no estoque transferido (Aguardando Retirada)"
+                                                            title="Confirmar a retirada física (dar baixa no saldo aguardando retirada)"
                                                         >
-                                                            Transferir
+                                                            Retirada
                                                         </button>
                                                     )}
                                                 </div>
