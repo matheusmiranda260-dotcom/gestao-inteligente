@@ -150,6 +150,13 @@ END $$;
 DO $$
 BEGIN
     IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'employee_vacations') THEN
+        -- Adiciona a coluna period se ela não existir
+        ALTER TABLE public.employee_vacations ADD COLUMN IF NOT EXISTS period TEXT;
+
+        -- Atualiza a constraint de status para permitir 'Agendada'
+        ALTER TABLE public.employee_vacations DROP CONSTRAINT IF EXISTS employee_vacations_status_check;
+        ALTER TABLE public.employee_vacations ADD CONSTRAINT employee_vacations_status_check CHECK (status IN ('Agendada', 'Programada', 'Gozada', 'Vendida', 'Cancelada'));
+
         ALTER TABLE public.employee_vacations ENABLE ROW LEVEL SECURITY;
         DROP POLICY IF EXISTS "Enable all access for all users" ON public.employee_vacations;
         CREATE POLICY "Enable all access for all users" ON public.employee_vacations FOR ALL USING (true) WITH CHECK (true);

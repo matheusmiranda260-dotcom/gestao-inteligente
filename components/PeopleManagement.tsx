@@ -139,11 +139,138 @@ const DashboardRH: React.FC<{ employees: Employee[], absences: EmployeeAbsence[]
 
     // Simple analysis
     const currentlyOnVacation = vacations.filter(v => {
+        if (v.status !== 'Gozada' && v.status !== 'Agendada' && v.status !== 'Programada') return false;
         const now = new Date();
         return new Date(v.startDate) <= now && new Date(v.endDate) >= now;
     }).length;
 
     const recentAbsences = absences.length; // Could filter by date
+
+    // Birthday calculations
+    const birthdayAlerts = useMemo(() => {
+        const alerts: { employee: Employee; daysUntil: number; isToday: boolean; birthDateStr: string; age: number }[] = [];
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentDate = now.getDate();
+
+        employees.forEach(emp => {
+            if (!emp.birthDate || !emp.active) return;
+            // Parse YYYY-MM-DD manually to avoid timezone shifting
+            const parts = emp.birthDate.split('-');
+            if (parts.length !== 3) return;
+            const birthYear = parseInt(parts[0]);
+            const birthMonth = parseInt(parts[1]) - 1; // 0-indexed
+            const birthDay = parseInt(parts[2]);
+
+            let nextBirthday = new Date(now.getFullYear(), birthMonth, birthDay);
+            
+            // If birthday has already occurred this year, check next year's birthday
+            if (nextBirthday < new Date(now.getFullYear(), currentMonth, currentDate)) {
+                nextBirthday.setFullYear(now.getFullYear() + 1);
+            }
+
+            const diffTime = nextBirthday.getTime() - new Date(now.getFullYear(), currentMonth, currentDate).getTime();
+            const daysUntil = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            const isToday = birthMonth === currentMonth && birthDay === currentDate;
+            const age = nextBirthday.getFullYear() - birthYear;
+
+            // Show alert if birthday is today or within the next 15 days
+            if (isToday || daysUntil <= 15) {
+                const formattedBirthDate = `${birthDay.toString().padStart(2, '0')}/${(birthMonth + 1).toString().padStart(2, '0')}`;
+                alerts.push({
+                    employee: emp,
+                    daysUntil: isToday ? 0 : daysUntil,
+                    isToday,
+                    birthDateStr: formattedBirthDate,
+                    age
+                });
+            }
+        });
+
+        return alerts.sort((a, b) => a.daysUntil - b.daysUntil);
+    }, [employees]);
+
+    // Vacation expiration calculations (Férias Vencendo/A Vencer)
+    const vacationAlerts = useMemo(() => {
+        const alerts: { employee: Employee; periodStr: string; daysRemaining: number; deadlineStr: string; daysToDeadline: number; isOverdue: boolean }[] = [];
+        const now = new Date();
+
+        employees.forEach(emp => {
+            if (!emp.admissionDate || !emp.active) return;
+            
+            const parts = emp.admissionDate.split('-');
+            if (parts.length !== 3) return;
+            const admYear = parseInt(parts[0]);
+            const admMonth = parseInt(parts[1]) - 1;
+            const admDay = parseInt(parts[2]);
+            const admission = new Date(admYear, admMonth, admDay);
+
+            // Calculate how many completed years since admission
+            const yearsWorked = Math.floor((now.getTime() - admission.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+            
+            // Check periods for each completed year
+            for (let i = 0; i < yearsWorked; i++) {
+                const periodStart = new Date(admission);
+                periodStart.setFullYear(admission.getFullYear() + i);
+                const periodEnd = new Date(admission);
+                periodEnd.setFullYear(admission.getFullYear() + i + 1);
+                
+                // Deadline to take this vacation is 1 year after the period ends (so admissionDate + i + 2 years)
+                const deadline = new Date(admission);
+                deadline.setFullYear(admission.getFullYear() + i + 2);
+                deadline.setDate(deadline.getDate() - 1); // Deadline is usually the day before the anniversary of the 2nd year
+
+                const startYear = periodStart.getFullYear();
+                const endYear = periodEnd.getFullYear();
+                const periodStr = `${startYear}-${endYear}`;
+
+                // Find all vacations for this employee that match this period
+                const empVacations = vacations.filter(v => {
+                    if (v.employeeId !== emp.id) return false;
+                    if (!v.period) return false;
+                    
+                    const normPeriod = v.period.replace(/\s+/g, '').replace(/\//g, '-');
+                    const p1 = `${startYear}-${endYear}`;
+                    const p2 = `${startYear.toString().slice(-2)}-${endYear.toString().slice(-2)}`;
+                    
+                    return normPeriod.includes(p1) || normPeriod.includes(p2) || normPeriod.includes(startYear.toString());
+                });
+
+                // Calculate total days taken/scheduled/sold
+                let daysUsed = 0;
+                empVacations.forEach(v => {
+                    if (v.status === 'Cancelada') return;
+                    const days = Math.round((new Date(v.endDate).getTime() - new Date(v.startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                    if (!isNaN(days)) {
+                        daysUsed += days;
+                    }
+                });
+
+                const daysRemaining = 30 - daysUsed;
+
+                if (daysRemaining > 0) {
+                    const diffTime = deadline.getTime() - now.getTime();
+                    const daysToDeadline = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    const isOverdue = daysToDeadline < 0;
+
+                    // Show alert if overdue or if deadline is in less than 90 days
+                    if (isOverdue || daysToDeadline <= 90) {
+                        alerts.push({
+                            employee: emp,
+                            periodStr,
+                            daysRemaining,
+                            deadlineStr: deadline.toLocaleDateString('pt-BR'),
+                            daysToDeadline,
+                            isOverdue
+                        });
+                    }
+                }
+            }
+        });
+
+        return alerts.sort((a, b) => a.daysToDeadline - b.daysToDeadline);
+    }, [employees, vacations]);
 
     return (
         <div className="space-y-6">
@@ -178,22 +305,102 @@ const DashboardRH: React.FC<{ employees: Employee[], absences: EmployeeAbsence[]
                 </div>
             </div>
 
+            {/* SEÇÃO DE ALERTAS E LEMBRETES DE RH */}
+            {(birthdayAlerts.length > 0 || vacationAlerts.length > 0) && (
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 animate-fadeIn">
+                    <h3 className="font-extrabold text-[#0F3F5C] text-lg mb-4 border-b pb-2 flex items-center gap-2">
+                        <ExclamationIcon className="h-5 w-5 text-amber-500" />
+                        Lembretes e Alertas de RH
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Alertas de Aniversário */}
+                        {birthdayAlerts.length > 0 && (
+                            <div className="bg-pink-50/30 p-4 rounded-xl border border-pink-100/50">
+                                <h4 className="font-bold text-pink-700 text-sm mb-3 flex items-center gap-1.5">
+                                    🎂 Próximos Aniversários
+                                </h4>
+                                <ul className="space-y-3">
+                                    {birthdayAlerts.map(({ employee, daysUntil, isToday, birthDateStr, age }) => (
+                                        <li key={employee.id} className="flex justify-between items-center bg-white p-2.5 rounded-lg border border-pink-100/30 shadow-sm text-sm">
+                                            <div>
+                                                <span className="font-bold text-slate-800">{employee.name}</span>
+                                                <span className="text-xs text-slate-500 ml-1">({age} anos • {birthDateStr})</span>
+                                            </div>
+                                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                                                isToday ? 'bg-pink-100 text-pink-700 animate-pulse' : 'bg-slate-100 text-slate-600'
+                                            }`}>
+                                                {isToday ? 'Faz aniversário hoje! 🎉' : `Em ${daysUntil} ${daysUntil === 1 ? 'dia' : 'dias'}`}
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+
+                        {/* Alertas de Férias a Vencer */}
+                        {vacationAlerts.length > 0 && (
+                            <div className="bg-amber-50/30 p-4 rounded-xl border border-amber-100/50">
+                                <h4 className="font-bold text-amber-700 text-sm mb-3 flex items-center gap-1.5">
+                                    📅 Férias a Vencer / Vencidas
+                                </h4>
+                                <ul className="space-y-3">
+                                    {vacationAlerts.map(({ employee, periodStr, daysRemaining, deadlineStr, daysToDeadline, isOverdue }) => (
+                                        <li key={`${employee.id}-${periodStr}`} className="flex flex-col bg-white p-2.5 rounded-lg border border-amber-100/30 shadow-sm text-sm">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <span className="font-bold text-slate-800">{employee.name}</span>
+                                                    <span className="text-xs text-slate-500 block">Período Aquisitivo: {periodStr}</span>
+                                                </div>
+                                                <span className={`px-2 py-0.5 rounded-full text-xs font-bold shrink-0 ${
+                                                    isOverdue ? 'bg-red-100 text-red-700 font-extrabold animate-pulse' : 'bg-amber-100 text-amber-700'
+                                                }`}>
+                                                    {isOverdue ? 'FÉRIAS VENCIDAS ⚠️' : `Vence em ${daysToDeadline} ${daysToDeadline === 1 ? 'dia' : 'dias'}`}
+                                                </span>
+                                            </div>
+                                            <div className="mt-2 text-xs flex justify-between text-slate-600 border-t pt-1.5 border-dashed">
+                                                <span>Dias em haver: <strong>{daysRemaining} dias</strong></span>
+                                                <span>Prazo: {deadlineStr}</span>
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
             {/* Graphs / Lists could go here */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                 <h3 className="font-bold text-slate-700 mb-4">Colaboradores em Férias</h3>
-                {vacations.filter(v => new Date(v.endDate) >= new Date()).length > 0 ? (
+                {vacations.filter(v => {
+                    if (v.status !== 'Gozada' && v.status !== 'Agendada' && v.status !== 'Programada') return false;
+                    return new Date(v.endDate) >= new Date();
+                }).length > 0 ? (
                     <table className="w-full text-sm">
                         <thead className="text-left bg-slate-50 text-slate-500 uppercase text-xs">
-                            <tr><th className="p-2">Colaborador</th><th className="p-2">Início</th><th className="p-2">Fim</th></tr>
+                            <tr><th className="p-2">Colaborador</th><th className="p-2">Início</th><th className="p-2">Fim</th><th className="p-2">Status</th></tr>
                         </thead>
                         <tbody>
-                            {vacations.filter(v => new Date(v.endDate) >= new Date()).map(v => {
+                            {vacations.filter(v => {
+                                if (v.status !== 'Gozada' && v.status !== 'Agendada' && v.status !== 'Programada') return false;
+                                return new Date(v.endDate) >= new Date();
+                            }).map(v => {
                                 const emp = employees.find(e => e.id === v.employeeId);
                                 return (
                                     <tr key={v.id} className="border-b">
                                         <td className="p-2 font-bold">{emp?.name || 'Desconhecido'}</td>
                                         <td className="p-2">{new Date(v.startDate).toLocaleDateString()}</td>
                                         <td className="p-2">{new Date(v.endDate).toLocaleDateString()}</td>
+                                        <td className="p-2">
+                                            <span className={`px-2 py-0.5 rounded text-xs font-bold border ${
+                                                v.status === 'Gozada' 
+                                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                                    : 'bg-blue-50 text-blue-700 border-blue-200'
+                                            }`}>
+                                                {v.status === 'Gozada' ? 'Em Gozo' : 'Agendada'}
+                                            </span>
+                                        </td>
                                     </tr>
                                 );
                             })}
@@ -324,7 +531,7 @@ const EmployeeDetailModal: React.FC<{
     // HR Form State
     const [newAbsence, setNewAbsence] = useState({ type: 'Falta Injustificada', startDate: '', endDate: '', reason: '' });
     const [absenceFile, setAbsenceFile] = useState<File | null>(null);
-    const [newVacation, setNewVacation] = useState({ period: '', startDate: '', endDate: '' });
+    const [newVacation, setNewVacation] = useState({ period: '', startDate: '', endDate: '', status: 'Agendada' });
 
     // Handlers for HR
     const handleAddAbsence = async () => {
@@ -369,10 +576,10 @@ const EmployeeDetailModal: React.FC<{
                 period: newVacation.period,
                 startDate: newVacation.startDate,
                 endDate: newVacation.endDate,
-                status: 'Agendada'
+                status: newVacation.status || 'Agendada'
             } as any);
-            alert('Férias agendadas');
-            setNewVacation({ period: '', startDate: '', endDate: '' });
+            alert('Férias registradas com sucesso!');
+            setNewVacation({ period: '', startDate: '', endDate: '', status: 'Agendada' });
             loadDetails();
         } catch (e) { alert('Erro ao registrar férias'); }
     };
@@ -983,10 +1190,10 @@ const EmployeeDetailModal: React.FC<{
                                     Controle de Férias
                                 </h3>
                                 {!readOnly && (
-                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 bg-blue-50 p-4 rounded-lg">
+                                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4 bg-blue-50/50 border border-blue-100 p-4 rounded-xl">
                                         <div>
-                                            <label className="text-xs font-bold text-slate-500">Período Aquisitivo</label>
-                                            <input type="text" placeholder="Ex: 2024-2025" className="w-full p-2 border rounded" value={newVacation.period} onChange={e => setNewVacation({ ...newVacation, period: e.target.value })} />
+                                            <label className="text-xs font-bold text-slate-500 uppercase">Período Aquisitivo</label>
+                                            <input type="text" placeholder="Ex: 2024-2025" className="w-full mt-1 p-2 border rounded-lg bg-white" value={newVacation.period} onChange={e => setNewVacation({ ...newVacation, period: e.target.value })} />
                                         </div>
                                         <div>
                                             <MobileFriendlyDateInput label="Início do Gozo" value={newVacation.startDate} onChange={v => setNewVacation({ ...newVacation, startDate: v })} disabled={readOnly} />
@@ -994,8 +1201,18 @@ const EmployeeDetailModal: React.FC<{
                                         <div>
                                             <MobileFriendlyDateInput label="Fim do Gozo" value={newVacation.endDate} onChange={v => setNewVacation({ ...newVacation, endDate: v })} disabled={readOnly} />
                                         </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase">Status</label>
+                                            <select className="w-full mt-1 p-2 border rounded-lg bg-white" value={newVacation.status || 'Agendada'} onChange={e => setNewVacation({ ...newVacation, status: e.target.value })}>
+                                                <option value="Agendada">Agendada</option>
+                                                <option value="Programada">Programada</option>
+                                                <option value="Gozada">Gozada (Tirada)</option>
+                                                <option value="Vendida">Vendida (Abono)</option>
+                                                <option value="Cancelada">Cancelada</option>
+                                            </select>
+                                        </div>
                                         <div className="flex flex-col justify-end">
-                                            <button onClick={handleAddVacation} className="bg-blue-600 text-white font-bold py-2 px-4 rounded hover:bg-blue-700 transition">Agendar Férias</button>
+                                            <button onClick={handleAddVacation} className="bg-blue-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-blue-700 transition">Registrar Férias</button>
                                         </div>
                                     </div>
                                 )}
@@ -1005,29 +1222,97 @@ const EmployeeDetailModal: React.FC<{
                                             <tr>
                                                 <th className="p-3">Período Aquisitivo</th>
                                                 <th className="p-3">Data de Gozo</th>
+                                                <th className="p-3">Duração</th>
                                                 <th className="p-3">Status</th>
                                                 <th className="p-3 text-center">Ações</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {vacations.map(vac => (
-                                                <tr key={vac.id} className="border-b hover:bg-slate-50">
-                                                    <td className="p-3 font-semibold text-slate-700">{vac.period}</td>
-                                                    <td className="p-3 text-slate-600">
-                                                        {new Date(vac.startDate).toLocaleDateString()} a {new Date(vac.endDate).toLocaleDateString()}
-                                                    </td>
-                                                    <td className="p-3">
-                                                        <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">{vac.status}</span>
-                                                    </td>
-                                                    <td className="p-3 text-center">
-                                                        {!readOnly && <button onClick={() => handleDeleteVacation(vac.id)} className="text-red-400 hover:text-red-600"><TrashIcon className="h-4 w-4" /></button>}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                            {vacations.length === 0 && <tr><td colSpan={4} className="p-4 text-center text-slate-400">Nenhuma férias registrada.</td></tr>}
+                                            {vacations.map(vac => {
+                                                const durationDays = Math.round((new Date(vac.endDate).getTime() - new Date(vac.startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                                                return (
+                                                    <tr key={vac.id} className="border-b hover:bg-slate-50">
+                                                        <td className="p-3 font-semibold text-slate-700">{vac.period}</td>
+                                                        <td className="p-3 text-slate-600">
+                                                            {new Date(vac.startDate).toLocaleDateString()} a {new Date(vac.endDate).toLocaleDateString()}
+                                                        </td>
+                                                        <td className="p-3 text-slate-600 font-medium">
+                                                            {isNaN(durationDays) ? '-' : `${durationDays} ${durationDays === 1 ? 'dia' : 'dias'}`}
+                                                        </td>
+                                                        <td className="p-3">
+                                                            <span className={`px-2 py-1 rounded text-xs font-bold border ${
+                                                                vac.status === 'Gozada' 
+                                                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                                                    : vac.status === 'Vendida' 
+                                                                        ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                                                        : vac.status === 'Cancelada'
+                                                                            ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                                                            : 'bg-blue-50 text-blue-700 border-blue-200'
+                                                            }`}>
+                                                                {vac.status === 'Gozada' ? 'Gozada (Tirada)' : vac.status === 'Vendida' ? 'Vendida (Abono)' : vac.status}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-3 text-center">
+                                                            {!readOnly && <button onClick={() => handleDeleteVacation(vac.id)} className="text-red-400 hover:text-red-600"><TrashIcon className="h-4 w-4" /></button>}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                            {vacations.length === 0 && <tr><td colSpan={5} className="p-4 text-center text-slate-400">Nenhuma férias registrada.</td></tr>}
                                         </tbody>
                                     </table>
                                 </div>
+
+                                {/* Resumo de Saldos por Período */}
+                                {vacations.length > 0 && (
+                                    <div className="mt-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                        <h4 className="font-bold text-slate-700 text-sm mb-3 uppercase tracking-wider">Saldo por Período Aquisitivo (Base: 30 dias)</h4>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            {Object.entries(
+                                                vacations.reduce((acc, vac) => {
+                                                    const p = vac.period || 'Sem Período';
+                                                    if (!acc[p]) acc[p] = { gozados: 0, agendados: 0, vendidos: 0 };
+                                                    const days = Math.round((new Date(vac.endDate).getTime() - new Date(vac.startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                                                    if (!isNaN(days) && vac.status !== 'Cancelada') {
+                                                        if (vac.status === 'Gozada') {
+                                                            acc[p].gozados += days;
+                                                        } else if (vac.status === 'Vendida') {
+                                                            acc[p].vendidos += days;
+                                                        } else {
+                                                            acc[p].agendados += days;
+                                                        }
+                                                    }
+                                                    return acc;
+                                                }, {} as Record<string, { gozados: number; agendados: number; vendidos: number }>)
+                                            ).map(([period, stats]) => {
+                                                const totalUsed = stats.gozados + stats.agendados + stats.vendidos;
+                                                const balance = 30 - totalUsed;
+                                                return (
+                                                    <div key={period} className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm flex flex-col justify-between">
+                                                        <div className="flex justify-between items-center mb-2">
+                                                            <span className="font-extrabold text-slate-700">{period}</span>
+                                                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                                                                balance <= 0 ? 'bg-green-100 text-green-700' : balance === 30 ? 'bg-slate-100 text-slate-600' : 'bg-blue-100 text-blue-700'
+                                                            }`}>
+                                                                {balance <= 0 ? 'Quitado' : `${balance} dias em haver`}
+                                                            </span>
+                                                        </div>
+                                                        <div className="text-xs text-slate-500 space-y-1">
+                                                            <div className="flex justify-between"><span>Gozados (Tirados):</span> <span className="font-semibold text-slate-700">{stats.gozados} dias</span></div>
+                                                            <div className="flex justify-between"><span>Agendados:</span> <span className="font-semibold text-slate-700">{stats.agendados} dias</span></div>
+                                                            <div className="flex justify-between"><span>Vendidos (Abono):</span> <span className="font-semibold text-slate-700">{stats.vendidos} dias</span></div>
+                                                            <div className="w-full bg-slate-100 h-1.5 rounded-full mt-2 overflow-hidden flex">
+                                                                <div className="bg-emerald-500 h-full" style={{ width: `${(stats.gozados / 30) * 100}%` }} title={`Gozados: ${stats.gozados} dias`}></div>
+                                                                <div className="bg-blue-500 h-full" style={{ width: `${(stats.agendados / 30) * 100}%` }} title={`Agendados: ${stats.agendados} dias`}></div>
+                                                                <div className="bg-amber-500 h-full" style={{ width: `${(stats.vendidos / 30) * 100}%` }} title={`Vendidos: ${stats.vendidos} dias`}></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}

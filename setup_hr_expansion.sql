@@ -33,9 +33,10 @@ CREATE TABLE IF NOT EXISTS public.employee_absences (
 CREATE TABLE IF NOT EXISTS public.employee_vacations (
     id TEXT PRIMARY KEY,
     employee_id TEXT REFERENCES public.employees(id),
+    period TEXT,
     start_date DATE NOT NULL,
     end_date DATE NOT NULL,
-    status TEXT CHECK (status IN ('Programada', 'Gozada', 'Vendida', 'Cancelada'))
+    status TEXT CHECK (status IN ('Agendada', 'Programada', 'Gozada', 'Vendida', 'Cancelada'))
 );
 
 -- Tabela de Responsabilidades/Atribuições da Função
