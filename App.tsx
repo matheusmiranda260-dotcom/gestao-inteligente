@@ -837,6 +837,14 @@ const App: React.FC = () => {
         for (const item of finishedGoods) {
             if (data.items.has(item.id)) {
                 const transferQty = data.items.get(item.id)!;
+                
+                // Valida limite de estoque físico disponível (físico total - pendente de retirada)
+                const availablePhys = (item.physicalQuantity || 0) - (item.pendingTransferQuantity || 0);
+                if (transferQty > availablePhys) {
+                    showNotification(`Erro: Quantidade a transferir para ${item.model} (${transferQty} pçs) excede o saldo físico disponível (${availablePhys} pçs).`, 'error');
+                    return null;
+                }
+
                 const weightPerPiece = item.totalWeight / item.quantity;
                 const transferredWeight = weightPerPiece * transferQty;
 
@@ -880,6 +888,14 @@ const App: React.FC = () => {
         for (const item of pontasStock) {
             if (data.items.has(item.id)) {
                 const transferQty = data.items.get(item.id)!;
+
+                // Valida limite de estoque físico disponível
+                const availablePhys = (item.physicalQuantity || 0) - (item.pendingTransferQuantity || 0);
+                if (transferQty > availablePhys) {
+                    showNotification(`Erro: Quantidade a transferir para ponta ${item.model} (${transferQty} pçs) excede o saldo físico disponível (${availablePhys} pçs).`, 'error');
+                    return null;
+                }
+
                 const weightPerPiece = item.totalWeight / item.quantity;
                 const transferredWeight = weightPerPiece * transferQty;
 

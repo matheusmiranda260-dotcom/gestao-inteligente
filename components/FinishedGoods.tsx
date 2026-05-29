@@ -32,7 +32,7 @@ const TransferFinishedGoodsModal: React.FC<{
     const [destinationSector, setDestinationSector] = useState('CAA60');
     const [otherDestination, setOtherDestination] = useState('');
     const [withdrawPhysicalNow, setWithdrawPhysicalNow] = useState(false);
-    const [quantities, setQuantities] = useState<Map<string, number>>(() => new Map(itemsToTransfer.map(item => [item.id, item.physicalQuantity])));
+    const [quantities, setQuantities] = useState<Map<string, number>>(() => new Map(itemsToTransfer.map(item => [item.id, item.physicalQuantity - (item.pendingTransferQuantity || 0)])));
 
     const handleQuantityChange = (itemId: string, newQuantity: number, maxQuantity: number) => {
         const validatedQuantity = Math.max(0, Math.min(newQuantity, maxQuantity));
@@ -116,29 +116,32 @@ const TransferFinishedGoodsModal: React.FC<{
                             </tr>
                         </thead>
                         <tbody>
-                            {itemsToTransfer.map(item => (
-                                <tr key={item.id} className="border-b">
-                                    <td className="p-2 font-medium text-slate-800">{item.model} ({item.size}m)</td>
-                                    <td className="p-2 font-bold text-slate-700">{formatPiecesAndPackages(item.physicalQuantity)}</td>
-                                    <td className="p-2">
-                                        <div className="flex flex-col">
-                                            <input
-                                                type="number"
-                                                value={quantities.get(item.id) !== undefined ? quantities.get(item.id) : ''}
-                                                onChange={e => handleQuantityChange(item.id, parseInt(e.target.value) || 0, item.physicalQuantity)}
-                                                max={item.physicalQuantity}
-                                                className="w-full p-1.5 border border-slate-300 rounded text-slate-800 font-bold"
-                                            />
-                                            {quantities.get(item.id) ? (
-                                                <span className="text-[11px] font-bold text-indigo-600 block mt-1">
-                                                    = {Math.floor((quantities.get(item.id) || 0) / 200)} pac. 
-                                                    {(quantities.get(item.id) || 0) % 200 > 0 ? ` + ${(quantities.get(item.id) || 0) % 200} pçs` : ''}
-                                                </span>
-                                            ) : null}
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
+                            {itemsToTransfer.map(item => {
+                                const availablePhys = item.physicalQuantity - (item.pendingTransferQuantity || 0);
+                                return (
+                                    <tr key={item.id} className="border-b">
+                                        <td className="p-2 font-medium text-slate-800">{item.model} ({item.size}m)</td>
+                                        <td className="p-2 font-bold text-slate-700">{formatPiecesAndPackages(availablePhys)}</td>
+                                        <td className="p-2">
+                                            <div className="flex flex-col">
+                                                <input
+                                                    type="number"
+                                                    value={quantities.get(item.id) !== undefined ? quantities.get(item.id) : ''}
+                                                    onChange={e => handleQuantityChange(item.id, parseInt(e.target.value) || 0, availablePhys)}
+                                                    max={availablePhys}
+                                                    className="w-full p-1.5 border border-slate-300 rounded text-slate-800 font-bold"
+                                                />
+                                                {quantities.get(item.id) ? (
+                                                    <span className="text-[11px] font-bold text-indigo-600 block mt-1">
+                                                        = {Math.floor((quantities.get(item.id) || 0) / 200)} pac. 
+                                                        {(quantities.get(item.id) || 0) % 200 > 0 ? ` + ${(quantities.get(item.id) || 0) % 200} pçs` : ''}
+                                                    </span>
+                                                ) : null}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>
@@ -403,7 +406,7 @@ const FinishedGoods: React.FC<FinishedGoodsProps> = ({ finishedGoods, pontasStoc
                     <table className="w-full text-sm text-left">
                         <thead className="text-xs text-slate-600 uppercase bg-slate-50">
                             <tr>
-                                <th className="p-4 w-12"><input type="checkbox" onChange={() => handleSelectAll(finishedGoods.filter(i => i.physicalQuantity > 0 && i.isConferred !== false), 'trelica')} className="h-4 w-4 rounded" /></th>
+                                <th className="p-4 w-12"><input type="checkbox" onChange={() => handleSelectAll(finishedGoods.filter(i => (i.physicalQuantity - (i.pendingTransferQuantity || 0)) > 0 && i.isConferred !== false), 'trelica')} className="h-4 w-4 rounded" /></th>
                                 <th className="px-6 py-3">Data Produção</th>
                                 <th className="px-6 py-3">Nº Ordem</th>
                                 <th className="px-6 py-3">Modelo</th>
@@ -416,24 +419,33 @@ const FinishedGoods: React.FC<FinishedGoodsProps> = ({ finishedGoods, pontasStoc
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200">
-                            {finishedGoods.map(item => (
-                                <tr key={item.id} className={`bg-white hover:bg-slate-50 ${item.physicalQuantity <= 0 ? 'opacity-65' : ''}`}>
-                                    <td className="p-4">
-                                        <input 
-                                            type="checkbox" 
-                                            disabled={item.physicalQuantity <= 0 || item.isConferred === false}
-                                            checked={selectedItems.has(item.id)} 
-                                            onChange={() => handleSelectItem(item.id)} 
-                                            className="h-4 w-4 rounded disabled:opacity-30 disabled:cursor-not-allowed" 
-                                            title={item.physicalQuantity <= 0 ? "Sem estoque físico no chão" : item.isConferred === false ? "Aguardando conferência de estoque" : ""}
-                                        />
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">{new Date(item.productionDate).toLocaleDateString('pt-BR')}</td>
-                                    <td className="px-6 py-4 font-medium text-slate-900 whitespace-nowrap">{item.orderNumber}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap">{item.model}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap">{item.size}</td>
-                                    <td className="px-6 py-4 text-right font-medium text-slate-500 whitespace-nowrap">{formatPiecesAndPackages(item.quantity)}</td>
-                                    <td className="px-6 py-4 text-right font-bold text-slate-900 whitespace-nowrap">{formatPiecesAndPackages(item.physicalQuantity)}</td>
+                            {finishedGoods.map(item => {
+                                const availablePhys = item.physicalQuantity - (item.pendingTransferQuantity || 0);
+                                return (
+                                    <tr key={item.id} className={`bg-white hover:bg-slate-50 ${availablePhys <= 0 ? 'opacity-65' : ''}`}>
+                                        <td className="p-4">
+                                            <input 
+                                                type="checkbox" 
+                                                disabled={availablePhys <= 0 || item.isConferred === false}
+                                                checked={selectedItems.has(item.id)} 
+                                                onChange={() => handleSelectItem(item.id)} 
+                                                className="h-4 w-4 rounded disabled:opacity-30 disabled:cursor-not-allowed" 
+                                                title={availablePhys <= 0 ? "Sem estoque físico disponível para transferência" : item.isConferred === false ? "Aguardando conferência de estoque" : ""}
+                                            />
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">{new Date(item.productionDate).toLocaleDateString('pt-BR')}</td>
+                                        <td className="px-6 py-4 font-medium text-slate-900 whitespace-nowrap">{item.orderNumber}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap">{item.model}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap">{item.size}</td>
+                                        <td className="px-6 py-4 text-right font-medium text-slate-500 whitespace-nowrap">{formatPiecesAndPackages(item.quantity)}</td>
+                                        <td className="px-6 py-4 text-right font-bold text-slate-900 whitespace-nowrap">
+                                            <div>{formatPiecesAndPackages(item.physicalQuantity)}</div>
+                                            {item.pendingTransferQuantity && item.pendingTransferQuantity > 0 ? (
+                                                <div className="text-[10px] text-amber-600 font-semibold mt-0.5">
+                                                    ({formatPiecesAndPackages(availablePhys)} disponív.)
+                                                </div>
+                                            ) : null}
+                                        </td>
                                     <td className="px-6 py-4 text-right font-bold text-slate-900 whitespace-nowrap">{item.totalWeight.toFixed(2)}</td>
                                     <td className="px-6 py-4 text-center whitespace-nowrap">
                                         {item.isConferred === false ? (
@@ -461,7 +473,7 @@ const FinishedGoods: React.FC<FinishedGoodsProps> = ({ finishedGoods, pontasStoc
                                     </td>
                                     <td className="px-6 py-4 text-center">{getStatusBadge(item.status)}</td>
                                 </tr>
-                            ))}
+                            ); })}
                         </tbody>
                     </table>
                     {finishedGoods.length === 0 && (
@@ -483,7 +495,7 @@ const FinishedGoods: React.FC<FinishedGoodsProps> = ({ finishedGoods, pontasStoc
                     <table className="w-full text-sm text-left">
                         <thead className="text-xs text-slate-600 uppercase bg-slate-50">
                             <tr>
-                                <th className="p-4 w-12"><input type="checkbox" onChange={() => handleSelectAll(pontasStock.filter(i => i.physicalQuantity > 0 && i.isConferred !== false), 'ponta')} className="h-4 w-4 rounded" /></th>
+                                <th className="p-4 w-12"><input type="checkbox" onChange={() => handleSelectAll(pontasStock.filter(i => (i.physicalQuantity - (i.pendingTransferQuantity || 0)) > 0 && i.isConferred !== false), 'ponta')} className="h-4 w-4 rounded" /></th>
                                 <th className="px-6 py-3">Data Produção</th>
                                 <th className="px-6 py-3">Nº Ordem Origem</th>
                                 <th className="px-6 py-3">Modelo</th>
@@ -496,24 +508,33 @@ const FinishedGoods: React.FC<FinishedGoodsProps> = ({ finishedGoods, pontasStoc
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200">
-                            {pontasStock.filter(i => i.quantity > 0 || i.physicalQuantity > 0).map(item => (
-                                <tr key={item.id} className={`bg-white hover:bg-slate-50 ${item.physicalQuantity <= 0 ? 'opacity-65' : ''}`}>
-                                    <td className="p-4">
-                                        <input 
-                                            type="checkbox" 
-                                            disabled={item.physicalQuantity <= 0 || item.isConferred === false}
-                                            checked={selectedItems.has(item.id)} 
-                                            onChange={() => handleSelectItem(item.id)} 
-                                            className="h-4 w-4 rounded disabled:opacity-30 disabled:cursor-not-allowed" 
-                                            title={item.physicalQuantity <= 0 ? "Sem estoque físico no chão" : item.isConferred === false ? "Aguardando conferência de estoque" : ""}
-                                        />
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">{new Date(item.productionDate).toLocaleDateString('pt-BR')}</td>
-                                    <td className="px-6 py-4 font-medium text-slate-900 whitespace-nowrap">{item.orderNumber}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap">{item.model}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap font-semibold">{item.size}</td>
-                                    <td className="px-6 py-4 text-right font-medium text-slate-500 whitespace-nowrap">{formatPiecesAndPackages(item.quantity)}</td>
-                                    <td className="px-6 py-4 text-right font-bold text-slate-900 whitespace-nowrap">{formatPiecesAndPackages(item.physicalQuantity)}</td>
+                            {pontasStock.filter(i => i.quantity > 0 || i.physicalQuantity > 0).map(item => {
+                                const availablePhys = item.physicalQuantity - (item.pendingTransferQuantity || 0);
+                                return (
+                                    <tr key={item.id} className={`bg-white hover:bg-slate-50 ${availablePhys <= 0 ? 'opacity-65' : ''}`}>
+                                        <td className="p-4">
+                                            <input 
+                                                type="checkbox" 
+                                                disabled={availablePhys <= 0 || item.isConferred === false}
+                                                checked={selectedItems.has(item.id)} 
+                                                onChange={() => handleSelectItem(item.id)} 
+                                                className="h-4 w-4 rounded disabled:opacity-30 disabled:cursor-not-allowed" 
+                                                title={availablePhys <= 0 ? "Sem estoque físico disponível para transferência" : item.isConferred === false ? "Aguardando conferência de estoque" : ""}
+                                            />
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">{new Date(item.productionDate).toLocaleDateString('pt-BR')}</td>
+                                        <td className="px-6 py-4 font-medium text-slate-900 whitespace-nowrap">{item.orderNumber}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap">{item.model}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap font-semibold">{item.size}</td>
+                                        <td className="px-6 py-4 text-right font-medium text-slate-500 whitespace-nowrap">{formatPiecesAndPackages(item.quantity)}</td>
+                                        <td className="px-6 py-4 text-right font-bold text-slate-900 whitespace-nowrap">
+                                            <div>{formatPiecesAndPackages(item.physicalQuantity)}</div>
+                                            {item.pendingTransferQuantity && item.pendingTransferQuantity > 0 ? (
+                                                <div className="text-[10px] text-amber-600 font-semibold mt-0.5">
+                                                    ({formatPiecesAndPackages(availablePhys)} disponív.)
+                                                </div>
+                                            ) : null}
+                                        </td>
                                     <td className="px-6 py-4 text-right font-bold text-slate-900 whitespace-nowrap">{item.totalWeight.toFixed(2)}</td>
                                     <td className="px-6 py-4 text-center whitespace-nowrap">
                                         {item.isConferred === false ? (
@@ -541,7 +562,7 @@ const FinishedGoods: React.FC<FinishedGoodsProps> = ({ finishedGoods, pontasStoc
                                     </td>
                                     <td className="px-6 py-4 text-center">{getStatusBadge(item.status)}</td>
                                 </tr>
-                            ))}
+                            ); })}
                         </tbody>
                     </table>
                     {pontasStock.filter(i => i.quantity > 0).length === 0 && (
