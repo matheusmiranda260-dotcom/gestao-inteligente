@@ -92,7 +92,13 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
             const unconferredList = relevantItems.filter(i => i.isConferred === false);
 
             if (relevantItems.length > 0) {
-                id = relevantItems[0].id;
+                // Ordenar para garantir que o id pertença a um lote conferido (se houver algum)
+                const sortedRelevant = [...relevantItems].sort((a, b) => {
+                    const aConf = a.isConferred !== false ? 1 : 0;
+                    const bConf = b.isConferred !== false ? 1 : 0;
+                    return bConf - aConf;
+                });
+                id = sortedRelevant[0].id;
                 relevantItems.forEach(item => {
                     virtualQty += item.quantity;
                     physicalQty += (item.physicalQuantity || 0);
@@ -100,6 +106,11 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
                     totalWeight += item.totalWeight;
                 });
             }
+
+            const availablePhysForTransf = relevantItems.reduce((acc, item) => {
+                if (item.isConferred === false) return acc;
+                return acc + ((item.physicalQuantity || 0) - (item.pendingTransferQuantity || 0));
+            }, 0);
 
             return {
                 id,
@@ -113,7 +124,8 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
                 theoreticalWeightPerPiece: parseFloat(m.pesoFinal.replace(',', '.')),
                 unconferredList,
                 hasUnconferred: unconferredList.length > 0,
-                unconferredQty: unconferredList.reduce((acc, curr) => acc + curr.quantity, 0)
+                unconferredQty: unconferredList.reduce((acc, curr) => acc + curr.quantity, 0),
+                availablePhysForTransf
             };
         });
     }, [finishedGoods]);
@@ -173,7 +185,11 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
 
         const relevantItems = finishedGoods.filter(
             i => i.model === movingItem.model && i.size.trim() === movingItem.size.trim()
-        );
+        ).sort((a, b) => {
+            const aConf = a.isConferred !== false ? 1 : 0;
+            const bConf = b.isConferred !== false ? 1 : 0;
+            return bConf - aConf;
+        });
         let targetId = relevantItems[0]?.id;
 
         // Validação de segurança de senha de gestor e OP para adicionar estoque virtual
@@ -238,6 +254,24 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
             }
         }
 
+        // Validação na transferência
+        if (movingItem.type === 'transfer') {
+            const currentItem = relevantItems[0];
+            if (!currentItem || currentItem.isConferred === false) {
+                alert('Erro: Nenhum lote conferido encontrado para transferência.');
+                return;
+            }
+            const availablePhys = (currentItem.physicalQuantity || 0) - (currentItem.pendingTransferQuantity || 0);
+            if (movementQty <= 0) {
+                alert('A quantidade a transferir deve ser maior que zero.');
+                return;
+            }
+            if (movementQty > availablePhys) {
+                alert(`Erro: Quantidade a transferir (${movementQty} pçs) excede o saldo físico disponível (${availablePhys} pçs).`);
+                return;
+            }
+        }
+
         if (!targetId) {
             onAddManual({
                 productType: 'Treliça',
@@ -262,13 +296,13 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
             to: movingItem.type === 'transfer' ? 'physical' : (movingItem.type === 'virtual_audit' || movingItem.type === 'add_virtual') ? 'virtual' : 'out',
             quantity: movementQty,
             operator: currentUser?.username || 'Sistema',
-            observations: obs || (movingItem.type === 'audit' ? 'Ajuste de estoque físico' : movingItem.type === 'add_virtual' ? 'Entrada de estoque' : movingItem.type === 'virtual_audit' ? 'Ajuste de estoque virtual' : movingItem.type === 'dispatch' ? 'Despacho físico de treliça' : 'Transferência para o pátio')
+            observations: obs || (movingItem.type === 'audit' ? 'Ajuste de estoque físico' : movingItem.type === 'add_virtual' ? 'Entrada de estoque' : movingItem.type === 'virtual_audit' ? 'Ajuste de estoque virtual' : movingItem.type === 'dispatch' ? 'Despacho físico de treliça' : 'Transferência para outro setor (Aguardando Retirada)')
         };
 
         const updates: Partial<FinishedProductItem> = {};
         if (movingItem.type === 'transfer') {
             updates.quantity = Math.max(0, currentItem.quantity - movementQty);
-            updates.physicalQuantity = (currentItem.physicalQuantity || 0) + movementQty;
+            updates.pendingTransferQuantity = (currentItem.pendingTransferQuantity || 0) + movementQty;
         } else if (movingItem.type === 'virtual_audit') {
             updates.quantity = movementQty;
         } else if (movingItem.type === 'dispatch') {
@@ -285,9 +319,30 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
         setObs('');
     };
 
-    const currentItemForModal = movingItem
-        ? finishedGoods.find(i => i.model === movingItem.model && i.size.trim() === movingItem.size.trim())
-        : null;
+    const currentItemForModal = useMemo(() => {
+        if (!movingItem) return null;
+        const relevant = finishedGoods.filter(
+            i => i.model === movingItem.model && i.size.trim() === movingItem.size.trim()
+        ).sort((a, b) => {
+            const aConf = a.isConferred !== false ? 1 : 0;
+            const bConf = b.isConferred !== false ? 1 : 0;
+            return bConf - aConf;
+        });
+        return relevant[0] || null;
+    }, [movingItem, finishedGoods]);
+
+    const maxQtyForModal = useMemo(() => {
+        if (!movingItem || !currentItemForModal) return Infinity;
+        if (movingItem.type === 'dispatch') {
+            return Math.min(currentItemForModal.pendingTransferQuantity || 0, currentItemForModal.physicalQuantity || 0);
+        }
+        if (movingItem.type === 'transfer') {
+            return currentItemForModal.isConferred !== false
+                ? (currentItemForModal.physicalQuantity || 0) - (currentItemForModal.pendingTransferQuantity || 0)
+                : 0;
+        }
+        return Infinity;
+    }, [movingItem, currentItemForModal]);
 
     return (
         <div className="p-4 sm:p-6 md:p-8 space-y-8 animate-fade-in">
@@ -298,7 +353,7 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
                         <div className={`p-8 ${movingItem.type === 'transfer' ? 'bg-indigo-600' : movingItem.type === 'virtual_audit' ? 'bg-slate-700' : movingItem.type === 'add_virtual' ? 'bg-emerald-500' : movingItem.type === 'dispatch' ? 'bg-amber-600' : 'bg-emerald-600'} text-white`}>
                             <h3 className="text-2xl font-black flex items-center gap-3">
                                 {movingItem.type === 'transfer' ? <SwitchHorizontalIcon className="h-7 w-7" /> : movingItem.type === 'add_virtual' ? <PlusIcon className="h-7 w-7" /> : movingItem.type === 'dispatch' ? <ArrowLeftIcon className="h-7 w-7" /> : <CalculatorIcon className="h-7 w-7" />}
-                                {movingItem.type === 'transfer' ? 'Transferir para Físico' : movingItem.type === 'add_virtual' ? 'Adicionar Estoque' : movingItem.type === 'virtual_audit' ? 'Ajustar Saldo Virtual' : movingItem.type === 'dispatch' ? 'Despachar Físico (Baixa Pendente)' : 'Ajustar Contagem Física'}
+                                {movingItem.type === 'transfer' ? 'Transferir para Setor (Aguardando Retirada)' : movingItem.type === 'add_virtual' ? 'Adicionar Estoque' : movingItem.type === 'virtual_audit' ? 'Ajustar Saldo Virtual' : movingItem.type === 'dispatch' ? 'Despachar Físico (Baixa Pendente)' : 'Ajustar Contagem Física'}
                             </h3>
                             <p className="text-white/70 font-bold uppercase text-xs tracking-widest mt-2">{movingItem.model} - {movingItem.size}m</p>
                         </div>
@@ -307,6 +362,15 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
                                 <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-xs font-semibold text-amber-800 flex justify-between">
                                     <span>Pendente Retirada: <strong>{currentItemForModal.pendingTransferQuantity || 0} pçs</strong></span>
                                     <span>Disponível no Físico: <strong>{currentItemForModal.physicalQuantity || 0} pçs</strong></span>
+                                </div>
+                            )}
+
+                            {movingItem.type === 'transfer' && currentItemForModal && (
+                                <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-2xl text-xs font-semibold text-indigo-800 flex justify-between animate-fade-in">
+                                    <span>Disponível Físico (Galpão): <strong>{formatPiecesAndPacksShort((currentItemForModal.physicalQuantity || 0) - (currentItemForModal.pendingTransferQuantity || 0))}</strong></span>
+                                    {currentItemForModal.pendingTransferQuantity > 0 && (
+                                        <span className="text-[10px] text-amber-600 font-bold uppercase">(Aguardando: {currentItemForModal.pendingTransferQuantity} pçs)</span>
+                                    )}
                                 </div>
                             )}
                             
@@ -324,7 +388,8 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
                                             onChange={(e) => {
                                                 const packs = parseInt(e.target.value) || 0;
                                                 const rem = movementQty % 200;
-                                                setMovementQty(packs * 200 + rem);
+                                                const newQty = Math.min(packs * 200 + rem, maxQtyForModal);
+                                                setMovementQty(newQty);
                                             }}
                                             className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-black text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none"
                                         />
@@ -337,7 +402,8 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
                                             onChange={(e) => {
                                                 const rem = parseInt(e.target.value) || 0;
                                                 const packs = Math.floor(movementQty / 200);
-                                                setMovementQty(packs * 200 + rem);
+                                                const newQty = Math.min(packs * 200 + rem, maxQtyForModal);
+                                                setMovementQty(newQty);
                                             }}
                                             className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-black text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none"
                                         />
@@ -841,8 +907,9 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
                                                             setMovingItem({ model: item.model, size: item.size, type: 'transfer' });
                                                             setMovementQty(0);
                                                         }}
-                                                        className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-black uppercase transition-all"
-                                                        title="Transferir Virtual para Físico"
+                                                        disabled={item.availablePhysForTransf <= 0}
+                                                        className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-black uppercase transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                                                        title={item.availablePhysForTransf <= 0 ? "Sem estoque físico disponível para transferência" : "Transferir para outro setor (Aguardando Retirada)"}
                                                     >
                                                         Transferir
                                                     </button>
