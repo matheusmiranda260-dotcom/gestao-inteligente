@@ -391,11 +391,22 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
                     font-weight: 400;
                     opacity: 0.5;
                 }
+                .op-number-input {
+                    color: white !important;
+                    background: transparent !important;
+                    border: none !important;
+                    outline: none !important;
+                    box-shadow: none !important;
+                }
 
                 @media print {
                     @page {
                         size: A4 portrait;
                         margin: 5mm;
+                    }
+                    * {
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
                     }
                     /* Reset wrappers for print to ensure full width and no margins */
                     .app-container,
@@ -440,6 +451,26 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
                     }
                     tr, td, th {
                         page-break-inside: avoid !important;
+                    }
+                    /* Lighten background for print */
+                    .print-bg-light {
+                        background-color: #eff6ff !important;
+                        color: #002060 !important;
+                    }
+                    thead tr.print-bg-light th {
+                        background-color: #eff6ff !important;
+                        color: #002060 !important;
+                        border-bottom: 2px solid #002060 !important;
+                    }
+                    .op-number-input {
+                        color: #002060 !important;
+                        background: transparent !important;
+                    }
+                    .op-number-input::placeholder {
+                        color: rgba(0, 32, 96, 0.5) !important;
+                    }
+                    .op-label-print {
+                        color: #475569 !important;
                     }
                 }
 
@@ -536,13 +567,13 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
                         </div>
 
                         {/* Bloco OP */}
-                        <div className="col-span-3 bg-[#002060] text-white p-2 flex flex-col justify-center text-center">
-                            <div className="text-xs md:text-[14px] font-black text-slate-300 uppercase">Ordem de Produção</div>
+                        <div className="col-span-3 bg-[#002060] text-white p-2 flex flex-col justify-center text-center print-bg-light">
+                            <div className="text-xs md:text-[14px] font-black text-slate-300 uppercase op-label-print">Ordem de Produção</div>
                             <input 
                                 type="text" 
                                 value={ordemProducao} 
                                 onChange={e => setOrdemProducao(e.target.value)} 
-                                className="op-editable-input text-center text-3xl md:text-4xl font-black w-full bg-transparent text-white outline-none border-none placeholder:text-white mt-1"
+                                className="op-number-input text-center text-3xl md:text-4xl font-black w-full bg-transparent text-white outline-none border-none placeholder:text-white mt-1 focus:ring-0 focus:border-0"
                                 placeholder="84536" 
                             />
                         </div>
@@ -559,7 +590,7 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
                                 <col style={{ width: '20%' }} />
                             </colgroup>
                             <thead>
-                                <tr className="bg-[#002060] text-white text-[12px] font-black uppercase text-center border-b border-[#002060] tracking-wider leading-tight">
+                                <tr className="bg-[#002060] text-white text-[12px] font-black uppercase text-center border-b border-[#002060] tracking-wider leading-tight print-bg-light">
                                     <th className="border-r border-slate-300 py-2.5 align-middle text-center">Data</th>
                                     <th className="border-r border-slate-300 py-2.5 align-middle text-center">Lote (copex)</th>
                                     <th className="border-r border-slate-300 py-2.5 align-middle text-center">Peso Etiqueta (kg)</th>
