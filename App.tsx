@@ -2313,7 +2313,7 @@ const App: React.FC = () => {
             
             // Re-calcula peso se a quantidade virtual mudar
             if (updates.quantity !== undefined) {
-                const weightPerPiece = item.totalWeight / item.quantity;
+                const weightPerPiece = item.quantity > 0 ? item.totalWeight / item.quantity : 0;
                 dbUpdates.total_weight = weightPerPiece * updates.quantity;
                 updates.totalWeight = dbUpdates.total_weight;
             }

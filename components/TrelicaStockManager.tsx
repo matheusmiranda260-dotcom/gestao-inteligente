@@ -1180,6 +1180,16 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
                                                 </button>
                                                 <button 
                                                     onClick={() => {
+                                                        setMovingItem({ model: item.model, size: item.size, type: 'virtual_audit' });
+                                                        setMovementQty(item.virtualQty);
+                                                    }}
+                                                    className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-[10px] font-black uppercase transition-all"
+                                                    title="Ajustar Saldo Virtual (Sistema)"
+                                                >
+                                                    Aj. Virtual
+                                                </button>
+                                                <button 
+                                                    onClick={() => {
                                                         setMovingItem({ model: item.model, size: item.size, type: 'audit' });
                                                         setMovementQty(item.physicalQty);
                                                     }}
