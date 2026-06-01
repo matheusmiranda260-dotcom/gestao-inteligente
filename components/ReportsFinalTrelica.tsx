@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Page, StockItem, StockGauge } from '../types';
 import html2canvas from 'html2canvas';
+import { trelicaModels } from './ProductionOrderTrelica';
 
 interface ReportsFinalTrelicaProps {
     stock: StockItem[];
@@ -47,6 +48,27 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
     
     // Meta de produção
     const [piecesToProduce, setPiecesToProduce] = useState<number | ''>('');
+
+    // Modelo de Treliça Selecionado
+    const [selectedModelCod, setSelectedModelCod] = useState<string>('');
+
+    const normalizeBitolaVal = (val: string): string => {
+        if (!val) return '';
+        const num = parseFloat(val.replace(',', '.'));
+        return isNaN(num) ? '' : num.toFixed(2);
+    };
+
+    const handleModelChange = (cod: string) => {
+        setSelectedModelCod(cod);
+        if (cod) {
+            const model = trelicaModels.find(m => m.cod === cod);
+            if (model) {
+                setBitolaBlock1(normalizeBitolaVal(model.superior));
+                setBitolaBlock2(normalizeBitolaVal(model.inferior));
+                setBitolaBlock3(normalizeBitolaVal(model.senozoide));
+            }
+        }
+    };
 
     // Bitolas disponíveis de CA-60 no sistema (combinando padrão + DB + estoque)
     const CA60Bitolas = useMemo(() => {
@@ -242,6 +264,7 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
                 if (data.ordemProducao) setOrdemProducao(data.ordemProducao);
                 if (data.responsavel) setResponsavel(data.responsavel);
                 if (data.piecesToProduce !== undefined) setPiecesToProduce(data.piecesToProduce);
+                if (data.selectedModelCod) setSelectedModelCod(data.selectedModelCod);
                 if (data.prodRows) setProdRows(data.prodRows);
                 if (data.rows6mm) setRows6mm(data.rows6mm);
                 if (data.rows3_8mm) setRows3_8mm(data.rows3_8mm);
@@ -267,6 +290,7 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
             ordemProducao,
             responsavel,
             piecesToProduce,
+            selectedModelCod,
             prodRows,
             rows6mm,
             rows3_8mm,
@@ -296,7 +320,7 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
             saveDraft();
         }, 800);
         return () => clearTimeout(timer);
-    }, [selectedDate, ordemProducao, responsavel, piecesToProduce, prodRows, rows6mm, rows3_8mm, rows4_2mm, previsto6mm, previsto3_8mm, previsto4_2mm, bitolaBlock1, bitolaBlock2, bitolaBlock3, loading]);
+    }, [selectedDate, ordemProducao, responsavel, piecesToProduce, prodRows, rows6mm, rows3_8mm, rows4_2mm, previsto6mm, previsto3_8mm, previsto4_2mm, bitolaBlock1, bitolaBlock2, bitolaBlock3, loading, selectedModelCod]);
 
     // Operações em Linhas
     const updateProdRowField = (rowId: string, field: keyof ProductionRow, value: any) => {
@@ -338,6 +362,7 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
         setOrdemProducao('');
         setResponsavel('');
         setPiecesToProduce('');
+        setSelectedModelCod('');
         setProdRows(Array.from({ length: 6 }, createEmptyProductionRow));
         setRows6mm(Array.from({ length: 5 }, createEmptyGaugeRow));
         setRows3_8mm(Array.from({ length: 5 }, createEmptyGaugeRow));
@@ -356,6 +381,7 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
         setOrdemProducao('84536');
         setResponsavel('Matheus Miranda');
         setPiecesToProduce(10000);
+        setSelectedModelCod('H8P12');
         setBitolaBlock1('6.00');
         setBitolaBlock2('3.80');
         setBitolaBlock3('4.20');
@@ -538,6 +564,17 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
                     border: none !important;
                     outline: none !important;
                     box-shadow: none !important;
+                    cursor: text !important;
+                    border-bottom: 1.5px dashed transparent !important;
+                    transition: all 0.2s;
+                }
+                .op-number-input:hover {
+                    border-bottom: 1.5px dashed rgba(255, 255, 255, 0.4) !important;
+                    background-color: rgba(255, 255, 255, 0.05) !important;
+                }
+                .op-number-input:focus {
+                    border-bottom: 1.8px solid white !important;
+                    background-color: rgba(255, 255, 255, 0.1) !important;
                 }
 
                 @media print {
@@ -746,21 +783,43 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
                         <div className="bg-[#002060] text-white text-center py-2 font-black text-sm uppercase tracking-wider print-bg-light">
                             ATUALIZAÇÃO DA PRODUÇÃO
                         </div>
-                        <div className="p-3 bg-slate-50 border-b border-[#002060] flex flex-col sm:flex-row items-center justify-between gap-3">
-                            <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
-                                <span>Quantidade de peças a produzir:</span>
-                                <input 
-                                    type="number" 
-                                    value={piecesToProduce} 
-                                    onChange={e => setPiecesToProduce(e.target.value === '' ? '' : Number(e.target.value))}
-                                    className="op-editable-input text-center w-24 text-[#002060] font-black text-sm"
-                                    placeholder="Meta..."
-                                />
-                                <span className="text-slate-500 font-medium">treliças</span>
+                        <div className="p-3 bg-slate-50 border-b border-[#002060] flex flex-col gap-3">
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-slate-700">
+                                    <div className="flex items-center gap-2">
+                                        <span>Quantidade de peças a produzir:</span>
+                                        <input 
+                                            type="number" 
+                                            value={piecesToProduce} 
+                                            onChange={e => setPiecesToProduce(e.target.value === '' ? '' : Number(e.target.value))}
+                                            className="op-editable-input text-center w-24 text-[#002060] font-black text-sm"
+                                            placeholder="Meta..."
+                                        />
+                                        <span className="text-slate-500 font-medium">treliças</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 sm:border-l sm:pl-4 border-slate-300">
+                                        <span>Modelo da Treliça:</span>
+                                        <select
+                                            value={selectedModelCod}
+                                            onChange={e => handleModelChange(e.target.value)}
+                                            className="text-xs font-black text-[#002060] bg-transparent outline-none cursor-pointer hover:bg-slate-100/50 rounded pr-1 no-print-capturing"
+                                        >
+                                            <option value="">Selecione o modelo...</option>
+                                            {trelicaModels.map(m => (
+                                                <option key={m.cod} value={m.cod}>
+                                                    {m.cod} - {m.modelo} ({m.tamanho}m)
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <span className="print-only-capturing hidden text-xs font-black text-[#002060]">
+                                            {selectedModelCod ? `${selectedModelCod} - ${trelicaModels.find(m => m.cod === selectedModelCod)?.modelo || ''}` : '-'}
+                                        </span>
+                                    </div>
+                                </div>
+                                <button onClick={addProdRow} className="no-print bg-[#002060] text-white font-black text-[10px] px-3 py-1.5 rounded hover:bg-slate-800 shadow transition-all uppercase">
+                                    + Adicionar Lançamento
+                                </button>
                             </div>
-                            <button onClick={addProdRow} className="no-print bg-[#002060] text-white font-black text-[10px] px-3 py-1.5 rounded hover:bg-slate-800 shadow transition-all uppercase">
-                                + Adicionar Lançamento
-                            </button>
                         </div>
                         <table className="w-full text-center border-collapse table-fixed text-xs">
                             <colgroup>
