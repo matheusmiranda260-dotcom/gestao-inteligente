@@ -355,6 +355,37 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
         else setRows4_2mm(prev => prev.filter(r => r.id !== rowId));
     };
 
+    const sortGaugeRows = (tableType: '6mm' | '3_8mm' | '4_2mm') => {
+        const sorter = (rows: GaugeRow[]) => {
+            const filled = rows.filter(r => r.lote.trim() !== '');
+            const empty = rows.filter(r => r.lote.trim() === '');
+            
+            filled.sort((a, b) => {
+                const aVal = a.lote.trim();
+                const bVal = b.lote.trim();
+                
+                // Tenta comparação numérica se ambos forem números
+                const aNum = Number(aVal);
+                const bNum = Number(bVal);
+                
+                if (!isNaN(aNum) && !isNaN(bNum)) {
+                    return aNum - bNum;
+                }
+                
+                // Caso contrário, comparação natural/alfabética
+                return aVal.localeCompare(bVal, undefined, { numeric: true, sensitivity: 'base' });
+            });
+            
+            return [...filled, ...empty];
+        };
+
+        if (tableType === '6mm') setRows6mm(sorter);
+        else if (tableType === '3_8mm') setRows3_8mm(sorter);
+        else setRows4_2mm(sorter);
+        
+        showToast('Lotes ordenados do menor para o maior.', 'success');
+    };
+
     const clearForm = () => {
         const confirm = window.confirm("Deseja realmente limpar toda a planilha?");
         if (!confirm) return;
@@ -1065,9 +1096,21 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
                                                 </span>
                                                 <span className="text-[10px] text-slate-400 font-extrabold uppercase">Consumo de Lotes</span>
                                             </div>
-                                            <button onClick={() => addGaugeRow(gBlock.type)} className="no-print bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-black text-[9px] px-2.5 py-1 rounded transition-all uppercase">
-                                                + Lote
-                                            </button>
+                                            <div className="flex items-center gap-1.5 no-print">
+                                                <button 
+                                                    onClick={() => sortGaugeRows(gBlock.type)} 
+                                                    className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-black text-[9px] px-2.5 py-1 rounded transition-all uppercase flex items-center gap-1"
+                                                    title="Ordenar lotes do menor para o maior"
+                                                >
+                                                    ⇅ Classificar
+                                                </button>
+                                                <button 
+                                                    onClick={() => addGaugeRow(gBlock.type)} 
+                                                    className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-black text-[9px] px-2.5 py-1 rounded transition-all uppercase"
+                                                >
+                                                    + Lote
+                                                </button>
+                                            </div>
                                         </div>
 
                                          <div className="border border-slate-200 rounded-lg overflow-hidden">
