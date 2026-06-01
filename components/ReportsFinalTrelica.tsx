@@ -805,17 +805,17 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
                             .op-label-print {
                                 color: #475569 !important;
                             }
-                            .trelica-gauge-block {
+                            #relatorio-final-sheet .trelica-gauge-block {
                                 border: none !important;
                                 background: transparent !important;
                                 margin-top: 80px !important;
                                 margin-bottom: 0px !important;
                                 padding: 0 !important;
                             }
-                            .trelica-gauge-block .print-full-width > * + * {
+                            #relatorio-final-sheet .trelica-gauge-block .print-full-width > * + * {
                                 margin-top: 8px !important;
                             }
-                            .trelica-totals-section {
+                            #relatorio-final-sheet .trelica-totals-section {
                                 margin-top: 80px !important;
                             }
                         }
@@ -1035,7 +1035,7 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
                                 : '';
 
                             return (
-                                <div key={gBlock.type} className="trelica-gauge-block grid grid-cols-12 gap-6 items-start border border-slate-200 p-4 rounded-xl bg-[#fafbfc]">
+                                <div key={gBlock.type} className="trelica-gauge-block grid grid-cols-12 gap-6 items-start border border-slate-200 p-[16px] rounded-xl bg-[#fafbfc]">
                                     {/* Tabela do Lado Esquerdo */}
                                     <div className="col-span-12 md:col-span-9 print-full-width space-y-2">
                                         <div className="flex items-center justify-between pb-1">
