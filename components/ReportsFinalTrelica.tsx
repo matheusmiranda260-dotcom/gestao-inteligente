@@ -663,7 +663,7 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
                         @media print {
                             @page {
                                 size: A4 portrait;
-                                margin: 5mm;
+                                margin: 10mm;
                             }
                             * {
                                 -webkit-print-color-adjust: exact !important;
@@ -974,103 +974,105 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
                                             </button>
                                         </div>
 
-                                        <table className="w-full text-center border-collapse text-xs table-fixed bg-white border border-slate-200 rounded overflow-hidden">
-                                            <colgroup>
-                                                <col style={{ width: '30%' }} />
-                                                <col style={{ width: '23%' }} />
-                                                <col style={{ width: '23%' }} />
-                                                <col style={{ width: '24%' }} />
-                                            </colgroup>
-                                            <thead>
-                                                <tr className="bg-slate-50 font-bold border-b border-slate-200">
-                                                    <th className="py-2 border-r border-slate-200 w-[30%] text-center">Lote</th>
-                                                    <th className="py-2 border-r border-slate-200 w-[23%] text-center">Peso (kg)</th>
-                                                    <th className="py-2 border-r border-slate-200 w-[23%] text-center">Usado (kg)</th>
-                                                    <th className="py-2 w-[24%] text-center">Sobrou (kg)</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {gBlock.rows.map(row => {
-                                                    const sobrou = (typeof row.peso === 'number' && typeof row.usado === 'number')
-                                                        ? row.peso - row.usado 
-                                                        : 0;
-
-                                                    return (
-                                                        <tr key={row.id} className="border-b border-slate-100 hover:bg-slate-50/50 group">
-                                                            {/* Lote Input com Autocomplete */}
-                                                            <td className="p-1 border-r border-slate-200 w-[30%] text-center relative">
-                                                                <input 
-                                                                    type="text"
-                                                                    value={row.lote}
-                                                                    onChange={e => handleLoteChange(gBlock.type, row.id, e.target.value)}
-                                                                    onFocus={() => {
-                                                                        setFilterText(row.lote);
-                                                                        setActiveSuggestion({ tableType: gBlock.type, rowId: row.id });
-                                                                    }}
-                                                                    className="op-editable-input text-center w-full text-[13px] uppercase font-black"
-                                                                    placeholder="Lote..."
-                                                                />
-                                                                {/* Dropdown de sugestão */}
-                                                                {(activeSuggestion?.tableType === gBlock.type && activeSuggestion?.rowId === row.id && suggestions.length > 0) && (
-                                                                    <div ref={suggestionsRef} className="absolute left-0 right-0 top-full mt-1 bg-white border-2 border-[#002060] rounded shadow-xl z-50 text-left text-[9px] suggestions-dropdown max-h-[160px] overflow-y-auto font-sans">
-                                                                        {suggestions.map(item => (
-                                                                            <div 
-                                                                                key={item.id}
-                                                                                onClick={() => handleSelectSuggestion(gBlock.type, row.id, item)}
-                                                                                className="p-1.5 hover:bg-slate-100 cursor-pointer border-b border-slate-100 last:border-b-0"
-                                                                            >
-                                                                                <div className="font-bold text-[#002060]">{item.internalLot} {item.supplierLot ? `(${item.supplierLot})` : ''}</div>
-                                                                                <div className="text-slate-500 font-medium">Peso: {item.remainingQuantity || item.weight || '-'} kg | Bitola: {item.bitola || '-'}</div>
-                                                                            </div>
-                                                                        ))}
-                                                                    </div>
-                                                                )}
-                                                            </td>
-                                                            
-                                                            {/* Peso Lote */}
-                                                            <td className="p-1 border-r border-slate-200 w-[23%] text-center">
-                                                                <input 
-                                                                    type="number"
-                                                                    value={row.peso}
-                                                                    onChange={e => updateGaugeRowField(gBlock.type, row.id, 'peso', e.target.value === '' ? '' : Number(e.target.value))}
-                                                                    className="op-editable-input text-center w-full text-[13px]"
-                                                                    placeholder="0"
-                                                                />
-                                                            </td>
-
-                                                            {/* Usado */}
-                                                            <td className="p-1 border-r border-slate-200 bg-slate-50/20 w-[23%] text-center">
-                                                                <input 
-                                                                    type="number"
-                                                                    value={row.usado}
-                                                                    onChange={e => updateGaugeRowField(gBlock.type, row.id, 'usado', e.target.value === '' ? '' : Number(e.target.value))}
-                                                                    className="op-editable-input text-center w-full text-[13px]"
-                                                                    placeholder="0"
-                                                                />
-                                                            </td>
-
-                                                            {/* Sobrou */}
-                                                            <td className="p-1 w-[24%] text-center relative font-bold text-slate-800 text-[13px]">
-                                                                <span>{sobrou || 0}</span>
-                                                                <button 
-                                                                    onClick={() => removeGaugeRow(gBlock.type, row.id)} 
-                                                                    className="absolute right-1 top-1/2 -translate-y-1/2 text-rose-500 hover:text-rose-700 font-bold no-print opacity-0 group-hover:opacity-100 transition-opacity p-1"
-                                                                >
-                                                                    ✕
-                                                                </button>
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                                {/* Totais do Bloco */}
-                                                <tr className="bg-slate-50 font-black text-[13px] text-slate-800 border-t border-slate-200">
-                                                    <td className="py-2 border-r border-slate-200 uppercase font-extrabold text-[10px] text-slate-500 w-[30%] text-center">Total</td>
-                                                    <td className="py-2 border-r border-slate-200 w-[23%] text-center">{gBlock.stats.totalWeight}</td>
-                                                    <td className="py-2 border-r border-slate-200 font-black text-[#002060] w-[23%] text-center">{gBlock.stats.totalUsed}</td>
-                                                    <td className="py-2 w-[24%] text-center">{gBlock.stats.totalRemaining}</td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
+                                         <div className="border border-slate-200 rounded-lg overflow-hidden">
+                                             <table className="w-full text-center border-collapse text-xs table-fixed bg-white">
+                                                 <colgroup>
+                                                     <col style={{ width: '30%' }} />
+                                                     <col style={{ width: '23%' }} />
+                                                     <col style={{ width: '23%' }} />
+                                                     <col style={{ width: '24%' }} />
+                                                 </colgroup>
+                                                 <thead>
+                                                     <tr className="bg-slate-50 font-bold border-b border-slate-200">
+                                                         <th className="py-2 border-r border-slate-200 w-[30%] text-center">Lote</th>
+                                                         <th className="py-2 border-r border-slate-200 w-[23%] text-center">Peso (kg)</th>
+                                                         <th className="py-2 border-r border-slate-200 w-[23%] text-center">Usado (kg)</th>
+                                                         <th className="py-2 w-[24%] text-center">Sobrou (kg)</th>
+                                                     </tr>
+                                                 </thead>
+                                                 <tbody>
+                                                     {gBlock.rows.map(row => {
+                                                         const sobrou = (typeof row.peso === 'number' && typeof row.usado === 'number')
+                                                             ? row.peso - row.usado 
+                                                             : 0;
+     
+                                                         return (
+                                                             <tr key={row.id} className="border-b border-slate-200 hover:bg-slate-50/50 group">
+                                                                 {/* Lote Input com Autocomplete */}
+                                                                 <td className="p-1 border-r border-slate-200 w-[30%] text-center relative">
+                                                                     <input 
+                                                                         type="text"
+                                                                         value={row.lote}
+                                                                         onChange={e => handleLoteChange(gBlock.type, row.id, e.target.value)}
+                                                                         onFocus={() => {
+                                                                             setFilterText(row.lote);
+                                                                             setActiveSuggestion({ tableType: gBlock.type, rowId: row.id });
+                                                                         }}
+                                                                         className="op-editable-input text-center w-full text-[13px] uppercase font-black"
+                                                                         placeholder="Lote..."
+                                                                     />
+                                                                     {/* Dropdown de sugestão */}
+                                                                     {(activeSuggestion?.tableType === gBlock.type && activeSuggestion?.rowId === row.id && suggestions.length > 0) && (
+                                                                         <div ref={suggestionsRef} className="absolute left-0 right-0 top-full mt-1 bg-white border-2 border-[#002060] rounded shadow-xl z-50 text-left text-[9px] suggestions-dropdown max-h-[160px] overflow-y-auto font-sans">
+                                                                             {suggestions.map(item => (
+                                                                                 <div 
+                                                                                     key={item.id}
+                                                                                     onClick={() => handleSelectSuggestion(gBlock.type, row.id, item)}
+                                                                                     className="p-1.5 hover:bg-slate-100 cursor-pointer border-b border-slate-100 last:border-b-0"
+                                                                                 >
+                                                                                     <div className="font-bold text-[#002060]">{item.internalLot} {item.supplierLot ? `(${item.supplierLot})` : ''}</div>
+                                                                                     <div className="text-slate-500 font-medium">Peso: {item.remainingQuantity || item.weight || '-'} kg | Bitola: {item.bitola || '-'}</div>
+                                                                                 </div>
+                                                                             ))}
+                                                                         </div>
+                                                                     )}
+                                                                 </td>
+                                                                 
+                                                                 {/* Peso Lote */}
+                                                                 <td className="p-1 border-r border-slate-200 w-[23%] text-center">
+                                                                     <input 
+                                                                         type="number"
+                                                                         value={row.peso}
+                                                                         onChange={e => updateGaugeRowField(gBlock.type, row.id, 'peso', e.target.value === '' ? '' : Number(e.target.value))}
+                                                                         className="op-editable-input text-center w-full text-[13px]"
+                                                                         placeholder="0"
+                                                                     />
+                                                                 </td>
+     
+                                                                 {/* Usado */}
+                                                                 <td className="p-1 border-r border-slate-200 bg-slate-50/20 w-[23%] text-center">
+                                                                     <input 
+                                                                         type="number"
+                                                                         value={row.usado}
+                                                                         onChange={e => updateGaugeRowField(gBlock.type, row.id, 'usado', e.target.value === '' ? '' : Number(e.target.value))}
+                                                                         className="op-editable-input text-center w-full text-[13px]"
+                                                                         placeholder="0"
+                                                                     />
+                                                                 </td>
+     
+                                                                 {/* Sobrou */}
+                                                                 <td className="p-1 w-[24%] text-center relative font-bold text-slate-800 text-[13px]">
+                                                                     <span>{sobrou || 0}</span>
+                                                                     <button 
+                                                                         onClick={() => removeGaugeRow(gBlock.type, row.id)} 
+                                                                         className="absolute right-1 top-1/2 -translate-y-1/2 text-rose-500 hover:text-rose-700 font-bold no-print opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                                                                     >
+                                                                         ✕
+                                                                     </button>
+                                                                 </td>
+                                                             </tr>
+                                                         );
+                                                     })}
+                                                     {/* Totais do Bloco */}
+                                                     <tr className="bg-slate-50 font-black text-[13px] text-slate-800 border-t border-slate-200">
+                                                         <td className="py-2 border-r border-slate-200 uppercase font-extrabold text-[10px] text-slate-500 w-[30%] text-center">Total</td>
+                                                         <td className="py-2 border-r border-slate-200 w-[23%] text-center">{gBlock.stats.totalWeight}</td>
+                                                         <td className="py-2 border-r border-slate-200 font-black text-[#002060] w-[23%] text-center">{gBlock.stats.totalUsed}</td>
+                                                         <td className="py-2 w-[24%] text-center">{gBlock.stats.totalRemaining}</td>
+                                                     </tr>
+                                                 </tbody>
+                                             </table>
+                                         </div>
                                     </div>
 
                                     {/* Cards do Lado Direito */}
