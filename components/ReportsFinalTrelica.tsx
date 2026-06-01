@@ -830,10 +830,10 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
                             </colgroup>
                             <thead>
                                 <tr className="bg-slate-100 font-bold border-b border-[#002060]">
-                                    <th className="py-2 border-r border-[#002060]">Qnt.</th>
-                                    <th className="py-2 border-r border-[#002060]">peso (kg)</th>
-                                    <th className="py-2 border-r border-[#002060]">media (kg/peça)</th>
-                                    <th className="py-2">Data</th>
+                                    <th className="py-2 border-r border-[#002060] w-[25%] text-center font-bold text-slate-700 uppercase tracking-wider text-[11px]">Qnt.</th>
+                                    <th className="py-2 border-r border-[#002060] w-[25%] text-center font-bold text-slate-700 uppercase tracking-wider text-[11px]">Peso (kg)</th>
+                                    <th className="py-2 border-r border-[#002060] w-[25%] text-center font-bold text-slate-700 uppercase tracking-wider text-[11px]">Média (kg/peça)</th>
+                                    <th className="py-2 w-[25%] text-center font-bold text-slate-700 uppercase tracking-wider text-[11px]">Data</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -844,7 +844,7 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
 
                                     return (
                                         <tr key={row.id} className="border-b border-slate-200 hover:bg-slate-50/50 group">
-                                            <td className="p-1 border-r border-slate-200 relative">
+                                            <td className="p-1 border-r border-[#002060] w-[25%] text-center relative">
                                                 <input 
                                                     type="number"
                                                     value={row.qnt}
@@ -853,7 +853,7 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
                                                     placeholder="0"
                                                 />
                                             </td>
-                                            <td className="p-1 border-r border-slate-200">
+                                            <td className="p-1 border-r border-[#002060] w-[25%] text-center">
                                                 <input 
                                                     type="number"
                                                     value={row.peso}
@@ -862,10 +862,10 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
                                                     placeholder="0"
                                                 />
                                             </td>
-                                            <td className="p-1 border-r border-slate-200 font-bold text-slate-800 text-[13px]">
+                                            <td className="p-1 border-r border-[#002060] w-[25%] text-center font-bold text-slate-800 text-[13px]">
                                                 {media > 0 ? media.toFixed(2).replace('.', ',') : '-'}
                                             </td>
-                                            <td className="p-1 relative">
+                                            <td className="p-1 w-[25%] text-center relative">
                                                 <input 
                                                     type="text"
                                                     value={row.data}
@@ -885,10 +885,10 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
                                 })}
                                 {/* Total Row */}
                                 <tr className="bg-slate-100 font-black border-t-2 border-[#002060] text-sm text-[#002060]">
-                                    <td className="py-2.5 border-r border-[#002060]">{prodTotals.totalQnt || 0}</td>
-                                    <td className="py-2.5 border-r border-[#002060]">{prodTotals.totalWeight || 0} kg</td>
-                                    <td className="py-2.5 border-r border-[#002060]">{prodTotals.overallAverage > 0 ? prodTotals.overallAverage.toFixed(2).replace('.', ',') : '0,00'} kg/pç</td>
-                                    <td className="py-2.5 text-xs uppercase tracking-wider font-extrabold text-slate-500">TOTAL / MÉDIA</td>
+                                    <td className="py-2.5 border-r border-[#002060] w-[25%] text-center">{prodTotals.totalQnt || 0}</td>
+                                    <td className="py-2.5 border-r border-[#002060] w-[25%] text-center">{prodTotals.totalWeight || 0} kg</td>
+                                    <td className="py-2.5 border-r border-[#002060] w-[25%] text-center">{prodTotals.overallAverage > 0 ? prodTotals.overallAverage.toFixed(2).replace('.', ',') : '0,00'} kg/pç</td>
+                                    <td className="py-2.5 w-[25%] text-center text-xs uppercase tracking-wider font-extrabold text-slate-500">TOTAL / MÉDIA</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -948,10 +948,10 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
                                             </colgroup>
                                             <thead>
                                                 <tr className="bg-slate-50 font-bold border-b border-slate-200">
-                                                    <th className="py-2 border-r border-slate-200">Lote</th>
-                                                    <th className="py-2 border-r border-slate-200">Peso (kg)</th>
-                                                    <th className="py-2 border-r border-slate-200">Usado (kg)</th>
-                                                    <th className="py-2">Sobrou (kg)</th>
+                                                    <th className="py-2 border-r border-slate-200 w-[30%] text-center">Lote</th>
+                                                    <th className="py-2 border-r border-slate-200 w-[23%] text-center">Peso (kg)</th>
+                                                    <th className="py-2 border-r border-slate-200 w-[23%] text-center">Usado (kg)</th>
+                                                    <th className="py-2 w-[24%] text-center">Sobrou (kg)</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -963,7 +963,7 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
                                                     return (
                                                         <tr key={row.id} className="border-b border-slate-100 hover:bg-slate-50/50 group">
                                                             {/* Lote Input com Autocomplete */}
-                                                            <td className="p-1 border-r border-slate-200 relative">
+                                                            <td className="p-1 border-r border-slate-200 w-[30%] text-center relative">
                                                                 <input 
                                                                     type="text"
                                                                     value={row.lote}
@@ -993,7 +993,7 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
                                                             </td>
                                                             
                                                             {/* Peso Lote */}
-                                                            <td className="p-1 border-r border-slate-200">
+                                                            <td className="p-1 border-r border-slate-200 w-[23%] text-center">
                                                                 <input 
                                                                     type="number"
                                                                     value={row.peso}
@@ -1004,7 +1004,7 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
                                                             </td>
 
                                                             {/* Usado */}
-                                                            <td className="p-1 border-r border-slate-200 bg-slate-50/20">
+                                                            <td className="p-1 border-r border-slate-200 bg-slate-50/20 w-[23%] text-center">
                                                                 <input 
                                                                     type="number"
                                                                     value={row.usado}
@@ -1015,7 +1015,7 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
                                                             </td>
 
                                                             {/* Sobrou */}
-                                                            <td className="p-1 relative font-bold text-slate-800 text-[13px]">
+                                                            <td className="p-1 w-[24%] text-center relative font-bold text-slate-800 text-[13px]">
                                                                 <span>{sobrou || 0}</span>
                                                                 <button 
                                                                     onClick={() => removeGaugeRow(gBlock.type, row.id)} 
@@ -1029,10 +1029,10 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
                                                 })}
                                                 {/* Totais do Bloco */}
                                                 <tr className="bg-slate-50 font-black text-[13px] text-slate-800 border-t border-slate-200">
-                                                    <td className="py-2 border-r border-slate-200 uppercase font-extrabold text-[10px] text-slate-500">Total</td>
-                                                    <td className="py-2 border-r border-slate-200">{gBlock.stats.totalWeight}</td>
-                                                    <td className="py-2 border-r border-slate-200 font-black text-[#002060]">{gBlock.stats.totalUsed}</td>
-                                                    <td className="py-2">{gBlock.stats.totalRemaining}</td>
+                                                    <td className="py-2 border-r border-slate-200 uppercase font-extrabold text-[10px] text-slate-500 w-[30%] text-center">Total</td>
+                                                    <td className="py-2 border-r border-slate-200 w-[23%] text-center">{gBlock.stats.totalWeight}</td>
+                                                    <td className="py-2 border-r border-slate-200 font-black text-[#002060] w-[23%] text-center">{gBlock.stats.totalUsed}</td>
+                                                    <td className="py-2 w-[24%] text-center">{gBlock.stats.totalRemaining}</td>
                                                 </tr>
                                             </tbody>
                                         </table>
