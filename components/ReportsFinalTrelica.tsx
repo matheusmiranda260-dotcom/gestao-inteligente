@@ -459,6 +459,7 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
                     const clonedElement = clonedDoc.getElementById('relatorio-final-sheet');
                     if (!clonedElement) return;
 
+                    // Sync and replace inputs
                     const clonedInputs = clonedElement.querySelectorAll('input');
                     clonedInputs.forEach((input: any) => {
                         const div = clonedDoc.createElement('div');
@@ -474,6 +475,31 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
                         div.style.overflow = 'visible';
 
                         input.parentNode?.replaceChild(div, input);
+                    });
+
+                    // Hide elements with no-print
+                    const clonedNoPrints = clonedElement.querySelectorAll('.no-print');
+                    clonedNoPrints.forEach((el: any) => {
+                        el.style.setProperty('display', 'none', 'important');
+                    });
+
+                    // Hide elements with no-print-capturing
+                    const clonedNoPrintCapturings = clonedElement.querySelectorAll('.no-print-capturing');
+                    clonedNoPrintCapturings.forEach((el: any) => {
+                        el.style.setProperty('display', 'none', 'important');
+                    });
+
+                    // Show elements with print-only-capturing
+                    const clonedPrintOnlys = clonedElement.querySelectorAll('.print-only-capturing');
+                    clonedPrintOnlys.forEach((el: any) => {
+                        el.style.setProperty('display', 'inline-block', 'important');
+                    });
+
+                    // Make print-full-width elements span full 12 columns
+                    const clonedFullWidths = clonedElement.querySelectorAll('.print-full-width');
+                    clonedFullWidths.forEach((el: any) => {
+                        el.style.setProperty('grid-column', 'span 12 / span 12', 'important');
+                        el.style.setProperty('width', '100%', 'important');
                     });
                 }
             });
@@ -513,185 +539,6 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
 
     return (
         <div className="p-4 sm:p-6 md:p-8 bg-slate-50 min-h-screen font-mono text-slate-800 relative select-none">
-            {/* CSS Customizado para impressão e captura */}
-            <style dangerouslySetInnerHTML={{ __html: `
-                input::-webkit-outer-spin-button,
-                input::-webkit-inner-spin-button {
-                    -webkit-appearance: none;
-                    margin: 0;
-                }
-                input[type=number] {
-                    -moz-appearance: textfield;
-                }
-
-                .op-sheet-container {
-                    font-family: 'Inter', 'Segoe UI', 'Arial', sans-serif;
-                }
-                
-                .op-editable-input {
-                    border: none !important;
-                    background: transparent !important;
-                    font-weight: 800 !important;
-                    color: #002060 !important;
-                    padding: 2px !important;
-                    margin: 0 !important;
-                    outline: none !important;
-                    box-shadow: none !important;
-                    transition: all 0.2s;
-                    border-bottom: 1.5px dashed transparent !important;
-                    border-radius: 0 !important;
-                    height: auto !important;
-                    line-height: normal !important;
-                    min-width: 0 !important;
-                }
-                .op-editable-input:hover {
-                    border-bottom: 1.5px dashed #3b82f6 !important;
-                    background-color: rgba(59, 130, 246, 0.04) !important;
-                }
-                .op-editable-input:focus {
-                    border-bottom: 1.8px solid #002060 !important;
-                    background-color: rgba(59, 130, 246, 0.08) !important;
-                    outline: none !important;
-                }
-                .op-editable-input::placeholder {
-                    color: #94a3b8;
-                    font-weight: 400;
-                    opacity: 0.5;
-                }
-                .op-number-input {
-                    color: white !important;
-                    background: transparent !important;
-                    border: none !important;
-                    outline: none !important;
-                    box-shadow: none !important;
-                    cursor: text !important;
-                    border-bottom: 1.5px dashed transparent !important;
-                    transition: all 0.2s;
-                }
-                .op-number-input:hover {
-                    border-bottom: 1.5px dashed rgba(255, 255, 255, 0.4) !important;
-                    background-color: rgba(255, 255, 255, 0.05) !important;
-                }
-                .op-number-input:focus {
-                    border-bottom: 1.8px solid white !important;
-                    background-color: rgba(255, 255, 255, 0.1) !important;
-                }
-
-                @media print {
-                    @page {
-                        size: A4 portrait;
-                        margin: 5mm;
-                    }
-                    * {
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                    }
-                    .app-container,
-                    .main-content,
-                    .main-content > div,
-                    .app-container > main,
-                    div.p-4 {
-                        display: block !important;
-                        width: 100% !important;
-                        padding: 0 !important;
-                        margin: 0 !important;
-                        position: static !important;
-                        border: none !important;
-                        box-shadow: none !important;
-                    }
-                    body {
-                        background: white !important;
-                        color: black !important;
-                        margin: 0 !important;
-                        padding: 0 !important;
-                    }
-                    .no-print {
-                        display: none !important;
-                    }
-                    .print-sheet-a4 {
-                        padding: 0 !important;
-                        margin: 0 !important;
-                        border: none !important;
-                        box-shadow: none !important;
-                        max-width: 100% !important;
-                        width: 100% !important;
-                        border-radius: 0 !important;
-                    }
-                    .op-editable-input {
-                        border-bottom: none !important;
-                        background: transparent !important;
-                        pointer-events: none !important;
-                        line-height: 1.2 !important;
-                    }
-                    .suggestions-dropdown {
-                        display: none !important;
-                    }
-                    tr, td, th {
-                        page-break-inside: avoid !important;
-                    }
-                    .print-bg-light {
-                        background-color: #eff6ff !important;
-                        color: #002060 !important;
-                    }
-                    thead tr.print-bg-light th {
-                        background-color: #eff6ff !important;
-                        color: #002060 !important;
-                        border-bottom: 2px solid #002060 !important;
-                    }
-                    .border-slate-300,
-                    .border-slate-200 {
-                        border-color: #002060 !important;
-                    }
-                    .op-number-input {
-                        color: #002060 !important;
-                        background: transparent !important;
-                    }
-                    .op-number-input::placeholder {
-                        color: rgba(0, 32, 96, 0.5) !important;
-                    }
-                    .op-label-print {
-                        color: #475569 !important;
-                    }
-                }
-
-                .is-capturing .no-print {
-                    display: none !important;
-                }
-                .is-capturing {
-                    padding: 0 !important;
-                    margin: 0 auto !important;
-                    box-shadow: none !important;
-                    border: none !important;
-                    width: 1180px !important;
-                    max-width: 1180px !important;
-                    border-radius: 0 !important;
-                }
-                .is-capturing .op-editable-input {
-                    border-bottom: none !important;
-                    background: transparent !important;
-                    pointer-events: none !important;
-                    line-height: 1.2 !important;
-                }
-
-                .print-only-capturing {
-                    display: none;
-                }
-                .is-capturing .print-only-capturing {
-                    display: inline-block !important;
-                }
-                .is-capturing .no-print-capturing {
-                    display: none !important;
-                }
-                
-                @media print {
-                    .print-only-capturing {
-                        display: inline-block !important;
-                    }
-                    .no-print-capturing {
-                        display: none !important;
-                    }
-                }
-            `}} />
 
             {/* Toasts */}
             <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none no-print">
@@ -749,6 +596,194 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
                 </div>
             ) : (
                 <div id="relatorio-final-sheet" className="bg-white max-w-[1240px] mx-auto op-sheet-container print-sheet-a4 border-2 border-[#002060] rounded-lg overflow-hidden shadow-lg p-6 bg-white relative space-y-6">
+                    {/* CSS Customizado para impressão e captura */}
+                    <style dangerouslySetInnerHTML={{ __html: `
+                        input::-webkit-outer-spin-button,
+                        input::-webkit-inner-spin-button {
+                            -webkit-appearance: none;
+                            margin: 0;
+                        }
+                        input[type=number] {
+                            -moz-appearance: textfield;
+                        }
+
+                        .op-sheet-container {
+                            font-family: 'Inter', 'Segoe UI', 'Arial', sans-serif;
+                        }
+                        
+                        .op-editable-input {
+                            border: none !important;
+                            background: transparent !important;
+                            font-weight: 800 !important;
+                            color: #002060 !important;
+                            padding: 2px !important;
+                            margin: 0 !important;
+                            outline: none !important;
+                            box-shadow: none !important;
+                            transition: all 0.2s;
+                            border-bottom: 1.5px dashed transparent !important;
+                            border-radius: 0 !important;
+                            height: auto !important;
+                            line-height: normal !important;
+                            min-width: 0 !important;
+                        }
+                        .op-editable-input:hover {
+                            border-bottom: 1.5px dashed #3b82f6 !important;
+                            background-color: rgba(59, 130, 246, 0.04) !important;
+                        }
+                        .op-editable-input:focus {
+                            border-bottom: 1.8px solid #002060 !important;
+                            background-color: rgba(59, 130, 246, 0.08) !important;
+                            outline: none !important;
+                        }
+                        .op-editable-input::placeholder {
+                            color: #94a3b8;
+                            font-weight: 400;
+                            opacity: 0.5;
+                        }
+                        .op-number-input {
+                            color: white !important;
+                            background: transparent !important;
+                            border: none !important;
+                            outline: none !important;
+                            box-shadow: none !important;
+                            cursor: text !important;
+                            border-bottom: 1.5px dashed transparent !important;
+                            transition: all 0.2s;
+                        }
+                        .op-number-input:hover {
+                            border-bottom: 1.5px dashed rgba(255, 255, 255, 0.4) !important;
+                            background-color: rgba(255, 255, 255, 0.05) !important;
+                        }
+                        .op-number-input:focus {
+                            border-bottom: 1.8px solid white !important;
+                            background-color: rgba(255, 255, 255, 0.1) !important;
+                        }
+
+                        @media print {
+                            @page {
+                                size: A4 portrait;
+                                margin: 5mm;
+                            }
+                            * {
+                                -webkit-print-color-adjust: exact !important;
+                                print-color-adjust: exact !important;
+                            }
+                            .app-container,
+                            .main-content,
+                            .main-content > div,
+                            .app-container > main,
+                            div.p-4 {
+                                display: block !important;
+                                width: 100% !important;
+                                padding: 0 !important;
+                                margin: 0 !important;
+                                position: static !important;
+                                border: none !important;
+                                box-shadow: none !important;
+                            }
+                            body {
+                                background: white !important;
+                                color: black !important;
+                                margin: 0 !important;
+                                padding: 0 !important;
+                            }
+                            .no-print {
+                                display: none !important;
+                            }
+                            .print-full-width {
+                                grid-column: span 12 / span 12 !important;
+                                width: 100% !important;
+                            }
+                            .print-sheet-a4 {
+                                padding: 0 !important;
+                                margin: 0 !important;
+                                border: none !important;
+                                box-shadow: none !important;
+                                max-width: 100% !important;
+                                width: 100% !important;
+                                border-radius: 0 !important;
+                            }
+                            .op-editable-input {
+                                border-bottom: none !important;
+                                background: transparent !important;
+                                pointer-events: none !important;
+                                line-height: 1.2 !important;
+                            }
+                            .suggestions-dropdown {
+                                display: none !important;
+                            }
+                            tr, td, th {
+                                page-break-inside: avoid !important;
+                            }
+                            .print-bg-light {
+                                background-color: #eff6ff !important;
+                                color: #002060 !important;
+                            }
+                            thead tr.print-bg-light th {
+                                background-color: #eff6ff !important;
+                                color: #002060 !important;
+                                border-bottom: 2px solid #002060 !important;
+                            }
+                            .border-slate-300,
+                            .border-slate-200 {
+                                border-color: #002060 !important;
+                            }
+                            .op-number-input {
+                                color: #002060 !important;
+                                background: transparent !important;
+                            }
+                            .op-number-input::placeholder {
+                                color: rgba(0, 32, 96, 0.5) !important;
+                            }
+                            .op-label-print {
+                                color: #475569 !important;
+                            }
+                        }
+
+                        .is-capturing .no-print {
+                            display: none !important;
+                        }
+                        .is-capturing .print-full-width {
+                            grid-column: span 12 / span 12 !important;
+                            width: 100% !important;
+                        }
+                        .is-capturing {
+                            padding: 0 !important;
+                            margin: 0 auto !important;
+                            box-shadow: none !important;
+                            border: none !important;
+                            width: 1180px !important;
+                            max-width: 1180px !important;
+                            border-radius: 0 !important;
+                        }
+                        .is-capturing .op-editable-input {
+                            border-bottom: none !important;
+                            background: transparent !important;
+                            pointer-events: none !important;
+                            line-height: 1.2 !important;
+                        }
+
+                        .print-only-capturing {
+                            display: none;
+                        }
+                        .is-capturing .print-only-capturing {
+                            display: inline-block !important;
+                        }
+                        .is-capturing .no-print-capturing {
+                            display: none !important;
+                        }
+                        
+                        @media print {
+                            .print-only-capturing {
+                                display: inline-block !important;
+                            }
+                            .no-print-capturing {
+                                display: none !important;
+                            }
+                        }
+                    `}} />
+
                     
                     {/* CABEÇALHO */}
                     <div className="grid grid-cols-12 border border-[#002060]">
@@ -910,7 +945,7 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
                             return (
                                 <div key={gBlock.type} className="grid grid-cols-12 gap-6 items-start border border-slate-200 p-4 rounded-xl bg-[#fafbfc]">
                                     {/* Tabela do Lado Esquerdo */}
-                                    <div className="col-span-12 md:col-span-9 space-y-3">
+                                    <div className="col-span-12 md:col-span-9 print-full-width space-y-3">
                                         <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                                             <div className="flex items-center gap-3">
                                                 <select
@@ -1039,7 +1074,7 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
                                     </div>
 
                                     {/* Cards do Lado Direito */}
-                                    <div className="col-span-12 md:col-span-3 flex flex-col gap-3 justify-center h-full pt-10 md:pt-12">
+                                    <div className="col-span-12 md:col-span-3 flex flex-col gap-3 justify-center h-full pt-10 md:pt-12 no-print">
                                         
                                         {/* Peso Previsto - Amarelo */}
                                         <div className="bg-[#FFFF00] text-slate-900 border-2 border-yellow-500 rounded-2xl p-3 text-center shadow-sm relative">
