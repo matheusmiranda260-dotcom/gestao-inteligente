@@ -77,6 +77,8 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
     // Filtros rápidos
     const [filterModel, setFilterModel] = useState<string>('all');
     const [filterPendingWithdrawal, setFilterPendingWithdrawal] = useState<boolean>(false);
+    const [filterHasVirtual, setFilterHasVirtual] = useState<boolean>(false);
+    const [filterHasPhysical, setFilterHasPhysical] = useState<boolean>(false);
 
     // --- CÁLCULO DE RESUMO GERAL DAS TRELIÇAS ---
     const overallStats = useMemo(() => {
@@ -168,11 +170,17 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
         if (filterModel !== 'all') {
             result = result.filter(m => m.model === filterModel);
         }
-        if (filterPendingWithdrawal) {
-            result = result.filter(m => m.pendingTransferQty > 0);
+        const hasActiveStockFilter = filterPendingWithdrawal || filterHasVirtual || filterHasPhysical;
+        if (hasActiveStockFilter) {
+            result = result.filter(m => {
+                const matchPending = filterPendingWithdrawal && m.pendingTransferQty > 0;
+                const matchVirtual = filterHasVirtual && m.virtualQty > 0;
+                const matchPhysical = filterHasPhysical && m.physicalQty > 0;
+                return matchPending || matchVirtual || matchPhysical;
+            });
         }
         return result;
-    }, [modelsSummary, filterModel, filterPendingWithdrawal]);
+    }, [modelsSummary, filterModel, filterPendingWithdrawal, filterHasVirtual, filterHasPhysical]);
 
     // --- FILTRAGEM DE ORDENS EM PRODUÇÃO (TRELIÇA) ---
     const trelicaOrders = useMemo(() => {
@@ -1061,9 +1069,9 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
                 </header>
 
                 {/* Painel de Filtros Rápidos */}
-                <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 flex-1">
-                        <div className="space-y-1.5 flex-1 max-w-sm">
+                <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                    <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 flex-1">
+                        <div className="space-y-1.5 min-w-[200px]">
                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
                                 Filtrar por Modelo
                             </label>
@@ -1078,8 +1086,36 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
                                 ))}
                             </select>
                         </div>
-                        <div className="flex items-center gap-3 pt-6 sm:pt-0">
-                            <label className="flex items-center gap-3 cursor-pointer p-3 bg-slate-50 hover:bg-slate-100/50 rounded-xl border border-slate-200 transition-all select-none">
+                        
+                        {/* Filtros de quantidades de estoque */}
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1 md:pl-2">
+                            <label className="flex items-center gap-3 cursor-pointer p-3 bg-slate-50 hover:bg-slate-100/50 rounded-xl border border-slate-200 transition-all select-none flex-1">
+                                <input 
+                                    type="checkbox"
+                                    checked={filterHasVirtual}
+                                    onChange={(e) => setFilterHasVirtual(e.target.checked)}
+                                    className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                />
+                                <div>
+                                    <span className="font-bold text-slate-700 text-xs">Estoque Virtual</span>
+                                    <p className="text-[8px] text-slate-400 uppercase font-black tracking-widest mt-0.5">Saldo virtual &gt; 0</p>
+                                </div>
+                            </label>
+
+                            <label className="flex items-center gap-3 cursor-pointer p-3 bg-slate-50 hover:bg-slate-100/50 rounded-xl border border-slate-200 transition-all select-none flex-1">
+                                <input 
+                                    type="checkbox"
+                                    checked={filterHasPhysical}
+                                    onChange={(e) => setFilterHasPhysical(e.target.checked)}
+                                    className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                />
+                                <div>
+                                    <span className="font-bold text-slate-700 text-xs">Estoque Físico</span>
+                                    <p className="text-[8px] text-slate-400 uppercase font-black tracking-widest mt-0.5">Saldo físico &gt; 0</p>
+                                </div>
+                            </label>
+
+                            <label className="flex items-center gap-3 cursor-pointer p-3 bg-slate-50 hover:bg-slate-100/50 rounded-xl border border-slate-200 transition-all select-none flex-1">
                                 <input 
                                     type="checkbox"
                                     checked={filterPendingWithdrawal}
@@ -1087,14 +1123,14 @@ const TrelicaStockManager: React.FC<TrelicaStockManagerProps> = ({
                                     className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                                 />
                                 <div>
-                                    <span className="font-bold text-slate-700 text-xs">Apenas Aguardando Retirada</span>
-                                    <p className="text-[8px] text-slate-400 uppercase font-black tracking-widest mt-0.5">Filtra itens com saldo reservado</p>
+                                    <span className="font-bold text-slate-700 text-xs">Aguardando Retirada</span>
+                                    <p className="text-[8px] text-slate-400 uppercase font-black tracking-widest mt-0.5">Saldo reservado &gt; 0</p>
                                 </div>
                             </label>
                         </div>
                     </div>
                     {/* Indicador de resultados */}
-                    <div className="text-right text-xs font-black text-slate-400 uppercase tracking-widest">
+                    <div className="text-right text-xs font-black text-slate-400 uppercase tracking-widest whitespace-nowrap lg:pl-2">
                         Exibindo <span className="text-indigo-600 font-extrabold">{filteredModels.length}</span> modelos
                     </div>
                 </div>
