@@ -627,45 +627,45 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
                             font-family: 'Inter', 'Segoe UI', 'Arial', sans-serif;
                         }
 
-                        /* Aumento global das fontes do relatório para melhor visualização */
+                        /* Aumento global das fontes do relatório para melhor visualização (escala ampliada) */
                         #relatorio-final-sheet {
-                            font-size: 15px !important;
+                            font-size: 17px !important;
                         }
                         #relatorio-final-sheet .text-xs {
-                            font-size: 14px !important;
+                            font-size: 16px !important;
                         }
                         #relatorio-final-sheet .text-sm {
-                            font-size: 16px !important;
-                        }
-                        #relatorio-final-sheet .text-base {
                             font-size: 18px !important;
                         }
-                        #relatorio-final-sheet .text-lg {
+                        #relatorio-final-sheet .text-base {
                             font-size: 20px !important;
                         }
-                        #relatorio-final-sheet .text-xl {
+                        #relatorio-final-sheet .text-lg {
                             font-size: 22px !important;
                         }
+                        #relatorio-final-sheet .text-xl {
+                            font-size: 24px !important;
+                        }
                         #relatorio-final-sheet .text-2xl {
-                            font-size: 26px !important;
+                            font-size: 28px !important;
                         }
                         #relatorio-final-sheet .text-3xl {
-                            font-size: 32px !important;
+                            font-size: 34px !important;
                         }
                         #relatorio-final-sheet .text-4xl {
-                            font-size: 38px !important;
+                            font-size: 40px !important;
                         }
                         #relatorio-final-sheet .text-[10px] {
-                            font-size: 12px !important;
+                            font-size: 14px !important;
                         }
                         #relatorio-final-sheet .text-[11px] {
-                            font-size: 13px !important;
-                        }
-                        #relatorio-final-sheet .text-[13px] {
                             font-size: 15px !important;
                         }
+                        #relatorio-final-sheet .text-[13px] {
+                            font-size: 17px !important;
+                        }
                         #relatorio-final-sheet .text-[14px] {
-                            font-size: 16px !important;
+                            font-size: 18px !important;
                         }
                         
                         .op-editable-input {
@@ -1023,7 +1023,7 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
                                 <div key={gBlock.type} className="trelica-gauge-block grid grid-cols-12 gap-6 items-start border border-slate-200 p-4 rounded-xl bg-[#fafbfc]">
                                     {/* Tabela do Lado Esquerdo */}
                                     <div className="col-span-12 md:col-span-9 print-full-width space-y-3">
-                                        <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                                        <div className="flex items-center justify-between pb-2">
                                             <div className="flex items-center gap-3">
                                                 <select
                                                     value={gBlock.type === '6mm' ? bitolaBlock1 : gBlock.type === '3_8mm' ? bitolaBlock2 : bitolaBlock3}
