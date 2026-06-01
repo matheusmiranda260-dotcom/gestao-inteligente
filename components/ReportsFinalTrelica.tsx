@@ -505,11 +505,17 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
                     // Add spacing and styling adjustments to cloned gauge blocks
                     const clonedGaugeBlocks = clonedElement.querySelectorAll('.trelica-gauge-block');
                     clonedGaugeBlocks.forEach((el: any) => {
-                        el.style.setProperty('margin-top', '35px', 'important');
+                        el.style.setProperty('margin-top', '55px', 'important');
                         el.style.setProperty('margin-bottom', '0px', 'important');
                         el.style.setProperty('border', 'none', 'important');
                         el.style.setProperty('background', 'transparent', 'important');
                         el.style.setProperty('padding', '0', 'important');
+                    });
+
+                    // Add spacing to totals section in cloned element
+                    const clonedTotals = clonedElement.querySelectorAll('.trelica-totals-section');
+                    clonedTotals.forEach((el: any) => {
+                        el.style.setProperty('margin-top', '55px', 'important');
                     });
                 }
             });
@@ -605,7 +611,7 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
                     Carregando dados...
                 </div>
             ) : (
-                <div id="relatorio-final-sheet" className="bg-white max-w-[1240px] mx-auto op-sheet-container print-sheet-a4 border-2 border-[#002060] rounded-lg overflow-hidden shadow-lg p-6 bg-white relative space-y-6">
+                <div id="relatorio-final-sheet" className="bg-white max-w-[1240px] mx-auto op-sheet-container print-sheet-a4 border-2 border-[#002060] rounded-lg overflow-hidden shadow-lg p-6 bg-white relative space-y-10">
                     {/* CSS Customizado para impressão e captura */}
                     <style dangerouslySetInnerHTML={{ __html: `
                         input::-webkit-outer-spin-button,
@@ -619,6 +625,47 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
 
                         .op-sheet-container {
                             font-family: 'Inter', 'Segoe UI', 'Arial', sans-serif;
+                        }
+
+                        /* Aumento global das fontes do relatório para melhor visualização */
+                        #relatorio-final-sheet {
+                            font-size: 15px !important;
+                        }
+                        #relatorio-final-sheet .text-xs {
+                            font-size: 14px !important;
+                        }
+                        #relatorio-final-sheet .text-sm {
+                            font-size: 16px !important;
+                        }
+                        #relatorio-final-sheet .text-base {
+                            font-size: 18px !important;
+                        }
+                        #relatorio-final-sheet .text-lg {
+                            font-size: 20px !important;
+                        }
+                        #relatorio-final-sheet .text-xl {
+                            font-size: 22px !important;
+                        }
+                        #relatorio-final-sheet .text-2xl {
+                            font-size: 26px !important;
+                        }
+                        #relatorio-final-sheet .text-3xl {
+                            font-size: 32px !important;
+                        }
+                        #relatorio-final-sheet .text-4xl {
+                            font-size: 38px !important;
+                        }
+                        #relatorio-final-sheet .text-[10px] {
+                            font-size: 12px !important;
+                        }
+                        #relatorio-final-sheet .text-[11px] {
+                            font-size: 13px !important;
+                        }
+                        #relatorio-final-sheet .text-[13px] {
+                            font-size: 15px !important;
+                        }
+                        #relatorio-final-sheet .text-[14px] {
+                            font-size: 16px !important;
                         }
                         
                         .op-editable-input {
@@ -752,9 +799,12 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
                             .trelica-gauge-block {
                                 border: none !important;
                                 background: transparent !important;
-                                margin-top: 35px !important;
+                                margin-top: 55px !important;
                                 margin-bottom: 0px !important;
                                 padding: 0 !important;
+                            }
+                            .trelica-totals-section {
+                                margin-top: 55px !important;
                             }
                         }
 
@@ -783,9 +833,12 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
                         .is-capturing .trelica-gauge-block {
                             border: none !important;
                             background: transparent !important;
-                            margin-top: 35px !important;
+                            margin-top: 55px !important;
                             margin-bottom: 0px !important;
                             padding: 0 !important;
+                        }
+                        .is-capturing .trelica-totals-section {
+                            margin-top: 55px !important;
                         }
 
                         .print-only-capturing {
@@ -954,7 +1007,7 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
                     </div>
 
                     {/* SEÇÃO 2: BITOLAS (6mm, 3.8mm, 4.2mm) */}
-                    <div className="space-y-6">
+                    <div className="space-y-10">
                         
                         {/* Bloco Gauge Render Helper */}
                         {([
@@ -1138,7 +1191,7 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
                     </div>
 
                     {/* TABELA DE TOTAIS E ASSINATURA */}
-                    <div className="grid grid-cols-12 gap-6 mt-6 pt-4 border-t border-slate-200">
+                    <div className="trelica-totals-section grid grid-cols-12 gap-6 mt-6 pt-4 border-t border-slate-200">
                         {/* Resumo Consumo Geral */}
                         <div className="col-span-12 md:col-span-5">
                             <table className="border-2 border-[#002060] font-black text-sm text-[#002060] w-full border-collapse">
