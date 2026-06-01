@@ -5,6 +5,7 @@ import ReportsTrefila from './ReportsTrefila';
 import ReportsOPTrefila from './ReportsOPTrefila';
 import ReportsFechamentoOP from './ReportsFechamentoOP';
 import ReportsRequisicaoTransferencia from './ReportsRequisicaoTransferencia';
+import ReportsFinalTrelica from './ReportsFinalTrelica';
 
 interface ReportsProps {
     stock: StockItem[];
@@ -14,7 +15,7 @@ interface ReportsProps {
 }
 
 const Reports: React.FC<ReportsProps> = ({ stock, trefilaProduction, trelicaProduction, setPage }) => {
-    const [activeTab, setActiveTab] = useState<'trelica' | 'trefila' | 'op_trefila' | 'fechamento_op' | 'requisicao_transferencia'>('trelica');
+    const [activeTab, setActiveTab] = useState<'trelica' | 'trefila' | 'op_trefila' | 'fechamento_op' | 'requisicao_transferencia' | 'final_trelica'>('trelica');
 
     return (
         <div className="flex flex-col h-full bg-slate-100">
@@ -70,6 +71,16 @@ const Reports: React.FC<ReportsProps> = ({ stock, trefilaProduction, trelicaProd
                 >
                     Transferência de Material
                 </button>
+                <button
+                    onClick={() => setActiveTab('final_trelica')}
+                    className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${
+                        activeTab === 'final_trelica' 
+                        ? 'bg-[#002060] text-white shadow-md' 
+                        : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200'
+                    }`}
+                >
+                    Relatório Final - Treliça
+                </button>
             </div>
 
             {/* Renderizar o Relatório Selecionado */}
@@ -93,6 +104,11 @@ const Reports: React.FC<ReportsProps> = ({ stock, trefilaProduction, trelicaProd
                 ) : activeTab === 'requisicao_transferencia' ? (
                     <ReportsRequisicaoTransferencia 
                         setPage={setPage} 
+                    />
+                ) : activeTab === 'final_trelica' ? (
+                    <ReportsFinalTrelica 
+                        stock={stock}
+                        setPage={setPage}
                     />
                 ) : (
                     <ReportsFechamentoOP
