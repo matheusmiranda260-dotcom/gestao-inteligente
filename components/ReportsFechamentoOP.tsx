@@ -217,6 +217,59 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
         setRows(prev => prev.filter(r => r.id !== rowId));
     };
 
+    const sortRows = () => {
+        // Separa as linhas em blocos divididos pelos separadores
+        const blocks: FechamentoOPRow[][] = [];
+        let currentBlock: FechamentoOPRow[] = [];
+
+        rows.forEach(row => {
+            if (row.isSeparator) {
+                blocks.push(currentBlock);
+                currentBlock = [];
+            } else {
+                currentBlock.push(row);
+            }
+        });
+        blocks.push(currentBlock);
+
+        // Classifica cada bloco separadamente
+        const sortedBlocks = blocks.map(block => {
+            const filled = block.filter(r => (r.lote || '').trim() !== '');
+            const empty = block.filter(r => (r.lote || '').trim() === '');
+
+            filled.sort((a, b) => {
+                const aVal = (a.lote || '').trim();
+                const bVal = (b.lote || '').trim();
+
+                const aNum = Number(aVal);
+                const bNum = Number(bVal);
+
+                if (!isNaN(aNum) && !isNaN(bNum)) {
+                    return aNum - bNum;
+                }
+                return aVal.localeCompare(bVal, undefined, { numeric: true, sensitivity: 'base' });
+            });
+
+            return [...filled, ...empty];
+        });
+
+        // Recombina os blocos mantendo os separadores na mesma ordem e posições
+        const newRows: FechamentoOPRow[] = [];
+        let separatorIndex = 0;
+        const separatorRows = rows.filter(r => r.isSeparator);
+
+        sortedBlocks.forEach((block, index) => {
+            newRows.push(...block);
+            if (index < sortedBlocks.length - 1 && separatorRows[separatorIndex]) {
+                newRows.push(separatorRows[separatorIndex]);
+                separatorIndex++;
+            }
+        });
+
+        setRows(newRows);
+        showToast('Lotes ordenados em ordem crescente.', 'success');
+    };
+
     const getRowSpanForData = (rowIndex: number) => {
         if (rows[rowIndex].isSeparator) return 1;
         let isFirstInBlock = true;
@@ -519,6 +572,9 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
                     <button onClick={loadSampleData} className="bg-amber-500 hover:bg-amber-600 text-white font-bold py-1.5 px-3 rounded text-xs shadow">
                         ⭐ Carregar Modelo de Teste
                     </button>
+                    <button onClick={sortRows} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1.5 px-3 rounded text-xs shadow flex items-center gap-1">
+                        ⇅ Classificar Lotes
+                    </button>
                     <button onClick={copyToClipboard} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 px-3 rounded text-xs shadow flex items-center gap-1">
                         🟢 Copiar Imagem (Zap)
                     </button>
@@ -581,6 +637,16 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
                                 placeholder="84536" 
                             />
                         </div>
+                    </div>
+
+                    {/* Botão de Classificar no topo da tabela (no-print) */}
+                    <div className="mb-3 no-print flex justify-start">
+                        <button 
+                            onClick={sortRows} 
+                            className="bg-indigo-50 hover:bg-indigo-600 border border-indigo-300 hover:border-indigo-600 text-indigo-700 hover:text-white font-black text-[10px] px-3.5 py-1.5 rounded transition-all uppercase flex items-center gap-1 shadow-sm"
+                        >
+                            ⇅ Classificar Lotes
+                        </button>
                     </div>
 
                     {/* TABELA PRINCIPAL DA FICHA */}
@@ -721,6 +787,9 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
                         </button>
                         <button onClick={addSeparatorRow} className="border-2 border-slate-400 text-slate-500 font-black text-[10px] px-3.5 py-1.5 rounded hover:bg-slate-400 hover:text-white transition-all uppercase">
                             Pular Linha (Novo Dia)
+                        </button>
+                        <button onClick={sortRows} className="border-2 border-indigo-600 text-indigo-600 font-black text-[10px] px-3.5 py-1.5 rounded hover:bg-indigo-600 hover:text-white transition-all uppercase flex items-center gap-1">
+                            ⇅ Classificar Lotes
                         </button>
                     </div>
 
