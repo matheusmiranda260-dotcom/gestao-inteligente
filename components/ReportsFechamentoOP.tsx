@@ -494,7 +494,8 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
                         margin: 0 !important;
                         padding: 0 !important;
                     }
-                    .no-print {
+                    .no-print,
+                    .sidebar {
                         display: none !important;
                     }
                     .print-sheet-a4 {

@@ -335,7 +335,8 @@ tr:hover td {
     height: auto !important;
   }
 
-  .no-print {
+  .no-print,
+  .sidebar {
     display: none !important;
   }
 
