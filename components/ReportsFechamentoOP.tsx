@@ -218,56 +218,49 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
     };
 
     const sortRows = () => {
-        // Separa as linhas em blocos divididos pelos separadores
-        const blocks: FechamentoOPRow[][] = [];
-        let currentBlock: FechamentoOPRow[] = [];
-
-        rows.forEach(row => {
+        // Propaga a data dos cabeçalhos dos blocos para todas as linhas antes de ordenar,
+        // garantindo que nenhuma informação de data seja perdida.
+        let currentStatusDate = '';
+        const rowsWithPropagatedDates = rows.map(row => {
             if (row.isSeparator) {
-                blocks.push(currentBlock);
-                currentBlock = [];
-            } else {
-                currentBlock.push(row);
+                currentStatusDate = '';
+                return row;
             }
-        });
-        blocks.push(currentBlock);
-
-        // Classifica cada bloco separadamente
-        const sortedBlocks = blocks.map(block => {
-            const filled = block.filter(r => (r.lote || '').trim() !== '');
-            const empty = block.filter(r => (r.lote || '').trim() === '');
-
-            filled.sort((a, b) => {
-                const aVal = (a.lote || '').trim();
-                const bVal = (b.lote || '').trim();
-
-                const aNum = Number(aVal);
-                const bNum = Number(bVal);
-
-                if (!isNaN(aNum) && !isNaN(bNum)) {
-                    return aNum - bNum;
-                }
-                return aVal.localeCompare(bVal, undefined, { numeric: true, sensitivity: 'base' });
-            });
-
-            return [...filled, ...empty];
-        });
-
-        // Recombina os blocos mantendo os separadores na mesma ordem e posições
-        const newRows: FechamentoOPRow[] = [];
-        let separatorIndex = 0;
-        const separatorRows = rows.filter(r => r.isSeparator);
-
-        sortedBlocks.forEach((block, index) => {
-            newRows.push(...block);
-            if (index < sortedBlocks.length - 1 && separatorRows[separatorIndex]) {
-                newRows.push(separatorRows[separatorIndex]);
-                separatorIndex++;
+            if (row.data) {
+                currentStatusDate = row.data;
             }
+            return {
+                ...row,
+                data: row.data || currentStatusDate
+            };
         });
 
-        setRows(newRows);
-        showToast('Lotes ordenados em ordem crescente.', 'success');
+        // Filtra todas as linhas preenchidas (não separadoras e com lote)
+        const filled = rowsWithPropagatedDates.filter(r => !r.isSeparator && (r.lote || '').trim() !== '');
+        
+        // Filtra as linhas vazias (não separadoras e sem lote)
+        const empty = rowsWithPropagatedDates.filter(r => !r.isSeparator && (r.lote || '').trim() === '');
+        
+        // Filtra os separadores
+        const separators = rowsWithPropagatedDates.filter(r => r.isSeparator);
+
+        // Ordena globalmente os lotes preenchidos em ordem crescente
+        filled.sort((a, b) => {
+            const aVal = (a.lote || '').trim();
+            const bVal = (b.lote || '').trim();
+
+            const aNum = Number(aVal);
+            const bNum = Number(bVal);
+
+            if (!isNaN(aNum) && !isNaN(bNum)) {
+                return aNum - bNum;
+            }
+            return aVal.localeCompare(bVal, undefined, { numeric: true, sensitivity: 'base' });
+        });
+
+        // Coloca os lotes ordenados no topo, seguidos das linhas vazias e depois dos separadores
+        setRows([...filled, ...empty, ...separators]);
+        showToast('Todos os lotes foram ordenados globalmente.', 'success');
     };
 
     const getRowSpanForData = (rowIndex: number) => {
