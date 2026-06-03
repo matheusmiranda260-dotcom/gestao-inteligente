@@ -406,7 +406,7 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
     };
 
     return (
-        <div className="p-4 sm:p-6 md:p-8 bg-slate-50 min-h-screen font-mono text-slate-800 relative select-none">
+        <div id="fechamento-op-wrapper" className="p-4 sm:p-6 md:p-8 bg-slate-50 min-h-screen font-mono text-slate-800 relative select-none">
             {/* CSS de Ajustes de Impressão A4 */}
             <style dangerouslySetInnerHTML={{ __html: `
                 input::-webkit-outer-spin-button,
@@ -470,18 +470,26 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
                         print-color-adjust: exact !important;
                     }
                     /* Reset wrappers for print to ensure full width and no margins */
+                    #fechamento-op-wrapper,
                     .app-container,
                     .main-content,
                     .main-content > div,
                     .app-container > main,
-                    div.p-4 {
+                    div.flex-1,
+                    div.flex,
+                    div.p-4,
+                    div.p-6,
+                    div.p-8 {
                         display: block !important;
                         width: 100% !important;
+                        max-width: 100% !important;
+                        min-width: 100% !important;
                         padding: 0 !important;
                         margin: 0 !important;
                         position: static !important;
                         border: none !important;
                         box-shadow: none !important;
+                        overflow: visible !important;
                     }
                     body {
                         background: white !important;
