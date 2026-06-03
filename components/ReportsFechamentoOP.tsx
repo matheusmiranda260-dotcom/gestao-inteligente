@@ -463,24 +463,29 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
                 @media print {
                     @page {
                         size: A4 portrait;
-                        margin: 5mm;
+                        margin: 6mm 5mm 6mm 5mm;
                     }
                     * {
                         -webkit-print-color-adjust: exact !important;
                         print-color-adjust: exact !important;
                     }
-                    /* Reset wrappers for print to ensure full width and no margins */
+                    /* Reset ALL wrappers for print — force visible overflow everywhere */
+                    html, body, #root,
                     #fechamento-op-wrapper,
                     .app-container,
                     .main-content,
                     .main-content > div,
                     .app-container > main,
                     div.flex-1,
-                    div.overflow-hidden {
+                    div.overflow-hidden,
+                    div.overflow-x-auto,
+                    div.overflow-y-auto {
                         display: block !important;
                         width: 100% !important;
                         max-width: 100% !important;
                         min-width: 100% !important;
+                        height: auto !important;
+                        max-height: none !important;
                         padding: 0 !important;
                         margin: 0 !important;
                         position: static !important;
@@ -493,31 +498,76 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
                         color: black !important;
                         margin: 0 !important;
                         padding: 0 !important;
+                        overflow: visible !important;
                     }
                     .no-print,
                     .sidebar {
                         display: none !important;
                     }
+                    /* Sheet container — must NOT clip content */
                     .print-sheet-a4 {
-                        padding: 16px !important;
+                        padding: 10px !important;
                         margin: 0 !important;
                         border: 2px solid #002060 !important;
                         box-shadow: none !important;
                         max-width: 100% !important;
                         width: 100% !important;
-                        border-radius: 6px !important;
+                        border-radius: 4px !important;
+                        overflow: visible !important;
+                        height: auto !important;
+                        max-height: none !important;
+                    }
+                    /* Logo fix — ensure it renders correctly */
+                    .print-sheet-a4 img {
+                        max-height: 60px !important;
+                        height: auto !important;
+                        object-fit: contain !important;
+                        display: block !important;
+                    }
+                    /* Table container — MUST be overflow visible */
+                    .print-sheet-a4 > div {
+                        overflow: visible !important;
+                    }
+                    /* Table itself */
+                    table {
+                        width: 100% !important;
+                        table-layout: fixed !important;
+                        border-collapse: collapse !important;
+                        overflow: visible !important;
+                    }
+                    /* Prevent rows from being cut across pages */
+                    table, thead, tbody, tr, td, th {
+                        page-break-inside: avoid !important;
+                        break-inside: avoid !important;
+                        overflow: visible !important;
+                    }
+                    /* Ensure each row has enough height and visible borders */
+                    tbody tr {
+                        min-height: 24px !important;
+                        height: auto !important;
+                    }
+                    td, th {
+                        padding: 4px 3px !important;
+                        height: auto !important;
+                        min-height: 20px !important;
+                        line-height: 1.3 !important;
+                        overflow: visible !important;
+                        white-space: normal !important;
+                        word-wrap: break-word !important;
                     }
                     .op-editable-input {
                         border-bottom: none !important;
                         background: transparent !important;
                         pointer-events: none !important;
-                        line-height: 1.2 !important;
+                        line-height: 1.3 !important;
+                        height: auto !important;
+                        min-height: 18px !important;
+                        overflow: visible !important;
+                        display: block !important;
+                        padding: 1px 2px !important;
                     }
                     .suggestions-dropdown {
                         display: none !important;
-                    }
-                    tr, td, th {
-                        page-break-inside: avoid !important;
                     }
                     /* Lighten background for print */
                     .print-bg-light {
@@ -542,6 +592,27 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
                     }
                     .op-label-print {
                         color: #475569 !important;
+                    }
+                    /* Keep the whole table together if possible, or allow clean page breaks between rows */
+                    thead {
+                        display: table-header-group !important;
+                    }
+                    tbody {
+                        display: table-row-group !important;
+                    }
+                    /* Ultra-specific: force the main sheet and ALL nested divs to never clip */
+                    #fechamento-op-sheet,
+                    #fechamento-op-sheet * {
+                        overflow: visible !important;
+                        max-height: none !important;
+                    }
+                    #fechamento-op-sheet {
+                        height: auto !important;
+                        overflow: visible !important;
+                    }
+                    /* The rounded table wrapper must not clip */
+                    #fechamento-op-sheet .rounded {
+                        overflow: visible !important;
                     }
                 }
 
