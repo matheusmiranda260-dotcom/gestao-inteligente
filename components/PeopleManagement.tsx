@@ -4,6 +4,130 @@ import { ArrowLeftIcon, PlusIcon, StarIcon, ChartBarIcon, TrophyIcon, SearchIcon
 import type { Page, Employee, Evaluation, TechnicalEvaluation, Achievement, User, EmployeeCourse, EmployeeAbsence, EmployeeVacation, EmployeeResponsibility, OrgUnit, OrgPosition, EmployeeDocument, KaizenProblem } from '../types';
 import { fetchTable, insertItem, updateItem, deleteItem, deleteItemByColumn, fetchByColumn, uploadFile } from '../services/supabaseService';
 
+interface QuestionConfig {
+    id: string;
+    section: string;
+    text: string;
+    correct: string;
+    options: string[];
+}
+
+const TREFILA_QUESTIONS: QuestionConfig[] = [
+    {
+        id: 'q1',
+        section: 'Matéria-Prima (Entrada)',
+        text: 'Qual é o nome técnico da matéria-prima que utilizamos na trefila?',
+        correct: 'Fio Máquina',
+        options: ['Fio Máquina', 'Vergalhão CA50', 'Bobina Laminada a Frio', 'Arame Recozido']
+    },
+    {
+        id: 'q2',
+        section: 'Matéria-Prima (Entrada)',
+        text: 'Quais são as bitolas de Fio Máquina que temos disponíveis hoje para o processo?',
+        correct: '8.00mm, 6.50mm, 6.35mm e 5.50mm',
+        options: [
+            '8.00mm, 6.50mm, 6.35mm e 5.50mm',
+            '10.00mm, 8.00mm, 6.00mm e 4.20mm',
+            '12.50mm, 10.00mm, 8.00mm e 6.30mm',
+            '8.00mm, 7.00mm, 6.00mm e 5.00mm'
+        ]
+    },
+    {
+        id: 'q3',
+        section: 'Produto Final (Saída)',
+        text: 'Como chamamos comercialmente o produto que sai da nossa trefila?',
+        correct: 'Rolo CA60 (ou Aço CA60)',
+        options: ['Rolo CA60 (ou Aço CA60)', 'Vergalhão CA50', 'Arame Recozido Galvanizado', 'Treliça Eletrosoldada H8']
+    },
+    {
+        id: 'q4',
+        section: 'Produto Final (Saída)',
+        text: 'Cite 5 bitolas diferentes que produzimos na trefila após o processo de redução.',
+        correct: '6.0mm, 5.8mm, 5.6mm, 5.0mm, 4.2mm, 4.1mm, 3.8mm',
+        options: [
+            '6.0mm, 5.8mm, 5.6mm, 5.0mm, 4.2mm, 4.1mm, 3.8mm',
+            '12.0mm, 10.0mm, 8.0mm, 6.3mm, 5.0mm',
+            '8.0mm, 6.5mm, 6.35mm, 5.5mm, 3.2mm',
+            '4.2mm, 3.8mm, 3.4mm, 3.0mm, 2.8mm'
+        ]
+    },
+    {
+        id: 'q5',
+        section: 'Aplicação (Valor)',
+        text: 'O Rolo CA60 que produzimos é a matéria-prima principal para quais produtos finais na nossa fábrica?',
+        correct: 'Fabricação de Treliças, Vergalhões (corte e dobra) e Estribos',
+        options: [
+            'Fabricação de Treliças, Vergalhões (corte e dobra) e Estribos',
+            'Lajes Treliçadas, Pregos e Telas Soldadas',
+            'Chapas Finas, Tubos de Aço e Vigas U',
+            'Arame Farpado, Pregos e Cordoalhas'
+        ]
+    }
+];
+
+const TRELICA_QUESTIONS: QuestionConfig[] = [
+    {
+        id: 'q1',
+        section: 'Codificação e Identificação',
+        text: 'Como identificamos nossos modelos de treliça na produção?',
+        correct: 'Pela letra "H" seguida do número que indica a altura (ex: H8, H12)',
+        options: [
+            'Pela letra "H" seguida do número que indica a altura (ex: H8, H12)',
+            'Pela letra "T" seguida do peso por metro (ex: T8, T12)',
+            'Pela bitola do ferro inferior (ex: 3.8, 4.2)',
+            'Pela letra "V" seguida do vão máximo suportado (ex: V8, V12)'
+        ]
+    },
+    {
+        id: 'q2',
+        section: 'Codificação e Identificação',
+        text: 'Se eu pedir uma H12, o que esse "12" representa?',
+        correct: 'A altura da treliça (em centímetros)',
+        options: [
+            'A altura da treliça (em centímetros)',
+            'O comprimento da barra (em metros)',
+            'A bitola do ferro superior (em milímetros)',
+            'O número de senoides por metro'
+        ]
+    },
+    {
+        id: 'q3',
+        section: 'Estrutura e Composição',
+        text: 'Descreva a disposição dos ferros em uma treliça padrão.',
+        correct: '1 ferro superior, 2 ferros na senoide (zigue-zague) e 2 ferros inferiores',
+        options: [
+            '1 ferro superior, 2 ferros na senoide (zigue-zague) e 2 ferros inferiores',
+            '2 ferros superiores, 1 ferro na senoide e 1 ferro inferior',
+            '1 ferro superior, 1 ferro na senoide e 2 ferros inferiores',
+            '2 ferros superiores, 2 ferros na senoide e 2 ferros inferiores'
+        ]
+    },
+    {
+        id: 'q4',
+        section: 'Padronização',
+        text: 'Quais são os comprimentos padrão das barras que produzimos?',
+        correct: '6 metros e 12 metros',
+        options: [
+            '6 metros e 12 metros',
+            '8 metros e 10 metros',
+            '5 metros e 10 metros',
+            '6 metros e 9 metros'
+        ]
+    },
+    {
+        id: 'q5',
+        section: 'Demonstração de Domínio (O "Caso Real")',
+        text: 'Escolha um modelo que você domina (ex: H12 Leve) e me detalhe as bitolas utilizadas nele.',
+        correct: 'H12 Leve -> Superior: 5.8mm | Senoide: 3.2mm | Inferior: 3.8mm',
+        options: [
+            'H12 Leve -> Superior: 5.8mm | Senoide: 3.2mm | Inferior: 3.8mm',
+            'H12 Leve -> Superior: 6.0mm | Senoide: 3.8mm | Inferior: 4.2mm',
+            'H12 Leve -> Superior: 5.0mm | Senoide: 3.2mm | Inferior: 4.2mm',
+            'H12 Leve -> Superior: 8.0mm | Senoide: 3.2mm | Inferior: 5.8mm'
+        ]
+    }
+];
+
 interface PeopleManagementProps {
     setPage: (page: Page) => void;
     currentUser: User | null;
@@ -1483,51 +1607,65 @@ const EmployeeDetailModal: React.FC<{
                                                     <h3 className="text-base font-black text-[#0F3F5C] uppercase tracking-wider">Avaliação de Conhecimento (Perguntas)</h3>
                                                 </div>
                                                 
-                                                {(techEvalMachineType === 'Trefila' ? [
-                                                    { id: 'q1', section: '1. Matéria-Prima (O básico da entrada)', text: 'Qual é o nome técnico da matéria-prima que utilizamos na trefila?', correct: 'Fio Máquina.' },
-                                                    { id: 'q2', section: '1. Matéria-Prima (O básico da entrada)', text: 'Quais são as bitolas de Fio Máquina que temos disponíveis hoje para o processo?', correct: '8.00mm, 6.50mm, 6.35mm e 5.50mm.' },
-                                                    { id: 'q3', section: '2. Produto Final (O básico da saída)', text: 'Como chamamos comercialmente o produto que sai da nossa trefila?', correct: 'Rolo CA60 (ou Aço CA60).' },
-                                                    { id: 'q4', section: '2. Produto Final (O básico da saída)', text: 'Cite 5 bitolas diferentes que produzimos na trefila após o processo de redução.', correct: '6.0mm, 5.8mm, 5.6mm, 5.0mm, 4.2mm, 4.1mm, 3.8mm.' },
-                                                    { id: 'q5', section: '3. Aplicação (Entendendo o valor do produto)', text: 'O Rolo CA60 que produzimos é a matéria-prima principal para quais produtos finais na nossa fábrica?', correct: 'Fabricação de Treliças, Vergalhões (processo de corte e dobra) e Estribos.' }
-                                                ] : [
-                                                    { id: 'q1', section: '1. Codificação e Identificação', text: 'Como identificamos nossos modelos de treliça na produção?', correct: 'Pela letra "H" seguida do número que indica a altura (ex: H8, H12).' },
-                                                    { id: 'q2', section: '1. Codificação e Identificação', text: 'Se eu pedir uma H12, o que esse "12" representa?', correct: 'A altura da treliça (em centímetros).' },
-                                                    { id: 'q3', section: '2. Estrutura e Composição', text: 'Descreva a disposição dos ferros em uma treliça padrão.', correct: '1 ferro superior, 2 ferros na senoide (zigue-zague) e 2 ferros inferiores.' },
-                                                    { id: 'q4', section: '3. Padronização', text: 'Quais são os comprimentos padrão das barras que produzimos?', correct: '6 metros e 12 metros.' },
-                                                    { id: 'q5', section: '4. Demonstração de Domínio (O "Caso Real")', text: 'Escolha um modelo que você domina (ex: H12 Leve) e me detalhe as bitolas utilizadas nele.', correct: 'Superior: 5.8mm, Senoide: 3.2mm, Inferior: 3.8mm. (Deve demonstrar saber consultar ou memorizar bitolas)' }
-                                                ]).map((q, idx) => (
-                                                    <div key={q.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200/60 space-y-3">
-                                                        <div className="flex justify-between items-start">
-                                                            <div>
-                                                                <span className="text-[9px] font-black uppercase text-blue-700 tracking-wider block">{q.section}</span>
-                                                                <label className="text-sm font-bold text-slate-800 block mt-0.5">{idx + 1}. {q.text}</label>
+                                                {(techEvalMachineType === 'Trefila' ? TREFILA_QUESTIONS : TRELICA_QUESTIONS).map((q, idx) => (
+                                                    <div key={q.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200/60 space-y-4">
+                                                        <div>
+                                                            <span className="text-[9px] font-black uppercase text-blue-700 tracking-wider block">{q.section}</span>
+                                                            <label className="text-sm font-black text-[#0F3F5C] block mt-0.5">{idx + 1}. {q.text}</label>
+                                                        </div>
+                                                        
+                                                        <div className="space-y-2">
+                                                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wide">Selecione a resposta dada pelo colaborador:</label>
+                                                            <div className="grid grid-cols-1 gap-2">
+                                                                {q.options.map((optionText, optIdx) => {
+                                                                    const isSelected = techEvalAnswers[q.id] === optionText;
+                                                                    return (
+                                                                        <label
+                                                                            key={optIdx}
+                                                                            className={`flex items-start gap-3 p-3 rounded-lg border text-xs font-bold cursor-pointer transition-all ${
+                                                                                isSelected
+                                                                                    ? 'border-blue-500 bg-blue-50/50 text-blue-900 shadow-sm'
+                                                                                    : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                                                                            }`}
+                                                                        >
+                                                                            <input
+                                                                                type="radio"
+                                                                                name={`question_${q.id}`}
+                                                                                required
+                                                                                className="mt-0.5 text-blue-600 focus:ring-blue-400"
+                                                                                checked={isSelected}
+                                                                                onChange={() => {
+                                                                                    const newAnswers = { ...techEvalAnswers, [q.id]: optionText };
+                                                                                    setTechEvalAnswers(newAnswers);
+                                                                                    
+                                                                                    const isCorrect = optionText === q.correct;
+                                                                                    const newScores = { ...techEvalScores, [q.id]: isCorrect ? 10 : 0 };
+                                                                                    setTechEvalScores(newScores);
+                                                                                }}
+                                                                            />
+                                                                            <span>{optionText}</span>
+                                                                        </label>
+                                                                    );
+                                                                })}
                                                             </div>
                                                         </div>
-                                                        <div className="bg-emerald-50 border border-emerald-100 p-2.5 rounded-lg text-xs text-emerald-800 font-medium">
-                                                            💡 <strong>Resposta Correta Esperada:</strong> {q.correct}
-                                                        </div>
-                                                        <div>
-                                                            <label className="block text-xs font-bold text-slate-500 uppercase">Resposta do Funcionário</label>
-                                                            <textarea
-                                                                required
-                                                                className="w-full mt-1 p-2 border rounded-lg bg-white text-slate-900 text-sm font-medium"
-                                                                placeholder="Descreva o que o funcionário respondeu..."
-                                                                rows={2}
-                                                                value={techEvalAnswers[q.id]}
-                                                                onChange={e => setTechEvalAnswers({ ...techEvalAnswers, [q.id]: e.target.value })}
-                                                            />
-                                                        </div>
-                                                        <div className="flex items-center gap-3">
-                                                            <label className="text-xs font-bold text-slate-500 uppercase">Nota da Resposta (0 a 10):</label>
-                                                            <select
-                                                                className="p-1.5 border rounded-lg bg-white font-extrabold text-[#0F3F5C] w-24 text-center"
-                                                                value={techEvalScores[q.id]}
-                                                                onChange={e => setTechEvalScores({ ...techEvalScores, [q.id]: parseFloat(e.target.value) })}
-                                                            >
-                                                                {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
-                                                                    <option key={n} value={n}>{n}</option>
-                                                                ))}
-                                                            </select>
+                                                        
+                                                        <div className="flex justify-between items-center bg-white px-3 py-2 rounded-lg border border-slate-100">
+                                                            <span className="text-xs font-bold text-slate-500">
+                                                                Gabarito: <strong className="text-slate-800">{q.correct}</strong>
+                                                            </span>
+                                                            <div className="flex items-center gap-2 shrink-0">
+                                                                <label className="text-[10px] font-black text-slate-400 uppercase">Ajustar Nota (Manual):</label>
+                                                                <select
+                                                                    className="p-1 border rounded bg-slate-50 font-black text-xs text-[#0F3F5C] w-16 text-center"
+                                                                    value={techEvalScores[q.id]}
+                                                                    onChange={e => setTechEvalScores({ ...techEvalScores, [q.id]: parseFloat(e.target.value) })}
+                                                                >
+                                                                    {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                                                                        <option key={n} value={n}>{n}</option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 ))}
@@ -1710,32 +1848,50 @@ const EmployeeDetailModal: React.FC<{
                                                 {/* Detalhes Conhecimento */}
                                                 <div className="space-y-4">
                                                     <h5 className="font-black text-slate-800 text-sm uppercase tracking-wide border-b pb-1">1. Detalhamento - Conhecimento</h5>
-                                                    {(selectedTechEval.machineType === 'Trefila' ? [
-                                                        { id: 'q1', section: 'Matéria-Prima (Entrada)', text: 'Qual é o nome técnico da matéria-prima que utilizamos na trefila?', correct: 'Fio Máquina.' },
-                                                        { id: 'q2', section: 'Matéria-Prima (Entrada)', text: 'Quais são as bitolas de Fio Máquina que temos disponíveis hoje para o processo?', correct: '8.00mm, 6.50mm, 6.35mm e 5.50mm.' },
-                                                        { id: 'q3', section: 'Produto Final (Saída)', text: 'Como chamamos comercialmente o produto que sai da nossa trefila?', correct: 'Rolo CA60 (ou Aço CA60).' },
-                                                        { id: 'q4', section: 'Produto Final (Saída)', text: 'Cite 5 bitolas diferentes que produzimos na trefila após o processo de redução.', correct: '6.0mm, 5.8mm, 5.6mm, 5.0mm, 4.2mm, 4.1mm, 3.8mm.' },
-                                                        { id: 'q5', section: 'Aplicação (Valor)', text: 'O Rolo CA60 que produzimos é a matéria-prima principal para quais produtos finais na nossa fábrica?', correct: 'Fabricação de Treliças, Vergalhões (processo de corte e dobra) e Estribos.' }
-                                                    ] : [
-                                                        { id: 'q1', section: 'Codificação e Identificação', text: 'Como identificamos nossos modelos de treliça na produção?', correct: 'Pela letra "H" seguida do número que indica a altura (ex: H8, H12).' },
-                                                        { id: 'q2', section: 'Codificação e Identificação', text: 'Se eu pedir uma H12, o que esse "12" representa?', correct: 'A altura da treliça (em centímetros).' },
-                                                        { id: 'q3', section: 'Estrutura e Composição', text: 'Descreva a disposição dos ferros em uma treliça padrão.', correct: '1 ferro superior, 2 ferros na senoide (zigue-zague) e 2 ferros inferiores.' },
-                                                        { id: 'q4', section: 'Padronização', text: 'Quais são os comprimentos padrão das barras que produzimos?', correct: '6 metros e 12 metros.' },
-                                                        { id: 'q5', section: 'Demonstração de Domínio (O "Caso Real")', text: 'Escolha um modelo que você domina (ex: H12 Leve) e me detalhe as bitolas utilizadas nele.', correct: 'Superior: 5.8mm, Senoide: 3.2mm, Inferior: 3.8mm. (Deve demonstrar saber consultar ou memorizar bitolas)' }
-                                                    ]).map((q, idx) => {
+                                                    {(selectedTechEval.machineType === 'Trefila' ? TREFILA_QUESTIONS : TRELICA_QUESTIONS).map((q, idx) => {
                                                         const answer = selectedTechEval[`${q.id}Answer` as keyof TechnicalEvaluation] || '';
                                                         const score = selectedTechEval[`${q.id}Score` as keyof TechnicalEvaluation] || 0;
                                                         return (
-                                                            <div key={q.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200/60 space-y-2">
+                                                            <div key={q.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200/60 space-y-3">
                                                                 <div>
                                                                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">{q.section}</span>
                                                                     <h6 className="font-bold text-slate-800 text-xs mt-0.5">{idx + 1}. {q.text}</h6>
                                                                 </div>
-                                                                <div className="bg-white p-2.5 rounded-lg text-xs text-slate-700 italic border border-slate-100 font-medium">
-                                                                    <strong>Resposta do Colaborador:</strong> "{answer || 'Não preenchida.'}"
+                                                                
+                                                                {/* Opções de Resposta em modo Leitura */}
+                                                                <div className="grid grid-cols-1 gap-1.5 text-xs font-semibold">
+                                                                    {q.options.map((opt, optIdx) => {
+                                                                        const isSelected = answer === opt;
+                                                                        const isCorrectOption = opt === q.correct;
+                                                                        let itemClass = "bg-white border-slate-100 text-slate-600";
+                                                                        if (isSelected) {
+                                                                            itemClass = isCorrectOption 
+                                                                                ? "bg-emerald-50 border-emerald-200 text-emerald-900 font-bold" 
+                                                                                : "bg-red-50 border-red-200 text-red-900 font-bold";
+                                                                        } else if (isCorrectOption && answer) {
+                                                                            itemClass = "bg-emerald-50/20 border-emerald-100 text-emerald-800 border-dashed";
+                                                                        }
+                                                                        return (
+                                                                            <div key={optIdx} className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${itemClass}`}>
+                                                                                <span className="h-4 w-4 shrink-0 flex items-center justify-center rounded-full border text-[9px] font-black uppercase">
+                                                                                    {isSelected ? (isCorrectOption ? '✓' : '✕') : String.fromCharCode(65 + optIdx)}
+                                                                                </span>
+                                                                                <span>{opt}</span>
+                                                                            </div>
+                                                                        );
+                                                                    })}
                                                                 </div>
-                                                                <div className="flex justify-between items-center text-xs pt-1">
-                                                                    <span className="text-[10px] text-emerald-700 font-bold uppercase tracking-tight bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">Esperado: {q.correct}</span>
+                                                                
+                                                                <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-200/60">
+                                                                    <span className="text-[10px] font-black uppercase tracking-tight">
+                                                                        {answer === q.correct ? (
+                                                                            <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">✓ Resposta Correta</span>
+                                                                        ) : answer ? (
+                                                                            <span className="text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-100">✕ Resposta Incorreta</span>
+                                                                        ) : (
+                                                                            <span className="text-slate-400 bg-slate-100 px-2 py-0.5 rounded border">Não Respondida</span>
+                                                                        )}
+                                                                    </span>
                                                                     <span className="font-extrabold text-slate-600">Nota: <strong className="text-slate-800 text-sm">{score}</strong> / 10</span>
                                                                 </div>
                                                             </div>
@@ -1853,26 +2009,33 @@ const EmployeeDetailModal: React.FC<{
                                                 {/* Seção Conhecimento */}
                                                 <div className="space-y-4 mb-6">
                                                     <h2 className="text-xs font-black text-slate-800 border-b pb-1 uppercase tracking-wider">1. Detalhado - Conhecimento (Perguntas)</h2>
-                                                    {(selectedTechEval.machineType === 'Trefila' ? [
-                                                        { id: 'q1', section: 'Matéria-Prima (Entrada)', text: 'Qual é o nome técnico da matéria-prima que utilizamos na trefila?', correct: 'Fio Máquina.' },
-                                                        { id: 'q2', section: 'Matéria-Prima (Entrada)', text: 'Quais são as bitolas de Fio Máquina que temos disponíveis hoje para o processo?', correct: '8.00mm, 6.50mm, 6.35mm e 5.50mm.' },
-                                                        { id: 'q3', section: 'Produto Final (Saída)', text: 'Como chamamos comercialmente o produto que sai da nossa trefila?', correct: 'Rolo CA60 (ou Aço CA60).' },
-                                                        { id: 'q4', section: 'Produto Final (Saída)', text: 'Cite 5 bitolas diferentes que produzimos na trefila após o processo de redução.', correct: '6.0mm, 5.8mm, 5.6mm, 5.0mm, 4.2mm, 4.1mm, 3.8mm.' },
-                                                        { id: 'q5', section: 'Aplicação (Valor)', text: 'O Rolo CA60 que produzimos é a matéria-prima principal para quais produtos finais na nossa fábrica?', correct: 'Fabricação de Treliças, Vergalhões (processo de corte e dobra) e Estribos.' }
-                                                    ] : [
-                                                        { id: 'q1', section: 'Codificação e Identificação', text: 'Como identificamos nossos modelos de treliça na produção?', correct: 'Pela letra "H" seguida do número que indica a altura (ex: H8, H12).' },
-                                                        { id: 'q2', section: 'Codificação e Identificação', text: 'Se eu pedir uma H12, o que esse "12" representa?', correct: 'A altura da treliça (em centímetros).' },
-                                                        { id: 'q3', section: 'Estrutura e Composição', text: 'Descreva a disposição dos ferros em uma treliça padrão.', correct: '1 ferro superior, 2 ferros na senoide (zigue-zague) e 2 ferros inferiores.' },
-                                                        { id: 'q4', section: 'Padronização', text: 'Quais são os comprimentos padrão das barras que produzimos?', correct: '6 metros e 12 metros.' },
-                                                        { id: 'q5', section: 'Demonstração de Domínio (O "Caso Real")', text: 'Escolha um modelo que você domina (ex: H12 Leve) e me detalhe as bitolas utilizadas nele.', correct: 'Superior: 5.8mm, Senoide: 3.2mm, Inferior: 3.8mm. (Deve demonstrar saber consultar ou memorizar bitolas)' }
-                                                    ]).map((q, idx) => {
+                                                    {(selectedTechEval.machineType === 'Trefila' ? TREFILA_QUESTIONS : TRELICA_QUESTIONS).map((q, idx) => {
                                                         const answer = selectedTechEval[`${q.id}Answer` as keyof TechnicalEvaluation] || '';
                                                         const score = selectedTechEval[`${q.id}Score` as keyof TechnicalEvaluation] || 0;
                                                         return (
-                                                            <div key={q.id} className="border-l-4 border-slate-300 pl-4 py-0.5">
-                                                                <p className="text-xs font-black text-slate-800">{idx + 1}. {q.text}</p>
-                                                                <p className="text-xs text-slate-600 font-medium italic mt-1">Resposta: "{answer || 'Não respondida'}"</p>
-                                                                <p className="text-[10px] text-slate-400 mt-0.5">Esperado: {q.correct} • Nota: {score}/10</p>
+                                                            <div key={q.id} className="border-l-2 border-slate-400 pl-3 py-1 space-y-1 page-break-inside-avoid">
+                                                                <p className="text-xs font-bold text-slate-900">{idx + 1}. {q.text}</p>
+                                                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] font-medium mt-1">
+                                                                    {q.options.map((opt, optIdx) => {
+                                                                        const isSelected = answer === opt;
+                                                                        const isCorrectOption = opt === q.correct;
+                                                                        let mark = "[ ]";
+                                                                        let optStyle = "text-slate-600";
+                                                                        if (isSelected) {
+                                                                            mark = isCorrectOption ? "[x] (✓)" : "[x] (✕)";
+                                                                            optStyle = isCorrectOption ? "text-emerald-800 font-bold bg-emerald-50/50 rounded px-1" : "text-red-800 font-bold bg-red-50/50 rounded px-1";
+                                                                        } else if (isCorrectOption) {
+                                                                            mark = "[ ] (Correto)";
+                                                                            optStyle = "text-emerald-700 border-b border-dashed border-emerald-300";
+                                                                        }
+                                                                        return (
+                                                                            <div key={optIdx} className={optStyle}>
+                                                                                {mark} {opt}
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                                <p className="text-[9px] text-slate-500 font-semibold">Nota obtida nesta questão: {score} / 10</p>
                                                             </div>
                                                         );
                                                     })}
