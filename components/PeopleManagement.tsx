@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import { ArrowLeftIcon, PlusIcon, StarIcon, ChartBarIcon, TrophyIcon, SearchIcon, FilterIcon, UserIcon, BookOpenIcon, ClockIcon, DocumentTextIcon, PencilIcon, TrashIcon, UserGroupIcon, ExclamationIcon, SaveIcon, XIcon, DownloadIcon, PrinterIcon, CheckCircleIcon } from './icons';
-import type { Page, Employee, Evaluation, Achievement, User, EmployeeCourse, EmployeeAbsence, EmployeeVacation, EmployeeResponsibility, OrgUnit, OrgPosition, EmployeeDocument, KaizenProblem } from '../types';
+import type { Page, Employee, Evaluation, TechnicalEvaluation, Achievement, User, EmployeeCourse, EmployeeAbsence, EmployeeVacation, EmployeeResponsibility, OrgUnit, OrgPosition, EmployeeDocument, KaizenProblem } from '../types';
 import { fetchTable, insertItem, updateItem, deleteItem, deleteItemByColumn, fetchByColumn, uploadFile } from '../services/supabaseService';
 
 interface PeopleManagementProps {
@@ -628,6 +628,17 @@ const EmployeeDetailModal: React.FC<{
     const [evalScores, setEvalScores] = useState({ organization: 0, cleanliness: 0, effort: 0, communication: 0, improvement: 0 });
     const [evalNote, setEvalNote] = useState('');
 
+    // Estados para Avaliação Técnica (Trefila)
+    const [technicalEvaluations, setTechnicalEvaluations] = useState<TechnicalEvaluation[]>([]);
+    const [activeEvalSubTab, setActiveEvalSubTab] = useState<'behavioral' | 'technical'>('behavioral');
+    const [isEvaluatingTechnical, setIsEvaluatingTechnical] = useState(false);
+    const [selectedTechEval, setSelectedTechEval] = useState<TechnicalEvaluation | null>(null);
+    const [techEvalMonth, setTechEvalMonth] = useState<number>(1);
+    const [techEvalDate, setTechEvalDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+    const [techEvalAnswers, setTechEvalAnswers] = useState<Record<string, string>>({ q1: '', q2: '', q3: '', q4: '', q5: '' });
+    const [techEvalScores, setTechEvalScores] = useState<Record<string, number>>({ q1: 0, q2: 0, q3: 0, q4: 0, q5: 0 });
+    const [techEvalNote, setTechEvalNote] = useState('');
+
     // Documents State
     const [documents, setDocuments] = useState<EmployeeDocument[]>([]);
 
@@ -811,17 +822,19 @@ const EmployeeDetailModal: React.FC<{
 
     const loadDetails = async () => {
         try {
-            const [resps, crs, abs, vacs, evals] = await Promise.all([
+            const [resps, crs, abs, vacs, evals, techEvals] = await Promise.all([
                 fetchByColumn<EmployeeResponsibility>('employee_responsibilities', 'employee_id', employee.id),
                 fetchByColumn<EmployeeCourse>('employee_courses', 'employee_id', employee.id),
                 fetchByColumn<EmployeeAbsence>('employee_absences', 'employee_id', employee.id),
                 fetchByColumn<EmployeeVacation>('employee_vacations', 'employee_id', employee.id),
-                fetchByColumn<Evaluation>('evaluations', 'employee_id', employee.id)
+                fetchByColumn<Evaluation>('evaluations', 'employee_id', employee.id),
+                fetchByColumn<TechnicalEvaluation>('technical_evaluations', 'employee_id', employee.id).catch(() => [])
             ]);
             setResponsibilities(resps);
             setCourses(crs);
             setAbsences(abs);
             setVacations(vacs);
+            setTechnicalEvaluations(techEvals.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
 
             // Fetch Documents
             const docs = await fetchByColumn<EmployeeDocument>('employee_documents', 'employee_id', employee.id);
@@ -940,10 +953,73 @@ const EmployeeDetailModal: React.FC<{
         } catch (e) { alert('Erro ao salvar avaliação'); }
     };
 
+    const handleSubmitTechnicalEvaluation = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!currentUser) return;
+        
+        // Calculate average score of Q1 to Q5
+        const total = (
+            techEvalScores.q1 + 
+            techEvalScores.q2 + 
+            techEvalScores.q3 + 
+            techEvalScores.q4 + 
+            techEvalScores.q5
+        ) / 5;
+
+        try {
+            const newEval = await insertItem<TechnicalEvaluation>('technical_evaluations', {
+                employeeId: employee.id,
+                evaluator: currentUser.username,
+                date: new Date(techEvalDate).toISOString(),
+                monthNum: techEvalMonth,
+                q1Answer: techEvalAnswers.q1,
+                q1Score: techEvalScores.q1,
+                q2Answer: techEvalAnswers.q2,
+                q2Score: techEvalScores.q2,
+                q3Answer: techEvalAnswers.q3,
+                q3Score: techEvalScores.q3,
+                q4Answer: techEvalAnswers.q4,
+                q4Score: techEvalScores.q4,
+                q5Answer: techEvalAnswers.q5,
+                q5Score: techEvalScores.q5,
+                totalScore: parseFloat(total.toFixed(2)),
+                note: techEvalNote
+            } as TechnicalEvaluation);
+
+            setTechnicalEvaluations([newEval, ...technicalEvaluations]);
+            setIsEvaluatingTechnical(false);
+            setTechEvalMonth(1);
+            setTechEvalDate(new Date().toISOString().split('T')[0]);
+            setTechEvalAnswers({ q1: '', q2: '', q3: '', q4: '', q5: '' });
+            setTechEvalScores({ q1: 0, q2: 0, q3: 0, q4: 0, q5: 0 });
+            setTechEvalNote('');
+            alert('Avaliação técnica salva com sucesso!');
+            loadDetails();
+            onSave();
+        } catch (e) {
+            console.error('Error saving technical evaluation:', e);
+            alert('Erro ao salvar avaliação técnica.');
+        }
+    };
+
+    const handleDeleteTechnicalEvaluation = async (id: string) => {
+        if (!confirm('Deseja realmente excluir esta avaliação técnica?')) return;
+        try {
+            await deleteItem('technical_evaluations', id);
+            setTechnicalEvaluations(technicalEvaluations.filter(e => e.id !== id));
+            alert('Avaliação técnica excluída!');
+            loadDetails();
+            onSave();
+        } catch (e) {
+            console.error(e);
+            alert('Erro ao excluir avaliação técnica.');
+        }
+    };
+
     return (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-0 md:p-4">
             <div className="bg-white md:rounded-2xl shadow-2xl w-full md:max-w-4xl h-full md:h-[90vh] flex flex-col overflow-hidden">
-                <div className="bg-slate-50 p-6 border-b border-slate-200 flex justify-between items-start">
+                <div className="bg-slate-50 p-6 border-b border-slate-200 flex justify-between items-start no-print">
                     <div className="flex items-center space-x-4">
                         <div className="h-20 w-20 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden border-4 border-white shadow-sm relative group">
                             {empData.photoUrl ? <img src={empData.photoUrl} alt={empData.name} className={`h-full w-full object-cover transition-opacity ${isUploading ? 'opacity-50' : ''}`} /> : <span className="text-3xl font-bold text-slate-400">{empData.name.charAt(0)}</span>}
@@ -997,7 +1073,7 @@ const EmployeeDetailModal: React.FC<{
                         <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-200 transition">✕</button>
                     </div>
                 </div>
-                <div className="flex border-b border-slate-200 bg-white overflow-x-auto no-scrollbar">
+                <div className="flex border-b border-slate-200 bg-white overflow-x-auto no-scrollbar no-print">
                     {[
                         { id: 'profile', label: 'Resumo / Perfil', icon: <UserIcon className="h-4 w-4" /> },
                         { id: 'responsibilities', label: 'Atribuições', icon: <DocumentTextIcon className="h-4 w-4" /> },
@@ -1227,16 +1303,424 @@ const EmployeeDetailModal: React.FC<{
                     )}
                     {activeTab === 'evaluations' && (
                         <div className="space-y-6">
-                            {!readOnly && (
-                                !isEvaluating ? (<button onClick={() => setIsEvaluating(true)} className="w-full bg-[#0F3F5C] text-white font-bold py-3 rounded-xl hover:bg-[#0A2A3D] transition shadow-md">+ Nova Avaliação Rápida</button>) : (
-                                    <div className="bg-white p-6 rounded-xl border border-blue-100 shadow-md">
-                                        <h4 className="font-bold text-lg mb-4 text-[#0F3F5C]">Nova Avaliação</h4>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">{[{ key: 'organization', label: 'Organização' }, { key: 'cleanliness', label: 'Limpeza Máquina' }, { key: 'effort', label: 'Empenho' }, { key: 'communication', label: 'Comunicação' }, { key: 'improvement', label: 'Melhoria' }].map(cat => (<div key={cat.key} className="flex justify-between items-center bg-slate-50 p-3 rounded-lg"><span className="text-sm font-medium">{cat.label}</span>{/* @ts-ignore */}<StarRating score={evalScores[cat.key]} onChange={v => setEvalScores({ ...evalScores, [cat.key]: v })} /></div>))}</div>
-                                        <textarea className="w-full border p-2 rounded-lg text-sm mb-4" placeholder="Observação..." value={evalNote} onChange={e => setEvalNote(e.target.value)} /><div className="flex justify-end gap-3"><button onClick={() => setIsEvaluating(false)} className="text-slate-500 hover:text-slate-700">Cancelar</button><button onClick={handleSubmitEvaluation} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold">Salvar Avaliação</button></div>
+                            {/* Navegação de Sub-abas */}
+                            <div className="flex border-b border-slate-200 mb-4 no-print gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => { setActiveEvalSubTab('behavioral'); setSelectedTechEval(null); setIsEvaluatingTechnical(false); }}
+                                    className={`px-4 py-2 text-xs font-black uppercase tracking-wider border-b-2 transition-colors ${activeEvalSubTab === 'behavioral' ? 'border-[#0F3F5C] text-[#0F3F5C]' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                                >
+                                    🎭 Comportamental / Rápida
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => { setActiveEvalSubTab('technical'); setIsEvaluating(false); }}
+                                    className={`px-4 py-2 text-xs font-black uppercase tracking-wider border-b-2 transition-colors ${activeEvalSubTab === 'technical' ? 'border-[#0F3F5C] text-[#0F3F5C]' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                                >
+                                    ⚙️ Teste Técnico (Trefila)
+                                </button>
+                            </div>
+
+                            {/* SUB-ABA 1: AVALIAÇÃO COMPORTAMENTAL */}
+                            {activeEvalSubTab === 'behavioral' && (
+                                <div className="space-y-6 no-print">
+                                    {!readOnly && (
+                                        !isEvaluating ? (
+                                            <button onClick={() => setIsEvaluating(true)} className="w-full bg-[#0F3F5C] text-white font-bold py-3 rounded-xl hover:bg-[#0A2A3D] transition shadow-md">
+                                                + Nova Avaliação Rápida
+                                            </button>
+                                        ) : (
+                                            <div className="bg-white p-6 rounded-xl border border-blue-100 shadow-md">
+                                                <h4 className="font-bold text-lg mb-4 text-[#0F3F5C]">Nova Avaliação</h4>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                                    {[{ key: 'organization', label: 'Organização' }, { key: 'cleanliness', label: 'Limpeza Máquina' }, { key: 'effort', label: 'Empenho' }, { key: 'communication', label: 'Comunicação' }, { key: 'improvement', label: 'Melhoria' }].map(cat => (
+                                                        <div key={cat.key} className="flex justify-between items-center bg-slate-50 p-3 rounded-lg">
+                                                            <span className="text-sm font-medium">{cat.label}</span>
+                                                            {/* @ts-ignore */}
+                                                            <StarRating score={evalScores[cat.key]} onChange={v => setEvalScores({ ...evalScores, [cat.key]: v })} />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <textarea className="w-full border p-2 rounded-lg text-sm mb-4" placeholder="Observação..." value={evalNote} onChange={e => setEvalNote(e.target.value)} />
+                                                <div className="flex justify-end gap-3">
+                                                    <button onClick={() => setIsEvaluating(false)} className="text-slate-500 hover:text-slate-700">Cancelar</button>
+                                                    <button onClick={handleSubmitEvaluation} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold">Salvar Avaliação</button>
+                                                </div>
+                                            </div>
+                                        )
+                                    )}
+                                    <div className="space-y-4">
+                                        {evaluations.map(ev => (
+                                            <div key={ev.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <div>
+                                                        <p className="text-sm font-bold text-slate-800">{new Date(ev.date).toLocaleDateString()} - Avaliado por {ev.evaluator}</p>
+                                                        <div className="flex items-center mt-1">
+                                                            <StarIcon className="h-4 w-4 text-yellow-400 fill-current mr-1" />
+                                                            <span className="font-bold">{(ev.totalScore / 5).toFixed(1)}</span>
+                                                        </div>
+                                                    </div>
+                                                    <span className="text-xs text-slate-400 font-semibold">Total: {ev.totalScore}/25</span>
+                                                </div>
+                                                {ev.note && <p className="text-sm text-slate-600 bg-slate-50 p-2 rounded italic">"{ev.note}"</p>}
+                                            </div>
+                                        ))}
+                                        {evaluations.length === 0 && (
+                                            <p className="text-slate-400 text-center py-4">Nenhuma avaliação comportamental registrada.</p>
+                                        )}
                                     </div>
-                                )
+                                </div>
                             )}
-                            <div className="space-y-4">{evaluations.map(ev => (<div key={ev.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm"><div className="flex justify-between items-start mb-2"><div><p className="text-sm font-bold text-slate-800">{new Date(ev.date).toLocaleDateString()} - Avaliado por {ev.evaluator}</p><div className="flex items-center mt-1"><StarIcon className="h-4 w-4 text-yellow-400 fill-current mr-1" /><span className="font-bold">{(ev.totalScore / 5).toFixed(1)}</span></div></div><span className="text-xs text-slate-400">Total: {ev.totalScore}/25</span></div>{ev.note && <p className="text-sm text-slate-600 bg-slate-50 p-2 rounded italic">"{ev.note}"</p>}</div>))}</div>
+
+                            {/* SUB-ABA 2: TESTE TÉCNICO (TREFILA) */}
+                            {activeEvalSubTab === 'technical' && (
+                                <div className="space-y-6">
+                                    {/* Caso 1: Editando/Avaliando */}
+                                    {isEvaluatingTechnical && !readOnly && (
+                                        <form onSubmit={handleSubmitTechnicalEvaluation} className="bg-white p-6 rounded-xl border border-blue-100 shadow-md space-y-6 no-print">
+                                            <div className="flex justify-between items-center border-b pb-3">
+                                                <h4 className="font-black text-lg text-[#0F3F5C] uppercase tracking-tight">Novo Teste Técnico: Domínio Técnico da Trefila</h4>
+                                                <button type="button" onClick={() => setIsEvaluatingTechnical(false)} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+                                            </div>
+
+                                            {/* Cabeçalho do formulário */}
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <div>
+                                                    <label className="block text-xs font-black text-slate-500 uppercase">Período de Experiência</label>
+                                                    <select
+                                                        required
+                                                        className="w-full mt-1 p-2 border rounded-lg bg-slate-50 text-slate-900 font-bold"
+                                                        value={techEvalMonth}
+                                                        onChange={e => setTechEvalMonth(parseInt(e.target.value))}
+                                                    >
+                                                        <option value={1}>1º Mês de Experiência</option>
+                                                        <option value={2}>2º Mês de Experiência</option>
+                                                        <option value={3}>3º Mês de Experiência</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-black text-slate-500 uppercase">Data do Teste</label>
+                                                    <input
+                                                        type="date"
+                                                        required
+                                                        className="w-full mt-1 p-2 border rounded-lg bg-slate-50 text-slate-900 font-bold"
+                                                        value={techEvalDate}
+                                                        onChange={e => setTechEvalDate(e.target.value)}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-black text-slate-500 uppercase">Avaliador</label>
+                                                    <input
+                                                        type="text"
+                                                        disabled
+                                                        className="w-full mt-1 p-2 border rounded-lg bg-slate-200 text-slate-700 font-bold cursor-not-allowed"
+                                                        value={currentUser?.username || ''}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {/* Perguntas */}
+                                            <div className="space-y-6 border-t pt-4">
+                                                {[
+                                                    { id: 'q1', section: '1. Matéria-Prima (O básico da entrada)', text: 'Qual é o nome técnico da matéria-prima que utilizamos na trefila?', correct: 'Fio Máquina.' },
+                                                    { id: 'q2', section: '1. Matéria-Prima (O básico da entrada)', text: 'Quais são as bitolas de Fio Máquina que temos disponíveis hoje para o processo?', correct: '8.00mm, 6.50mm, 6.35mm e 5.50mm.' },
+                                                    { id: 'q3', section: '2. Produto Final (O básico da saída)', text: 'Como chamamos comercialmente o produto que sai da nossa trefila?', correct: 'Rolo CA60 (ou Aço CA60).' },
+                                                    { id: 'q4', section: '2. Produto Final (O básico da saída)', text: 'Cite 5 bitolas diferentes que produzimos na trefila após o processo de redução.', correct: '6.0mm, 5.8mm, 5.6mm, 5.0mm, 4.2mm, 4.1mm, 3.8mm.' },
+                                                    { id: 'q5', section: '3. Aplicação (Entendendo o valor do produto)', text: 'O Rolo CA60 que produzimos é a matéria-prima principal para quais produtos finais na nossa fábrica?', correct: 'Fabricação de Treliças, Vergalhões (processo de corte e dobra) e Estribos.' }
+                                                ].map((q, idx) => (
+                                                    <div key={q.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200/60 space-y-3">
+                                                        <div>
+                                                            <span className="text-[10px] font-black uppercase text-blue-700 tracking-wider block">{q.section}</span>
+                                                            <label className="text-sm font-bold text-slate-800 block mt-0.5">{idx + 1}. {q.text}</label>
+                                                        </div>
+                                                        <div className="bg-emerald-50 border border-emerald-100 p-2.5 rounded-lg text-xs text-emerald-800 font-medium">
+                                                            💡 <strong>Resposta Esperada:</strong> {q.correct}
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs font-bold text-slate-500 uppercase">Resposta do Funcionário</label>
+                                                            <textarea
+                                                                required
+                                                                className="w-full mt-1 p-2 border rounded-lg bg-white text-slate-900 text-sm font-medium"
+                                                                placeholder="Descreva o que o funcionário respondeu..."
+                                                                rows={2}
+                                                                value={techEvalAnswers[q.id]}
+                                                                onChange={e => setTechEvalAnswers({ ...techEvalAnswers, [q.id]: e.target.value })}
+                                                            />
+                                                        </div>
+                                                        <div className="flex items-center gap-3">
+                                                            <label className="text-xs font-bold text-slate-500 uppercase">Nota da Resposta (0 a 10):</label>
+                                                            <select
+                                                                className="p-1.5 border rounded-lg bg-white font-extrabold text-[#0F3F5C] w-24 text-center"
+                                                                value={techEvalScores[q.id]}
+                                                                onChange={e => setTechEvalScores({ ...techEvalScores, [q.id]: parseFloat(e.target.value) })}
+                                                            >
+                                                                {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                                                                    <option key={n} value={n}>{n}</option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            {/* Observações Gerais */}
+                                            <div className="border-t pt-4">
+                                                <label className="block text-xs font-black text-slate-500 uppercase">Comentários e Parecer Geral</label>
+                                                <textarea
+                                                    className="w-full mt-1 p-2 border rounded-lg text-sm bg-white text-slate-900 font-medium"
+                                                    placeholder="Pontos de melhoria, postura técnica, facilidade de aprendizado..."
+                                                    rows={3}
+                                                    value={techEvalNote}
+                                                    onChange={e => setTechEvalNote(e.target.value)}
+                                                />
+                                            </div>
+
+                                            <div className="flex justify-end gap-3 pt-2">
+                                                <button type="button" onClick={() => setIsEvaluatingTechnical(false)} className="px-5 py-2 border rounded-lg text-slate-600 font-bold text-sm hover:bg-slate-50">Cancelar</button>
+                                                <button type="submit" className="px-6 py-2 bg-[#0F3F5C] text-white font-bold rounded-lg text-sm hover:bg-[#0A2A3D] transition">Salvar Teste Técnico</button>
+                                            </div>
+                                        </form>
+                                    )}
+
+                                    {/* Caso 2: Visualizando Resultados de um Teste */}
+                                    {selectedTechEval && (
+                                        <div className="space-y-6">
+                                            {/* Ações na tela (Voltar / Imprimir) */}
+                                            <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-100 shadow-sm no-print">
+                                                <button
+                                                    onClick={() => setSelectedTechEval(null)}
+                                                    className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 rounded-lg text-slate-700 text-xs font-bold hover:bg-slate-50 transition"
+                                                >
+                                                    <ArrowLeftIcon className="h-4 w-4" /> Voltar ao Histórico
+                                                </button>
+                                                <button
+                                                    onClick={() => window.print()}
+                                                    className="flex items-center gap-1.5 px-5 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition shadow"
+                                                >
+                                                    <PrinterIcon className="h-4 w-4" /> Imprimir Avaliação
+                                                </button>
+                                            </div>
+
+                                            {/* Tela de exibição do resultado (Tela) */}
+                                            <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-md space-y-6 no-print">
+                                                <div className="flex justify-between items-start border-b pb-4">
+                                                    <div>
+                                                        <span className="text-xs font-black text-blue-700 uppercase tracking-widest">Resultados Técnicos</span>
+                                                        <h4 className="text-xl font-black text-slate-800 mt-1">
+                                                            {selectedTechEval.monthNum}º Mês de Experiência
+                                                        </h4>
+                                                        <p className="text-xs text-slate-500 font-semibold mt-1">
+                                                            Avaliado por <strong className="text-slate-700">{selectedTechEval.evaluator}</strong> em {new Date(selectedTechEval.date).toLocaleDateString('pt-BR')}
+                                                        </p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Média Final</span>
+                                                        <div className="flex items-baseline justify-end gap-1 mt-1">
+                                                            <span className={`text-4xl font-black ${selectedTechEval.totalScore >= 7 ? 'text-green-600' : selectedTechEval.totalScore >= 5 ? 'text-amber-500' : 'text-red-500'}`}>
+                                                                {selectedTechEval.totalScore.toFixed(1)}
+                                                            </span>
+                                                            <span className="text-slate-400 font-bold text-sm">/ 10</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Detalhamento das Questões */}
+                                                <div className="space-y-4">
+                                                    {[
+                                                        { id: 'q1', section: '1. Matéria-Prima (O básico da entrada)', text: 'Qual é o nome técnico da matéria-prima que utilizamos na trefila?', correct: 'Fio Máquina.' },
+                                                        { id: 'q2', section: '1. Matéria-Prima (O básico da entrada)', text: 'Quais são as bitolas de Fio Máquina que temos disponíveis hoje para o processo?', correct: '8.00mm, 6.50mm, 6.35mm e 5.50mm.' },
+                                                        { id: 'q3', section: '2. Produto Final (O básico da saída)', text: 'Como chamamos comercialmente o produto que sai da nossa trefila?', correct: 'Rolo CA60 (ou Aço CA60).' },
+                                                        { id: 'q4', section: '2. Produto Final (O básico da saída)', text: 'Cite 5 bitolas diferentes que produzimos na trefila após o processo de redução.', correct: '6.0mm, 5.8mm, 5.6mm, 5.0mm, 4.2mm, 4.1mm, 3.8mm.' },
+                                                        { id: 'q5', section: '3. Aplicação (Entendendo o valor do produto)', text: 'O Rolo CA60 que produzimos é a matéria-prima principal para quais produtos finais na nossa fábrica?', correct: 'Fabricação de Treliças, Vergalhões (processo de corte e dobra) e Estribos.' }
+                                                    ].map((q, idx) => {
+                                                        const answer = selectedTechEval[`${q.id}Answer` as keyof TechnicalEvaluation] || '';
+                                                        const score = selectedTechEval[`${q.id}Score` as keyof TechnicalEvaluation] || 0;
+                                                        return (
+                                                            <div key={q.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200/60 space-y-2.5">
+                                                                <div>
+                                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">{q.section}</span>
+                                                                    <h5 className="font-bold text-slate-800 text-sm mt-0.5">{idx + 1}. {q.text}</h5>
+                                                                </div>
+                                                                <div className="bg-slate-100 p-2.5 rounded-lg text-xs text-slate-700 italic border border-slate-200 font-medium">
+                                                                    <strong>Resposta do Funcionário:</strong> "{answer || 'Não preenchida.'}"
+                                                                </div>
+                                                                <div className="flex justify-between items-center text-xs pt-1">
+                                                                    <span className="text-[10px] text-emerald-700 font-bold uppercase tracking-tight bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">Esperado: {q.correct}</span>
+                                                                    <span className="font-extrabold text-slate-600">Nota: <strong className="text-slate-800 text-sm">{score}</strong> / 10</span>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+
+                                                {/* Observações */}
+                                                {selectedTechEval.note && (
+                                                    <div className="bg-blue-50/20 border border-blue-100/50 p-4 rounded-xl">
+                                                        <h5 className="text-xs font-black text-[#0F3F5C] uppercase tracking-wider mb-1">Parecer / Comentários do Gestor</h5>
+                                                        <p className="text-slate-700 text-sm whitespace-pre-wrap font-medium italic">"{selectedTechEval.note}"</p>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* FOLHA DE IMPRESSÃO A4 (EXCLUSIVA PARA IMPRESSÃO) */}
+                                            <div className="hidden print:block print:fixed print:inset-0 print:bg-white print:z-[9999] print:p-10 print:text-black print:overflow-visible text-slate-900 font-sans">
+                                                {/* Cabeçalho do Documento */}
+                                                <div className="border-b-2 border-slate-900 pb-4 mb-6 flex justify-between items-end">
+                                                    <div>
+                                                        <h1 className="text-xl font-black tracking-tight uppercase">MSM - Gestão Inteligente de Produção</h1>
+                                                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-0.5">Relatório de Avaliação Técnica de Experiência</p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className="text-xs font-bold bg-slate-100 px-3 py-1 rounded border border-slate-200">TREFILA</span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Ficha do Funcionário */}
+                                                <div className="grid grid-cols-2 gap-x-8 gap-y-3 bg-slate-50 p-4 rounded-lg border border-slate-200 text-sm mb-6">
+                                                    <div>
+                                                        <span className="font-bold text-slate-500 text-xs block uppercase">Colaborador Avaliado</span>
+                                                        <span className="font-black text-slate-800 text-base">{employee.name}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="font-bold text-slate-500 text-xs block uppercase">Avaliador (Gestor)</span>
+                                                        <span className="font-bold text-slate-800 text-base">{selectedTechEval.evaluator}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="font-bold text-slate-500 text-xs block uppercase">Data de Aplicação</span>
+                                                        <span className="font-semibold text-slate-800">{new Date(selectedTechEval.date).toLocaleDateString('pt-BR')}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="font-bold text-slate-500 text-xs block uppercase">Período de Experiência</span>
+                                                        <span className="font-black text-blue-800 text-base">{selectedTechEval.monthNum}º Mês</span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Questionário */}
+                                                <div className="space-y-6 mb-8">
+                                                    <h2 className="text-sm font-black text-slate-800 border-b pb-1 uppercase tracking-wider">Questionário Aplicado</h2>
+                                                    {[
+                                                        { id: 'q1', section: '1. Matéria-Prima (O básico da entrada)', text: 'Qual é o nome técnico da matéria-prima que utilizamos na trefila?', correct: 'Fio Máquina.' },
+                                                        { id: 'q2', section: '1. Matéria-Prima (O básico da entrada)', text: 'Quais são as bitolas de Fio Máquina que temos disponíveis hoje para o processo?', correct: '8.00mm, 6.50mm, 6.35mm e 5.50mm.' },
+                                                        { id: 'q3', section: '2. Produto Final (O básico da saída)', text: 'Como chamamos comercialmente o produto que sai da nossa trefila?', correct: 'Rolo CA60 (ou Aço CA60).' },
+                                                        { id: 'q4', section: '2. Produto Final (O básico da saída)', text: 'Cite 5 bitolas diferentes que produzimos na trefila após o processo de redução.', correct: '6.0mm, 5.8mm, 5.6mm, 5.0mm, 4.2mm, 4.1mm, 3.8mm.' },
+                                                        { id: 'q5', section: '3. Aplicação (Entendendo o valor do produto)', text: 'O Rolo CA60 que produzimos é a matéria-prima principal para quais produtos finais na nossa fábrica?', correct: 'Fabricação de Treliças, Vergalhões (processo de corte e dobra) e Estribos.' }
+                                                    ].map((q, idx) => {
+                                                        const answer = selectedTechEval[`${q.id}Answer` as keyof TechnicalEvaluation] || '';
+                                                        const score = selectedTechEval[`${q.id}Score` as keyof TechnicalEvaluation] || 0;
+                                                        return (
+                                                            <div key={q.id} className="border-l-4 border-slate-300 pl-4 py-1">
+                                                                <p className="text-xs font-bold text-slate-500 uppercase tracking-tight">{q.section}</p>
+                                                                <p className="text-sm font-black text-slate-800 mt-0.5">{idx + 1}. {q.text}</p>
+                                                                <div className="mt-2 text-xs">
+                                                                    <span className="font-bold text-slate-400 block uppercase">Resposta do Funcionário:</span>
+                                                                    <p className="text-slate-800 whitespace-pre-wrap mt-0.5 font-medium italic">"{answer || 'Não respondida'}"</p>
+                                                                </div>
+                                                                <div className="mt-1.5 flex justify-between items-center bg-slate-50 px-2 py-1 rounded text-xs">
+                                                                    <span className="text-[10px] font-bold text-slate-500 uppercase italic">Resposta correta esperada: {q.correct}</span>
+                                                                    <span className="font-extrabold text-slate-700">Nota: <strong className="text-slate-900 text-sm">{score}</strong> / 10</span>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+
+                                                {/* Resultados Finais */}
+                                                <div className="grid grid-cols-3 gap-6 bg-slate-50 p-4 rounded-lg border border-slate-200 text-sm mb-12">
+                                                    <div className="col-span-2">
+                                                        <span className="font-bold text-slate-500 text-xs block uppercase">Parecer / Observações Finais</span>
+                                                        <p className="text-slate-700 italic mt-1 font-medium">{selectedTechEval.note || 'Sem observações.'}</p>
+                                                    </div>
+                                                    <div className="border-l border-slate-200 pl-6 flex flex-col justify-center items-center">
+                                                        <span className="font-bold text-slate-500 text-xs uppercase block text-center mb-1">Média Final</span>
+                                                        <div className="flex items-baseline gap-1">
+                                                            <span className={`text-3xl font-black ${selectedTechEval.totalScore >= 7 ? 'text-green-600' : selectedTechEval.totalScore >= 5 ? 'text-amber-500' : 'text-red-500'}`}>
+                                                                {selectedTechEval.totalScore.toFixed(1)}
+                                                            </span>
+                                                            <span className="text-slate-400 font-bold">/ 10</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Assinaturas */}
+                                                <div className="grid grid-cols-2 gap-16 text-center text-xs pt-8 mt-auto border-t border-slate-200 border-dashed">
+                                                    <div className="flex flex-col items-center">
+                                                        <div className="w-64 border-b border-slate-400 mb-2"></div>
+                                                        <span className="font-bold text-slate-600 uppercase tracking-wider">Assinatura do Avaliador</span>
+                                                        <span className="text-[10px] text-slate-400 font-semibold">({selectedTechEval.evaluator})</span>
+                                                    </div>
+                                                    <div className="flex flex-col items-center">
+                                                        <div className="w-64 border-b border-slate-400 mb-2"></div>
+                                                        <span className="font-bold text-slate-600 uppercase tracking-wider">Assinatura do Colaborador</span>
+                                                        <span className="text-[10px] text-slate-400 font-semibold">({employee.name})</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Caso 3: Listagem Histórica dos Testes */}
+                                    {!isEvaluatingTechnical && !selectedTechEval && (
+                                        <div className="space-y-4 no-print">
+                                            {!readOnly && (
+                                                <button
+                                                    onClick={() => {
+                                                        setIsEvaluatingTechnical(true);
+                                                        setTechEvalMonth(1);
+                                                        setTechEvalDate(new Date().toISOString().split('T')[0]);
+                                                        setTechEvalAnswers({ q1: '', q2: '', q3: '', q4: '', q5: '' });
+                                                        setTechEvalScores({ q1: 0, q2: 0, q3: 0, q4: 0, q5: 0 });
+                                                        setTechEvalNote('');
+                                                    }}
+                                                    className="w-full bg-[#0F3F5C] text-white font-bold py-3 rounded-xl hover:bg-[#0A2A3D] transition shadow-md"
+                                                >
+                                                    + Novo Teste Técnico (Trefila)
+                                                </button>
+                                            )}
+
+                                            <div className="space-y-3">
+                                                {technicalEvaluations.map(ev => (
+                                                    <div key={ev.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex justify-between items-center hover:bg-slate-50/50 transition">
+                                                        <div>
+                                                            <h5 className="font-black text-slate-800 text-sm uppercase">Teste Técnico: {ev.monthNum}º Mês</h5>
+                                                            <p className="text-xs text-slate-500 mt-0.5">
+                                                                Avaliado por <strong className="text-slate-700">{ev.evaluator}</strong> em {new Date(ev.date).toLocaleDateString()}
+                                                            </p>
+                                                        </div>
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="text-right">
+                                                                <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold block">Nota Final</span>
+                                                                <span className={`text-base font-black ${ev.totalScore >= 7 ? 'text-green-600' : ev.totalScore >= 5 ? 'text-amber-500' : 'text-red-500'}`}>
+                                                                    {ev.totalScore.toFixed(1)} <strong className="text-[10px] text-slate-400 font-bold">/10</strong>
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex gap-2">
+                                                                <button
+                                                                    onClick={() => setSelectedTechEval(ev)}
+                                                                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 border text-slate-700 font-bold rounded-lg text-xs transition"
+                                                                >
+                                                                    📂 Visualizar
+                                                                </button>
+                                                                {!readOnly && (
+                                                                    <button
+                                                                        onClick={() => handleDeleteTechnicalEvaluation(ev.id)}
+                                                                        className="p-1.5 hover:bg-red-50 text-red-500 hover:text-red-600 rounded-lg transition"
+                                                                        title="Excluir Teste"
+                                                                    >
+                                                                        <TrashIcon className="h-4.5 w-4.5" />
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                {technicalEvaluations.length === 0 && (
+                                                    <p className="text-slate-400 text-center py-4">Nenhum teste técnico registrado para este colaborador.</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     )}
                     {activeTab === 'hr' && (

@@ -478,6 +478,26 @@ export interface Evaluation {
     photoUrl?: string;
 }
 
+export interface TechnicalEvaluation {
+    id: string;
+    employeeId: string;
+    evaluator: string;
+    date: string;
+    monthNum: number;
+    q1Answer: string;
+    q1Score: number;
+    q2Answer: string;
+    q2Score: number;
+    q3Answer: string;
+    q3Score: number;
+    q4Answer: string;
+    q4Score: number;
+    q5Answer: string;
+    q5Score: number;
+    totalScore: number;
+    note?: string;
+}
+
 export interface Achievement {
     id: string;
     employeeId: string;
