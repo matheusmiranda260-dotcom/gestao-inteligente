@@ -484,16 +484,33 @@ export interface TechnicalEvaluation {
     evaluator: string;
     date: string;
     monthNum: number;
-    q1Answer: string;
+    machineType: 'Trefila' | 'Treliça';
+    
+    // Conhecimento (Questões)
+    q1Answer?: string;
     q1Score: number;
-    q2Answer: string;
+    q2Answer?: string;
     q2Score: number;
-    q3Answer: string;
+    q3Answer?: string;
     q3Score: number;
-    q4Answer: string;
+    q4Answer?: string;
     q4Score: number;
-    q5Answer: string;
+    q5Answer?: string;
     q5Score: number;
+    
+    // Habilidade (Prática)
+    h1Score: number;
+    h2Score: number;
+    h3Score: number;
+    h4Score: number;
+    
+    // Atitude (Comportamento)
+    a1Score: number;
+    a2Score: number;
+    a3Score: number;
+    a4Score: number;
+    
+    // Geral
     totalScore: number;
     note?: string;
 }

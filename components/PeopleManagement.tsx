@@ -628,15 +628,18 @@ const EmployeeDetailModal: React.FC<{
     const [evalScores, setEvalScores] = useState({ organization: 0, cleanliness: 0, effort: 0, communication: 0, improvement: 0 });
     const [evalNote, setEvalNote] = useState('');
 
-    // Estados para Avaliação Técnica (Trefila)
+    // Estados para Avaliação CHA (Conhecimento, Habilidade e Atitude)
     const [technicalEvaluations, setTechnicalEvaluations] = useState<TechnicalEvaluation[]>([]);
     const [activeEvalSubTab, setActiveEvalSubTab] = useState<'behavioral' | 'technical'>('behavioral');
     const [isEvaluatingTechnical, setIsEvaluatingTechnical] = useState(false);
     const [selectedTechEval, setSelectedTechEval] = useState<TechnicalEvaluation | null>(null);
     const [techEvalMonth, setTechEvalMonth] = useState<number>(1);
     const [techEvalDate, setTechEvalDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+    const [techEvalMachineType, setTechEvalMachineType] = useState<'Trefila' | 'Treliça'>('Trefila');
     const [techEvalAnswers, setTechEvalAnswers] = useState<Record<string, string>>({ q1: '', q2: '', q3: '', q4: '', q5: '' });
     const [techEvalScores, setTechEvalScores] = useState<Record<string, number>>({ q1: 0, q2: 0, q3: 0, q4: 0, q5: 0 });
+    const [techEvalSkills, setTechEvalSkills] = useState<Record<string, number>>({ h1: 0, h2: 0, h3: 0, h4: 0 });
+    const [techEvalAttitudes, setTechEvalAttitudes] = useState<Record<string, number>>({ a1: 0, a2: 0, a3: 0, a4: 0 });
     const [techEvalNote, setTechEvalNote] = useState('');
 
     // Documents State
@@ -957,14 +960,12 @@ const EmployeeDetailModal: React.FC<{
         e.preventDefault();
         if (!currentUser) return;
         
-        // Calculate average score of Q1 to Q5
-        const total = (
-            techEvalScores.q1 + 
-            techEvalScores.q2 + 
-            techEvalScores.q3 + 
-            techEvalScores.q4 + 
-            techEvalScores.q5
-        ) / 5;
+        // Calculate average score of graded elements (CHA)
+        // Both Trefila and Treliça have exactly 5 knowledge questions, 4 skills, and 4 attitudes, totaling 13 graded elements.
+        const qSum = techEvalScores.q1 + techEvalScores.q2 + techEvalScores.q3 + techEvalScores.q4 + techEvalScores.q5;
+        const hSum = techEvalSkills.h1 + techEvalSkills.h2 + techEvalSkills.h3 + techEvalSkills.h4;
+        const aSum = techEvalAttitudes.a1 + techEvalAttitudes.a2 + techEvalAttitudes.a3 + techEvalAttitudes.a4;
+        const total = (qSum + hSum + aSum) / 13;
 
         try {
             const newEval = await insertItem<TechnicalEvaluation>('technical_evaluations', {
@@ -972,6 +973,7 @@ const EmployeeDetailModal: React.FC<{
                 evaluator: currentUser.username,
                 date: new Date(techEvalDate).toISOString(),
                 monthNum: techEvalMonth,
+                machineType: techEvalMachineType,
                 q1Answer: techEvalAnswers.q1,
                 q1Score: techEvalScores.q1,
                 q2Answer: techEvalAnswers.q2,
@@ -982,6 +984,14 @@ const EmployeeDetailModal: React.FC<{
                 q4Score: techEvalScores.q4,
                 q5Answer: techEvalAnswers.q5,
                 q5Score: techEvalScores.q5,
+                h1Score: techEvalSkills.h1,
+                h2Score: techEvalSkills.h2,
+                h3Score: techEvalSkills.h3,
+                h4Score: techEvalSkills.h4,
+                a1Score: techEvalAttitudes.a1,
+                a2Score: techEvalAttitudes.a2,
+                a3Score: techEvalAttitudes.a3,
+                a4Score: techEvalAttitudes.a4,
                 totalScore: parseFloat(total.toFixed(2)),
                 note: techEvalNote
             } as TechnicalEvaluation);
@@ -992,13 +1002,15 @@ const EmployeeDetailModal: React.FC<{
             setTechEvalDate(new Date().toISOString().split('T')[0]);
             setTechEvalAnswers({ q1: '', q2: '', q3: '', q4: '', q5: '' });
             setTechEvalScores({ q1: 0, q2: 0, q3: 0, q4: 0, q5: 0 });
+            setTechEvalSkills({ h1: 0, h2: 0, h3: 0, h4: 0 });
+            setTechEvalAttitudes({ a1: 0, a2: 0, a3: 0, a4: 0 });
             setTechEvalNote('');
-            alert('Avaliação técnica salva com sucesso!');
+            alert('Avaliação de Conhecimento salva com sucesso!');
             loadDetails();
             onSave();
         } catch (e) {
             console.error('Error saving technical evaluation:', e);
-            alert('Erro ao salvar avaliação técnica.');
+            alert('Erro ao salvar avaliação.');
         }
     };
 
@@ -1317,7 +1329,7 @@ const EmployeeDetailModal: React.FC<{
                                     onClick={() => { setActiveEvalSubTab('technical'); setIsEvaluating(false); }}
                                     className={`px-4 py-2 text-xs font-black uppercase tracking-wider border-b-2 transition-colors ${activeEvalSubTab === 'technical' ? 'border-[#0F3F5C] text-[#0F3F5C]' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
                                 >
-                                    ⚙️ Teste Técnico (Trefila)
+                                    ⚙️ Teste de Conhecimento (CHA)
                                 </button>
                             </div>
 
@@ -1372,19 +1384,44 @@ const EmployeeDetailModal: React.FC<{
                                 </div>
                             )}
 
-                            {/* SUB-ABA 2: TESTE TÉCNICO (TREFILA) */}
-                            {activeEvalSubTab === 'technical' && (
-                                <div className="space-y-6">
-                                    {/* Caso 1: Editando/Avaliando */}
-                                    {isEvaluatingTechnical && !readOnly && (
-                                        <form onSubmit={handleSubmitTechnicalEvaluation} className="bg-white p-6 rounded-xl border border-blue-100 shadow-md space-y-6 no-print">
-                                            <div className="flex justify-between items-center border-b pb-3">
-                                                <h4 className="font-black text-lg text-[#0F3F5C] uppercase tracking-tight">Novo Teste Técnico: Domínio Técnico da Trefila</h4>
+                            {/* SUB-ABA 2: TESTE DE CONHECIMENTO (CHA) */}
+                            {activeEvalSubTab === 'technical' && (() => {
+                                const liveCScore = (techEvalScores.q1 + techEvalScores.q2 + techEvalScores.q3 + techEvalScores.q4 + techEvalScores.q5) / 5;
+                                const liveHScore = (techEvalSkills.h1 + techEvalSkills.h2 + techEvalSkills.h3 + techEvalSkills.h4) / 4;
+                                const liveAScore = (techEvalAttitudes.a1 + techEvalAttitudes.a2 + techEvalAttitudes.a3 + techEvalAttitudes.a4) / 4;
+                                const liveTotalScore = (techEvalScores.q1 + techEvalScores.q2 + techEvalScores.q3 + techEvalScores.q4 + techEvalScores.q5 +
+                                                       techEvalSkills.h1 + techEvalSkills.h2 + techEvalSkills.h3 + techEvalSkills.h4 +
+                                                       techEvalAttitudes.a1 + techEvalAttitudes.a2 + techEvalAttitudes.a3 + techEvalAttitudes.a4) / 13;
+                                return (
+                                    <div className="space-y-6">
+                                        {/* Caso 1: Criando/Editando Avaliação CHA */}
+                                        {isEvaluatingTechnical && !readOnly && (
+                                            <form onSubmit={handleSubmitTechnicalEvaluation} className="bg-white p-6 rounded-xl border border-blue-100 shadow-md space-y-6 no-print">
+                                                <div className="flex justify-between items-center border-b pb-3">
+                                                    <h4 className="font-black text-lg text-[#0F3F5C] uppercase tracking-tight">Novo Teste de Conhecimento (CHA)</h4>
                                                 <button type="button" onClick={() => setIsEvaluatingTechnical(false)} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
                                             </div>
 
                                             {/* Cabeçalho do formulário */}
-                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                                <div>
+                                                    <label className="block text-xs font-black text-slate-500 uppercase">Máquina / Posto de Trabalho</label>
+                                                    <select
+                                                        required
+                                                        className="w-full mt-1 p-2 border rounded-lg bg-blue-50 text-[#0F3F5C] font-extrabold"
+                                                        value={techEvalMachineType}
+                                                        onChange={e => {
+                                                            const type = e.target.value as 'Trefila' | 'Treliça';
+                                                            setTechEvalMachineType(type);
+                                                            // Limpar respostas antigas ao trocar
+                                                            setTechEvalAnswers({ q1: '', q2: '', q3: '', q4: '', q5: '' });
+                                                            setTechEvalScores({ q1: 0, q2: 0, q3: 0, q4: 0, q5: 0 });
+                                                        }}
+                                                    >
+                                                        <option value="Trefila">Trefila (Wire Drawing)</option>
+                                                        <option value="Treliça">Treliça (Truss Machine)</option>
+                                                    </select>
+                                                </div>
                                                 <div>
                                                     <label className="block text-xs font-black text-slate-500 uppercase">Período de Experiência</label>
                                                     <select
@@ -1419,22 +1456,55 @@ const EmployeeDetailModal: React.FC<{
                                                 </div>
                                             </div>
 
-                                            {/* Perguntas */}
+                                            {/* Painel de Notas CHA em Tempo Real */}
+                                            <div className="bg-[#0F3F5C]/5 border border-[#0F3F5C]/10 rounded-xl p-4 grid grid-cols-2 md:grid-cols-4 gap-4 items-center">
+                                                <div className="text-center p-2 bg-white rounded-lg shadow-sm border border-blue-100/40">
+                                                    <span className="text-[10px] font-black text-blue-700 uppercase tracking-wider block">C - Conhecimento</span>
+                                                    <span className="text-lg font-black text-blue-800">{liveCScore.toFixed(1)} <span className="text-xs text-blue-400">/10</span></span>
+                                                </div>
+                                                <div className="text-center p-2 bg-white rounded-lg shadow-sm border border-green-100/40">
+                                                    <span className="text-[10px] font-black text-green-700 uppercase tracking-wider block">H - Habilidade</span>
+                                                    <span className="text-lg font-black text-green-800">{liveHScore.toFixed(1)} <span className="text-xs text-green-400">/10</span></span>
+                                                </div>
+                                                <div className="text-center p-2 bg-white rounded-lg shadow-sm border border-purple-100/40">
+                                                    <span className="text-[10px] font-black text-purple-700 uppercase tracking-wider block">A - Atitude</span>
+                                                    <span className="text-lg font-black text-purple-800">{liveAScore.toFixed(1)} <span className="text-xs text-purple-400">/10</span></span>
+                                                </div>
+                                                <div className="text-center p-2 bg-blue-600 text-white rounded-lg shadow-md col-span-2 md:col-span-1">
+                                                    <span className="text-[10px] font-black text-blue-100 uppercase tracking-wider block">Média CHA Geral</span>
+                                                    <span className="text-xl font-black">{liveTotalScore.toFixed(1)} <span className="text-xs text-blue-200">/10</span></span>
+                                                </div>
+                                            </div>
+
+                                            {/* PILLAR 1: CONHECIMENTO */}
                                             <div className="space-y-6 border-t pt-4">
-                                                {[
+                                                <div className="flex items-center gap-2">
+                                                    <span className="flex items-center justify-center bg-blue-100 text-[#0F3F5C] h-6 w-6 rounded-full font-black text-xs">C</span>
+                                                    <h3 className="text-base font-black text-[#0F3F5C] uppercase tracking-wider">Avaliação de Conhecimento (Perguntas)</h3>
+                                                </div>
+                                                
+                                                {(techEvalMachineType === 'Trefila' ? [
                                                     { id: 'q1', section: '1. Matéria-Prima (O básico da entrada)', text: 'Qual é o nome técnico da matéria-prima que utilizamos na trefila?', correct: 'Fio Máquina.' },
                                                     { id: 'q2', section: '1. Matéria-Prima (O básico da entrada)', text: 'Quais são as bitolas de Fio Máquina que temos disponíveis hoje para o processo?', correct: '8.00mm, 6.50mm, 6.35mm e 5.50mm.' },
                                                     { id: 'q3', section: '2. Produto Final (O básico da saída)', text: 'Como chamamos comercialmente o produto que sai da nossa trefila?', correct: 'Rolo CA60 (ou Aço CA60).' },
                                                     { id: 'q4', section: '2. Produto Final (O básico da saída)', text: 'Cite 5 bitolas diferentes que produzimos na trefila após o processo de redução.', correct: '6.0mm, 5.8mm, 5.6mm, 5.0mm, 4.2mm, 4.1mm, 3.8mm.' },
                                                     { id: 'q5', section: '3. Aplicação (Entendendo o valor do produto)', text: 'O Rolo CA60 que produzimos é a matéria-prima principal para quais produtos finais na nossa fábrica?', correct: 'Fabricação de Treliças, Vergalhões (processo de corte e dobra) e Estribos.' }
-                                                ].map((q, idx) => (
+                                                ] : [
+                                                    { id: 'q1', section: '1. Codificação e Identificação', text: 'Como identificamos nossos modelos de treliça na produção?', correct: 'Pela letra "H" seguida do número que indica a altura (ex: H8, H12).' },
+                                                    { id: 'q2', section: '1. Codificação e Identificação', text: 'Se eu pedir uma H12, o que esse "12" representa?', correct: 'A altura da treliça (em centímetros).' },
+                                                    { id: 'q3', section: '2. Estrutura e Composição', text: 'Descreva a disposição dos ferros em uma treliça padrão.', correct: '1 ferro superior, 2 ferros na senoide (zigue-zague) e 2 ferros inferiores.' },
+                                                    { id: 'q4', section: '3. Padronização', text: 'Quais são os comprimentos padrão das barras que produzimos?', correct: '6 metros e 12 metros.' },
+                                                    { id: 'q5', section: '4. Demonstração de Domínio (O "Caso Real")', text: 'Escolha um modelo que você domina (ex: H12 Leve) e me detalhe as bitolas utilizadas nele.', correct: 'Superior: 5.8mm, Senoide: 3.2mm, Inferior: 3.8mm. (Deve demonstrar saber consultar ou memorizar bitolas)' }
+                                                ]).map((q, idx) => (
                                                     <div key={q.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200/60 space-y-3">
-                                                        <div>
-                                                            <span className="text-[10px] font-black uppercase text-blue-700 tracking-wider block">{q.section}</span>
-                                                            <label className="text-sm font-bold text-slate-800 block mt-0.5">{idx + 1}. {q.text}</label>
+                                                        <div className="flex justify-between items-start">
+                                                            <div>
+                                                                <span className="text-[9px] font-black uppercase text-blue-700 tracking-wider block">{q.section}</span>
+                                                                <label className="text-sm font-bold text-slate-800 block mt-0.5">{idx + 1}. {q.text}</label>
+                                                            </div>
                                                         </div>
                                                         <div className="bg-emerald-50 border border-emerald-100 p-2.5 rounded-lg text-xs text-emerald-800 font-medium">
-                                                            💡 <strong>Resposta Esperada:</strong> {q.correct}
+                                                            💡 <strong>Resposta Correta Esperada:</strong> {q.correct}
                                                         </div>
                                                         <div>
                                                             <label className="block text-xs font-bold text-slate-500 uppercase">Resposta do Funcionário</label>
@@ -1463,12 +1533,80 @@ const EmployeeDetailModal: React.FC<{
                                                 ))}
                                             </div>
 
+                                            {/* PILLAR 2: HABILIDADE */}
+                                            <div className="space-y-4 border-t pt-6">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="flex items-center justify-center bg-green-100 text-green-700 h-6 w-6 rounded-full font-black text-xs">H</span>
+                                                    <h3 className="text-base font-black text-green-700 uppercase tracking-wider">Avaliação de Habilidade (Prática Operacional)</h3>
+                                                </div>
+                                                
+                                                {[
+                                                    { id: 'h1', title: 'Setup e Ajustes da Máquina', desc: 'Domínio técnico na regulagem, troca de carretéis, ferramentas e preparação geral da máquina.' },
+                                                    { id: 'h2', title: 'Ritmo de Trabalho e Produtividade', desc: 'Eficiência e velocidade na operação diária, atingimento de metas e foco produtivo.' },
+                                                    { id: 'h3', title: 'Controle de Qualidade', desc: 'Inspeção de bitolas, conformidade de tolerâncias e prevenção de defeitos do produto final.' },
+                                                    { id: 'h4', title: 'Segurança Operacional', desc: 'Cumprimento de regras de segurança, uso correto de EPIs e postura segura de trabalho.' }
+                                                ].map(h => (
+                                                    <div key={h.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200/60 flex flex-col md:flex-row justify-between md:items-center gap-4">
+                                                        <div>
+                                                            <h5 className="font-bold text-slate-800 text-sm">{h.title}</h5>
+                                                            <p className="text-xs text-slate-500">{h.desc}</p>
+                                                        </div>
+                                                        <div className="flex items-center gap-3 shrink-0">
+                                                            <label className="text-xs font-bold text-slate-500 uppercase">Nota (0 a 10):</label>
+                                                            <select
+                                                                className="p-1.5 border rounded-lg bg-white font-extrabold text-green-700 w-24 text-center"
+                                                                value={techEvalSkills[h.id]}
+                                                                onChange={e => setTechEvalSkills({ ...techEvalSkills, [h.id]: parseFloat(e.target.value) })}
+                                                            >
+                                                                {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                                                                    <option key={n} value={n}>{n}</option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            {/* PILLAR 3: ATITUDE */}
+                                            <div className="space-y-4 border-t pt-6">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="flex items-center justify-center bg-purple-100 text-purple-700 h-6 w-6 rounded-full font-black text-xs">A</span>
+                                                    <h3 className="text-base font-black text-purple-700 uppercase tracking-wider">Avaliação de Atitude (Comportamento)</h3>
+                                                </div>
+
+                                                {[
+                                                    { id: 'a1', title: 'Organização e Limpeza (5S)', desc: 'Conservação da máquina atribuída, limpeza do posto de trabalho e descarte correto de resíduos/sucata.' },
+                                                    { id: 'a2', title: 'Assiduidade e Disciplina', desc: 'Cumprimento de horários, postura profissional, respeito às normas da fábrica e assiduidade.' },
+                                                    { id: 'a3', title: 'Iniciativa e Melhoria Contínua', desc: 'Proatividade para buscar soluções, informar desvios operacionais e buscar novos aprendizados.' },
+                                                    { id: 'a4', title: 'Trabalho em Equipe e Postura', desc: 'Espírito cooperativo com o turno, comunicação clara com colegas e líderes e postura ética.' }
+                                                ].map(a => (
+                                                    <div key={a.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200/60 flex flex-col md:flex-row justify-between md:items-center gap-4">
+                                                        <div>
+                                                            <h5 className="font-bold text-slate-800 text-sm">{a.title}</h5>
+                                                            <p className="text-xs text-slate-500">{a.desc}</p>
+                                                        </div>
+                                                        <div className="flex items-center gap-3 shrink-0">
+                                                            <label className="text-xs font-bold text-slate-500 uppercase">Nota (0 a 10):</label>
+                                                            <select
+                                                                className="p-1.5 border rounded-lg bg-white font-extrabold text-purple-700 w-24 text-center"
+                                                                value={techEvalAttitudes[a.id]}
+                                                                onChange={e => setTechEvalAttitudes({ ...techEvalAttitudes, [a.id]: parseFloat(e.target.value) })}
+                                                            >
+                                                                {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                                                                    <option key={n} value={n}>{n}</option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+
                                             {/* Observações Gerais */}
                                             <div className="border-t pt-4">
-                                                <label className="block text-xs font-black text-slate-500 uppercase">Comentários e Parecer Geral</label>
+                                                <label className="block text-xs font-black text-slate-500 uppercase">Parecer Geral / Observações do Gestor</label>
                                                 <textarea
                                                     className="w-full mt-1 p-2 border rounded-lg text-sm bg-white text-slate-900 font-medium"
-                                                    placeholder="Pontos de melhoria, postura técnica, facilidade de aprendizado..."
+                                                    placeholder="Descreva pontos positivos, potencial e feedbacks dados..."
                                                     rows={3}
                                                     value={techEvalNote}
                                                     onChange={e => setTechEvalNote(e.target.value)}
@@ -1477,12 +1615,12 @@ const EmployeeDetailModal: React.FC<{
 
                                             <div className="flex justify-end gap-3 pt-2">
                                                 <button type="button" onClick={() => setIsEvaluatingTechnical(false)} className="px-5 py-2 border rounded-lg text-slate-600 font-bold text-sm hover:bg-slate-50">Cancelar</button>
-                                                <button type="submit" className="px-6 py-2 bg-[#0F3F5C] text-white font-bold rounded-lg text-sm hover:bg-[#0A2A3D] transition">Salvar Teste Técnico</button>
+                                                <button type="submit" className="px-6 py-2 bg-[#0F3F5C] text-white font-bold rounded-lg text-sm hover:bg-[#0A2A3D] transition shadow-md">Salvar Avaliação CHA</button>
                                             </div>
                                         </form>
                                     )}
 
-                                    {/* Caso 2: Visualizando Resultados de um Teste */}
+                                    {/* Caso 2: Visualizando Resultados de um Teste CHA */}
                                     {selectedTechEval && (
                                         <div className="space-y-6">
                                             {/* Ações na tela (Voltar / Imprimir) */}
@@ -1501,11 +1639,16 @@ const EmployeeDetailModal: React.FC<{
                                                 </button>
                                             </div>
 
-                                            {/* Tela de exibição do resultado (Tela) */}
+                                            {/* Painel de Visualização no Sistema */}
                                             <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-md space-y-6 no-print">
-                                                <div className="flex justify-between items-start border-b pb-4">
+                                                {/* Cabeçalho */}
+                                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-4 gap-4">
                                                     <div>
-                                                        <span className="text-xs font-black text-blue-700 uppercase tracking-widest">Resultados Técnicos</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-xs font-black bg-blue-100 text-[#0F3F5C] px-2 py-0.5 rounded uppercase border border-blue-200">
+                                                                Posto: {selectedTechEval.machineType}
+                                                            </span>
+                                                        </div>
                                                         <h4 className="text-xl font-black text-slate-800 mt-1">
                                                             {selectedTechEval.monthNum}º Mês de Experiência
                                                         </h4>
@@ -1514,7 +1657,7 @@ const EmployeeDetailModal: React.FC<{
                                                         </p>
                                                     </div>
                                                     <div className="text-right">
-                                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Média Final</span>
+                                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Média Geral CHA</span>
                                                         <div className="flex items-baseline justify-end gap-1 mt-1">
                                                             <span className={`text-4xl font-black ${selectedTechEval.totalScore >= 7 ? 'text-green-600' : selectedTechEval.totalScore >= 5 ? 'text-amber-500' : 'text-red-500'}`}>
                                                                 {selectedTechEval.totalScore.toFixed(1)}
@@ -1524,25 +1667,72 @@ const EmployeeDetailModal: React.FC<{
                                                     </div>
                                                 </div>
 
-                                                {/* Detalhamento das Questões */}
+                                                {/* Dashboard Rápido de Notas CHA */}
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                    {/* Conhecimento */}
+                                                    {(() => {
+                                                        const scores = [selectedTechEval.q1Score, selectedTechEval.q2Score, selectedTechEval.q3Score, selectedTechEval.q4Score, selectedTechEval.q5Score];
+                                                        const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+                                                        return (
+                                                            <div className="bg-blue-50/40 p-4 rounded-xl border border-blue-100/60 text-center">
+                                                                <span className="text-xs font-bold text-blue-700 uppercase block tracking-wider">C - Conhecimento</span>
+                                                                <span className="text-2xl font-black text-blue-800 block mt-1">{avg.toFixed(1)} <strong className="text-xs text-blue-400 font-semibold">/10</strong></span>
+                                                                <span className="text-[10px] text-slate-400 mt-1 block">Média das Questões de Conhecimento</span>
+                                                            </div>
+                                                        );
+                                                    })()}
+
+                                                    {/* Habilidade */}
+                                                    {(() => {
+                                                        const avg = (selectedTechEval.h1Score + selectedTechEval.h2Score + selectedTechEval.h3Score + selectedTechEval.h4Score) / 4;
+                                                        return (
+                                                            <div className="bg-green-50/40 p-4 rounded-xl border border-green-100/60 text-center">
+                                                                <span className="text-xs font-bold text-green-700 uppercase block tracking-wider">H - Habilidade</span>
+                                                                <span className="text-2xl font-black text-green-800 block mt-1">{avg.toFixed(1)} <strong className="text-xs text-green-400 font-semibold">/10</strong></span>
+                                                                <span className="text-[10px] text-slate-400 mt-1 block">Média de Operação Prática</span>
+                                                            </div>
+                                                        );
+                                                    })()}
+
+                                                    {/* Atitude */}
+                                                    {(() => {
+                                                        const avg = (selectedTechEval.a1Score + selectedTechEval.a2Score + selectedTechEval.a3Score + selectedTechEval.a4Score) / 4;
+                                                        return (
+                                                            <div className="bg-purple-50/40 p-4 rounded-xl border border-purple-100/60 text-center">
+                                                                <span className="text-xs font-bold text-purple-700 uppercase block tracking-wider">A - Atitude</span>
+                                                                <span className="text-2xl font-black text-purple-800 block mt-1">{avg.toFixed(1)} <strong className="text-xs text-purple-400 font-semibold">/10</strong></span>
+                                                                <span className="text-[10px] text-slate-400 mt-1 block">Média Comportamental</span>
+                                                            </div>
+                                                        );
+                                                    })()}
+                                                </div>
+
+                                                {/* Detalhes Conhecimento */}
                                                 <div className="space-y-4">
-                                                    {[
-                                                        { id: 'q1', section: '1. Matéria-Prima (O básico da entrada)', text: 'Qual é o nome técnico da matéria-prima que utilizamos na trefila?', correct: 'Fio Máquina.' },
-                                                        { id: 'q2', section: '1. Matéria-Prima (O básico da entrada)', text: 'Quais são as bitolas de Fio Máquina que temos disponíveis hoje para o processo?', correct: '8.00mm, 6.50mm, 6.35mm e 5.50mm.' },
-                                                        { id: 'q3', section: '2. Produto Final (O básico da saída)', text: 'Como chamamos comercialmente o produto que sai da nossa trefila?', correct: 'Rolo CA60 (ou Aço CA60).' },
-                                                        { id: 'q4', section: '2. Produto Final (O básico da saída)', text: 'Cite 5 bitolas diferentes que produzimos na trefila após o processo de redução.', correct: '6.0mm, 5.8mm, 5.6mm, 5.0mm, 4.2mm, 4.1mm, 3.8mm.' },
-                                                        { id: 'q5', section: '3. Aplicação (Entendendo o valor do produto)', text: 'O Rolo CA60 que produzimos é a matéria-prima principal para quais produtos finais na nossa fábrica?', correct: 'Fabricação de Treliças, Vergalhões (processo de corte e dobra) e Estribos.' }
-                                                    ].map((q, idx) => {
+                                                    <h5 className="font-black text-slate-800 text-sm uppercase tracking-wide border-b pb-1">1. Detalhamento - Conhecimento</h5>
+                                                    {(selectedTechEval.machineType === 'Trefila' ? [
+                                                        { id: 'q1', section: 'Matéria-Prima (Entrada)', text: 'Qual é o nome técnico da matéria-prima que utilizamos na trefila?', correct: 'Fio Máquina.' },
+                                                        { id: 'q2', section: 'Matéria-Prima (Entrada)', text: 'Quais são as bitolas de Fio Máquina que temos disponíveis hoje para o processo?', correct: '8.00mm, 6.50mm, 6.35mm e 5.50mm.' },
+                                                        { id: 'q3', section: 'Produto Final (Saída)', text: 'Como chamamos comercialmente o produto que sai da nossa trefila?', correct: 'Rolo CA60 (ou Aço CA60).' },
+                                                        { id: 'q4', section: 'Produto Final (Saída)', text: 'Cite 5 bitolas diferentes que produzimos na trefila após o processo de redução.', correct: '6.0mm, 5.8mm, 5.6mm, 5.0mm, 4.2mm, 4.1mm, 3.8mm.' },
+                                                        { id: 'q5', section: 'Aplicação (Valor)', text: 'O Rolo CA60 que produzimos é a matéria-prima principal para quais produtos finais na nossa fábrica?', correct: 'Fabricação de Treliças, Vergalhões (processo de corte e dobra) e Estribos.' }
+                                                    ] : [
+                                                        { id: 'q1', section: 'Codificação e Identificação', text: 'Como identificamos nossos modelos de treliça na produção?', correct: 'Pela letra "H" seguida do número que indica a altura (ex: H8, H12).' },
+                                                        { id: 'q2', section: 'Codificação e Identificação', text: 'Se eu pedir uma H12, o que esse "12" representa?', correct: 'A altura da treliça (em centímetros).' },
+                                                        { id: 'q3', section: 'Estrutura e Composição', text: 'Descreva a disposição dos ferros em uma treliça padrão.', correct: '1 ferro superior, 2 ferros na senoide (zigue-zague) e 2 ferros inferiores.' },
+                                                        { id: 'q4', section: 'Padronização', text: 'Quais são os comprimentos padrão das barras que produzimos?', correct: '6 metros e 12 metros.' },
+                                                        { id: 'q5', section: 'Demonstração de Domínio (O "Caso Real")', text: 'Escolha um modelo que você domina (ex: H12 Leve) e me detalhe as bitolas utilizadas nele.', correct: 'Superior: 5.8mm, Senoide: 3.2mm, Inferior: 3.8mm. (Deve demonstrar saber consultar ou memorizar bitolas)' }
+                                                    ]).map((q, idx) => {
                                                         const answer = selectedTechEval[`${q.id}Answer` as keyof TechnicalEvaluation] || '';
                                                         const score = selectedTechEval[`${q.id}Score` as keyof TechnicalEvaluation] || 0;
                                                         return (
-                                                            <div key={q.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200/60 space-y-2.5">
+                                                            <div key={q.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200/60 space-y-2">
                                                                 <div>
                                                                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">{q.section}</span>
-                                                                    <h5 className="font-bold text-slate-800 text-sm mt-0.5">{idx + 1}. {q.text}</h5>
+                                                                    <h6 className="font-bold text-slate-800 text-xs mt-0.5">{idx + 1}. {q.text}</h6>
                                                                 </div>
-                                                                <div className="bg-slate-100 p-2.5 rounded-lg text-xs text-slate-700 italic border border-slate-200 font-medium">
-                                                                    <strong>Resposta do Funcionário:</strong> "{answer || 'Não preenchida.'}"
+                                                                <div className="bg-white p-2.5 rounded-lg text-xs text-slate-700 italic border border-slate-100 font-medium">
+                                                                    <strong>Resposta do Colaborador:</strong> "{answer || 'Não preenchida.'}"
                                                                 </div>
                                                                 <div className="flex justify-between items-center text-xs pt-1">
                                                                     <span className="text-[10px] text-emerald-700 font-bold uppercase tracking-tight bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">Esperado: {q.correct}</span>
@@ -1553,10 +1743,42 @@ const EmployeeDetailModal: React.FC<{
                                                     })}
                                                 </div>
 
+                                                {/* Detalhes Habilidade */}
+                                                <div className="space-y-3">
+                                                    <h5 className="font-black text-slate-800 text-sm uppercase tracking-wide border-b pb-1">2. Detalhamento - Habilidade</h5>
+                                                    {[
+                                                        { key: 'h1', title: 'Setup e Ajustes da Máquina', val: selectedTechEval.h1Score },
+                                                        { key: 'h2', title: 'Ritmo de Trabalho e Produtividade', val: selectedTechEval.h2Score },
+                                                        { key: 'h3', title: 'Controle de Qualidade', val: selectedTechEval.h3Score },
+                                                        { key: 'h4', title: 'Segurança Operacional', val: selectedTechEval.h4Score }
+                                                    ].map(h => (
+                                                        <div key={h.key} className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border">
+                                                            <span className="text-xs font-bold text-slate-700">{h.title}</span>
+                                                            <span className="text-xs font-extrabold text-[#0F3F5C] bg-white px-3 py-1 rounded border">Nota: <strong className="text-sm font-black">{h.val}</strong> / 10</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                {/* Detalhes Atitude */}
+                                                <div className="space-y-3">
+                                                    <h5 className="font-black text-slate-800 text-sm uppercase tracking-wide border-b pb-1">3. Detalhamento - Atitude</h5>
+                                                    {[
+                                                        { key: 'a1', title: 'Organização e Limpeza (5S)', val: selectedTechEval.a1Score },
+                                                        { key: 'a2', title: 'Assiduidade e Disciplina', val: selectedTechEval.a2Score },
+                                                        { key: 'a3', title: 'Iniciativa e Melhoria Contínua', val: selectedTechEval.a3Score },
+                                                        { key: 'a4', title: 'Trabalho em Equipe e Postura', val: selectedTechEval.a4Score }
+                                                    ].map(a => (
+                                                        <div key={a.key} className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border">
+                                                            <span className="text-xs font-bold text-slate-700">{a.title}</span>
+                                                            <span className="text-xs font-extrabold text-purple-700 bg-white px-3 py-1 rounded border">Nota: <strong className="text-sm font-black">{a.val}</strong> / 10</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+
                                                 {/* Observações */}
                                                 {selectedTechEval.note && (
                                                     <div className="bg-blue-50/20 border border-blue-100/50 p-4 rounded-xl">
-                                                        <h5 className="text-xs font-black text-[#0F3F5C] uppercase tracking-wider mb-1">Parecer / Comentários do Gestor</h5>
+                                                        <h5 className="text-xs font-black text-[#0F3F5C] uppercase tracking-wider mb-1">Comentários e Feedbacks do Gestor</h5>
                                                         <p className="text-slate-700 text-sm whitespace-pre-wrap font-medium italic">"{selectedTechEval.note}"</p>
                                                     </div>
                                                 )}
@@ -1568,10 +1790,10 @@ const EmployeeDetailModal: React.FC<{
                                                 <div className="border-b-2 border-slate-900 pb-4 mb-6 flex justify-between items-end">
                                                     <div>
                                                         <h1 className="text-xl font-black tracking-tight uppercase">MSM - Gestão Inteligente de Produção</h1>
-                                                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-0.5">Relatório de Avaliação Técnica de Experiência</p>
+                                                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-0.5">Relatório de Avaliação CHA de Experiência</p>
                                                     </div>
                                                     <div className="text-right">
-                                                        <span className="text-xs font-bold bg-slate-100 px-3 py-1 rounded border border-slate-200">TREFILA</span>
+                                                        <span className="text-xs font-bold bg-slate-100 px-3 py-1 rounded border border-slate-200 uppercase">Posto: {selectedTechEval.machineType}</span>
                                                     </div>
                                                 </div>
 
@@ -1595,51 +1817,96 @@ const EmployeeDetailModal: React.FC<{
                                                     </div>
                                                 </div>
 
-                                                {/* Questionário */}
-                                                <div className="space-y-6 mb-8">
-                                                    <h2 className="text-sm font-black text-slate-800 border-b pb-1 uppercase tracking-wider">Questionário Aplicado</h2>
-                                                    {[
-                                                        { id: 'q1', section: '1. Matéria-Prima (O básico da entrada)', text: 'Qual é o nome técnico da matéria-prima que utilizamos na trefila?', correct: 'Fio Máquina.' },
-                                                        { id: 'q2', section: '1. Matéria-Prima (O básico da entrada)', text: 'Quais são as bitolas de Fio Máquina que temos disponíveis hoje para o processo?', correct: '8.00mm, 6.50mm, 6.35mm e 5.50mm.' },
-                                                        { id: 'q3', section: '2. Produto Final (O básico da saída)', text: 'Como chamamos comercialmente o produto que sai da nossa trefila?', correct: 'Rolo CA60 (ou Aço CA60).' },
-                                                        { id: 'q4', section: '2. Produto Final (O básico da saída)', text: 'Cite 5 bitolas diferentes que produzimos na trefila após o processo de redução.', correct: '6.0mm, 5.8mm, 5.6mm, 5.0mm, 4.2mm, 4.1mm, 3.8mm.' },
-                                                        { id: 'q5', section: '3. Aplicação (Entendendo o valor do produto)', text: 'O Rolo CA60 que produzimos é a matéria-prima principal para quais produtos finais na nossa fábrica?', correct: 'Fabricação de Treliças, Vergalhões (processo de corte e dobra) e Estribos.' }
-                                                    ].map((q, idx) => {
+                                                {/* Tabela Resumo CHA */}
+                                                <div className="border border-slate-200 rounded-lg overflow-hidden mb-6 text-xs text-left">
+                                                    <table className="w-full">
+                                                        <thead className="bg-slate-100 uppercase font-black text-slate-700">
+                                                            <tr>
+                                                                <th className="p-3 border-b border-r">C - Média Conhecimento</th>
+                                                                <th className="p-3 border-b border-r">H - Média Habilidade</th>
+                                                                <th className="p-3 border-b border-r">A - Média Atitude</th>
+                                                                <th className="p-3 border-b bg-blue-100 text-blue-900">Média Geral CHA</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="font-bold text-slate-800">
+                                                            <tr>
+                                                                <td className="p-3 border-r">
+                                                                    {(() => {
+                                                                        const scores = [selectedTechEval.q1Score, selectedTechEval.q2Score, selectedTechEval.q3Score, selectedTechEval.q4Score, selectedTechEval.q5Score];
+                                                                        return (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1);
+                                                                    })()} / 10
+                                                                </td>
+                                                                <td className="p-3 border-r">
+                                                                    {((selectedTechEval.h1Score + selectedTechEval.h2Score + selectedTechEval.h3Score + selectedTechEval.h4Score) / 4).toFixed(1)} / 10
+                                                                </td>
+                                                                <td className="p-3 border-r">
+                                                                    {((selectedTechEval.a1Score + selectedTechEval.a2Score + selectedTechEval.a3Score + selectedTechEval.a4Score) / 4).toFixed(1)} / 10
+                                                                </td>
+                                                                <td className="p-3 bg-blue-50 text-blue-950 font-black text-sm">
+                                                                    {selectedTechEval.totalScore.toFixed(1)} / 10
+                                                                </td>
+                                                            </tr>
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+
+                                                {/* Seção Conhecimento */}
+                                                <div className="space-y-4 mb-6">
+                                                    <h2 className="text-xs font-black text-slate-800 border-b pb-1 uppercase tracking-wider">1. Detalhado - Conhecimento (Perguntas)</h2>
+                                                    {(selectedTechEval.machineType === 'Trefila' ? [
+                                                        { id: 'q1', section: 'Matéria-Prima (Entrada)', text: 'Qual é o nome técnico da matéria-prima que utilizamos na trefila?', correct: 'Fio Máquina.' },
+                                                        { id: 'q2', section: 'Matéria-Prima (Entrada)', text: 'Quais são as bitolas de Fio Máquina que temos disponíveis hoje para o processo?', correct: '8.00mm, 6.50mm, 6.35mm e 5.50mm.' },
+                                                        { id: 'q3', section: 'Produto Final (Saída)', text: 'Como chamamos comercialmente o produto que sai da nossa trefila?', correct: 'Rolo CA60 (ou Aço CA60).' },
+                                                        { id: 'q4', section: 'Produto Final (Saída)', text: 'Cite 5 bitolas diferentes que produzimos na trefila após o processo de redução.', correct: '6.0mm, 5.8mm, 5.6mm, 5.0mm, 4.2mm, 4.1mm, 3.8mm.' },
+                                                        { id: 'q5', section: 'Aplicação (Valor)', text: 'O Rolo CA60 que produzimos é a matéria-prima principal para quais produtos finais na nossa fábrica?', correct: 'Fabricação de Treliças, Vergalhões (processo de corte e dobra) e Estribos.' }
+                                                    ] : [
+                                                        { id: 'q1', section: 'Codificação e Identificação', text: 'Como identificamos nossos modelos de treliça na produção?', correct: 'Pela letra "H" seguida do número que indica a altura (ex: H8, H12).' },
+                                                        { id: 'q2', section: 'Codificação e Identificação', text: 'Se eu pedir uma H12, o que esse "12" representa?', correct: 'A altura da treliça (em centímetros).' },
+                                                        { id: 'q3', section: 'Estrutura e Composição', text: 'Descreva a disposição dos ferros em uma treliça padrão.', correct: '1 ferro superior, 2 ferros na senoide (zigue-zague) e 2 ferros inferiores.' },
+                                                        { id: 'q4', section: 'Padronização', text: 'Quais são os comprimentos padrão das barras que produzimos?', correct: '6 metros e 12 metros.' },
+                                                        { id: 'q5', section: 'Demonstração de Domínio (O "Caso Real")', text: 'Escolha um modelo que você domina (ex: H12 Leve) e me detalhe as bitolas utilizadas nele.', correct: 'Superior: 5.8mm, Senoide: 3.2mm, Inferior: 3.8mm. (Deve demonstrar saber consultar ou memorizar bitolas)' }
+                                                    ]).map((q, idx) => {
                                                         const answer = selectedTechEval[`${q.id}Answer` as keyof TechnicalEvaluation] || '';
                                                         const score = selectedTechEval[`${q.id}Score` as keyof TechnicalEvaluation] || 0;
                                                         return (
-                                                            <div key={q.id} className="border-l-4 border-slate-300 pl-4 py-1">
-                                                                <p className="text-xs font-bold text-slate-500 uppercase tracking-tight">{q.section}</p>
-                                                                <p className="text-sm font-black text-slate-800 mt-0.5">{idx + 1}. {q.text}</p>
-                                                                <div className="mt-2 text-xs">
-                                                                    <span className="font-bold text-slate-400 block uppercase">Resposta do Funcionário:</span>
-                                                                    <p className="text-slate-800 whitespace-pre-wrap mt-0.5 font-medium italic">"{answer || 'Não respondida'}"</p>
-                                                                </div>
-                                                                <div className="mt-1.5 flex justify-between items-center bg-slate-50 px-2 py-1 rounded text-xs">
-                                                                    <span className="text-[10px] font-bold text-slate-500 uppercase italic">Resposta correta esperada: {q.correct}</span>
-                                                                    <span className="font-extrabold text-slate-700">Nota: <strong className="text-slate-900 text-sm">{score}</strong> / 10</span>
-                                                                </div>
+                                                            <div key={q.id} className="border-l-4 border-slate-300 pl-4 py-0.5">
+                                                                <p className="text-xs font-black text-slate-800">{idx + 1}. {q.text}</p>
+                                                                <p className="text-xs text-slate-600 font-medium italic mt-1">Resposta: "{answer || 'Não respondida'}"</p>
+                                                                <p className="text-[10px] text-slate-400 mt-0.5">Esperado: {q.correct} • Nota: {score}/10</p>
                                                             </div>
                                                         );
                                                     })}
                                                 </div>
 
-                                                {/* Resultados Finais */}
-                                                <div className="grid grid-cols-3 gap-6 bg-slate-50 p-4 rounded-lg border border-slate-200 text-sm mb-12">
-                                                    <div className="col-span-2">
-                                                        <span className="font-bold text-slate-500 text-xs block uppercase">Parecer / Observações Finais</span>
-                                                        <p className="text-slate-700 italic mt-1 font-medium">{selectedTechEval.note || 'Sem observações.'}</p>
+                                                {/* Seções Habilidade e Atitude */}
+                                                <div className="grid grid-cols-2 gap-8 mb-6 text-xs">
+                                                    <div>
+                                                        <h2 className="font-black text-slate-800 border-b pb-1 uppercase tracking-wider mb-2">2. Detalhado - Habilidades</h2>
+                                                        <div className="space-y-1.5">
+                                                            <div>Setup e Ajustes: <strong>{selectedTechEval.h1Score} / 10</strong></div>
+                                                            <div>Ritmo de Trabalho: <strong>{selectedTechEval.h2Score} / 10</strong></div>
+                                                            <div>Controle de Qualidade: <strong>{selectedTechEval.h3Score} / 10</strong></div>
+                                                            <div>Segurança Operacional: <strong>{selectedTechEval.h4Score} / 10</strong></div>
+                                                        </div>
                                                     </div>
-                                                    <div className="border-l border-slate-200 pl-6 flex flex-col justify-center items-center">
-                                                        <span className="font-bold text-slate-500 text-xs uppercase block text-center mb-1">Média Final</span>
-                                                        <div className="flex items-baseline gap-1">
-                                                            <span className={`text-3xl font-black ${selectedTechEval.totalScore >= 7 ? 'text-green-600' : selectedTechEval.totalScore >= 5 ? 'text-amber-500' : 'text-red-500'}`}>
-                                                                {selectedTechEval.totalScore.toFixed(1)}
-                                                            </span>
-                                                            <span className="text-slate-400 font-bold">/ 10</span>
+                                                    <div>
+                                                        <h2 className="font-black text-slate-800 border-b pb-1 uppercase tracking-wider mb-2">3. Detalhado - Atitudes</h2>
+                                                        <div className="space-y-1.5">
+                                                            <div>Organização e 5S: <strong>{selectedTechEval.a1Score} / 10</strong></div>
+                                                            <div>Assiduidade e Disciplina: <strong>{selectedTechEval.a2Score} / 10</strong></div>
+                                                            <div>Iniciativa e Proatividade: <strong>{selectedTechEval.a3Score} / 10</strong></div>
+                                                            <div>Trabalho em Equipe: <strong>{selectedTechEval.a4Score} / 10</strong></div>
                                                         </div>
                                                     </div>
                                                 </div>
+
+                                                {/* Observações e Parecer */}
+                                                {selectedTechEval.note && (
+                                                    <div className="bg-slate-50 p-4 rounded border text-xs mb-12">
+                                                        <span className="font-bold text-slate-500 uppercase block">Observações e Parecer Técnico Geral</span>
+                                                        <p className="text-slate-800 mt-1 italic">"{selectedTechEval.note}"</p>
+                                                    </div>
+                                                )}
 
                                                 {/* Assinaturas */}
                                                 <div className="grid grid-cols-2 gap-16 text-center text-xs pt-8 mt-auto border-t border-slate-200 border-dashed">
@@ -1664,16 +1931,22 @@ const EmployeeDetailModal: React.FC<{
                                             {!readOnly && (
                                                 <button
                                                     onClick={() => {
+                                                        // Preencher por padrão com a máquina vinculada ao funcionário
+                                                        const defaultMachine = (employee.assignedMachine && employee.assignedMachine.includes('Treliça')) ? 'Treliça' : 'Trefila';
+                                                        setTechEvalMachineType(defaultMachine);
+                                                        
                                                         setIsEvaluatingTechnical(true);
                                                         setTechEvalMonth(1);
                                                         setTechEvalDate(new Date().toISOString().split('T')[0]);
                                                         setTechEvalAnswers({ q1: '', q2: '', q3: '', q4: '', q5: '' });
                                                         setTechEvalScores({ q1: 0, q2: 0, q3: 0, q4: 0, q5: 0 });
+                                                        setTechEvalSkills({ h1: 0, h2: 0, h3: 0, h4: 0 });
+                                                        setTechEvalAttitudes({ a1: 0, a2: 0, a3: 0, a4: 0 });
                                                         setTechEvalNote('');
                                                     }}
                                                     className="w-full bg-[#0F3F5C] text-white font-bold py-3 rounded-xl hover:bg-[#0A2A3D] transition shadow-md"
                                                 >
-                                                    + Novo Teste Técnico (Trefila)
+                                                    + Novo Teste de Conhecimento (CHA)
                                                 </button>
                                             )}
 
@@ -1681,7 +1954,12 @@ const EmployeeDetailModal: React.FC<{
                                                 {technicalEvaluations.map(ev => (
                                                     <div key={ev.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex justify-between items-center hover:bg-slate-50/50 transition">
                                                         <div>
-                                                            <h5 className="font-black text-slate-800 text-sm uppercase">Teste Técnico: {ev.monthNum}º Mês</h5>
+                                                            <div className="flex items-center gap-2">
+                                                                <h5 className="font-black text-slate-800 text-sm uppercase">Teste de Conhecimento: {ev.monthNum}º Mês</h5>
+                                                                <span className="text-[9px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded border">
+                                                                    {ev.machineType}
+                                                                </span>
+                                                            </div>
                                                             <p className="text-xs text-slate-500 mt-0.5">
                                                                 Avaliado por <strong className="text-slate-700">{ev.evaluator}</strong> em {new Date(ev.date).toLocaleDateString()}
                                                             </p>
@@ -1714,13 +1992,13 @@ const EmployeeDetailModal: React.FC<{
                                                     </div>
                                                 ))}
                                                 {technicalEvaluations.length === 0 && (
-                                                    <p className="text-slate-400 text-center py-4">Nenhum teste técnico registrado para este colaborador.</p>
+                                                    <p className="text-slate-400 text-center py-4">Nenhum teste de conhecimento registrado para este colaborador.</p>
                                                 )}
                                             </div>
                                         </div>
                                     )}
                                 </div>
-                            )}
+                            )})()}
                         </div>
                     )}
                     {activeTab === 'hr' && (
