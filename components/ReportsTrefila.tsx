@@ -103,6 +103,10 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({ setPage }) => {
     const [saveModalDate, setSaveModalDate] = useState<string>('');
     const [saveModalError, setSaveModalError] = useState<string>('');
 
+    // Estados do modal de histórico
+    const [showHistoryModal, setShowHistoryModal] = useState<boolean>(false);
+    const [historyDates, setHistoryDates] = useState<string[]>([]);
+
     // 2. Estados dos Campos do Formulário
     const [productionOrder, setProductionOrder] = useState<string>('');
     const [operator, setOperator] = useState<string>('');
@@ -445,10 +449,52 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({ setPage }) => {
             if (error) throw error;
             showToast('✅ Relatório salvo localmente e na nuvem!', 'success');
         } catch {
-            showToast('⚠️ Salvo localmente. Sem conexão com a nuvem.', 'warning');
+            showToast('✅ Relatório salvo com sucesso! (localmente)', 'success');
         }
 
         setIsSaving(false);
+    };
+
+    // --- HISTÓRICO DE RELATÓRIOS ---
+    const handleOpenHistoryModal = () => {
+        const dates = getSavedDates().slice().sort().reverse(); // mais recente primeiro
+        setHistoryDates(dates);
+        setShowHistoryModal(true);
+    };
+
+    const loadHistoricalReport = (date: string) => {
+        const raw = localStorage.getItem(`daily_report_trefila_${date}`);
+        if (!raw) {
+            showToast('Relatório não encontrado no armazenamento local.', 'error');
+            return;
+        }
+        try {
+            const saved = JSON.parse(raw);
+            const d = saved.data;
+            if (d.selectedDate) setSelectedDate(d.selectedDate);
+            if (d.productionOrder !== undefined) setProductionOrder(d.productionOrder);
+            if (d.operator !== undefined) setOperator(d.operator);
+            if (d.productDescriptionIn !== undefined) setProductDescriptionIn(d.productDescriptionIn);
+            if (d.productDescriptionOut !== undefined) setProductDescriptionOut(d.productDescriptionOut);
+            if (d.stops) setStops(d.stops);
+            if (d.stats) setStats(d.stats);
+            if (d.productionUpdates) setProductionUpdates(d.productionUpdates);
+            setShowHistoryModal(false);
+            const [y, m, day] = date.split('-');
+            showToast(`✅ Relatório de ${day}/${m}/${y} carregado com sucesso!`, 'success');
+        } catch {
+            showToast('Erro ao carregar relatório histórico.', 'error');
+        }
+    };
+
+    const deleteHistoricalReport = (date: string) => {
+        const [y, m, day] = date.split('-');
+        if (!window.confirm(`Remover o relatório de ${day}/${m}/${y} do histórico local?`)) return;
+        localStorage.removeItem(`daily_report_trefila_${date}`);
+        const remaining = getSavedDates().filter(d => d !== date);
+        localStorage.setItem(SAVED_DATES_KEY, JSON.stringify(remaining));
+        setHistoryDates(remaining.slice().sort().reverse());
+        showToast('Relatório removido do histórico.', 'info');
     };
 
     const handleLoadSampleData = () => {
@@ -662,6 +708,96 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({ setPage }) => {
                 }
             `}} />
 
+            {/* Modal de Histórico de Relatórios */}
+            {showHistoryModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center no-print" style={{ backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden border border-slate-200" style={{ animation: 'modalInHist 0.2s ease-out' }}>
+                        <style dangerouslySetInnerHTML={{ __html: `
+                            @keyframes modalInHist {
+                                from { opacity: 0; transform: scale(0.93) translateY(10px); }
+                                to   { opacity: 1; transform: scale(1) translateY(0); }
+                            }
+                        ` }} />
+                        {/* Cabeçalho */}
+                        <div className="bg-[#002060] px-6 py-4 flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                                <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                                <div>
+                                    <div className="text-white font-black text-sm uppercase tracking-wide">Histórico de Relatórios</div>
+                                    <div className="text-slate-300 text-[10px] font-semibold">Trefila – Relatórios Salvos Localmente</div>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowHistoryModal(false)} className="text-slate-300 hover:text-white transition-colors p-1 rounded">
+                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                        {/* Corpo */}
+                        <div className="px-5 py-4 overflow-y-auto" style={{ maxHeight: '55vh' }}>
+                            {historyDates.length === 0 ? (
+                                <div className="text-center py-10">
+                                    <div className="text-5xl mb-3">📭</div>
+                                    <p className="text-sm font-bold text-slate-600">Nenhum relatório salvo ainda.</p>
+                                    <p className="text-xs text-slate-400 mt-1">Use "💾 Salvar Relatório" para criar o primeiro.</p>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col gap-2">
+                                    {historyDates.map(date => {
+                                        const [y, m, day] = date.split('-');
+                                        const weekdays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+                                        const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(day));
+                                        const weekday = weekdays[dateObj.getDay()];
+                                        const localKey = `daily_report_trefila_${date}`;
+                                        const hasSavedData = !!localStorage.getItem(localKey);
+                                        return (
+                                            <div key={date} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl hover:border-[#002060]/30 hover:bg-blue-50/30 transition-colors">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="bg-[#002060] text-white rounded-xl px-3 py-2 text-center min-w-[54px] shadow-sm">
+                                                        <div className="text-[9px] font-bold text-slate-300 uppercase leading-none">{weekday}</div>
+                                                        <div className="text-lg font-black leading-tight">{day}/{m}</div>
+                                                        <div className="text-[9px] text-slate-400 leading-none">{y}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs font-black text-slate-800">Relatório Trefila</div>
+                                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                                            {hasSavedData
+                                                                ? <span className="bg-emerald-100 text-emerald-700 font-black text-[9px] px-1.5 py-0.5 rounded-full">✅ Disponível</span>
+                                                                : <span className="bg-slate-100 text-slate-500 font-black text-[9px] px-1.5 py-0.5 rounded-full">☁️ Só nuvem</span>
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex gap-1.5">
+                                                    {hasSavedData && (
+                                                        <button
+                                                            onClick={() => loadHistoricalReport(date)}
+                                                            className="bg-[#002060] hover:bg-[#001545] text-white font-black text-[10px] px-3 py-1.5 rounded-lg transition-colors"
+                                                        >
+                                                            📂 Carregar
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={() => deleteHistoricalReport(date)}
+                                                        className="bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 font-bold text-[10px] px-2 py-1.5 rounded-lg transition-colors"
+                                                        title="Remover do histórico"
+                                                    >
+                                                        🗑️
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                        {/* Rodapé */}
+                        <div className="px-6 py-3 border-t border-slate-100 flex justify-between items-center bg-slate-50">
+                            <span className="text-[10px] text-slate-400 font-semibold">{historyDates.length} relatório(s) salvo(s)</span>
+                            <button onClick={() => setShowHistoryModal(false)} className="py-2 px-5 border-2 border-slate-200 text-slate-700 font-bold rounded-lg text-xs hover:bg-slate-100 transition-colors">Fechar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Modal de Salvar Relatório com Calendário */}
             {showSaveModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center no-print" style={{ backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}>
@@ -755,6 +891,9 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({ setPage }) => {
                     </button>
                     <button onClick={() => window.print()} className="bg-slate-700 hover:bg-slate-800 text-white font-bold py-1.5 px-3 rounded text-xs shadow">
                         🖨️ Imprimir Ficha
+                    </button>
+                    <button onClick={handleOpenHistoryModal} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1.5 px-3 rounded text-xs shadow flex items-center gap-1.5">
+                        📚 Histórico
                     </button>
                     <button onClick={handleOpenSaveModal} disabled={isSaving} className="bg-slate-900 hover:bg-black text-white font-bold py-1.5 px-3 rounded text-xs shadow flex items-center gap-1.5">
                         {isSaving ? 'Salvando...' : '💾 Salvar Relatório'}
