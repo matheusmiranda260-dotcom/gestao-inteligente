@@ -304,7 +304,7 @@ const ProductionOrderDesbobinadeira: React.FC<ProductionOrderDesbobinadeiraProps
     };
 
     // Form Submit
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!orderNumber.trim()) {
             showNotification('O número da ordem de produção é obrigatório.', 'error');
@@ -319,8 +319,11 @@ const ProductionOrderDesbobinadeira: React.FC<ProductionOrderDesbobinadeiraProps
             return;
         }
 
+        // Capture osItems BEFORE any reset (protect from async race)
+        const snapshotItems = [...osItems];
+
         // Add as Ghost Order (always true for Desbobinadeira since we bypass stock lots)
-        addProductionOrder({
+        await addProductionOrder({
             orderNumber,
             machine: 'Desbobinadeira 1' as MachineType,
             targetBitola: 'N/A' as Bitola,
@@ -328,15 +331,15 @@ const ProductionOrderDesbobinadeira: React.FC<ProductionOrderDesbobinadeiraProps
             totalWeight: parseFloat(ghostTargetWeight.replace(',', '.')),
             isGhostOrder: true,
             inputBitola: 'N/A',
-            summary: osItems.length > 0 ? { items: osItems } : null
-        });
+            summary: snapshotItems.length > 0 ? { items: snapshotItems } : null,
+            os_items: snapshotItems.length > 0 ? snapshotItems : null,
+        } as any);
 
-        // Reset Form
+        // Reset Form (only AFTER save completes)
         setOrderNumber('');
         setGhostTargetWeight('');
         setInputBitolaFilter('');
         resetPdf();
-        showNotification('Ordem de Produção criada com sucesso!', 'success');
     };
 
     const handleClearForm = () => {

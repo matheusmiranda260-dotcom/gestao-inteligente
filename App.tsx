@@ -1001,8 +1001,8 @@ const App: React.FC = () => {
     };
 
     const addProductionOrder = async (orderData: Omit<ProductionOrderData, 'id' | 'status' | 'creationDate'>) => {
-        const { isGhostOrder, inputBitola, trelicaSuperior, trelicaInferior, trelicaSinusoide, ...orderDataToSave } = orderData;
-        const newOrder: Partial<ProductionOrderData> = {
+        const { isGhostOrder, inputBitola, trelicaSuperior, trelicaInferior, trelicaSinusoide, os_items, ...orderDataToSave } = orderData as any;
+        const newOrder: Record<string, any> = {
             ...orderDataToSave,
             // id is NOT set here to allow insertItem to generate a proper UUID for Supabase
             status: 'pending',
@@ -1011,7 +1011,14 @@ const App: React.FC = () => {
             processedLots: [],
             operatorLogs: isGhostOrder ? [{ operator: 'GHOST_ORDER_FLAG', action: inputBitola || '', startTime: new Date().toISOString() }] : [],
             weighedPackages: [],
-            pontas: []
+            pontas: [],
+            // Preserve ghost/desbobinadeira fields
+            isGhostOrder: isGhostOrder ?? false,
+            inputBitola: inputBitola || null,
+            // Ensure quantityToProduce defaults to 0 if not provided (Desbobinadeira doesn't use it)
+            quantityToProduce: orderDataToSave.quantityToProduce ?? 0,
+            // os_items: store directly (already extracted to avoid mapToSnakeCase double-converting)
+            osItems: os_items || orderDataToSave.osItems || null,
         };
 
         try {
@@ -1069,9 +1076,10 @@ const App: React.FC = () => {
             }
 
             showNotification('Ordem de produção criada com sucesso!', 'success');
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error creating production order:', error);
-            showNotification('Erro ao criar ordem de produção.', 'error');
+            const detail = error?.message || error?.details || error?.hint || JSON.stringify(error);
+            showNotification(`Erro ao criar ordem de produção: ${detail}`, 'error');
         }
     };
 
