@@ -94,7 +94,7 @@ const DesbobinadeiraDashboard: React.FC<DesbobinadeiraDashboardProps> = ({ produ
         if (seconds < 0) seconds = 0;
         const h = Math.floor(seconds / 3600);
         const m = Math.floor((seconds % 3600) / 60);
-        const s = seconds % 60;
+        const s = Math.floor(seconds % 60);
         return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
@@ -116,7 +116,11 @@ const DesbobinadeiraDashboard: React.FC<DesbobinadeiraDashboardProps> = ({ produ
     
     const visibleOsItems = useMemo(() => {
         if (showAllOs) return activeOsItems;
-        return activeOsItems.filter((item: any) => osProgress?.currentOs?.os === item.os);
+        if (!osProgress?.currentOs) return [];
+        return activeOsItems.filter((item: any, idx: number) => {
+            const osName = item.os || `OS ${idx + 1}`;
+            return osProgress.currentOs === osName;
+        });
     }, [activeOsItems, osProgress, showAllOs]);
 
     return (
@@ -207,9 +211,9 @@ const DesbobinadeiraDashboard: React.FC<DesbobinadeiraDashboardProps> = ({ produ
                                 </div>
                             ) : (
                                 visibleOsItems.map((item: any, idx: number) => {
-                                    const osName = item.os || `OS ${idx + 1}`;
-                                    const isCurrent = osProgress?.currentOs?.os === item.os;
-                                    const completedLog = completedLogs.find((l: any) => l.os === item.os);
+                                    const osName = item.os || `OS ${activeOsItems.indexOf(item) + 1}`;
+                                    const isCurrent = osProgress?.currentOs === osName;
+                                    const completedLog = completedLogs.find((l: any) => l.os === osName);
                                     const isCompleted = !!completedLog;
                                     
                                     let statusBg = 'bg-white/5 border-white/10';
@@ -230,23 +234,36 @@ const DesbobinadeiraDashboard: React.FC<DesbobinadeiraDashboardProps> = ({ produ
                                     }
 
                                     return (
-                                        <div key={idx} className={`p-4 rounded-xl border flex items-center justify-between transition-all ${statusBg}`}>
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-8 flex justify-center">
-                                                    {icon}
-                                                </div>
-                                                <div>
-                                                    <h3 className={`text-lg font-black ${isCurrent ? 'text-white' : isCompleted ? 'text-emerald-50' : 'text-slate-300'}`}>
+                                        <div key={idx} className={`p-4 rounded-xl border flex flex-col gap-3 transition-all ${statusBg}`}>
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 flex justify-center">{icon}</div>
+                                                    <h3 className={`text-xl font-black ${isCurrent ? 'text-white' : isCompleted ? 'text-emerald-50' : 'text-slate-300'}`}>
                                                         {osName}
                                                     </h3>
-                                                    <div className="flex gap-4 text-xs font-medium text-slate-500 mt-1">
-                                                        <span>Qtd: <b className="text-slate-300">{item.quantidade || '-'}</b></span>
-                                                        <span>Bitola: <b className="text-slate-300">{item.bitola || '-'}</b></span>
-                                                    </div>
+                                                </div>
+                                                <div className={`text-sm tracking-wider uppercase ${textColor}`}>
+                                                    {statusText}
                                                 </div>
                                             </div>
-                                            <div className={`text-sm tracking-wider uppercase ${textColor}`}>
-                                                {statusText}
+                                            
+                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pl-11">
+                                                <div className="bg-black/20 p-2 rounded-lg border border-white/5">
+                                                    <span className="block text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Quantidade</span>
+                                                    <span className="text-sm font-black text-slate-200">{item.quantidade || '-'} <span className="text-[10px] text-slate-500">pçs</span></span>
+                                                </div>
+                                                <div className="bg-black/20 p-2 rounded-lg border border-white/5">
+                                                    <span className="block text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Bitola</span>
+                                                    <span className="text-sm font-black text-slate-200">{item.bitola || '-'} <span className="text-[10px] text-slate-500">mm</span></span>
+                                                </div>
+                                                <div className="bg-black/20 p-2 rounded-lg border border-white/5">
+                                                    <span className="block text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Comprimento</span>
+                                                    <span className="text-sm font-black text-slate-200">{item.length || item.comprimento || '-'} <span className="text-[10px] text-slate-500">m</span></span>
+                                                </div>
+                                                <div className="bg-black/20 p-2 rounded-lg border border-white/5">
+                                                    <span className="block text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Formato</span>
+                                                    <span className="text-sm font-black text-slate-200 truncate">{item.drawingType || item.formato || '-'}</span>
+                                                </div>
                                             </div>
                                         </div>
                                     );
