@@ -1133,21 +1133,21 @@ const EmployeeDetailModal: React.FC<{
         // Calculate average score of graded elements (CHA)
         // 5 knowledge, 5 skills, 11 attitudes = 21 elements
         const qSum = techEvalScores.q1 + techEvalScores.q2 + techEvalScores.q3 + techEvalScores.q4 + techEvalScores.q5;
-        const conhecimentoScore = qSum * 2; // qSum is max 50, so * 2 = max 100
+        const conhecimentoScore = qSum; // qSum is max 50
         
         const hSum = Object.values(techEvalHabilidadeData).reduce((sum, item) => {
-            if (item.level === 'Bom') return sum + 20;
-            if (item.level === 'Médio') return sum + 10;
+            if (item.level === 'Bom') return sum + 5;
+            if (item.level === 'Médio') return sum + 2.5;
             return sum; // Ruim or Não = 0
         }, 0);
         
         const aSum = Object.values(techEvalAtitudeData).reduce((sum, item) => {
-            if (item.level === 'Bom') return sum + (100 / 11);
-            if (item.level === 'Médio') return sum + (50 / 11);
+            if (item.level === 'Bom') return sum + (25 / 11);
+            if (item.level === 'Médio') return sum + (12.5 / 11);
             return sum; // Ruim or Não = 0
         }, 0);
         
-        const total = (conhecimentoScore + hSum + aSum) / 3;
+        const total = conhecimentoScore + hSum + aSum;
 
         try {
             const evalDataToSave = {
@@ -1992,12 +1992,12 @@ const EmployeeDetailModal: React.FC<{
                                                     {/* Conhecimento */}
                                                     {(() => {
                                                         const scores = [selectedTechEval.q1Score, selectedTechEval.q2Score, selectedTechEval.q3Score, selectedTechEval.q4Score, selectedTechEval.q5Score];
-                                                        const avg = scores.reduce((a, b) => a + b, 0) * 2;
+                                                        const avg = scores.reduce((a, b) => a + b, 0);
                                                         return (
                                                             <div className="bg-blue-50/40 p-4 rounded-xl border border-blue-100/60 text-center">
                                                                 <span className="text-xs font-bold text-blue-700 uppercase block tracking-wider">C - Conhecimento</span>
-                                                                <span className="text-2xl font-black text-blue-800 block mt-1">{avg.toFixed(1)} <strong className="text-xs text-blue-400 font-semibold">/100</strong></span>
-                                                                <span className="text-[10px] text-slate-400 mt-1 block">Média das Questões de Conhecimento</span>
+                                                                <span className="text-2xl font-black text-blue-800 block mt-1">{avg.toFixed(1)} <strong className="text-xs text-blue-400 font-semibold">/ 50</strong></span>
+                                                                <span className="text-[10px] text-slate-400 mt-1 block">Peso: 50%</span>
                                                             </div>
                                                         );
                                                     })()}
@@ -2005,13 +2005,13 @@ const EmployeeDetailModal: React.FC<{
                                                     {/* Habilidade */}
                                                     {(() => {
                                                         const avg = selectedTechEval.habilidadeData && Object.keys(selectedTechEval.habilidadeData).length > 0 
-                                                            ? Object.values(selectedTechEval.habilidadeData).reduce((s: number, item: any) => s + (item.level === 'Bom' ? 20 : item.level === 'Médio' ? 10 : 0), 0)
-                                                            : ((selectedTechEval.h1Score + selectedTechEval.h2Score + selectedTechEval.h3Score + selectedTechEval.h4Score) / 4) * 10;
+                                                            ? Object.values(selectedTechEval.habilidadeData).reduce((s: number, item: any) => s + (item.level === 'Bom' ? 5 : item.level === 'Médio' ? 2.5 : 0), 0)
+                                                            : ((selectedTechEval.h1Score + selectedTechEval.h2Score + selectedTechEval.h3Score + selectedTechEval.h4Score) / 4) * 2.5;
                                                         return (
                                                             <div className="bg-green-50/40 p-4 rounded-xl border border-green-100/60 text-center">
                                                                 <span className="text-xs font-bold text-green-700 uppercase block tracking-wider">H - Habilidade</span>
-                                                                <span className="text-2xl font-black text-green-800 block mt-1">{avg.toFixed(1)} <strong className="text-xs text-green-400 font-semibold">/100</strong></span>
-                                                                <span className="text-[10px] text-slate-400 mt-1 block">Média de Operação Prática</span>
+                                                                <span className="text-2xl font-black text-green-800 block mt-1">{avg.toFixed(1)} <strong className="text-xs text-green-400 font-semibold">/ 25</strong></span>
+                                                                <span className="text-[10px] text-slate-400 mt-1 block">Peso: 25%</span>
                                                             </div>
                                                         );
                                                     })()}
@@ -2019,13 +2019,13 @@ const EmployeeDetailModal: React.FC<{
                                                     {/* Atitude */}
                                                     {(() => {
                                                         const avg = selectedTechEval.atitudeData && Object.keys(selectedTechEval.atitudeData).length > 0 
-                                                            ? Object.values(selectedTechEval.atitudeData).reduce((s: number, item: any) => s + (item.level === 'Bom' ? 100/11 : item.level === 'Médio' ? 50/11 : 0), 0)
-                                                            : ((selectedTechEval.a1Score + selectedTechEval.a2Score + selectedTechEval.a3Score + selectedTechEval.a4Score) / 4) * 10;
+                                                            ? Object.values(selectedTechEval.atitudeData).reduce((s: number, item: any) => s + (item.level === 'Bom' ? 25/11 : item.level === 'Médio' ? 12.5/11 : 0), 0)
+                                                            : ((selectedTechEval.a1Score + selectedTechEval.a2Score + selectedTechEval.a3Score + selectedTechEval.a4Score) / 4) * 2.5;
                                                         return (
                                                             <div className="bg-purple-50/40 p-4 rounded-xl border border-purple-100/60 text-center">
                                                                 <span className="text-xs font-bold text-purple-700 uppercase block tracking-wider">A - Atitude</span>
-                                                                <span className="text-2xl font-black text-purple-800 block mt-1">{avg.toFixed(1)} <strong className="text-xs text-purple-400 font-semibold">/100</strong></span>
-                                                                <span className="text-[10px] text-slate-400 mt-1 block">Média Comportamental</span>
+                                                                <span className="text-2xl font-black text-purple-800 block mt-1">{avg.toFixed(1)} <strong className="text-xs text-purple-400 font-semibold">/ 25</strong></span>
+                                                                <span className="text-[10px] text-slate-400 mt-1 block">Peso: 25%</span>
                                                             </div>
                                                         );
                                                     })()}
@@ -2218,35 +2218,35 @@ const EmployeeDetailModal: React.FC<{
                                                                 <td className="p-2 border-r">
                                                                     {(() => {
                                                                         const scores = [selectedTechEval.q1Score, selectedTechEval.q2Score, selectedTechEval.q3Score, selectedTechEval.q4Score, selectedTechEval.q5Score];
-                                                                        return (scores.reduce((a, b) => a + b, 0) * 2).toFixed(1);
-                                                                    })()} / 100
+                                                                        return scores.reduce((a, b) => a + b, 0).toFixed(1);
+                                                                    })()} / 50
                                                                 </td>
                                                                 <td className="p-2 border-r">
                                                                     {selectedTechEval.habilidadeData && Object.keys(selectedTechEval.habilidadeData).length > 0 ? (
                                                                         (() => {
                                                                             const sum = Object.values(selectedTechEval.habilidadeData).reduce((s: number, item: any) => {
-                                                                                if (item.level === 'Bom') return s + 20;
-                                                                                if (item.level === 'Médio') return s + 10;
+                                                                                if (item.level === 'Bom') return s + 5;
+                                                                                if (item.level === 'Médio') return s + 2.5;
                                                                                 return s;
                                                                             }, 0);
-                                                                            return sum.toFixed(1) + ' / 100';
+                                                                            return sum.toFixed(1) + ' / 25';
                                                                         })()
                                                                     ) : (
-                                                                        (((selectedTechEval.h1Score + selectedTechEval.h2Score + selectedTechEval.h3Score + selectedTechEval.h4Score) / 4) * 10).toFixed(1) + ' / 100'
+                                                                        (((selectedTechEval.h1Score + selectedTechEval.h2Score + selectedTechEval.h3Score + selectedTechEval.h4Score) / 4) * 2.5).toFixed(1) + ' / 25'
                                                                     )}
                                                                 </td>
                                                                 <td className="p-2 border-r">
                                                                     {selectedTechEval.atitudeData && Object.keys(selectedTechEval.atitudeData).length > 0 ? (
                                                                         (() => {
                                                                             const sum = Object.values(selectedTechEval.atitudeData).reduce((s: number, item: any) => {
-                                                                                if (item.level === 'Bom') return s + (100/11);
-                                                                                if (item.level === 'Médio') return s + (50/11);
+                                                                                if (item.level === 'Bom') return s + (25/11);
+                                                                                if (item.level === 'Médio') return s + (12.5/11);
                                                                                 return s;
                                                                             }, 0);
-                                                                            return sum.toFixed(1) + ' / 100';
+                                                                            return sum.toFixed(1) + ' / 25';
                                                                         })()
                                                                     ) : (
-                                                                        (((selectedTechEval.a1Score + selectedTechEval.a2Score + selectedTechEval.a3Score + selectedTechEval.a4Score) / 4) * 10).toFixed(1) + ' / 100'
+                                                                        (((selectedTechEval.a1Score + selectedTechEval.a2Score + selectedTechEval.a3Score + selectedTechEval.a4Score) / 4) * 2.5).toFixed(1) + ' / 25'
                                                                     )}
                                                                 </td>
                                                                 <td className="p-2 bg-blue-50 text-blue-950 font-black text-xs">
