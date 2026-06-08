@@ -128,6 +128,41 @@ const TRELICA_QUESTIONS: QuestionConfig[] = [
     }
 ];
 
+export interface HabilidadeQuestionConfig {
+    id: string;
+    text: string;
+}
+
+const HABILIDADE_QUESTIONS: HabilidadeQuestionConfig[] = [
+    { id: 'h1', text: 'Já operou ponte rolante?' },
+    { id: 'h2', text: 'Já consegue tirar balanço da ponte rolante?' },
+    { id: 'h3', text: 'Já acompanhou e participou de limpeza (dos k7s)?' },
+    { id: 'h4', text: 'Já acompanhou e participou de descarga de rolos?' },
+    { id: 'h5', text: 'Já acompanhou e retirou pacotes de treliças da máquina?' }
+];
+
+export interface AtitudeQuestionConfig {
+    id: string;
+    category: string;
+    text: string;
+}
+
+const ATITUDE_QUESTIONS: AtitudeQuestionConfig[] = [
+    { id: 'a1_1', category: 'Organização e Limpeza (5S)', text: 'Deixa a área limpa e organizada?' },
+    { id: 'a1_2', category: 'Organização e Limpeza (5S)', text: 'Guarda cada coisa no seu devido lugar?' },
+    { id: 'a2_1', category: 'Assiduidade e Disciplina', text: 'Chega no horário?' },
+    { id: 'a2_2', category: 'Assiduidade e Disciplina', text: 'Respeita as normas da empresa?' },
+    { id: 'a2_3', category: 'Assiduidade e Disciplina', text: 'Usa os EPIs de forma correta?' },
+    { id: 'a3_1', category: 'Iniciativa e Melhoria Contínua', text: 'Proativo para solucionar problemas?' },
+    { id: 'a3_2', category: 'Iniciativa e Melhoria Contínua', text: 'Busca aprender?' },
+    { id: 'a3_3', category: 'Iniciativa e Melhoria Contínua', text: 'É comunicativo? Questiona bastante?' },
+    { id: 'a4_1', category: 'Trabalho em Equipe e Postura', text: 'Tem espírito cooperativo com a equipe?' },
+    { id: 'a4_2', category: 'Trabalho em Equipe e Postura', text: 'Tem boa comunicação?' },
+    { id: 'a4_3', category: 'Trabalho em Equipe e Postura', text: 'Tem boa postura Ética?' }
+];
+
+const ATITUDE_CATEGORIES = Array.from(new Set(ATITUDE_QUESTIONS.map(q => q.category)));
+
 interface PeopleManagementProps {
     setPage: (page: Page) => void;
     currentUser: User | null;
@@ -757,6 +792,7 @@ const EmployeeDetailModal: React.FC<{
     const [activeEvalSubTab, setActiveEvalSubTab] = useState<'behavioral' | 'technical'>('behavioral');
     const [isEvaluatingTechnical, setIsEvaluatingTechnical] = useState(false);
     const [selectedTechEval, setSelectedTechEval] = useState<TechnicalEvaluation | null>(null);
+    const [editingTechEvalId, setEditingTechEvalId] = useState<string | null>(null);
     const [techEvalMonth, setTechEvalMonth] = useState<number>(1);
     const [techEvalDate, setTechEvalDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
     const [techEvalMachineType, setTechEvalMachineType] = useState<'Trefila' | 'Treliça'>('Trefila');
@@ -765,6 +801,8 @@ const EmployeeDetailModal: React.FC<{
     const [techEvalSkills, setTechEvalSkills] = useState<Record<string, number>>({ h1: 0, h2: 0, h3: 0, h4: 0 });
     const [techEvalAttitudes, setTechEvalAttitudes] = useState<Record<string, number>>({ a1: 0, a2: 0, a3: 0, a4: 0 });
     const [techEvalNote, setTechEvalNote] = useState('');
+    const [techEvalHabilidadeData, setTechEvalHabilidadeData] = useState<Record<string, { answer: 'Sim' | 'Não' | '', level?: string, reason?: string }>>({});
+    const [techEvalAtitudeData, setTechEvalAtitudeData] = useState<Record<string, { answer: 'Sim' | 'Não' | '', level?: string, reason?: string }>>({});
 
     const shuffledTechQuestions = useMemo(() => {
         const questions = techEvalMachineType === 'Trefila' ? TREFILA_QUESTIONS : TRELICA_QUESTIONS;
@@ -1093,14 +1131,22 @@ const EmployeeDetailModal: React.FC<{
         if (!currentUser) return;
         
         // Calculate average score of graded elements (CHA)
-        // Both Trefila and Treliça have exactly 5 knowledge questions, 4 skills, and 4 attitudes, totaling 13 graded elements.
+        // 5 knowledge, 5 skills, 11 attitudes = 21 elements
         const qSum = techEvalScores.q1 + techEvalScores.q2 + techEvalScores.q3 + techEvalScores.q4 + techEvalScores.q5;
-        const hSum = techEvalSkills.h1 + techEvalSkills.h2 + techEvalSkills.h3 + techEvalSkills.h4;
-        const aSum = techEvalAttitudes.a1 + techEvalAttitudes.a2 + techEvalAttitudes.a3 + techEvalAttitudes.a4;
-        const total = (qSum + hSum + aSum) / 13;
+        const hSum = Object.values(techEvalHabilidadeData).reduce((sum, item) => {
+            if (item.level === 'Bom') return sum + 10;
+            if (item.level === 'Médio') return sum + 5;
+            return sum; // Ruim or Não = 0
+        }, 0);
+        const aSum = Object.values(techEvalAtitudeData).reduce((sum, item) => {
+            if (item.level === 'Bom') return sum + 10;
+            if (item.level === 'Médio') return sum + 5;
+            return sum; // Ruim or Não = 0
+        }, 0);
+        const total = (qSum + hSum + aSum) / 21;
 
         try {
-            const newEval = await insertItem<TechnicalEvaluation>('technical_evaluations', {
+            const evalDataToSave = {
                 employeeId: employee.id,
                 evaluator: currentUser.username,
                 date: new Date(techEvalDate).toISOString(),
@@ -1116,25 +1162,38 @@ const EmployeeDetailModal: React.FC<{
                 q4Score: techEvalScores.q4,
                 q5Answer: techEvalAnswers.q5,
                 q5Score: techEvalScores.q5,
-                h1Score: techEvalSkills.h1,
-                h2Score: techEvalSkills.h2,
-                h3Score: techEvalSkills.h3,
-                h4Score: techEvalSkills.h4,
-                a1Score: techEvalAttitudes.a1,
-                a2Score: techEvalAttitudes.a2,
-                a3Score: techEvalAttitudes.a3,
-                a4Score: techEvalAttitudes.a4,
+                h1Score: 0,
+                h2Score: 0,
+                h3Score: 0,
+                h4Score: 0,
+                habilidadeData: techEvalHabilidadeData,
+                a1Score: 0,
+                a2Score: 0,
+                a3Score: 0,
+                a4Score: 0,
+                atitudeData: techEvalAtitudeData,
                 totalScore: parseFloat(total.toFixed(2)),
                 note: techEvalNote
-            } as TechnicalEvaluation);
+            } as TechnicalEvaluation;
 
-            setTechnicalEvaluations([newEval, ...technicalEvaluations]);
+            let newEval: TechnicalEvaluation;
+
+            if (editingTechEvalId) {
+                newEval = await updateItem<TechnicalEvaluation>('technical_evaluations', editingTechEvalId, evalDataToSave);
+                setTechnicalEvaluations(technicalEvaluations.map(e => e.id === editingTechEvalId ? newEval : e));
+            } else {
+                newEval = await insertItem<TechnicalEvaluation>('technical_evaluations', evalDataToSave);
+                setTechnicalEvaluations([newEval, ...technicalEvaluations]);
+            }
+
             setIsEvaluatingTechnical(false);
+            setEditingTechEvalId(null);
             setTechEvalMonth(1);
             setTechEvalDate(new Date().toISOString().split('T')[0]);
             setTechEvalAnswers({ q1: '', q2: '', q3: '', q4: '', q5: '' });
             setTechEvalScores({ q1: 0, q2: 0, q3: 0, q4: 0, q5: 0 });
-            setTechEvalSkills({ h1: 0, h2: 0, h3: 0, h4: 0 });
+            setTechEvalHabilidadeData({});
+            setTechEvalAtitudeData({});
             setTechEvalAttitudes({ a1: 0, a2: 0, a3: 0, a4: 0 });
             setTechEvalNote('');
             alert('Avaliação de Conhecimento salva com sucesso!');
@@ -1144,6 +1203,25 @@ const EmployeeDetailModal: React.FC<{
             console.error('Error saving technical evaluation:', e);
             alert('Erro ao salvar avaliação.');
         }
+    };
+
+    const handleEditTechEval = (evalData: TechnicalEvaluation) => {
+        setEditingTechEvalId(evalData.id);
+        setTechEvalMonth(evalData.monthNum);
+        setTechEvalDate(new Date(evalData.date).toISOString().split('T')[0]);
+        setTechEvalMachineType(evalData.machineType as 'Trefila' | 'Treliça');
+        setTechEvalAnswers({
+            q1: evalData.q1Answer || '', q2: evalData.q2Answer || '', q3: evalData.q3Answer || '', q4: evalData.q4Answer || '', q5: evalData.q5Answer || ''
+        });
+        setTechEvalScores({
+            q1: evalData.q1Score || 0, q2: evalData.q2Score || 0, q3: evalData.q3Score || 0, q4: evalData.q4Score || 0, q5: evalData.q5Score || 0
+        });
+        setTechEvalHabilidadeData(evalData.habilidadeData || {});
+        setTechEvalAtitudeData(evalData.atitudeData || {});
+        setTechEvalNote(evalData.note || '');
+        
+        setSelectedTechEval(null);
+        setIsEvaluatingTechnical(true);
     };
 
     const handleDeleteTechnicalEvaluation = async (id: string) => {
@@ -1686,31 +1764,67 @@ const EmployeeDetailModal: React.FC<{
                                                     <h3 className="text-base font-black text-green-700 uppercase tracking-wider">Avaliação de Habilidade (Prática Operacional)</h3>
                                                 </div>
                                                 
-                                                {[
-                                                    { id: 'h1', title: 'Setup e Ajustes da Máquina', desc: 'Domínio técnico na regulagem, troca de carretéis, ferramentas e preparação geral da máquina.' },
-                                                    { id: 'h2', title: 'Ritmo de Trabalho e Produtividade', desc: 'Eficiência e velocidade na operação diária, atingimento de metas e foco produtivo.' },
-                                                    { id: 'h3', title: 'Controle de Qualidade', desc: 'Inspeção de bitolas, conformidade de tolerâncias e prevenção de defeitos do produto final.' },
-                                                    { id: 'h4', title: 'Segurança Operacional', desc: 'Cumprimento de regras de segurança, uso correto de EPIs e postura segura de trabalho.' }
-                                                ].map(h => (
-                                                    <div key={h.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200/60 flex flex-col md:flex-row justify-between md:items-center gap-4">
+                                                {HABILIDADE_QUESTIONS.map(h => {
+                                                    const currentData = techEvalHabilidadeData[h.id] || { answer: '' };
+                                                    return (
+                                                    <div key={h.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200/60 flex flex-col gap-4">
                                                         <div>
-                                                            <h5 className="font-bold text-slate-800 text-sm">{h.title}</h5>
-                                                            <p className="text-xs text-slate-500">{h.desc}</p>
+                                                            <h5 className="font-bold text-slate-800 text-sm">{h.text}</h5>
                                                         </div>
-                                                        <div className="flex items-center gap-3 shrink-0">
-                                                            <label className="text-xs font-bold text-slate-500 uppercase">Nota (0 a 10):</label>
-                                                            <select
-                                                                className="p-1.5 border rounded-lg bg-white font-extrabold text-green-700 w-24 text-center"
-                                                                value={techEvalSkills[h.id]}
-                                                                onChange={e => setTechEvalSkills({ ...techEvalSkills, [h.id]: parseFloat(e.target.value) })}
-                                                            >
-                                                                {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
-                                                                    <option key={n} value={n}>{n}</option>
-                                                                ))}
-                                                            </select>
+                                                        <div className="flex flex-col gap-3">
+                                                            <div className="flex items-center gap-4">
+                                                                <label className="flex items-center gap-2 text-sm font-bold cursor-pointer">
+                                                                    <input 
+                                                                        type="radio" 
+                                                                        name={`hab_${h.id}`} 
+                                                                        checked={currentData.answer === 'Sim'} 
+                                                                        onChange={() => setTechEvalHabilidadeData({...techEvalHabilidadeData, [h.id]: { answer: 'Sim', level: 'Médio' }})}
+                                                                        className="text-green-600 focus:ring-green-400"
+                                                                    />
+                                                                    Sim
+                                                                </label>
+                                                                <label className="flex items-center gap-2 text-sm font-bold cursor-pointer">
+                                                                    <input 
+                                                                        type="radio" 
+                                                                        name={`hab_${h.id}`} 
+                                                                        checked={currentData.answer === 'Não'} 
+                                                                        onChange={() => setTechEvalHabilidadeData({...techEvalHabilidadeData, [h.id]: { answer: 'Não', reason: '' }})}
+                                                                        className="text-red-600 focus:ring-red-400"
+                                                                    />
+                                                                    Não
+                                                                </label>
+                                                            </div>
+                                                            
+                                                            {currentData.answer === 'Sim' && (
+                                                                <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-200">
+                                                                    <label className="text-xs font-bold text-slate-500 uppercase">Classificação:</label>
+                                                                    <select
+                                                                        className="p-1.5 border rounded-lg bg-white font-extrabold text-green-700 text-sm"
+                                                                        value={currentData.level || 'Médio'}
+                                                                        onChange={e => setTechEvalHabilidadeData({...techEvalHabilidadeData, [h.id]: { ...currentData, level: e.target.value }})}
+                                                                    >
+                                                                        <option value="Bom">Bom</option>
+                                                                        <option value="Médio">Médio</option>
+                                                                        <option value="Ruim">Ruim</option>
+                                                                    </select>
+                                                                </div>
+                                                            )}
+
+                                                            {currentData.answer === 'Não' && (
+                                                                <div className="flex flex-col gap-1 p-3 bg-white rounded-lg border border-slate-200">
+                                                                    <label className="text-xs font-bold text-slate-500 uppercase">Por quê?</label>
+                                                                    <input 
+                                                                        type="text"
+                                                                        placeholder="Descreva o motivo..."
+                                                                        className="p-2 border rounded-lg text-sm w-full"
+                                                                        value={currentData.reason || ''}
+                                                                        onChange={e => setTechEvalHabilidadeData({...techEvalHabilidadeData, [h.id]: { ...currentData, reason: e.target.value }})}
+                                                                    />
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
-                                                ))}
+                                                )})}
                                             </div>
 
                                             {/* PILLAR 3: ATITUDE */}
@@ -1720,28 +1834,70 @@ const EmployeeDetailModal: React.FC<{
                                                     <h3 className="text-base font-black text-purple-700 uppercase tracking-wider">Avaliação de Atitude (Comportamento)</h3>
                                                 </div>
 
-                                                {[
-                                                    { id: 'a1', title: 'Organização e Limpeza (5S)', desc: 'Conservação da máquina atribuída, limpeza do posto de trabalho e descarte correto de resíduos/sucata.' },
-                                                    { id: 'a2', title: 'Assiduidade e Disciplina', desc: 'Cumprimento de horários, postura profissional, respeito às normas da fábrica e assiduidade.' },
-                                                    { id: 'a3', title: 'Iniciativa e Melhoria Contínua', desc: 'Proatividade para buscar soluções, informar desvios operacionais e buscar novos aprendizados.' },
-                                                    { id: 'a4', title: 'Trabalho em Equipe e Postura', desc: 'Espírito cooperativo com o turno, comunicação clara com colegas e líderes e postura ética.' }
-                                                ].map(a => (
-                                                    <div key={a.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200/60 flex flex-col md:flex-row justify-between md:items-center gap-4">
-                                                        <div>
-                                                            <h5 className="font-bold text-slate-800 text-sm">{a.title}</h5>
-                                                            <p className="text-xs text-slate-500">{a.desc}</p>
-                                                        </div>
-                                                        <div className="flex items-center gap-3 shrink-0">
-                                                            <label className="text-xs font-bold text-slate-500 uppercase">Nota (0 a 10):</label>
-                                                            <select
-                                                                className="p-1.5 border rounded-lg bg-white font-extrabold text-purple-700 w-24 text-center"
-                                                                value={techEvalAttitudes[a.id]}
-                                                                onChange={e => setTechEvalAttitudes({ ...techEvalAttitudes, [a.id]: parseFloat(e.target.value) })}
-                                                            >
-                                                                {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
-                                                                    <option key={n} value={n}>{n}</option>
-                                                                ))}
-                                                            </select>
+                                                {ATITUDE_CATEGORIES.map(category => (
+                                                    <div key={category} className="bg-slate-50 p-4 rounded-xl border border-slate-200/60 flex flex-col gap-4">
+                                                        <h5 className="font-bold text-slate-800 text-sm border-b pb-2">{category}</h5>
+                                                        <div className="space-y-6">
+                                                            {ATITUDE_QUESTIONS.filter(q => q.category === category).map(q => {
+                                                                const currentData = techEvalAtitudeData[q.id] || { answer: '' };
+                                                                return (
+                                                                    <div key={q.id} className="flex flex-col gap-2">
+                                                                        <span className="font-bold text-slate-700 text-xs">{q.text}</span>
+                                                                        <div className="flex flex-col gap-3">
+                                                                            <div className="flex items-center gap-4">
+                                                                                <label className="flex items-center gap-2 text-sm font-bold cursor-pointer">
+                                                                                    <input 
+                                                                                        type="radio" 
+                                                                                        name={`atit_${q.id}`} 
+                                                                                        checked={currentData.answer === 'Sim'} 
+                                                                                        onChange={() => setTechEvalAtitudeData({...techEvalAtitudeData, [q.id]: { answer: 'Sim', level: 'Médio' }})}
+                                                                                        className="text-purple-600 focus:ring-purple-400"
+                                                                                    />
+                                                                                    Sim
+                                                                                </label>
+                                                                                <label className="flex items-center gap-2 text-sm font-bold cursor-pointer">
+                                                                                    <input 
+                                                                                        type="radio" 
+                                                                                        name={`atit_${q.id}`} 
+                                                                                        checked={currentData.answer === 'Não'} 
+                                                                                        onChange={() => setTechEvalAtitudeData({...techEvalAtitudeData, [q.id]: { answer: 'Não', reason: '' }})}
+                                                                                        className="text-red-600 focus:ring-red-400"
+                                                                                    />
+                                                                                    Não
+                                                                                </label>
+                                                                            </div>
+                                                                            
+                                                                            {currentData.answer === 'Sim' && (
+                                                                                <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-200">
+                                                                                    <label className="text-xs font-bold text-slate-500 uppercase">Classificação:</label>
+                                                                                    <select
+                                                                                        className="p-1.5 border rounded-lg bg-white font-extrabold text-purple-700 text-sm"
+                                                                                        value={currentData.level || 'Médio'}
+                                                                                        onChange={e => setTechEvalAtitudeData({...techEvalAtitudeData, [q.id]: { ...currentData, level: e.target.value }})}
+                                                                                    >
+                                                                                        <option value="Bom">Bom</option>
+                                                                                        <option value="Médio">Médio</option>
+                                                                                        <option value="Ruim">Ruim</option>
+                                                                                    </select>
+                                                                                </div>
+                                                                            )}
+
+                                                                            {currentData.answer === 'Não' && (
+                                                                                <div className="flex flex-col gap-1 p-3 bg-white rounded-lg border border-slate-200">
+                                                                                    <label className="text-xs font-bold text-slate-500 uppercase">Por quê?</label>
+                                                                                    <input 
+                                                                                        type="text"
+                                                                                        placeholder="Descreva o motivo..."
+                                                                                        className="p-2 border rounded-lg text-sm w-full"
+                                                                                        value={currentData.reason || ''}
+                                                                                        onChange={e => setTechEvalAtitudeData({...techEvalAtitudeData, [q.id]: { ...currentData, reason: e.target.value }})}
+                                                                                    />
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                )
+                                                            })}
                                                         </div>
                                                     </div>
                                                 ))}
@@ -1771,18 +1927,30 @@ const EmployeeDetailModal: React.FC<{
                                         <div className="space-y-6">
                                             {/* Ações na tela (Voltar / Imprimir) */}
                                             <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-100 shadow-sm no-print">
-                                                <button
-                                                    onClick={() => setSelectedTechEval(null)}
-                                                    className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 rounded-lg text-slate-700 text-xs font-bold hover:bg-slate-50 transition"
-                                                >
-                                                    <ArrowLeftIcon className="h-4 w-4" /> Voltar ao Histórico
-                                                </button>
-                                                <button
-                                                    onClick={() => window.print()}
-                                                    className="flex items-center gap-1.5 px-5 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition shadow"
-                                                >
-                                                    <PrinterIcon className="h-4 w-4" /> Imprimir Avaliação
-                                                </button>
+                                                <div className="flex gap-3">
+                                                    <button
+                                                        onClick={() => setSelectedTechEval(null)}
+                                                        className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 rounded-lg text-slate-700 text-xs font-bold hover:bg-slate-50 transition"
+                                                    >
+                                                        <ArrowLeftIcon className="h-4 w-4" /> Voltar ao Histórico
+                                                    </button>
+                                                </div>
+                                                <div className="flex gap-3">
+                                                    {!readOnly && (
+                                                        <button
+                                                            onClick={() => handleEditTechEval(selectedTechEval)}
+                                                            className="flex items-center gap-1.5 px-4 py-2 border border-blue-200 bg-blue-50 text-blue-700 rounded-lg text-xs font-bold hover:bg-blue-100 transition shadow-sm"
+                                                        >
+                                                            Editar Avaliação
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={() => window.print()}
+                                                        className="flex items-center gap-1.5 px-5 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition shadow"
+                                                    >
+                                                        <PrinterIcon className="h-4 w-4" /> Imprimir Avaliação
+                                                    </button>
+                                                </div>
                                             </div>
 
                                             {/* Painel de Visualização no Sistema */}
@@ -1910,33 +2078,76 @@ const EmployeeDetailModal: React.FC<{
                                                 {/* Detalhes Habilidade */}
                                                 <div className="space-y-3">
                                                     <h5 className="font-black text-slate-800 text-sm uppercase tracking-wide border-b pb-1">2. Detalhamento - Habilidade</h5>
-                                                    {[
-                                                        { key: 'h1', title: 'Setup e Ajustes da Máquina', val: selectedTechEval.h1Score },
-                                                        { key: 'h2', title: 'Ritmo de Trabalho e Produtividade', val: selectedTechEval.h2Score },
-                                                        { key: 'h3', title: 'Controle de Qualidade', val: selectedTechEval.h3Score },
-                                                        { key: 'h4', title: 'Segurança Operacional', val: selectedTechEval.h4Score }
-                                                    ].map(h => (
-                                                        <div key={h.key} className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border">
-                                                            <span className="text-xs font-bold text-slate-700">{h.title}</span>
-                                                            <span className="text-xs font-extrabold text-[#0F3F5C] bg-white px-3 py-1 rounded border">Nota: <strong className="text-sm font-black">{h.val}</strong> / 10</span>
+                                                    {selectedTechEval.habilidadeData && Object.keys(selectedTechEval.habilidadeData).length > 0 ? (
+                                                        <div className="space-y-2">
+                                                            {HABILIDADE_QUESTIONS.map(q => {
+                                                                const data = selectedTechEval.habilidadeData[q.id];
+                                                                if (!data) return null;
+                                                                return (
+                                                                    <div key={q.id} className="bg-slate-50 p-3 rounded-lg border space-y-1">
+                                                                        <span className="text-xs font-bold text-slate-700">{q.text}</span>
+                                                                        <div className="flex gap-2 items-center">
+                                                                            <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${data.answer === 'Sim' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{data.answer}</span>
+                                                                            {data.answer === 'Sim' && <span className="text-xs text-slate-600 border px-2 py-0.5 rounded bg-white font-semibold">Nível: {data.level}</span>}
+                                                                            {data.answer === 'Não' && <span className="text-xs text-slate-600 bg-white px-2 py-0.5 rounded border border-red-100 italic">Por quê: {data.reason || 'Não informado'}</span>}
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
                                                         </div>
-                                                    ))}
+                                                    ) : (
+                                                        [
+                                                            { key: 'h1', title: 'Setup e Ajustes da Máquina', val: selectedTechEval.h1Score },
+                                                            { key: 'h2', title: 'Ritmo de Trabalho e Produtividade', val: selectedTechEval.h2Score },
+                                                            { key: 'h3', title: 'Controle de Qualidade', val: selectedTechEval.h3Score },
+                                                            { key: 'h4', title: 'Segurança Operacional', val: selectedTechEval.h4Score }
+                                                        ].map(h => (
+                                                            <div key={h.key} className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border">
+                                                                <span className="text-xs font-bold text-slate-700">{h.title}</span>
+                                                                <span className="text-xs font-extrabold text-[#0F3F5C] bg-white px-3 py-1 rounded border">Nota: <strong className="text-sm font-black">{h.val}</strong> / 10</span>
+                                                            </div>
+                                                        ))
+                                                    )}
                                                 </div>
 
                                                 {/* Detalhes Atitude */}
                                                 <div className="space-y-3">
                                                     <h5 className="font-black text-slate-800 text-sm uppercase tracking-wide border-b pb-1">3. Detalhamento - Atitude</h5>
-                                                    {[
-                                                        { key: 'a1', title: 'Organização e Limpeza (5S)', val: selectedTechEval.a1Score },
-                                                        { key: 'a2', title: 'Assiduidade e Disciplina', val: selectedTechEval.a2Score },
-                                                        { key: 'a3', title: 'Iniciativa e Melhoria Contínua', val: selectedTechEval.a3Score },
-                                                        { key: 'a4', title: 'Trabalho em Equipe e Postura', val: selectedTechEval.a4Score }
-                                                    ].map(a => (
-                                                        <div key={a.key} className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border">
-                                                            <span className="text-xs font-bold text-slate-700">{a.title}</span>
-                                                            <span className="text-xs font-extrabold text-purple-700 bg-white px-3 py-1 rounded border">Nota: <strong className="text-sm font-black">{a.val}</strong> / 10</span>
+                                                    {selectedTechEval.atitudeData && Object.keys(selectedTechEval.atitudeData).length > 0 ? (
+                                                        <div className="space-y-4">
+                                                            {ATITUDE_CATEGORIES.map(category => (
+                                                                <div key={category} className="bg-slate-50 p-3 rounded-lg border space-y-2">
+                                                                    <span className="text-xs font-black text-slate-800 border-b pb-1 block mb-2">{category}</span>
+                                                                    {ATITUDE_QUESTIONS.filter(q => q.category === category).map(q => {
+                                                                        const data = selectedTechEval.atitudeData[q.id];
+                                                                        if (!data) return null;
+                                                                        return (
+                                                                            <div key={q.id} className="flex flex-col gap-1">
+                                                                                <span className="text-[11px] font-bold text-slate-700">{q.text}</span>
+                                                                                <div className="flex gap-2 items-center">
+                                                                                    <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${data.answer === 'Sim' ? 'bg-purple-100 text-purple-800' : 'bg-red-100 text-red-800'}`}>{data.answer}</span>
+                                                                                    {data.answer === 'Sim' && <span className="text-[11px] text-slate-600 border px-2 py-0.5 rounded bg-white font-semibold">Nível: {data.level}</span>}
+                                                                                    {data.answer === 'Não' && <span className="text-[11px] text-slate-600 bg-white px-2 py-0.5 rounded border border-red-100 italic">Por quê: {data.reason || 'Não informado'}</span>}
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            ))}
                                                         </div>
-                                                    ))}
+                                                    ) : (
+                                                        [
+                                                            { key: 'a1', title: 'Organização e Limpeza (5S)', val: selectedTechEval.a1Score },
+                                                            { key: 'a2', title: 'Assiduidade e Disciplina', val: selectedTechEval.a2Score },
+                                                            { key: 'a3', title: 'Iniciativa e Melhoria Contínua', val: selectedTechEval.a3Score },
+                                                            { key: 'a4', title: 'Trabalho em Equipe e Postura', val: selectedTechEval.a4Score }
+                                                        ].map(a => (
+                                                            <div key={a.key} className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border">
+                                                                <span className="text-xs font-bold text-slate-700">{a.title}</span>
+                                                                <span className="text-xs font-extrabold text-purple-700 bg-white px-3 py-1 rounded border">Nota: <strong className="text-sm font-black">{a.val}</strong> / 10</span>
+                                                            </div>
+                                                        ))
+                                                    )}
                                                 </div>
 
                                                 {/* Observações */}
@@ -1949,64 +2160,86 @@ const EmployeeDetailModal: React.FC<{
                                             </div>
 
                                             {/* FOLHA DE IMPRESSÃO A4 (EXCLUSIVA PARA IMPRESSÃO) */}
-                                            <div className="hidden print:block print:fixed print:inset-0 print:bg-white print:z-[9999] print:p-10 print:text-black print:overflow-visible text-slate-900 font-sans">
+                                            <div className="hidden print:block print:fixed print:inset-0 print:bg-white print:z-[9999] print:p-6 print:text-black print:overflow-visible text-slate-900 font-sans">
                                                 {/* Cabeçalho do Documento */}
-                                                <div className="border-b-2 border-slate-900 pb-4 mb-6 flex justify-between items-end">
+                                                <div className="border-b-2 border-slate-900 pb-2 mb-4 flex justify-between items-end">
                                                     <div>
-                                                        <h1 className="text-xl font-black tracking-tight uppercase">MSM - Gestão Inteligente de Produção</h1>
-                                                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-0.5">Relatório de Avaliação CHA de Experiência</p>
+                                                        <h1 className="text-[16px] font-black tracking-tight uppercase">MSM - Gestão Inteligente de Produção</h1>
+                                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">Relatório de Avaliação CHA de Experiência</p>
                                                     </div>
                                                     <div className="text-right">
-                                                        <span className="text-xs font-bold bg-slate-100 px-3 py-1 rounded border border-slate-200 uppercase">Posto: {selectedTechEval.machineType}</span>
+                                                        <span className="text-[10px] font-bold bg-slate-100 px-2 py-1 rounded border border-slate-200 uppercase">Posto: {selectedTechEval.machineType}</span>
                                                     </div>
                                                 </div>
 
                                                 {/* Ficha do Funcionário */}
-                                                <div className="grid grid-cols-2 gap-x-8 gap-y-3 bg-slate-50 p-4 rounded-lg border border-slate-200 text-sm mb-6">
+                                                <div className="grid grid-cols-2 gap-x-6 gap-y-2 bg-slate-50 p-2 rounded-lg border border-slate-200 text-xs mb-4">
                                                     <div>
-                                                        <span className="font-bold text-slate-500 text-xs block uppercase">Colaborador Avaliado</span>
-                                                        <span className="font-black text-slate-800 text-base">{employee.name}</span>
+                                                        <span className="font-bold text-slate-500 text-[10px] block uppercase">Colaborador Avaliado</span>
+                                                        <span className="font-black text-slate-800 text-sm">{employee.name}</span>
                                                     </div>
                                                     <div>
-                                                        <span className="font-bold text-slate-500 text-xs block uppercase">Avaliador (Gestor)</span>
-                                                        <span className="font-bold text-slate-800 text-base">{selectedTechEval.evaluator}</span>
+                                                        <span className="font-bold text-slate-500 text-[10px] block uppercase">Avaliador (Gestor)</span>
+                                                        <span className="font-bold text-slate-800 text-sm">{selectedTechEval.evaluator}</span>
                                                     </div>
                                                     <div>
-                                                        <span className="font-bold text-slate-500 text-xs block uppercase">Data de Aplicação</span>
-                                                        <span className="font-semibold text-slate-800">{new Date(selectedTechEval.date).toLocaleDateString('pt-BR')}</span>
+                                                        <span className="font-bold text-slate-500 text-[10px] block uppercase">Data de Aplicação</span>
+                                                        <span className="font-semibold text-slate-800 text-sm">{new Date(selectedTechEval.date).toLocaleDateString('pt-BR')}</span>
                                                     </div>
                                                     <div>
-                                                        <span className="font-bold text-slate-500 text-xs block uppercase">Período de Experiência</span>
-                                                        <span className="font-black text-blue-800 text-base">{selectedTechEval.monthNum}º Mês</span>
+                                                        <span className="font-bold text-slate-500 text-[10px] block uppercase">Período de Experiência</span>
+                                                        <span className="font-black text-blue-800 text-sm">{selectedTechEval.monthNum}º Mês</span>
                                                     </div>
                                                 </div>
 
                                                 {/* Tabela Resumo CHA */}
-                                                <div className="border border-slate-200 rounded-lg overflow-hidden mb-6 text-xs text-left">
+                                                <div className="border border-slate-200 rounded-lg overflow-hidden mb-4 text-[11px] text-left">
                                                     <table className="w-full">
                                                         <thead className="bg-slate-100 uppercase font-black text-slate-700">
                                                             <tr>
-                                                                <th className="p-3 border-b border-r">C - Média Conhecimento</th>
-                                                                <th className="p-3 border-b border-r">H - Média Habilidade</th>
-                                                                <th className="p-3 border-b border-r">A - Média Atitude</th>
-                                                                <th className="p-3 border-b bg-blue-100 text-blue-900">Média Geral CHA</th>
+                                                                <th className="p-2 border-b border-r">C - Média Conhecimento</th>
+                                                                <th className="p-2 border-b border-r">H - Média Habilidade</th>
+                                                                <th className="p-2 border-b border-r">A - Média Atitude</th>
+                                                                <th className="p-2 border-b bg-blue-100 text-blue-900">Média Geral CHA</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody className="font-bold text-slate-800">
                                                             <tr>
-                                                                <td className="p-3 border-r">
+                                                                <td className="p-2 border-r">
                                                                     {(() => {
                                                                         const scores = [selectedTechEval.q1Score, selectedTechEval.q2Score, selectedTechEval.q3Score, selectedTechEval.q4Score, selectedTechEval.q5Score];
                                                                         return (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1);
                                                                     })()} / 10
                                                                 </td>
-                                                                <td className="p-3 border-r">
-                                                                    {((selectedTechEval.h1Score + selectedTechEval.h2Score + selectedTechEval.h3Score + selectedTechEval.h4Score) / 4).toFixed(1)} / 10
+                                                                <td className="p-2 border-r">
+                                                                    {selectedTechEval.habilidadeData && Object.keys(selectedTechEval.habilidadeData).length > 0 ? (
+                                                                        (() => {
+                                                                            const sum = Object.values(selectedTechEval.habilidadeData).reduce((s: number, item: any) => {
+                                                                                if (item.level === 'Bom') return s + 10;
+                                                                                if (item.level === 'Médio') return s + 5;
+                                                                                return s;
+                                                                            }, 0);
+                                                                            return (sum / 5).toFixed(1) + ' / 10';
+                                                                        })()
+                                                                    ) : (
+                                                                        ((selectedTechEval.h1Score + selectedTechEval.h2Score + selectedTechEval.h3Score + selectedTechEval.h4Score) / 4).toFixed(1) + ' / 10'
+                                                                    )}
                                                                 </td>
-                                                                <td className="p-3 border-r">
-                                                                    {((selectedTechEval.a1Score + selectedTechEval.a2Score + selectedTechEval.a3Score + selectedTechEval.a4Score) / 4).toFixed(1)} / 10
+                                                                <td className="p-2 border-r">
+                                                                    {selectedTechEval.atitudeData && Object.keys(selectedTechEval.atitudeData).length > 0 ? (
+                                                                        (() => {
+                                                                            const sum = Object.values(selectedTechEval.atitudeData).reduce((s: number, item: any) => {
+                                                                                if (item.level === 'Bom') return s + 10;
+                                                                                if (item.level === 'Médio') return s + 5;
+                                                                                return s;
+                                                                            }, 0);
+                                                                            return (sum / 11).toFixed(1) + ' / 10';
+                                                                        })()
+                                                                    ) : (
+                                                                        ((selectedTechEval.a1Score + selectedTechEval.a2Score + selectedTechEval.a3Score + selectedTechEval.a4Score) / 4).toFixed(1) + ' / 10'
+                                                                    )}
                                                                 </td>
-                                                                <td className="p-3 bg-blue-50 text-blue-950 font-black text-sm">
+                                                                <td className="p-2 bg-blue-50 text-blue-950 font-black text-xs">
                                                                     {selectedTechEval.totalScore.toFixed(1)} / 10
                                                                 </td>
                                                             </tr>
@@ -2015,15 +2248,15 @@ const EmployeeDetailModal: React.FC<{
                                                 </div>
 
                                                 {/* Seção Conhecimento */}
-                                                <div className="space-y-4 mb-6">
-                                                    <h2 className="text-xs font-black text-slate-800 border-b pb-1 uppercase tracking-wider">1. Detalhado - Conhecimento (Perguntas)</h2>
+                                                <div className="space-y-1.5 mb-4">
+                                                    <h2 className="text-[10px] font-black text-slate-800 border-b pb-0.5 uppercase tracking-wider">1. Detalhado - Conhecimento (Perguntas)</h2>
                                                     {(selectedTechEval.machineType === 'Trefila' ? TREFILA_QUESTIONS : TRELICA_QUESTIONS).map((q, idx) => {
                                                         const answer = selectedTechEval[`${q.id}Answer` as keyof TechnicalEvaluation] || '';
                                                         const score = selectedTechEval[`${q.id}Score` as keyof TechnicalEvaluation] || 0;
                                                         return (
-                                                            <div key={q.id} className="border-l-2 border-slate-400 pl-3 py-1 space-y-1 page-break-inside-avoid">
-                                                                <p className="text-xs font-bold text-slate-900">{idx + 1}. {q.text}</p>
-                                                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] font-medium mt-1">
+                                                            <div key={q.id} className="border-l-2 border-slate-400 pl-2 py-0.5 space-y-0.5 page-break-inside-avoid">
+                                                                <p className="text-[10px] font-bold text-slate-900">{idx + 1}. {q.text}</p>
+                                                                <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[9px] font-medium mt-0.5">
                                                                     {q.options.map((opt, optIdx) => {
                                                                         const isSelected = answer === opt;
                                                                         const isCorrectOption = opt === q.correct;
@@ -2043,53 +2276,88 @@ const EmployeeDetailModal: React.FC<{
                                                                         );
                                                                     })}
                                                                 </div>
-                                                                <p className="text-[9px] text-slate-500 font-semibold">Nota obtida nesta questão: {score} / 10</p>
+                                                                <p className="text-[8px] text-slate-500 font-semibold">Nota obtida nesta questão: {score} / 10</p>
                                                             </div>
                                                         );
                                                     })}
                                                 </div>
 
                                                 {/* Seções Habilidade e Atitude */}
-                                                <div className="grid grid-cols-2 gap-8 mb-6 text-xs">
+                                                <div className="grid grid-cols-2 gap-4 mb-4 text-[10px]">
                                                     <div>
-                                                        <h2 className="font-black text-slate-800 border-b pb-1 uppercase tracking-wider mb-2">2. Detalhado - Habilidades</h2>
-                                                        <div className="space-y-1.5">
-                                                            <div>Setup e Ajustes: <strong>{selectedTechEval.h1Score} / 10</strong></div>
-                                                            <div>Ritmo de Trabalho: <strong>{selectedTechEval.h2Score} / 10</strong></div>
-                                                            <div>Controle de Qualidade: <strong>{selectedTechEval.h3Score} / 10</strong></div>
-                                                            <div>Segurança Operacional: <strong>{selectedTechEval.h4Score} / 10</strong></div>
+                                                        <h2 className="font-black text-slate-800 border-b pb-0.5 uppercase tracking-wider mb-1">2. Detalhado - Habilidades</h2>
+                                                        <div className="space-y-1">
+                                                            {selectedTechEval.habilidadeData && Object.keys(selectedTechEval.habilidadeData).length > 0 ? (
+                                                                HABILIDADE_QUESTIONS.map(q => {
+                                                                    const data = selectedTechEval.habilidadeData[q.id];
+                                                                    if (!data) return null;
+                                                                    return (
+                                                                        <div key={q.id}>
+                                                                            <span className="truncate block max-w-[200px]" title={q.text}>{q.text.split(' ').slice(0, 3).join(' ')}...:</span> 
+                                                                            <strong>{data.answer === 'Sim' ? data.level : 'Não'}</strong>
+                                                                        </div>
+                                                                    );
+                                                                })
+                                                            ) : (
+                                                                <>
+                                                                    <div>Setup e Ajustes: <strong>{selectedTechEval.h1Score} / 10</strong></div>
+                                                                    <div>Ritmo de Trabalho: <strong>{selectedTechEval.h2Score} / 10</strong></div>
+                                                                    <div>Controle de Qualidade: <strong>{selectedTechEval.h3Score} / 10</strong></div>
+                                                                    <div>Segurança Operacional: <strong>{selectedTechEval.h4Score} / 10</strong></div>
+                                                                </>
+                                                            )}
                                                         </div>
                                                     </div>
                                                     <div>
-                                                        <h2 className="font-black text-slate-800 border-b pb-1 uppercase tracking-wider mb-2">3. Detalhado - Atitudes</h2>
-                                                        <div className="space-y-1.5">
-                                                            <div>Organização e 5S: <strong>{selectedTechEval.a1Score} / 10</strong></div>
-                                                            <div>Assiduidade e Disciplina: <strong>{selectedTechEval.a2Score} / 10</strong></div>
-                                                            <div>Iniciativa e Proatividade: <strong>{selectedTechEval.a3Score} / 10</strong></div>
-                                                            <div>Trabalho em Equipe: <strong>{selectedTechEval.a4Score} / 10</strong></div>
+                                                        <h2 className="font-black text-slate-800 border-b pb-0.5 uppercase tracking-wider mb-1">3. Detalhado - Atitudes</h2>
+                                                        <div className="space-y-1">
+                                                            {selectedTechEval.atitudeData && Object.keys(selectedTechEval.atitudeData).length > 0 ? (
+                                                                ATITUDE_CATEGORIES.map(category => (
+                                                                    <div key={category} className="mb-1">
+                                                                        <span className="font-bold border-b border-slate-300 block mb-0.5 text-[9px]">{category}</span>
+                                                                        {ATITUDE_QUESTIONS.filter(q => q.category === category).map(q => {
+                                                                            const data = selectedTechEval.atitudeData[q.id];
+                                                                            if (!data) return null;
+                                                                            return (
+                                                                                <div key={q.id} className="text-[10px]">
+                                                                                    <span className="truncate inline-block max-w-[150px] align-bottom" title={q.text}>- {q.text.split(' ').slice(0, 3).join(' ')}...:</span> 
+                                                                                    <strong> {data.answer === 'Sim' ? data.level : 'Não'}</strong>
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                ))
+                                                            ) : (
+                                                                <>
+                                                                    <div>Organização e 5S: <strong>{selectedTechEval.a1Score} / 10</strong></div>
+                                                                    <div>Assiduidade e Disciplina: <strong>{selectedTechEval.a2Score} / 10</strong></div>
+                                                                    <div>Iniciativa e Proatividade: <strong>{selectedTechEval.a3Score} / 10</strong></div>
+                                                                    <div>Trabalho em Equipe: <strong>{selectedTechEval.a4Score} / 10</strong></div>
+                                                                </>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </div>
 
                                                 {/* Observações e Parecer */}
                                                 {selectedTechEval.note && (
-                                                    <div className="bg-slate-50 p-4 rounded border text-xs mb-12">
+                                                    <div className="bg-slate-50 p-2 rounded border text-[10px] mb-4">
                                                         <span className="font-bold text-slate-500 uppercase block">Observações e Parecer Técnico Geral</span>
                                                         <p className="text-slate-800 mt-1 italic">"{selectedTechEval.note}"</p>
                                                     </div>
                                                 )}
 
                                                 {/* Assinaturas */}
-                                                <div className="grid grid-cols-2 gap-16 text-center text-xs pt-8 mt-auto border-t border-slate-200 border-dashed">
+                                                <div className="grid grid-cols-2 gap-8 text-center text-[10px] pt-4 mt-auto border-t border-slate-200 border-dashed">
                                                     <div className="flex flex-col items-center">
-                                                        <div className="w-64 border-b border-slate-400 mb-2"></div>
+                                                        <div className="w-48 border-b border-slate-400 mb-1"></div>
                                                         <span className="font-bold text-slate-600 uppercase tracking-wider">Assinatura do Avaliador</span>
-                                                        <span className="text-[10px] text-slate-400 font-semibold">({selectedTechEval.evaluator})</span>
+                                                        <span className="text-[9px] text-slate-400 font-semibold">({selectedTechEval.evaluator})</span>
                                                     </div>
                                                     <div className="flex flex-col items-center">
-                                                        <div className="w-64 border-b border-slate-400 mb-2"></div>
+                                                        <div className="w-48 border-b border-slate-400 mb-1"></div>
                                                         <span className="font-bold text-slate-600 uppercase tracking-wider">Assinatura do Colaborador</span>
-                                                        <span className="text-[10px] text-slate-400 font-semibold">({employee.name})</span>
+                                                        <span className="text-[9px] text-slate-400 font-semibold">({employee.name})</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -2106,6 +2374,7 @@ const EmployeeDetailModal: React.FC<{
                                                         const defaultMachine = (employee.assignedMachine && employee.assignedMachine.includes('Treliça')) ? 'Treliça' : 'Trefila';
                                                         setTechEvalMachineType(defaultMachine);
                                                         
+                                                        setEditingTechEvalId(null);
                                                         setIsEvaluatingTechnical(true);
                                                         setTechEvalMonth(1);
                                                         setTechEvalDate(new Date().toISOString().split('T')[0]);
