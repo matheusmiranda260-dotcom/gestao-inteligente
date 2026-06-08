@@ -1615,7 +1615,7 @@ const EmployeeDetailModal: React.FC<{
                                     <div className="space-y-6">
                                         {/* Caso 1: Criando/Editando Avaliação CHA */}
                                         {isEvaluatingTechnical && !readOnly && (
-                                            <form onSubmit={handleSubmitTechnicalEvaluation} className="bg-white p-6 rounded-xl border border-blue-100 shadow-md space-y-6 no-print min-h-[500px] flex flex-col">
+                                            <form onSubmit={handleSubmitTechnicalEvaluation} autoComplete="off" className="bg-white p-6 rounded-xl border border-blue-100 shadow-md space-y-6 no-print min-h-[500px] flex flex-col">
                                                 <div className="flex justify-between items-center border-b pb-3">
                                                     <h4 className="font-black text-lg text-[#0F3F5C] uppercase tracking-tight">
                                                         Avaliação CHA
@@ -1706,7 +1706,7 @@ const EmployeeDetailModal: React.FC<{
                                                                     <label className="text-lg font-black text-[#0F3F5C] block leading-tight">{q.text}</label>
                                                                 </div>
                                                                 <div className="space-y-3 mt-4">
-                                                                    <label className="block text-xs font-black text-slate-500 uppercase tracking-wide">Selecione a resposta dada pelo colaborador:</label>
+                                                                    <label className="block text-xs font-black text-slate-500 uppercase tracking-wide">Sua Resposta:</label>
                                                                     <div className="grid grid-cols-1 gap-3">
                                                                         {q.options.map((optionText, optIdx) => {
                                                                             const isSelected = techEvalAnswers[q.id] === optionText;
@@ -1722,6 +1722,7 @@ const EmployeeDetailModal: React.FC<{
                                                                                     <input
                                                                                         type="radio"
                                                                                         name={`question_${q.id}`}
+                                                                                        value={optionText}
                                                                                         className="mt-0.5 w-5 h-5 text-blue-600 focus:ring-blue-400"
                                                                                         checked={isSelected}
                                                                                         onChange={() => {
