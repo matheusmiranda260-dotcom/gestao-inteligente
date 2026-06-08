@@ -793,6 +793,7 @@ const EmployeeDetailModal: React.FC<{
     const [isEvaluatingTechnical, setIsEvaluatingTechnical] = useState(false);
     const [selectedTechEval, setSelectedTechEval] = useState<TechnicalEvaluation | null>(null);
     const [editingTechEvalId, setEditingTechEvalId] = useState<string | null>(null);
+    const [evalWizardStep, setEvalWizardStep] = useState<number>(0);
     const [techEvalMonth, setTechEvalMonth] = useState<number>(1);
     const [techEvalDate, setTechEvalDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
     const [techEvalMachineType, setTechEvalMachineType] = useState<'Trefila' | 'Treliça'>('Trefila');
@@ -801,6 +802,7 @@ const EmployeeDetailModal: React.FC<{
     const [techEvalSkills, setTechEvalSkills] = useState<Record<string, number>>({ h1: 0, h2: 0, h3: 0, h4: 0 });
     const [techEvalAttitudes, setTechEvalAttitudes] = useState<Record<string, number>>({ a1: 0, a2: 0, a3: 0, a4: 0 });
     const [techEvalNote, setTechEvalNote] = useState('');
+    const [techEvalEmployeeNote, setTechEvalEmployeeNote] = useState('');
     const [techEvalHabilidadeData, setTechEvalHabilidadeData] = useState<Record<string, { answer: 'Sim' | 'Não' | '', level?: string, reason?: string }>>({});
     const [techEvalAtitudeData, setTechEvalAtitudeData] = useState<Record<string, { answer: 'Sim' | 'Não' | '', level?: string, reason?: string }>>({});
 
@@ -1177,7 +1179,8 @@ const EmployeeDetailModal: React.FC<{
                 a4Score: 0,
                 atitudeData: techEvalAtitudeData,
                 totalScore: parseFloat(total.toFixed(2)),
-                note: techEvalNote
+                note: techEvalNote,
+                employeeNote: techEvalEmployeeNote
             } as TechnicalEvaluation;
 
             let newEval: TechnicalEvaluation;
@@ -1200,6 +1203,8 @@ const EmployeeDetailModal: React.FC<{
             setTechEvalAtitudeData({});
             setTechEvalAttitudes({ a1: 0, a2: 0, a3: 0, a4: 0 });
             setTechEvalNote('');
+            setTechEvalEmployeeNote('');
+            setEvalWizardStep(0);
             alert('Avaliação de Conhecimento salva com sucesso!');
             loadDetails();
             onSave();
@@ -1610,162 +1615,142 @@ const EmployeeDetailModal: React.FC<{
                                     <div className="space-y-6">
                                         {/* Caso 1: Criando/Editando Avaliação CHA */}
                                         {isEvaluatingTechnical && !readOnly && (
-                                            <form onSubmit={handleSubmitTechnicalEvaluation} className="bg-white p-6 rounded-xl border border-blue-100 shadow-md space-y-6 no-print">
+                                            <form onSubmit={handleSubmitTechnicalEvaluation} className="bg-white p-6 rounded-xl border border-blue-100 shadow-md space-y-6 no-print min-h-[500px] flex flex-col">
                                                 <div className="flex justify-between items-center border-b pb-3">
-                                                    <h4 className="font-black text-lg text-[#0F3F5C] uppercase tracking-tight">Novo Teste de Conhecimento (CHA)</h4>
-                                                <button type="button" onClick={() => setIsEvaluatingTechnical(false)} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
-                                            </div>
+                                                    <h4 className="font-black text-lg text-[#0F3F5C] uppercase tracking-tight">
+                                                        Avaliação CHA
+                                                        {evalWizardStep > 0 && <span className="ml-2 text-sm text-slate-400">Passo {evalWizardStep} de 8</span>}
+                                                    </h4>
+                                                    <button type="button" onClick={() => { setIsEvaluatingTechnical(false); setEvalWizardStep(0); }} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+                                                </div>
 
-                                            {/* Cabeçalho do formulário */}
-                                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                                <div>
-                                                    <label className="block text-xs font-black text-slate-500 uppercase">Máquina / Posto de Trabalho</label>
-                                                    <select
-                                                        required
-                                                        className="w-full mt-1 p-2 border rounded-lg bg-blue-50 text-[#0F3F5C] font-extrabold"
-                                                        value={techEvalMachineType}
-                                                        onChange={e => {
-                                                            const type = e.target.value as 'Trefila' | 'Treliça';
-                                                            setTechEvalMachineType(type);
-                                                            // Limpar respostas antigas ao trocar
-                                                            setTechEvalAnswers({ q1: '', q2: '', q3: '', q4: '', q5: '' });
-                                                            setTechEvalScores({ q1: 0, q2: 0, q3: 0, q4: 0, q5: 0 });
-                                                        }}
-                                                    >
-                                                        <option value="Trefila">Trefila (Wire Drawing)</option>
-                                                        <option value="Treliça">Treliça (Truss Machine)</option>
-                                                    </select>
+                                                {/* ProgressBar */}
+                                                <div className="w-full bg-slate-100 rounded-full h-1.5 mb-4">
+                                                    <div className="bg-blue-600 h-1.5 rounded-full transition-all duration-300" style={{ width: `${(evalWizardStep / 8) * 100}%` }}></div>
                                                 </div>
-                                                <div>
-                                                    <label className="block text-xs font-black text-slate-500 uppercase">Período de Experiência</label>
-                                                    <select
-                                                        required
-                                                        className="w-full mt-1 p-2 border rounded-lg bg-slate-50 text-slate-900 font-bold"
-                                                        value={techEvalMonth}
-                                                        onChange={e => setTechEvalMonth(parseInt(e.target.value))}
-                                                    >
-                                                        <option value={1}>1º Mês de Experiência</option>
-                                                        <option value={2}>2º Mês de Experiência</option>
-                                                        <option value={3}>3º Mês de Experiência</option>
-                                                    </select>
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-black text-slate-500 uppercase">Data do Teste</label>
-                                                    <input
-                                                        type="date"
-                                                        required
-                                                        className="w-full mt-1 p-2 border rounded-lg bg-slate-50 text-slate-900 font-bold"
-                                                        value={techEvalDate}
-                                                        onChange={e => setTechEvalDate(e.target.value)}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-black text-slate-500 uppercase">Avaliador</label>
-                                                    <input
-                                                        type="text"
-                                                        disabled
-                                                        className="w-full mt-1 p-2 border rounded-lg bg-slate-200 text-slate-700 font-bold cursor-not-allowed"
-                                                        value={currentUser?.username || ''}
-                                                    />
-                                                </div>
-                                            </div>
 
-                                            {/* Painel de Notas CHA em Tempo Real */}
-                                            <div className="bg-[#0F3F5C]/5 border border-[#0F3F5C]/10 rounded-xl p-4 grid grid-cols-2 md:grid-cols-4 gap-4 items-center">
-                                                <div className="text-center p-2 bg-white rounded-lg shadow-sm border border-blue-100/40">
-                                                    <span className="text-[10px] font-black text-blue-700 uppercase tracking-wider block">C - Conhecimento</span>
-                                                    <span className="text-lg font-black text-blue-800">{liveCScore.toFixed(1)} <span className="text-xs text-blue-400">/10</span></span>
-                                                </div>
-                                                <div className="text-center p-2 bg-white rounded-lg shadow-sm border border-green-100/40">
-                                                    <span className="text-[10px] font-black text-green-700 uppercase tracking-wider block">H - Habilidade</span>
-                                                    <span className="text-lg font-black text-green-800">{liveHScore.toFixed(1)} <span className="text-xs text-green-400">/10</span></span>
-                                                </div>
-                                                <div className="text-center p-2 bg-white rounded-lg shadow-sm border border-purple-100/40">
-                                                    <span className="text-[10px] font-black text-purple-700 uppercase tracking-wider block">A - Atitude</span>
-                                                    <span className="text-lg font-black text-purple-800">{liveAScore.toFixed(1)} <span className="text-xs text-purple-400">/10</span></span>
-                                                </div>
-                                                <div className="text-center p-2 bg-blue-600 text-white rounded-lg shadow-md col-span-2 md:col-span-1">
-                                                    <span className="text-[10px] font-black text-blue-100 uppercase tracking-wider block">Média CHA Geral</span>
-                                                    <span className="text-xl font-black">{liveTotalScore.toFixed(1)} <span className="text-xs text-blue-200">/10</span></span>
-                                                </div>
-                                            </div>
-
-                                            {/* PILLAR 1: CONHECIMENTO */}
-                                            <div className="space-y-6 border-t pt-4">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="flex items-center justify-center bg-blue-100 text-[#0F3F5C] h-6 w-6 rounded-full font-black text-xs">C</span>
-                                                    <h3 className="text-base font-black text-[#0F3F5C] uppercase tracking-wider">Avaliação de Conhecimento (Perguntas)</h3>
-                                                </div>
-                                                
-                                                {shuffledTechQuestions.map((q, idx) => (
-                                                    <div key={q.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200/60 space-y-4">
-                                                        <div>
-                                                            <span className="text-[9px] font-black uppercase text-blue-700 tracking-wider block">{q.section}</span>
-                                                            <label className="text-sm font-black text-[#0F3F5C] block mt-0.5">{idx + 1}. {q.text}</label>
+                                                <div className="flex-grow">
+                                                {evalWizardStep === 0 && (
+                                                    <div className="space-y-6 animate-fadeIn">
+                                                        <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+                                                            <h5 className="font-bold text-blue-800 text-sm mb-1">Configuração da Avaliação</h5>
+                                                            <p className="text-xs text-blue-600">Confirme os dados abaixo antes de iniciar o questionário.</p>
                                                         </div>
-                                                        
-                                                        <div className="space-y-2">
-                                                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wide">Selecione a resposta dada pelo colaborador:</label>
-                                                            <div className="grid grid-cols-1 gap-2">
-                                                                {q.options.map((optionText, optIdx) => {
-                                                                    const isSelected = techEvalAnswers[q.id] === optionText;
-                                                                    return (
-                                                                        <label
-                                                                            key={optIdx}
-                                                                            className={`flex items-start gap-3 p-3 rounded-lg border text-xs font-bold cursor-pointer transition-all ${
-                                                                                isSelected
-                                                                                    ? 'border-blue-500 bg-blue-50/50 text-blue-900 shadow-sm'
-                                                                                    : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
-                                                                            }`}
-                                                                        >
-                                                                            <input
-                                                                                type="radio"
-                                                                                name={`question_${q.id}`}
-                                                                                required
-                                                                                className="mt-0.5 text-blue-600 focus:ring-blue-400"
-                                                                                checked={isSelected}
-                                                                                onChange={() => {
-                                                                                    const newAnswers = { ...techEvalAnswers, [q.id]: optionText };
-                                                                                    setTechEvalAnswers(newAnswers);
-                                                                                    
-                                                                                    const isCorrect = optionText === q.correct;
-                                                                                    const newScores = { ...techEvalScores, [q.id]: isCorrect ? 10 : 0 };
-                                                                                    setTechEvalScores(newScores);
-                                                                                }}
-                                                                            />
-                                                                            <span>{optionText}</span>
-                                                                        </label>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        </div>
-                                                        
-                                                        <div className="flex justify-between items-center bg-white px-3 py-2 rounded-lg border border-slate-100">
-                                                            <span className="text-xs font-bold text-slate-500">
-                                                                Gabarito: <strong className="text-slate-800">{q.correct}</strong>
-                                                            </span>
-                                                            <div className="flex items-center gap-2 shrink-0">
-                                                                <label className="text-[10px] font-black text-slate-400 uppercase">Ajustar Nota (Manual):</label>
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                            <div>
+                                                                <label className="block text-xs font-black text-slate-500 uppercase">Máquina / Posto de Trabalho</label>
                                                                 <select
-                                                                    className="p-1 border rounded bg-slate-50 font-black text-xs text-[#0F3F5C] w-16 text-center"
-                                                                    value={techEvalScores[q.id]}
-                                                                    onChange={e => setTechEvalScores({ ...techEvalScores, [q.id]: parseFloat(e.target.value) })}
+                                                                    required
+                                                                    className="w-full mt-1 p-2 border rounded-lg bg-white text-[#0F3F5C] font-extrabold"
+                                                                    value={techEvalMachineType}
+                                                                    onChange={e => {
+                                                                        const type = e.target.value as 'Trefila' | 'Treliça';
+                                                                        setTechEvalMachineType(type);
+                                                                        setTechEvalAnswers({ q1: '', q2: '', q3: '', q4: '', q5: '' });
+                                                                        setTechEvalScores({ q1: 0, q2: 0, q3: 0, q4: 0, q5: 0 });
+                                                                    }}
                                                                 >
-                                                                    {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
-                                                                        <option key={n} value={n}>{n}</option>
-                                                                    ))}
+                                                                    <option value="Trefila">Trefila (Wire Drawing)</option>
+                                                                    <option value="Treliça">Treliça (Truss Machine)</option>
                                                                 </select>
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-xs font-black text-slate-500 uppercase">Período de Experiência</label>
+                                                                <select
+                                                                    required
+                                                                    className="w-full mt-1 p-2 border rounded-lg bg-slate-50 text-slate-900 font-bold"
+                                                                    value={techEvalMonth}
+                                                                    onChange={e => setTechEvalMonth(parseInt(e.target.value))}
+                                                                >
+                                                                    <option value={1}>1º Mês de Experiência</option>
+                                                                    <option value={2}>2º Mês de Experiência</option>
+                                                                    <option value={3}>3º Mês de Experiência</option>
+                                                                </select>
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-xs font-black text-slate-500 uppercase">Data do Teste</label>
+                                                                <input
+                                                                    type="date"
+                                                                    required
+                                                                    className="w-full mt-1 p-2 border rounded-lg bg-slate-50 text-slate-900 font-bold"
+                                                                    value={techEvalDate}
+                                                                    onChange={e => setTechEvalDate(e.target.value)}
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-xs font-black text-slate-500 uppercase">Avaliador</label>
+                                                                <input
+                                                                    type="text"
+                                                                    disabled
+                                                                    className="w-full mt-1 p-2 border rounded-lg bg-slate-200 text-slate-700 font-bold cursor-not-allowed"
+                                                                    value={currentUser?.username || ''}
+                                                                />
                                                             </div>
                                                         </div>
                                                     </div>
-                                                ))}
-                                            </div>
+                                                )}
+
+                                                {evalWizardStep >= 1 && evalWizardStep <= 5 && (() => {
+                                                    const qIndex = evalWizardStep - 1;
+                                                    const q = shuffledTechQuestions[qIndex];
+                                                    if (!q) return null;
+                                                    return (
+                                                        <div className="space-y-6 animate-fadeIn">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="flex items-center justify-center bg-blue-100 text-[#0F3F5C] h-6 w-6 rounded-full font-black text-xs">C</span>
+                                                                <h3 className="text-base font-black text-[#0F3F5C] uppercase tracking-wider">Avaliação de Conhecimento ({evalWizardStep}/5)</h3>
+                                                            </div>
+                                                            <div className="bg-slate-50 p-6 rounded-xl border border-slate-200/60 space-y-6 shadow-sm">
+                                                                <div>
+                                                                    <span className="text-[10px] font-black uppercase text-blue-700 tracking-wider block mb-2">{q.section}</span>
+                                                                    <label className="text-lg font-black text-[#0F3F5C] block leading-tight">{q.text}</label>
+                                                                </div>
+                                                                <div className="space-y-3 mt-4">
+                                                                    <label className="block text-xs font-black text-slate-500 uppercase tracking-wide">Selecione a resposta dada pelo colaborador:</label>
+                                                                    <div className="grid grid-cols-1 gap-3">
+                                                                        {q.options.map((optionText, optIdx) => {
+                                                                            const isSelected = techEvalAnswers[q.id] === optionText;
+                                                                            return (
+                                                                                <label
+                                                                                    key={optIdx}
+                                                                                    className={`flex items-start gap-4 p-4 rounded-xl border text-sm font-bold cursor-pointer transition-all ${
+                                                                                        isSelected
+                                                                                            ? 'border-blue-500 bg-blue-50/50 text-blue-900 shadow-md ring-2 ring-blue-500/20'
+                                                                                            : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                                                                                    }`}
+                                                                                >
+                                                                                    <input
+                                                                                        type="radio"
+                                                                                        name={`question_${q.id}`}
+                                                                                        className="mt-0.5 w-5 h-5 text-blue-600 focus:ring-blue-400"
+                                                                                        checked={isSelected}
+                                                                                        onChange={() => {
+                                                                                            const newAnswers = { ...techEvalAnswers, [q.id]: optionText };
+                                                                                            setTechEvalAnswers(newAnswers);
+                                                                                            const isCorrect = optionText === q.correct;
+                                                                                            setTechEvalScores({ ...techEvalScores, [q.id]: isCorrect ? 10 : 0 });
+                                                                                        }}
+                                                                                    />
+                                                                                    <span className="leading-snug">{optionText}</span>
+                                                                                </label>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })()}
 
                                             {/* PILLAR 2: HABILIDADE */}
-                                            <div className="space-y-4 border-t pt-6">
-                                                <div className="flex items-center gap-2">
+                                            {evalWizardStep === 6 && (
+                                            <div className="space-y-4 pt-2 animate-fadeIn">
+                                                <div className="flex items-center gap-2 mb-4">
                                                     <span className="flex items-center justify-center bg-green-100 text-green-700 h-6 w-6 rounded-full font-black text-xs">H</span>
                                                     <h3 className="text-base font-black text-green-700 uppercase tracking-wider">Avaliação de Habilidade (Prática Operacional)</h3>
+                                                </div>
+                                                <div className="bg-amber-50 p-3 rounded-lg border border-amber-200 text-amber-800 text-sm font-bold mb-4">
+                                                    ⚠️ Esta etapa deve ser preenchida em conjunto (Operador + Encarregado).
                                                 </div>
                                                 
                                                 {HABILIDADE_QUESTIONS.map(h => {
@@ -1830,12 +1815,17 @@ const EmployeeDetailModal: React.FC<{
                                                     </div>
                                                 )})}
                                             </div>
+                                            )}
 
                                             {/* PILLAR 3: ATITUDE */}
-                                            <div className="space-y-4 border-t pt-6">
-                                                <div className="flex items-center gap-2">
+                                            {evalWizardStep === 7 && (
+                                            <div className="space-y-4 pt-2 animate-fadeIn">
+                                                <div className="flex items-center gap-2 mb-4">
                                                     <span className="flex items-center justify-center bg-purple-100 text-purple-700 h-6 w-6 rounded-full font-black text-xs">A</span>
                                                     <h3 className="text-base font-black text-purple-700 uppercase tracking-wider">Avaliação de Atitude (Comportamento)</h3>
+                                                </div>
+                                                <div className="bg-amber-50 p-3 rounded-lg border border-amber-200 text-amber-800 text-sm font-bold mb-4">
+                                                    ⚠️ Esta etapa deve ser preenchida em conjunto (Operador + Encarregado).
                                                 </div>
 
                                                 {ATITUDE_CATEGORIES.map(category => (
@@ -1906,22 +1896,48 @@ const EmployeeDetailModal: React.FC<{
                                                     </div>
                                                 ))}
                                             </div>
+                                            )}
 
-                                            {/* Observações Gerais */}
-                                            <div className="border-t pt-4">
-                                                <label className="block text-xs font-black text-slate-500 uppercase">Parecer Geral / Observações do Gestor</label>
-                                                <textarea
+                                            {/* FEEDBACKS */}
+                                            {evalWizardStep === 8 && (
+                                            <div className="space-y-6 pt-2 animate-fadeIn">
+                                                <div>
+                                                    <label className="block text-xs font-black text-slate-500 uppercase">Considerações do Colaborador (Autoavaliação / Defesa)</label>
+                                                    <textarea
+                                                        className="w-full mt-1 p-3 border rounded-xl text-sm bg-white text-slate-900 font-medium shadow-sm"
+                                                        placeholder="Espaço reservado para o colaborador relatar sua visão sobre o teste..."
+                                                        rows={3}
+                                                        value={techEvalEmployeeNote}
+                                                        onChange={e => setTechEvalEmployeeNote(e.target.value)}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-black text-slate-500 uppercase">Parecer Geral / Observações do Gestor</label>
+                                                    <textarea
                                                     className="w-full mt-1 p-2 border rounded-lg text-sm bg-white text-slate-900 font-medium"
                                                     placeholder="Descreva pontos positivos, potencial e feedbacks dados..."
                                                     rows={3}
                                                     value={techEvalNote}
                                                     onChange={e => setTechEvalNote(e.target.value)}
                                                 />
+                                                </div>
                                             </div>
+                                            )}
+                                            
+                                            </div> {/* End of flex-grow div */}
 
-                                            <div className="flex justify-end gap-3 pt-2">
-                                                <button type="button" onClick={() => setIsEvaluatingTechnical(false)} className="px-5 py-2 border rounded-lg text-slate-600 font-bold text-sm hover:bg-slate-50">Cancelar</button>
-                                                <button type="submit" className="px-6 py-2 bg-[#0F3F5C] text-white font-bold rounded-lg text-sm hover:bg-[#0A2A3D] transition shadow-md">Salvar Avaliação CHA</button>
+                                            <div className="flex justify-between items-center pt-4 border-t mt-auto">
+                                                <button type="button" onClick={() => { setIsEvaluatingTechnical(false); setEvalWizardStep(0); }} className="px-5 py-2 text-slate-400 font-bold text-sm hover:text-slate-600">Cancelar</button>
+                                                <div className="flex gap-3">
+                                                    {evalWizardStep > 0 && (
+                                                        <button type="button" onClick={() => setEvalWizardStep(s => s - 1)} className="px-5 py-2 border rounded-lg text-slate-600 font-bold text-sm hover:bg-slate-50">Anterior</button>
+                                                    )}
+                                                    {evalWizardStep < 8 ? (
+                                                        <button type="button" onClick={() => setEvalWizardStep(s => s + 1)} className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg text-sm hover:bg-blue-700 transition shadow-md">Próxima</button>
+                                                    ) : (
+                                                        <button type="submit" className="px-6 py-2 bg-green-600 text-white font-black rounded-lg text-sm hover:bg-green-700 transition shadow-md">Concluir e Salvar</button>
+                                                    )}
+                                                </div>
                                             </div>
                                         </form>
                                     )}
@@ -2353,12 +2369,20 @@ const EmployeeDetailModal: React.FC<{
                                                 </div>
 
                                                 {/* Observações e Parecer */}
-                                                {selectedTechEval.note && (
-                                                    <div className="bg-slate-50 p-2 rounded border text-[10px] mb-4">
-                                                        <span className="font-bold text-slate-500 uppercase block">Observações e Parecer Técnico Geral</span>
-                                                        <p className="text-slate-800 mt-1 italic">"{selectedTechEval.note}"</p>
-                                                    </div>
-                                                )}
+                                                <div className="grid grid-cols-2 gap-4 mb-4">
+                                                    {selectedTechEval.employeeNote && (
+                                                        <div className="bg-slate-50 p-2 rounded border text-[10px]">
+                                                            <span className="font-bold text-slate-500 uppercase block">Considerações do Colaborador</span>
+                                                            <p className="text-slate-800 mt-1 italic">"{selectedTechEval.employeeNote}"</p>
+                                                        </div>
+                                                    )}
+                                                    {selectedTechEval.note && (
+                                                        <div className="bg-slate-50 p-2 rounded border text-[10px]">
+                                                            <span className="font-bold text-slate-500 uppercase block">Parecer Geral do Gestor</span>
+                                                            <p className="text-slate-800 mt-1 italic">"{selectedTechEval.note}"</p>
+                                                        </div>
+                                                    )}
+                                                </div>
 
                                                 {/* Assinaturas */}
                                                 <div className="grid grid-cols-2 gap-8 text-center text-[10px] pt-4 mt-auto border-t border-slate-200 border-dashed">

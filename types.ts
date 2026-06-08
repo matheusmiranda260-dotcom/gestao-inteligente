@@ -513,6 +513,7 @@ export interface TechnicalEvaluation {
     // Geral
     totalScore: number;
     note?: string;
+    employeeNote?: string;
     
     // Novo campo para as respostas de Habilidade e Atitude
     habilidadeData?: any;
