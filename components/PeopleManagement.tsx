@@ -796,7 +796,7 @@ const EmployeeDetailModal: React.FC<{
     const [evalWizardStep, setEvalWizardStep] = useState<number>(0);
     const [techEvalMonth, setTechEvalMonth] = useState<number>(1);
     const [techEvalDate, setTechEvalDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
-    const [techEvalMachineType, setTechEvalMachineType] = useState<'Trefila' | 'Treliça'>('Trefila');
+    const [techEvalMachineType, setTechEvalMachineType] = useState<string>('Geral (Trefila e Treliça)');
     const [techEvalAnswers, setTechEvalAnswers] = useState<Record<string, string>>({ q1: '', q2: '', q3: '', q4: '', q5: '' });
     const [techEvalScores, setTechEvalScores] = useState<Record<string, number>>({ q1: 0, q2: 0, q3: 0, q4: 0, q5: 0 });
     const [techEvalSkills, setTechEvalSkills] = useState<Record<string, number>>({ h1: 0, h2: 0, h3: 0, h4: 0 });
@@ -807,12 +807,21 @@ const EmployeeDetailModal: React.FC<{
     const [techEvalAtitudeData, setTechEvalAtitudeData] = useState<Record<string, { answer: 'Sim' | 'Não' | '', level?: string, reason?: string }>>({});
 
     const shuffledTechQuestions = useMemo(() => {
-        const questions = techEvalMachineType === 'Trefila' ? TREFILA_QUESTIONS : TRELICA_QUESTIONS;
-        return questions.map(q => ({
+        const unifiedQuestions = [
+            ...TREFILA_QUESTIONS.map(q => ({ ...q, id: q.id.replace('q', 'q_tref_') })),
+            ...TRELICA_QUESTIONS.map(q => ({ ...q, id: q.id.replace('q', 'q_trel_') }))
+        ];
+        
+        // Misturar e pegar 5 perguntas aleatórias (sem duplicar) do pool total de 10
+        const selected = unifiedQuestions.sort(() => Math.random() - 0.5).slice(0, 5);
+        
+        // Remapear para q1..q5 para que o resto do código funcione perfeitamente
+        return selected.map((q, index) => ({
             ...q,
+            id: `q${index + 1}`,
             options: [...q.options].sort(() => Math.random() - 0.5)
         }));
-    }, [techEvalMachineType, isEvaluatingTechnical]);
+    }, [isEvaluatingTechnical]);
 
     // Documents State
     const [documents, setDocuments] = useState<EmployeeDocument[]>([]);
@@ -1568,20 +1577,12 @@ const EmployeeDetailModal: React.FC<{
                                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                             <div>
                                                                 <label className="block text-xs font-black text-slate-500 uppercase">Máquina / Posto de Trabalho</label>
-                                                                <select
-                                                                    required
-                                                                    className="w-full mt-1 p-2 border rounded-lg bg-white text-[#0F3F5C] font-extrabold"
-                                                                    value={techEvalMachineType}
-                                                                    onChange={e => {
-                                                                        const type = e.target.value as 'Trefila' | 'Treliça';
-                                                                        setTechEvalMachineType(type);
-                                                                        setTechEvalAnswers({ q1: '', q2: '', q3: '', q4: '', q5: '' });
-                                                                        setTechEvalScores({ q1: 0, q2: 0, q3: 0, q4: 0, q5: 0 });
-                                                                    }}
-                                                                >
-                                                                    <option value="Trefila">Trefila (Wire Drawing)</option>
-                                                                    <option value="Treliça">Treliça (Truss Machine)</option>
-                                                                </select>
+                                                                <input
+                                                                    type="text"
+                                                                    disabled
+                                                                    className="w-full mt-1 p-2 border rounded-lg bg-slate-200 text-slate-700 font-bold cursor-not-allowed"
+                                                                    value="Geral (Trefila e Treliça)"
+                                                                />
                                                             </div>
                                                             <div>
                                                                 <label className="block text-xs font-black text-slate-500 uppercase">Mês de Referência</label>
@@ -2438,8 +2439,7 @@ const EmployeeDetailModal: React.FC<{
                                                             {!readOnly && (
                                                                 <button
                                                                     onClick={() => {
-                                                                        const defaultMachine = (employee.assignedMachine && employee.assignedMachine.includes('Treliça')) ? 'Treliça' : 'Trefila';
-                                                                        setTechEvalMachineType(defaultMachine);
+                                                                        setTechEvalMachineType('Geral (Trefila e Treliça)');
                                                                         setEditingTechEvalId(null);
                                                                         setIsEvaluatingTechnical(true);
                                                                         setTechEvalMonth(monthNum);

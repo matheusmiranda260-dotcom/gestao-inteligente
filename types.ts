@@ -484,7 +484,7 @@ export interface TechnicalEvaluation {
     evaluator: string;
     date: string;
     monthNum: number;
-    machineType: 'Trefila' | 'Treliça';
+    machineType: string;
     
     // Conhecimento (Questões)
     q1Answer?: string;
