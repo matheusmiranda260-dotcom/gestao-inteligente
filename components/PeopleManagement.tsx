@@ -1899,7 +1899,7 @@ const EmployeeDetailModal: React.FC<{
 
                                     {/* Caso 2: Visualizando Resultados de um Teste CHA */}
                                     {selectedTechEval && (
-                                        <div className="space-y-6">
+                                        <div className="space-y-6" key={selectedTechEval?.id || 'visualizar'}>
                                             {/* Ações na tela (Voltar / Imprimir) */}
                                             <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-100 shadow-sm no-print">
                                                 <div className="flex gap-3">
@@ -2017,7 +2017,7 @@ const EmployeeDetailModal: React.FC<{
                                                                 
                                                                 {/* Opções de Resposta em modo Leitura */}
                                                                 <div className="grid grid-cols-1 gap-1.5 text-xs font-semibold">
-                                                                    {q.options.map((opt, optIdx) => {
+                                                                    {q.options && q.options.map((opt, optIdx) => {
                                                                         const isSelected = answer === opt;
                                                                         const isCorrectOption = opt === q.correct;
                                                                         let itemClass = "bg-white border-slate-100 text-slate-600";
@@ -2231,11 +2231,33 @@ const EmployeeDetailModal: React.FC<{
                                                                     <div className="px-3 pb-3 space-y-4 flex-1">
                                                                         {questionsArr.map((q, idx) => {
                                                                             const score = selectedTechEval[`q${idx+1}Score` as keyof TechnicalEvaluation] || 0;
+                                                                            const answer = selectedTechEval[`q${idx+1}Answer` as keyof TechnicalEvaluation] || '';
                                                                             return (
-                                                                                <div key={idx} className="flex gap-2 items-start border-b border-slate-100 pb-2 page-break-inside-avoid">
+                                                                                <div key={idx} className="flex gap-2 items-start border-b border-slate-100 pb-2">
                                                                                     <div className="text-emerald-500 mt-0.5 shrink-0"><CheckCircleIcon className="w-5 h-5" /></div>
                                                                                     <div className="flex-1">
-                                                                                        <p className="text-[10px] font-bold text-slate-700 leading-tight mb-1">{q.text.split(' ').slice(0, 10).join(' ')}...</p>
+                                                                                        <p className="text-[10px] font-bold text-slate-700 leading-tight mb-1">{q.text}</p>
+                                                                                        <div className="mt-1.5 mb-2 space-y-1">
+                                                                                            {q.options && q.options.map((opt, optIdx) => {
+                                                                                                const isSelected = answer === opt;
+                                                                                                const isCorrect = opt === q.correct;
+                                                                                                let style = "text-slate-500 font-medium";
+                                                                                                let mark = "[ ] ";
+                                                                                                
+                                                                                                if (isSelected) {
+                                                                                                    style = isCorrect ? "text-emerald-800 font-black bg-emerald-50/80 px-1 py-0.5 rounded border border-emerald-200" : "text-red-800 font-black bg-red-50/80 px-1 py-0.5 rounded border border-red-200";
+                                                                                                    mark = isCorrect ? "[✓] " : "[✕] ";
+                                                                                                } else if (isCorrect) {
+                                                                                                    style = "text-emerald-600 font-bold border-b border-dashed border-emerald-200";
+                                                                                                }
+                                                                                                
+                                                                                                return (
+                                                                                                    <div key={optIdx} className={`text-[9px] leading-tight ${style}`}>
+                                                                                                        <span className="font-mono">{mark}</span>{opt}
+                                                                                                    </div>
+                                                                                                );
+                                                                                            })}
+                                                                                        </div>
                                                                                         <div className="h-1.5 w-full bg-slate-200 rounded-full mt-1 overflow-hidden">
                                                                                             <div className="h-full bg-emerald-500 rounded-full" style={{width: `${(score/10)*100}%`}}></div>
                                                                                         </div>
@@ -2266,7 +2288,7 @@ const EmployeeDetailModal: React.FC<{
                                                                                 const data = selectedTechEval.habilidadeData![q.id];
                                                                                 if(!data) return null;
                                                                                 return (
-                                                                                    <div key={q.id} className="flex gap-2 items-center justify-between border-b border-slate-100 pb-2 page-break-inside-avoid">
+                                                                                    <div key={q.id} className="flex gap-2 items-center justify-between border-b border-slate-100 pb-2">
                                                                                         <p className="text-[10px] font-bold text-slate-700 leading-tight flex-1 pr-2">⚙️ {q.text.split(' ').slice(0, 4).join(' ')}...</p>
                                                                                         <div className="text-center shrink-0">
                                                                                             <span className="text-[10px] font-black uppercase text-emerald-700 block leading-none">{data.answer === 'Sim' ? data.level : 'Não'}</span>
@@ -2301,7 +2323,7 @@ const EmployeeDetailModal: React.FC<{
                                                                     <div className="px-3 pb-3 space-y-4 flex-1 overflow-hidden">
                                                                         {selectedTechEval.atitudeData && Object.keys(selectedTechEval.atitudeData).length > 0 ? (
                                                                             ATITUDE_CATEGORIES.map((category) => (
-                                                                                <div key={category} className="mb-2 page-break-inside-avoid">
+                                                                                <div key={category} className="mb-2">
                                                                                     <span className="text-[9px] font-black text-slate-800 uppercase bg-slate-100 px-1 py-0.5 rounded block mb-1">{category}</span>
                                                                                     {ATITUDE_QUESTIONS.filter(q => q.category === category).map(q => {
                                                                                         const data = selectedTechEval.atitudeData![q.id];
@@ -2330,7 +2352,7 @@ const EmployeeDetailModal: React.FC<{
                                                             </div>
 
                                                             {/* Considerações e Parecer Footer */}
-                                                            <div className="flex justify-between gap-4 mt-auto relative page-break-inside-avoid">
+                                                            <div className="flex justify-between gap-4 mt-auto relative">
                                                                 <div className="border-[2px] border-blue-400 rounded-2xl py-3 px-6 bg-white w-full shadow-sm">
                                                                     <span className="font-black text-slate-800 uppercase text-[10px] block mb-1">CONSIDERAÇÕES DO COLABORADOR:</span>
                                                                     <span className="text-xs text-slate-600 italic">"{selectedTechEval.employeeNote || 'Sem considerações.'}"</span>
@@ -2342,7 +2364,7 @@ const EmployeeDetailModal: React.FC<{
                                                             </div>
 
                                                             {/* Assinaturas */}
-                                                            <div className="grid grid-cols-2 gap-8 text-center text-[10px] pt-12 mt-8 page-break-inside-avoid">
+                                                            <div className="grid grid-cols-2 gap-8 text-center text-[10px] pt-12 mt-8">
                                                                 <div className="flex flex-col items-center">
                                                                     <div className="w-64 border-b border-slate-400 mb-1"></div>
                                                                     <span className="font-bold text-slate-600 uppercase tracking-wider">Assinatura do Avaliador</span>
@@ -2391,7 +2413,7 @@ const EmployeeDetailModal: React.FC<{
                                                                     </div>
                                                                     <div className="flex gap-2">
                                                                         <button
-                                                                            onClick={() => setSelectedTechEval(existingTest)}
+                                                                            onClick={() => setSelectedTechEval({ ...existingTest, habilidadeData: existingTest.habilidadeData ?? {}, atitudeData: existingTest.atitudeData ?? {} })}
                                                                             className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 border text-slate-700 font-bold rounded-lg text-xs transition"
                                                                         >
                                                                             📂 Visualizar
@@ -3143,8 +3165,29 @@ const OrgChart: React.FC<{
                         background: white !important; 
                         width: 100% !important;
                     }
+                    .print-modal-container {
+                        position: absolute !important;
+                        top: 0 !important;
+                        left: 0 !important;
+                        width: 100% !important;
+                        height: auto !important;
+                        min-height: 100% !important;
+                        background: white !important;
+                        align-items: flex-start !important;
+                        z-index: 9999 !important;
+                    }
+                    .print-modal-content {
+                        height: auto !important;
+                        overflow: visible !important;
+                        box-shadow: none !important;
+                        border: none !important;
+                    }
+                    .print-section {
+                        height: auto !important;
+                        overflow: visible !important;
+                    }
                     @page { 
-                        size: A4 landscape; 
+                        size: A4; 
                         margin: 5mm; 
                     }
                     * { 
