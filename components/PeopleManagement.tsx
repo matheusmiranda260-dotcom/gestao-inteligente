@@ -2141,217 +2141,222 @@ const EmployeeDetailModal: React.FC<{
                                             </div>
 
                                             {/* FOLHA DE IMPRESSÃO A4 (EXCLUSIVA PARA IMPRESSÃO) */}
-                                            <div className="hidden print:block print:bg-white print:p-6 print:text-black print:overflow-visible text-slate-900 font-sans">
-                                                {/* Cabeçalho do Documento */}
-                                                <div className="border-b-2 border-slate-900 pb-2 mb-4 flex justify-between items-end">
-                                                    <div>
-                                                        <h1 className="text-[16px] font-black tracking-tight uppercase">MSM - Gestão Inteligente de Produção</h1>
-                                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">Relatório de Avaliação CHA de Experiência</p>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <span className="text-[10px] font-bold bg-slate-100 px-2 py-1 rounded border border-slate-200 uppercase">Posto: {selectedTechEval.machineType}</span>
-                                                    </div>
-                                                </div>
-
-                                                {/* Ficha do Funcionário */}
-                                                <div className="grid grid-cols-2 gap-x-6 gap-y-2 bg-slate-50 p-2 rounded-lg border border-slate-200 text-xs mb-4">
-                                                    <div>
-                                                        <span className="font-bold text-slate-500 text-[10px] block uppercase">Colaborador Avaliado</span>
-                                                        <span className="font-black text-slate-800 text-sm">{employee.name}</span>
-                                                    </div>
-                                                    <div>
-                                                        <span className="font-bold text-slate-500 text-[10px] block uppercase">Avaliador (Gestor)</span>
-                                                        <span className="font-bold text-slate-800 text-sm">{selectedTechEval.evaluator}</span>
-                                                    </div>
-                                                    <div>
-                                                        <span className="font-bold text-slate-500 text-[10px] block uppercase">Data de Aplicação</span>
-                                                        <span className="font-semibold text-slate-800 text-sm">{new Date(selectedTechEval.date).toLocaleDateString('pt-BR')}</span>
-                                                    </div>
-                                                    <div>
-                                                        <span className="font-bold text-slate-500 text-[10px] block uppercase">Período de Experiência</span>
-                                                        <span className="font-black text-blue-800 text-sm">{selectedTechEval.monthNum}º Mês</span>
-                                                    </div>
-                                                </div>
-
-                                                {/* Tabela Resumo CHA */}
-                                                <div className="border border-slate-200 rounded-lg overflow-hidden mb-4 text-[11px] text-left">
-                                                    <table className="w-full">
-                                                        <thead className="bg-slate-100 uppercase font-black text-slate-700">
-                                                            <tr>
-                                                                <th className="p-2 border-b border-r">C - Média Conhecimento</th>
-                                                                <th className="p-2 border-b border-r">H - Média Habilidade</th>
-                                                                <th className="p-2 border-b border-r">A - Média Atitude</th>
-                                                                <th className="p-2 border-b bg-blue-100 text-blue-900">Média Geral CHA</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody className="font-bold text-slate-800">
-                                                            <tr>
-                                                                <td className="p-2 border-r">
-                                                                    {(() => {
-                                                                        const scores = [selectedTechEval.q1Score, selectedTechEval.q2Score, selectedTechEval.q3Score, selectedTechEval.q4Score, selectedTechEval.q5Score];
-                                                                        return scores.reduce((a, b) => a + b, 0).toFixed(1);
-                                                                    })()} / 50
-                                                                </td>
-                                                                <td className="p-2 border-r">
-                                                                    {selectedTechEval.habilidadeData && Object.keys(selectedTechEval.habilidadeData).length > 0 ? (
-                                                                        (() => {
-                                                                            const sum = Object.values(selectedTechEval.habilidadeData).reduce((s: number, item: any) => {
-                                                                                if (item.level === 'Bom') return s + 5;
-                                                                                if (item.level === 'Médio') return s + 2.5;
-                                                                                return s;
-                                                                            }, 0);
-                                                                            return sum.toFixed(1) + ' / 25';
-                                                                        })()
-                                                                    ) : (
-                                                                        (((selectedTechEval.h1Score + selectedTechEval.h2Score + selectedTechEval.h3Score + selectedTechEval.h4Score) / 4) * 2.5).toFixed(1) + ' / 25'
-                                                                    )}
-                                                                </td>
-                                                                <td className="p-2 border-r">
-                                                                    {selectedTechEval.atitudeData && Object.keys(selectedTechEval.atitudeData).length > 0 ? (
-                                                                        (() => {
-                                                                            const sum = Object.values(selectedTechEval.atitudeData).reduce((s: number, item: any) => {
-                                                                                if (item.level === 'Bom') return s + (25/11);
-                                                                                if (item.level === 'Médio') return s + (12.5/11);
-                                                                                return s;
-                                                                            }, 0);
-                                                                            return sum.toFixed(1) + ' / 25';
-                                                                        })()
-                                                                    ) : (
-                                                                        (((selectedTechEval.a1Score + selectedTechEval.a2Score + selectedTechEval.a3Score + selectedTechEval.a4Score) / 4) * 2.5).toFixed(1) + ' / 25'
-                                                                    )}
-                                                                </td>
-                                                                <td className="p-2 bg-blue-50 text-blue-950 font-black text-xs">
-                                                                    {selectedTechEval.habilidadeData && Object.keys(selectedTechEval.habilidadeData).length > 0 
-                                                                        ? selectedTechEval.totalScore.toFixed(1) + ' / 100'
-                                                                        : (selectedTechEval.totalScore * 10).toFixed(1) + ' / 100'
-                                                                    }
-                                                                </td>
-                                                            </tr>
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-
-                                                {/* Seção Conhecimento */}
-                                                <div className="space-y-1.5 mb-4">
-                                                    <h2 className="text-[10px] font-black text-slate-800 border-b pb-0.5 uppercase tracking-wider">1. Detalhado - Conhecimento (Perguntas)</h2>
-                                                    {(selectedTechEval.machineType === 'Trefila' ? TREFILA_QUESTIONS : TRELICA_QUESTIONS).map((q, idx) => {
-                                                        const answer = selectedTechEval[`${q.id}Answer` as keyof TechnicalEvaluation] || '';
-                                                        const score = selectedTechEval[`${q.id}Score` as keyof TechnicalEvaluation] || 0;
-                                                        return (
-                                                            <div key={q.id} className="border-l-2 border-slate-400 pl-2 py-0.5 space-y-0.5 page-break-inside-avoid">
-                                                                <p className="text-[10px] font-bold text-slate-900">{idx + 1}. {q.text}</p>
-                                                                <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[9px] font-medium mt-0.5">
-                                                                    {q.options.map((opt, optIdx) => {
-                                                                        const isSelected = answer === opt;
-                                                                        const isCorrectOption = opt === q.correct;
-                                                                        let mark = "[ ]";
-                                                                        let optStyle = "text-slate-600";
-                                                                        if (isSelected) {
-                                                                            mark = isCorrectOption ? "[x] (✓)" : "[x] (✕)";
-                                                                            optStyle = isCorrectOption ? "text-emerald-800 font-bold bg-emerald-50/50 rounded px-1" : "text-red-800 font-bold bg-red-50/50 rounded px-1";
-                                                                        } else if (isCorrectOption) {
-                                                                            mark = "[ ] (Correto)";
-                                                                            optStyle = "text-emerald-700 border-b border-dashed border-emerald-300";
-                                                                        }
-                                                                        return (
-                                                                            <div key={optIdx} className={optStyle}>
-                                                                                {mark} {opt}
-                                                                            </div>
-                                                                        );
-                                                                    })}
+                                            <div className="hidden print:block print:bg-slate-50 print:p-6 print:text-black print:overflow-visible text-slate-900 font-sans">
+                                                {(() => {
+                                                    const sumC = selectedTechEval.q1Score + selectedTechEval.q2Score + selectedTechEval.q3Score + selectedTechEval.q4Score + selectedTechEval.q5Score;
+                                                    const sumH = selectedTechEval.habilidadeData && Object.keys(selectedTechEval.habilidadeData).length > 0
+                                                        ? Object.values(selectedTechEval.habilidadeData).reduce((s: number, item: any) => {
+                                                            if (item.level === 'Bom') return s + 5;
+                                                            if (item.level === 'Médio') return s + 2.5;
+                                                            return s;
+                                                        }, 0)
+                                                        : (((selectedTechEval.h1Score + selectedTechEval.h2Score + selectedTechEval.h3Score + selectedTechEval.h4Score) / 4) * 2.5);
+                                                    const sumA = selectedTechEval.atitudeData && Object.keys(selectedTechEval.atitudeData).length > 0
+                                                        ? Object.values(selectedTechEval.atitudeData).reduce((s: number, item: any) => {
+                                                            if (item.level === 'Bom') return s + (25/11);
+                                                            if (item.level === 'Médio') return s + (12.5/11);
+                                                            return s;
+                                                        }, 0)
+                                                        : (((selectedTechEval.a1Score + selectedTechEval.a2Score + selectedTechEval.a3Score + selectedTechEval.a4Score) / 4) * 2.5);
+                                                    const totalScore = selectedTechEval.habilidadeData && Object.keys(selectedTechEval.habilidadeData).length > 0 
+                                                        ? selectedTechEval.totalScore
+                                                        : (selectedTechEval.totalScore * 10);
+                                                    
+                                                    const questionsArr = [...TREFILA_QUESTIONS, ...TRELICA_QUESTIONS].slice(0, 5); // Fallback mapping
+                                                    
+                                                    return (
+                                                        <>
+                                                            {/* Cabeçalho Infográfico */}
+                                                            <div className="flex items-center justify-between bg-white rounded-2xl p-4 shadow-sm border border-slate-200 mb-6">
+                                                                <div className="flex items-center gap-4">
+                                                                    <div className="shrink-0 bg-slate-50 p-2 rounded-xl border border-slate-100">
+                                                                        {/* Using next/image or standard img. We'll use standard img for print reliability */}
+                                                                        <img src="/ita-acos-logo.png" alt="Ita Aços" className="h-10 w-auto object-contain print:h-12" />
+                                                                    </div>
+                                                                    <div>
+                                                                        <h1 className="text-[14px] font-black tracking-tight uppercase text-slate-500">MSM - Gestão Inteligente de Produção</h1>
+                                                                        <h2 className="text-[20px] font-black text-slate-800 uppercase tracking-widest mt-0.5">Relatório de Avaliação de Experiência</h2>
+                                                                    </div>
                                                                 </div>
-                                                                <p className="text-[8px] text-slate-500 font-semibold">Nota obtida nesta questão: {score} / 10</p>
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="flex flex-col text-right">
+                                                                        <span className="text-base font-black text-slate-500 uppercase leading-tight">Média Geral</span>
+                                                                    </div>
+                                                                    <div className="relative w-20 h-20 flex items-center justify-center rounded-full border-[6px] border-emerald-500 bg-white shadow-sm z-10">
+                                                                        <span className="text-2xl font-black text-slate-800">{totalScore.toFixed(1)}</span>
+                                                                    </div>
+                                                                </div>
                                                             </div>
-                                                        );
-                                                    })}
-                                                </div>
 
-                                                {/* Seções Habilidade e Atitude */}
-                                                <div className="grid grid-cols-2 gap-4 mb-4 text-[10px]">
-                                                    <div>
-                                                        <h2 className="font-black text-slate-800 border-b pb-0.5 uppercase tracking-wider mb-1">2. Detalhado - Habilidades</h2>
-                                                        <div className="space-y-1">
-                                                            {selectedTechEval.habilidadeData && Object.keys(selectedTechEval.habilidadeData).length > 0 ? (
-                                                                HABILIDADE_QUESTIONS.map(q => {
-                                                                    const data = selectedTechEval.habilidadeData[q.id];
-                                                                    if (!data) return null;
-                                                                    return (
-                                                                        <div key={q.id}>
-                                                                            <span className="truncate block max-w-[200px]" title={q.text}>{q.text.split(' ').slice(0, 3).join(' ')}...:</span> 
-                                                                            <strong>{data.answer === 'Sim' ? data.level : 'Não'}</strong>
+                                                            {/* Fichas Informativas Topo */}
+                                                            <div className="flex justify-between gap-4 mb-6">
+                                                                <div className="flex-1 flex items-center gap-3 bg-white border border-slate-200 p-3 rounded-xl shadow-sm">
+                                                                    <div className="bg-blue-100 p-2 rounded-full text-blue-600"><UserIcon className="w-6 h-6" /></div>
+                                                                    <div>
+                                                                        <span className="text-[10px] font-bold text-slate-500 uppercase block">Colaborador Avaliado</span>
+                                                                        <span className="text-sm font-black text-slate-800 truncate block max-w-[150px]">{employee.name}</span>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="flex-1 flex items-center gap-3 bg-white border border-slate-200 p-3 rounded-xl shadow-sm">
+                                                                    <div className="bg-emerald-100 p-2 rounded-full text-emerald-600"><UserIcon className="w-6 h-6" /></div>
+                                                                    <div>
+                                                                        <span className="text-[10px] font-bold text-slate-500 uppercase block">Gestor Avaliador</span>
+                                                                        <span className="text-sm font-black text-slate-800 truncate block max-w-[150px]">{selectedTechEval.evaluator}</span>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="flex-1 flex items-center gap-3 bg-white border border-slate-200 p-3 rounded-xl shadow-sm">
+                                                                    <div className="bg-orange-100 p-2 rounded-full text-orange-600"><ClockIcon className="w-6 h-6" /></div>
+                                                                    <div>
+                                                                        <span className="text-[10px] font-bold text-slate-500 uppercase block">Data e Período</span>
+                                                                        <span className="text-sm font-black text-slate-800">{new Date(selectedTechEval.date).toLocaleDateString('pt-BR')} / {selectedTechEval.monthNum}º Mês</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* 3 Colunas Principais */}
+                                                            <div className="grid grid-cols-3 gap-4 mb-6" style={{ minHeight: '400px' }}>
+                                                                {/* C - Conhecimento */}
+                                                                <div className="border-[3px] border-blue-400 rounded-2xl bg-white flex flex-col overflow-hidden h-full">
+                                                                    <div className="flex items-center gap-2 p-3 pb-0">
+                                                                        <BookOpenIcon className="w-6 h-6 text-blue-500" />
+                                                                        <h3 className="text-base font-black text-slate-800 uppercase">Conhecimento (C)</h3>
+                                                                    </div>
+                                                                    <div className="bg-slate-100 p-2 m-3 rounded-lg flex justify-between items-center mb-4 border border-slate-200">
+                                                                        <div className="leading-tight">
+                                                                            <span className="font-black text-base text-slate-800 block">C - DETALHADO</span>
+                                                                            <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">Conhecimento</span>
                                                                         </div>
-                                                                    );
-                                                                })
-                                                            ) : (
-                                                                <>
-                                                                    <div>Setup e Ajustes: <strong>{selectedTechEval.h1Score} / 10</strong></div>
-                                                                    <div>Ritmo de Trabalho: <strong>{selectedTechEval.h2Score} / 10</strong></div>
-                                                                    <div>Controle de Qualidade: <strong>{selectedTechEval.h3Score} / 10</strong></div>
-                                                                    <div>Segurança Operacional: <strong>{selectedTechEval.h4Score} / 10</strong></div>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                    <div>
-                                                        <h2 className="font-black text-slate-800 border-b pb-0.5 uppercase tracking-wider mb-1">3. Detalhado - Atitudes</h2>
-                                                        <div className="space-y-1">
-                                                            {selectedTechEval.atitudeData && Object.keys(selectedTechEval.atitudeData).length > 0 ? (
-                                                                ATITUDE_CATEGORIES.map(category => (
-                                                                    <div key={category} className="mb-1">
-                                                                        <span className="font-bold border-b border-slate-300 block mb-0.5 text-[9px]">{category}</span>
-                                                                        {ATITUDE_QUESTIONS.filter(q => q.category === category).map(q => {
-                                                                            const data = selectedTechEval.atitudeData[q.id];
-                                                                            if (!data) return null;
+                                                                        <div className="bg-blue-600 text-white px-3 py-1 rounded font-black text-lg">{sumC.toFixed(1)}<span className="text-xs opacity-80">/50</span></div>
+                                                                    </div>
+                                                                    <div className="px-3 pb-3 space-y-4 flex-1">
+                                                                        {questionsArr.map((q, idx) => {
+                                                                            const score = selectedTechEval[`q${idx+1}Score` as keyof TechnicalEvaluation] || 0;
                                                                             return (
-                                                                                <div key={q.id} className="text-[10px]">
-                                                                                    <span className="truncate inline-block max-w-[150px] align-bottom" title={q.text}>- {q.text.split(' ').slice(0, 3).join(' ')}...:</span> 
-                                                                                    <strong> {data.answer === 'Sim' ? data.level : 'Não'}</strong>
+                                                                                <div key={idx} className="flex gap-2 items-start border-b border-slate-100 pb-2 page-break-inside-avoid">
+                                                                                    <div className="text-emerald-500 mt-0.5 shrink-0"><CheckCircleIcon className="w-5 h-5" /></div>
+                                                                                    <div className="flex-1">
+                                                                                        <p className="text-[10px] font-bold text-slate-700 leading-tight mb-1">{q.text.split(' ').slice(0, 10).join(' ')}...</p>
+                                                                                        <div className="h-1.5 w-full bg-slate-200 rounded-full mt-1 overflow-hidden">
+                                                                                            <div className="h-full bg-emerald-500 rounded-full" style={{width: `${(score/10)*100}%`}}></div>
+                                                                                        </div>
+                                                                                        <div className="text-[9px] font-black text-slate-500 text-right mt-0.5">{score}/10</div>
+                                                                                    </div>
                                                                                 </div>
                                                                             );
                                                                         })}
                                                                     </div>
-                                                                ))
-                                                            ) : (
-                                                                <>
-                                                                    <div>Organização e 5S: <strong>{selectedTechEval.a1Score} / 10</strong></div>
-                                                                    <div>Assiduidade e Disciplina: <strong>{selectedTechEval.a2Score} / 10</strong></div>
-                                                                    <div>Iniciativa e Proatividade: <strong>{selectedTechEval.a3Score} / 10</strong></div>
-                                                                    <div>Trabalho em Equipe: <strong>{selectedTechEval.a4Score} / 10</strong></div>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
+                                                                </div>
 
-                                                {/* Observações e Parecer */}
-                                                <div className="grid grid-cols-2 gap-4 mb-4">
-                                                    {selectedTechEval.employeeNote && (
-                                                        <div className="bg-slate-50 p-2 rounded border text-[10px]">
-                                                            <span className="font-bold text-slate-500 uppercase block">Considerações do Colaborador</span>
-                                                            <p className="text-slate-800 mt-1 italic">"{selectedTechEval.employeeNote}"</p>
-                                                        </div>
-                                                    )}
-                                                    {selectedTechEval.note && (
-                                                        <div className="bg-slate-50 p-2 rounded border text-[10px]">
-                                                            <span className="font-bold text-slate-500 uppercase block">Parecer Geral do Gestor</span>
-                                                            <p className="text-slate-800 mt-1 italic">"{selectedTechEval.note}"</p>
-                                                        </div>
-                                                    )}
-                                                </div>
+                                                                {/* H - Habilidades */}
+                                                                <div className="border-[3px] border-emerald-400 rounded-2xl bg-white flex flex-col overflow-hidden h-full">
+                                                                    <div className="flex items-center gap-2 p-3 pb-0">
+                                                                        <ChartBarIcon className="w-6 h-6 text-emerald-500" />
+                                                                        <h3 className="text-base font-black text-slate-800 uppercase">Habilidades (H)</h3>
+                                                                    </div>
+                                                                    <div className="bg-slate-100 p-2 m-3 rounded-lg flex justify-between items-center mb-4 border border-slate-200">
+                                                                        <div className="leading-tight">
+                                                                            <span className="font-black text-base text-slate-800 block">H - DETALHADO</span>
+                                                                            <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">Habilidades</span>
+                                                                        </div>
+                                                                        <div className="bg-emerald-500 text-white px-3 py-1 rounded font-black text-lg">{sumH.toFixed(1)}<span className="text-xs opacity-80">/25</span></div>
+                                                                    </div>
+                                                                    <div className="px-3 pb-3 space-y-4 flex-1">
+                                                                        {selectedTechEval.habilidadeData && Object.keys(selectedTechEval.habilidadeData).length > 0 ? (
+                                                                            HABILIDADE_QUESTIONS.map(q => {
+                                                                                const data = selectedTechEval.habilidadeData![q.id];
+                                                                                if(!data) return null;
+                                                                                return (
+                                                                                    <div key={q.id} className="flex gap-2 items-center justify-between border-b border-slate-100 pb-2 page-break-inside-avoid">
+                                                                                        <p className="text-[10px] font-bold text-slate-700 leading-tight flex-1 pr-2">⚙️ {q.text.split(' ').slice(0, 4).join(' ')}...</p>
+                                                                                        <div className="text-center shrink-0">
+                                                                                            <span className="text-[10px] font-black uppercase text-emerald-700 block leading-none">{data.answer === 'Sim' ? data.level : 'Não'}</span>
+                                                                                            <div className="flex text-yellow-400 mt-1">
+                                                                                                {[1,2,3,4,5].map(star => (
+                                                                                                    <StarIcon key={star} className={`w-3 h-3 ${data.level === 'Bom' || (data.level === 'Médio' && star <= 3) || (data.level === 'Ruim' && star <= 1) ? 'text-yellow-400 fill-yellow-400' : 'text-slate-200'}`} />
+                                                                                                ))}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                );
+                                                                            })
+                                                                        ) : (
+                                                                            <div className="text-[10px] text-slate-500">Dados antigos sem detalhamento.</div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
 
-                                                {/* Assinaturas */}
-                                                <div className="grid grid-cols-2 gap-8 text-center text-[10px] pt-4 mt-auto border-t border-slate-200 border-dashed">
-                                                    <div className="flex flex-col items-center">
-                                                        <div className="w-48 border-b border-slate-400 mb-1"></div>
-                                                        <span className="font-bold text-slate-600 uppercase tracking-wider">Assinatura do Avaliador</span>
-                                                        <span className="text-[9px] text-slate-400 font-semibold">({selectedTechEval.evaluator})</span>
-                                                    </div>
-                                                    <div className="flex flex-col items-center">
-                                                        <div className="w-48 border-b border-slate-400 mb-1"></div>
-                                                        <span className="font-bold text-slate-600 uppercase tracking-wider">Assinatura do Colaborador</span>
-                                                        <span className="text-[9px] text-slate-400 font-semibold">({employee.name})</span>
-                                                    </div>
-                                                </div>
+                                                                {/* A - Atitudes */}
+                                                                <div className="border-[3px] border-orange-400 rounded-2xl bg-white flex flex-col overflow-hidden h-full">
+                                                                    <div className="flex items-center gap-2 p-3 pb-0">
+                                                                        <UserGroupIcon className="w-6 h-6 text-orange-500" />
+                                                                        <h3 className="text-base font-black text-slate-800 uppercase">Atitudes (A)</h3>
+                                                                    </div>
+                                                                    <div className="bg-slate-100 p-2 m-3 rounded-lg flex justify-between items-center mb-4 border border-slate-200">
+                                                                        <div className="leading-tight">
+                                                                            <span className="font-black text-base text-slate-800 block">A - DETALHADO</span>
+                                                                            <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">Atitudes</span>
+                                                                        </div>
+                                                                        <div className="bg-orange-500 text-white px-3 py-1 rounded font-black text-lg">{sumA.toFixed(1)}<span className="text-xs opacity-80">/25</span></div>
+                                                                    </div>
+                                                                    <div className="px-3 pb-3 space-y-4 flex-1 overflow-hidden">
+                                                                        {selectedTechEval.atitudeData && Object.keys(selectedTechEval.atitudeData).length > 0 ? (
+                                                                            ATITUDE_CATEGORIES.map((category) => (
+                                                                                <div key={category} className="mb-2 page-break-inside-avoid">
+                                                                                    <span className="text-[9px] font-black text-slate-800 uppercase bg-slate-100 px-1 py-0.5 rounded block mb-1">{category}</span>
+                                                                                    {ATITUDE_QUESTIONS.filter(q => q.category === category).map(q => {
+                                                                                        const data = selectedTechEval.atitudeData![q.id];
+                                                                                        if(!data) return null;
+                                                                                        return (
+                                                                                            <div key={q.id} className="flex gap-2 items-center justify-between border-b border-slate-100 pb-1 mb-1">
+                                                                                                <p className="text-[9px] font-bold text-slate-600 leading-tight flex-1 pr-2">💡 {q.text.split(' ').slice(0, 4).join(' ')}...</p>
+                                                                                                <div className="text-center shrink-0">
+                                                                                                    <span className="text-[8px] font-black uppercase text-orange-600 block leading-none">{data.answer === 'Sim' ? data.level : 'Não'}</span>
+                                                                                                    <div className="flex text-yellow-400 mt-0.5">
+                                                                                                        {[1,2,3,4,5].map(star => (
+                                                                                                            <StarIcon key={star} className={`w-2 h-2 ${data.level === 'Bom' || (data.level === 'Médio' && star <= 3) || (data.level === 'Ruim' && star <= 1) ? 'text-yellow-400 fill-yellow-400' : 'text-slate-200'}`} />
+                                                                                                        ))}
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        );
+                                                                                    })}
+                                                                                </div>
+                                                                            ))
+                                                                        ) : (
+                                                                            <div className="text-[10px] text-slate-500">Dados antigos sem detalhamento.</div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Considerações e Parecer Footer */}
+                                                            <div className="flex justify-between gap-4 mt-auto relative page-break-inside-avoid">
+                                                                <div className="border-[2px] border-blue-400 rounded-2xl py-3 px-6 bg-white w-full shadow-sm">
+                                                                    <span className="font-black text-slate-800 uppercase text-[10px] block mb-1">CONSIDERAÇÕES DO COLABORADOR:</span>
+                                                                    <span className="text-xs text-slate-600 italic">"{selectedTechEval.employeeNote || 'Sem considerações.'}"</span>
+                                                                </div>
+                                                                <div className="border-[2px] border-orange-400 rounded-2xl py-3 px-6 bg-white w-full shadow-sm">
+                                                                    <span className="font-black text-slate-800 uppercase text-[10px] block mb-1">PARECER GERAL DO GESTOR:</span>
+                                                                    <span className="text-xs text-slate-600 italic">"{selectedTechEval.note || 'Sem parecer final registrado.'}"</span>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Assinaturas */}
+                                                            <div className="grid grid-cols-2 gap-8 text-center text-[10px] pt-12 mt-8 page-break-inside-avoid">
+                                                                <div className="flex flex-col items-center">
+                                                                    <div className="w-64 border-b border-slate-400 mb-1"></div>
+                                                                    <span className="font-bold text-slate-600 uppercase tracking-wider">Assinatura do Avaliador</span>
+                                                                    <span className="text-[9px] text-slate-400 font-semibold">({selectedTechEval.evaluator})</span>
+                                                                </div>
+                                                                <div className="flex flex-col items-center">
+                                                                    <div className="w-64 border-b border-slate-400 mb-1"></div>
+                                                                    <span className="font-bold text-slate-600 uppercase tracking-wider">Assinatura do Colaborador</span>
+                                                                    <span className="text-[9px] text-slate-400 font-semibold">({employee.name})</span>
+                                                                </div>
+                                                            </div>
+                                                        </>
+                                                    );
+                                                })()}
                                             </div>
                                         </div>
                                     )}
