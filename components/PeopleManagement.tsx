@@ -1248,8 +1248,8 @@ const EmployeeDetailModal: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-0">
-            <div className="bg-white w-full h-full shadow-2xl flex flex-col overflow-hidden">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-0 print-modal-container">
+            <div className="bg-white w-full h-full shadow-2xl flex flex-col overflow-hidden print-modal-content">
                 <div className="bg-slate-50 p-6 border-b border-slate-200 flex justify-between items-start no-print">
                     <div className="flex items-center space-x-4">
                         <div className="h-20 w-20 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden border-4 border-white shadow-sm relative group">
@@ -1325,7 +1325,7 @@ const EmployeeDetailModal: React.FC<{
                         </button>
                     ))}
                 </div>
-                <div className="flex-grow overflow-y-auto p-6 bg-slate-50">
+                <div className="flex-grow overflow-y-auto p-6 bg-slate-50 print-section">
                     {activeTab === 'profile' && (
                         <form onSubmit={handleUpdateProfile} className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
@@ -1534,83 +1534,12 @@ const EmployeeDetailModal: React.FC<{
                     )}
                     {activeTab === 'evaluations' && (
                         <div className="space-y-6">
-                            {/* Navegação de Sub-abas */}
-                            <div className="flex border-b border-slate-200 mb-4 no-print gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => { setActiveEvalSubTab('behavioral'); setSelectedTechEval(null); setIsEvaluatingTechnical(false); }}
-                                    className={`px-4 py-2 text-xs font-black uppercase tracking-wider border-b-2 transition-colors ${activeEvalSubTab === 'behavioral' ? 'border-[#0F3F5C] text-[#0F3F5C]' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-                                >
-                                    🎭 Comportamental / Rápida
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => { setActiveEvalSubTab('technical'); setIsEvaluating(false); }}
-                                    className={`px-4 py-2 text-xs font-black uppercase tracking-wider border-b-2 transition-colors ${activeEvalSubTab === 'technical' ? 'border-[#0F3F5C] text-[#0F3F5C]' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-                                >
-                                    ⚙️ Teste de Conhecimento (CHA)
-                                </button>
-                            </div>
-
-                            {/* SUB-ABA 1: AVALIAÇÃO COMPORTAMENTAL */}
-                            {activeEvalSubTab === 'behavioral' && (
-                                <div className="space-y-6 no-print">
-                                    {!readOnly && (
-                                        !isEvaluating ? (
-                                            <button onClick={() => setIsEvaluating(true)} className="w-full bg-[#0F3F5C] text-white font-bold py-3 rounded-xl hover:bg-[#0A2A3D] transition shadow-md">
-                                                + Nova Avaliação Rápida
-                                            </button>
-                                        ) : (
-                                            <div className="bg-white p-6 rounded-xl border border-blue-100 shadow-md">
-                                                <h4 className="font-bold text-lg mb-4 text-[#0F3F5C]">Nova Avaliação</h4>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                                    {[{ key: 'organization', label: 'Organização' }, { key: 'cleanliness', label: 'Limpeza Máquina' }, { key: 'effort', label: 'Empenho' }, { key: 'communication', label: 'Comunicação' }, { key: 'improvement', label: 'Melhoria' }].map(cat => (
-                                                        <div key={cat.key} className="flex justify-between items-center bg-slate-50 p-3 rounded-lg">
-                                                            <span className="text-sm font-medium">{cat.label}</span>
-                                                            {/* @ts-ignore */}
-                                                            <StarRating score={evalScores[cat.key]} onChange={v => setEvalScores({ ...evalScores, [cat.key]: v })} />
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                                <textarea className="w-full border p-2 rounded-lg text-sm mb-4" placeholder="Observação..." value={evalNote} onChange={e => setEvalNote(e.target.value)} />
-                                                <div className="flex justify-end gap-3">
-                                                    <button onClick={() => setIsEvaluating(false)} className="text-slate-500 hover:text-slate-700">Cancelar</button>
-                                                    <button onClick={handleSubmitEvaluation} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold">Salvar Avaliação</button>
-                                                </div>
-                                            </div>
-                                        )
-                                    )}
-                                    <div className="space-y-4">
-                                        {evaluations.map(ev => (
-                                            <div key={ev.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <div>
-                                                        <p className="text-sm font-bold text-slate-800">{new Date(ev.date).toLocaleDateString()} - Avaliado por {ev.evaluator}</p>
-                                                        <div className="flex items-center mt-1">
-                                                            <StarIcon className="h-4 w-4 text-yellow-400 fill-current mr-1" />
-                                                            <span className="font-bold">{(ev.totalScore / 5).toFixed(1)}</span>
-                                                        </div>
-                                                    </div>
-                                                    <span className="text-xs text-slate-400 font-semibold">Total: {ev.totalScore}/25</span>
-                                                </div>
-                                                {ev.note && <p className="text-sm text-slate-600 bg-slate-50 p-2 rounded italic">"{ev.note}"</p>}
-                                            </div>
-                                        ))}
-                                        {evaluations.length === 0 && (
-                                            <p className="text-slate-400 text-center py-4">Nenhuma avaliação comportamental registrada.</p>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* SUB-ABA 2: TESTE DE CONHECIMENTO (CHA) */}
-                            {activeEvalSubTab === 'technical' && (() => {
-                                const liveCScore = (techEvalScores.q1 + techEvalScores.q2 + techEvalScores.q3 + techEvalScores.q4 + techEvalScores.q5) / 5;
-                                const liveHScore = (techEvalSkills.h1 + techEvalSkills.h2 + techEvalSkills.h3 + techEvalSkills.h4) / 4;
-                                const liveAScore = (techEvalAttitudes.a1 + techEvalAttitudes.a2 + techEvalAttitudes.a3 + techEvalAttitudes.a4) / 4;
-                                const liveTotalScore = (techEvalScores.q1 + techEvalScores.q2 + techEvalScores.q3 + techEvalScores.q4 + techEvalScores.q5 +
-                                                       techEvalSkills.h1 + techEvalSkills.h2 + techEvalSkills.h3 + techEvalSkills.h4 +
-                                                       techEvalAttitudes.a1 + techEvalAttitudes.a2 + techEvalAttitudes.a3 + techEvalAttitudes.a4) / 13;
+                            {/* TESTE DE CONHECIMENTO (CHA) */}
+                            {(() => {
+                                const liveCScore = techEvalScores.q1 + techEvalScores.q2 + techEvalScores.q3 + techEvalScores.q4 + techEvalScores.q5;
+                                const liveHScore = Object.values(techEvalHabilidadeData).reduce((s: number, item: any) => s + (item.level === 'Bom' ? 5 : item.level === 'Médio' ? 2.5 : 0), 0);
+                                const liveAScore = Object.values(techEvalAtitudeData).reduce((s: number, item: any) => s + (item.level === 'Bom' ? 25/11 : item.level === 'Médio' ? 12.5/11 : 0), 0);
+                                const liveTotalScore = liveCScore + liveHScore + liveAScore;
                                 return (
                                     <div className="space-y-6">
                                         {/* Caso 1: Criando/Editando Avaliação CHA */}
@@ -1655,10 +1584,10 @@ const EmployeeDetailModal: React.FC<{
                                                                 </select>
                                                             </div>
                                                             <div>
-                                                                <label className="block text-xs font-black text-slate-500 uppercase">Período de Experiência</label>
+                                                                <label className="block text-xs font-black text-slate-500 uppercase">Mês de Referência</label>
                                                                 <select
-                                                                    required
-                                                                    className="w-full mt-1 p-2 border rounded-lg bg-slate-50 text-slate-900 font-bold"
+                                                                    disabled
+                                                                    className="w-full mt-1 p-2 border rounded-lg bg-slate-200 text-slate-700 font-bold cursor-not-allowed"
                                                                     value={techEvalMonth}
                                                                     onChange={e => setTechEvalMonth(parseInt(e.target.value))}
                                                                 >
@@ -1902,9 +1831,32 @@ const EmployeeDetailModal: React.FC<{
                                             {/* FEEDBACKS */}
                                             {evalWizardStep === 8 && (
                                             <div className="space-y-6 pt-2 animate-fadeIn">
+                                                <div className="bg-blue-50/40 p-4 rounded-xl border border-blue-100/60 mb-4">
+                                                    <h4 className="font-bold text-blue-900 text-sm mb-3 uppercase tracking-wider">Resumo Prévio da Avaliação</h4>
+                                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
+                                                        <div className="bg-white p-3 rounded-lg border shadow-sm">
+                                                            <span className="text-[10px] font-bold text-blue-700 uppercase block">Conhecimento (C)</span>
+                                                            <span className="text-xl font-black text-slate-800">{liveCScore.toFixed(1)} <span className="text-xs text-slate-400">/ 50</span></span>
+                                                        </div>
+                                                        <div className="bg-white p-3 rounded-lg border shadow-sm">
+                                                            <span className="text-[10px] font-bold text-green-700 uppercase block">Habilidade (H)</span>
+                                                            <span className="text-xl font-black text-slate-800">{liveHScore.toFixed(1)} <span className="text-xs text-slate-400">/ 25</span></span>
+                                                        </div>
+                                                        <div className="bg-white p-3 rounded-lg border shadow-sm">
+                                                            <span className="text-[10px] font-bold text-purple-700 uppercase block">Atitude (A)</span>
+                                                            <span className="text-xl font-black text-slate-800">{liveAScore.toFixed(1)} <span className="text-xs text-slate-400">/ 25</span></span>
+                                                        </div>
+                                                        <div className="bg-[#0F3F5C] p-3 rounded-lg border border-[#0A2A3D] shadow-sm">
+                                                            <span className="text-[10px] font-bold text-blue-100 uppercase block">Nota Final</span>
+                                                            <span className="text-xl font-black text-white">{liveTotalScore.toFixed(1)} <span className="text-xs text-blue-200">/ 100</span></span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
                                                 <div>
                                                     <label className="block text-xs font-black text-slate-500 uppercase">Considerações do Colaborador (Autoavaliação / Defesa)</label>
                                                     <textarea
+                                                        required
                                                         className="w-full mt-1 p-3 border rounded-xl text-sm bg-white text-slate-900 font-medium shadow-sm"
                                                         placeholder="Espaço reservado para o colaborador relatar sua visão sobre o teste..."
                                                         rows={3}
@@ -1915,12 +1867,13 @@ const EmployeeDetailModal: React.FC<{
                                                 <div>
                                                     <label className="block text-xs font-black text-slate-500 uppercase">Parecer Geral / Observações do Gestor</label>
                                                     <textarea
-                                                    className="w-full mt-1 p-2 border rounded-lg text-sm bg-white text-slate-900 font-medium"
-                                                    placeholder="Descreva pontos positivos, potencial e feedbacks dados..."
-                                                    rows={3}
-                                                    value={techEvalNote}
-                                                    onChange={e => setTechEvalNote(e.target.value)}
-                                                />
+                                                        required
+                                                        className="w-full mt-1 p-2 border rounded-lg text-sm bg-white text-slate-900 font-medium"
+                                                        placeholder="Descreva pontos positivos, potencial e feedbacks dados..."
+                                                        rows={3}
+                                                        value={techEvalNote}
+                                                        onChange={e => setTechEvalNote(e.target.value)}
+                                                    />
                                                 </div>
                                             </div>
                                             )}
@@ -2187,7 +2140,7 @@ const EmployeeDetailModal: React.FC<{
                                             </div>
 
                                             {/* FOLHA DE IMPRESSÃO A4 (EXCLUSIVA PARA IMPRESSÃO) */}
-                                            <div className="hidden print:block print:fixed print:inset-0 print:bg-white print:z-[9999] print:p-6 print:text-black print:overflow-visible text-slate-900 font-sans">
+                                            <div className="hidden print:block print:bg-white print:p-6 print:text-black print:overflow-visible text-slate-900 font-sans">
                                                 {/* Cabeçalho do Documento */}
                                                 <div className="border-b-2 border-slate-900 pb-2 mb-4 flex justify-between items-end">
                                                     <div>
@@ -2405,73 +2358,107 @@ const EmployeeDetailModal: React.FC<{
                                     {/* Caso 3: Listagem Histórica dos Testes */}
                                     {!isEvaluatingTechnical && !selectedTechEval && (
                                         <div className="space-y-4 no-print">
-                                            {!readOnly && (
-                                                <button
-                                                    onClick={() => {
-                                                        // Preencher por padrão com a máquina vinculada ao funcionário
-                                                        const defaultMachine = (employee.assignedMachine && employee.assignedMachine.includes('Treliça')) ? 'Treliça' : 'Trefila';
-                                                        setTechEvalMachineType(defaultMachine);
-                                                        
-                                                        setEditingTechEvalId(null);
-                                                        setIsEvaluatingTechnical(true);
-                                                        setTechEvalMonth(1);
-                                                        setTechEvalDate(new Date().toISOString().split('T')[0]);
-                                                        setTechEvalAnswers({ q1: '', q2: '', q3: '', q4: '', q5: '' });
-                                                        setTechEvalScores({ q1: 0, q2: 0, q3: 0, q4: 0, q5: 0 });
-                                                        setTechEvalSkills({ h1: 0, h2: 0, h3: 0, h4: 0 });
-                                                        setTechEvalAttitudes({ a1: 0, a2: 0, a3: 0, a4: 0 });
-                                                        setTechEvalNote('');
-                                                    }}
-                                                    className="w-full bg-[#0F3F5C] text-white font-bold py-3 rounded-xl hover:bg-[#0A2A3D] transition shadow-md"
-                                                >
-                                                    + Novo Teste de Conhecimento (CHA)
-                                                </button>
-                                            )}
-
                                             <div className="space-y-3">
-                                                {technicalEvaluations.map(ev => (
-                                                    <div key={ev.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex justify-between items-center hover:bg-slate-50/50 transition">
-                                                        <div>
-                                                            <div className="flex items-center gap-2">
-                                                                <h5 className="font-black text-slate-800 text-sm uppercase">Teste de Conhecimento: {ev.monthNum}º Mês</h5>
-                                                                <span className="text-[9px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded border">
-                                                                    {ev.machineType}
-                                                                </span>
+                                                {[1, 2, 3].map(monthNum => {
+                                                    const existingTest = technicalEvaluations.find(ev => ev.monthNum === monthNum);
+                                                    
+                                                    if (existingTest) {
+                                                        return (
+                                                            <div key={`test-done-${monthNum}`} className="bg-white p-4 rounded-xl border border-emerald-100 shadow-sm flex justify-between items-center hover:bg-slate-50/50 transition">
+                                                                <div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <h5 className="font-black text-slate-800 text-sm uppercase">Teste de Conhecimento: {existingTest.monthNum}º Mês</h5>
+                                                                        <span className="text-[9px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded border border-emerald-200">
+                                                                            Concluído - {existingTest.machineType}
+                                                                        </span>
+                                                                    </div>
+                                                                    <p className="text-xs text-slate-500 mt-0.5">
+                                                                        Avaliado por <strong className="text-slate-700">{existingTest.evaluator}</strong> em {new Date(existingTest.date).toLocaleDateString()}
+                                                                    </p>
+                                                                </div>
+                                                                <div className="flex items-center gap-4">
+                                                                    <div className="text-right">
+                                                                        <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold block">Nota Final</span>
+                                                                        <span className={`text-base font-black ${existingTest.totalScore >= 7 ? 'text-green-600' : existingTest.totalScore >= 5 ? 'text-amber-500' : 'text-red-500'}`}>
+                                                                            {existingTest.totalScore.toFixed(1)} <strong className="text-[10px] text-slate-400 font-bold">/10</strong>
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="flex gap-2">
+                                                                        <button
+                                                                            onClick={() => setSelectedTechEval(existingTest)}
+                                                                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 border text-slate-700 font-bold rounded-lg text-xs transition"
+                                                                        >
+                                                                            📂 Visualizar
+                                                                        </button>
+                                                                        {!readOnly && (
+                                                                            <button
+                                                                                onClick={() => handleDeleteTechnicalEvaluation(existingTest.id)}
+                                                                                className="p-1.5 hover:bg-red-50 text-red-500 hover:text-red-600 rounded-lg transition"
+                                                                                title="Excluir Teste"
+                                                                            >
+                                                                                <TrashIcon className="h-4.5 w-4.5" />
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
                                                             </div>
-                                                            <p className="text-xs text-slate-500 mt-0.5">
-                                                                Avaliado por <strong className="text-slate-700">{ev.evaluator}</strong> em {new Date(ev.date).toLocaleDateString()}
-                                                            </p>
-                                                        </div>
-                                                        <div className="flex items-center gap-4">
-                                                            <div className="text-right">
-                                                                <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold block">Nota Final</span>
-                                                                <span className={`text-base font-black ${ev.totalScore >= 7 ? 'text-green-600' : ev.totalScore >= 5 ? 'text-amber-500' : 'text-red-500'}`}>
-                                                                    {ev.totalScore.toFixed(1)} <strong className="text-[10px] text-slate-400 font-bold">/10</strong>
-                                                                </span>
-                                                            </div>
-                                                            <div className="flex gap-2">
-                                                                <button
-                                                                    onClick={() => setSelectedTechEval(ev)}
-                                                                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 border text-slate-700 font-bold rounded-lg text-xs transition"
-                                                                >
-                                                                    📂 Visualizar
-                                                                </button>
-                                                                {!readOnly && (
-                                                                    <button
-                                                                        onClick={() => handleDeleteTechnicalEvaluation(ev.id)}
-                                                                        className="p-1.5 hover:bg-red-50 text-red-500 hover:text-red-600 rounded-lg transition"
-                                                                        title="Excluir Teste"
-                                                                    >
-                                                                        <TrashIcon className="h-4.5 w-4.5" />
-                                                                    </button>
+                                                        );
+                                                    }
+
+                                                    // Pendente
+                                                    let dueDateStr = '';
+                                                    let isOverdue = false;
+                                                    if (employee.admissionDate) {
+                                                        const parts = employee.admissionDate.split('-');
+                                                        if (parts.length === 3) {
+                                                            const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                                                            d.setDate(d.getDate() + (monthNum * 30));
+                                                            dueDateStr = d.toLocaleDateString();
+                                                            isOverdue = d < new Date();
+                                                        }
+                                                    }
+
+                                                    return (
+                                                        <div key={`test-pending-${monthNum}`} className="bg-slate-50 p-4 rounded-xl border border-slate-200 border-dashed flex justify-between items-center">
+                                                            <div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <h5 className="font-bold text-slate-500 text-sm uppercase">Teste de Conhecimento: {monthNum}º Mês</h5>
+                                                                    <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded border border-amber-200 uppercase">
+                                                                        Pendente
+                                                                    </span>
+                                                                </div>
+                                                                {dueDateStr ? (
+                                                                    <p className={`text-xs mt-0.5 font-semibold ${isOverdue ? 'text-red-500' : 'text-slate-500'}`}>
+                                                                        Vence em: {dueDateStr} {isOverdue && '(Atrasado)'}
+                                                                    </p>
+                                                                ) : (
+                                                                    <p className="text-xs text-slate-400 mt-0.5">Defina a data de admissão no perfil para calcular prazos</p>
                                                                 )}
                                                             </div>
+                                                            {!readOnly && (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        const defaultMachine = (employee.assignedMachine && employee.assignedMachine.includes('Treliça')) ? 'Treliça' : 'Trefila';
+                                                                        setTechEvalMachineType(defaultMachine);
+                                                                        setEditingTechEvalId(null);
+                                                                        setIsEvaluatingTechnical(true);
+                                                                        setTechEvalMonth(monthNum);
+                                                                        setTechEvalDate(new Date().toISOString().split('T')[0]);
+                                                                        setTechEvalAnswers({ q1: '', q2: '', q3: '', q4: '', q5: '' });
+                                                                        setTechEvalScores({ q1: 0, q2: 0, q3: 0, q4: 0, q5: 0 });
+                                                                        setTechEvalSkills({ h1: 0, h2: 0, h3: 0, h4: 0 });
+                                                                        setTechEvalAttitudes({ a1: 0, a2: 0, a3: 0, a4: 0 });
+                                                                        setTechEvalNote('');
+                                                                        setTechEvalEmployeeNote('');
+                                                                    }}
+                                                                    className="px-4 py-2 bg-[#0F3F5C] text-white font-bold rounded-lg text-xs hover:bg-[#0A2A3D] transition shadow"
+                                                                >
+                                                                    + Realizar Teste
+                                                                </button>
+                                                            )}
                                                         </div>
-                                                    </div>
-                                                ))}
-                                                {technicalEvaluations.length === 0 && (
-                                                    <p className="text-slate-400 text-center py-4">Nenhum teste de conhecimento registrado para este colaborador.</p>
-                                                )}
+                                                    );
+                                                })}
                                             </div>
                                         </div>
                                     )}
