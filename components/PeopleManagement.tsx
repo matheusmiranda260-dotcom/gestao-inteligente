@@ -751,18 +751,18 @@ const EmployeeCard: React.FC<{ employee: Employee; onSelect: () => void; onDelet
 });
 
 
-// ... EmployeeDetailModal (Same as before) ...
 const EmployeeDetailModal: React.FC<{
     employee: Employee;
+    employees?: Employee[]; // Adicionado para buscar a foto do gestor
     onClose: () => void;
     onSave: () => void;
-    onDelete: () => void; // New prop
+    onDelete: () => void;
     currentUser: User | null;
     readOnly?: boolean;
     initialTab?: 'profile' | 'responsibilities' | 'development' | 'hr' | 'evaluations' | 'documents' | 'tasks';
     orgUnits?: OrgUnit[];
     orgPositions?: OrgPosition[];
-}> = ({ employee, onClose, onSave, onDelete, currentUser, readOnly, initialTab = 'profile', orgUnits = [], orgPositions = [] }) => {
+}> = ({ employee, employees = [], onClose, onSave, onDelete, currentUser, readOnly, initialTab = 'profile', orgUnits = [], orgPositions = [] }) => {
     // ... Copy existing implementation or use a placeholder if too long (I'll keep it shortened for this specific file write as the focus is Organograma)
     // To ensure I don't break existing features, I will replicate it or assume it's there. 
     // Given the previous step saw the full file, I will perform a full overwrite including the Modal code to be safe.
@@ -2162,7 +2162,7 @@ const EmployeeDetailModal: React.FC<{
                                                         ? selectedTechEval.totalScore
                                                         : (selectedTechEval.totalScore * 10);
                                                     
-                                                    const questionsArr = [...TREFILA_QUESTIONS, ...TRELICA_QUESTIONS].slice(0, 5); // Fallback mapping
+                                                    const questionsArr = selectedTechEval.machineType === 'Trefila' ? TREFILA_QUESTIONS : TRELICA_QUESTIONS;
                                                     
                                                     return (
                                                         <>
@@ -2191,14 +2191,27 @@ const EmployeeDetailModal: React.FC<{
                                                             {/* Fichas Informativas Topo */}
                                                             <div className="flex justify-between gap-4 mb-6">
                                                                 <div className="flex-1 flex items-center gap-3 bg-white border border-slate-200 p-3 rounded-xl shadow-sm">
-                                                                    <div className="bg-blue-100 p-2 rounded-full text-blue-600"><UserIcon className="w-6 h-6" /></div>
+                                                                    {employee.photoUrl ? (
+                                                                        <img src={employee.photoUrl} alt={employee.name} className="w-10 h-10 rounded-full object-cover border border-slate-200" />
+                                                                    ) : (
+                                                                        <div className="bg-blue-100 p-2 rounded-full text-blue-600"><UserIcon className="w-6 h-6" /></div>
+                                                                    )}
                                                                     <div>
                                                                         <span className="text-[10px] font-bold text-slate-500 uppercase block">Colaborador Avaliado</span>
                                                                         <span className="text-sm font-black text-slate-800 truncate block max-w-[150px]">{employee.name}</span>
                                                                     </div>
                                                                 </div>
                                                                 <div className="flex-1 flex items-center gap-3 bg-white border border-slate-200 p-3 rounded-xl shadow-sm">
-                                                                    <div className="bg-emerald-100 p-2 rounded-full text-emerald-600"><UserIcon className="w-6 h-6" /></div>
+                                                                    {(() => {
+                                                                        const evaluatorEmp = employees.find(e => e.name === selectedTechEval.evaluator) 
+                                                                            || (currentUser?.username === selectedTechEval.evaluator ? employees.find(e => e.appUserId === currentUser.id) : null)
+                                                                            || employees.find(e => e.name.toLowerCase().includes(selectedTechEval.evaluator.split(' ')[0].toLowerCase()));
+                                                                        return evaluatorEmp?.photoUrl ? (
+                                                                            <img src={evaluatorEmp.photoUrl} alt={selectedTechEval.evaluator} className="w-10 h-10 rounded-full object-cover border border-slate-200" />
+                                                                        ) : (
+                                                                            <div className="bg-emerald-100 p-2 rounded-full text-emerald-600"><UserIcon className="w-6 h-6" /></div>
+                                                                        );
+                                                                    })()}
                                                                     <div>
                                                                         <span className="text-[10px] font-bold text-slate-500 uppercase block">Gestor Avaliador</span>
                                                                         <span className="text-sm font-black text-slate-800 truncate block max-w-[150px]">{selectedTechEval.evaluator}</span>
@@ -2289,7 +2302,7 @@ const EmployeeDetailModal: React.FC<{
                                                                                 if(!data) return null;
                                                                                 return (
                                                                                     <div key={q.id} className="flex gap-2 items-center justify-between border-b border-slate-100 pb-2">
-                                                                                        <p className="text-[10px] font-bold text-slate-700 leading-tight flex-1 pr-2">⚙️ {q.text.split(' ').slice(0, 4).join(' ')}...</p>
+                                                                                        <p className="text-[10px] font-bold text-slate-700 leading-tight flex-1 pr-2">⚙️ {q.text}</p>
                                                                                         <div className="text-center shrink-0">
                                                                                             <span className="text-[10px] font-black uppercase text-emerald-700 block leading-none">{data.answer === 'Sim' ? data.level : 'Não'}</span>
                                                                                             <div className="flex text-yellow-400 mt-1">
@@ -2330,7 +2343,7 @@ const EmployeeDetailModal: React.FC<{
                                                                                         if(!data) return null;
                                                                                         return (
                                                                                             <div key={q.id} className="flex gap-2 items-center justify-between border-b border-slate-100 pb-1 mb-1">
-                                                                                                <p className="text-[9px] font-bold text-slate-600 leading-tight flex-1 pr-2">💡 {q.text.split(' ').slice(0, 4).join(' ')}...</p>
+                                                                                                <p className="text-[9px] font-bold text-slate-600 leading-tight flex-1 pr-2">💡 {q.text}</p>
                                                                                                 <div className="text-center shrink-0">
                                                                                                     <span className="text-[8px] font-black uppercase text-orange-600 block leading-none">{data.answer === 'Sim' ? data.level : 'Não'}</span>
                                                                                                     <div className="flex text-yellow-400 mt-0.5">
@@ -3637,6 +3650,7 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
             {selectedEmployee && (
                 <EmployeeDetailModal
                     employee={selectedEmployee.emp}
+                    employees={employees}
                     currentUser={currentUser}
                     onClose={() => setSelectedEmployee(null)}
                     onSave={loadData}
@@ -3765,6 +3779,7 @@ const PeopleManagement: React.FC<PeopleManagementProps> = ({ setPage, currentUse
             {selectedEmployee && (
                 <EmployeeDetailModal
                     employee={selectedEmployee.emp}
+                    employees={employees}
                     currentUser={currentUser}
                     onClose={() => setSelectedEmployee(null)}
                     onSave={loadData}
