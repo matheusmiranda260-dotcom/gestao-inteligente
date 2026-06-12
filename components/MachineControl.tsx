@@ -1907,7 +1907,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
             )}
 
             {/* Overlay Fixed para Bloqueio de Operador */}
-            {!hasActiveShift && isAnyActiveShift && activeOrder && (
+            {!hasActiveShift && isAnyActiveShift && activeOrder && !isGestor && (
                 <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center z-[100] transition-all duration-500 p-4">
                     <div className="text-center p-8 bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md mx-auto animate-fade-in-up border-4 border-amber-400/50 overflow-hidden relative">
                         <div className="absolute top-0 inset-x-0 h-2 bg-gradient-to-r from-amber-400 via-amber-200 to-amber-400"></div>
