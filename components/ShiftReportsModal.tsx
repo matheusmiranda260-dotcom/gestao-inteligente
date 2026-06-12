@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import type { ShiftReport, StockItem } from '../types';
 import { PrinterIcon, DocumentReportIcon, ArchiveIcon, WarningIcon, TrashIcon, ChartBarIcon, PencilIcon } from './icons';
+import { trelicaModels } from './ProductionOrderTrelica';
 
 export const EditShiftReportModal: React.FC<{
     report: ShiftReport;
@@ -12,6 +13,22 @@ export const EditShiftReportModal: React.FC<{
     const [meters, setMeters] = useState(report.totalProducedMeters || 0);
     const [scrap, setScrap] = useState(report.totalScrapWeight || 0);
     const [isSaving, setIsSaving] = useState(false);
+
+    const handleQuantityChange = (val: number) => {
+        setQuantity(val);
+        
+        // Se a máquina for Treliça, calcula automaticamente metros e peso teórico correspondente
+        if (report.machine?.toLowerCase().startsWith('treliça') || report.machine?.toLowerCase().startsWith('trelica')) {
+            const tamanhoNum = parseFloat(report.tamanho || '6') || 6;
+            setMeters(val * tamanhoNum);
+
+            const modelInfo = trelicaModels.find(m => m.modelo === report.trelicaModel);
+            if (modelInfo) {
+                const theoreticalPieceWeight = parseFloat(modelInfo.pesoFinal.replace(',', '.'));
+                setWeight(val * theoreticalPieceWeight);
+            }
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -53,7 +70,7 @@ export const EditShiftReportModal: React.FC<{
                                 type="number"
                                 step="any"
                                 value={quantity}
-                                onChange={(e) => setQuantity(Number(e.target.value))}
+                                onChange={(e) => handleQuantityChange(Number(e.target.value))}
                                 className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-lg font-bold rounded-xl px-4 py-3 focus:ring-2 focus:ring-rose-500 focus:border-transparent outline-none"
                             />
                         </div>
