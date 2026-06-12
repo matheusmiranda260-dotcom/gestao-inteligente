@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import type { Page, ProductionOrderData, ShiftReport, User, StockItem } from '../types';
-import { ArrowLeftIcon, PencilIcon, WarningIcon, CheckCircleIcon, ChartBarIcon, ScaleIcon, ClockIcon, ClipboardListIcon, TrashIcon } from './icons';
-import { EditShiftReportModal } from './ShiftReportsModal';
+import { ArrowLeftIcon, PencilIcon, WarningIcon, CheckCircleIcon, ChartBarIcon, ScaleIcon, ClockIcon, ClipboardListIcon, TrashIcon, PrinterIcon } from './icons';
+import { EditShiftReportModal, ShiftReportPrintView } from './ShiftReportsModal';
 
 interface ProductionControlProps {
     machineCategory: 'Trefila' | 'Treliça';
@@ -179,6 +179,15 @@ const ProductionControl: React.FC<ProductionControlProps> = ({
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'completed' | 'other'>('active');
     const [editingReport, setEditingReport] = useState<ShiftReport | null>(null);
+    const [printingReport, setPrintingReport] = useState<ShiftReport | null>(null);
+
+    const handlePrintReport = (report: ShiftReport) => {
+        setPrintingReport(report);
+        setTimeout(() => {
+            window.print();
+            setPrintingReport(null);
+        }, 600);
+    };
 
     const handleRecalculateTotals = async () => {
         if (!selectedOrder || !updateProductionOrder) return;
@@ -850,7 +859,7 @@ const ProductionControl: React.FC<ProductionControlProps> = ({
                                                 <th className="py-3 px-4">Produzido ({machineCategory === 'Trefila' ? 'kg' : 'peças'})</th>
                                                 <th className="py-3 px-4">Sucata (kg)</th>
                                                 <th className="py-3 px-4">Eficiência (%)</th>
-                                                {isGestor && <th className="py-3 px-4 text-center">Ações</th>}
+                                                <th className="py-3 px-4 text-center">Ações</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50">
@@ -893,34 +902,43 @@ const ProductionControl: React.FC<ProductionControlProps> = ({
                                                             <td className="py-4 px-4">
                                                                 {getEfficiencyBadge(eff)}
                                                             </td>
-                                                            {isGestor && (
-                                                                <td className="py-4 px-4">
-                                                                    <div className="flex items-center justify-center gap-2">
-                                                                        <button
-                                                                            onClick={() => setEditingReport(report)}
-                                                                            className="p-2 bg-slate-100 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 text-slate-600 hover:text-indigo-600 rounded-full transition-all active:scale-90"
-                                                                            title="Ajustar Lançamento do Turno"
-                                                                        >
-                                                                            <PencilIcon className="w-3.5 h-3.5" />
-                                                                        </button>
-                                                                        {onDeleteReport && (
+                                                            <td className="py-4 px-4">
+                                                                <div className="flex items-center justify-center gap-2">
+                                                                    <button
+                                                                        onClick={() => handlePrintReport(report)}
+                                                                        className="p-2 bg-slate-100 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 text-slate-600 hover:text-emerald-600 rounded-full transition-all active:scale-90"
+                                                                        title="Imprimir Relatório de Turno"
+                                                                    >
+                                                                        <PrinterIcon className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                    {isGestor && (
+                                                                        <>
                                                                             <button
-                                                                                onClick={() => onDeleteReport(report.id)}
-                                                                                className="p-2 bg-slate-100 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 text-slate-600 hover:text-rose-600 rounded-full transition-all active:scale-90"
-                                                                                title="Excluir Lançamento do Turno"
+                                                                                onClick={() => setEditingReport(report)}
+                                                                                className="p-2 bg-slate-100 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 text-slate-600 hover:text-indigo-600 rounded-full transition-all active:scale-90"
+                                                                                title="Ajustar Lançamento do Turno"
                                                                             >
-                                                                                <TrashIcon className="w-3.5 h-3.5" />
+                                                                                <PencilIcon className="w-3.5 h-3.5" />
                                                                             </button>
-                                                                        )}
-                                                                    </div>
-                                                                </td>
-                                                            )}
+                                                                            {onDeleteReport && (
+                                                                                <button
+                                                                                    onClick={() => onDeleteReport(report.id)}
+                                                                                    className="p-2 bg-slate-100 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 text-slate-600 hover:text-rose-600 rounded-full transition-all active:scale-90"
+                                                                                    title="Excluir Lançamento do Turno"
+                                                                                >
+                                                                                    <TrashIcon className="w-3.5 h-3.5" />
+                                                                                </button>
+                                                                            )}
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            </td>
                                                         </tr>
                                                     );
                                                 })
                                             ) : (
                                                 <tr>
-                                                    <td colSpan={isGestor ? 6 : 5} className="py-10 text-center text-slate-400">
+                                                    <td colSpan={6} className="py-10 text-center text-slate-400">
                                                         <WarningIcon className="w-10 h-10 text-slate-300 mx-auto mb-2" />
                                                         <p className="font-bold">Nenhum turno registrado</p>
                                                         <p className="text-xs text-slate-400 mt-1">Esta ordem ainda não possui relatórios de turno encerrados.</p>
@@ -955,6 +973,19 @@ const ProductionControl: React.FC<ProductionControlProps> = ({
                     onClose={() => setEditingReport(null)}
                     onSave={onUpdateReport}
                 />
+            )}
+
+            {/* Print View Container */}
+            {printingReport && (
+                <div className="fixed inset-0 bg-white z-[9999] overflow-y-auto print-modal-container">
+                    <div className="bg-white w-full print-modal-content">
+                        <ShiftReportPrintView 
+                            report={printingReport} 
+                            stock={stock} 
+                            allReports={shiftReports} 
+                        />
+                    </div>
+                </div>
             )}
         </div>
     );

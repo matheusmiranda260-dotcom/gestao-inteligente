@@ -328,7 +328,7 @@ const ShiftDetails: React.FC<{ report: ShiftReport, stock: StockItem[], onPrint:
     );
 };
 
-const ShiftReportPrintView: React.FC<{ report: ShiftReport, stock: StockItem[], allReports?: ShiftReport[] }> = ({ report, stock, allReports }) => {
+export const ShiftReportPrintView: React.FC<{ report: ShiftReport, stock: StockItem[], allReports?: ShiftReport[] }> = ({ report, stock, allReports }) => {
     const { totalDuration, productiveTime, totalDowntime, productivePercentage, downtimePercentage } = useMemo(() => {
         const shiftStart = new Date(report.shiftStartTime).getTime();
         const shiftEnd = new Date(report.shiftEndTime).getTime();
