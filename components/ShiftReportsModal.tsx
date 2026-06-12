@@ -828,7 +828,12 @@ const ShiftReportsModal: React.FC<ShiftReportsModalProps> = ({ reports, stock, o
                             </div>
                             <div>
                                 <h2 className="text-xl font-black text-slate-800 tracking-tight text-center">Relatórios de Turno</h2>
-                                <p className="text-slate-400 font-bold uppercase tracking-[0.1em] text-[9px]">Histórico Analítico de Operação</p>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                    <p className="text-slate-400 font-bold uppercase tracking-[0.1em] text-[9px] mr-1">Histórico Analítico de Operação</p>
+                                    <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md border ${isGestor ? 'bg-amber-50 text-amber-700 border-amber-200 shadow-sm' : 'bg-slate-100 text-slate-400 border-slate-200'}`}>
+                                        {isGestor ? 'Modo Gestor' : 'Modo Operador'}
+                                    </span>
+                                </div>
                             </div>
                         </div>
                         <div className="flex items-center gap-3">

@@ -811,7 +811,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
     cancelProductionOrder, pauseProductionOrder, addLotToOrder, initialView, initialModal, gauges = [],
     downtimeConfigs = [], updateProductionOrder
 }) => {
-    const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor' || currentUser?.username === 'admin';
+    const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor' || currentUser?.username?.toLowerCase() === 'admin' || currentUser?.username?.toLowerCase() === 'gestor' || currentUser?.username?.toLowerCase().includes('matheusmiranda');
     const [activeMachine, setActiveMachine] = useState<MachineType>(() => {
         const saved = localStorage.getItem('msm_active_machine');
         const safeMachineType = machineType || 'Trefila';
@@ -2059,7 +2059,14 @@ const MachineControl: React.FC<MachineControlProps> = ({
             )}
             {showShiftReportsModal && (
                 <ShiftReportsModal
-                    reports={(shiftReports || []).filter(r => (r.machine === activeMachine || (activeMachine.startsWith('Trefila') && r.machine === 'Trefila') || (activeMachine.startsWith('Treliça') && r.machine === 'Treliça') || (activeMachine.startsWith('Desbobinadeira') && r.machine.startsWith('Desbobinadeira'))))}
+                    reports={(shiftReports || []).filter(r => {
+                        const cat = (machineType || 'Trefila').toLowerCase();
+                        const rMachine = (r.machine || '').toLowerCase();
+                        if (cat.startsWith('trefila')) return rMachine.startsWith('trefila');
+                        if (cat.startsWith('treliça')) return rMachine.startsWith('treliça');
+                        if (cat.startsWith('desbobinadeira')) return rMachine.startsWith('desbobinadeira');
+                        return r.machine === activeMachine;
+                    })}
                     stock={stock}
                     onClose={() => setShowShiftReportsModal(false)}
                     onDelete={deleteShiftReport}
