@@ -2459,12 +2459,31 @@ const App: React.FC = () => {
 
 
     const deleteShiftReport = async (reportId: string) => {
-        if (!confirm('Tem certeza que deseja excluir este relatório de turno?')) return;
+        if (!confirm('⚠️ Tem certeza que deseja EXCLUIR permanentemente este relatório de turno? As quantidades produzidas nele serão subtraídas da Ordem de Produção mãe.')) return;
         try {
+            const report = shiftReports?.find(r => r.id === reportId);
+            if (!report) throw new Error("Relatório não encontrado");
+
+            // 1. Delete from database
             await deleteItem('shift_reports', reportId);
-            showNotification('Relatório excluído com sucesso.', 'success');
-        } catch (error) {
-            showNotification('Erro ao excluir o relatório.', 'error');
+
+            // 2. Subtract from parent order
+            if (report.productionOrderId) {
+                const parentOrder = productionOrders?.find(o => o.id === report.productionOrderId);
+                if (parentOrder) {
+                    const newQty = Math.max(0, (parentOrder.actualProducedQuantity || 0) - (report.totalProducedQuantity || 0));
+                    const newWeight = Math.max(0, (parentOrder.actualProducedWeight || 0) - (report.totalProducedWeight || 0));
+
+                    await updateProductionOrder(parentOrder.id, {
+                        actualProducedQuantity: newQty,
+                        actualProducedWeight: newWeight
+                    });
+                }
+            }
+            showNotification('Relatório excluído e totais da ordem recalculados!', 'success');
+        } catch (error: any) {
+            console.error("Erro ao excluir relatório:", error);
+            showNotification(`Erro ao excluir o relatório: ${error.message || error}`, 'error');
         }
     };
 
@@ -2544,8 +2563,8 @@ const App: React.FC = () => {
             case 'productionOrderTrelica': return <ProductionOrderTrelica setPage={setPage} stock={stock} productionOrders={productionOrders} addProductionOrder={addProductionOrder} showNotification={showNotification} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} gauges={gauges} currentUser={currentUser} />;
             case 'productionOrderDesbobinadeira': return <ProductionOrderDesbobinadeira setPage={setPage} stock={stock} productionOrders={productionOrders} addProductionOrder={addProductionOrder} showNotification={showNotification} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} gauges={gauges} currentUser={currentUser} />;
             case 'productionDashboard': return <ProductionDashboard setPage={setPage} productionOrders={productionOrders} stock={stock} currentUser={currentUser} downtimeConfigs={downtimeConfigs} />;
-            case 'trefilaControl': return <ProductionControl machineCategory="Trefila" setPage={setPage} productionOrders={productionOrders} shiftReports={shiftReports} currentUser={currentUser} onUpdateReport={handleUpdateShiftReport} stock={stock} />;
-            case 'trelicaControl': return <ProductionControl machineCategory="Treliça" setPage={setPage} productionOrders={productionOrders} shiftReports={shiftReports} currentUser={currentUser} onUpdateReport={handleUpdateShiftReport} stock={stock} />;
+            case 'trefilaControl': return <ProductionControl machineCategory="Trefila" setPage={setPage} productionOrders={productionOrders} shiftReports={shiftReports} currentUser={currentUser} onUpdateReport={handleUpdateShiftReport} onDeleteReport={deleteShiftReport} updateProductionOrder={updateProductionOrder} stock={stock} />;
+            case 'trelicaControl': return <ProductionControl machineCategory="Treliça" setPage={setPage} productionOrders={productionOrders} shiftReports={shiftReports} currentUser={currentUser} onUpdateReport={handleUpdateShiftReport} onDeleteReport={deleteShiftReport} updateProductionOrder={updateProductionOrder} stock={stock} />;
             case 'reports': return <Reports setPage={setPage} stock={stock} trefilaProduction={trefilaProduction} trelicaProduction={trelicaProduction} gauges={gauges} />;
             case 'userManagement': return <UserManagement users={users} employees={employees} addUser={addUser} updateUser={updateUser} deleteUser={deleteUser} setPage={setPage} accessLogs={accessLogs} />;
             case 'finishedGoods': return <FinishedGoods finishedGoods={finishedGoods} pontasStock={pontasStock} setPage={setPage} finishedGoodsTransfers={finishedGoodsTransfers} createFinishedGoodsTransfer={createFinishedGoodsTransfer} onDelete={deleteFinishedGoods} onUpdateFinishedGood={updateFinishedGood} onUpdatePonta={updatePonta} currentUser={currentUser} users={users} />;
