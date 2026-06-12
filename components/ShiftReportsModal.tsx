@@ -328,483 +328,906 @@ const ShiftDetails: React.FC<{ report: ShiftReport, stock: StockItem[], onPrint:
     );
 };
 
+// SVG Icon Components for ShiftReportPrintView
+const CalendarIcon = ({ className = "h-5 w-5" }: { className?: string }) => (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+    </svg>
+);
+
+const ClipboardIcon = ({ className = "h-5 w-5" }: { className?: string }) => (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+    </svg>
+);
+
+const UserIcon = ({ className = "h-5 w-5" }: { className?: string }) => (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+    </svg>
+);
+
+const GaugeIcon = ({ className = "h-5 w-5" }: { className?: string }) => (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" fill="none" />
+        <path d="M12 12 l5 -5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+        <path d="M6 12 a6 6 0 0 1 12 0" stroke="currentColor" strokeWidth="1.5" strokeDasharray="2,2" />
+    </svg>
+);
+
+const ClockIcon = ({ className = "h-5 w-5" }: { className?: string }) => (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+);
+
+const LayersIcon = ({ className = "h-5 w-5" }: { className?: string }) => (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+    </svg>
+);
+
+const RulerIcon = ({ className = "h-5 w-5" }: { className?: string }) => (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <rect x="3" y="8" width="18" height="8" rx="2" stroke="currentColor" strokeWidth="2" fill="none" />
+        <line x1="6" y1="8" x2="6" y2="12" stroke="currentColor" strokeWidth="1.5" />
+        <line x1="9" y1="8" x2="9" y2="11" stroke="currentColor" strokeWidth="1.5" />
+        <line x1="12" y1="8" x2="12" y2="13" stroke="currentColor" strokeWidth="2" />
+        <line x1="15" y1="8" x2="15" y2="11" stroke="currentColor" strokeWidth="1.5" />
+        <line x1="18" y1="8" x2="18" y2="12" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+);
+
 export const ShiftReportPrintView: React.FC<{ report: ShiftReport, stock: StockItem[], allReports?: ShiftReport[] }> = ({ report, stock, allReports }) => {
-    const { totalDuration, productiveTime, totalDowntime, productivePercentage, downtimePercentage } = useMemo(() => {
-        const shiftStart = new Date(report.shiftStartTime).getTime();
-        const shiftEnd = new Date(report.shiftEndTime).getTime();
-        const totalDuration = shiftEnd - shiftStart;
-        const totalDowntime = report.downtimeEvents.reduce((acc, event) => {
-            const stop = new Date(event.stopTime).getTime();
-            const resume = event.resumeTime ? new Date(event.resumeTime).getTime() : shiftEnd;
-            const effectiveStart = Math.max(stop, shiftStart);
-            const effectiveEnd = Math.min(resume, shiftEnd);
-            return effectiveEnd > effectiveStart ? acc + (effectiveEnd - effectiveStart) : acc;
-        }, 0);
-        const productiveTime = Math.max(0, totalDuration - totalDowntime);
-        return {
-            totalDuration, productiveTime, totalDowntime,
-            productivePercentage: totalDuration > 0 ? (productiveTime / totalDuration) * 100 : 0,
-            downtimePercentage: totalDuration > 0 ? (totalDowntime / totalDuration) * 100 : 0
-        };
+    // 1. Helpers de Formatação e Data
+    const dateStr = useMemo(() => {
+        if (report.date) return report.date.split(' ')[0];
+        if (report.shiftStartTime) return new Date(report.shiftStartTime).toISOString().split('T')[0];
+        return new Date().toISOString().split('T')[0];
     }, [report]);
 
-    const sortedEvents = useMemo(() =>
-        [...report.downtimeEvents].sort((a, b) => new Date(a.stopTime).getTime() - new Date(b.stopTime).getTime()),
-        [report.downtimeEvents]);
+    const dateObj = useMemo(() => new Date(dateStr + 'T00:00:00'), [dateStr]);
+    const formattedDateNumbers = useMemo(() => dateObj.toLocaleDateString('pt-BR'), [dateObj]);
+    const formattedDayOfWeek = useMemo(() => {
+        const days = ['DOMINGO', 'SEGUNDA-FEIRA', 'TERÇA-FEIRA', 'QUARTA-FEIRA', 'QUINTA-FEIRA', 'SEXTA-FEIRA', 'SÁBADO'];
+        return days[dateObj.getDay()];
+    }, [dateObj]);
 
-    const isTrelica = report.machine !== 'Trefila';
+    const isTrelica = useMemo(() => {
+        const m = (report.machine || '').toLowerCase();
+        return m.startsWith('treliça') || m.startsWith('trelica');
+    }, [report]);
+
+    const machineName = report.machine || (isTrelica ? 'Treliça 1' : 'Trefila');
+
+    // 2. Filtro dos relatórios do mesmo dia e mesma categoria de máquina para agrupar Turno A e B (para Treliça)
+    const sameDayReports = useMemo(() => {
+        if (!allReports) return [report];
+        return allReports.filter(r => {
+            const rDate = r.date?.split(' ')[0] || (r.shiftStartTime ? new Date(r.shiftStartTime).toISOString().split('T')[0] : '');
+            const rMachineCategory = r.machine?.toLowerCase().startsWith('trefila') ? 'Trefila' : 'Treliça';
+            const currentMachineCategory = report.machine?.toLowerCase().startsWith('trefila') ? 'Trefila' : 'Treliça';
+            return rDate === dateStr && rMachineCategory === currentMachineCategory;
+        }).sort((a, b) => new Date(a.shiftStartTime || '').getTime() - new Date(b.shiftStartTime || '').getTime());
+    }, [allReports, report, dateStr]);
+
+    // Turno A e Turno B
+    const reportA = sameDayReports[0] || report;
+    const reportB = sameDayReports[1] || null;
+
+    const secondsToTime = (totalSeconds: number): string => {
+        if (totalSeconds <= 0 || isNaN(totalSeconds)) return '00:00:00';
+        const hrs = Math.floor(totalSeconds / 3600);
+        const mins = Math.floor((totalSeconds % 3600) / 60);
+        const secs = Math.floor(totalSeconds % 60);
+        const pad = (n: number) => String(n).padStart(2, '0');
+        return `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
+    };
+
+    // Estatísticas da Treliça (Turno A e B)
+    const getShiftStats = (r?: ShiftReport | null) => {
+        if (!r) {
+            return {
+                operator: '—',
+                horasTrabalhadas: '09:00:00',
+                tempoParado: '00:00:00',
+                percentParado: '0,0',
+                tempoEfetivo: '09:00:00',
+                percentEfetivo: '100,0',
+                pecas: 0,
+                tamanho: 6,
+                metros: 0,
+                tempoPorPeca: '00:00:00',
+                velocidade: '0,0',
+                stops: [],
+            };
+        }
+
+        const shiftStart = new Date(r.shiftStartTime || '').getTime();
+        const shiftEnd = new Date(r.shiftEndTime || '').getTime();
+        const totalDuration = isNaN(shiftStart) || isNaN(shiftEnd) ? (9 * 3600 * 1000) : (shiftEnd - shiftStart);
+        
+        const totalDowntime = (r.downtimeEvents || []).reduce((acc, event) => {
+            const stop = new Date(event.stopTime).getTime();
+            const resume = event.resumeTime ? new Date(event.resumeTime).getTime() : (isNaN(shiftEnd) ? stop : shiftEnd);
+            const effectiveStart = isNaN(shiftStart) ? stop : Math.max(stop, shiftStart);
+            const effectiveEnd = isNaN(shiftEnd) ? resume : Math.min(resume, shiftEnd);
+            return effectiveEnd > effectiveStart ? acc + (effectiveEnd - effectiveStart) : acc;
+        }, 0);
+        
+        const productiveTime = Math.max(0, totalDuration - totalDowntime);
+        const productivePercentage = totalDuration > 0 ? (productiveTime / totalDuration) * 100 : 100;
+        const downtimePercentage = totalDuration > 0 ? (totalDowntime / totalDuration) * 100 : 0;
+        
+        const size = parseFloat(r.tamanho || '6') || 6;
+        const pecas = r.totalProducedQuantity || (r.totalProducedMeters ? (r.totalProducedMeters / size) : 0);
+        const metros = pecas * size;
+        
+        const timePerPieceMs = pecas > 0 ? productiveTime / pecas : 0;
+        const speedMpm = productiveTime > 0 ? metros / (productiveTime / 60000) : 0;
+
+        const formatDurationLocal = (ms: number) => {
+            if (ms < 0) ms = 0;
+            const totalSeconds = Math.floor(ms / 1000);
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = totalSeconds % 60;
+            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        };
+
+        const mappedStops = (r.downtimeEvents || []).map((event, i) => {
+            const stopMs = new Date(event.stopTime).getTime();
+            const resumeMs = event.resumeTime ? new Date(event.resumeTime).getTime() : (isNaN(shiftEnd) ? stopMs : shiftEnd);
+            const dur = Math.max(0, resumeMs - stopMs);
+            
+            const formatTime = (dateStr: string) => {
+                const d = new Date(dateStr);
+                return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            };
+
+            return {
+                id: event.id || String(i),
+                inicio: formatTime(event.stopTime),
+                fim: event.resumeTime ? formatTime(event.resumeTime) : formatTime(r.shiftEndTime || ''),
+                motivo: event.reason,
+                duracaoStr: formatDurationLocal(dur)
+            };
+        }).sort((a, b) => a.inicio.localeCompare(b.inicio));
+
+        return {
+            operator: r.operator || '—',
+            horasTrabalhadas: formatDurationLocal(totalDuration),
+            tempoParado: formatDurationLocal(totalDowntime),
+            percentParado: downtimePercentage.toFixed(1).replace('.', ','),
+            tempoEfetivo: formatDurationLocal(productiveTime),
+            percentEfetivo: productivePercentage.toFixed(1).replace('.', ','),
+            pecas,
+            tamanho: size,
+            metros,
+            tempoPorPeca: formatDurationLocal(timePerPieceMs),
+            velocidade: speedMpm.toFixed(1).replace('.', ','),
+            stops: mappedStops,
+        };
+    };
+
+    // Estatísticas da Trefila
+    const getTrefilaStats = (r: ShiftReport) => {
+        const shiftStart = new Date(r.shiftStartTime || '').getTime();
+        const shiftEnd = new Date(r.shiftEndTime || '').getTime();
+        const totalDuration = isNaN(shiftStart) || isNaN(shiftEnd) ? (9 * 3600 * 1000) : (shiftEnd - shiftStart);
+        
+        const totalDowntime = (r.downtimeEvents || []).reduce((acc, event) => {
+            const stop = new Date(event.stopTime).getTime();
+            const resume = event.resumeTime ? new Date(event.resumeTime).getTime() : (isNaN(shiftEnd) ? stop : shiftEnd);
+            const effectiveStart = isNaN(shiftStart) ? stop : Math.max(stop, shiftStart);
+            const effectiveEnd = isNaN(shiftEnd) ? resume : Math.min(resume, shiftEnd);
+            return effectiveEnd > effectiveStart ? acc + (effectiveEnd - effectiveStart) : acc;
+        }, 0);
+        
+        const productiveTime = Math.max(0, totalDuration - totalDowntime);
+        const productivePercentage = totalDuration > 0 ? (productiveTime / totalDuration) * 100 : 100;
+        const downtimePercentage = totalDuration > 0 ? (totalDowntime / totalDuration) * 100 : 0;
+
+        const totalProducedWeight = r.totalProducedWeight || 0;
+        const totalScrapWeight = r.totalScrapWeight || 0;
+        const totalInputWeight = totalProducedWeight + totalScrapWeight;
+        const scrapPercentage = totalInputWeight > 0 ? (totalScrapWeight / totalInputWeight) * 100 : 0;
+
+        const bitolaNum = parseFloat(r.targetBitola || '6') || 6;
+        const area = Math.PI * Math.pow(bitolaNum / 2000, 2);
+        const density = 7850;
+        const weightPerMeter = area * density;
+        const totalMeters = weightPerMeter > 0 ? (totalProducedWeight / weightPerMeter) : 0;
+        const speedMps = productiveTime > 0 ? (totalMeters / (productiveTime / 1000)) : 0;
+        const speedMpm = speedMps * 60;
+
+        const formatDurationLocal = (ms: number) => {
+            if (ms < 0) ms = 0;
+            const totalSeconds = Math.floor(ms / 1000);
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = totalSeconds % 60;
+            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        };
+
+        const mappedStops = (r.downtimeEvents || []).map((event, i) => {
+            const stopMs = new Date(event.stopTime).getTime();
+            const resumeMs = event.resumeTime ? new Date(event.resumeTime).getTime() : (isNaN(shiftEnd) ? stopMs : shiftEnd);
+            const dur = Math.max(0, resumeMs - stopMs);
+
+            const formatTime = (dateStr: string) => {
+                const d = new Date(dateStr);
+                return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            };
+
+            return {
+                id: event.id || String(i),
+                inicio: formatTime(event.stopTime),
+                fim: event.resumeTime ? formatTime(event.resumeTime) : formatTime(r.shiftEndTime || ''),
+                motivo: event.reason,
+                duracaoStr: formatDurationLocal(dur)
+            };
+        }).sort((a, b) => a.inicio.localeCompare(b.inicio));
+
+        return {
+            operator: r.operator || '—',
+            horasTrabalhadas: formatDurationLocal(totalDuration),
+            tempoParado: formatDurationLocal(totalDowntime),
+            percentParado: downtimePercentage.toFixed(1).replace('.', ','),
+            tempoEfetivo: formatDurationLocal(productiveTime),
+            percentEfetivo: productivePercentage.toFixed(1).replace('.', ','),
+            pesoEntrada: totalInputWeight,
+            pesoSaida: totalProducedWeight,
+            sucata: totalScrapWeight,
+            percentSucata: scrapPercentage.toFixed(1).replace('.', ','),
+            metros: totalMeters,
+            velocidadeMs: speedMps,
+            velocidadeMin: speedMpm,
+            stops: mappedStops,
+        };
+    };
+
+    // Histórico de produção (pesagens) para a Ordem
+    const productionHistory = useMemo(() => {
+        const allSourceReports = allReports || [report];
+        const uniqueReports = Array.from(new Map(allSourceReports.map(item => [item.id, item])).values()) as ShiftReport[];
+
+        return uniqueReports
+            .filter(r => r.orderNumber === report.orderNumber && (isTrelica ? !r.machine?.toLowerCase().startsWith('trefila') : r.machine?.toLowerCase().startsWith('trefila')))
+            .sort((a, b) => new Date(a.shiftStartTime || a.date || '').getTime() - new Date(b.shiftStartTime || b.date || '').getTime());
+    }, [allReports, report.orderNumber, isTrelica]);
+
+    const totalsHistory = useMemo(() => {
+        let totalQty = 0;
+        let totalWeight = 0;
+
+        productionHistory.forEach(r => {
+            const size = parseFloat(r.tamanho || '6') || 6;
+            const q = r.totalProducedQuantity || (r.totalProducedMeters ? (r.totalProducedMeters / size) : 0);
+            totalQty += q;
+            totalWeight += (r.totalProducedWeight || 0);
+        });
+
+        const avgWeight = totalQty > 0 ? (totalWeight / totalQty) : 0;
+
+        return {
+            totalQty,
+            totalWeight,
+            avgWeight
+        };
+    }, [productionHistory]);
+
+    // Estilos comuns para impressão
+    const printStyles = `
+        .worksheet-container {
+            font-family: 'Inter', 'Segoe UI', 'Arial', sans-serif;
+            background: #ffffff;
+            color: #1e293b;
+        }
+        .text-blue-msm {
+            color: #002060 !important;
+        }
+        .bg-blue-msm {
+            background-color: #002060 !important;
+        }
+        .border-blue-msm {
+            border-color: #002060 !important;
+        }
+        @media print {
+            @page { size: A4 portrait; margin: 6mm 5mm 6mm 5mm; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            html, body {
+                background: white !important; overflow: visible !important; height: auto !important;
+            }
+            .print-sheet {
+                max-width: 100% !important; width: 100% !important;
+                box-shadow: none !important; border-radius: 0 !important;
+                border: 2px solid #002060 !important;
+            }
+            table, thead, tbody, tr, td, th {
+                page-break-inside: avoid !important; break-inside: avoid !important;
+            }
+        }
+    `;
 
     if (isTrelica) {
-        const tamanhoNum = parseFloat(report.tamanho || '6') || 6;
-        const totalPieces = report.totalProducedQuantity > 0
-            ? report.totalProducedQuantity
-            : (report.totalProducedMeters / tamanhoNum);
-        // FIX: Metros = peças × tamanho da peça (ex: 716 × 6 = 4296m)
-        const correctedMeters = totalPieces * tamanhoNum;
-        const timePerPieceMs = totalPieces > 0 ? productiveTime / totalPieces : 0;
-        const speedMpm = productiveTime > 0 ? correctedMeters / (productiveTime / 60000) : 0;
-
-        // Historical data for "Atualização da Produção"
-        // Historical data for "Atualização da Produção" - Listed by Shift
-        const productionHistory = useMemo(() => {
-            // Deduplicate reports by ID
-            const allSourceReports = allReports || [report];
-            const uniqueReports = Array.from(new Map(allSourceReports.map(item => [item.id, item])).values()) as ShiftReport[];
-
-            return uniqueReports
-                .filter(r => r.orderNumber === report.orderNumber && r.machine !== 'Trefila')
-                .sort((a, b) => new Date(a.shiftStartTime || a.date).getTime() - new Date(b.shiftStartTime || b.date).getTime());
-        }, [allReports, report.orderNumber]);
-
-        const totalHistPieces = productionHistory.reduce((acc, r) => {
-            const qty = r.totalProducedQuantity > 0 ? r.totalProducedQuantity : ((r.totalProducedMeters || 0) / (parseFloat(r.tamanho || '6') || 6));
-            return acc + qty;
-        }, 0);
-        const totalHistWeight = productionHistory.reduce((acc, r) => acc + (r.totalProducedWeight || 0), 0);
-        const avgHistMedia = totalHistPieces > 0 ? totalHistWeight / totalHistPieces : 0;
+        const statsA = getShiftStats(reportA);
+        const statsB = getShiftStats(reportB);
+        const totalPecasProduzidas = statsA.pecas + statsB.pecas;
 
         return (
-            <div className="p-8 bg-white text-black font-sans min-h-screen text-[12px] print:block">
-                {/* Header Section */}
-                <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-4">
-                        <img src="/ita-acos-logo.png" alt="Grupo ITA AÇOS" className="h-24 w-auto object-contain" />
+            <div className="bg-white p-4 max-w-5xl mx-auto worksheet-container print-sheet border-2 border-[#002060] rounded-xl overflow-hidden shadow-lg text-slate-800 text-left">
+                <style dangerouslySetInnerHTML={{ __html: printStyles }} />
+                
+                {/* CABEÇALHO */}
+                <div className="grid grid-cols-1 md:grid-cols-12 border-b-2 border-[#002060]">
+                    <div className="col-span-3 bg-white p-2.5 flex items-center justify-center border-r-2 border-[#002060]">
+                        <img src="/ita-acos-logo.png" alt="Logo Grupo Ita Aços" className="h-16 md:h-20 object-contain" style={{ maxHeight: '82px' }} />
                     </div>
-                    <div className="text-center flex-grow px-4">
-                        <h1 className="text-lg font-black uppercase leading-tight tracking-tight">
-                            CONTROLE DE PRODUÇÃO DIARIA - SETOR LAMINAÇÃO<br />
-                            TRELIÇA
-                        </h1>
+
+                    <div className="col-span-6 bg-[#002060] text-white p-4 flex flex-col justify-center pl-8 text-left">
+                        <h2 className="text-xl md:text-2xl font-black uppercase tracking-wider leading-none text-white">
+                            Controle de Produção Diária
+                        </h2>
+                        <p className="text-xs md:text-sm font-extrabold uppercase tracking-widest text-slate-300 mt-1">
+                            Setor Laminação – {machineName}
+                        </p>
                     </div>
-                    <div className="w-24"></div> {/* Balance spacer */}
+
+                    <div className="col-span-3 bg-[#002060] text-white p-3 flex items-center border-l-2 border-white pl-4">
+                        <div className="flex items-center gap-2.5">
+                            <CalendarIcon className="h-6 w-6 text-white" />
+                            <div>
+                                <div className="text-[9px] font-black text-slate-300 tracking-wider">DATA DA PRODUÇÃO</div>
+                                <div className="text-base font-black text-white leading-tight">{formattedDateNumbers}</div>
+                                <div className="text-[10px] font-extrabold text-slate-300 uppercase">{formattedDayOfWeek}</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                {/* Info Table */}
-                <table className="w-full border-collapse border-2 border-black mb-4">
-                    <tbody>
-                        <tr>
-                            <td className="border border-black p-2 font-bold bg-white text-center align-middle text-base">Ordem de produção : <span className="font-black ml-2 tabular-nums text-xl">{report.orderNumber}</span></td>
-                        </tr>
-                        <tr>
-                            <td className="border border-black p-2 font-bold bg-white text-center align-middle text-base">
-                                Data da produção: <span className="font-bold ml-2 uppercase text-base">{new Date(report.date).toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}</span>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td className="border border-black p-2 font-bold bg-white text-center align-middle text-base">Operador/auxiliar: <span className="font-black ml-2 uppercase text-lg">{report.operator}</span></td>
-                        </tr>
-                    </tbody>
-                </table>
+                {/* METADADOS */}
+                <div className="grid grid-cols-12 border-b border-slate-200 bg-[#fbfcfd] text-left text-xs">
+                    <div className="col-span-4 p-4 flex flex-col justify-between gap-3 border-r border-slate-200">
+                        <div className="flex items-start gap-2.5">
+                            <ClipboardIcon className="h-5 w-5 text-[#002060] mt-0.5" />
+                            <div>
+                                <div className="text-[9px] font-black text-slate-500 uppercase tracking-wider">ORDEM DE PRODUÇÃO</div>
+                                <div className="text-sm font-black text-[#002060] uppercase mt-0.5">{report.orderNumber || '—'}</div>
+                            </div>
+                        </div>
+                        <div className="pt-3 border-t border-slate-100 flex items-start gap-2.5">
+                            <UserIcon className="h-5 w-5 text-[#002060] mt-0.5" />
+                            <div>
+                                <div className="text-[9px] font-black text-slate-500 uppercase tracking-wider">OPERADOR / AUXILIAR - TURNO A</div>
+                                <div className="text-sm font-black text-[#002060] uppercase mt-0.5">{statsA.operator}</div>
+                            </div>
+                        </div>
+                    </div>
 
-                {/* Product Description */}
-                <table className="w-full border-collapse border-2 border-black mb-6">
-                    <tbody>
-                        <tr>
-                            <td className="p-3 border-b border-black">
-                                <span className="font-bold text-lg">Descrição do produto:</span>
-                                <span className="ml-2 font-black text-2xl uppercase">TRELIÇA {report.trelicaModel} {report.tamanho} MTS</span>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td className="p-3">
-                                <span className="font-bold text-lg">Qnt. De peças produzidas:</span>
-                                <span className="ml-2 font-black text-3xl tabular-nums">{totalPieces.toFixed(0)} peças</span>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                    <div className="col-span-5 p-4 flex flex-col justify-between gap-3 border-r border-slate-200">
+                        <div className="flex items-start gap-2.5">
+                            <div className="pl-1">
+                                <div className="text-[9px] font-black text-slate-500 uppercase tracking-wider">DESCRIÇÃO DO PRODUTO</div>
+                                <div className="text-sm font-black text-[#002060] uppercase mt-0.5">TRELIÇA {report.trelicaModel || 'H-12'} {report.tamanho || '6'} MTS</div>
+                            </div>
+                        </div>
+                        <div className="pt-3 border-t border-slate-100 flex items-start gap-2.5">
+                            <UserIcon className="h-5 w-5 text-[#002060] mt-0.5" />
+                            <div>
+                                <div className="text-[9px] font-black text-slate-500 uppercase tracking-wider">OPERADOR / AUXILIAR - TURNO B</div>
+                                <div className="text-sm font-black text-[#002060] uppercase mt-0.5">{statsB.operator}</div>
+                            </div>
+                        </div>
+                    </div>
 
-                {/* Paradas e Motivos */}
-                <div className="mb-6">
-                    <h2 className="text-center italic font-black text-base mb-1 underline">PARADAS E SEUS MOTIVOS:</h2>
-                    <table className="w-full border-collapse border-2 border-black">
+                    <div className="col-span-3 p-4 flex flex-col justify-center items-center text-center bg-slate-50">
+                        <div className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-1">QUANTIDADE DE PEÇAS PRODUZIDAS</div>
+                        <div className="flex items-baseline gap-1">
+                            <span className="text-4xl font-black text-[#002060] tracking-tight">{totalPecasProduzidas.toFixed(0)}</span>
+                            <span className="text-sm font-bold text-slate-600">peças</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* PARADAS DOS TURNOS A E B LADO A LADO */}
+                <div className="grid grid-cols-2 gap-4 p-4 border-b border-slate-200">
+                    {/* Paradas Turno A */}
+                    <div className="border border-[#002060] rounded-lg overflow-hidden bg-white shadow-sm flex flex-col">
+                        <div className="bg-[#002060] text-white py-2 px-3 text-[11px] font-black tracking-wider uppercase text-left">
+                            PARADAS E SEUS MOTIVOS – TURNO A
+                        </div>
+                        <table className="w-full border-collapse">
+                            <thead>
+                                <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-700 uppercase">
+                                    <th className="py-1.5 border-r border-slate-200 text-center" style={{ width: '75px' }}>Início</th>
+                                    <th className="py-1.5 border-r border-slate-200 text-center" style={{ width: '75px' }}>Fim</th>
+                                    <th className="py-1.5 border-r border-slate-200 text-center" style={{ width: '70px' }}>Duração</th>
+                                    <th className="py-1.5 text-left pl-3">Motivo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {statsA.stops.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={4} className="text-center py-6 text-slate-400 italic font-bold text-xs">
+                                            Nenhuma parada registrada no Turno A.
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    statsA.stops.map((stop: any) => (
+                                        <tr key={stop.id} className="border-b border-slate-200 text-xs">
+                                            <td className="p-1 border-r border-slate-200 text-center text-rose-600 font-black">{stop.inicio}</td>
+                                            <td className="p-1 border-r border-slate-200 text-center text-emerald-600 font-black">{stop.fim}</td>
+                                            <td className="p-1 border-r border-slate-200 text-center font-black text-rose-600">{stop.duracaoStr}</td>
+                                            <td className="p-1 text-left pl-3 font-bold text-slate-800 uppercase">{stop.motivo}</td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Paradas Turno B */}
+                    <div className="border border-[#002060] rounded-lg overflow-hidden bg-white shadow-sm flex flex-col">
+                        <div className="bg-[#002060] text-white py-2 px-3 text-[11px] font-black tracking-wider uppercase text-left">
+                            PARADAS E SEUS MOTIVOS – TURNO B
+                        </div>
+                        <table className="w-full border-collapse">
+                            <thead>
+                                <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-700 uppercase">
+                                    <th className="py-1.5 border-r border-slate-200 text-center" style={{ width: '75px' }}>Início</th>
+                                    <th className="py-1.5 border-r border-slate-200 text-center" style={{ width: '75px' }}>Fim</th>
+                                    <th className="py-1.5 border-r border-slate-200 text-center" style={{ width: '70px' }}>Duração</th>
+                                    <th className="py-1.5 text-left pl-3">Motivo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {statsB.stops.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={4} className="text-center py-6 text-slate-400 italic font-bold text-xs">
+                                            Nenhuma parada registrada no Turno B.
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    statsB.stops.map((stop: any) => (
+                                        <tr key={stop.id} className="border-b border-slate-200 text-xs">
+                                            <td className="p-1 border-r border-slate-200 text-center text-rose-600 font-black">{stop.inicio}</td>
+                                            <td className="p-1 border-r border-slate-200 text-center text-emerald-600 font-black">{stop.fim}</td>
+                                            <td className="p-1 border-r border-slate-200 text-center font-black text-rose-600">{stop.duracaoStr}</td>
+                                            <td className="p-1 text-left pl-3 font-bold text-slate-800 uppercase">{stop.motivo}</td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {/* ESTATÍSTICA DO DIA LADO A LADO */}
+                <div className="grid grid-cols-2 gap-4 p-4 border-b border-slate-200 bg-[#fbfcfd]">
+                    {/* Estatísticas Turno A */}
+                    <div className="border border-[#002060] rounded-lg overflow-hidden bg-white shadow-sm flex flex-col">
+                        <div className="bg-[#002060] text-white py-2 px-3 text-[11px] font-black tracking-wider uppercase text-left flex items-center gap-1.5">
+                            <GaugeIcon className="h-4 w-4 text-white" />
+                            <span>ESTATÍSTICA DO DIA – TURNO A</span>
+                        </div>
+                        <div className="p-3 divide-y divide-slate-100 flex flex-col justify-between h-full text-xs">
+                            <div className="flex items-center justify-between py-2.5">
+                                <div className="flex items-center gap-2">
+                                    <ClockIcon className="h-4 w-4 text-slate-400" />
+                                    <span className="font-bold text-slate-700">Horas (Turno trabalhado)</span>
+                                </div>
+                                <span className="font-black text-slate-950">{statsA.horasTrabalhadas}</span>
+                            </div>
+                            <div className="flex items-center justify-between py-2.5 bg-rose-50/20 px-1 rounded">
+                                <div className="flex items-center gap-2">
+                                    <ClockIcon className="h-4 w-4 text-rose-500" />
+                                    <span className="font-black text-rose-600 uppercase">Tempo de máquina (parada)</span>
+                                </div>
+                                <div className="flex gap-4 font-black text-rose-600">
+                                    <span>{statsA.tempoParado}</span>
+                                    <span>{statsA.percentParado}%</span>
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between py-2.5 bg-emerald-50/20 px-1 rounded">
+                                <div className="flex items-center gap-2">
+                                    <ClockIcon className="h-4 w-4 text-emerald-500" />
+                                    <span className="font-black text-emerald-600 uppercase">Tempo de máquina (E efetivo)</span>
+                                </div>
+                                <div className="flex gap-4 font-black text-emerald-600">
+                                    <span>{statsA.tempoEfetivo}</span>
+                                    <span>{statsA.percentEfetivo}%</span>
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between py-2.5">
+                                <div className="flex items-center gap-2">
+                                    <LayersIcon className="h-4 w-4 text-slate-400" />
+                                    <span className="font-bold text-slate-700">Quantidade de peças produzidas</span>
+                                </div>
+                                <span className="font-black text-[#002060]">{statsA.pecas.toFixed(0)} <span className="text-[10px] text-slate-500 font-bold">peças de {statsA.tamanho} metros</span></span>
+                            </div>
+                            <div className="flex items-center justify-between py-2.5">
+                                <div className="flex items-center gap-2">
+                                    <RulerIcon className="h-4 w-4 text-slate-400" />
+                                    <span className="font-bold text-slate-700">Quantidade de metros metros produzidos</span>
+                                </div>
+                                <span className="font-black text-[#002060]">{statsA.metros.toFixed(0)} metros</span>
+                            </div>
+                            <div className="flex items-center justify-between py-2.5">
+                                <div className="flex items-center gap-2">
+                                    <ClockIcon className="h-4 w-4 text-slate-400" />
+                                    <span className="font-bold text-slate-700">Tempo por peça (médio)</span>
+                                </div>
+                                <span className="font-black text-[#002060]">{statsA.tempoPorPeca}</span>
+                            </div>
+                            <div className="flex items-center justify-between py-2.5">
+                                <div className="flex items-center gap-2">
+                                    <GaugeIcon className="h-4 w-4 text-slate-400" />
+                                    <span className="font-bold text-slate-700">Velocidade (média)</span>
+                                </div>
+                                <span className="font-black text-[#002060]">{statsA.velocidade} metros/ minuto</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Estatísticas Turno B */}
+                    <div className="border border-[#002060] rounded-lg overflow-hidden bg-white shadow-sm flex flex-col">
+                        <div className="bg-[#002060] text-white py-2 px-3 text-[11px] font-black tracking-wider uppercase text-left flex items-center gap-1.5">
+                            <GaugeIcon className="h-4 w-4 text-white" />
+                            <span>ESTATÍSTICA DO DIA – TURNO B</span>
+                        </div>
+                        <div className="p-3 divide-y divide-slate-100 flex flex-col justify-between h-full text-xs">
+                            <div className="flex items-center justify-between py-2.5">
+                                <div className="flex items-center gap-2">
+                                    <ClockIcon className="h-4 w-4 text-slate-400" />
+                                    <span className="font-bold text-slate-700">Horas (Turno trabalhado)</span>
+                                </div>
+                                <span className="font-black text-slate-950">{statsB.horasTrabalhadas}</span>
+                            </div>
+                            <div className="flex items-center justify-between py-2.5 bg-rose-50/20 px-1 rounded">
+                                <div className="flex items-center gap-2">
+                                    <ClockIcon className="h-4 w-4 text-rose-500" />
+                                    <span className="font-black text-rose-600 uppercase">Tempo de máquina (parada)</span>
+                                </div>
+                                <div className="flex gap-4 font-black text-rose-600">
+                                    <span>{statsB.tempoParado}</span>
+                                    <span>{statsB.percentParado}%</span>
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between py-2.5 bg-emerald-50/20 px-1 rounded">
+                                <div className="flex items-center gap-2">
+                                    <ClockIcon className="h-4 w-4 text-emerald-500" />
+                                    <span className="font-black text-emerald-600 uppercase">Tempo de máquina (E efetivo)</span>
+                                </div>
+                                <div className="flex gap-4 font-black text-emerald-600">
+                                    <span>{statsB.tempoEfetivo}</span>
+                                    <span>{statsB.percentEfetivo}%</span>
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between py-2.5">
+                                <div className="flex items-center gap-2">
+                                    <LayersIcon className="h-4 w-4 text-slate-400" />
+                                    <span className="font-bold text-slate-700">Quantidade de peças produzidas</span>
+                                </div>
+                                <span className="font-black text-[#002060]">{statsB.pecas.toFixed(0)} <span className="text-[10px] text-slate-500 font-bold">peças de {statsB.tamanho} metros</span></span>
+                            </div>
+                            <div className="flex items-center justify-between py-2.5">
+                                <div className="flex items-center gap-2">
+                                    <RulerIcon className="h-4 w-4 text-slate-400" />
+                                    <span className="font-bold text-slate-700">Quantidade de metros metros produzidos</span>
+                                </div>
+                                <span className="font-black text-[#002060]">{statsB.metros.toFixed(0)} metros</span>
+                            </div>
+                            <div className="flex items-center justify-between py-2.5">
+                                <div className="flex items-center gap-2">
+                                    <ClockIcon className="h-4 w-4 text-slate-400" />
+                                    <span className="font-bold text-slate-700">Tempo por peça (médio)</span>
+                                </div>
+                                <span className="font-black text-[#002060]">{statsB.tempoPorPeca}</span>
+                            </div>
+                            <div className="flex items-center justify-between py-2.5">
+                                <div className="flex items-center gap-2">
+                                    <GaugeIcon className="h-4 w-4 text-slate-400" />
+                                    <span className="font-bold text-slate-700">Velocidade (média)</span>
+                                </div>
+                                <span className="font-black text-[#002060]">{statsB.velocidade} metros/ minuto</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* ATUALIZAÇÃO DA PRODUÇÃO */}
+                <div className="p-4 bg-white text-left">
+                    <div className="bg-[#002060] text-white py-2 px-3 text-[11px] font-black tracking-wider uppercase mb-3 rounded">
+                        ATUALIZAÇÃO DA PRODUÇÃO
+                    </div>
+                    <div className="text-xs font-black text-slate-700 mb-4 pl-1">
+                        Quantidade de peças a produzir: <span className="font-black text-[#002060] text-sm tabular-nums">{report.quantityToProduce || reportA?.quantityToProduce || '-'}</span> treliças
+                    </div>
+
+                    <table className="w-full border-collapse border-2 border-[#002060] text-xs">
                         <thead>
-                            <tr className="bg-slate-100 text-sm font-black text-center">
-                                <th className="border border-black p-2 w-32">INÍCIO</th>
-                                <th className="border border-black p-2 w-32">FIM</th>
-                                <th className="border border-black p-2 px-4">MOTIVO</th>
-                                <th className="border border-black p-2 w-32">DURAÇÃO</th>
+                            <tr className="border-b-2 border-[#002060] bg-slate-50 font-black text-[#002060] text-center">
+                                <th className="p-2 border-r border-[#002060] w-1/4">QNT.</th>
+                                <th className="p-2 border-r border-[#002060] w-1/4">PESO (KG)</th>
+                                <th className="p-2 border-r border-[#002060] w-1/4">MÉDIA (KG/PEÇA)</th>
+                                <th className="p-2 w-1/4">DATA</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {sortedEvents.map((event, idx) => {
-                                const duration = new Date(event.resumeTime || report.shiftEndTime).getTime() - new Date(event.stopTime).getTime();
+                            {productionHistory.map((r, i) => {
+                                const size = parseFloat(r.tamanho || '6') || 6;
+                                const q = r.totalProducedQuantity > 0 ? r.totalProducedQuantity : ((r.totalProducedMeters || 0) / size);
+                                const media = q > 0 ? (r.totalProducedWeight || 0) / q : 0;
+                                const dateStrFormatted = r.date ? new Date(r.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '';
+
                                 return (
-                                    <tr key={idx} className="text-sm">
-                                        <td className="border border-black p-2 text-center font-black text-rose-600 tabular-nums">
-                                            {new Date(event.stopTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                                        </td>
-                                        <td className="border border-black p-2 text-center font-black text-emerald-600 tabular-nums">
-                                            {event.resumeTime ? new Date(event.resumeTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : new Date(report.shiftEndTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + '*'}
-                                        </td>
-                                        <td className="border border-black p-2 px-4 italic font-bold text-slate-800 uppercase">
-                                            {event.reason}
-                                            {event.justification && <div className="text-[10px] text-rose-500 font-bold normal-case mt-1 italic">Justificativa: {event.justification}</div>}
-                                        </td>
-                                        <td className="border border-black p-2 text-center font-black text-rose-600 tabular-nums">
-                                            {formatDuration(duration)}
-                                        </td>
+                                    <tr key={i} className="border-b border-[#002060] tabular-nums font-bold text-center text-slate-800">
+                                        <td className="p-2 border-r border-[#002060]">{q.toFixed(0)}</td>
+                                        <td className="p-2 border-r border-[#002060]">{(r.totalProducedWeight || 0).toFixed(0)}</td>
+                                        <td className="p-2 border-r border-[#002060]">{media.toFixed(2)}</td>
+                                        <td className="p-2">{dateStrFormatted}</td>
                                     </tr>
                                 );
                             })}
-                            {sortedEvents.length === 0 && (
-                                <tr className="h-8">
-                                    <td className="border border-black p-2 text-center font-medium italic" colSpan={4}>Nenhuma parada registrada.</td>
+                            <tr className="border-t-2 border-[#002060] bg-slate-50 font-black tabular-nums text-center text-[#002060]">
+                                <td className="p-2.5 border-r border-[#002060]">{totalsHistory.totalQty.toFixed(0)}</td>
+                                <td className="p-2.5 border-r border-[#002060]">{totalsHistory.totalWeight.toFixed(0)}</td>
+                                <td className="p-2.5 border-r border-[#002060]">{totalsHistory.avgWeight.toFixed(2)}</td>
+                                <td className="p-2.5 italic uppercase text-center">TOTAL / MÉDIA</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div className="mt-8 text-center border-t border-slate-100 pt-4">
+                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">MSM Inteligência Operacional — Gerado em {new Date().toLocaleString('pt-BR')}</p>
+                </div>
+            </div>
+        );
+    } else {
+        // --- LAYOUT TREFILA ---
+        const statsA = getTrefilaStats(report);
+
+        return (
+            <div className="bg-white p-4 max-w-5xl mx-auto worksheet-container print-sheet border-2 border-[#002060] rounded-xl overflow-hidden shadow-lg text-slate-800 text-left">
+                <style dangerouslySetInnerHTML={{ __html: printStyles }} />
+                
+                {/* CABEÇALHO */}
+                <div className="grid grid-cols-1 md:grid-cols-12 border-b-2 border-[#002060]">
+                    <div className="col-span-3 bg-white p-2.5 flex items-center justify-center border-r-2 border-[#002060]">
+                        <img src="/ita-acos-logo.png" alt="Logo Grupo Ita Aços" className="h-16 md:h-20 object-contain" style={{ maxHeight: '82px' }} />
+                    </div>
+
+                    <div className="col-span-6 bg-[#002060] text-white p-4 flex flex-col justify-center pl-8 text-left">
+                        <h2 className="text-xl md:text-2xl font-black uppercase tracking-wider leading-none text-white">
+                            Controle de Produção Diária
+                        </h2>
+                        <p className="text-xs md:text-sm font-extrabold uppercase tracking-widest text-slate-300 mt-1">
+                            Setor Laminação – Trefila
+                        </p>
+                    </div>
+
+                    <div className="col-span-3 bg-[#002060] text-white p-3 flex items-center border-l-2 border-white pl-4">
+                        <div className="flex items-center gap-2.5">
+                            <CalendarIcon className="h-6 w-6 text-white" />
+                            <div>
+                                <div className="text-[9px] font-black text-slate-300 tracking-wider">DATA DA PRODUÇÃO</div>
+                                <div className="text-base font-black text-white leading-tight">{formattedDateNumbers}</div>
+                                <div className="text-[10px] font-extrabold text-slate-300 uppercase">{formattedDayOfWeek}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* METADADOS */}
+                <div className="grid grid-cols-12 border-b border-slate-200 bg-[#fbfcfd] text-left text-xs">
+                    <div className="col-span-4 p-4 flex flex-col justify-between gap-3 border-r border-slate-200">
+                        <div className="flex items-start gap-2.5">
+                            <ClipboardIcon className="h-5 w-5 text-[#002060] mt-0.5" />
+                            <div>
+                                <div className="text-[9px] font-black text-slate-500 uppercase tracking-wider">ORDEM DE PRODUÇÃO</div>
+                                <div className="text-sm font-black text-[#002060] uppercase mt-0.5">{report.orderNumber || '—'}</div>
+                            </div>
+                        </div>
+                        <div className="pt-3 border-t border-slate-100 flex items-start gap-2.5">
+                            <UserIcon className="h-5 w-5 text-[#002060] mt-0.5" />
+                            <div>
+                                <div className="text-[9px] font-black text-slate-500 uppercase tracking-wider">OPERADOR / AUXILIAR</div>
+                                <div className="text-sm font-black text-[#002060] uppercase mt-0.5">{statsA.operator}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="col-span-5 p-4 flex flex-col justify-between gap-3 border-r border-slate-200">
+                        <div>
+                            <div className="text-[9px] font-black text-slate-500 uppercase tracking-wider">DESCRIÇÃO DO PRODUTO (ENTRADA)</div>
+                            <div className="text-sm font-black text-[#002060] uppercase mt-0.5">{report.targetBitola ? `Fio Máquina ⌀ 8,00 mm` : '—'}</div>
+                        </div>
+                        <div className="pt-3 border-t border-slate-100">
+                            <div className="text-[9px] font-black text-slate-500 uppercase tracking-wider">DESCRIÇÃO DO PRODUTO (SAÍDA)</div>
+                            <div className="text-sm font-black text-[#002060] uppercase mt-0.5">{report.targetBitola ? `CA-60 / CA-50 ⌀ ${report.targetBitola} mm` : '—'}</div>
+                        </div>
+                    </div>
+
+                    <div className="col-span-3 p-4 flex flex-col justify-center items-center text-center bg-slate-50">
+                        <div className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-1">PESO TOTAL PRODUZIDO</div>
+                        <div className="flex items-baseline gap-1">
+                            <span className="text-4xl font-black text-[#002060] tracking-tight">{statsA.pesoSaida.toFixed(0)}</span>
+                            <span className="text-sm font-bold text-slate-600">kg</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* PARADAS E ESTATÍSTICAS - LADO A LADO */}
+                <div className="grid grid-cols-12 gap-4 p-4 border-b border-slate-200">
+                    {/* Paradas (col-span-7) */}
+                    <div className="col-span-7 border border-[#002060] rounded-lg overflow-hidden bg-white shadow-sm flex flex-col">
+                        <div className="bg-[#002060] text-white py-2 px-3 text-[11px] font-black tracking-wider uppercase text-left">
+                            PARADAS E SEUS MOTIVOS
+                        </div>
+                        <table className="w-full border-collapse">
+                            <thead>
+                                <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-700 uppercase">
+                                    <th className="py-1.5 border-r border-slate-200 text-center" style={{ width: '75px' }}>Início</th>
+                                    <th className="py-1.5 border-r border-slate-200 text-center" style={{ width: '75px' }}>Fim</th>
+                                    <th className="py-1.5 border-r border-slate-200 text-center" style={{ width: '70px' }}>Duração</th>
+                                    <th className="py-1.5 text-left pl-3">Motivo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {statsA.stops.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={4} className="text-center py-6 text-slate-400 italic font-bold text-xs">
+                                            Nenhuma parada registrada.
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    statsA.stops.map((stop: any) => (
+                                        <tr key={stop.id} className="border-b border-slate-200 text-xs">
+                                            <td className="p-1 border-r border-slate-200 text-center text-rose-600 font-black">{stop.inicio}</td>
+                                            <td className="p-1 border-r border-slate-200 text-center text-emerald-600 font-black">{stop.fim}</td>
+                                            <td className="p-1 border-r border-slate-200 text-center font-black text-rose-600">{stop.duracaoStr}</td>
+                                            <td className="p-1 text-left pl-3 font-bold text-slate-800 uppercase">{stop.motivo}</td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Estatísticas (col-span-5) */}
+                    <div className="col-span-5 border border-[#002060] rounded-lg overflow-hidden bg-white shadow-sm flex flex-col text-xs">
+                        <div className="bg-[#002060] text-white py-2 px-3 text-[11px] font-black tracking-wider uppercase text-left flex items-center gap-1.5">
+                            <GaugeIcon className="h-4 w-4 text-white" />
+                            <span>ESTATÍSTICA DO DIA</span>
+                        </div>
+                        <div className="p-3 divide-y divide-slate-100 flex flex-col justify-between h-full text-xs text-left">
+                            <div className="flex items-center justify-between py-2">
+                                <div className="flex items-center gap-2">
+                                    <ClockIcon className="h-4 w-4 text-slate-400" />
+                                    <span className="font-bold text-slate-700">Horas (Turno trabalhado)</span>
+                                </div>
+                                <span className="font-black text-slate-900">{statsA.horasTrabalhadas}</span>
+                            </div>
+                            <div className="flex items-center justify-between py-2 bg-rose-50/20 px-1 rounded">
+                                <div className="flex items-center gap-2">
+                                    <ClockIcon className="h-4 w-4 text-rose-500" />
+                                    <span className="font-black text-rose-600 uppercase">Tempo de máquina (parada)</span>
+                                </div>
+                                <div className="flex gap-4 font-black text-rose-600">
+                                    <span>{statsA.tempoParado}</span>
+                                    <span>{statsA.percentParado}%</span>
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between py-2 bg-emerald-50/20 px-1 rounded">
+                                <div className="flex items-center gap-2">
+                                    <ClockIcon className="h-4 w-4 text-emerald-500" />
+                                    <span className="font-black text-emerald-600 uppercase">Tempo de máquina (Efetivo)</span>
+                                </div>
+                                <div className="flex gap-4 font-black text-emerald-600">
+                                    <span>{statsA.tempoEfetivo}</span>
+                                    <span>{statsA.percentEfetivo}%</span>
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between py-2">
+                                <div className="flex items-center gap-2">
+                                    <LayersIcon className="h-4 w-4 text-slate-400" />
+                                    <span className="font-bold text-slate-700">Peso entrada</span>
+                                </div>
+                                <span className="font-black text-[#002060]">{statsA.pesoEntrada.toLocaleString('pt-BR')} kg</span>
+                            </div>
+                            <div className="flex items-center justify-between py-2">
+                                <div className="flex items-center gap-2">
+                                    <LayersIcon className="h-4 w-4 text-slate-400" />
+                                    <span className="font-bold text-slate-700">Peso saida</span>
+                                </div>
+                                <span className="font-black text-[#002060]">{statsA.pesoSaida.toLocaleString('pt-BR')} kg</span>
+                            </div>
+                            <div className="flex items-center justify-between py-2">
+                                <div className="flex items-center gap-2">
+                                    <LayersIcon className="h-4 w-4 text-slate-400" />
+                                    <span className="font-bold text-slate-700">Sucata</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <span className="font-black text-[#002060]">{statsA.sucata.toLocaleString('pt-BR')} kg</span>
+                                    <span className="text-rose-600 font-black text-[10px] bg-rose-50 border border-rose-100 rounded px-1.5 py-0.5">{statsA.percentSucata}%</span>
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between py-2">
+                                <div className="flex items-center gap-2">
+                                    <RulerIcon className="h-4 w-4 text-slate-400" />
+                                    <span className="font-bold text-slate-700">Quant. metros produzidos</span>
+                                </div>
+                                <span className="font-black text-[#002060]">{Math.round(statsA.metros).toLocaleString('pt-BR')} metros</span>
+                            </div>
+                            <div className="flex items-center justify-between py-2">
+                                <div className="flex items-center gap-2">
+                                    <GaugeIcon className="h-4 w-4 text-slate-400" />
+                                    <span className="font-bold text-slate-700">Velocidade (média)</span>
+                                </div>
+                                <span className="font-black text-[#002060]">{statsA.velocidadeMin.toFixed(1).replace('.', ',')} metros/ minuto</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* ATUALIZAÇÃO DA PRODUÇÃO (LOTES PROCESSADOS) */}
+                <div className="p-4 bg-white text-left">
+                    <div className="bg-[#002060] text-white py-2 px-3 text-[11px] font-black tracking-wider uppercase mb-3 rounded">
+                        ATUALIZAÇÃO DA PRODUÇÃO – LINHA DO TEMPO DE LOTES
+                    </div>
+                    <table className="w-full border-collapse border-2 border-[#002060] text-xs">
+                        <thead>
+                            <tr className="border-b-2 border-[#002060] bg-slate-50 font-black text-[#002060] text-center">
+                                <th className="p-2 border-r border-[#002060] w-1/4">CÓDIGO RASTREIO</th>
+                                <th className="p-2 border-r border-[#002060] w-1/4">PESO LÍQUIDO (KG)</th>
+                                <th className="p-2 border-r border-[#002060] w-1/4">JANELA OPERATIVA</th>
+                                <th className="p-2 w-1/4">TEMPO DE CICLO</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {(report.processedLots || []).map((lot, idx) => {
+                                const stockInfo = stock.find(s => s.id === lot.lotId);
+                                const duration = new Date(lot.endTime).getTime() - new Date(lot.startTime).getTime();
+                                const start = new Date(lot.startTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                                const end = new Date(lot.endTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+                                const formatDurationLocal = (ms: number) => {
+                                    if (ms < 0) ms = 0;
+                                    const totalSeconds = Math.floor(ms / 1000);
+                                    const hours = Math.floor(totalSeconds / 3600);
+                                    const minutes = Math.floor((totalSeconds % 3600) / 60);
+                                    const seconds = totalSeconds % 60;
+                                    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                                };
+
+                                return (
+                                    <tr key={lot.lotId || idx} className="border-b border-[#002060] tabular-nums font-bold text-center text-slate-800">
+                                        <td className="p-2 border-r border-[#002060]">{stockInfo?.internalLot || '—'}</td>
+                                        <td className="p-2 border-r border-[#002060]">{lot.finalWeight?.toFixed(2) || '0,00'}</td>
+                                        <td className="p-2 border-r border-[#002060]">{start} - {end}</td>
+                                        <td className="p-2">{formatDurationLocal(duration)}</td>
+                                    </tr>
+                                );
+                            })}
+                            {(report.processedLots || []).length === 0 && (
+                                <tr>
+                                    <td colSpan={4} className="text-center py-6 text-slate-400 italic font-bold text-xs">
+                                        Nenhum lote processado neste turno.
+                                    </td>
                                 </tr>
                             )}
                         </tbody>
                     </table>
                 </div>
 
-                {/* Estatística do Dia */}
-                <div className="mb-6 border-2 border-black p-6 bg-white">
-                    <h2 className="text-center italic font-black text-lg mb-6 underline">ESTATÍSTICA DO DIA:</h2>
-                    <div className="space-y-2 mx-auto max-w-3xl px-8">
-                        <div className="flex justify-between items-center text-base border-b border-slate-100 pb-1">
-                            <span className="font-bold">Horas (Turno trabalhados):</span>
-                            <span className="font-black tabular-nums text-xl">{formatDuration(totalDuration)}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-base border-b border-slate-100 pb-1">
-                            <span className="font-bold text-rose-600">Tempo de maquina (parada) :</span>
-                            <div className="flex gap-4 items-center">
-                                <span className="font-black tabular-nums text-rose-600 text-xl">{formatDuration(totalDowntime)}</span>
-                                <span className="font-black text-rose-600 w-16 text-right text-lg">{downtimePercentage.toFixed(1)}%</span>
-                            </div>
-                        </div>
-                        <div className="flex justify-between items-center text-base border-b border-slate-100 pb-1">
-                            <span className="font-bold text-emerald-600">Tempo de maquina (Efetivo) :</span>
-                            <div className="flex gap-4 items-center">
-                                <span className="font-black tabular-nums text-emerald-600 text-xl">{formatDuration(productiveTime)}</span>
-                                <span className="font-black text-emerald-600 w-16 text-right text-lg">{productivePercentage.toFixed(1)}%</span>
-                            </div>
-                        </div>
-                        <div className="flex justify-between items-center text-base border-b border-slate-100 pb-1">
-                            <span className="font-bold">Quant. de peças produzidas:</span>
-                            <span className="font-black tabular-nums text-xl">{totalPieces.toFixed(0)} peças de {report.tamanho} metros</span>
-                        </div>
-                        <div className="flex justify-between items-center text-base border-b border-slate-100 pb-1">
-                            <span className="font-bold">Quant. de metros produzidos:</span>
-                            <span className="font-black tabular-nums text-xl">{correctedMeters.toFixed(0)} metros</span>
-                        </div>
-                        <div className="flex justify-between items-center text-base border-b border-slate-100 pb-1">
-                            <span className="font-bold">Tempo por peça:</span>
-                            <span className="font-black tabular-nums text-xl">{formatDuration(timePerPieceMs)}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-base pt-1">
-                            <span className="font-bold">Velocidade:</span>
-                            <span className="font-black tabular-nums text-xl">{speedMpm.toFixed(1)} metros/minuto</span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Atualização da Produção */}
-                <div className="border-2 border-black p-4 bg-white">
-                    <h2 className="text-center italic font-black text-lg mb-2 underline uppercase">ATUALIZAÇÃO DA PRODUÇÃO:</h2>
-                    <p className="text-center font-black mb-6 text-base">Qntidade de peças a produzir: {report.quantityToProduce || '-'} treliças</p>
-
-                    <table className="w-full border-collapse mx-auto max-w-3xl text-sm mb-2">
-                        <thead>
-                            <tr className="border-b-2 border-black font-black text-base">
-                                <th className="p-3 text-center w-1/4">Qnt.</th>
-                                <th className="p-3 text-center w-1/4">peso</th>
-                                <th className="p-3 text-center w-1/4">media</th>
-                                <th className="p-3 text-center w-1/4">Data</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {productionHistory.map((r, i) => {
-                                const q = r.totalProducedQuantity > 0 ? r.totalProducedQuantity : ((r.totalProducedMeters || 0) / (parseFloat(r.tamanho || '6') || 6));
-                                const media = q > 0 ? (r.totalProducedWeight || 0) / q : 0;
-
-                                const start = r.shiftStartTime ? new Date(r.shiftStartTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
-                                const end = r.shiftEndTime ? new Date(r.shiftEndTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
-                                const dateStr = new Date(r.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-
-                                const timeLabel = start && end ? `${dateStr} - ${start} às ${end}` : new Date(r.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
-
-                                return (
-                                    <tr key={i} className="tabular-nums font-bold text-base hover:bg-slate-50">
-                                        <td className="p-2 text-center w-1/4">{q.toFixed(0)}</td>
-                                        <td className="p-2 text-center w-1/4">{(r.totalProducedWeight || 0).toFixed(0)}</td>
-                                        <td className="p-2 text-center w-1/4">{media.toFixed(2)}</td>
-                                        <td className="p-2 text-center w-1/4 text-sm whitespace-nowrap">{timeLabel}</td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-
-                    {/* Floating Total Row - Separated Table for clean gap */}
-                    <table className="w-full border-collapse mx-auto max-w-3xl text-sm">
-                        <tbody>
-                            <tr className="border-2 border-black font-black tabular-nums bg-slate-50 shadow-sm text-lg">
-                                <td className="p-3 text-center w-1/4">{totalHistPieces.toFixed(0)}</td>
-                                <td className="p-3 text-center w-1/4">{totalHistWeight.toFixed(0)}</td>
-                                <td className="p-3 text-center w-1/4">{avgHistMedia.toFixed(2)}</td>
-                                <td className="p-3 text-center italic text-[#002B7F] w-1/4">TOTAL</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <div className="mt-8 text-center">
+                <div className="mt-8 text-center border-t border-slate-100 pt-4">
                     <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">MSM Inteligência Operacional — Gerado em {new Date().toLocaleString('pt-BR')}</p>
                 </div>
             </div>
         );
     }
-
-    return (
-        <div className="p-12 bg-white text-slate-900 font-sans min-h-screen relative overflow-hidden print:block">
-            {/* Background Branding (Watermark-like) */}
-            <div className="absolute top-0 right-0 -mr-32 -mt-32 w-96 h-96 bg-slate-50 rounded-full opacity-50 z-0"></div>
-
-            <div className="relative z-10">
-                {/* Header with High-Contrast Design */}
-                <div className="flex justify-between items-end border-b-8 border-slate-900 pb-10 mb-12">
-                    <div className="space-y-4">
-                        <div className="flex items-center gap-4">
-                            <div className="w-14 h-14 bg-slate-900 flex items-center justify-center rounded-2xl transform rotate-3">
-                                <span className="text-white font-black text-2xl tracking-tighter">M</span>
-                            </div>
-                            <div>
-                                <h1 className="text-5xl font-black text-slate-900 uppercase tracking-tighter leading-none">Shift Report</h1>
-                                <p className="text-indigo-600 font-black text-xs uppercase tracking-[0.3em] mt-1 ml-1">Advanced Production Analytics</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="text-right flex flex-col items-end gap-2">
-                        <p className="text-3xl font-black text-slate-900 tabular-nums">{new Date(report.date).toLocaleDateString('pt-BR')}</p>
-                        <div className="bg-slate-900 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">
-                            MÁQUINA: {report.machine === 'Trefila' ? 'DHTRF-01' : 'DHSTR-02'}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Primary Data Ribbon */}
-                <div className="grid grid-cols-4 gap-6 mb-12">
-                    <div className="p-6 bg-slate-50 rounded-[2rem] border-2 border-slate-100 flex flex-col justify-between">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Workload Total</p>
-                        <p className="text-4xl font-black text-slate-900 tabular-nums leading-none">{formatDuration(totalDuration)}</p>
-                        <p className="text-[10px] font-bold text-slate-500 mt-2 uppercase">Horas Contabilizadas</p>
-                    </div>
-                    <div className="p-6 bg-emerald-50 rounded-[2rem] border-2 border-emerald-100 flex flex-col justify-between relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-12 h-12 bg-emerald-100/50 rounded-full -mr-4 -mt-4"></div>
-                        <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-4">Availability</p>
-                        <p className="text-4xl font-black text-emerald-800 tabular-nums leading-none">{productivePercentage.toFixed(1)}%</p>
-                        <p className="text-[10px] font-bold text-emerald-600/70 mt-2 uppercase">Tempo Produtivo</p>
-                    </div>
-                    <div className="p-6 bg-rose-50 rounded-[2rem] border-2 border-rose-100 flex flex-col justify-between relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-12 h-12 bg-rose-100/50 rounded-full -mr-4 -mt-4"></div>
-                        <p className="text-[10px] font-black text-rose-600 uppercase tracking-[0.2em] mb-4">Downtime</p>
-                        <p className="text-4xl font-black text-rose-800 tabular-nums leading-none">{downtimePercentage.toFixed(1)}%</p>
-                        <p className="text-[10px] font-bold text-rose-600/70 mt-2 uppercase">Perda de Disponibilidade</p>
-                    </div>
-                    <div className="p-6 bg-indigo-600 rounded-[2rem] shadow-xl shadow-indigo-100 flex flex-col justify-between">
-                        <p className="text-[10px] font-black text-indigo-200 uppercase tracking-[0.2em] mb-4">Output</p>
-                        <p className="text-4xl font-black text-white tabular-nums leading-none">{report.totalProducedWeight.toFixed(0)}<sub className="text-sm font-black ml-1 uppercase">kg</sub></p>
-                        <p className="text-[10px] font-bold text-indigo-300 mt-2 uppercase">Massa Líquida</p>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-12 mb-12">
-                    <section className="space-y-6">
-                        <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.25em] flex items-center gap-3 border-b-2 border-slate-900 pb-3">
-                            <span className="w-3 h-3 bg-slate-900 rounded-sm"></span>
-                            Tech Specs & Context
-                        </h3>
-                        <div className="grid grid-cols-1 gap-4">
-                            <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Order Number</span>
-                                <span className="text-sm font-black text-slate-900"># {report.orderNumber}</span>
-                            </div>
-                            <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Lead Operator</span>
-                                <span className="text-sm font-black text-indigo-600 uppercase tracking-widest">{report.operator}</span>
-                            </div>
-                            <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Shift Window</span>
-                                <span className="text-sm font-black text-slate-900">
-                                    {new Date(report.shiftStartTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                                    <span className="mx-2 text-slate-300">/</span>
-                                    {new Date(report.shiftEndTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                                </span>
-                            </div>
-                            {report.machine === 'Trefila' ? (
-                                <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Bitola Alvo</span>
-                                    <span className="text-sm font-black text-slate-900 whitespace-nowrap bg-slate-100 px-3 py-1 rounded-full uppercase tracking-tighter">⌀ {report.targetBitola} MM</span>
-                                </div>
-                            ) : (
-                                <>
-                                    <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Truss Model</span>
-                                        <span className="text-sm font-black text-slate-900 uppercase">{report.trelicaModel}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Unit Length</span>
-                                        <span className="text-sm font-black text-slate-900">{report.tamanho} M</span>
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    </section>
-
-                    <section className="space-y-6">
-                        <h3 className="text-xs font-black text-rose-600 uppercase tracking-[0.25em] flex items-center gap-3 border-b-2 border-rose-600 pb-3">
-                            <span className="w-3 h-3 bg-rose-600 rounded-sm"></span>
-                            Loss Analysis
-                        </h3>
-                        <div className="p-8 bg-slate-900 rounded-[2.5rem] relative overflow-hidden group">
-                            <div className="absolute bottom-0 right-0 w-32 h-32 bg-rose-600/10 rounded-full -mb-16 -mr-16"></div>
-                            <div className="flex justify-between items-end mb-8 relative z-10">
-                                <div>
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Total Scrap</p>
-                                    <p className="text-5xl font-black text-white tabular-nums leading-none">{report.totalScrapWeight.toFixed(1)}<sub className="text-xs font-black ml-1">KG</sub></p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Scrap Ratio</p>
-                                    <p className="text-5xl font-black text-rose-500 tabular-nums leading-none">{report.scrapPercentage.toFixed(1)}%</p>
-                                </div>
-                            </div>
-                            <div className="w-full bg-slate-800 h-3 rounded-full overflow-hidden relative z-10">
-                                <div className="h-full bg-gradient-to-r from-rose-500 to-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.3)]" style={{ width: `${Math.min(100, report.scrapPercentage * 8)}%` }}></div>
-                            </div>
-                            <p className="text-[9px] font-bold text-slate-500 mt-4 uppercase tracking-[0.2em] relative z-10">Performance Index vs Quality Threshold</p>
-                        </div>
-                    </section>
-                </div>
-
-                <div className="space-y-16">
-                    <section>
-                        <header className="flex justify-between items-end mb-6 border-b-4 border-slate-900 pb-3">
-                            <div className="flex flex-col">
-                                <h3 className="text-lg font-black text-slate-900 uppercase tracking-tighter">Production Timeline</h3>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Linear Output Visualization</p>
-                            </div>
-                            <span className="text-[10px] font-black text-white bg-slate-900 px-4 py-1.5 rounded-full uppercase tracking-widest">{report.processedLots.length} UNITS TRACKED</span>
-                        </header>
-                        <table className="w-full text-xs text-left border-separate border-spacing-y-2">
-                            <thead>
-                                <tr className="text-slate-400 font-black uppercase tracking-widest text-[9px]">
-                                    <th className="pb-4 px-4">Tracking Code</th>
-                                    <th className="pb-4 px-4 text-right">Net Weight (KG)</th>
-                                    <th className="pb-4 px-4 text-center">Operation Window</th>
-                                    <th className="pb-4 px-4 text-right">Cycle Time</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {report.processedLots.map((lot, idx) => {
-                                    const stockInfo = stock.find(s => s.id === lot.lotId);
-                                    const duration = new Date(lot.endTime).getTime() - new Date(lot.startTime).getTime();
-                                    return (
-                                        <tr key={lot.lotId} className="bg-slate-50 group">
-                                            <td className="py-4 px-4 rounded-l-2xl border-l-4 border-indigo-600">
-                                                <span className="font-black text-slate-900">{stockInfo?.internalLot || 'N/A'}</span>
-                                            </td>
-                                            <td className="py-4 px-4 text-right">
-                                                <span className="font-black text-indigo-700 tabular-nums">{lot.finalWeight?.toFixed(2) || '0.00'}</span>
-                                            </td>
-                                            <td className="py-4 px-4 text-center font-mono text-slate-500 font-bold border-x border-slate-200/50">
-                                                {new Date(lot.startTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} - {new Date(lot.endTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                                            </td>
-                                            <td className="py-4 px-4 text-right rounded-r-2xl font-black tabular-nums">
-                                                {formatDuration(duration)}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </section>
-
-                    <section>
-                        <header className="flex justify-between items-end mb-6 border-b-4 border-rose-600 pb-3">
-                            <div className="flex flex-col">
-                                <h3 className="text-lg font-black text-rose-600 uppercase tracking-tighter">Event Protocol</h3>
-                                <p className="text-[10px] font-bold text-rose-300 uppercase tracking-widest">Interruption & Downtime Registry</p>
-                            </div>
-                            <span className="text-[10px] font-black text-rose-600 bg-rose-50 border border-rose-100 px-4 py-1.5 rounded-full uppercase tracking-widest">{report.downtimeEvents.length} INCIDENTS</span>
-                        </header>
-                        <table className="w-full text-xs text-left border-separate border-spacing-y-2">
-                            <thead>
-                                <tr className="text-slate-400 font-black uppercase tracking-widest text-[9px]">
-                                    <th className="pb-4 px-4">Event Description</th>
-                                    <th className="pb-4 px-4 text-center">Timestamp Window</th>
-                                    <th className="pb-4 px-4 text-right">Impact Duration</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {sortedEvents.map((event, i) => {
-                                    const duration = new Date(event.resumeTime || report.shiftEndTime).getTime() - new Date(event.stopTime).getTime();
-                                    return (
-                                        <tr key={i} className="bg-rose-50 group">
-                                            <td className="py-4 px-4 rounded-l-2xl border-l-4 border-rose-600">
-                                                <span className="font-black text-rose-900 uppercase tracking-tight">{event.reason}</span>
-                                                {event.justification && <div className="text-[10px] text-rose-500 font-black normal-case mt-1 italic">Justificativa: {event.justification}</div>}
-                                            </td>
-                                            <td className="py-4 px-4 text-center font-mono text-rose-400 font-bold border-x border-rose-200/50">
-                                                {new Date(event.stopTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} - {event.resumeTime ? new Date(event.resumeTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'END OF SHIFT'}
-                                            </td>
-                                            <td className="py-4 px-4 text-right rounded-r-2xl font-black text-rose-600 tabular-nums">
-                                                {formatDuration(duration)}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </section>
-                </div>
-
-                {/* Footer / Signature Area */}
-                <div className="mt-24 pt-12 border-t-8 border-slate-900 flex justify-between items-start">
-                    <div className="space-y-6">
-                        <div className="w-80 h-16 border-b-2 border-slate-200"></div>
-                        <div className="space-y-1">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Production Supervisor</p>
-                            <p className="text-sm font-black text-slate-900 uppercase tracking-tighter">{report.operator}</p>
-                        </div>
-                    </div>
-                    <div className="text-center px-8 py-4 bg-slate-50 rounded-2xl border border-slate-100">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Generated Tracking ID</p>
-                        <p className="text-[9px] font-mono text-slate-300 font-bold">{report.id}</p>
-                    </div>
-                    <div className="space-y-6 text-right">
-                        <div className="w-80 h-16 border-b-2 border-slate-200 ml-auto"></div>
-                        <div className="space-y-1">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Quality Assurance Approval</p>
-                            <p className="text-sm font-black text-slate-900 uppercase tracking-tighter tracking-[0.1em]">Verification Required</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="mt-8 text-center">
-                    <p className="text-[8px] font-black text-slate-300 uppercase tracking-[0.5em]">MSM - Gestão Inteligente de Produção © {new Date().getFullYear()}</p>
-                </div>
-            </div>
-        </div>
-    );
 };
 
 interface ShiftReportsModalProps {
