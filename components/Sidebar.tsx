@@ -269,6 +269,7 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                 {(isGestor || hasPermission('trefilaControl') || hasPermission('trelicaControl')) && (
                     <div className="sidebar-category">
                         <div className="sidebar-category-title">{isCollapsed ? '📈' : '📈 Controle de Produção'}</div>
+                        <MenuItem target="pcpBoard" label="Quadro PCP" icon={ClipboardListIcon} />
                         <MenuItem target="trefilaControl" label="Evolução – Trefila" icon={DocumentReportIcon} />
                         <MenuItem target="trelicaControl" label="Evolução – Treliça" icon={DocumentReportIcon} />
                     </div>

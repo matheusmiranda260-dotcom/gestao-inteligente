@@ -19,6 +19,7 @@ import FinishedGoods from './components/FinishedGoods';
 import TrelicaStockManager from './components/TrelicaStockManager';
 import SparePartsManager from './components/SparePartsManager';
 import ProductionControl from './components/ProductionControl';
+import { PCPBoard } from './components/PCPBoard';
 
 import ContinuousImprovement from './components/ContinuousImprovement';
 import WorkInstructions from './components/WorkInstructions';
@@ -2682,6 +2683,7 @@ const App: React.FC = () => {
                 />;
             case 'laboratory': return <Laboratory setPage={setPage} currentUser={currentUser} gauges={gauges} />;
             case 'downtimeConfigs': return <DowntimeConfigManager onBack={() => setPage('menu')} showNotification={showNotification} />;
+            case 'pcpBoard': return <PCPBoard setPage={setPage} productionOrders={productionOrders} updateProductionOrder={updateProductionOrder} stock={stock} currentUser={currentUser} />;
             default: return <Login onLogin={handleLogin} error={null} />;
         }
     };
