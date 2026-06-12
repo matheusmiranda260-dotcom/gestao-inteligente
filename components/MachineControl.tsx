@@ -1587,8 +1587,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
         const completed = (activeOrder.processedLots || []).map(processedLot => {
             const lotInfo = stock.find(s => s.id === processedLot.lotId);
-            return { ...processedLot, lotInfo };
-        }).filter(item => item.lotInfo);
+            return { ...processedLot, lotInfo: lotInfo || null };
+        });
 
         return { waitingLots: waiting, completedLots: completed };
     }, [activeOrder, stock, activeLotProcessingData]);
