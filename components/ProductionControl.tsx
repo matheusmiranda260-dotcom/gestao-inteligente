@@ -18,6 +18,21 @@ const formatDate = (dateStr?: string) => {
     try {
         const d = new Date(dateStr);
         if (isNaN(d.getTime())) return dateStr;
+        
+        // Manual formatting to avoid time zone shifts and handle ISO timestamps
+        if (dateStr.includes('T')) {
+            const day = String(d.getDate()).padStart(2, '0');
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const year = d.getFullYear();
+            return `${day}/${month}/${year}`;
+        }
+        
+        // If it's a simple YYYY-MM-DD
+        const parts = dateStr.split(' ')[0].split('-');
+        if (parts.length === 3) {
+            return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
+        
         return d.toLocaleDateString('pt-BR');
     } catch {
         return dateStr;
@@ -25,17 +40,19 @@ const formatDate = (dateStr?: string) => {
 };
 
 const formatShiftDate = (report: ShiftReport) => {
-    if (report.date) {
-        const parts = report.date.split('-');
-        if (parts.length === 3) {
-            return `${parts[2]}/${parts[1]}/${parts[0]}`;
-        }
-        return report.date;
+    const rawDate = report.date || report.shiftStartTime;
+    if (!rawDate) return '—';
+    
+    // Check if rawDate is an ISO/timestamp string
+    if (rawDate.includes('T') || rawDate.includes(':')) {
+        return formatDate(rawDate);
     }
-    if (report.shiftStartTime) {
-        return formatDate(report.shiftStartTime);
+    
+    const parts = rawDate.split(' ')[0].split('-');
+    if (parts.length === 3) {
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
     }
-    return '—';
+    return rawDate;
 };
 
 const getStatusBadge = (status: string) => {
@@ -145,7 +162,7 @@ const ProductionControl: React.FC<ProductionControlProps> = ({
 
         const isTrefila = machineCategory === 'Trefila';
         const meta = isTrefila 
-            ? (selectedOrder.plannedOutputWeight || selectedOrder.quantityToProduce || 0)
+            ? (selectedOrder.totalWeight || 0)
             : (selectedOrder.quantityToProduce || 0);
 
         const actual = isTrefila
@@ -242,7 +259,7 @@ const ProductionControl: React.FC<ProductionControlProps> = ({
                                 const isSelected = selectedOrderId === order.id;
                                 const isTrefila = machineCategory === 'Trefila';
                                 const oMeta = isTrefila 
-                                    ? (order.plannedOutputWeight || order.quantityToProduce || 0)
+                                    ? (order.totalWeight || 0)
                                     : (order.quantityToProduce || 0);
                                 const oActual = isTrefila
                                     ? (order.actualProducedWeight || 0)
@@ -339,7 +356,9 @@ const ProductionControl: React.FC<ProductionControlProps> = ({
                                     </div>
                                     <div>
                                         <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Operador Responsável</span>
-                                        <span className="font-extrabold text-slate-800 text-sm">{selectedOrder.operator || '—'}</span>
+                                        <span className="font-extrabold text-slate-800 text-sm">
+                                            {selectedOrder.operator || (reportsForSelectedOrder.length > 0 ? reportsForSelectedOrder[reportsForSelectedOrder.length - 1]?.operator : '—')}
+                                        </span>
                                     </div>
                                 </div>
 
@@ -418,8 +437,18 @@ const ProductionControl: React.FC<ProductionControlProps> = ({
                                                     <div className="text-xs text-slate-600 space-y-0.5">
                                                         <p><strong>Operador:</strong> {report.operator || 'Não informado'}</p>
                                                         <div className="flex gap-4 flex-wrap text-slate-500">
-                                                            <span><strong>Produzido:</strong> {report.totalProducedQuantity?.toLocaleString('pt-BR') || 0} peças</span>
-                                                            <span><strong>Peso Total:</strong> {report.totalProducedWeight?.toFixed(2) || 0} kg</span>
+                                                            {machineCategory === 'Treliça' ? (
+                                                                <>
+                                                                    <span><strong>Produzido:</strong> {report.totalProducedQuantity?.toLocaleString('pt-BR') || 0} peças</span>
+                                                                    {report.totalProducedMeters && report.totalProducedMeters > 0 ? (
+                                                                        <span><strong>Metragem:</strong> {report.totalProducedMeters.toFixed(1)} m</span>
+                                                                    ) : null}
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <span><strong>Produzido:</strong> {report.totalProducedWeight?.toLocaleString('pt-BR') || 0} kg</span>
+                                                                </>
+                                                            )}
                                                             <span><strong>Sucata:</strong> {report.totalScrapWeight?.toFixed(1) || 0} kg</span>
                                                         </div>
                                                     </div>
