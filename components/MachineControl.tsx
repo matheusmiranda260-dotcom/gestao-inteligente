@@ -803,6 +803,23 @@ interface TrefilaRingStock {
     quantity: number;
 }
 
+// Helper functions for lot selection normalization
+const normalizeStr = (str: string): string => {
+    return (str || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+};
+
+const parseBitolaFloat = (val: string | number | undefined | null): number | null => {
+    if (val === undefined || val === null) return null;
+    const str = typeof val === 'number' ? val.toString() : String(val);
+    const cleaned = str.replace(/[^0-9.,-]/g, '').replace(',', '.');
+    const parsed = parseFloat(cleaned);
+    return isNaN(parsed) ? null : parsed;
+};
+
 const MachineControl: React.FC<MachineControlProps> = ({
     machineType, setPage, currentUser, users = [], stock, productionOrders = [],
     shiftReports = [], startProductionOrder, startOperatorShift, endOperatorShift,
@@ -2093,21 +2110,45 @@ const MachineControl: React.FC<MachineControlProps> = ({
                 <LotSelectionModal
                     onClose={() => setShowLotSelectionModal(false)}
                     stock={(() => {
-                        const selectedIds = Array.isArray(activeOrder?.selectedLotIds) ? activeOrder?.selectedLotIds : [];
+                        const selectedIds = (Array.isArray(activeOrder?.selectedLotIds) ? activeOrder.selectedLotIds : [])
+                            .map((l: any) => typeof l === 'string' ? l : l?.lotId)
+                            .filter(Boolean);
                         const processedIds = (activeOrder?.processedLots || []).map(p => p.lotId);
                         const currentActiveId = activeOrder?.activeLotProcessing?.lotId;
                         const usedLotIds = new Set([...selectedIds, ...processedIds, currentActiveId].filter(Boolean));
+
+                        const allowedBitolas = new Set<number>();
+
+                        // 1. Tentar obter a bitola de entrada explicitamente definida na OP
+                        if (activeOrder?.inputBitola) {
+                            const bNum = parseBitolaFloat(activeOrder.inputBitola);
+                            if (bNum !== null) {
+                                allowedBitolas.add(bNum);
+                            }
+                        }
+
+                        // 2. Se a OP já tiver lotes vinculados (pré-selecionados ou processados), pegar as bitolas deles
+                        usedLotIds.forEach(id => {
+                            const lot = stock.find(s => s.id === id);
+                            if (lot && lot.bitola) {
+                                const bNum = parseBitolaFloat(lot.bitola);
+                                if (bNum !== null) {
+                                    allowedBitolas.add(bNum);
+                                }
+                            }
+                        });
 
                         const filteredStock = stock.filter(lot => {
                             const isAlreadyUsed = usedLotIds.has(lot.id);
                             if (isAlreadyUsed) return false;
 
-                            const isFioMaquina = lot.materialType === 'Fio Máquina';
+                            const isFioMaquina = normalizeStr(lot.materialType) === 'fio maquina';
                             if (!isFioMaquina) return false;
 
-                            // Se tiver bitola de entrada definida na ordem fantasma, filtra por ela
-                            if (activeOrder?.isGhostOrder && activeOrder?.inputBitola) {
-                                return lot.bitola.replace(',', '.') === activeOrder.inputBitola?.replace(',', '.');
+                            // Se tivermos bitolas permitidas determinadas pela OP, filtramos estritamente por elas
+                            if (allowedBitolas.size > 0) {
+                                const lotBitolaNum = parseBitolaFloat(lot.bitola);
+                                return lotBitolaNum !== null && allowedBitolas.has(lotBitolaNum);
                             }
                             return true;
                         });
@@ -3021,7 +3062,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                             <div className={`bg-white p-6 rounded-2xl shadow-sm ${mobileTab !== 'process' ? 'hidden lg:block' : 'animate-fade-in'}`}>
                                                 <div className="flex justify-between items-center mb-4">
                                                     <h3 className="text-lg font-bold text-slate-700">Fila de Lotes (Matéria-Prima)</h3>
-                                                    {activeOrder.isGhostOrder && (
+                                                    {(activeOrder.isGhostOrder || activeOrder.machine.startsWith('Trefila') || activeOrder.machine.startsWith('Desbobinadeira')) && (
                                                         <button
                                                             onClick={() => setShowLotSelectionModal(true)}
                                                             className="flex items-center gap-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-4 py-2 rounded-xl text-xs font-bold border border-indigo-100 transition"
