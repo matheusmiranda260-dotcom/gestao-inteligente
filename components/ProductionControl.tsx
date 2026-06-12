@@ -177,7 +177,7 @@ const ProductionControl: React.FC<ProductionControlProps> = ({
     const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor';
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
-    const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'completed' | 'other'>('all');
+    const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'completed' | 'other'>('active');
     const [editingReport, setEditingReport] = useState<ShiftReport | null>(null);
 
     const handleRecalculateTotals = async () => {
@@ -488,24 +488,7 @@ const ProductionControl: React.FC<ProductionControlProps> = ({
                                 </div>
                             </div>
 
-                            {/* Status Filters Tabs */}
-                            <div className="flex bg-slate-100 p-1 rounded-xl">
-                                {(['all', 'active', 'completed', 'other'] as const).map(tab => (
-                                    <button
-                                        key={tab}
-                                        onClick={() => setStatusFilter(tab)}
-                                        className={`flex-1 text-center py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all ${
-                                            statusFilter === tab 
-                                                ? 'bg-white text-slate-800 shadow-sm' 
-                                                : 'text-slate-500 hover:text-slate-800'
-                                        }`}
-                                    >
-                                        {tab === 'all' ? 'Todas' :
-                                         tab === 'active' ? 'Ativas' :
-                                         tab === 'completed' ? 'Concluídas' : 'Outros'}
-                                    </button>
-                                ))}
-                            </div>
+
                         </div>
 
                         {/* Scrollable List */}
