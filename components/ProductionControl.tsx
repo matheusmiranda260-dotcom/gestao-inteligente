@@ -126,11 +126,62 @@ const ProductionControl: React.FC<ProductionControlProps> = ({
             const totalQty = reportsForSelectedOrder.reduce((sum, r) => sum + (r.totalProducedQuantity || 0), 0);
             const totalWeight = reportsForSelectedOrder.reduce((sum, r) => sum + (r.totalProducedWeight || 0), 0);
 
+            // Chronologically sort the shift reports of this order (oldest first)
+            const sortedReportsAsc = [...reportsForSelectedOrder].sort((a, b) => {
+                const dateA = a.shiftStartTime || a.date || '';
+                const dateB = b.shiftStartTime || b.date || '';
+                return new Date(dateA).getTime() - new Date(dateB).getTime();
+            });
+
+            const existingLogs = selectedOrder.operatorLogs || [];
+            let currentCumulative = 0;
+
+            const updatedLogs = sortedReportsAsc.map(report => {
+                // Find matching log in existingLogs
+                const matchingLog = existingLogs.find(log => log.operator === report.operator && log.startTime === report.shiftStartTime);
+                
+                const startQty = currentCumulative;
+                const endQty = currentCumulative + (report.totalProducedQuantity || 0);
+                currentCumulative = endQty;
+
+                if (matchingLog) {
+                    return {
+                        ...matchingLog,
+                        startQuantity: startQty,
+                        endQuantity: endQty,
+                        endTime: report.shiftEndTime || matchingLog.endTime
+                    };
+                } else {
+                    return {
+                        operator: report.operator,
+                        startTime: report.shiftStartTime,
+                        endTime: report.shiftEndTime || new Date(report.date).toISOString(),
+                        startQuantity: startQty,
+                        endQuantity: endQty
+                    };
+                }
+            });
+
+            // Re-append any active/running shifts (not yet closed/reported)
+            const activeLogs = existingLogs.filter(log => !log.endTime);
+            if (activeLogs.length > 0) {
+                activeLogs.forEach(log => {
+                    // Prevent duplicates in case active log is somehow already in updatedLogs
+                    if (!updatedLogs.some(l => l.operator === log.operator && l.startTime === log.startTime)) {
+                        updatedLogs.push({
+                            ...log,
+                            startQuantity: currentCumulative
+                        });
+                    }
+                });
+            }
+
             await updateProductionOrder(selectedOrder.id, {
                 actualProducedQuantity: totalQty,
-                actualProducedWeight: totalWeight
+                actualProducedWeight: totalWeight,
+                operatorLogs: updatedLogs
             });
-            alert("Totais da Ordem de Produção recalculados com sucesso!");
+            alert("Totais e turnos da Ordem de Produção recalculados com sucesso!");
         } catch (error: any) {
             console.error("Erro ao recalcular totais:", error);
             alert(`Erro ao recalcular totais: ${error.message || error}`);

@@ -1087,7 +1087,8 @@ const App: React.FC = () => {
 
     const updateProductionOrder = async (orderId: string, updates: Partial<ProductionOrderData>) => {
         try {
-            await updateItem('production_orders', orderId, updates);
+            const updatedOrder = await updateItem<ProductionOrderData>('production_orders', orderId, updates);
+            setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
             showNotification('Ordem de produção atualizada com sucesso!', 'success');
         } catch (error) {
             showNotification('Erro ao atualizar ordem de produção.', 'error');
@@ -2467,19 +2468,42 @@ const App: React.FC = () => {
             // 1. Delete from database
             await deleteItem('shift_reports', reportId);
 
-            // 2. Subtract from parent order
+            // 2. Subtract from parent order and adjust active shift startQuantity if present
             if (report.productionOrderId) {
                 const parentOrder = productionOrders?.find(o => o.id === report.productionOrderId);
                 if (parentOrder) {
-                    const newQty = Math.max(0, (parentOrder.actualProducedQuantity || 0) - (report.totalProducedQuantity || 0));
+                    const qtyDelta = -(report.totalProducedQuantity || 0);
+                    const newQty = Math.max(0, (parentOrder.actualProducedQuantity || 0) + qtyDelta);
                     const newWeight = Math.max(0, (parentOrder.actualProducedWeight || 0) - (report.totalProducedWeight || 0));
 
-                    await updateProductionOrder(parentOrder.id, {
+                    const orderUpdates: Partial<ProductionOrderData> = {
                         actualProducedQuantity: newQty,
                         actualProducedWeight: newWeight
-                    });
+                    };
+
+                    if (parentOrder.operatorLogs && parentOrder.operatorLogs.length > 0) {
+                        orderUpdates.operatorLogs = parentOrder.operatorLogs
+                            .filter(log => {
+                                // Match the operator log of this shift report to delete it
+                                const isMatch = log.operator === report.operator && log.startTime === report.shiftStartTime;
+                                return !isMatch;
+                            })
+                            .map(log => {
+                                if (!log.endTime) {
+                                    return {
+                                        ...log,
+                                        startQuantity: Math.max(0, (log.startQuantity || 0) + qtyDelta)
+                                    };
+                                }
+                                return log;
+                            });
+                    }
+
+                    await updateProductionOrder(parentOrder.id, orderUpdates);
                 }
             }
+            // Update local state for shiftReports as well, to ensure immediate update
+            setShiftReports(prev => prev.filter(r => r.id !== reportId));
             showNotification('Relatório excluído e totais da ordem recalculados!', 'success');
         } catch (error: any) {
             console.error("Erro ao excluir relatório:", error);
@@ -2498,16 +2522,40 @@ const App: React.FC = () => {
             // Update shift_reports in Supabase
             await updateItem('shift_reports', reportId, updates);
 
-            // Update parent production order
-            if ((qtyDelta !== 0 || weightDelta !== 0) && originalReport.productionOrderId) {
+            // Update parent production order and adjust active shift startQuantity if present
+            if (originalReport.productionOrderId) {
                 const parentOrder = productionOrders?.find(o => o.id === originalReport.productionOrderId);
                 if (parentOrder) {
-                    await updateProductionOrder(parentOrder.id, {
-                        actualProducedQuantity: (parentOrder.actualProducedQuantity || 0) + qtyDelta,
-                        actualProducedWeight: (parentOrder.actualProducedWeight || 0) + weightDelta
-                    });
+                    const orderUpdates: Partial<ProductionOrderData> = {
+                        actualProducedQuantity: Math.max(0, (parentOrder.actualProducedQuantity || 0) + qtyDelta),
+                        actualProducedWeight: Math.max(0, (parentOrder.actualProducedWeight || 0) + weightDelta)
+                    };
+
+                    if (parentOrder.operatorLogs && parentOrder.operatorLogs.length > 0) {
+                        orderUpdates.operatorLogs = parentOrder.operatorLogs.map(log => {
+                            // If it's the operator log of this shift report, update its endQuantity
+                            if (log.operator === originalReport.operator && log.startTime === originalReport.shiftStartTime) {
+                                return {
+                                    ...log,
+                                    endQuantity: (log.startQuantity || 0) + (updates.totalProducedQuantity ?? originalReport.totalProducedQuantity ?? 0)
+                                };
+                            }
+                            // If it's the active operator log, adjust its startQuantity
+                            if (!log.endTime) {
+                                return {
+                                    ...log,
+                                    startQuantity: Math.max(0, (log.startQuantity || 0) + qtyDelta)
+                                };
+                            }
+                            return log;
+                        });
+                    }
+
+                    await updateProductionOrder(parentOrder.id, orderUpdates);
                 }
             }
+            // Update local state for shiftReports as well
+            setShiftReports(prev => prev.map(r => r.id === reportId ? { ...r, ...updates } : r));
             showNotification('Relatório de turno atualizado com sucesso!', 'success');
         } catch (error: any) {
             console.error("Erro ao atualizar relatório:", error);
