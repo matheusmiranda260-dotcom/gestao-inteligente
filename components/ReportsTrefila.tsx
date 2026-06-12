@@ -165,31 +165,49 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({ setPage }) => {
     };
 
     // Formatações de Data
-    const formattedProductionDate = useMemo(() => {
-        if (!selectedDate) return '';
-        const parts = selectedDate.split('-');
-        const dateObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-        const weekdays = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
-        const dayName = weekdays[dateObj.getDay()];
-        const day = dateObj.getDate();
-        const year = dateObj.getFullYear();
-        const monthName = dateObj.toLocaleDateString('pt-BR', { month: 'long' });
-        return `${dayName}, ${day} de ${monthName} de ${year}`;
+    const safeDateObj = useMemo(() => {
+        if (!selectedDate) return new Date();
+        if (selectedDate.includes('/')) {
+            const parts = selectedDate.split('/');
+            if (parts.length === 3) {
+                return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+            }
+        }
+        if (selectedDate.includes('-')) {
+            const parts = selectedDate.split('-');
+            if (parts.length === 3) {
+                if (parts[0].length === 4) {
+                    return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                }
+                if (parts[2].length === 4) {
+                    return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                }
+            }
+        }
+        const d = new Date(selectedDate);
+        return isNaN(d.getTime()) ? new Date() : d;
     }, [selectedDate]);
+
+    const formattedProductionDate = useMemo(() => {
+        if (isNaN(safeDateObj.getTime())) return '';
+        const weekdays = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+        const dayName = weekdays[safeDateObj.getDay()];
+        const day = safeDateObj.getDate();
+        const year = safeDateObj.getFullYear();
+        const monthName = safeDateObj.toLocaleDateString('pt-BR', { month: 'long' });
+        return `${dayName}, ${day} de ${monthName} de ${year}`;
+    }, [safeDateObj]);
 
     const formattedDateNumbers = useMemo(() => {
-        if (!selectedDate) return '';
-        const parts = selectedDate.split('-');
-        return `${parts[2]}/${parts[1]}/${parts[0]}`;
-    }, [selectedDate]);
+        if (isNaN(safeDateObj.getTime())) return selectedDate || '';
+        return safeDateObj.toLocaleDateString('pt-BR');
+    }, [safeDateObj, selectedDate]);
 
     const formattedDayOfWeek = useMemo(() => {
-        if (!selectedDate) return '';
-        const parts = selectedDate.split('-');
-        const dateObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+        if (isNaN(safeDateObj.getTime())) return '';
         const weekdays = ['DOMINGO', 'SEGUNDA-FEIRA', 'TERÇA-FEIRA', 'QUARTA-FEIRA', 'QUINTA-FEIRA', 'SEXTA-FEIRA', 'SÁBADO'];
-        return weekdays[dateObj.getDay()];
-    }, [selectedDate]);
+        return weekdays[safeDateObj.getDay()];
+    }, [safeDateObj]);
 
     // 5. Motor de Cálculos Dinâmicos
     const calculatedData = useMemo(() => {

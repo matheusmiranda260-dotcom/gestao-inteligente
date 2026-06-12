@@ -451,520 +451,361 @@ const ProductionControl: React.FC<ProductionControlProps> = ({
 
         return {
             avgEfficiency: Math.min(150, avgEfficiency), // Cap efficiency visual at 150%
-            avgScrap: isNaN(avgScrap) ? 0 : avgScrap
         };
     }, [reportsForSelectedOrder, selectedOrder]);
 
     return (
-        <div className="min-h-screen bg-[#F8FAFC] p-4 sm:p-6 md:p-8 flex flex-col gap-6 animate-fade-in">
-            {/* Header / Top Navbar */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200 pb-4">
+        <div className="p-4 sm:p-6 md:p-8 bg-slate-50 min-h-screen font-mono text-slate-800 relative select-none">
+            {/* CSS de Alta Fidelidade herdado da Treliça */}
+            <style dangerouslySetInnerHTML={{ __html: `
+                input::-webkit-outer-spin-button,
+                input::-webkit-inner-spin-button {
+                    -webkit-appearance: none;
+                    margin: 0;
+                }
+                input[type=number] {
+                    -moz-appearance: textfield;
+                }
+
+                .worksheet-container {
+                    font-family: 'Inter', 'Segoe UI', 'Arial', sans-serif;
+                }
+                
+                @media print {
+                    @page { size: A4 portrait; margin: 6mm 5mm 6mm 5mm; }
+                    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                    html, body {
+                        margin: 0 !important; padding: 0 !important;
+                        background: white !important; overflow: visible !important; height: auto !important;
+                    }
+                    html body .no-print, html body .sidebar, .no-print, .sidebar {
+                        display: none !important; visibility: hidden !important;
+                    }
+                    #root {
+                        display: block !important; width: 100% !important; max-width: 100% !important;
+                        height: auto !important; max-height: none !important;
+                        padding: 0 !important; margin: 0 !important;
+                        overflow: visible !important; position: static !important;
+                        border: none !important; box-shadow: none !important;
+                    }
+                    .print-sheet {
+                        max-width: 100% !important; width: 100% !important;
+                        overflow: visible !important; height: auto !important; max-height: none !important;
+                        box-shadow: none !important;
+                        border: none !important;
+                    }
+                }
+            `}} />
+
+            {/* Menu Administrativo da Ficha */}
+            <header className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 pb-4 border-b border-slate-200 no-print gap-4">
                 <div>
                     <button
                         onClick={() => setPage('menu')}
-                        className="flex items-center gap-2 text-slate-500 hover:text-slate-800 font-black uppercase text-xs tracking-widest transition-all mb-2"
+                        className="flex items-center gap-2 text-slate-500 hover:text-[#002060] font-black uppercase text-xs tracking-widest transition-all mb-2"
                     >
                         <ArrowLeftIcon className="w-4 h-4" /> Voltar ao Menu
                     </button>
-                    <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
-                        Controle de Produção – <span className="text-indigo-600">{machineCategory}</span>
+                    <h1 className="text-xl font-black text-[#002060] flex items-center gap-2 uppercase tracking-wide">
+                        📋 Controle de Produção – {machineCategory}
                     </h1>
-                    <p className="text-slate-500 text-sm mt-1">
-                        Acompanhe o progresso de ordens de produção e ajuste os lançamentos retroativos dos turnos.
-                    </p>
                 </div>
-            </div>
-
-            {/* Main Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                 
-                {/* Left Side: Order Listing & Weekly Performance (5 cols) */}
-                <div className="lg:col-span-5 space-y-6">
-                    {/* Order List Card */}
-                    <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col max-h-[50vh]">
-                        <div className="p-5 border-b border-slate-100 bg-slate-50/50 space-y-4">
-                            {/* Search Input */}
-                            <div className="relative">
-                                <input
-                                    type="text"
-                                    placeholder="Buscar por OP, Bitola ou Modelo..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full bg-white border border-slate-200 text-slate-800 text-sm font-semibold rounded-2xl px-4 py-3 pl-10 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all shadow-sm"
-                                />
-                                <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
-                                    🔍
-                                </div>
-                            </div>
-
-
-                        </div>
-
-                        {/* Scrollable List */}
-                        <div className="overflow-y-auto divide-y divide-slate-100 flex-1">
-                            {filteredOrders.length > 0 ? (
-                                filteredOrders.map(order => {
-                                    const isSelected = selectedOrderId === order.id;
-                                    const isTrefila = machineCategory === 'Trefila';
-                                    const oMeta = isTrefila 
-                                        ? (order.totalWeight || 0)
-                                        : (order.quantityToProduce || 0);
-                                    const oActual = isTrefila
-                                        ? (order.actualProducedWeight || 0)
-                                        : (order.actualProducedQuantity || 0);
-                                    const oUnit = isTrefila ? 'kg' : 'pçs';
-                                    const oPercent = oMeta > 0 ? Math.min(100, Math.round((oActual / oMeta) * 100)) : 0;
-
-                                    return (
-                                        <button
-                                            key={order.id}
-                                            onClick={() => setSelectedOrderId(order.id)}
-                                            className={`w-full p-5 text-left transition-all flex flex-col gap-3 hover:bg-slate-50 ${
-                                                isSelected ? 'bg-indigo-50/40 border-l-4 border-indigo-600' : ''
-                                            }`}
-                                        >
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <h3 className="font-extrabold text-slate-900 text-lg">
-                                                        OP {order.orderNumber}
-                                                    </h3>
-                                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                                                        {order.trelicaModel ? `${order.trelicaModel} • ` : ''}{order.targetBitola} mm
-                                                    </p>
-                                                </div>
-                                                {getStatusBadge(order.status)}
-                                            </div>
-
-                                            {/* Progress row */}
-                                            <div className="space-y-1">
-                                                <div className="flex justify-between text-xs font-bold text-slate-500">
-                                                    <span>Progresso: {oActual.toLocaleString('pt-BR')} / {oMeta.toLocaleString('pt-BR')} {oUnit}</span>
-                                                    <span className={oPercent >= 100 ? 'text-green-600 font-extrabold' : ''}>{oPercent}%</span>
-                                                </div>
-                                                <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                                                    <div 
-                                                        className={`h-full rounded-full transition-all duration-500 ${
-                                                            oPercent >= 100 
-                                                                ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' 
-                                                                : 'bg-indigo-600'
-                                                        }`}
-                                                        style={{ width: `${oPercent}%` }}
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            <div className="flex justify-between items-center text-[10px] font-semibold text-slate-400">
-                                                <span>Máquina: {order.machine}</span>
-                                                <span>Iniciada em: {formatDate(order.startTime)}</span>
-                                            </div>
-                                        </button>
-                                    );
-                                })
-                            ) : (
-                                <div className="p-8 text-center text-slate-400 font-bold">
-                                    Nenhum ordem encontrada com os filtros selecionados.
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Resumo de Performance Card */}
-                    <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-6">
-                        <div>
-                            <h3 className="text-sm font-extrabold text-slate-800 tracking-tight">
-                                RESUMO SEMANAL DE PERFORMANCE
-                            </h3>
-                            <div className="flex items-center gap-4 text-[9px] font-black text-slate-400 uppercase tracking-wider mt-2">
-                                <div className="flex items-center gap-1.5">
-                                    <div className="w-3 h-3 bg-[#0F3F5C] rounded" />
-                                    <span>Produção ({machineCategory === 'Trefila' ? 'kg' : 'peças'})</span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <div className="w-3 h-3 bg-[#a2e0e6] rounded" />
-                                    <span>Target ({machineCategory === 'Trefila' ? 'kg' : 'peças'})</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Pure CSS/HTML Bar Chart */}
-                        {(() => {
-                            const totalWeeklyProduced = weeklyChartData.reduce((sum, d) => sum + d.produced, 0);
-                            const totalWeeklyTarget = weeklyChartData.reduce((sum, d) => sum + d.target, 0);
-                            
-                            const allCols = [
-                                ...weeklyChartData.map(d => ({ label: d.label, produced: d.produced, target: d.target, isTotal: false })),
-                                { label: 'TOTAL', produced: totalWeeklyProduced, target: totalWeeklyTarget, isTotal: true }
-                            ];
-
-                            const maxChartVal = Math.max(
-                                ...allCols.map(d => Math.max(d.produced, d.target)),
-                                1 // avoid division by zero
-                            );
-
-                            return (
-                                <div className="grid grid-cols-7 gap-2 items-end h-44 bg-slate-50 p-4 rounded-2xl border border-slate-100/50">
-                                    {allCols.map((col, idx) => {
-                                        const prodHeight = (col.produced / maxChartVal) * 100;
-                                        const targetHeight = (col.target / maxChartVal) * 100;
-                                        
-                                        return (
-                                            <div key={idx} className="flex flex-col items-center gap-2 h-full justify-end group relative">
-                                                {/* Tooltip */}
-                                                <div className="absolute bottom-full mb-1 hidden group-hover:flex flex-col items-center bg-slate-800 text-white text-[9px] font-bold py-1.5 px-2 rounded-lg shadow-lg z-30 pointer-events-none w-24 text-center">
-                                                    <span className="block text-white">Prod: {col.produced.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
-                                                    <span className="block text-slate-300 font-medium">Meta: {col.target.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
-                                                </div>
-
-                                                {/* Value above the TOTAL column */}
-                                                {col.isTotal && (
-                                                    <span className="text-[9px] font-black text-slate-700 absolute -top-4 leading-none">
-                                                        {col.produced.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
-                                                    </span>
-                                                )}
-
-                                                {/* The two bars side by side */}
-                                                <div className="flex items-end gap-1 h-32 w-full justify-center">
-                                                    <div 
-                                                        className={`w-3.5 rounded-t transition-all duration-500 bg-gradient-to-t ${
-                                                            col.isTotal 
-                                                                ? 'from-[#0B2535] to-[#0F3F5C] shadow-[#0F3F5C]/10 shadow-lg' 
-                                                                : 'from-[#0F3F5C] to-[#1e5b80]'
-                                                        }`}
-                                                        style={{ height: `${Math.max(5, prodHeight)}%` }}
-                                                    />
-                                                    <div 
-                                                        className="w-3.5 bg-[#a2e0e6] rounded-t transition-all duration-500"
-                                                        style={{ height: `${Math.max(5, targetHeight)}%` }}
-                                                    />
-                                                </div>
-
-                                                <span className={`text-[9px] font-bold uppercase tracking-wider ${col.isTotal ? 'text-indigo-600 font-extrabold' : 'text-slate-400'}`}>
-                                                    {col.label}
-                                                </span>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            );
-                        })()}
-
-                        {/* Semi-circular Arc Gauges side by side */}
-                        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-100">
-                            <div className="flex flex-col items-center text-center">
-                                {(() => {
-                                    const eff = averageMetrics.avgEfficiency;
-                                    return (
-                                        <>
-                                            <div className="relative w-28 h-16 flex items-end justify-center overflow-hidden">
-                                                <svg className="w-28 h-16" viewBox="0 0 100 60">
-                                                    <path d="M 15 50 A 35 35 0 0 1 85 50" stroke="#f1f5f9" strokeWidth="8" fill="transparent" strokeLinecap="round" />
-                                                    <path d="M 15 50 A 35 35 0 0 1 85 50" stroke="#0f766e" strokeWidth="8" fill="transparent" strokeLinecap="round"
-                                                        strokeDasharray="110"
-                                                        strokeDashoffset={110 - (Math.min(100, eff) / 100) * 110}
-                                                        className="transition-all duration-500" />
-                                                </svg>
-                                                <span className="absolute bottom-1 font-black text-slate-800 text-base">{eff}%</span>
-                                            </div>
-                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Eficiência Média</span>
-                                        </>
-                                    );
-                                })()}
-                            </div>
-
-                            <div className="flex flex-col items-center text-center">
-                                {(() => {
-                                    const scrap = averageMetrics.avgScrap;
-                                    return (
-                                        <>
-                                            <div className="relative w-28 h-16 flex items-end justify-center overflow-hidden">
-                                                <svg className="w-28 h-16" viewBox="0 0 100 60">
-                                                    <path d="M 15 50 A 35 35 0 0 1 85 50" stroke="#f1f5f9" strokeWidth="8" fill="transparent" strokeLinecap="round" />
-                                                    <path d="M 15 50 A 35 35 0 0 1 85 50" stroke="#ef4444" strokeWidth="8" fill="transparent" strokeLinecap="round"
-                                                        strokeDasharray="110"
-                                                        strokeDashoffset={110 - (Math.min(25, scrap) / 25) * 110}
-                                                        className="transition-all duration-500" />
-                                                </svg>
-                                                <span className="absolute bottom-1 font-black text-slate-800 text-base">{scrap}%</span>
-                                            </div>
-                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Média Sucata</span>
-                                        </>
-                                    );
-                                })()}
-                            </div>
-                        </div>
-                    </div>
+                <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                    {isGestor && updateProductionOrder && (
+                        <button onClick={handleRecalculateTotals} className="bg-amber-500 hover:bg-amber-600 text-white font-bold py-1.5 px-3 rounded text-xs shadow flex items-center gap-1">
+                            🔄 Recalcular OP
+                        </button>
+                    )}
+                    <button onClick={() => window.print()} className="bg-[#002060] hover:bg-[#001545] text-white font-bold py-1.5 px-3 rounded text-xs shadow flex items-center gap-1">
+                        🖨️ Imprimir OP
+                    </button>
                 </div>
+            </header>
 
-                {/* Right Side: Order Details & Shift History (7 cols) */}
-                <div className="lg:col-span-7 space-y-6 animate-fade-in">
-                    {selectedOrder ? (
-                        <>
-                            {/* Card 1: Details and KPIs */}
-                            <div className="bg-transparent rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-                                {/* Dark Premium Header */}
-                                <div className="bg-[#0F3F5C] bg-gradient-to-br from-[#0F3F5C] to-[#0A2A3D] text-white p-6 rounded-t-3xl border-b border-[#113850] relative">
-                                    <div className="flex justify-between items-start flex-wrap gap-4">
-                                        <div>
-                                            <div className="flex items-center gap-3">
-                                                <h2 className="text-2xl font-black text-white tracking-tight">
-                                                    Detalhes da OP {selectedOrder.orderNumber}
-                                                </h2>
-                                                {getStatusBadge(selectedOrder.status)}
-                                            </div>
-                                            <p className="text-white/60 text-xs mt-1">
-                                                Especificações técnicas e acompanhamento geral da execução.
-                                            </p>
-                                        </div>
-                                        {isGestor && updateProductionOrder && (
-                                            <button
-                                                onClick={handleRecalculateTotals}
-                                                className="px-4 py-2 border border-white/20 hover:bg-white/10 text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-sm"
-                                                title="Recalcular totais da OP com base nos turnos"
-                                            >
-                                                🔄 Recalcular Totais
-                                            </button>
-                                        )}
-                                    </div>
+            {/* Filtros - No Print */}
+            <section className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6 flex flex-col sm:flex-row items-center justify-between gap-4 no-print">
+                <div className="flex items-center gap-3 w-full">
+                    <span className="font-black text-slate-700 text-xs uppercase tracking-wider">Selecionar Ordem:</span>
+                    <select
+                        value={selectedOrderId || ''}
+                        onChange={(e) => setSelectedOrderId(e.target.value)}
+                        className="flex-1 max-w-md p-2 border-2 border-slate-200 focus:border-[#002060] rounded-lg text-sm font-bold text-[#002060] outline-none cursor-pointer"
+                    >
+                        <option value="">-- Escolha uma OP --</option>
+                        {filteredOrders.map(order => (
+                            <option key={order.id} value={order.id}>
+                                OP {order.orderNumber} ({order.status}) - {order.machine}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            </section>
 
-                                    {/* Specifications Grid */}
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-6 border-t border-white/10 pt-4">
-                                        <div>
-                                            <span className="block text-[8px] font-black text-white/50 uppercase tracking-widest">Máquina</span>
-                                            <span className="font-extrabold text-white text-base">{selectedOrder.machine}</span>
+            {/* Ficha Técnica - ALTA FIDELIDADE */}
+            {selectedOrder ? (
+                <div id="production-control-sheet" className="bg-white max-w-5xl mx-auto worksheet-container print-sheet border-2 border-[#002060] rounded-xl overflow-hidden shadow-xl">
+                    
+                    {/* CABEÇALHO */}
+                    <div className="grid grid-cols-1 md:grid-cols-12 border-b-2 border-[#002060]">
+                        <div className="col-span-1 md:col-span-3 bg-white p-2.5 flex items-center justify-center md:border-r-2 border-[#002060]">
+                            <img src="/ita-acos-logo.png" alt="Logo Grupo Ita Aços" className="h-16 md:h-20 object-contain" style={{ maxHeight: '82px' }} />
+                        </div>
+
+                        <div className="col-span-1 md:col-span-6 bg-[#002060] text-white p-4 flex flex-col justify-center text-center md:text-left md:pl-8">
+                            <h2 className="text-xl md:text-2xl font-black uppercase tracking-wider leading-none text-white">
+                                Resumo da Ordem de Produção
+                            </h2>
+                            <p className="text-xs md:text-sm font-extrabold uppercase tracking-widest text-slate-300 mt-1">
+                                {machineCategory}
+                            </p>
+                        </div>
+
+                        <div className="col-span-1 md:col-span-3 bg-[#002060] text-white p-3 flex flex-col justify-center border-t-2 md:border-t-0 md:border-l-2 border-white items-center">
+                            <div className="text-[10px] font-black text-slate-300 tracking-wider uppercase">Número da OP</div>
+                            <div className="text-2xl font-black text-white leading-tight">{selectedOrder.orderNumber}</div>
+                            <div className="mt-1">{getStatusBadge(selectedOrder.status)}</div>
+                        </div>
+                    </div>
+
+                    {/* METADADOS */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 border-b-2 border-[#002060] bg-[#fbfcfd]">
+                        <div className="p-3 border-r border-slate-200 border-b md:border-b-0">
+                            <div className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Máquina</div>
+                            <div className="text-sm font-black text-[#002060]">{selectedOrder.machine}</div>
+                        </div>
+                        <div className="p-3 border-r border-slate-200 border-b md:border-b-0">
+                            <div className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Bitola Alvo</div>
+                            <div className="text-sm font-black text-[#002060]">{selectedOrder.targetBitola} mm</div>
+                        </div>
+                        <div className="p-3 border-r border-slate-200 border-b md:border-b-0">
+                            <div className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Modelo</div>
+                            <div className="text-sm font-black text-[#002060]">{selectedOrder.trelicaModel || 'N/A'}</div>
+                        </div>
+                        <div className="p-3">
+                            <div className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Iniciada em</div>
+                            <div className="text-sm font-black text-[#002060]">{formatDate(selectedOrder.startTime)}</div>
+                        </div>
+                    </div>
+
+                    {/* KPIs - ESTATÍSTICA DA OP */}
+                    {stats && (
+                        <div className="border-b-2 border-[#002060] bg-white flex flex-col">
+                            <div className="bg-[#002060] text-white py-2 px-3 flex items-center gap-1.5 text-[11px] font-black tracking-wider uppercase">
+                                <ChartBarIcon className="h-4 w-4 text-white" />
+                                <span>INDICADORES DE PERFORMANCE DA OP</span>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-slate-200 p-2">
+                                <div className="p-3 text-center flex flex-col items-center justify-center">
+                                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Meta Total</span>
+                                    <span className="text-xl font-black text-[#002060]">{stats.meta.toLocaleString('pt-BR')} {stats.unit}</span>
+                                </div>
+                                <div className="p-3 text-center flex flex-col items-center justify-center bg-emerald-50/50">
+                                    <span className="text-[10px] font-black text-emerald-600 uppercase tracking-wider">Produzido</span>
+                                    <span className="text-xl font-black text-emerald-600">{stats.actual.toLocaleString('pt-BR')} {stats.unit}</span>
+                                </div>
+                                <div className="p-3 text-center flex flex-col items-center justify-center">
+                                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Progresso</span>
+                                    <div className="flex items-center gap-2 mt-1 w-full max-w-[120px]">
+                                        <div className="flex-1 bg-slate-200 h-2 rounded-full overflow-hidden">
+                                            <div className="bg-[#002060] h-full rounded-full" style={{ width: `${stats.progressPercent}%` }} />
                                         </div>
-                                        <div>
-                                            <span className="block text-[8px] font-black text-white/50 uppercase tracking-widest">Bitola</span>
-                                            <span className="font-extrabold text-white text-base">{selectedOrder.targetBitola} mm</span>
-                                        </div>
-                                        <div>
-                                            <span className="block text-[8px] font-black text-white/50 uppercase tracking-widest">Modelo</span>
-                                            <span className="font-extrabold text-white text-base">{selectedOrder.trelicaModel || '—'}</span>
-                                        </div>
-                                        <div>
-                                            <span className="block text-[8px] font-black text-white/50 uppercase tracking-widest">Operador Responsável</span>
-                                            <span className="font-extrabold text-white text-base truncate block">
-                                                {selectedOrder.operator || (reportsForSelectedOrder.length > 0 ? reportsForSelectedOrder[reportsForSelectedOrder.length - 1]?.operator : '—')}
-                                            </span>
-                                        </div>
+                                        <span className="text-sm font-black text-[#002060]">{stats.progressPercent}%</span>
                                     </div>
                                 </div>
-
-                                {/* KPIs Grid */}
-                                {stats && (
-                                    <div className="bg-[#0B1E2B] p-6 rounded-b-3xl grid grid-cols-2 lg:grid-cols-4 gap-4 text-white">
-                                        {/* Target Card */}
-                                        <div className="p-5 bg-[#123146] border border-white/5 rounded-2xl flex flex-col justify-between min-h-[120px]">
-                                            <span className="text-[9px] font-black text-white/50 uppercase tracking-wider block">Meta</span>
-                                            <div>
-                                                <span className="text-3xl font-black text-white block leading-none tracking-tight">
-                                                    {stats.meta.toLocaleString('pt-BR')}
-                                                </span>
-                                                <span className="text-[10px] text-white/40 font-bold uppercase tracking-wider mt-1 block">{stats.unit}</span>
-                                            </div>
-                                        </div>
-
-                                        {/* Produced Card */}
-                                        <div className="p-5 bg-gradient-to-br from-[#123c34] to-[#0d2a24] border-2 border-emerald-500/30 rounded-2xl flex flex-col justify-between min-h-[120px] relative shadow-[0_0_15px_rgba(16,185,129,0.1)]">
-                                            <span className="text-[9px] font-black text-emerald-400 uppercase tracking-wider block">Produzido</span>
-                                            <div>
-                                                <span className="text-3xl font-black text-emerald-400 block leading-none tracking-tight">
-                                                    {stats.actual.toLocaleString('pt-BR')}
-                                                </span>
-                                                <span className="text-[10px] text-emerald-400/60 font-bold uppercase tracking-wider mt-1 block">
-                                                    {stats.unit
-                                                }</span>
-                                            </div>
-                                            {/* Trend Badge */}
-                                            {stats.meta > 0 && (
-                                                <div className="absolute top-4 right-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider">
-                                                    {stats.actual >= stats.meta 
-                                                        ? `↑ +${Math.round(((stats.actual - stats.meta) / stats.meta) * 100)}% vs Target` 
-                                                        : `↓ -${Math.round(((stats.meta - stats.actual) / stats.meta) * 100)}% vs Target`}
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Progress Card */}
-                                        <div className="p-4 bg-[#123146] border border-white/5 rounded-2xl flex flex-col items-center justify-center min-h-[120px]">
-                                            <span className="text-[9px] font-black text-white/50 uppercase tracking-wider block mb-2">Progresso</span>
-                                            {(() => {
-                                                const radius = 24;
-                                                const circumference = 2 * Math.PI * radius;
-                                                const progressVal = stats.meta > 0 ? (stats.actual / stats.meta) * 100 : 0;
-                                                const visualProgress = Math.min(100, progressVal);
-                                                const dashoffset = circumference - (visualProgress / 100) * circumference;
-                                                return (
-                                                    <div className="relative inline-flex items-center justify-center">
-                                                        <svg className="w-16 h-16" viewBox="0 0 60 60">
-                                                            <circle cx="30" cy="30" r={radius} stroke="rgba(255,255,255,0.06)" strokeWidth="5" fill="transparent" />
-                                                            <circle cx="30" cy="30" r={radius} stroke="#eab308" strokeWidth="5" fill="transparent"
-                                                                strokeDasharray={circumference}
-                                                                strokeDashoffset={dashoffset}
-                                                                strokeLinecap="round"
-                                                                transform="rotate(-90 30 30)"
-                                                                className="transition-all duration-500" />
-                                                        </svg>
-                                                        <span className="absolute text-[11px] font-black text-white">{Math.round(progressVal)}%</span>
-                                                    </div>
-                                                );
-                                            })()}
-                                        </div>
-
-                                        {/* Sucata Card */}
-                                        <div className="p-4 bg-[#123146] border border-white/5 rounded-2xl flex flex-col items-center justify-center min-h-[120px]">
-                                            <span className="text-[9px] font-black text-white/50 uppercase tracking-wider block mb-2">Sucata</span>
-                                            {(() => {
-                                                const radius = 24;
-                                                const circumference = 2 * Math.PI * radius;
-                                                const scrapVal = parseFloat(stats.scrapPercent);
-                                                const visualScrap = Math.min(100, scrapVal);
-                                                const dashoffset = circumference - (visualScrap / 100) * circumference;
-                                                return (
-                                                    <div className="relative inline-flex items-center justify-center">
-                                                        <svg className="w-16 h-16" viewBox="0 0 60 60">
-                                                            <circle cx="30" cy="30" r={radius} stroke="rgba(255,255,255,0.06)" strokeWidth="5" fill="transparent" />
-                                                            <circle cx="30" cy="30" r={radius} stroke="#ef4444" strokeWidth="5" fill="transparent"
-                                                                strokeDasharray={circumference}
-                                                                strokeDashoffset={dashoffset}
-                                                                strokeLinecap="round"
-                                                                transform="rotate(-90 30 30)"
-                                                                className="transition-all duration-500" />
-                                                        </svg>
-                                                        <span className="absolute text-[11px] font-black text-white">{scrapVal.toFixed(1)}%</span>
-                                                    </div>
-                                                );
-                                            })()}
-                                        </div>
+                                <div className="p-3 text-center flex flex-col items-center justify-center bg-rose-50/50">
+                                    <span className="text-[10px] font-black text-rose-500 uppercase tracking-wider">Sucata Acumulada</span>
+                                    <div className="flex items-baseline gap-1">
+                                        <span className="text-xl font-black text-rose-600">{stats.totalScrap.toLocaleString('pt-BR')} kg</span>
+                                        <span className="text-[10px] font-bold text-rose-500">({stats.scrapPercent}%)</span>
                                     </div>
-                                )}
-                            </div>
-
-                            {/* Card 2: Shift Reports Table (Evolution) */}
-                            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-6">
-                                <div>
-                                    <h3 className="text-xl font-bold text-slate-800 tracking-tight">
-                                        Evolução da Produção
-                                    </h3>
-                                    <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mt-0.5">
-                                        Lançamentos diários e turnos que atuaram nesta ordem.
-                                    </p>
                                 </div>
-
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm text-left text-slate-500 border-collapse">
-                                        <thead>
-                                            <tr className="border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                                <th className="py-3 px-4">Data/Turno</th>
-                                                <th className="py-3 px-4">Operador</th>
-                                                <th className="py-3 px-4">Produzido ({machineCategory === 'Trefila' ? 'kg' : 'peças'})</th>
-                                                <th className="py-3 px-4">Sucata (kg)</th>
-                                                <th className="py-3 px-4">Eficiência (%)</th>
-                                                <th className="py-3 px-4 text-center">Ações</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-50">
-                                            {reportsForSelectedOrder.length > 0 ? (
-                                                reportsForSelectedOrder.map((report) => {
-                                                    const eff = calculateShiftEfficiency(report, selectedOrder);
-                                                    const prodValue = machineCategory === 'Trefila' 
-                                                        ? (report.totalProducedWeight || 0) 
-                                                        : (report.totalProducedQuantity || 0);
-                                                    const prodUnit = machineCategory === 'Trefila' ? 'kg' : 'peças';
-                                                    
-                                                    const shiftTarget = machineCategory === 'Trefila' ? 15000 : 500;
-                                                    const shiftProgressPercent = Math.min(100, Math.round((prodValue / shiftTarget) * 100));
-
-                                                    return (
-                                                        <tr key={report.id} className="hover:bg-slate-50/50 transition-colors">
-                                                            <td className="py-4 px-4">
-                                                                <span className="font-extrabold text-slate-800 block">{formatShiftDate(report)}</span>
-                                                                <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded uppercase tracking-wider inline-block mt-1">
-                                                                    {report.operator ? 'Turno' : 'Lançamento'}
-                                                                </span>
-                                                            </td>
-                                                            <td className="py-4 px-4 font-bold text-slate-700">
-                                                                {report.operator || '—'}
-                                                            </td>
-                                                            <td className="py-4 px-4">
-                                                                <div className="space-y-1">
-                                                                    <span className="font-extrabold text-slate-800">{prodValue.toLocaleString('pt-BR')} {prodUnit}</span>
-                                                                    <div className="w-24 bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                                                                        <div 
-                                                                            className="bg-indigo-600 h-full rounded-full" 
-                                                                            style={{ width: `${shiftProgressPercent}%` }}
-                                                                        />
-                                                                    </div>
-                                                                </div>
-                                                            </td>
-                                                            <td className="py-4 px-4 font-bold text-slate-700">
-                                                                {(report.totalScrapWeight || 0).toFixed(1)} kg
-                                                            </td>
-                                                            <td className="py-4 px-4">
-                                                                {getEfficiencyBadge(eff)}
-                                                            </td>
-                                                            <td className="py-4 px-4">
-                                                                <div className="flex items-center justify-center gap-2">
-                                                                    <button
-                                                                        onClick={() => handlePrintReport(report)}
-                                                                        className="p-2 bg-slate-100 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 text-slate-600 hover:text-emerald-600 rounded-full transition-all active:scale-90"
-                                                                        title="Imprimir Relatório de Turno"
-                                                                    >
-                                                                        <PrinterIcon className="w-3.5 h-3.5" />
-                                                                    </button>
-                                                                    {isGestor && (
-                                                                        <>
-                                                                            <button
-                                                                                onClick={() => setEditingReport(report)}
-                                                                                className="p-2 bg-slate-100 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 text-slate-600 hover:text-indigo-600 rounded-full transition-all active:scale-90"
-                                                                                title="Ajustar Lançamento do Turno"
-                                                                            >
-                                                                                <PencilIcon className="w-3.5 h-3.5" />
-                                                                            </button>
-                                                                            {onDeleteReport && (
-                                                                                <button
-                                                                                    onClick={() => onDeleteReport(report.id)}
-                                                                                    className="p-2 bg-slate-100 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 text-slate-600 hover:text-rose-600 rounded-full transition-all active:scale-90"
-                                                                                    title="Excluir Lançamento do Turno"
-                                                                                >
-                                                                                    <TrashIcon className="w-3.5 h-3.5" />
-                                                                                </button>
-                                                                            )}
-                                                                        </>
-                                                                    )}
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })
-                                            ) : (
-                                                <tr>
-                                                    <td colSpan={6} className="py-10 text-center text-slate-400">
-                                                        <WarningIcon className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-                                                        <p className="font-bold">Nenhum turno registrado</p>
-                                                        <p className="text-xs text-slate-400 mt-1">Esta ordem ainda não possui relatórios de turno encerrados.</p>
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </>
-                    ) : (
-                        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-12 text-center text-slate-400 flex flex-col items-center justify-center min-h-[50vh] gap-4">
-                            <div className="w-16 h-16 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center border border-slate-200">
-                                <ClipboardListIcon className="w-8 h-8" />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-extrabold text-slate-800">Nenhuma Ordem Selecionada</h3>
-                                <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">
-                                    Selecione uma ordem de produção na lista ao lado para visualizar os detalhes, KPIs e a linha do tempo da evolução.
-                                </p>
                             </div>
                         </div>
                     )}
+
+                    {/* LANÇAMENTOS (HISTÓRICO DE TURNOS) */}
+                    <div className="bg-white flex flex-col min-h-[300px]">
+                        <div className="bg-[#002060] text-white py-2 px-3 flex items-center justify-between text-[11px] font-black tracking-wider uppercase">
+                            <div className="flex items-center gap-1.5">
+                                <ClipboardListIcon className="h-4 w-4 text-white" />
+                                <span>HISTÓRICO DE LANÇAMENTOS (TURNOS)</span>
+                            </div>
+                            <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded">{reportsForSelectedOrder.length} Turno(s)</span>
+                        </div>
+                        
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-slate-50 border-b-2 border-slate-200 text-[10px] font-black text-slate-700 uppercase">
+                                        <th className="py-2.5 px-3 border-r border-slate-200">Data do Turno</th>
+                                        <th className="py-2.5 px-3 border-r border-slate-200">Operador(es)</th>
+                                        <th className="py-2.5 px-3 border-r border-slate-200 text-right">Produção ({machineCategory === 'Trefila' ? 'kg' : 'pçs'})</th>
+                                        <th className="py-2.5 px-3 border-r border-slate-200 text-right">Sucata (kg)</th>
+                                        <th className="py-2.5 px-3 border-r border-slate-200 text-center">Paradas</th>
+                                        <th className="py-2.5 px-3 border-r border-slate-200 text-center">Eficiência</th>
+                                        <th className="py-2.5 px-3 text-center no-print"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {/* TURNO ATUAL EM ANDAMENTO */}
+                                    {(() => {
+                                        const activeLog = (selectedOrder.operatorLogs || []).find(log => !log.endTime);
+                                        if (!activeLog) return null;
+                                        
+                                        const shiftStartMs = new Date(activeLog.startTime).getTime();
+                                        const currentMs = Date.now();
+                                        
+                                        const liveDowntimeMs = (selectedOrder.downtimeEvents || []).reduce((acc: number, event: any) => {
+                                            const stop = new Date(event.stopTime).getTime();
+                                            const resume = event.resumeTime ? new Date(event.resumeTime).getTime() : currentMs;
+                                            const effectiveStart = Math.max(stop, shiftStartMs);
+                                            const effectiveEnd = Math.min(resume, currentMs);
+                                            return effectiveEnd > effectiveStart ? acc + (effectiveEnd - effectiveStart) : acc;
+                                        }, 0);
+                                        
+                                        const liveDowntimeMins = Math.floor(liveDowntimeMs / 60000);
+                                        const dtHours = Math.floor(liveDowntimeMins / 60);
+                                        const dtMins = liveDowntimeMins % 60;
+                                        const liveDtStr = dtHours > 0 ? `${dtHours}h ${dtMins}m` : `${dtMins}m`;
+                                        const liveHasDowntime = liveDowntimeMins > 0;
+                                        
+                                        const liveQuantity = (selectedOrder.actualProducedQuantity || 0) - (activeLog.startQuantity || 0);
+                                        let liveWeight = 0;
+                                        if (machineCategory === 'Trefila') {
+                                            const liveProcessedLots = (selectedOrder.processedLots || []).filter(lot => new Date(lot.endTime || lot.startTime).getTime() >= shiftStartMs);
+                                            liveWeight = liveProcessedLots.reduce((sum, lot) => sum + (lot.finalWeight || 0), 0);
+                                        } else {
+                                            liveWeight = liveQuantity; 
+                                        }
+                                        const liveProdValue = machineCategory === 'Trefila' ? liveWeight : liveQuantity;
+                                        
+                                        const liveReport = {
+                                            shiftStartTime: activeLog.startTime,
+                                            shiftEndTime: new Date().toISOString(),
+                                            totalProducedQuantity: liveQuantity,
+                                            totalProducedWeight: liveWeight,
+                                            tamanho: selectedOrder.tamanho,
+                                            downtimeEvents: selectedOrder.downtimeEvents?.filter(e => new Date(e.stopTime).getTime() >= shiftStartMs) || []
+                                        } as any;
+                                        
+                                        const liveEff = calculateShiftEfficiency(liveReport, selectedOrder);
+                                        
+                                        return (
+                                            <tr key="live" className="border-b-2 border-emerald-500 bg-emerald-50/60 group relative text-sm shadow-inner">
+                                                <td className="py-2 px-3 border-r border-slate-200 font-bold text-emerald-900 flex flex-col">
+                                                    <span>{new Date(activeLog.startTime).toLocaleDateString('pt-BR')}</span>
+                                                    <span className="text-[9px] uppercase font-black text-white tracking-widest bg-emerald-500 rounded px-1.5 py-0.5 w-max mt-1 animate-pulse shadow-sm">Em Andamento</span>
+                                                </td>
+                                                <td className="py-2 px-3 border-r border-slate-200 font-bold text-[#002060]">
+                                                    {activeLog.operator}
+                                                </td>
+                                                <td className="py-2 px-3 border-r border-slate-200 font-black text-emerald-600 text-right">
+                                                    {(liveProdValue || 0).toLocaleString('pt-BR')}
+                                                </td>
+                                                <td className="py-2 px-3 border-r border-slate-200 font-black text-rose-500 text-right opacity-70">
+                                                    —
+                                                </td>
+                                                <td className={`py-2 px-3 border-r border-slate-200 text-center font-bold ${liveHasDowntime ? 'text-amber-600' : 'text-slate-400'}`}>
+                                                    {liveHasDowntime ? liveDtStr : '—'}
+                                                </td>
+                                                <td className="py-2 px-3 border-r border-slate-200 text-center">
+                                                    {getEfficiencyBadge(liveEff)}
+                                                </td>
+                                                <td className="py-2 px-2 text-center relative no-print w-16">
+                                                </td>
+                                            </tr>
+                                        );
+                                    })()}
+
+                                    {reportsForSelectedOrder.length === 0 && !(selectedOrder.operatorLogs || []).some(l => !l.endTime) ? (
+                                        <tr>
+                                            <td colSpan={7} className="py-12 text-center text-slate-400">
+                                                <WarningIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                                                <div className="font-bold text-xs uppercase tracking-widest">Nenhum turno registrado</div>
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        reportsForSelectedOrder.map((report, idx) => {
+                                            const eff = calculateShiftEfficiency(report, selectedOrder);
+                                            const prodValue = machineCategory === 'Trefila' ? report.totalProducedWeight : report.totalProducedQuantity;
+                                            
+                                            // Calcula paradas do turno
+                                            const shiftStart = new Date(report.shiftStartTime || '').getTime();
+                                            const shiftEnd = new Date(report.shiftEndTime || '').getTime();
+                                            const totalDowntimeMs = (report.downtimeEvents || []).reduce((acc: number, event: any) => {
+                                                const stop = new Date(event.stopTime).getTime();
+                                                const resume = event.resumeTime ? new Date(event.resumeTime).getTime() : (isNaN(shiftEnd) ? stop : shiftEnd);
+                                                const effectiveStart = isNaN(shiftStart) ? stop : Math.max(stop, shiftStart);
+                                                const effectiveEnd = isNaN(shiftEnd) ? resume : Math.min(resume, shiftEnd);
+                                                return effectiveEnd > effectiveStart ? acc + (effectiveEnd - effectiveStart) : acc;
+                                            }, 0);
+                                            
+                                            // Formata para hh:mm
+                                            const totalDowntimeMins = Math.floor(totalDowntimeMs / 60000);
+                                            const dtHours = Math.floor(totalDowntimeMins / 60);
+                                            const dtMins = totalDowntimeMins % 60;
+                                            const dtStr = dtHours > 0 ? `${dtHours}h ${dtMins}m` : `${dtMins}m`;
+                                            const hasDowntime = totalDowntimeMins > 0;
+                                            
+                                            return (
+                                                <tr key={report.id} className={`border-b border-slate-200 group relative text-sm ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}>
+                                                    <td className="py-2 px-3 border-r border-slate-200 font-bold text-slate-800">
+                                                        {formatShiftDate(report)}
+                                                    </td>
+                                                    <td className="py-2 px-3 border-r border-slate-200 font-bold text-[#002060]">
+                                                        {report.operator || '—'}
+                                                    </td>
+                                                    <td className="py-2 px-3 border-r border-slate-200 font-black text-[#002060] text-right">
+                                                        {(prodValue || 0).toLocaleString('pt-BR')}
+                                                    </td>
+                                                    <td className="py-2 px-3 border-r border-slate-200 font-black text-rose-600 text-right">
+                                                        {(report.totalScrapWeight || 0).toLocaleString('pt-BR')}
+                                                    </td>
+                                                    <td className={`py-2 px-3 border-r border-slate-200 text-center font-bold ${hasDowntime ? 'text-amber-600' : 'text-slate-400'}`}>
+                                                        {hasDowntime ? dtStr : '—'}
+                                                    </td>
+                                                    <td className="py-2 px-3 border-r border-slate-200 text-center">
+                                                        {getEfficiencyBadge(eff)}
+                                                    </td>
+                                                    {/* Botões Flutuantes (Hover) - Ocultos na Impressão */}
+                                                    <td className="py-2 px-2 text-center relative no-print w-16">
+                                                        <div className="absolute inset-0 flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 backdrop-blur-sm px-2">
+                                                            <button onClick={() => handlePrintReport(report)} className="text-slate-500 hover:text-[#002060] transition-colors" title="Imprimir Relatório do Turno">
+                                                                <PrinterIcon className="w-4 h-4" />
+                                                            </button>
+                                                            {isGestor && (
+                                                                <>
+                                                                    <button onClick={() => setEditingReport(report)} className="text-slate-500 hover:text-indigo-600 transition-colors" title="Editar Turno">
+                                                                        <PencilIcon className="w-4 h-4" />
+                                                                    </button>
+                                                                    {onDeleteReport && (
+                                                                        <button onClick={() => onDeleteReport(report.id)} className="text-slate-500 hover:text-rose-600 transition-colors" title="Excluir Turno">
+                                                                            <TrashIcon className="w-4 h-4" />
+                                                                        </button>
+                                                                    )}
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            ) : (
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-16 text-center flex flex-col items-center justify-center min-h-[50vh] no-print">
+                    <ClipboardListIcon className="w-16 h-16 text-slate-200 mb-4" />
+                    <h3 className="text-xl font-black text-slate-800 uppercase tracking-widest">Controle de Produção</h3>
+                    <p className="text-sm text-slate-500 mt-2 max-w-md mx-auto font-bold">
+                        Selecione uma Ordem de Produção no filtro acima para visualizar a Ficha Completa.
+                    </p>
+                </div>
+            )}
 
             {/* Editing Modal (Rendered when gestor selects a report to adjust) */}
             {editingReport && (
@@ -975,7 +816,7 @@ const ProductionControl: React.FC<ProductionControlProps> = ({
                 />
             )}
 
-            {/* Print View Container */}
+            {/* Print View Container (For Shift Report Print) */}
             {printingReport && (
                 <div className="fixed inset-0 bg-white z-[9999] overflow-y-auto print-modal-container">
                     <div className="bg-white w-full print-modal-content">

@@ -379,16 +379,46 @@ const RulerIcon = ({ className = "h-5 w-5" }: { className?: string }) => (
 );
 
 export const ShiftReportPrintView: React.FC<{ report: ShiftReport, stock: StockItem[], allReports?: ShiftReport[] }> = ({ report, stock, allReports }) => {
-    // 1. Helpers de Formatação e Data
     const dateStr = useMemo(() => {
         if (report.date) return report.date.split(' ')[0];
-        if (report.shiftStartTime) return new Date(report.shiftStartTime).toISOString().split('T')[0];
+        if (report.shiftStartTime) {
+            const d = new Date(report.shiftStartTime);
+            if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+        }
         return new Date().toISOString().split('T')[0];
     }, [report]);
 
-    const dateObj = useMemo(() => new Date(dateStr + 'T00:00:00'), [dateStr]);
-    const formattedDateNumbers = useMemo(() => dateObj.toLocaleDateString('pt-BR'), [dateObj]);
+    const dateObj = useMemo(() => {
+        if (!dateStr) return new Date();
+        if (dateStr.includes('/')) {
+            const parts = dateStr.split('/');
+            if (parts.length === 3) {
+                return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+            }
+        } else if (dateStr.includes('-')) {
+            const parts = dateStr.split('-');
+            if (parts.length === 3) {
+                if (parts[0].length === 4) {
+                    return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                }
+                if (parts[2].length === 4) {
+                    return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                }
+            }
+        }
+        const d = new Date(dateStr + 'T00:00:00');
+        if (!isNaN(d.getTime())) return d;
+        const d2 = new Date(dateStr);
+        return isNaN(d2.getTime()) ? new Date() : d2;
+    }, [dateStr]);
+
+    const formattedDateNumbers = useMemo(() => {
+        if (isNaN(dateObj.getTime())) return dateStr;
+        return dateObj.toLocaleDateString('pt-BR');
+    }, [dateObj, dateStr]);
+
     const formattedDayOfWeek = useMemo(() => {
+        if (isNaN(dateObj.getTime())) return '';
         const days = ['DOMINGO', 'SEGUNDA-FEIRA', 'TERÇA-FEIRA', 'QUARTA-FEIRA', 'QUINTA-FEIRA', 'SEXTA-FEIRA', 'SÁBADO'];
         return days[dateObj.getDay()];
     }, [dateObj]);
