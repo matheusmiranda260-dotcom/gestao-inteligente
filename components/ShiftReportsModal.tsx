@@ -1,6 +1,115 @@
 import React, { useState, useMemo } from 'react';
 import type { ShiftReport, StockItem } from '../types';
-import { PrinterIcon, DocumentReportIcon, ArchiveIcon, WarningIcon, TrashIcon, ChartBarIcon } from './icons';
+import { PrinterIcon, DocumentReportIcon, ArchiveIcon, WarningIcon, TrashIcon, ChartBarIcon, PencilIcon } from './icons';
+
+const EditShiftReportModal: React.FC<{
+    report: ShiftReport;
+    onClose: () => void;
+    onSave: (reportId: string, updates: Partial<ShiftReport>) => Promise<void>;
+}> = ({ report, onClose, onSave }) => {
+    const [quantity, setQuantity] = useState(report.totalProducedQuantity || 0);
+    const [weight, setWeight] = useState(report.totalProducedWeight || 0);
+    const [meters, setMeters] = useState(report.totalProducedMeters || 0);
+    const [scrap, setScrap] = useState(report.totalScrapWeight || 0);
+    const [isSaving, setIsSaving] = useState(false);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSaving(true);
+        try {
+            await onSave(report.id, {
+                totalProducedQuantity: quantity,
+                totalProducedWeight: weight,
+                totalProducedMeters: meters,
+                totalScrapWeight: scrap,
+            });
+            onClose();
+        } catch (err) {
+            console.error(err);
+            alert("Erro ao salvar ajustes.");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[130] p-4 animate-fade-in">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg p-8 transform scale-100">
+                <div className="flex items-center gap-4 mb-8">
+                    <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-xl flex items-center justify-center">
+                        <PencilIcon className="w-6 h-6" />
+                    </div>
+                    <div>
+                        <h3 className="text-2xl font-black text-slate-800 tracking-tight">Ajuste de Turno</h3>
+                        <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Acesso Restrito: Gestor</p>
+                    </div>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Qtd. Peças</label>
+                            <input
+                                type="number"
+                                step="any"
+                                value={quantity}
+                                onChange={(e) => setQuantity(Number(e.target.value))}
+                                className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-lg font-bold rounded-xl px-4 py-3 focus:ring-2 focus:ring-rose-500 focus:border-transparent outline-none"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Peso Total (kg)</label>
+                            <input
+                                type="number"
+                                step="any"
+                                value={weight}
+                                onChange={(e) => setWeight(Number(e.target.value))}
+                                className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-lg font-bold rounded-xl px-4 py-3 focus:ring-2 focus:ring-rose-500 focus:border-transparent outline-none"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Metros</label>
+                            <input
+                                type="number"
+                                step="any"
+                                value={meters}
+                                onChange={(e) => setMeters(Number(e.target.value))}
+                                className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-lg font-bold rounded-xl px-4 py-3 focus:ring-2 focus:ring-rose-500 focus:border-transparent outline-none"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Sucata (kg)</label>
+                            <input
+                                type="number"
+                                step="any"
+                                value={scrap}
+                                onChange={(e) => setScrap(Number(e.target.value))}
+                                className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-lg font-bold rounded-xl px-4 py-3 focus:ring-2 focus:ring-rose-500 focus:border-transparent outline-none"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="px-6 py-3 rounded-xl font-black text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors uppercase text-sm tracking-widest"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={isSaving}
+                            className="px-8 py-3 rounded-xl font-black text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50 transition-colors shadow-lg shadow-rose-200 uppercase text-sm tracking-widest"
+                        >
+                            {isSaving ? 'Salvando...' : 'Salvar Ajuste'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
 
 const formatDuration = (ms: number) => {
     if (ms < 0) ms = 0;
@@ -686,11 +795,14 @@ interface ShiftReportsModalProps {
     stock: StockItem[];
     onClose: () => void;
     onDelete?: (reportId: string) => void;
+    isGestor?: boolean;
+    onUpdateReport?: (reportId: string, updates: Partial<ShiftReport>) => Promise<void>;
 }
 
-const ShiftReportsModal: React.FC<ShiftReportsModalProps> = ({ reports, stock, onClose, onDelete }) => {
+const ShiftReportsModal: React.FC<ShiftReportsModalProps> = ({ reports, stock, onClose, onDelete, isGestor, onUpdateReport }) => {
     const [expandedReportId, setExpandedReportId] = useState<string | null>(null);
     const [printingReport, setPrintingReport] = useState<ShiftReport | null>(null);
+    const [editingReport, setEditingReport] = useState<ShiftReport | null>(null);
 
     const toggleExpand = (reportId: string) => {
         setExpandedReportId(prevId => (prevId === reportId ? null : reportId));
@@ -815,6 +927,15 @@ const ShiftReportsModal: React.FC<ShiftReportsModalProps> = ({ reports, stock, o
                                                             >
                                                                 Ver Relatório
                                                             </button>
+                                                            {isGestor && onUpdateReport && (
+                                                                <button
+                                                                    onClick={() => setEditingReport(report)}
+                                                                    className="py-2 px-3 rounded-lg text-xs font-bold uppercase bg-amber-50 text-amber-600 border border-amber-200 hover:bg-amber-100 transition-all flex items-center gap-1"
+                                                                    title="Ajustar Turno (Gestor)"
+                                                                >
+                                                                    <PencilIcon className="h-4 w-4" /> Ajustar
+                                                                </button>
+                                                            )}
                                                             {onDelete && (
                                                                 <button
                                                                     onClick={() => onDelete(report.id)}
@@ -866,6 +987,13 @@ const ShiftReportsModal: React.FC<ShiftReportsModalProps> = ({ reports, stock, o
                             Sair do Hub
                         </button>
                     </div>
+                )}
+                {editingReport && onUpdateReport && (
+                    <EditShiftReportModal
+                        report={editingReport}
+                        onClose={() => setEditingReport(null)}
+                        onSave={onUpdateReport}
+                    />
                 )}
             </div>
         </div>

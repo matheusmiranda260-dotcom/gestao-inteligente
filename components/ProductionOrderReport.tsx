@@ -27,6 +27,7 @@ interface ProductionOrderReportProps {
     stock: StockItem[];
     onClose: () => void;
     gauges: StockGauge[];
+    shiftReports?: any[];
 }
 
 const formatDuration = (ms: number) => {
@@ -38,7 +39,7 @@ const formatDuration = (ms: number) => {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 };
 
-const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportData, stock, onClose, gauges }) => {
+const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportData, stock, onClose, gauges, shiftReports = [] }) => {
     const {
         totalDurationMs,
         totalDowntimeMs,
@@ -200,6 +201,11 @@ const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportDat
         });
     }, [reportData]);
 
+    const productionHistory = useMemo(() => {
+        const orderReports = shiftReports.filter(r => r.orderNumber === reportData.orderNumber);
+        return orderReports.sort((a, b) => new Date(a.shiftStartTime || a.date).getTime() - new Date(b.shiftStartTime || b.date).getTime());
+    }, [shiftReports, reportData.orderNumber]);
+
     // Treliça Specific Layout
     if (reportData.machine === 'Treliça') {
         const sizeMeters = parseFloat((reportData.tamanho || '0').replace('MTS', '').trim());
@@ -312,45 +318,45 @@ const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportDat
 
                         {/* Production Updates Table */}
                         <div className="border border-black p-2">
-                            <h3 className="text-center italic underline font-bold mb-1 text-sm">ATUALIZAÇÃO DA PRODUÇÃO:</h3>
+                            <h3 className="text-center italic underline font-bold mb-1 text-sm">EVOLUÇÃO DA PRODUÇÃO (POR TURNO):</h3>
                             <div className="text-center font-bold mb-2 text-sm">Qntidade de peças a produzir: {reportData.quantityToProduce || '-'} treliças</div>
 
                             <table className="w-full max-w-lg mx-auto border-collapse border border-black text-center text-sm font-bold">
                                 <thead>
                                     <tr className="border-b border-black">
+                                        <th className="border-r border-black p-1 w-20">Turno</th>
+                                        <th className="border-r border-black p-1 w-20">Operador</th>
                                         <th className="border-r border-black p-1 w-20">Qnt.</th>
-                                        <th className="border-r border-black p-1 w-20">peso</th>
-                                        <th className="border-r border-black p-1 w-20">media</th>
+                                        <th className="border-r border-black p-1 w-20">Peso</th>
                                         <th className="p-1">Data</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {productionItems.length > 0 ? productionItems.map((pkg, idx) => (
-                                        <tr key={idx} className="border-b border-black">
-                                            <td className="border-r border-black p-1">{pkg.quantity}</td>
-                                            <td className="border-r border-black p-1">{pkg.weight.toFixed(0)}</td>
-                                            <td className="border-r border-black p-1">{(pkg.weight / pkg.quantity).toFixed(2)}</td>
-                                            <td className="p-1">{new Date(pkg.timestamp).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}</td>
-                                        </tr>
-                                    )) : (
+                                    {productionHistory.length > 0 ? productionHistory.map((hist, idx) => {
+                                        const q = hist.totalProducedQuantity > 0 ? hist.totalProducedQuantity : ((hist.totalProducedMeters || 0) / (parseFloat(hist.tamanho || '6') || 6));
+                                        const start = hist.shiftStartTime ? new Date(hist.shiftStartTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+                                        const end = hist.shiftEndTime ? new Date(hist.shiftEndTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+                                        const dateStr = new Date(hist.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                                        const timeLabel = start && end ? `${dateStr} - ${start} às ${end}` : dateStr;
+                                        return (
+                                            <tr key={idx} className="border-b border-black">
+                                                <td className="border-r border-black p-1">Turno {idx + 1}</td>
+                                                <td className="border-r border-black p-1 uppercase">{hist.operator}</td>
+                                                <td className="border-r border-black p-1">{q.toFixed(0)}</td>
+                                                <td className="border-r border-black p-1">{(hist.totalProducedWeight || 0).toFixed(0)}</td>
+                                                <td className="p-1 text-xs whitespace-nowrap">{timeLabel}</td>
+                                            </tr>
+                                        );
+                                    }) : (
                                         <tr className="border-b border-black">
+                                            <td className="border-r border-black p-1">-</td>
+                                            <td className="border-r border-black p-1">{operatorNames}</td>
                                             <td className="border-r border-black p-1">{totalPieces}</td>
                                             <td className="border-r border-black p-1">{(reportData.actualProducedWeight || 0).toFixed(0)}</td>
-                                            <td className="border-r border-black p-1">{totalPieces > 0 ? ((reportData.actualProducedWeight || 0) / totalPieces).toFixed(2) : '-'}</td>
                                             <td className="p-1">{new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}</td>
                                         </tr>
                                     )}
                                 </tbody>
-                                {productionItems.length > 0 && (
-                                    <tfoot>
-                                        <tr className="bg-gray-50">
-                                            <td className="border-r border-black p-1">{totalPackageQty}</td>
-                                            <td className="border-r border-black p-1">{totalPackageWeight.toFixed(0)}</td>
-                                            <td className="border-r border-black p-1">{averageWeight.toFixed(2)}</td>
-                                            <td className="p-1"></td>
-                                        </tr>
-                                    </tfoot>
-                                )}
                             </table>
                         </div>
                     </div>
@@ -513,19 +519,32 @@ const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportDat
                         </div>
 
                         {/* Atualização da Produção */}
-                        <div>
-                            <h3 className="text-center font-bold italic underline mb-1">ATUALIZAÇÃO DA PRODUÇÃO:</h3>
+                        <div className="border border-black p-2">
+                            <h3 className="text-center font-bold italic underline mb-1">EVOLUÇÃO DA PRODUÇÃO (POR TURNO):</h3>
                             <table className="w-full border-collapse border border-black text-sm text-center font-bold mx-auto max-w-2xl">
                                 <thead>
                                     <tr className="bg-white border-b-2 border-black">
-                                        <th className="border border-black p-1">Data</th>
-                                        <th className="border border-black p-1">kg (entrada)</th>
+                                        <th className="border border-black p-1">Turno</th>
+                                        <th className="border border-black p-1">Operador</th>
                                         <th className="border border-black p-1">kg (saída)</th>
-                                        <th className="border border-black p-1">bitola</th>
+                                        <th className="border border-black p-1">Data / Hora</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {dailyBreakdown.map((day, dIdx) => (
+                                    {productionHistory.length > 0 ? productionHistory.map((hist, idx) => {
+                                        const start = hist.shiftStartTime ? new Date(hist.shiftStartTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+                                        const end = hist.shiftEndTime ? new Date(hist.shiftEndTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+                                        const dateStr = new Date(hist.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                                        const timeLabel = start && end ? `${dateStr} - ${start} às ${end}` : dateStr;
+                                        return (
+                                            <tr key={idx}>
+                                                <td className="border border-black p-1">Turno {idx + 1}</td>
+                                                <td className="border border-black p-1 uppercase">{hist.operator}</td>
+                                                <td className="border border-black p-1">{(hist.totalProducedWeight || 0).toFixed(0)}</td>
+                                                <td className="border border-black p-1 text-xs whitespace-nowrap">{timeLabel}</td>
+                                            </tr>
+                                        );
+                                    }) : dailyBreakdown.map((day, dIdx) => (
                                         <React.Fragment key={dIdx}>
                                             {day.lots.map((lot, lIdx) => (
                                                 <tr key={lot.lotId}>
@@ -539,18 +558,12 @@ const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportDat
                                                     <td className="border border-black p-1">{(lot as any).measuredGauge ? (lot as any).measuredGauge.toFixed(2) + 'mm' : '-'}</td>
                                                 </tr>
                                             ))}
-                                            <tr className="bg-gray-50 text-red-600">
-                                                <td className="border border-black p-1 text-right italic" colSpan={4}>
-                                                    Subtotal Dia: {day.lots.reduce((acc, l) => acc + (l.finalWeight || 0), 0).toFixed(0)} kg
-                                                </td>
-                                            </tr>
                                         </React.Fragment>
                                     ))}
                                 </tbody>
                                 <tfoot>
                                     <tr className="border-t-2 border-black bg-white">
-                                        <td className="border border-black p-1 font-bold text-red-600 text-lg">Total</td>
-                                        <td className="border border-black p-1 font-bold text-red-600 text-lg">{inputWeight.toFixed(0)}</td>
+                                        <td className="border border-black p-1 font-bold text-red-600 text-lg" colSpan={2}>Total Saída Estimado</td>
                                         <td className="border border-black p-1 font-bold text-red-600 text-lg">{outputWeight.toFixed(0)}</td>
                                         <td className="border border-black p-1"></td>
                                     </tr>

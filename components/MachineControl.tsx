@@ -1644,6 +1644,33 @@ const MachineControl: React.FC<MachineControlProps> = ({
         }
     };
 
+    const handleUpdateShiftReport = async (reportId: string, updates: Partial<ShiftReport>) => {
+        try {
+            const originalReport = shiftReports?.find(r => r.id === reportId);
+            if (!originalReport) throw new Error("Relatório não encontrado");
+
+            const qtyDelta = (updates.totalProducedQuantity ?? originalReport.totalProducedQuantity) - originalReport.totalProducedQuantity;
+            const weightDelta = (updates.totalProducedWeight ?? originalReport.totalProducedWeight) - originalReport.totalProducedWeight;
+
+            // Update shift_reports
+            await updateItem('shift_reports', reportId, updates);
+
+            // Update parent production order
+            if ((qtyDelta !== 0 || weightDelta !== 0) && originalReport.productionOrderId && updateProductionOrder) {
+                const parentOrder = productionOrders?.find(o => o.id === originalReport.productionOrderId);
+                if (parentOrder) {
+                    await updateProductionOrder(parentOrder.id, {
+                        actualProducedQuantity: (parentOrder.actualProducedQuantity || 0) + qtyDelta,
+                        actualProducedWeight: (parentOrder.actualProducedWeight || 0) + weightDelta
+                    });
+                }
+            }
+        } catch (error) {
+            console.error("Erro ao atualizar relatório:", error);
+            throw error;
+        }
+    };
+
 
     // OS Tracking for Desbobinadeira
     const handleStartOs = (osIndex: number) => {
@@ -2036,6 +2063,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
                     stock={stock}
                     onClose={() => setShowShiftReportsModal(false)}
                     onDelete={deleteShiftReport}
+                    isGestor={isGestor}
+                    onUpdateReport={handleUpdateShiftReport}
                 />
             )}
             {productionReportData && (
@@ -2043,6 +2072,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
                     reportData={productionReportData}
                     stock={stock}
                     onClose={() => setProductionReportData(null)}
+                    gauges={gauges}
+                    shiftReports={shiftReports}
                 />
             )}
             {managerOverrideData && (
