@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import type { ShiftReport, StockItem } from '../types';
 import { PrinterIcon, DocumentReportIcon, ArchiveIcon, WarningIcon, TrashIcon, ChartBarIcon, PencilIcon } from './icons';
 
-const EditShiftReportModal: React.FC<{
+export const EditShiftReportModal: React.FC<{
     report: ShiftReport;
     onClose: () => void;
     onSave: (reportId: string, updates: Partial<ShiftReport>) => Promise<void>;

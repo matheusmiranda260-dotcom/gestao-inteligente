@@ -231,6 +231,35 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser }) =
                     </section>
                 )}
 
+                {/* CONTROLE DE PRODUÇÃO */}
+                {(hasPermission('trefilaControl') || hasPermission('trelicaControl')) && (
+                    <section>
+                        <div className="section-title">
+                            <h2>Controle de Produção</h2>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                            {hasPermission('trefilaControl') && (
+                                <MenuButton
+                                    onClick={() => setPage('trefilaControl')}
+                                    label="Controle – Trefila"
+                                    description="Evolução de ordens de trefila e ajustes de lançamentos."
+                                    icon={<ChartBarIcon />}
+                                    color="teal"
+                                />
+                            )}
+                            {hasPermission('trelicaControl') && (
+                                <MenuButton
+                                    onClick={() => setPage('trelicaControl')}
+                                    label="Controle – Treliça"
+                                    description="Evolução de ordens de treliça e ajustes de lançamentos."
+                                    icon={<ChartBarIcon />}
+                                    color="blue"
+                                />
+                            )}
+                        </div>
+                    </section>
+                )}
+
                 {/* RH */}
                 {(hasPermission('continuousImprovement') || hasPermission('peopleManagement')) && (
                     <section>

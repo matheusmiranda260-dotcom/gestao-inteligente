@@ -766,6 +766,7 @@ interface MachineControlProps {
     addLotToOrder?: (orderId: string, lotId: string) => void;
     downtimeConfigs?: DowntimeConfig[];
     updateProductionOrder?: (orderId: string, updates: Partial<ProductionOrderData>) => void;
+    onUpdateReport?: (reportId: string, updates: Partial<ShiftReport>) => Promise<void>;
 }
 
 const formatDuration = (ms: number) => {
@@ -809,7 +810,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
     recordLotWeight, recordPackageWeight, completeProduction, addPartsRequest,
     logPostProductionActivity, updateProducedQuantity, deleteShiftReport,
     cancelProductionOrder, pauseProductionOrder, addLotToOrder, initialView, initialModal, gauges = [],
-    downtimeConfigs = [], updateProductionOrder
+    downtimeConfigs = [], updateProductionOrder, onUpdateReport
 }) => {
     const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor' || currentUser?.username?.toLowerCase() === 'admin' || currentUser?.username?.toLowerCase() === 'gestor' || currentUser?.username?.toLowerCase().includes('matheusmiranda');
     const [activeMachine, setActiveMachine] = useState<MachineType>(() => {
@@ -1645,29 +1646,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
     };
 
     const handleUpdateShiftReport = async (reportId: string, updates: Partial<ShiftReport>) => {
-        try {
-            const originalReport = shiftReports?.find(r => r.id === reportId);
-            if (!originalReport) throw new Error("Relatório não encontrado");
-
-            const qtyDelta = (updates.totalProducedQuantity ?? originalReport.totalProducedQuantity) - originalReport.totalProducedQuantity;
-            const weightDelta = (updates.totalProducedWeight ?? originalReport.totalProducedWeight) - originalReport.totalProducedWeight;
-
-            // Update shift_reports
-            await updateItem('shift_reports', reportId, updates);
-
-            // Update parent production order
-            if ((qtyDelta !== 0 || weightDelta !== 0) && originalReport.productionOrderId && updateProductionOrder) {
-                const parentOrder = productionOrders?.find(o => o.id === originalReport.productionOrderId);
-                if (parentOrder) {
-                    await updateProductionOrder(parentOrder.id, {
-                        actualProducedQuantity: (parentOrder.actualProducedQuantity || 0) + qtyDelta,
-                        actualProducedWeight: (parentOrder.actualProducedWeight || 0) + weightDelta
-                    });
-                }
-            }
-        } catch (error) {
-            console.error("Erro ao atualizar relatório:", error);
-            throw error;
+        if (onUpdateReport) {
+            await onUpdateReport(reportId, updates);
         }
     };
 

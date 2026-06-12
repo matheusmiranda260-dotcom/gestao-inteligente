@@ -18,6 +18,7 @@ import { trelicaModels } from './components/ProductionOrderTrelica';
 import FinishedGoods from './components/FinishedGoods';
 import TrelicaStockManager from './components/TrelicaStockManager';
 import SparePartsManager from './components/SparePartsManager';
+import ProductionControl from './components/ProductionControl';
 
 import ContinuousImprovement from './components/ContinuousImprovement';
 import WorkInstructions from './components/WorkInstructions';
@@ -2467,6 +2468,35 @@ const App: React.FC = () => {
         }
     };
 
+    const handleUpdateShiftReport = async (reportId: string, updates: Partial<ShiftReport>) => {
+        try {
+            const originalReport = shiftReports?.find(r => r.id === reportId);
+            if (!originalReport) throw new Error("Relatório não encontrado");
+
+            const qtyDelta = (updates.totalProducedQuantity ?? originalReport.totalProducedQuantity ?? 0) - (originalReport.totalProducedQuantity ?? 0);
+            const weightDelta = (updates.totalProducedWeight ?? originalReport.totalProducedWeight ?? 0) - (originalReport.totalProducedWeight ?? 0);
+
+            // Update shift_reports in Supabase
+            await updateItem('shift_reports', reportId, updates);
+
+            // Update parent production order
+            if ((qtyDelta !== 0 || weightDelta !== 0) && originalReport.productionOrderId) {
+                const parentOrder = productionOrders?.find(o => o.id === originalReport.productionOrderId);
+                if (parentOrder) {
+                    await updateProductionOrder(parentOrder.id, {
+                        actualProducedQuantity: (parentOrder.actualProducedQuantity || 0) + qtyDelta,
+                        actualProducedWeight: (parentOrder.actualProducedWeight || 0) + weightDelta
+                    });
+                }
+            }
+            showNotification('Relatório de turno atualizado com sucesso!', 'success');
+        } catch (error: any) {
+            console.error("Erro ao atualizar relatório:", error);
+            showNotification(`Erro ao atualizar relatório: ${error.message || error}`, 'error');
+            throw error;
+        }
+    };
+
     const renderPage = () => {
         const mcProps = {
             setPage, stock, currentUser, registerProduction, productionOrders, shiftReports,
@@ -2475,7 +2505,7 @@ const App: React.FC = () => {
             addPartsRequest, logPostProductionActivity, completeProduction, recordPackageWeight,
             updateProducedQuantity, users, deleteShiftReport, gauges, cancelProductionOrder,
             pauseProductionOrder, addLotToOrder, downtimeConfigs,
-            updateProductionOrder
+            updateProductionOrder, onUpdateReport: handleUpdateShiftReport
         };
 
         switch (page) {
@@ -2514,6 +2544,8 @@ const App: React.FC = () => {
             case 'productionOrderTrelica': return <ProductionOrderTrelica setPage={setPage} stock={stock} productionOrders={productionOrders} addProductionOrder={addProductionOrder} showNotification={showNotification} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} gauges={gauges} currentUser={currentUser} />;
             case 'productionOrderDesbobinadeira': return <ProductionOrderDesbobinadeira setPage={setPage} stock={stock} productionOrders={productionOrders} addProductionOrder={addProductionOrder} showNotification={showNotification} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} gauges={gauges} currentUser={currentUser} />;
             case 'productionDashboard': return <ProductionDashboard setPage={setPage} productionOrders={productionOrders} stock={stock} currentUser={currentUser} downtimeConfigs={downtimeConfigs} />;
+            case 'trefilaControl': return <ProductionControl machineCategory="Trefila" setPage={setPage} productionOrders={productionOrders} shiftReports={shiftReports} currentUser={currentUser} onUpdateReport={handleUpdateShiftReport} stock={stock} />;
+            case 'trelicaControl': return <ProductionControl machineCategory="Treliça" setPage={setPage} productionOrders={productionOrders} shiftReports={shiftReports} currentUser={currentUser} onUpdateReport={handleUpdateShiftReport} stock={stock} />;
             case 'reports': return <Reports setPage={setPage} stock={stock} trefilaProduction={trefilaProduction} trelicaProduction={trelicaProduction} gauges={gauges} />;
             case 'userManagement': return <UserManagement users={users} employees={employees} addUser={addUser} updateUser={updateUser} deleteUser={deleteUser} setPage={setPage} accessLogs={accessLogs} />;
             case 'finishedGoods': return <FinishedGoods finishedGoods={finishedGoods} pontasStock={pontasStock} setPage={setPage} finishedGoodsTransfers={finishedGoodsTransfers} createFinishedGoodsTransfer={createFinishedGoodsTransfer} onDelete={deleteFinishedGoods} onUpdateFinishedGood={updateFinishedGood} onUpdatePonta={updatePonta} currentUser={currentUser} users={users} />;
@@ -2564,8 +2596,10 @@ const App: React.FC = () => {
                                 <div className="w-1.5 h-1.5 rounded-full bg-slate-400"></div>
                                 {page === 'trefilaInProgress' ? 'Produção Trefila' :
                                     page === 'trelicaInProgress' ? 'Produção Treliça' :
-                                        page === 'productionDashboard' ? 'Painel de Controle' :
-                                            page.charAt(0).toUpperCase() + page.slice(1).replace(/([A-Z])/g, ' $1')}
+                                        page === 'trefilaControl' ? 'Controle Trefila' :
+                                            page === 'trelicaControl' ? 'Controle Treliça' :
+                                                page === 'productionDashboard' ? 'Painel de Controle' :
+                                                    page.charAt(0).toUpperCase() + page.slice(1).replace(/([A-Z])/g, ' $1')}
                             </span>
                         </div>
                         

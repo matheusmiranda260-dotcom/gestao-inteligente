@@ -265,6 +265,15 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                     <MenuItem target="productionOrderTrelica" label="Ordens (Treliça)" icon={ClipboardListIcon} />
                 </div>
 
+                {/* CONTROLE DE PRODUÇÃO */}
+                {(isGestor || hasPermission('trefilaControl') || hasPermission('trelicaControl')) && (
+                    <div className="sidebar-category">
+                        <div className="sidebar-category-title">{isCollapsed ? '📈' : '📈 Controle de Produção'}</div>
+                        <MenuItem target="trefilaControl" label="Evolução – Trefila" icon={DocumentReportIcon} />
+                        <MenuItem target="trelicaControl" label="Evolução – Treliça" icon={DocumentReportIcon} />
+                    </div>
+                )}
+
                 {/* ESTOQUE */}
                 <div className="sidebar-category">
                     <div className="sidebar-category-title">{isCollapsed ? '📦' : '📦 Estoque'}</div>
