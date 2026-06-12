@@ -2096,10 +2096,53 @@ const App: React.FC = () => {
                 return p;
             });
 
+            // Calculate actualProducedWeight as the sum of all weighed lots
+            const newActualWeight = newProcessedLots.reduce((sum: number, lot: any) => sum + (lot.finalWeight || 0), 0);
+
             // Use updateItem service which handles snake_case conversion for the database
             const updatedOrder = await updateItem<ProductionOrderData>('production_orders', orderId, {
-                processedLots: newProcessedLots
+                processedLots: newProcessedLots,
+                actualProducedWeight: newActualWeight
             });
+
+            // 3. Find and update the shift report that contains this lotId
+            const matchingReport = shiftReports?.find(r => r.productionOrderId === orderId && r.processedLots?.some(l => l.lotId === lotId));
+            if (matchingReport) {
+                const updatedReportLots = (matchingReport.processedLots || []).map((l: any) => {
+                    if (l.lotId === lotId) {
+                        return {
+                            ...l,
+                            finalWeight: finalWeight !== undefined ? finalWeight : l.finalWeight,
+                            measuredGauge: measuredGauge !== undefined ? measuredGauge : l.measuredGauge
+                        };
+                    }
+                    return l;
+                });
+                
+                const reportWeight = updatedReportLots.reduce((sum: number, l: any) => sum + (l.finalWeight || 0), 0);
+
+                // Calculate meters for Trefila
+                const bitolaMm = parseFloat(order.targetBitola || '0');
+                const steelDensityKgPerM3 = 7850;
+                const radiusM = (bitolaMm / 1000) / 2;
+                const areaM2 = Math.PI * Math.pow(radiusM, 2);
+                const volumeM3 = reportWeight / steelDensityKgPerM3;
+                const reportMeters = areaM2 > 0 ? volumeM3 / areaM2 : 0;
+
+                await updateItem('shift_reports', matchingReport.id, {
+                    processedLots: updatedReportLots,
+                    totalProducedWeight: reportWeight,
+                    totalProducedMeters: reportMeters
+                });
+
+                // Update local state for shiftReports as well
+                setShiftReports(prev => prev.map(r => r.id === matchingReport.id ? {
+                    ...r,
+                    processedLots: updatedReportLots,
+                    totalProducedWeight: reportWeight,
+                    totalProducedMeters: reportMeters
+                } : r));
+            }
 
             setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
             showNotification('Dados do lote salvos com sucesso.', 'success');

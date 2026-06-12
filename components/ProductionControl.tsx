@@ -123,8 +123,45 @@ const ProductionControl: React.FC<ProductionControlProps> = ({
         if (!confirm('Deseja recalcular os totais produzidos desta Ordem de Produção com base na soma dos relatórios de turno atuais?')) return;
         
         try {
+            const isTrefila = machineCategory === 'Trefila';
+            
+            // If Trefila, first update all shift reports with the latest weights from the order's processedLots
+            if (isTrefila && onUpdateReport) {
+                for (const report of reportsForSelectedOrder) {
+                    const updatedReportLots = (report.processedLots || []).map((rl: any) => {
+                        const matchedLot = (selectedOrder.processedLots || []).find((ol: any) => ol.lotId === rl.lotId);
+                        if (matchedLot) {
+                            return {
+                                ...rl,
+                                finalWeight: matchedLot.finalWeight,
+                                measuredGauge: matchedLot.measuredGauge
+                            };
+                        }
+                        return rl;
+                    });
+                    const reportWeight = updatedReportLots.reduce((sum: number, l: any) => sum + (l.finalWeight || 0), 0);
+
+                    const bitolaMm = parseFloat(selectedOrder.targetBitola || '0');
+                    const steelDensityKgPerM3 = 7850;
+                    const radiusM = (bitolaMm / 1000) / 2;
+                    const areaM2 = Math.PI * Math.pow(radiusM, 2);
+                    const volumeM3 = reportWeight / steelDensityKgPerM3;
+                    const reportMeters = areaM2 > 0 ? volumeM3 / areaM2 : 0;
+
+                    await onUpdateReport(report.id, {
+                        processedLots: updatedReportLots,
+                        totalProducedWeight: reportWeight,
+                        totalProducedMeters: reportMeters
+                    });
+                }
+            }
+
             const totalQty = reportsForSelectedOrder.reduce((sum, r) => sum + (r.totalProducedQuantity || 0), 0);
-            const totalWeight = reportsForSelectedOrder.reduce((sum, r) => sum + (r.totalProducedWeight || 0), 0);
+            
+            // Calculate total weight: from processedLots if Trefila, or from shift reports if Treliça
+            const totalWeight = isTrefila
+                ? (selectedOrder.processedLots || []).reduce((sum, l) => sum + (l.finalWeight || 0), 0)
+                : reportsForSelectedOrder.reduce((sum, r) => sum + (r.totalProducedWeight || 0), 0);
 
             // Chronologically sort the shift reports of this order (oldest first)
             const sortedReportsAsc = [...reportsForSelectedOrder].sort((a, b) => {
