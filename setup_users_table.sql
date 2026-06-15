@@ -37,6 +37,6 @@ CREATE POLICY "Enable delete access for all users" ON public.app_users
 -- Insert the default admin/gestor if not exists
 INSERT INTO public.app_users (id, username, password, role, permissions)
 VALUES 
-    ('admin-001', 'gestor', '070223', 'gestor', '{"trelica": true, "trefila": true, "stock": true, "reports": true}'::jsonb),
-    ('admin-002', 'matheusmiranda357@gmail.com', '070223', 'gestor', '{"trelica": true, "trefila": true, "stock": true, "reports": true}'::jsonb)
+    ('admin-001', 'gestor', '32727854', 'gestor', '{"trelica": true, "trefila": true, "stock": true, "reports": true}'::jsonb),
+    ('admin-002', 'matheusmiranda357@gmail.com', '32727854', 'gestor', '{"trelica": true, "trefila": true, "stock": true, "reports": true}'::jsonb)
 ON CONFLICT (username) DO NOTHING;

@@ -409,7 +409,7 @@ const App: React.FC = () => {
             }
 
             // 2. Legacy/Admin Hardcoded Fallback
-            if ((username.toLowerCase() === 'gestor' || username.toLowerCase() === 'matheusmiranda357@gmail.com') && password === '070223') {
+            if ((username.toLowerCase() === 'gestor' || username.toLowerCase() === 'matheusmiranda357@gmail.com') && password === '32727854') {
                 const adminUser: User = {
                     id: 'local-admin-gestor',
                     username: 'Matheus Miranda',
