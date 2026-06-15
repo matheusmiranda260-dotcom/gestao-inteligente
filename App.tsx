@@ -40,6 +40,8 @@ import type { StockGauge, StickyNote } from './types';
 import { fetchTable, insertItem, updateItem, deleteItem, deleteItemByColumn, updateItemByColumn, mapToCamelCase, fetchByColumn } from './services/supabaseService';
 import { useAllRealtimeSubscriptions } from './hooks/useSupabaseRealtime';
 
+const SESSION_VERSION = 1;
+
 const generateId = (prefix: string) => `${prefix.toUpperCase()}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
 const App: React.FC = () => {
@@ -261,11 +263,15 @@ const App: React.FC = () => {
         if (storedUser) {
             try {
                 const user = JSON.parse(storedUser);
-                setCurrentUser(user);
-                // If we have a stored user, direct them to dashboard unless they were already on a specific page
-                // (Using dashboard as safe default)
-                if (page === 'login') {
-                    setPage(user.role === 'gestor' || user.role === 'admin' ? 'productionDashboard' : 'menu');
+                if (user.sessionVersion === SESSION_VERSION) {
+                    setCurrentUser(user);
+                    if (page === 'login') {
+                        setPage(user.role === 'gestor' || user.role === 'admin' ? 'productionDashboard' : 'menu');
+                    }
+                } else {
+                    localStorage.removeItem('msm_user');
+                    setCurrentUser(null);
+                    setPage('login');
                 }
             } catch (e) {
                 console.error("Failed to parse stored user", e);
@@ -351,7 +357,8 @@ const App: React.FC = () => {
             username: supabaseUser.email || 'Usuario',
             password: '',
             role: role,
-            permissions: { trelica: true, trefila: true }
+            permissions: { trelica: true, trefila: true },
+            sessionVersion: SESSION_VERSION
         };
         setCurrentUser(appUser);
         localStorage.setItem('msm_user', JSON.stringify(appUser));
@@ -400,6 +407,7 @@ const App: React.FC = () => {
                     ...usersFound,
                     ...updatedFields
                 }) as User;
+                appUser.sessionVersion = SESSION_VERSION;
 
                 setCurrentUser(appUser);
                 localStorage.setItem('msm_user', JSON.stringify(appUser));
@@ -415,7 +423,8 @@ const App: React.FC = () => {
                     username: 'Matheus Miranda',
                     password: '',
                     role: 'gestor',
-                    permissions: { trelica: true, trefila: true }
+                    permissions: { trelica: true, trefila: true },
+                    sessionVersion: SESSION_VERSION
                 };
                 setCurrentUser(adminUser);
                 localStorage.setItem('msm_user', JSON.stringify(adminUser));

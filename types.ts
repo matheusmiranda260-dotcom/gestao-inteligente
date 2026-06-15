@@ -45,6 +45,7 @@ export interface User {
     isOnline?: boolean;
     loginCount?: number;
     lastLoginAt?: string;
+    sessionVersion?: number;
 }
 
 export interface Employee {
