@@ -109,7 +109,7 @@ const DowntimeModal: React.FC<{
         }
 
         // Check for repeat reasons (excluding ADMINISTRATIVE reasons like Shift End)
-        const administrativeReasons = ['Aguardando Início da Produção', 'Final de Turno'];
+        const administrativeReasons = ['Aguardando Início da Produção', 'Aguardando Início de Lote', 'Final de Turno'];
         const repeatReasons = reasons.filter(r => 
             !administrativeReasons.includes(r) && 
             (downtimeEvents || []).some(e => e.reason && e.reason.includes(r))
@@ -973,7 +973,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
         // Check for ANY active downtime event from previous shift (not just the last array element)
         const openEvent = (activeOrder.downtimeEvents || []).find(e =>
-            !e.resumeTime && e.reason !== 'Final de Turno' && e.reason !== 'Aguardando Início da Produção'
+            !e.resumeTime && e.reason !== 'Final de Turno' && e.reason !== 'Aguardando Início da Produção' && e.reason?.toLowerCase() !== 'aguardando início de lote'
         );
 
         if (openEvent) {
@@ -1233,7 +1233,9 @@ const MachineControl: React.FC<MachineControlProps> = ({
         if (!orderForShift || !orderForShift.operatorLogs || orderForShift.operatorLogs.length === 0) return null;
 
         // 1. First priority: Check if current user has an open log
-        const myOpenLog = orderForShift.operatorLogs.find(l => l.operator === currentUser?.username && !l.endTime);
+        const myOpenLog = orderForShift.operatorLogs.find(l => 
+            currentUser?.username && l.operator.toLowerCase() === currentUser.username.toLowerCase() && !l.endTime
+        );
         if (myOpenLog) return myOpenLog;
 
         // 2. Second priority: Check the absolute latest overall log
@@ -1246,7 +1248,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
 
     const hasActiveShift = useMemo(() => {
-        return currentOperatorLog && currentOperatorLog.operator === currentUser?.username && !currentOperatorLog.endTime;
+        return currentOperatorLog && currentUser?.username && currentOperatorLog.operator.toLowerCase() === currentUser.username.toLowerCase() && !currentOperatorLog.endTime;
     }, [currentOperatorLog, currentUser]);
 
 
@@ -1315,14 +1317,17 @@ const MachineControl: React.FC<MachineControlProps> = ({
             return isAnyActiveShift ? 'Produzindo' : 'Ocioso';
         }
 
-        const prepReasons = ['Aguardando Início da Produção', 'Troca de Rolo / Preparação', 'Setup', 'Ajuste', 'Setup + Preparação'];
-        if (prepReasons.some(r => openEvent.reason?.includes(r))) {
+        const normalize = (s: string) => s ? s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : '';
+        const normReason = normalize(openEvent.reason);
+
+        const prepReasons = ['Aguardando Início da Produção', 'Aguardando Início de Lote', 'Troca de Rolo / Preparação', 'Setup', 'Ajuste', 'Setup + Preparação'];
+        if (prepReasons.some(r => normReason.includes(normalize(r)))) {
             return 'Preparacao';
         }
 
         // Se é final de turno, está desligada. Caso contrário, se não há turno ativo mas há um evento, 
         // deixamos cair no retorno 'Parada' ou 'Preparacao' acima para ser mais informativo.
-        if (openEvent.reason === 'Final de Turno' || openEvent.reason.includes('Turno')) {
+        if (normReason === normalize('Final de Turno') || normReason.includes('turno')) {
             return 'Desligada';
         }
 
@@ -1639,7 +1644,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
     }, [trelicaPackages, activeOrder, machineType]);
 
     const isCompletionDisabled = useMemo(() => {
-        if (isEmergencyStopped || !hasActiveShift) return true;
+        if (isEmergencyStopped || (!hasActiveShift && !isGestor)) return true;
         if (activeMachine.startsWith('Treliça')) return !allPackagesWeighed;
         if (activeMachine.startsWith('Trefila') || activeMachine.startsWith('Desbobinadeira')) return !allTrefilaLotsProcessed;
         return true;
@@ -3046,7 +3051,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                     )}
                                                                 </div>
                                                             </div>
-                                                            <button onClick={handleFinishLotProcess} disabled={isEmergencyStopped || !hasActiveShift} className={`w-full md:w-auto font-bold py-3 px-6 rounded-xl shadow-lg transition flex items-center justify-center gap-2 disabled:bg-slate-300 disabled:shadow-none ${activeLotProcessingData.isDelayed ? 'bg-red-600 text-white hover:bg-red-700 shadow-red-200' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200'}`}>
+                                                            <button onClick={handleFinishLotProcess} disabled={isEmergencyStopped || (!hasActiveShift && !isGestor)} className={`w-full md:w-auto font-bold py-3 px-6 rounded-xl shadow-lg transition flex items-center justify-center gap-2 disabled:bg-slate-300 disabled:shadow-none ${activeLotProcessingData.isDelayed ? 'bg-red-600 text-white hover:bg-red-700 shadow-red-200' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200'}`}>
                                                                 <CheckCircleIcon className="h-5 w-5" /> Finalizar Lote
                                                             </button>
                                                         </div>
@@ -3083,7 +3088,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                     </div>
                                                                     <button
                                                                         onClick={() => handleStartProcessingLot(lot.id)}
-                                                                        disabled={!!activeLotProcessingData || isEmergencyStopped || !hasActiveShift}
+                                                                        disabled={!!activeLotProcessingData || isEmergencyStopped || (!hasActiveShift && !isGestor)}
                                                                         className="w-full bg-white border-2 border-slate-200 text-slate-600 group-hover:border-indigo-500 group-hover:text-indigo-600 font-bold py-2 px-4 rounded-lg text-sm transition disabled:opacity-50 disabled:cursor-not-allowed">
                                                                         Processar
                                                                     </button>
@@ -3168,7 +3173,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                             {isWaiting ? (
                                                                                 <button
                                                                                     onClick={() => handleRecordWeight(lot.lotId)}
-                                                                                    disabled={!hasActiveShift}
+                                                                                    disabled={!hasActiveShift && !isGestor}
                                                                                     className="bg-emerald-500 text-white text-[10px] font-black py-2 px-3 rounded-lg hover:bg-emerald-600 w-full shadow-lg shadow-emerald-100 transition active:scale-95 disabled:opacity-50"
                                                                                 >
                                                                                     SALVAR
@@ -3244,7 +3249,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                     {isWaiting && (
                                                                         <button
                                                                             onClick={() => handleRecordWeight(lot.lotId)}
-                                                                            disabled={!hasActiveShift}
+                                                                            disabled={!hasActiveShift && !isGestor}
                                                                             className="w-full bg-emerald-600 text-white font-black py-4 rounded-xl shadow-lg shadow-emerald-100 active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-2"
                                                                         >
                                                                             <CheckCircleIcon className="h-6 w-6" />

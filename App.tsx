@@ -1748,6 +1748,17 @@ const App: React.FC = () => {
         try {
             const updatedOrder = await updateItem<ProductionOrderData>('production_orders', orderId, updates);
             setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
+            
+            // Add the lot to the active shift report for this order
+            const activeReport = shiftReports?.find(r => r.productionOrderId === orderId && !r.endTime);
+            if (activeReport) {
+                const newReportLots = [...(activeReport.processedLots || []), processedLot];
+                await updateItem('shift_reports', activeReport.id, {
+                    processedLots: newReportLots
+                });
+                setShiftReports(prev => prev.map(r => r.id === activeReport.id ? { ...r, processedLots: newReportLots } : r));
+            }
+
             showNotification('Processamento de lote finalizado.', 'success');
         } catch (error) {
             showNotification('Erro ao finalizar lote.', 'error');
