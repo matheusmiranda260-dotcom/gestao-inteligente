@@ -907,7 +907,7 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
             {/* Modal de Configuração da Malha */}
             {showMalhaModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center no-print" style={{ backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}>
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl mx-4 overflow-hidden border border-slate-200 animate-in fade-in zoom-in" style={{ animation: 'modalIn 0.2s ease-out' }}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-7xl mx-4 overflow-hidden border border-slate-200 animate-in fade-in zoom-in" style={{ animation: 'modalIn 0.2s ease-out' }}>
                         <div className="bg-gradient-to-r from-slate-50 to-slate-100 p-5 border-b border-slate-200 flex justify-between items-center">
                             <div>
                                 <h3 className="font-black text-slate-800 text-lg flex items-center gap-2">
