@@ -23,6 +23,8 @@ interface ShiftStats {
     horasTrabalhadas: string; // Padrão "09:00:00"
     pecasProduzidas: number;
     tamanhoPeca: number;      // Metros por peça (ex: 6 ou 12)
+    pecasDanificadasQuantidade: number;
+    pecasDanificadasPeso: number;
 }
 
 interface ProductionUpdateRow {
@@ -195,12 +197,16 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
     const [statsShiftA, setStatsShiftA] = useState<ShiftStats>({
         horasTrabalhadas: '09:00:00',
         pecasProduzidas: 0,
-        tamanhoPeca: 12
+        tamanhoPeca: 12,
+        pecasDanificadasQuantidade: 0,
+        pecasDanificadasPeso: 0
     });
     const [statsShiftB, setStatsShiftB] = useState<ShiftStats>({
         horasTrabalhadas: '09:00:00',
         pecasProduzidas: 0,
-        tamanhoPeca: 6
+        tamanhoPeca: 6,
+        pecasDanificadasQuantidade: 0,
+        pecasDanificadasPeso: 0
     });
 
     // Tabela de atualização da produção (rodapé)
@@ -1645,6 +1651,32 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
                                     </div>
                                     <span className="text-sm font-black text-slate-950">{calculatedData.turnoA.velocidadeStr}</span>
                                 </div>
+                                {/* Peças Danificadas */}
+                                <div className="flex items-center justify-between py-2.5 bg-rose-50/20 px-1 rounded">
+                                    <div className="flex items-center gap-2">
+                                        <LayersIcon className="h-4 w-4 text-rose-500" />
+                                        <span className="text-[13px] font-black text-rose-600 uppercase tracking-tight">Peças Danificadas</span>
+                                    </div>
+                                    <div className="flex items-center gap-1 font-bold text-sm text-rose-700 shrink-0 whitespace-nowrap">
+                                        <input
+                                            type="number"
+                                            value={statsShiftA.pecasDanificadasQuantidade || ''}
+                                            onChange={e => setStatsShiftA({ ...statsShiftA, pecasDanificadasQuantidade: parseInt(e.target.value, 10) || 0 })}
+                                            className="modern-editable-input text-center w-12 text-rose-700 border-b border-rose-200 font-black text-sm"
+                                            placeholder="0"
+                                        />
+                                        <span className="text-rose-500 font-bold text-xs px-0.5">qnt</span>
+                                        <input
+                                            type="number"
+                                            value={statsShiftA.pecasDanificadasPeso || ''}
+                                            onChange={e => setStatsShiftA({ ...statsShiftA, pecasDanificadasPeso: parseFloat(e.target.value) || 0 })}
+                                            className="modern-editable-input text-center w-16 text-rose-700 border-b border-rose-200 font-black text-sm ml-2"
+                                            placeholder="0"
+                                            step="0.01"
+                                        />
+                                        <span className="text-rose-500 font-bold text-xs pl-0.5">kg</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -1737,6 +1769,32 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
                                         <span className="text-sm font-extrabold text-slate-700">Velocidade (média)</span>
                                     </div>
                                     <span className="text-sm font-black text-slate-950">{calculatedData.turnoB.velocidadeStr}</span>
+                                </div>
+                                {/* Peças Danificadas */}
+                                <div className="flex items-center justify-between py-2.5 bg-rose-50/20 px-1 rounded">
+                                    <div className="flex items-center gap-2">
+                                        <LayersIcon className="h-4 w-4 text-rose-500" />
+                                        <span className="text-[13px] font-black text-rose-600 uppercase tracking-tight">Peças Danificadas</span>
+                                    </div>
+                                    <div className="flex items-center gap-1 font-bold text-sm text-rose-700 shrink-0 whitespace-nowrap">
+                                        <input
+                                            type="number"
+                                            value={statsShiftB.pecasDanificadasQuantidade || ''}
+                                            onChange={e => setStatsShiftB({ ...statsShiftB, pecasDanificadasQuantidade: parseInt(e.target.value, 10) || 0 })}
+                                            className="modern-editable-input text-center w-12 text-rose-700 border-b border-rose-200 font-black text-sm"
+                                            placeholder="0"
+                                        />
+                                        <span className="text-rose-500 font-bold text-xs px-0.5">qnt</span>
+                                        <input
+                                            type="number"
+                                            value={statsShiftB.pecasDanificadasPeso || ''}
+                                            onChange={e => setStatsShiftB({ ...statsShiftB, pecasDanificadasPeso: parseFloat(e.target.value) || 0 })}
+                                            className="modern-editable-input text-center w-16 text-rose-700 border-b border-rose-200 font-black text-sm ml-2"
+                                            placeholder="0"
+                                            step="0.01"
+                                        />
+                                        <span className="text-rose-500 font-bold text-xs pl-0.5">kg</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
