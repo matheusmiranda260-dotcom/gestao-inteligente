@@ -118,24 +118,32 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
         largura: 2.45,
         comprimento: 6,
         espacamentoTransversal: 15,
-        espacamentoLongitudinal: 15,
-        franjaTransversalSup: 2.5,
-        franjaTransversalInf: 2.5,
-        franjaLongitudinalEsq: 2.5,
-        franjaLongitudinalDir: 2.5
+        espacamentoLongitudinal: 15
     });
 
     const fiosLongitudinais = useMemo(() => {
         if (!malhaParams.largura || !malhaParams.espacamentoLongitudinal) return 0;
         const larguraCm = malhaParams.largura * 100;
-        return Math.round((larguraCm - malhaParams.franjaTransversalSup - malhaParams.franjaTransversalInf) / malhaParams.espacamentoLongitudinal) + 1;
-    }, [malhaParams.largura, malhaParams.espacamentoLongitudinal, malhaParams.franjaTransversalSup, malhaParams.franjaTransversalInf]);
+        return Math.floor(larguraCm / malhaParams.espacamentoLongitudinal) + 1;
+    }, [malhaParams.largura, malhaParams.espacamentoLongitudinal]);
 
     const fiosTransversais = useMemo(() => {
         if (!malhaParams.comprimento || !malhaParams.espacamentoTransversal) return 0;
         const comprimentoCm = malhaParams.comprimento * 100;
-        return Math.round((comprimentoCm - malhaParams.franjaLongitudinalEsq - malhaParams.franjaLongitudinalDir) / malhaParams.espacamentoTransversal) + 1;
-    }, [malhaParams.comprimento, malhaParams.espacamentoTransversal, malhaParams.franjaLongitudinalEsq, malhaParams.franjaLongitudinalDir]);
+        return Math.floor(comprimentoCm / malhaParams.espacamentoTransversal) + 1;
+    }, [malhaParams.comprimento, malhaParams.espacamentoTransversal]);
+
+    const franjaTransversal = useMemo(() => {
+        if (!malhaParams.largura || !malhaParams.espacamentoLongitudinal || fiosLongitudinais === 0) return 0;
+        const larguraCm = malhaParams.largura * 100;
+        return (larguraCm - (fiosLongitudinais - 1) * malhaParams.espacamentoLongitudinal) / 2;
+    }, [malhaParams.largura, malhaParams.espacamentoLongitudinal, fiosLongitudinais]);
+
+    const franjaLongitudinal = useMemo(() => {
+        if (!malhaParams.comprimento || !malhaParams.espacamentoTransversal || fiosTransversais === 0) return 0;
+        const comprimentoCm = malhaParams.comprimento * 100;
+        return (comprimentoCm - (fiosTransversais - 1) * malhaParams.espacamentoTransversal) / 2;
+    }, [malhaParams.comprimento, malhaParams.espacamentoTransversal, fiosTransversais]);
 
     // Tabelas de paradas
     const [stopsShiftA, setStopsShiftA] = useState<StopRow[]>([]);
@@ -918,10 +926,10 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
                                     comprimento={malhaParams.comprimento}
                                     espacamentoTransversal={malhaParams.espacamentoTransversal}
                                     espacamentoLongitudinal={malhaParams.espacamentoLongitudinal}
-                                    franjaTransversalSup={malhaParams.franjaTransversalSup}
-                                    franjaTransversalInf={malhaParams.franjaTransversalInf}
-                                    franjaLongitudinalEsq={malhaParams.franjaLongitudinalEsq}
-                                    franjaLongitudinalDir={malhaParams.franjaLongitudinalDir}
+                                    franjaTransversalSup={franjaTransversal}
+                                    franjaTransversalInf={franjaTransversal}
+                                    franjaLongitudinalEsq={franjaLongitudinal}
+                                    franjaLongitudinalDir={franjaLongitudinal}
                                     fiosTransversais={fiosTransversais}
                                     fiosLongitudinais={fiosLongitudinais}
                                 />
@@ -947,20 +955,16 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
                                         <input type="number" step="0.1" value={malhaParams.espacamentoLongitudinal} onChange={e => setMalhaParams(p => ({ ...p, espacamentoLongitudinal: Number(e.target.value) }))} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Franja Transv. Sup. (cm)</label>
-                                        <input type="number" step="0.1" value={malhaParams.franjaTransversalSup} onChange={e => setMalhaParams(p => ({ ...p, franjaTransversalSup: Number(e.target.value) }))} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                        <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Franja Transversal (cm)</label>
+                                        <div className="w-full bg-slate-200 border border-slate-300 text-slate-600 font-bold rounded-lg px-3 py-2 cursor-not-allowed">
+                                            {franjaTransversal.toFixed(2)}
+                                        </div>
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Franja Transv. Inf. (cm)</label>
-                                        <input type="number" step="0.1" value={malhaParams.franjaTransversalInf} onChange={e => setMalhaParams(p => ({ ...p, franjaTransversalInf: Number(e.target.value) }))} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Franja Long. Esq. (cm)</label>
-                                        <input type="number" step="0.1" value={malhaParams.franjaLongitudinalEsq} onChange={e => setMalhaParams(p => ({ ...p, franjaLongitudinalEsq: Number(e.target.value) }))} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Franja Long. Dir. (cm)</label>
-                                        <input type="number" step="0.1" value={malhaParams.franjaLongitudinalDir} onChange={e => setMalhaParams(p => ({ ...p, franjaLongitudinalDir: Number(e.target.value) }))} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                        <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Franja Longitudinal (cm)</label>
+                                        <div className="w-full bg-slate-200 border border-slate-300 text-slate-600 font-bold rounded-lg px-3 py-2 cursor-not-allowed">
+                                            {franjaLongitudinal.toFixed(2)}
+                                        </div>
                                     </div>
                                 </div>
                                 
