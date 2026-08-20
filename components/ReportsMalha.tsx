@@ -906,8 +906,8 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
 
             {/* Modal de Configuração da Malha */}
             {showMalhaModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center no-print" style={{ backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}>
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-7xl mx-4 overflow-hidden border border-slate-200 animate-in fade-in zoom-in" style={{ animation: 'modalIn 0.2s ease-out' }}>
+                <div className="fixed inset-0 z-[100] flex flex-col bg-slate-50 no-print animate-in fade-in zoom-in" style={{ animation: 'modalIn 0.2s ease-out' }}>
+                    <div className="w-full h-full flex flex-col bg-white shadow-2xl overflow-hidden">
                         <div className="bg-gradient-to-r from-slate-50 to-slate-100 p-5 border-b border-slate-200 flex justify-between items-center">
                             <div>
                                 <h3 className="font-black text-slate-800 text-lg flex items-center gap-2">
@@ -920,7 +920,7 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                             </button>
                         </div>
-                        <div className="p-6 bg-white flex flex-col lg:flex-row gap-8 items-stretch">
+                        <div className="p-6 bg-white flex flex-col lg:flex-row gap-8 items-stretch flex-1 overflow-y-auto">
                             {/* Imagem de Referência Dinâmica (CAD) */}
                             <div className="w-full lg:w-1/2 flex flex-col bg-slate-50 border border-slate-200 rounded-xl p-2 shrink-0">
                                 <MalhaPreview 
