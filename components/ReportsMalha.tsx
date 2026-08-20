@@ -121,8 +121,12 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
         espacamentoLongitudinal: 15
     });
 
-    const fiosLongitudinais = useMemo(() => {
-        if (!malhaParams.largura || !malhaParams.espacamentoLongitudinal) return 0;
+    const [fiosLongitudinais, setFiosLongitudinais] = useState(0);
+    const [fiosTransversais, setFiosTransversais] = useState(0);
+
+    // Cálculo automático de Fios Longitudinais quando largura ou espaçamento mudam
+    useEffect(() => {
+        if (!malhaParams.largura || !malhaParams.espacamentoLongitudinal) return;
         const larguraCm = malhaParams.largura * 100;
         let spaces = Math.floor(larguraCm / malhaParams.espacamentoLongitudinal);
         let franja = (larguraCm - spaces * malhaParams.espacamentoLongitudinal) / 2;
@@ -132,11 +136,12 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
             spaces -= 1;
         }
         
-        return spaces + 1;
+        setFiosLongitudinais(spaces + 1);
     }, [malhaParams.largura, malhaParams.espacamentoLongitudinal]);
 
-    const fiosTransversais = useMemo(() => {
-        if (!malhaParams.comprimento || !malhaParams.espacamentoTransversal) return 0;
+    // Cálculo automático de Fios Transversais quando comprimento ou espaçamento mudam
+    useEffect(() => {
+        if (!malhaParams.comprimento || !malhaParams.espacamentoTransversal) return;
         const comprimentoCm = malhaParams.comprimento * 100;
         let spaces = Math.floor(comprimentoCm / malhaParams.espacamentoTransversal);
         let franja = (comprimentoCm - spaces * malhaParams.espacamentoTransversal) / 2;
@@ -146,7 +151,7 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
             spaces -= 1;
         }
         
-        return spaces + 1;
+        setFiosTransversais(spaces + 1);
     }, [malhaParams.comprimento, malhaParams.espacamentoTransversal]);
 
     const franjaTransversal = useMemo(() => {
@@ -984,15 +989,24 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
                                     </div>
                                 </div>
                                 
-                                <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100 flex items-center justify-around">
-                                    <div className="text-center">
-                                        <div className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Qtd. Fios Longitudinais</div>
-                                        <div className="text-3xl font-black text-indigo-700">{fiosLongitudinais}</div>
+                                <div className="grid grid-cols-2 gap-px bg-slate-200 mt-6 rounded-lg overflow-hidden shrink-0 shadow-sm border border-slate-200">
+                                    <div className="bg-slate-50 p-3 text-center flex flex-col items-center">
+                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Qtd. Fios Longitudinais</label>
+                                        <input 
+                                            type="number" 
+                                            value={fiosLongitudinais} 
+                                            onChange={e => setFiosLongitudinais(Number(e.target.value))} 
+                                            className="w-24 text-center text-2xl font-black text-indigo-600 bg-slate-100 hover:bg-slate-200 focus:bg-white border border-slate-300 rounded focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 outline-none transition-colors" 
+                                        />
                                     </div>
-                                    <div className="w-px h-12 bg-indigo-200"></div>
-                                    <div className="text-center">
-                                        <div className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Qtd. Fios Transversais</div>
-                                        <div className="text-3xl font-black text-indigo-700">{fiosTransversais}</div>
+                                    <div className="bg-slate-50 p-3 text-center flex flex-col items-center">
+                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Qtd. Fios Transversais</label>
+                                        <input 
+                                            type="number" 
+                                            value={fiosTransversais} 
+                                            onChange={e => setFiosTransversais(Number(e.target.value))} 
+                                            className="w-24 text-center text-2xl font-black text-indigo-600 bg-slate-100 hover:bg-slate-200 focus:bg-white border border-slate-300 rounded focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 outline-none transition-colors" 
+                                        />
                                     </div>
                                 </div>
                                 
