@@ -906,7 +906,7 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
             {/* Modal de Configuração da Malha */}
             {showMalhaModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center no-print" style={{ backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}>
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden border border-slate-200 animate-in fade-in zoom-in" style={{ animation: 'modalIn 0.2s ease-out' }}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl mx-4 overflow-hidden border border-slate-200 animate-in fade-in zoom-in" style={{ animation: 'modalIn 0.2s ease-out' }}>
                         <div className="bg-gradient-to-r from-slate-50 to-slate-100 p-5 border-b border-slate-200 flex justify-between items-center">
                             <div>
                                 <h3 className="font-black text-slate-800 text-lg flex items-center gap-2">
@@ -919,56 +919,65 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                             </button>
                         </div>
-                        <div className="p-6 bg-white space-y-6">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Largura (m)</label>
-                                    <input type="number" step="0.01" value={malhaParams.largura} onChange={e => setMalhaParams(p => ({ ...p, largura: Number(e.target.value) }))} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Comprimento (m)</label>
-                                    <input type="number" step="0.01" value={malhaParams.comprimento} onChange={e => setMalhaParams(p => ({ ...p, comprimento: Number(e.target.value) }))} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Espaç. Transversal (cm)</label>
-                                    <input type="number" step="0.1" value={malhaParams.espacamentoTransversal} onChange={e => setMalhaParams(p => ({ ...p, espacamentoTransversal: Number(e.target.value) }))} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Espaç. Longitudinal (cm)</label>
-                                    <input type="number" step="0.1" value={malhaParams.espacamentoLongitudinal} onChange={e => setMalhaParams(p => ({ ...p, espacamentoLongitudinal: Number(e.target.value) }))} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Franja Transversal (cm)</label>
-                                    <input type="number" step="0.1" value={malhaParams.franjaTransversal} onChange={e => setMalhaParams(p => ({ ...p, franjaTransversal: Number(e.target.value) }))} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Franja Longitudinal (cm)</label>
-                                    <input type="number" step="0.1" value={malhaParams.franjaLongitudinal} onChange={e => setMalhaParams(p => ({ ...p, franjaLongitudinal: Number(e.target.value) }))} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
-                                </div>
+                        <div className="p-6 bg-white flex flex-col lg:flex-row gap-8 items-stretch">
+                            {/* Imagem de Referência */}
+                            <div className="w-full lg:w-1/2 flex items-center justify-center bg-slate-50 border border-slate-200 rounded-xl p-4 shrink-0 relative overflow-hidden group">
+                                <div className="absolute inset-0 bg-white/40 group-hover:bg-transparent transition-colors duration-300 pointer-events-none"></div>
+                                <img src="/esquema-malha.png" alt="Esquema de medidas da Malha" className="w-full h-auto object-contain mix-blend-multiply" style={{ maxHeight: '420px' }} />
                             </div>
-                            
-                            <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100 flex items-center justify-around">
-                                <div className="text-center">
-                                    <div className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Qtd. Fios Longitudinais</div>
-                                    <div className="text-3xl font-black text-indigo-700">{fiosLongitudinais}</div>
+
+                            {/* Formulário de Configuração */}
+                            <div className="w-full lg:w-1/2 flex flex-col justify-between space-y-6">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Largura (m)</label>
+                                        <input type="number" step="0.01" value={malhaParams.largura} onChange={e => setMalhaParams(p => ({ ...p, largura: Number(e.target.value) }))} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Comprimento (m)</label>
+                                        <input type="number" step="0.01" value={malhaParams.comprimento} onChange={e => setMalhaParams(p => ({ ...p, comprimento: Number(e.target.value) }))} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Espaç. Transversal (cm)</label>
+                                        <input type="number" step="0.1" value={malhaParams.espacamentoTransversal} onChange={e => setMalhaParams(p => ({ ...p, espacamentoTransversal: Number(e.target.value) }))} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Espaç. Longitudinal (cm)</label>
+                                        <input type="number" step="0.1" value={malhaParams.espacamentoLongitudinal} onChange={e => setMalhaParams(p => ({ ...p, espacamentoLongitudinal: Number(e.target.value) }))} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Franja Transversal (cm)</label>
+                                        <input type="number" step="0.1" value={malhaParams.franjaTransversal} onChange={e => setMalhaParams(p => ({ ...p, franjaTransversal: Number(e.target.value) }))} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Franja Longitudinal (cm)</label>
+                                        <input type="number" step="0.1" value={malhaParams.franjaLongitudinal} onChange={e => setMalhaParams(p => ({ ...p, franjaLongitudinal: Number(e.target.value) }))} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                    </div>
                                 </div>
-                                <div className="w-px h-12 bg-indigo-200"></div>
-                                <div className="text-center">
-                                    <div className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Qtd. Fios Transversais</div>
-                                    <div className="text-3xl font-black text-indigo-700">{fiosTransversais}</div>
+                                
+                                <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100 flex items-center justify-around">
+                                    <div className="text-center">
+                                        <div className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Qtd. Fios Longitudinais</div>
+                                        <div className="text-3xl font-black text-indigo-700">{fiosLongitudinais}</div>
+                                    </div>
+                                    <div className="w-px h-12 bg-indigo-200"></div>
+                                    <div className="text-center">
+                                        <div className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Qtd. Fios Transversais</div>
+                                        <div className="text-3xl font-black text-indigo-700">{fiosTransversais}</div>
+                                    </div>
                                 </div>
-                            </div>
-                            
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Descrição Final do Produto</label>
-                                <input type="text" value={productDescription} onChange={e => setProductDescription(e.target.value)} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
-                                <div className="flex justify-end gap-2 mt-2">
-                                    <button 
-                                        onClick={() => setProductDescription(`MALHA ${malhaParams.largura.toFixed(2)}x${malhaParams.comprimento.toFixed(2)}m (${malhaParams.espacamentoLongitudinal}x${malhaParams.espacamentoTransversal})`)}
-                                        className="text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-3 py-1 rounded hover:bg-indigo-100 transition-colors"
-                                    >
-                                        Gerar Sugestão Padrão
-                                    </button>
+                                
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Descrição Final do Produto</label>
+                                    <input type="text" value={productDescription} onChange={e => setProductDescription(e.target.value)} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                    <div className="flex justify-end gap-2 mt-2">
+                                        <button 
+                                            onClick={() => setProductDescription(`MALHA ${malhaParams.largura.toFixed(2)}x${malhaParams.comprimento.toFixed(2)}m (${malhaParams.espacamentoLongitudinal}x${malhaParams.espacamentoTransversal})`)}
+                                            className="text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-3 py-1 rounded hover:bg-indigo-100 transition-colors"
+                                        >
+                                            Gerar Sugestão Padrão
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
