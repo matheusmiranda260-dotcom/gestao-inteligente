@@ -111,6 +111,41 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
     const [productDescription, setProductDescription] = useState<string>('MALHA H-12 LEVE 6 MTS');
     const [piecesToProduce, setPiecesToProduce] = useState<number>(4500);
 
+    // Estados do Modal de Malha (Parâmetros)
+    const [showMalhaModal, setShowMalhaModal] = useState<boolean>(false);
+    const [malhaParams, setMalhaParams] = useState({
+        largura: 2.45,
+        comprimento: 6.00,
+        espacamentoTransversal: 15,
+        espacamentoLongitudinal: 15,
+        franjaTransversal: 2.5,
+        franjaLongitudinal: 2.5
+    });
+    const [fiosTransversais, setFiosTransversais] = useState(0);
+    const [fiosLongitudinais, setFiosLongitudinais] = useState(0);
+
+    useEffect(() => {
+        const { largura, comprimento, espacamentoTransversal, espacamentoLongitudinal, franjaTransversal, franjaLongitudinal } = malhaParams;
+        const compCm = comprimento * 100;
+        const largCm = largura * 100;
+
+        let qtdTransversais = 0;
+        let qtdLongitudinais = 0;
+
+        if (espacamentoTransversal > 0) {
+            // Fios transversais (verticais na imagem) preenchem o comprimento
+            qtdTransversais = Math.floor((compCm - 2 * franjaLongitudinal) / espacamentoTransversal) + 1;
+        }
+
+        if (espacamentoLongitudinal > 0) {
+            // Fios longitudinais (horizontais na imagem) preenchem a largura
+            qtdLongitudinais = Math.floor((largCm - 2 * franjaTransversal) / espacamentoLongitudinal) + 1;
+        }
+
+        setFiosTransversais(Math.max(0, qtdTransversais));
+        setFiosLongitudinais(Math.max(0, qtdLongitudinais));
+    }, [malhaParams]);
+
     // Tabelas de paradas
     const [stopsShiftA, setStopsShiftA] = useState<StopRow[]>([]);
     const [stopsShiftB, setStopsShiftB] = useState<StopRow[]>([]);
@@ -868,6 +903,82 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
                 }
             `}} />
 
+            {/* Modal de Configuração da Malha */}
+            {showMalhaModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center no-print" style={{ backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden border border-slate-200 animate-in fade-in zoom-in" style={{ animation: 'modalIn 0.2s ease-out' }}>
+                        <div className="bg-gradient-to-r from-slate-50 to-slate-100 p-5 border-b border-slate-200 flex justify-between items-center">
+                            <div>
+                                <h3 className="font-black text-slate-800 text-lg flex items-center gap-2">
+                                    <LayersIcon className="w-5 h-5 text-indigo-600" />
+                                    Configurar Dimensões da Malha
+                                </h3>
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">Preencha as medidas para calcular a quantidade de fios</p>
+                            </div>
+                            <button onClick={() => setShowMalhaModal(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-200 text-slate-600 hover:bg-slate-300 transition-colors">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            </button>
+                        </div>
+                        <div className="p-6 bg-white space-y-6">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Largura (m)</label>
+                                    <input type="number" step="0.01" value={malhaParams.largura} onChange={e => setMalhaParams(p => ({ ...p, largura: Number(e.target.value) }))} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Comprimento (m)</label>
+                                    <input type="number" step="0.01" value={malhaParams.comprimento} onChange={e => setMalhaParams(p => ({ ...p, comprimento: Number(e.target.value) }))} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Espaç. Transversal (cm)</label>
+                                    <input type="number" step="0.1" value={malhaParams.espacamentoTransversal} onChange={e => setMalhaParams(p => ({ ...p, espacamentoTransversal: Number(e.target.value) }))} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Espaç. Longitudinal (cm)</label>
+                                    <input type="number" step="0.1" value={malhaParams.espacamentoLongitudinal} onChange={e => setMalhaParams(p => ({ ...p, espacamentoLongitudinal: Number(e.target.value) }))} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Franja Transversal (cm)</label>
+                                    <input type="number" step="0.1" value={malhaParams.franjaTransversal} onChange={e => setMalhaParams(p => ({ ...p, franjaTransversal: Number(e.target.value) }))} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Franja Longitudinal (cm)</label>
+                                    <input type="number" step="0.1" value={malhaParams.franjaLongitudinal} onChange={e => setMalhaParams(p => ({ ...p, franjaLongitudinal: Number(e.target.value) }))} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                </div>
+                            </div>
+                            
+                            <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100 flex items-center justify-around">
+                                <div className="text-center">
+                                    <div className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Qtd. Fios Longitudinais</div>
+                                    <div className="text-3xl font-black text-indigo-700">{fiosLongitudinais}</div>
+                                </div>
+                                <div className="w-px h-12 bg-indigo-200"></div>
+                                <div className="text-center">
+                                    <div className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Qtd. Fios Transversais</div>
+                                    <div className="text-3xl font-black text-indigo-700">{fiosTransversais}</div>
+                                </div>
+                            </div>
+                            
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Descrição Final do Produto</label>
+                                <input type="text" value={productDescription} onChange={e => setProductDescription(e.target.value)} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                <div className="flex justify-end gap-2 mt-2">
+                                    <button 
+                                        onClick={() => setProductDescription(`MALHA ${malhaParams.largura.toFixed(2)}x${malhaParams.comprimento.toFixed(2)}m (${malhaParams.espacamentoLongitudinal}x${malhaParams.espacamentoTransversal})`)}
+                                        className="text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-3 py-1 rounded hover:bg-indigo-100 transition-colors"
+                                    >
+                                        Gerar Sugestão Padrão
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-3">
+                            <button onClick={() => setShowMalhaModal(false)} className="px-6 py-2.5 rounded-lg font-black text-slate-500 bg-white border border-slate-200 hover:bg-slate-50 transition-colors uppercase text-xs tracking-widest">Fechar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Modal de Salvar Relatório com Calendário */}
             {showSaveModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center no-print" style={{ backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}>
@@ -1161,15 +1272,15 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
 
                         {/* Coluna 2: Descrição do Produto e Operador Turno B */}
                         <div className="col-span-1 md:col-span-5 p-4 flex flex-col justify-between gap-3.5 border-r border-slate-200">
-                            <div className="flex items-start gap-2.5">
+                            <div className="flex items-start gap-2.5 cursor-pointer group" onClick={() => setShowMalhaModal(true)}>
                                 <div className="flex-grow pl-1">
-                                    <div className="text-[9px] font-black text-slate-500 uppercase tracking-wider">DESCRIÇÃO DO PRODUTO</div>
-                                    <input 
-                                        type="text" 
-                                        value={productDescription} 
-                                        onChange={e => setProductDescription(e.target.value)} 
-                                        className="w-full text-sm font-black text-[#002060] bg-transparent border-none p-0 focus:ring-0 focus:outline-none modern-editable-input"
-                                    />
+                                    <div className="text-[9px] font-black text-slate-500 uppercase tracking-wider flex justify-between">
+                                        <span>DESCRIÇÃO DO PRODUTO</span>
+                                        <span className="text-[8px] text-indigo-400 group-hover:text-indigo-600 transition-colors ml-2 hidden md:inline">Clique p/ editar dimensões</span>
+                                    </div>
+                                    <div className="w-full text-sm font-black text-[#002060] bg-transparent border-none p-0 mt-0.5 min-h-[20px] flex items-center">
+                                        {productDescription || "Configurar Malha..."}
+                                    </div>
                                 </div>
                             </div>
                             <div className="flex items-start gap-2.5 pt-3 border-t border-slate-100">
