@@ -127,8 +127,8 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
         let spaces = Math.floor(larguraCm / malhaParams.espacamentoLongitudinal);
         let franja = (larguraCm - spaces * malhaParams.espacamentoLongitudinal) / 2;
         
-        // Regra de negócio: Tem que existir franja de pelo menos 2cm
-        if (franja < 2 && spaces > 0) {
+        // Regra de negócio: Tem que existir franja de pelo menos 3cm
+        if (franja < 3 && spaces > 0) {
             spaces -= 1;
         }
         
@@ -141,8 +141,8 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
         let spaces = Math.floor(comprimentoCm / malhaParams.espacamentoTransversal);
         let franja = (comprimentoCm - spaces * malhaParams.espacamentoTransversal) / 2;
         
-        // Regra de negócio: Tem que existir franja de pelo menos 2cm
-        if (franja < 2 && spaces > 0) {
+        // Regra de negócio: Tem que existir franja de pelo menos 3cm
+        if (franja < 3 && spaces > 0) {
             spaces -= 1;
         }
         
