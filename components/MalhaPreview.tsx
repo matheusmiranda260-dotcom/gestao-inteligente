@@ -25,18 +25,18 @@ const MalhaPreview: React.FC<MalhaPreviewProps> = ({
     const widthCm = Math.max(10, comprimento * 100);
     const heightCm = Math.max(10, largura * 100);
 
-    // Padding menor para aproveitar mais o espaço
-    const paddingX = Math.max(80, widthCm * 0.15); 
-    const paddingY = Math.max(80, heightCm * 0.15);
+    // Reduzindo o padding drasticamente para que a malha ocupe mais espaço
+    const paddingX = Math.max(40, widthCm * 0.08); 
+    const paddingY = Math.max(40, heightCm * 0.08);
 
     const viewBoxWidth = widthCm + paddingX * 2;
     const viewBoxHeight = heightCm + paddingY * 2;
     const viewBox = `${-paddingX} ${-paddingY} ${viewBoxWidth} ${viewBoxHeight}`;
     
-    // Espessura da linha e do texto proporcionais à maior dimensão da viewBox para garantir legibilidade
+    // Espessura da linha e do texto (diminuindo o texto como solicitado)
     const maxDim = Math.max(viewBoxWidth, viewBoxHeight);
-    const strokeW = Math.max(1, maxDim * 0.004);
-    const textBaseSize = Math.max(12, maxDim * 0.025);
+    const strokeW = Math.max(0.5, maxDim * 0.003);
+    const textBaseSize = Math.max(6, maxDim * 0.015);
 
     const renderHorizontalWires = () => {
         const wires = [];
@@ -113,7 +113,7 @@ const MalhaPreview: React.FC<MalhaPreviewProps> = ({
 
             <svg 
                 viewBox={viewBox} 
-                className="w-full h-full max-h-[450px] drop-shadow-sm" 
+                className="w-full h-full drop-shadow-sm" 
                 preserveAspectRatio="xMidYMid meet"
             >
                 {/* Malha (Fios) */}
