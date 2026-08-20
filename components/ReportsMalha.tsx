@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import MalhaPreview from './MalhaPreview';
 import type { Page, StockItem, ProductionRecord } from '../types';
 import { supabase } from '../services/supabaseService';
 import html2canvas from 'html2canvas';
@@ -920,10 +921,18 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
                             </button>
                         </div>
                         <div className="p-6 bg-white flex flex-col lg:flex-row gap-8 items-stretch">
-                            {/* Imagem de Referência */}
-                            <div className="w-full lg:w-1/2 flex items-center justify-center bg-slate-50 border border-slate-200 rounded-xl p-4 shrink-0 relative overflow-hidden group">
-                                <div className="absolute inset-0 bg-white/40 group-hover:bg-transparent transition-colors duration-300 pointer-events-none"></div>
-                                <img src="/esquema-malha.png" alt="Esquema de medidas da Malha" className="w-full h-auto object-contain mix-blend-multiply" style={{ maxHeight: '420px' }} />
+                            {/* Imagem de Referência Dinâmica (CAD) */}
+                            <div className="w-full lg:w-1/2 flex flex-col bg-slate-50 border border-slate-200 rounded-xl p-2 shrink-0">
+                                <MalhaPreview 
+                                    largura={malhaParams.largura}
+                                    comprimento={malhaParams.comprimento}
+                                    espacamentoTransversal={malhaParams.espacamentoTransversal}
+                                    espacamentoLongitudinal={malhaParams.espacamentoLongitudinal}
+                                    franjaTransversal={malhaParams.franjaTransversal}
+                                    franjaLongitudinal={malhaParams.franjaLongitudinal}
+                                    fiosTransversais={fiosTransversais}
+                                    fiosLongitudinais={fiosLongitudinais}
+                                />
                             </div>
 
                             {/* Formulário de Configuração */}
