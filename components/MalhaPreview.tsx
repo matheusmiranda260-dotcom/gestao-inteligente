@@ -25,15 +25,18 @@ const MalhaPreview: React.FC<MalhaPreviewProps> = ({
     const widthCm = Math.max(10, comprimento * 100);
     const heightCm = Math.max(10, largura * 100);
 
-    // Padding para as anotações
-    const paddingX = widthCm * 0.25; // 25% de padding para textos
-    const paddingY = heightCm * 0.25;
+    // Padding menor para aproveitar mais o espaço
+    const paddingX = Math.max(80, widthCm * 0.15); 
+    const paddingY = Math.max(80, heightCm * 0.15);
 
-    const viewBox = `${-paddingX} ${-paddingY} ${widthCm + paddingX * 2} ${heightCm + paddingY * 2}`;
+    const viewBoxWidth = widthCm + paddingX * 2;
+    const viewBoxHeight = heightCm + paddingY * 2;
+    const viewBox = `${-paddingX} ${-paddingY} ${viewBoxWidth} ${viewBoxHeight}`;
     
-    // Espessura da linha baseada no tamanho total para manter proporção razoável
-    const strokeW = Math.max(0.5, Math.min(widthCm, heightCm) * 0.005);
-    const textBaseSize = Math.max(4, Math.min(widthCm, heightCm) * 0.04);
+    // Espessura da linha e do texto proporcionais à maior dimensão da viewBox para garantir legibilidade
+    const maxDim = Math.max(viewBoxWidth, viewBoxHeight);
+    const strokeW = Math.max(1, maxDim * 0.004);
+    const textBaseSize = Math.max(12, maxDim * 0.025);
 
     const renderHorizontalWires = () => {
         const wires = [];
@@ -173,8 +176,8 @@ const MalhaPreview: React.FC<MalhaPreviewProps> = ({
                 {/* Franja Longitudinal (Topo - Esquerda) */}
                 {franjaLongitudinal > 0 && fiosTransversais > 0 && (
                     <DimLine 
-                        x1={0} y1={-paddingY * 0.15} 
-                        x2={franjaLongitudinal} y2={-paddingY * 0.15} 
+                        x1={0} y1={-paddingY * 0.25} 
+                        x2={franjaLongitudinal} y2={-paddingY * 0.25} 
                         label={`Fr. Long. (${franjaLongitudinal}cm)`} 
                         labelColor="#64748b"
                     />
@@ -183,8 +186,8 @@ const MalhaPreview: React.FC<MalhaPreviewProps> = ({
                 {/* Franja Transversal (Esquerda - Baixo) */}
                 {franjaTransversal > 0 && fiosLongitudinais > 0 && (
                     <DimLine 
-                        x1={-paddingX * 0.15} y1={heightCm - franjaTransversal} 
-                        x2={-paddingX * 0.15} y2={heightCm} 
+                        x1={-paddingX * 0.25} y1={heightCm - franjaTransversal} 
+                        x2={-paddingX * 0.25} y2={heightCm} 
                         label={`Fr. Transv. (${franjaTransversal}cm)`} 
                         labelColor="#64748b"
                     />
