@@ -5,8 +5,10 @@ interface MalhaPreviewProps {
     comprimento: number; // m
     espacamentoTransversal: number; // cm
     espacamentoLongitudinal: number; // cm
-    franjaTransversal: number; // cm
-    franjaLongitudinal: number; // cm
+    franjaTransversalSup: number; // cm
+    franjaTransversalInf: number; // cm
+    franjaLongitudinalEsq: number; // cm
+    franjaLongitudinalDir: number; // cm
     fiosTransversais: number;
     fiosLongitudinais: number;
 }
@@ -16,8 +18,10 @@ const MalhaPreview: React.FC<MalhaPreviewProps> = ({
     comprimento,
     espacamentoTransversal,
     espacamentoLongitudinal,
-    franjaTransversal,
-    franjaLongitudinal,
+    franjaTransversalSup,
+    franjaTransversalInf,
+    franjaLongitudinalEsq,
+    franjaLongitudinalDir,
     fiosTransversais,
     fiosLongitudinais
 }) => {
@@ -41,7 +45,7 @@ const MalhaPreview: React.FC<MalhaPreviewProps> = ({
     const renderHorizontalWires = () => {
         const wires = [];
         for (let i = 0; i < fiosLongitudinais; i++) {
-            const y = franjaTransversal + (i * espacamentoLongitudinal);
+            const y = franjaTransversalSup + (i * espacamentoLongitudinal);
             if (y <= heightCm + 0.1) {
                 wires.push(<line key={`h-${i}`} x1={0} y1={y} x2={widthCm} y2={y} stroke="#64748b" strokeWidth={strokeW} />);
             }
@@ -52,7 +56,7 @@ const MalhaPreview: React.FC<MalhaPreviewProps> = ({
     const renderVerticalWires = () => {
         const wires = [];
         for (let i = 0; i < fiosTransversais; i++) {
-            const x = franjaLongitudinal + (i * espacamentoTransversal);
+            const x = franjaLongitudinalEsq + (i * espacamentoTransversal);
             if (x <= widthCm + 0.1) {
                 wires.push(<line key={`v-${i}`} x1={x} y1={0} x2={x} y2={heightCm} stroke="#64748b" strokeWidth={strokeW} />);
             }
@@ -126,8 +130,8 @@ const MalhaPreview: React.FC<MalhaPreviewProps> = ({
                 {/* Indicação de uma "Célula" da Malha (laranja como no original) */}
                 {fiosTransversais > 1 && fiosLongitudinais > 1 && (
                     <rect 
-                        x={franjaLongitudinal + (Math.floor(fiosTransversais/2) - 1) * espacamentoTransversal} 
-                        y={franjaTransversal + (Math.floor(fiosLongitudinais/2) - 1) * espacamentoLongitudinal} 
+                        x={franjaLongitudinalEsq + (Math.floor(fiosTransversais/2) - 1) * espacamentoTransversal} 
+                        y={franjaTransversalSup + (Math.floor(fiosLongitudinais/2) - 1) * espacamentoLongitudinal} 
                         width={espacamentoTransversal} 
                         height={espacamentoLongitudinal} 
                         fill="#f97316" 
@@ -157,8 +161,8 @@ const MalhaPreview: React.FC<MalhaPreviewProps> = ({
                 {/* Espaçamento Transversal (Topo) */}
                 {fiosTransversais > 1 && (
                     <DimLine 
-                        x1={franjaLongitudinal} y1={-paddingY * 0.7} 
-                        x2={franjaLongitudinal + espacamentoTransversal} y2={-paddingY * 0.7} 
+                        x1={franjaLongitudinalEsq} y1={-paddingY * 0.7} 
+                        x2={franjaLongitudinalEsq + espacamentoTransversal} y2={-paddingY * 0.7} 
                         label={`Espaç. Transv. (${espacamentoTransversal}cm)`} 
                         labelColor="#10b981"
                     />
@@ -167,29 +171,49 @@ const MalhaPreview: React.FC<MalhaPreviewProps> = ({
                 {/* Espaçamento Longitudinal (Direita) */}
                 {fiosLongitudinais > 1 && (
                     <DimLine 
-                        x1={widthCm + paddingX * 0.7} y1={franjaTransversal} 
-                        x2={widthCm + paddingX * 0.7} y2={franjaTransversal + espacamentoLongitudinal} 
+                        x1={widthCm + paddingX * 0.7} y1={franjaTransversalSup} 
+                        x2={widthCm + paddingX * 0.7} y2={franjaTransversalSup + espacamentoLongitudinal} 
                         label={`Espaç. Long. (${espacamentoLongitudinal}cm)`} 
                         labelColor="#8b5cf6"
                     />
                 )}
 
-                {/* Franja Longitudinal (Topo - Esquerda) */}
-                {franjaLongitudinal > 0 && fiosTransversais > 0 && (
+                {/* Franja Longitudinal Esq (Topo - Esquerda) */}
+                {franjaLongitudinalEsq > 0 && fiosTransversais > 0 && (
                     <DimLine 
                         x1={0} y1={-paddingY * 0.3} 
-                        x2={franjaLongitudinal} y2={-paddingY * 0.3} 
-                        label={`Fr. Long. (${franjaLongitudinal}cm)`} 
+                        x2={franjaLongitudinalEsq} y2={-paddingY * 0.3} 
+                        label={`Fr. Long. Esq (${franjaLongitudinalEsq}cm)`} 
+                        labelColor="#64748b"
+                    />
+                )}
+                
+                {/* Franja Longitudinal Dir (Topo - Direita) */}
+                {franjaLongitudinalDir > 0 && fiosTransversais > 0 && (
+                    <DimLine 
+                        x1={widthCm - franjaLongitudinalDir} y1={-paddingY * 0.3} 
+                        x2={widthCm} y2={-paddingY * 0.3} 
+                        label={`Fr. Long. Dir (${franjaLongitudinalDir}cm)`} 
                         labelColor="#64748b"
                     />
                 )}
 
-                {/* Franja Transversal (Esquerda - Baixo) */}
-                {franjaTransversal > 0 && fiosLongitudinais > 0 && (
+                {/* Franja Transversal Sup (Esquerda - Topo) */}
+                {franjaTransversalSup > 0 && fiosLongitudinais > 0 && (
                     <DimLine 
-                        x1={-paddingX * 0.3} y1={heightCm - franjaTransversal} 
+                        x1={-paddingX * 0.3} y1={0} 
+                        x2={-paddingX * 0.3} y2={franjaTransversalSup} 
+                        label={`Fr. Transv. Sup (${franjaTransversalSup}cm)`} 
+                        labelColor="#64748b"
+                    />
+                )}
+
+                {/* Franja Transversal Inf (Esquerda - Baixo) */}
+                {franjaTransversalInf > 0 && fiosLongitudinais > 0 && (
+                    <DimLine 
+                        x1={-paddingX * 0.3} y1={heightCm - franjaTransversalInf} 
                         x2={-paddingX * 0.3} y2={heightCm} 
-                        label={`Fr. Transv. (${franjaTransversal}cm)`} 
+                        label={`Fr. Transv. Inf (${franjaTransversalInf}cm)`} 
                         labelColor="#64748b"
                     />
                 )}
