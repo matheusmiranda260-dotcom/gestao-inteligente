@@ -77,6 +77,7 @@ const App: React.FC = () => {
     const [shiftReports, setShiftReports] = useState<ShiftReport[]>([]);
     const [trefilaProduction, setTrefilaProduction] = useState<ProductionRecord[]>([]);
     const [trelicaProduction, setTrelicaProduction] = useState<ProductionRecord[]>([]);
+    const [malhaProduction, setMalhaProduction] = useState<ProductionRecord[]>([]);
 
     const [gauges, setGauges] = useState<StockGauge[]>([]);
     const [stickyNotes, setStickyNotes] = useState<StickyNote[]>([]);
@@ -180,6 +181,7 @@ const App: React.FC = () => {
                 // Split production records
                 setTrefilaProduction(fetchedProductionRecords.filter(r => r.machine.startsWith('Trefila')));
                 setTrelicaProduction(fetchedProductionRecords.filter(r => r.machine.startsWith('Treliça')));
+                setMalhaProduction(fetchedProductionRecords.filter(r => r.machine.toLowerCase().startsWith('malha')));
 
 
             } catch (error) {
@@ -2677,7 +2679,7 @@ const App: React.FC = () => {
             case 'productionDashboard': return <ProductionDashboard setPage={setPage} productionOrders={productionOrders} stock={stock} currentUser={currentUser} downtimeConfigs={downtimeConfigs} />;
             case 'trefilaControl': return <ProductionControl machineCategory="Trefila" setPage={setPage} productionOrders={productionOrders} shiftReports={shiftReports} currentUser={currentUser} onUpdateReport={handleUpdateShiftReport} onDeleteReport={deleteShiftReport} updateProductionOrder={updateProductionOrder} stock={stock} />;
             case 'trelicaControl': return <ProductionControl machineCategory="Treliça" setPage={setPage} productionOrders={productionOrders} shiftReports={shiftReports} currentUser={currentUser} onUpdateReport={handleUpdateShiftReport} onDeleteReport={deleteShiftReport} updateProductionOrder={updateProductionOrder} stock={stock} />;
-            case 'reports': return <Reports setPage={setPage} stock={stock} trefilaProduction={trefilaProduction} trelicaProduction={trelicaProduction} gauges={gauges} />;
+            case 'reports': return <Reports setPage={setPage} stock={stock} trefilaProduction={trefilaProduction} trelicaProduction={trelicaProduction} malhaProduction={malhaProduction} gauges={gauges} />;
             case 'userManagement': return <UserManagement users={users} employees={employees} addUser={addUser} updateUser={updateUser} deleteUser={deleteUser} setPage={setPage} accessLogs={accessLogs} />;
             case 'finishedGoods': return <FinishedGoods finishedGoods={finishedGoods} pontasStock={pontasStock} setPage={setPage} finishedGoodsTransfers={finishedGoodsTransfers} createFinishedGoodsTransfer={createFinishedGoodsTransfer} onDelete={deleteFinishedGoods} onUpdateFinishedGood={updateFinishedGood} onUpdatePonta={updatePonta} currentUser={currentUser} users={users} />;
             case 'trelicaStock': return <TrelicaStockManager finishedGoods={finishedGoods} setPage={setPage} createFinishedGoodsTransfer={createFinishedGoodsTransfer} onDelete={deleteFinishedGoods} onUpdateQuantity={updateFinishedGood} onAddManual={addManualFinishedGood} currentUser={currentUser} productionOrders={productionOrders} stock={stock} users={users} onUpdateFinishedGood={updateFinishedGood} onResetStock={resetTrelicaStock} />;

@@ -6,17 +6,19 @@ import ReportsOPTrefila from './ReportsOPTrefila';
 import ReportsFechamentoOP from './ReportsFechamentoOP';
 import ReportsRequisicaoTransferencia from './ReportsRequisicaoTransferencia';
 import ReportsFinalTrelica from './ReportsFinalTrelica';
+import ReportsMalha from './ReportsMalha';
 
 interface ReportsProps {
     stock: StockItem[];
     trefilaProduction: ProductionRecord[];
     trelicaProduction: ProductionRecord[];
+    malhaProduction: ProductionRecord[];
     setPage: (page: Page) => void;
     gauges: StockGauge[];
 }
 
-const Reports: React.FC<ReportsProps> = ({ stock, trefilaProduction, trelicaProduction, setPage, gauges }) => {
-    const [activeTab, setActiveTab] = useState<'trelica' | 'trefila' | 'op_trefila' | 'fechamento_op' | 'requisicao_transferencia' | 'final_trelica'>('trelica');
+const Reports: React.FC<ReportsProps> = ({ stock, trefilaProduction, trelicaProduction, malhaProduction, setPage, gauges }) => {
+    const [activeTab, setActiveTab] = useState<'trelica' | 'malha' | 'trefila' | 'op_trefila' | 'fechamento_op' | 'requisicao_transferencia' | 'final_trelica'>('trelica');
 
     return (
         <div className="flex flex-col h-full bg-slate-100">
@@ -31,6 +33,16 @@ const Reports: React.FC<ReportsProps> = ({ stock, trefilaProduction, trelicaProd
                     }`}
                 >
                     Relatório Diário - Treliça
+                </button>
+                <button
+                    onClick={() => setActiveTab('malha')}
+                    className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${
+                        activeTab === 'malha' 
+                        ? 'bg-orange-600 text-white shadow-md' 
+                        : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200'
+                    }`}
+                >
+                    Relatório Diário - Malha
                 </button>
                 <button
                     onClick={() => setActiveTab('trefila')}
@@ -91,6 +103,13 @@ const Reports: React.FC<ReportsProps> = ({ stock, trefilaProduction, trelicaProd
                         stock={stock} 
                         trefilaProduction={trefilaProduction} 
                         trelicaProduction={trelicaProduction} 
+                        setPage={setPage} 
+                    />
+                ) : activeTab === 'malha' ? (
+                    <ReportsMalha 
+                        stock={stock} 
+                        trefilaProduction={trefilaProduction} 
+                        malhaProduction={malhaProduction} 
                         setPage={setPage} 
                     />
                 ) : activeTab === 'trefila' ? (
