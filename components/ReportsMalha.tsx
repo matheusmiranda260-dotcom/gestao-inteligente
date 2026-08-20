@@ -383,6 +383,21 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
         };
     }, [stopsShiftA, stopsShiftB, statsShiftA, statsShiftB, productionUpdates]);
 
+    // O tamanho da peça (tamanhoPeca) é a metragem linear exata de uma malha
+    const metrosPorMalha = useMemo(() => {
+        const fiosL = Number(fiosLongitudinais) || 0;
+        const comp = Number(malhaParams.comprimento) || 0;
+        const fiosT = Number(fiosTransversais) || 0;
+        const larg = Number(malhaParams.largura) || 0;
+        return (fiosL * comp) + (fiosT * larg);
+    }, [fiosLongitudinais, malhaParams.comprimento, fiosTransversais, malhaParams.largura]);
+
+    // Atualiza automaticamente o tamanho da peça nos turnos quando a malha mudar
+    useEffect(() => {
+        setStatsShiftA(prev => ({ ...prev, tamanhoPeca: metrosPorMalha }));
+        setStatsShiftB(prev => ({ ...prev, tamanhoPeca: metrosPorMalha }));
+    }, [metrosPorMalha]);
+
     // Função para carregar o rascunho de uma máquina específica do localStorage
     const loadDraftForMachine = (machine: 'Malha 1' | 'Malha 2') => {
         setLoading(true);
@@ -1599,12 +1614,11 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
                                         <span className="text-slate-500 font-bold text-xs px-0.5">peças de</span>
                                         <input
                                             type="number"
-                                            value={statsShiftA.tamanhoPeca || ''}
-                                            onChange={e => setStatsShiftA({ ...statsShiftA, tamanhoPeca: parseFloat(e.target.value) || 0 })}
-                                            className="modern-editable-input text-center w-8 text-slate-950 border-b border-slate-200 font-black text-sm"
-                                            placeholder="0"
+                                            value={statsShiftA.tamanhoPeca ? Number(statsShiftA.tamanhoPeca).toFixed(2) : ''}
+                                            readOnly
+                                            className="text-center w-16 text-slate-500 border-b border-slate-200 font-black text-sm bg-transparent outline-none cursor-not-allowed"
                                         />
-                                        <span className="text-slate-500 font-bold text-xs pl-0.5">metros</span>
+                                        <span className="text-slate-500 font-bold text-xs pl-0.5">m de fio</span>
                                     </div>
                                 </div>
                                 {/* Metros Produzidos */}
@@ -1693,12 +1707,11 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
                                         <span className="text-slate-500 font-bold text-xs px-0.5">peças de</span>
                                         <input
                                             type="number"
-                                            value={statsShiftB.tamanhoPeca || ''}
-                                            onChange={e => setStatsShiftB({ ...statsShiftB, tamanhoPeca: parseFloat(e.target.value) || 0 })}
-                                            className="modern-editable-input text-center w-8 text-slate-950 border-b border-slate-200 font-black text-sm"
-                                            placeholder="0"
+                                            value={statsShiftB.tamanhoPeca ? Number(statsShiftB.tamanhoPeca).toFixed(2) : ''}
+                                            readOnly
+                                            className="text-center w-16 text-slate-500 border-b border-slate-200 font-black text-sm bg-transparent outline-none cursor-not-allowed"
                                         />
-                                        <span className="text-slate-500 font-bold text-xs pl-0.5">metros</span>
+                                        <span className="text-slate-500 font-bold text-xs pl-0.5">m de fio</span>
                                     </div>
                                 </div>
                                 {/* Metros Produzidos */}
