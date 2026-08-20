@@ -25,9 +25,9 @@ const MalhaPreview: React.FC<MalhaPreviewProps> = ({
     const widthCm = Math.max(10, comprimento * 100);
     const heightCm = Math.max(10, largura * 100);
 
-    // Reduzindo o padding drasticamente para que a malha ocupe mais espaço
-    const paddingX = Math.max(40, widthCm * 0.08); 
-    const paddingY = Math.max(40, heightCm * 0.08);
+    // Padding generoso para garantir que as cotas caibam sem sobrepor
+    const paddingX = Math.max(120, widthCm * 0.2); 
+    const paddingY = Math.max(120, heightCm * 0.2);
 
     const viewBoxWidth = widthCm + paddingX * 2;
     const viewBoxHeight = heightCm + paddingY * 2;
@@ -96,7 +96,8 @@ const MalhaPreview: React.FC<MalhaPreviewProps> = ({
                     fontWeight="bold"
                     textAnchor="middle"
                     dominantBaseline="middle"
-                    transform={isVertical ? `rotate(-90 ${mx} ${my}) translate(0, -${textBaseSize * 1.2})` : `translate(0, -${textBaseSize * 1.2})`}
+                    dy={-textBaseSize * 0.8}
+                    transform={isVertical ? `rotate(-90 ${mx} ${my})` : undefined}
                 >
                     {label}
                 </text>
@@ -140,15 +141,15 @@ const MalhaPreview: React.FC<MalhaPreviewProps> = ({
                 
                 {/* Comprimento (Embaixo) */}
                 <DimLine 
-                    x1={0} y1={heightCm + paddingY * 0.35} 
-                    x2={widthCm} y2={heightCm + paddingY * 0.35} 
+                    x1={0} y1={heightCm + paddingY * 0.6} 
+                    x2={widthCm} y2={heightCm + paddingY * 0.6} 
                     label={`Comprimento: ${comprimento.toFixed(2)}m`} 
                 />
 
                 {/* Largura (Esquerda) */}
                 <DimLine 
-                    x1={-paddingX * 0.45} y1={0} 
-                    x2={-paddingX * 0.45} y2={heightCm} 
+                    x1={-paddingX * 0.7} y1={0} 
+                    x2={-paddingX * 0.7} y2={heightCm} 
                     label={`Largura: ${largura.toFixed(2)}m`} 
                     labelColor="#3b82f6"
                 />
@@ -156,8 +157,8 @@ const MalhaPreview: React.FC<MalhaPreviewProps> = ({
                 {/* Espaçamento Transversal (Topo) */}
                 {fiosTransversais > 1 && (
                     <DimLine 
-                        x1={franjaLongitudinal} y1={-paddingY * 0.5} 
-                        x2={franjaLongitudinal + espacamentoTransversal} y2={-paddingY * 0.5} 
+                        x1={franjaLongitudinal} y1={-paddingY * 0.7} 
+                        x2={franjaLongitudinal + espacamentoTransversal} y2={-paddingY * 0.7} 
                         label={`Espaç. Transv. (${espacamentoTransversal}cm)`} 
                         labelColor="#10b981"
                     />
@@ -166,8 +167,8 @@ const MalhaPreview: React.FC<MalhaPreviewProps> = ({
                 {/* Espaçamento Longitudinal (Direita) */}
                 {fiosLongitudinais > 1 && (
                     <DimLine 
-                        x1={widthCm + paddingX * 0.4} y1={franjaTransversal} 
-                        x2={widthCm + paddingX * 0.4} y2={franjaTransversal + espacamentoLongitudinal} 
+                        x1={widthCm + paddingX * 0.7} y1={franjaTransversal} 
+                        x2={widthCm + paddingX * 0.7} y2={franjaTransversal + espacamentoLongitudinal} 
                         label={`Espaç. Long. (${espacamentoLongitudinal}cm)`} 
                         labelColor="#8b5cf6"
                     />
@@ -176,8 +177,8 @@ const MalhaPreview: React.FC<MalhaPreviewProps> = ({
                 {/* Franja Longitudinal (Topo - Esquerda) */}
                 {franjaLongitudinal > 0 && fiosTransversais > 0 && (
                     <DimLine 
-                        x1={0} y1={-paddingY * 0.2} 
-                        x2={franjaLongitudinal} y2={-paddingY * 0.2} 
+                        x1={0} y1={-paddingY * 0.3} 
+                        x2={franjaLongitudinal} y2={-paddingY * 0.3} 
                         label={`Fr. Long. (${franjaLongitudinal}cm)`} 
                         labelColor="#64748b"
                     />
@@ -186,8 +187,8 @@ const MalhaPreview: React.FC<MalhaPreviewProps> = ({
                 {/* Franja Transversal (Esquerda - Baixo) */}
                 {franjaTransversal > 0 && fiosLongitudinais > 0 && (
                     <DimLine 
-                        x1={-paddingX * 0.2} y1={heightCm - franjaTransversal} 
-                        x2={-paddingX * 0.2} y2={heightCm} 
+                        x1={-paddingX * 0.3} y1={heightCm - franjaTransversal} 
+                        x2={-paddingX * 0.3} y2={heightCm} 
                         label={`Fr. Transv. (${franjaTransversal}cm)`} 
                         labelColor="#64748b"
                     />
