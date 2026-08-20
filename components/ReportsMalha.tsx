@@ -124,13 +124,29 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
     const fiosLongitudinais = useMemo(() => {
         if (!malhaParams.largura || !malhaParams.espacamentoLongitudinal) return 0;
         const larguraCm = malhaParams.largura * 100;
-        return Math.floor(larguraCm / malhaParams.espacamentoLongitudinal) + 1;
+        let spaces = Math.floor(larguraCm / malhaParams.espacamentoLongitudinal);
+        let franja = (larguraCm - spaces * malhaParams.espacamentoLongitudinal) / 2;
+        
+        // Regra de negócio: Tem que existir franja de pelo menos 2cm
+        if (franja < 2 && spaces > 0) {
+            spaces -= 1;
+        }
+        
+        return spaces + 1;
     }, [malhaParams.largura, malhaParams.espacamentoLongitudinal]);
 
     const fiosTransversais = useMemo(() => {
         if (!malhaParams.comprimento || !malhaParams.espacamentoTransversal) return 0;
         const comprimentoCm = malhaParams.comprimento * 100;
-        return Math.floor(comprimentoCm / malhaParams.espacamentoTransversal) + 1;
+        let spaces = Math.floor(comprimentoCm / malhaParams.espacamentoTransversal);
+        let franja = (comprimentoCm - spaces * malhaParams.espacamentoTransversal) / 2;
+        
+        // Regra de negócio: Tem que existir franja de pelo menos 2cm
+        if (franja < 2 && spaces > 0) {
+            spaces -= 1;
+        }
+        
+        return spaces + 1;
     }, [malhaParams.comprimento, malhaParams.espacamentoTransversal]);
 
     const franjaTransversal = useMemo(() => {
