@@ -114,22 +114,32 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
 
     // Estados do Modal de Malha (Parâmetros)
     const [showMalhaModal, setShowMalhaModal] = useState<boolean>(false);
-    const [malhaParams, setMalhaParams] = useState({
+    const [malhaParams, setMalhaParams] = useState<{
+        largura: number | '';
+        comprimento: number | '';
+        espacamentoTransversal: number | '';
+        espacamentoLongitudinal: number | '';
+    }>({
         largura: 2.45,
         comprimento: 6,
         espacamentoTransversal: 15,
         espacamentoLongitudinal: 15
     });
 
-    const [fiosLongitudinais, setFiosLongitudinais] = useState(0);
-    const [fiosTransversais, setFiosTransversais] = useState(0);
+    const [fiosLongitudinais, setFiosLongitudinais] = useState<number | ''>(0);
+    const [fiosTransversais, setFiosTransversais] = useState<number | ''>(0);
 
     // Cálculo automático de Fios Longitudinais quando largura ou espaçamento mudam
     useEffect(() => {
-        if (!malhaParams.largura || !malhaParams.espacamentoLongitudinal) return;
-        const larguraCm = malhaParams.largura * 100;
-        let spaces = Math.floor(larguraCm / malhaParams.espacamentoLongitudinal);
-        let franja = (larguraCm - spaces * malhaParams.espacamentoLongitudinal) / 2;
+        const l = Number(malhaParams.largura) || 0;
+        const eL = Number(malhaParams.espacamentoLongitudinal) || 0;
+        if (!l || !eL) {
+            setFiosLongitudinais('');
+            return;
+        }
+        const larguraCm = l * 100;
+        let spaces = Math.floor(larguraCm / eL);
+        let franja = (larguraCm - spaces * eL) / 2;
         
         // Regra de negócio: Tem que existir franja de pelo menos 3cm
         if (franja < 3 && spaces > 0) {
@@ -141,10 +151,15 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
 
     // Cálculo automático de Fios Transversais quando comprimento ou espaçamento mudam
     useEffect(() => {
-        if (!malhaParams.comprimento || !malhaParams.espacamentoTransversal) return;
-        const comprimentoCm = malhaParams.comprimento * 100;
-        let spaces = Math.floor(comprimentoCm / malhaParams.espacamentoTransversal);
-        let franja = (comprimentoCm - spaces * malhaParams.espacamentoTransversal) / 2;
+        const c = Number(malhaParams.comprimento) || 0;
+        const eT = Number(malhaParams.espacamentoTransversal) || 0;
+        if (!c || !eT) {
+            setFiosTransversais('');
+            return;
+        }
+        const comprimentoCm = c * 100;
+        let spaces = Math.floor(comprimentoCm / eT);
+        let franja = (comprimentoCm - spaces * eT) / 2;
         
         // Regra de negócio: Tem que existir franja de pelo menos 3cm
         if (franja < 3 && spaces > 0) {
@@ -155,15 +170,21 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
     }, [malhaParams.comprimento, malhaParams.espacamentoTransversal]);
 
     const franjaTransversal = useMemo(() => {
-        if (!malhaParams.largura || !malhaParams.espacamentoLongitudinal || fiosLongitudinais === 0) return 0;
-        const larguraCm = malhaParams.largura * 100;
-        return (larguraCm - (fiosLongitudinais - 1) * malhaParams.espacamentoLongitudinal) / 2;
+        const l = Number(malhaParams.largura) || 0;
+        const eL = Number(malhaParams.espacamentoLongitudinal) || 0;
+        const fL = Number(fiosLongitudinais) || 0;
+        if (!l || !eL || fL === 0) return 0;
+        const larguraCm = l * 100;
+        return (larguraCm - (fL - 1) * eL) / 2;
     }, [malhaParams.largura, malhaParams.espacamentoLongitudinal, fiosLongitudinais]);
 
     const franjaLongitudinal = useMemo(() => {
-        if (!malhaParams.comprimento || !malhaParams.espacamentoTransversal || fiosTransversais === 0) return 0;
-        const comprimentoCm = malhaParams.comprimento * 100;
-        return (comprimentoCm - (fiosTransversais - 1) * malhaParams.espacamentoTransversal) / 2;
+        const c = Number(malhaParams.comprimento) || 0;
+        const eT = Number(malhaParams.espacamentoTransversal) || 0;
+        const fT = Number(fiosTransversais) || 0;
+        if (!c || !eT || fT === 0) return 0;
+        const comprimentoCm = c * 100;
+        return (comprimentoCm - (fT - 1) * eT) / 2;
     }, [malhaParams.comprimento, malhaParams.espacamentoTransversal, fiosTransversais]);
 
     // Tabelas de paradas
@@ -943,16 +964,16 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
                             {/* Imagem de Referência Dinâmica (CAD) */}
                             <div className="w-full lg:w-1/2 flex flex-col bg-slate-50 border border-slate-200 rounded-xl p-2 shrink-0">
                                 <MalhaPreview 
-                                    largura={malhaParams.largura}
-                                    comprimento={malhaParams.comprimento}
-                                    espacamentoTransversal={malhaParams.espacamentoTransversal}
-                                    espacamentoLongitudinal={malhaParams.espacamentoLongitudinal}
+                                    largura={Number(malhaParams.largura) || 0}
+                                    comprimento={Number(malhaParams.comprimento) || 0}
+                                    espacamentoTransversal={Number(malhaParams.espacamentoTransversal) || 0}
+                                    espacamentoLongitudinal={Number(malhaParams.espacamentoLongitudinal) || 0}
                                     franjaTransversalSup={franjaTransversal}
                                     franjaTransversalInf={franjaTransversal}
                                     franjaLongitudinalEsq={franjaLongitudinal}
                                     franjaLongitudinalDir={franjaLongitudinal}
-                                    fiosTransversais={fiosTransversais}
-                                    fiosLongitudinais={fiosLongitudinais}
+                                    fiosTransversais={Number(fiosTransversais) || 0}
+                                    fiosLongitudinais={Number(fiosLongitudinais) || 0}
                                 />
                             </div>
 
@@ -961,19 +982,19 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-1.5">
                                         <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Largura (m)</label>
-                                        <input type="number" step="0.01" value={malhaParams.largura} onChange={e => setMalhaParams(p => ({ ...p, largura: Number(e.target.value) }))} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                        <input type="number" step="0.01" value={malhaParams.largura} onChange={e => setMalhaParams(p => ({ ...p, largura: e.target.value === '' ? '' : Number(e.target.value) }))} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
                                     </div>
                                     <div className="space-y-1.5">
                                         <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Comprimento (m)</label>
-                                        <input type="number" step="0.01" value={malhaParams.comprimento} onChange={e => setMalhaParams(p => ({ ...p, comprimento: Number(e.target.value) }))} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                        <input type="number" step="0.01" value={malhaParams.comprimento} onChange={e => setMalhaParams(p => ({ ...p, comprimento: e.target.value === '' ? '' : Number(e.target.value) }))} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
                                     </div>
                                     <div className="space-y-1.5">
                                         <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Espaç. Transversal (cm)</label>
-                                        <input type="number" step="0.1" value={malhaParams.espacamentoTransversal} onChange={e => setMalhaParams(p => ({ ...p, espacamentoTransversal: Number(e.target.value) }))} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                        <input type="number" step="0.1" value={malhaParams.espacamentoTransversal} onChange={e => setMalhaParams(p => ({ ...p, espacamentoTransversal: e.target.value === '' ? '' : Number(e.target.value) }))} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
                                     </div>
                                     <div className="space-y-1.5">
                                         <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Espaç. Longitudinal (cm)</label>
-                                        <input type="number" step="0.1" value={malhaParams.espacamentoLongitudinal} onChange={e => setMalhaParams(p => ({ ...p, espacamentoLongitudinal: Number(e.target.value) }))} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                        <input type="number" step="0.1" value={malhaParams.espacamentoLongitudinal} onChange={e => setMalhaParams(p => ({ ...p, espacamentoLongitudinal: e.target.value === '' ? '' : Number(e.target.value) }))} className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
                                     </div>
                                     <div className="space-y-1.5">
                                         <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Franja Transversal (cm)</label>
@@ -995,7 +1016,7 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
                                         <input 
                                             type="number" 
                                             value={fiosLongitudinais} 
-                                            onChange={e => setFiosLongitudinais(Number(e.target.value))} 
+                                            onChange={e => setFiosLongitudinais(e.target.value === '' ? '' : Number(e.target.value))} 
                                             className="w-24 text-center text-2xl font-black text-indigo-600 bg-slate-100 hover:bg-slate-200 focus:bg-white border border-slate-300 rounded focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 outline-none transition-colors" 
                                         />
                                     </div>
@@ -1004,7 +1025,7 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
                                         <input 
                                             type="number" 
                                             value={fiosTransversais} 
-                                            onChange={e => setFiosTransversais(Number(e.target.value))} 
+                                            onChange={e => setFiosTransversais(e.target.value === '' ? '' : Number(e.target.value))} 
                                             className="w-24 text-center text-2xl font-black text-indigo-600 bg-slate-100 hover:bg-slate-200 focus:bg-white border border-slate-300 rounded focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 outline-none transition-colors" 
                                         />
                                     </div>
