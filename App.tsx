@@ -7,6 +7,7 @@ import StockControl from './components/StockControl';
 import MachineControl from './components/MachineControl';
 import ProductionOrder from './components/ProductionOrder';
 import ProductionOrderTrelica from './components/ProductionOrderTrelica';
+import ProductionOrderMalha from './components/ProductionOrderMalha';
 import ProductionOrderDesbobinadeira from './components/ProductionOrderDesbobinadeira';
 import DesbobinadeiraDashboard from './components/DesbobinadeiraDashboard';
 import Reports from './components/Reports';
@@ -2666,6 +2667,12 @@ const App: React.FC = () => {
             case 'trelicaReports': return <MachineControl machineType="Treliça" {...mcProps} initialView="dashboard" initialModal="reports" />;
             case 'trelicaParts': return <MachineControl machineType="Treliça" {...mcProps} initialView="dashboard" initialModal="parts" />;
 
+            case 'malha': return <MachineControl machineType="Malha" {...mcProps} initialView="dashboard" initialModal={null} />;
+            case 'malhaInProgress': return <MachineControl machineType="Malha" {...mcProps} initialView="in_progress" initialModal={null} />;
+            case 'malhaPending': return <MachineControl machineType="Malha" {...mcProps} initialView="pending" initialModal={null} />;
+            case 'malhaCompleted': return <MachineControl machineType="Malha" {...mcProps} initialView="completed" initialModal={null} />;
+            case 'malhaReports': return <MachineControl machineType="Malha" {...mcProps} initialView="dashboard" initialModal="reports" />;
+
             case 'desbobinadeiraDashboard': return <DesbobinadeiraDashboard productionOrders={productionOrders} />;
             case 'desbobinadeira': return <MachineControl machineType="Desbobinadeira 1" {...mcProps} initialView="dashboard" initialModal={null} />;
             case 'desbobinadeiraInProgress': return <MachineControl machineType="Desbobinadeira 1" {...mcProps} initialView="in_progress" initialModal={null} />;
@@ -2675,10 +2682,12 @@ const App: React.FC = () => {
 
             case 'productionOrder': return <ProductionOrder setPage={setPage} stock={stock} productionOrders={productionOrders} addProductionOrder={addProductionOrder} showNotification={showNotification} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} gauges={gauges} currentUser={currentUser} />;
             case 'productionOrderTrelica': return <ProductionOrderTrelica setPage={setPage} stock={stock} productionOrders={productionOrders} addProductionOrder={addProductionOrder} showNotification={showNotification} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} gauges={gauges} currentUser={currentUser} />;
+            case 'productionOrderMalha': return <ProductionOrderMalha setPage={setPage} stock={stock} productionOrders={productionOrders} addProductionOrder={addProductionOrder} showNotification={showNotification} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} gauges={gauges} currentUser={currentUser} />;
             case 'productionOrderDesbobinadeira': return <ProductionOrderDesbobinadeira setPage={setPage} stock={stock} productionOrders={productionOrders} addProductionOrder={addProductionOrder} showNotification={showNotification} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} gauges={gauges} currentUser={currentUser} />;
             case 'productionDashboard': return <ProductionDashboard setPage={setPage} productionOrders={productionOrders} stock={stock} currentUser={currentUser} downtimeConfigs={downtimeConfigs} />;
             case 'trefilaControl': return <ProductionControl machineCategory="Trefila" setPage={setPage} productionOrders={productionOrders} shiftReports={shiftReports} currentUser={currentUser} onUpdateReport={handleUpdateShiftReport} onDeleteReport={deleteShiftReport} updateProductionOrder={updateProductionOrder} stock={stock} />;
             case 'trelicaControl': return <ProductionControl machineCategory="Treliça" setPage={setPage} productionOrders={productionOrders} shiftReports={shiftReports} currentUser={currentUser} onUpdateReport={handleUpdateShiftReport} onDeleteReport={deleteShiftReport} updateProductionOrder={updateProductionOrder} stock={stock} />;
+            case 'malhaControl': return <ProductionControl machineCategory="Malha" setPage={setPage} productionOrders={productionOrders} shiftReports={shiftReports} currentUser={currentUser} onUpdateReport={handleUpdateShiftReport} onDeleteReport={deleteShiftReport} updateProductionOrder={updateProductionOrder} stock={stock} />;
             case 'reports': return <Reports setPage={setPage} stock={stock} trefilaProduction={trefilaProduction} trelicaProduction={trelicaProduction} malhaProduction={malhaProduction} gauges={gauges} />;
             case 'userManagement': return <UserManagement users={users} employees={employees} addUser={addUser} updateUser={updateUser} deleteUser={deleteUser} setPage={setPage} accessLogs={accessLogs} />;
             case 'finishedGoods': return <FinishedGoods finishedGoods={finishedGoods} pontasStock={pontasStock} setPage={setPage} finishedGoodsTransfers={finishedGoodsTransfers} createFinishedGoodsTransfer={createFinishedGoodsTransfer} onDelete={deleteFinishedGoods} onUpdateFinishedGood={updateFinishedGood} onUpdatePonta={updatePonta} currentUser={currentUser} users={users} />;

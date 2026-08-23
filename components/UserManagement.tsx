@@ -50,6 +50,17 @@ const permissionCategories = [
         ]
     },
     {
+        title: '🕸️ Produção - Malha',
+        permissions: [
+            { page: 'malha', label: 'Dashboard Malha (Visão Geral)' },
+            { page: 'malhaInProgress', label: 'Painel: Máquina em Operação' },
+            { page: 'malhaPending', label: 'Próximas Produções (Fila)' },
+            { page: 'malhaCompleted', label: 'Histórico de Produções' },
+            { page: 'malhaReports', label: 'Relatórios de Turno' },
+            { page: 'productionOrderMalha', label: 'Criar Ordem de Produção' },
+        ]
+    },
+    {
         title: '🧪 Qualidade e Suporte',
         permissions: [
             { page: 'laboratory', label: '🔬 Laboratório (Ensaios e Testes)' },

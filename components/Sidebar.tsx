@@ -58,6 +58,8 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
             setExpandedMenus(prev => prev.includes('trefila') ? prev : [...prev, 'trefila']);
         } else if (['trelicaInProgress', 'trelicaPending', 'trelicaCompleted', 'trelicaReports'].includes(page)) {
             setExpandedMenus(prev => prev.includes('trelica') ? prev : [...prev, 'trelica']);
+        } else if (['malhaInProgress', 'malhaPending', 'malhaCompleted', 'malhaReports'].includes(page)) {
+            setExpandedMenus(prev => prev.includes('malha') ? prev : [...prev, 'malha']);
         } else if (['desbobinadeiraDashboard', 'desbobinadeiraInProgress', 'desbobinadeiraPending', 'desbobinadeiraCompleted', 'desbobinadeiraReports'].includes(page)) {
             setExpandedMenus(prev => prev.includes('desbobinadeira') ? prev : [...prev, 'desbobinadeira']);
         } else if (['peopleManagement', 'continuousImprovement'].includes(page)) {
@@ -261,17 +263,75 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                         </>
                     )}
 
+                    {/* Malha Collapsible */}
+                    {(hasPermission('malhaInProgress') || hasPermission('malhaPending') || hasPermission('malhaCompleted') || hasPermission('malhaReports')) && (
+                        <>
+                            <button
+                                onClick={() => toggleMenu('malha')}
+                                className={`sidebar-item ${['malhaInProgress', 'malhaPending', 'malhaCompleted', 'malhaReports'].includes(page) ? 'active' : ''} justify-between group`}
+                                title={isCollapsed ? 'Produção – Malha' : ''}
+                            >
+                                <div className="flex items-center gap-3 overflow-hidden">
+                                    <div className="sidebar-item-icon shrink-0">
+                                        <CogIcon className="w-full h-full" />
+                                    </div>
+                                    {!isCollapsed && <span className="sidebar-item-label whitespace-nowrap">Produção – Malha</span>}
+                                </div>
+                                {!isCollapsed && (
+                                    <ChevronRightIcon className={`w-3 h-3 text-slate-500 transition-transform duration-200 ${expandedMenus.includes('malha') ? 'rotate-90' : ''}`} />
+                                )}
+                            </button>
+
+                            {!isCollapsed && expandedMenus.includes('malha') && (
+                                <div className="ml-4 pl-4 border-l border-slate-700/50 flex flex-col gap-0.5 mt-1 mb-2 animate-in slide-in-from-left-2 duration-200">
+                                    {hasPermission('malhaInProgress') && (
+                                        <>
+                                            <button onClick={() => setPage('malhaInProgress')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'malhaInProgress' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                                ⚙️ Em Produção (Geral)
+                                            </button>
+                                            <div className="flex gap-1 px-3 mb-2">
+                                                {(!assignedMachine || assignedMachine === 'Malha 1') && (
+                                                    <button onClick={() => { localStorage.setItem('msm_active_machine', 'Malha 1'); setPage('malhaInProgress'); }} className="text-[9px] font-black bg-white/5 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 px-2 py-1 rounded border border-white/5 uppercase transition-all flex-1">Máquina 1</button>
+                                                )}
+                                                {(!assignedMachine || assignedMachine === 'Malha 2') && (
+                                                    <button onClick={() => { localStorage.setItem('msm_active_machine', 'Malha 2'); setPage('malhaInProgress'); }} className="text-[9px] font-black bg-white/5 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 px-2 py-1 rounded border border-white/5 uppercase transition-all flex-1">Máquina 2</button>
+                                                )}
+                                            </div>
+                                        </>
+                                    )}
+                                    {hasPermission('malhaPending') && (
+                                        <button onClick={() => setPage('malhaPending')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'malhaPending' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                            📋 Próximas Produções
+                                        </button>
+                                    )}
+                                    {hasPermission('malhaCompleted') && (
+                                        <button onClick={() => setPage('malhaCompleted')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'malhaCompleted' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                            📦 Produções Finalizadas
+                                        </button>
+                                    )}
+                                    {hasPermission('malhaReports') && (
+                                        <button onClick={() => setPage('malhaReports')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'malhaReports' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                            📑 Relatórios de Turno
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </>
+                    )}
+
                     <MenuItem target="productionOrder" label="Ordens (Trefila)" icon={ClipboardListIcon} />
                     <MenuItem target="productionOrderTrelica" label="Ordens (Treliça)" icon={ClipboardListIcon} />
+                    <MenuItem target="productionOrderMalha" label="Ordens (Malha)" icon={ClipboardListIcon} />
                 </div>
 
                 {/* CONTROLE DE PRODUÇÃO */}
-                {(isGestor || hasPermission('trefilaControl') || hasPermission('trelicaControl')) && (
+                {(isGestor || hasPermission('trefilaControl') || hasPermission('trelicaControl') || hasPermission('malhaControl')) && (
                     <div className="sidebar-category">
                         <div className="sidebar-category-title">{isCollapsed ? '📈' : '📈 Controle de Produção'}</div>
                         <MenuItem target="pcpBoard" label="Quadro PCP" icon={ClipboardListIcon} />
                         <MenuItem target="trefilaControl" label="Evolução – Trefila" icon={DocumentReportIcon} />
                         <MenuItem target="trelicaControl" label="Evolução – Treliça" icon={DocumentReportIcon} />
+                        <MenuItem target="malhaControl" label="Evolução – Malha" icon={DocumentReportIcon} />
                     </div>
                 )}
 
