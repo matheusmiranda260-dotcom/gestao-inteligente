@@ -1823,7 +1823,9 @@ const MachineControl: React.FC<MachineControlProps> = ({
         ? "Produção maquina DHTRF (TREFILA)" 
         : activeMachine.startsWith('Desbobinadeira') 
             ? "Produção maquina DESB (DESBOBINADEIRA 1)" 
-            : "Produção maquina DHSTR (TRELIÇA)";
+            : activeMachine.startsWith('Malha')
+                ? "Produção maquina MALHA (MALHA)"
+                : "Produção maquina DHSTR (TRELIÇA)";
 
     const promptOrder = pendingShiftEnd ? (productionOrders.find(o => o.id === pendingShiftEnd)) : activeOrder;
 
