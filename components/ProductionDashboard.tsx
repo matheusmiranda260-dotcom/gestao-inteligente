@@ -916,7 +916,7 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
         const saved = localStorage.getItem('dashboardVisibleMachines');
         return saved ? JSON.parse(saved) : ['Trefila 1', 'Treliça 1'];
     });
-    const allAvailableMachines: MachineType[] = ['Trefila 1', 'Trefila 2', 'Treliça 1', 'Treliça 2'];
+    const allAvailableMachines: MachineType[] = ['Trefila 1', 'Trefila 2', 'Treliça 1', 'Treliça 2', 'Malha 1', 'Malha 2'];
     const [showMachineSelector, setShowMachineSelector] = useState(false);
 
     const handleReset = (m: MachineType) => {
@@ -1069,7 +1069,8 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                         const isExact = o.machine === m;
                         const isLegacyTrefilaTo1 = (o.machine === 'Trefila' && m === 'Trefila 1');
                         const isLegacyTrelicaTo1 = (o.machine === 'Treliça' && m === 'Treliça 1');
-                        return isExact || isLegacyTrefilaTo1 || isLegacyTrelicaTo1;
+                        const isLegacyMalhaTo1 = (o.machine === 'Malha' && m === 'Malha 1');
+                        return isExact || isLegacyTrefilaTo1 || isLegacyTrelicaTo1 || isLegacyMalhaTo1;
                     });
 
                     // activeOrder derived from the already-filtered subset
@@ -1083,8 +1084,8 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                             allOrders={machineOrders}
                             stock={stock} 
                             dailyProducedValue={getDailyValue(m)} 
-                            dailyGoal={m.startsWith('Treliça') ? getTrelicaGoal(activeOrder) : (new Date().getHours() >= 5 && new Date().getHours() < 14 ? 15000 : 12000)} 
-                            goalUnit={m.startsWith('Treliça') ? "pçs" : "kg"} 
+                            dailyGoal={(m.startsWith('Treliça') || m.startsWith('Malha')) ? getTrelicaGoal(activeOrder) : (new Date().getHours() >= 5 && new Date().getHours() < 14 ? 15000 : 12000)} 
+                            goalUnit={(m.startsWith('Treliça') || m.startsWith('Malha')) ? "pçs" : "kg"} 
                             isGestor={isGestor} 
                             onResetShift={() => handleReset(m)} 
                             downtimeConfigs={downtimeConfigs}
