@@ -1417,6 +1417,8 @@ const EmployeeDetailModal: React.FC<{
                                                 <option value="Trefila 2">Trefila 2</option>
                                                 <option value="Treliça 1">Treliça 1</option>
                                                 <option value="Treliça 2">Treliça 2</option>
+                                                <option value="Malha 1">Malha 1</option>
+                                                <option value="Malha 2">Malha 2</option>
                                             </select>
                                         </div>
                                     </div>
