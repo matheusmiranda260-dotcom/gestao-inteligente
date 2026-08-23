@@ -7,6 +7,7 @@ import ReportsFechamentoOP from './ReportsFechamentoOP';
 import ReportsRequisicaoTransferencia from './ReportsRequisicaoTransferencia';
 import ReportsFinalTrelica from './ReportsFinalTrelica';
 import ReportsMalha from './ReportsMalha';
+import LabelGenerator from './LabelGenerator';
 
 interface ReportsProps {
     stock: StockItem[];
@@ -18,7 +19,7 @@ interface ReportsProps {
 }
 
 const Reports: React.FC<ReportsProps> = ({ stock, trefilaProduction, trelicaProduction, malhaProduction, setPage, gauges }) => {
-    const [activeTab, setActiveTab] = useState<'trelica' | 'malha' | 'trefila' | 'op_trefila' | 'fechamento_op' | 'requisicao_transferencia' | 'final_trelica'>('trelica');
+    const [activeTab, setActiveTab] = useState<'trelica' | 'malha' | 'trefila' | 'op_trefila' | 'fechamento_op' | 'requisicao_transferencia' | 'final_trelica' | 'gerar_etiqueta'>('trelica');
 
     return (
         <div className="flex flex-col h-full bg-slate-100">
@@ -94,6 +95,16 @@ const Reports: React.FC<ReportsProps> = ({ stock, trefilaProduction, trelicaProd
                 >
                     Relatório Final - Treliça
                 </button>
+                <button
+                    onClick={() => setActiveTab('gerar_etiqueta')}
+                    className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${
+                        activeTab === 'gerar_etiqueta' 
+                        ? 'bg-[#002060] text-white shadow-md' 
+                        : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200'
+                    }`}
+                >
+                    Gerar Etiqueta
+                </button>
             </div>
 
             {/* Renderizar o Relatório Selecionado */}
@@ -131,11 +142,13 @@ const Reports: React.FC<ReportsProps> = ({ stock, trefilaProduction, trelicaProd
                         setPage={setPage}
                         gauges={gauges}
                     />
-                ) : (
+                ) : activeTab === 'fechamento_op' ? (
                     <ReportsFechamentoOP
                         stock={stock}
                         setPage={setPage}
                     />
+                ) : (
+                    <LabelGenerator />
                 )}
             </div>
         </div>
