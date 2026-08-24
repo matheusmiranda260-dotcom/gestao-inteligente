@@ -148,46 +148,47 @@ const LabelGenerator: React.FC = () => {
                             style={{ 
                                 width: `${labelWidth}cm`, 
                                 height: `${labelHeight}cm`,
-                                padding: '1cm',
-                                boxSizing: 'border-box'
+                                padding: 'min(1cm, 5cqmin)',
+                                boxSizing: 'border-box',
+                                containerType: 'size'
                             }}
                         >
-                            <div className="flex justify-center mb-6 border-b-2 border-slate-800 pb-4">
-                                <img src="/ita-acos-logo.png" alt="Logo Grupo Ita Aços" className="h-16 object-contain" />
+                            <div className="flex justify-center border-b-2 border-slate-800" style={{ marginBottom: 'min(1.5rem, 4cqh)', paddingBottom: 'min(1rem, 3cqh)' }}>
+                                <img src="/ita-acos-logo.png" alt="Logo Grupo Ita Aços" className="object-contain" style={{ height: 'min(4rem, 15cqh)' }} />
                             </div>
                             
-                            <div className="flex-1 flex flex-col justify-center gap-6">
+                            <div className="flex-1 flex flex-col justify-center" style={{ gap: 'min(1.5rem, 4cqh)' }}>
                                 <div className="text-center">
-                                    <span className="block text-2xl font-black text-[#002060] uppercase tracking-wide">{nomeProduto || '-'}</span>
+                                    <span className="block font-black text-[#002060] uppercase tracking-wide" style={{ fontSize: 'min(1.5rem, 8cqw)' }}>{nomeProduto || '-'}</span>
                                 </div>
                                 <div className="text-center">
-                                    <span className="block text-sm font-bold text-slate-500 uppercase tracking-widest mb-1">Quantidade de Peças</span>
-                                    <span className="block text-4xl font-black text-slate-900">{quantidadePecas || '-'}</span>
+                                    <span className="block font-bold text-slate-500 uppercase tracking-widest mb-1" style={{ fontSize: 'min(0.875rem, 4cqw)' }}>Quantidade de Peças</span>
+                                    <span className="block font-black text-slate-900 leading-none" style={{ fontSize: 'min(2.25rem, 12cqw)' }}>{quantidadePecas || '-'}</span>
                                 </div>
                                 
-                                <div className="text-center mt-4">
-                                    <span className="block text-sm font-bold text-slate-500 uppercase tracking-widest mb-1">Lotes Usados</span>
-                                    <span className="block text-xl font-bold text-slate-800 whitespace-pre-wrap">{lotesUsados || '-'}</span>
+                                <div className="text-center" style={{ marginTop: 'min(1rem, 2cqh)' }}>
+                                    <span className="block font-bold text-slate-500 uppercase tracking-widest mb-1" style={{ fontSize: 'min(0.875rem, 4cqw)' }}>Lotes Usados</span>
+                                    <span className="block font-bold text-slate-800 whitespace-pre-wrap leading-tight" style={{ fontSize: 'min(1.25rem, 6cqw)' }}>{lotesUsados || '-'}</span>
                                 </div>
                                 
-                                <div className="grid grid-cols-2 gap-4 mt-2 text-center border-t border-slate-200 pt-4">
+                                <div className="grid grid-cols-2 text-center border-t border-slate-200" style={{ gap: 'min(1rem, 3cqw)', marginTop: 'min(0.5rem, 1cqh)', paddingTop: 'min(1rem, 3cqh)' }}>
                                     <div>
-                                        <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Ordem</span>
-                                        <span className="block text-sm font-bold text-slate-800">{numeroOrdem || '-'}</span>
+                                        <span className="block font-bold text-slate-500 uppercase tracking-widest mb-1" style={{ fontSize: 'min(0.625rem, 3cqw)' }}>Ordem</span>
+                                        <span className="block font-bold text-slate-800" style={{ fontSize: 'min(0.875rem, 4.5cqw)' }}>{numeroOrdem || '-'}</span>
                                     </div>
                                     <div>
-                                        <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Data</span>
-                                        <span className="block text-sm font-bold text-slate-800">{dataGeracao || '-'}</span>
+                                        <span className="block font-bold text-slate-500 uppercase tracking-widest mb-1" style={{ fontSize: 'min(0.625rem, 3cqw)' }}>Data</span>
+                                        <span className="block font-bold text-slate-800" style={{ fontSize: 'min(0.875rem, 4.5cqw)' }}>{dataGeracao || '-'}</span>
                                     </div>
-                                    <div className="col-span-2">
-                                        <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Operador</span>
-                                        <span className="block text-sm font-bold text-slate-800">{nomeOperador || '-'}</span>
+                                    <div className="col-span-2" style={{ marginTop: 'min(0.5rem, 1cqh)' }}>
+                                        <span className="block font-bold text-slate-500 uppercase tracking-widest mb-1" style={{ fontSize: 'min(0.625rem, 3cqw)' }}>Operador</span>
+                                        <span className="block font-bold text-slate-800" style={{ fontSize: 'min(0.875rem, 4.5cqw)' }}>{nomeOperador || '-'}</span>
                                     </div>
                                 </div>
                             </div>
                             
-                            <div className="mt-auto text-center border-t border-slate-200 pt-2">
-                                <span className="text-xs font-medium text-slate-400">ITA AÇOS - GESTÃO INTELIGENTE</span>
+                            <div className="mt-auto text-center border-t border-slate-200" style={{ paddingTop: 'min(0.5rem, 1.5cqh)' }}>
+                                <span className="font-medium text-slate-400" style={{ fontSize: 'min(0.75rem, 3.5cqw)' }}>ITA AÇOS - GESTÃO INTELIGENTE</span>
                             </div>
                         </div>
                     </div>
