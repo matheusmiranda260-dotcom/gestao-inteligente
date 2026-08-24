@@ -5,10 +5,12 @@ const LabelGenerator: React.FC = () => {
     const [labelWidth, setLabelWidth] = useState<number>(10);
     const [labelHeight, setLabelHeight] = useState<number>(15);
     const [quantidadePecas, setQuantidadePecas] = useState<string>('');
-    const [lotesUsados, setLotesUsados] = useState<string>('');
+    const [loteLongitudinal, setLoteLongitudinal] = useState<string>('');
+    const [loteTransversal, setLoteTransversal] = useState<string>('');
     const [nomeProduto, setNomeProduto] = useState<string>('');
     const [numeroOrdem, setNumeroOrdem] = useState<string>('');
     const [nomeOperador, setNomeOperador] = useState<string>('');
+    const [peso, setPeso] = useState<string>('');
     const [dataGeracao, setDataGeracao] = useState<string>(() => {
         const today = new Date();
         return today.toLocaleDateString('pt-BR');
@@ -85,13 +87,23 @@ const LabelGenerator: React.FC = () => {
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 mb-1">Lotes Usados</label>
-                                        <textarea 
-                                            value={lotesUsados} 
-                                            onChange={(e) => setLotesUsados(e.target.value)}
-                                            placeholder="Ex: Lote 1234, Lote 5678..."
-                                            rows={2}
-                                            className="modern-editable-input w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#002060] transition-colors resize-none"
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">Lote Longitudinal</label>
+                                        <input 
+                                            type="text"
+                                            value={loteLongitudinal} 
+                                            onChange={(e) => setLoteLongitudinal(e.target.value)}
+                                            placeholder="Ex: Lote 1234"
+                                            className="modern-editable-input w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#002060] transition-colors"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">Lote Transversal</label>
+                                        <input 
+                                            type="text"
+                                            value={loteTransversal} 
+                                            onChange={(e) => setLoteTransversal(e.target.value)}
+                                            placeholder="Ex: Lote 5678"
+                                            className="modern-editable-input w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#002060] transition-colors"
                                         />
                                     </div>
                                     <div>
@@ -111,6 +123,16 @@ const LabelGenerator: React.FC = () => {
                                             value={nomeOperador} 
                                             onChange={(e) => setNomeOperador(e.target.value)}
                                             placeholder="Ex: João Silva"
+                                            className="modern-editable-input w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#002060] transition-colors"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">Peso (kg)</label>
+                                        <input 
+                                            type="text" 
+                                            value={peso} 
+                                            onChange={(e) => setPeso(e.target.value)}
+                                            placeholder="Ex: 50.5"
                                             className="modern-editable-input w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#002060] transition-colors"
                                         />
                                     </div>
@@ -144,51 +166,61 @@ const LabelGenerator: React.FC = () => {
                         
                         {/* Wrapper for the actual label */}
                         <div 
-                            className="bg-white border border-slate-300 shadow-sm print-area flex flex-col"
+                            className="bg-white border border-slate-300 shadow-sm print-area flex flex-col justify-between"
                             style={{ 
                                 width: `${labelWidth}cm`, 
                                 height: `${labelHeight}cm`,
-                                padding: 'min(1cm, 5cqmin)',
+                                padding: 'min(0.5cm, 3cqmin)',
                                 boxSizing: 'border-box',
                                 containerType: 'size'
                             }}
                         >
-                            <div className="flex justify-center border-b-2 border-slate-800" style={{ marginBottom: 'min(1.5rem, 4cqh)', paddingBottom: 'min(1rem, 3cqh)' }}>
-                                <img src="/ita-acos-logo.png" alt="Logo Grupo Ita Aços" className="object-contain" style={{ height: 'min(4rem, 15cqh)' }} />
+                            <div className="flex justify-center border-b-2 border-black" style={{ marginBottom: 'min(0.75rem, 2cqh)', paddingBottom: 'min(0.5rem, 1.5cqh)' }}>
+                                <img src="/ita-acos-logo.png" alt="Logo Grupo Ita Aços" className="object-contain" style={{ height: 'min(3.5rem, 12cqh)' }} />
                             </div>
                             
-                            <div className="flex-1 flex flex-col justify-center" style={{ gap: 'min(1.5rem, 4cqh)' }}>
+                            <div className="flex-1 flex flex-col justify-center" style={{ gap: 'min(0.75rem, 2cqh)' }}>
                                 <div className="text-center">
-                                    <span className="block font-black text-[#002060] uppercase tracking-wide" style={{ fontSize: 'min(1.5rem, 8cqw)' }}>{nomeProduto || '-'}</span>
+                                    <span className="block font-black text-black uppercase tracking-wide leading-tight" style={{ fontSize: 'min(1.5rem, 7cqw)' }}>{nomeProduto || '-'}</span>
                                 </div>
                                 <div className="text-center">
-                                    <span className="block font-bold text-slate-500 uppercase tracking-widest mb-1" style={{ fontSize: 'min(0.875rem, 4cqw)' }}>Quantidade de Peças</span>
-                                    <span className="block font-black text-slate-900 leading-none" style={{ fontSize: 'min(2.25rem, 12cqw)' }}>{quantidadePecas || '-'}</span>
+                                    <span className="block font-black text-black uppercase tracking-widest mb-1" style={{ fontSize: 'min(0.75rem, 3.5cqw)' }}>Quantidade de Peças</span>
+                                    <span className="block font-black text-black leading-none" style={{ fontSize: 'min(2rem, 10cqw)' }}>{quantidadePecas || '-'}</span>
                                 </div>
                                 
-                                <div className="text-center" style={{ marginTop: 'min(1rem, 2cqh)' }}>
-                                    <span className="block font-bold text-slate-500 uppercase tracking-widest mb-1" style={{ fontSize: 'min(0.875rem, 4cqw)' }}>Lotes Usados</span>
-                                    <span className="block font-bold text-slate-800 whitespace-pre-wrap leading-tight" style={{ fontSize: 'min(1.25rem, 6cqw)' }}>{lotesUsados || '-'}</span>
+                                <div className="grid grid-cols-2 text-center" style={{ gap: 'min(0.5rem, 2cqw)', marginTop: 'min(0.5rem, 1cqh)' }}>
+                                    <div>
+                                        <span className="block font-black text-black uppercase tracking-widest mb-1" style={{ fontSize: 'min(0.5rem, 2.5cqw)' }}>Lote Longitudinal</span>
+                                        <span className="block font-black text-black whitespace-pre-wrap leading-tight" style={{ fontSize: 'min(0.875rem, 4cqw)' }}>{loteLongitudinal || '-'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="block font-black text-black uppercase tracking-widest mb-1" style={{ fontSize: 'min(0.5rem, 2.5cqw)' }}>Lote Transversal</span>
+                                        <span className="block font-black text-black whitespace-pre-wrap leading-tight" style={{ fontSize: 'min(0.875rem, 4cqw)' }}>{loteTransversal || '-'}</span>
+                                    </div>
                                 </div>
                                 
-                                <div className="grid grid-cols-2 text-center border-t border-slate-200" style={{ gap: 'min(1rem, 3cqw)', marginTop: 'min(0.5rem, 1cqh)', paddingTop: 'min(1rem, 3cqh)' }}>
+                                <div className="grid grid-cols-2 text-center border-t border-black" style={{ gap: 'min(0.5rem, 2cqw)', marginTop: 'min(0.5rem, 1cqh)', paddingTop: 'min(0.5rem, 1.5cqh)' }}>
                                     <div>
-                                        <span className="block font-bold text-slate-500 uppercase tracking-widest mb-1" style={{ fontSize: 'min(0.625rem, 3cqw)' }}>Ordem</span>
-                                        <span className="block font-bold text-slate-800" style={{ fontSize: 'min(0.875rem, 4.5cqw)' }}>{numeroOrdem || '-'}</span>
+                                        <span className="block font-black text-black uppercase tracking-widest mb-1" style={{ fontSize: 'min(0.5rem, 2.5cqw)' }}>Ordem</span>
+                                        <span className="block font-black text-black" style={{ fontSize: 'min(0.75rem, 4cqw)' }}>{numeroOrdem || '-'}</span>
                                     </div>
                                     <div>
-                                        <span className="block font-bold text-slate-500 uppercase tracking-widest mb-1" style={{ fontSize: 'min(0.625rem, 3cqw)' }}>Data</span>
-                                        <span className="block font-bold text-slate-800" style={{ fontSize: 'min(0.875rem, 4.5cqw)' }}>{dataGeracao || '-'}</span>
+                                        <span className="block font-black text-black uppercase tracking-widest mb-1" style={{ fontSize: 'min(0.5rem, 2.5cqw)' }}>Data</span>
+                                        <span className="block font-black text-black" style={{ fontSize: 'min(0.75rem, 4cqw)' }}>{dataGeracao || '-'}</span>
                                     </div>
-                                    <div className="col-span-2" style={{ marginTop: 'min(0.5rem, 1cqh)' }}>
-                                        <span className="block font-bold text-slate-500 uppercase tracking-widest mb-1" style={{ fontSize: 'min(0.625rem, 3cqw)' }}>Operador</span>
-                                        <span className="block font-bold text-slate-800" style={{ fontSize: 'min(0.875rem, 4.5cqw)' }}>{nomeOperador || '-'}</span>
+                                    <div style={{ marginTop: 'min(0.25rem, 0.5cqh)' }}>
+                                        <span className="block font-black text-black uppercase tracking-widest mb-1" style={{ fontSize: 'min(0.5rem, 2.5cqw)' }}>Operador</span>
+                                        <span className="block font-black text-black" style={{ fontSize: 'min(0.75rem, 4cqw)' }}>{nomeOperador || '-'}</span>
+                                    </div>
+                                    <div style={{ marginTop: 'min(0.25rem, 0.5cqh)' }}>
+                                        <span className="block font-black text-black uppercase tracking-widest mb-1" style={{ fontSize: 'min(0.5rem, 2.5cqw)' }}>Peso</span>
+                                        <span className="block font-black text-black" style={{ fontSize: 'min(0.75rem, 4cqw)' }}>{peso ? `${peso} kg` : '-'}</span>
                                     </div>
                                 </div>
                             </div>
                             
-                            <div className="mt-auto text-center border-t border-slate-200" style={{ paddingTop: 'min(0.5rem, 1.5cqh)' }}>
-                                <span className="font-medium text-slate-400" style={{ fontSize: 'min(0.75rem, 3.5cqw)' }}>ITA AÇOS - GESTÃO INTELIGENTE</span>
+                            <div className="mt-auto text-center border-t border-black" style={{ paddingTop: 'min(0.5rem, 1.5cqh)' }}>
+                                <span className="font-bold text-black" style={{ fontSize: 'min(0.625rem, 3cqw)' }}>ITA AÇOS - GESTÃO INTELIGENTE</span>
                             </div>
                         </div>
                     </div>
