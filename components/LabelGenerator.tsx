@@ -170,57 +170,57 @@ const LabelGenerator: React.FC = () => {
                             style={{ 
                                 width: `${labelWidth}cm`, 
                                 height: `${labelHeight}cm`,
-                                padding: 'min(0.5cm, 3cqmin)',
+                                padding: '3cqmin',
                                 boxSizing: 'border-box',
                                 containerType: 'size'
                             }}
                         >
-                            <div className="flex justify-center border-b-2 border-black" style={{ marginBottom: 'min(0.75rem, 2cqh)', paddingBottom: 'min(0.5rem, 1.5cqh)' }}>
-                                <img src="/ita-acos-logo.png" alt="Logo Grupo Ita Aços" className="object-contain" style={{ height: 'min(3.5rem, 12cqh)' }} />
+                            <div className="flex justify-center border-b-2 border-black" style={{ marginBottom: '2cqh', paddingBottom: '1.5cqh' }}>
+                                <img src="/ita-acos-logo.png" alt="Logo Grupo Ita Aços" className="object-contain" style={{ height: '12cqh' }} />
                             </div>
                             
-                            <div className="flex-1 flex flex-col justify-center" style={{ gap: 'min(0.75rem, 2cqh)' }}>
+                            <div className="flex-1 flex flex-col justify-center" style={{ gap: '2cqh' }}>
                                 <div className="text-center">
-                                    <span className="block font-black text-black uppercase tracking-wide leading-tight" style={{ fontSize: 'min(1.5rem, 7cqw)' }}>{nomeProduto || '-'}</span>
+                                    <span className="block font-black text-[#002060] uppercase tracking-wide leading-tight" style={{ fontSize: '7cqw' }}>{nomeProduto || '-'}</span>
                                 </div>
                                 <div className="text-center">
-                                    <span className="block font-black text-black uppercase tracking-widest mb-1" style={{ fontSize: 'min(0.75rem, 3.5cqw)' }}>Quantidade de Peças</span>
-                                    <span className="block font-black text-black leading-none" style={{ fontSize: 'min(2rem, 10cqw)' }}>{quantidadePecas || '-'}</span>
+                                    <span className="block font-black text-black uppercase tracking-widest mb-1" style={{ fontSize: '3.5cqw' }}>Quantidade de Peças</span>
+                                    <span className="block font-black text-black leading-none" style={{ fontSize: '10cqw' }}>{quantidadePecas || '-'}</span>
                                 </div>
                                 
-                                <div className="grid grid-cols-2 text-center" style={{ gap: 'min(0.5rem, 2cqw)', marginTop: 'min(0.5rem, 1cqh)' }}>
+                                <div className="grid grid-cols-2 text-center" style={{ gap: '2cqw', marginTop: '1cqh' }}>
                                     <div>
-                                        <span className="block font-black text-black uppercase tracking-widest mb-1" style={{ fontSize: 'min(0.5rem, 2.5cqw)' }}>Lote Longitudinal</span>
-                                        <span className="block font-black text-black whitespace-pre-wrap leading-tight" style={{ fontSize: 'min(0.875rem, 4cqw)' }}>{loteLongitudinal || '-'}</span>
+                                        <span className="block font-black text-black uppercase tracking-widest mb-1" style={{ fontSize: '2.5cqw' }}>Lote Longitudinal</span>
+                                        <span className="block font-black text-black whitespace-pre-wrap leading-tight" style={{ fontSize: '4cqw' }}>{loteLongitudinal || '-'}</span>
                                     </div>
                                     <div>
-                                        <span className="block font-black text-black uppercase tracking-widest mb-1" style={{ fontSize: 'min(0.5rem, 2.5cqw)' }}>Lote Transversal</span>
-                                        <span className="block font-black text-black whitespace-pre-wrap leading-tight" style={{ fontSize: 'min(0.875rem, 4cqw)' }}>{loteTransversal || '-'}</span>
+                                        <span className="block font-black text-black uppercase tracking-widest mb-1" style={{ fontSize: '2.5cqw' }}>Lote Transversal</span>
+                                        <span className="block font-black text-black whitespace-pre-wrap leading-tight" style={{ fontSize: '4cqw' }}>{loteTransversal || '-'}</span>
                                     </div>
                                 </div>
                                 
-                                <div className="grid grid-cols-2 text-center border-t border-black" style={{ gap: 'min(0.5rem, 2cqw)', marginTop: 'min(0.5rem, 1cqh)', paddingTop: 'min(0.5rem, 1.5cqh)' }}>
+                                <div className="grid grid-cols-2 text-center border-t border-black" style={{ gap: '2cqw', marginTop: '1cqh', paddingTop: '1.5cqh' }}>
                                     <div>
-                                        <span className="block font-black text-black uppercase tracking-widest mb-1" style={{ fontSize: 'min(0.5rem, 2.5cqw)' }}>Ordem</span>
-                                        <span className="block font-black text-black" style={{ fontSize: 'min(0.75rem, 4cqw)' }}>{numeroOrdem || '-'}</span>
+                                        <span className="block font-black text-black uppercase tracking-widest mb-1" style={{ fontSize: '2.5cqw' }}>Ordem</span>
+                                        <span className="block font-black text-black" style={{ fontSize: '4cqw' }}>{numeroOrdem || '-'}</span>
                                     </div>
                                     <div>
-                                        <span className="block font-black text-black uppercase tracking-widest mb-1" style={{ fontSize: 'min(0.5rem, 2.5cqw)' }}>Data</span>
-                                        <span className="block font-black text-black" style={{ fontSize: 'min(0.75rem, 4cqw)' }}>{dataGeracao || '-'}</span>
+                                        <span className="block font-black text-black uppercase tracking-widest mb-1" style={{ fontSize: '2.5cqw' }}>Data</span>
+                                        <span className="block font-black text-black" style={{ fontSize: '4cqw' }}>{dataGeracao || '-'}</span>
                                     </div>
-                                    <div style={{ marginTop: 'min(0.25rem, 0.5cqh)' }}>
-                                        <span className="block font-black text-black uppercase tracking-widest mb-1" style={{ fontSize: 'min(0.5rem, 2.5cqw)' }}>Operador</span>
-                                        <span className="block font-black text-black" style={{ fontSize: 'min(0.75rem, 4cqw)' }}>{nomeOperador || '-'}</span>
+                                    <div style={{ marginTop: '0.5cqh' }}>
+                                        <span className="block font-black text-black uppercase tracking-widest mb-1" style={{ fontSize: '2.5cqw' }}>Operador</span>
+                                        <span className="block font-black text-black" style={{ fontSize: '4cqw' }}>{nomeOperador || '-'}</span>
                                     </div>
-                                    <div style={{ marginTop: 'min(0.25rem, 0.5cqh)' }}>
-                                        <span className="block font-black text-black uppercase tracking-widest mb-1" style={{ fontSize: 'min(0.5rem, 2.5cqw)' }}>Peso</span>
-                                        <span className="block font-black text-black" style={{ fontSize: 'min(0.75rem, 4cqw)' }}>{peso ? `${peso} kg` : '-'}</span>
+                                    <div style={{ marginTop: '0.5cqh' }}>
+                                        <span className="block font-black text-black uppercase tracking-widest mb-1" style={{ fontSize: '2.5cqw' }}>Peso</span>
+                                        <span className="block font-black text-black" style={{ fontSize: '4cqw' }}>{peso ? `${peso} kg` : '-'}</span>
                                     </div>
                                 </div>
                             </div>
                             
-                            <div className="mt-auto text-center border-t border-black" style={{ paddingTop: 'min(0.5rem, 1.5cqh)' }}>
-                                <span className="font-bold text-black" style={{ fontSize: 'min(0.625rem, 3cqw)' }}>ITA AÇOS - GESTÃO INTELIGENTE</span>
+                            <div className="mt-auto text-center border-t border-black" style={{ paddingTop: '1.5cqh' }}>
+                                <span className="font-bold text-black" style={{ fontSize: '3cqw' }}>ITA AÇOS - GESTÃO INTELIGENTE</span>
                             </div>
                         </div>
                     </div>
@@ -230,7 +230,7 @@ const LabelGenerator: React.FC = () => {
             <style>{`
                 @page {
                     size: ${labelWidth}cm ${labelHeight}cm;
-                    margin: 0;
+                    margin: 0mm;
                 }
                 @media print {
                     /* Oculta tudo por padrão, mas preserva o layout (visibility em vez de display) */
@@ -241,30 +241,30 @@ const LabelGenerator: React.FC = () => {
                     .print-area, .print-area * {
                         visibility: visible;
                     }
-                    /* Posiciona a área de impressão no topo esquerdo absoluto */
+                    /* Posiciona a área de impressão no topo esquerdo absoluto e usa 100vw/vh para ocupar toda a pagina da impressora */
                     .print-area {
                         position: fixed !important;
                         left: 0 !important;
                         top: 0 !important;
-                        width: ${labelWidth}cm !important;
-                        height: ${labelHeight}cm !important;
+                        width: 100vw !important;
+                        height: 100vh !important;
                         margin: 0 !important;
+                        padding: 3cqmin !important;
                         border: none !important;
                         box-shadow: none !important;
                         background: white !important;
                         z-index: 999999 !important;
                         display: flex !important;
                     }
-                    /* Evita que elementos ocultos gerem páginas extras e quebrem o tamanho */
+                    /* Evita overflow e remove margens que poderiam gerar pagina em branco */
                     html, body {
-                        width: ${labelWidth}cm !important;
-                        height: ${labelHeight}cm !important;
+                        width: 100vw !important;
+                        height: 100vh !important;
                         overflow: hidden !important;
                         margin: 0 !important;
                         padding: 0 !important;
                         background: white !important;
                     }
-                    /* Ocultar scrollbars */
                     ::-webkit-scrollbar {
                         display: none;
                     }
