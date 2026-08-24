@@ -195,49 +195,46 @@ const LabelGenerator: React.FC = () => {
                 </div>
             </div>
 
-            {/* Estilos Globais de Impressão Específicos para a Etiqueta */}
             <style>{`
+                @page {
+                    size: ${labelWidth}cm ${labelHeight}cm;
+                    margin: 0;
+                }
                 @media print {
-                    @page {
-                        size: ${labelWidth}cm ${labelHeight}cm;
-                        margin: 0;
-                    }
-                    /* Esconde todos os outros elementos do corpo */
-                    body > *:not(.print-area-wrapper) {
-                        display: none !important;
-                    }
-                    /* Força o LabelGenerator e seus pais a não esconderem o conteúdo */
-                    html, body, #root, .flex-col, .flex-1 {
-                        height: auto !important;
-                        overflow: visible !important;
-                        position: static !important;
-                    }
-                    /* Força ocultar as barras laterais e cabeçalhos */
-                    header, aside, .sidebar {
-                        display: none !important;
-                    }
+                    /* Oculta tudo por padrão, mas preserva o layout (visibility em vez de display) */
                     body * {
                         visibility: hidden;
                     }
+                    /* Torna a área de impressão e seus filhos visíveis */
                     .print-area, .print-area * {
                         visibility: visible;
                     }
+                    /* Posiciona a área de impressão no topo esquerdo absoluto */
                     .print-area {
-                        position: fixed;
-                        left: 0;
-                        top: 0;
+                        position: fixed !important;
+                        left: 0 !important;
+                        top: 0 !important;
                         width: ${labelWidth}cm !important;
                         height: ${labelHeight}cm !important;
-                        margin: 0;
-                        padding: 0.5cm !important;
+                        margin: 0 !important;
                         border: none !important;
                         box-shadow: none !important;
                         background: white !important;
                         z-index: 999999 !important;
                         display: flex !important;
                     }
-                    .no-print {
-                        display: none !important;
+                    /* Evita que elementos ocultos gerem páginas extras e quebrem o tamanho */
+                    html, body {
+                        width: ${labelWidth}cm !important;
+                        height: ${labelHeight}cm !important;
+                        overflow: hidden !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        background: white !important;
+                    }
+                    /* Ocultar scrollbars */
+                    ::-webkit-scrollbar {
+                        display: none;
                     }
                 }
             `}</style>
