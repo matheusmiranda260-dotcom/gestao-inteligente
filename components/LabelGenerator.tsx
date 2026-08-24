@@ -166,61 +166,76 @@ const LabelGenerator: React.FC = () => {
                         
                         {/* Wrapper for the actual label */}
                         <div 
-                            className="bg-white border border-slate-300 shadow-sm print-area flex flex-col justify-between"
+                            className="bg-white border-4 border-black print-area flex flex-col"
                             style={{ 
                                 width: `${labelWidth}cm`, 
                                 height: `${labelHeight}cm`,
-                                padding: '3cqmin',
                                 boxSizing: 'border-box',
                                 containerType: 'size'
                             }}
                         >
-                            <div className="flex justify-center border-b-2 border-black" style={{ marginBottom: '2cqh', paddingBottom: '1.5cqh' }}>
-                                <img src="/ita-acos-logo.png" alt="Logo Grupo Ita Aços" className="object-contain" style={{ height: '12cqh' }} />
-                            </div>
-                            
-                            <div className="flex-1 flex flex-col justify-center" style={{ gap: '2cqh' }}>
-                                <div className="text-center">
-                                    <span className="block font-black text-[#002060] uppercase tracking-wide leading-tight" style={{ fontSize: '7cqw' }}>{nomeProduto || '-'}</span>
+                            {/* HEADER: Logo and Product */}
+                            <div className="flex flex-row border-b-4 border-black items-center" style={{ height: '18cqh' }}>
+                                <div className="flex items-center justify-center border-r-4 border-black h-full" style={{ width: '35cqw', padding: '1cqmin' }}>
+                                    <img src="/ita-acos-logo.png" alt="Logo Grupo Ita Aços" className="object-contain w-full h-full" />
                                 </div>
-                                <div className="text-center">
-                                    <span className="block font-black text-black uppercase tracking-widest mb-1" style={{ fontSize: '3.5cqw' }}>Quantidade de Peças</span>
-                                    <span className="block font-black text-black leading-none" style={{ fontSize: '10cqw' }}>{quantidadePecas || '-'}</span>
-                                </div>
-                                
-                                <div className="grid grid-cols-2 text-center" style={{ gap: '2cqw', marginTop: '1cqh' }}>
-                                    <div>
-                                        <span className="block font-black text-black uppercase tracking-widest mb-1" style={{ fontSize: '2.5cqw' }}>Lote Longitudinal</span>
-                                        <span className="block font-black text-black whitespace-pre-wrap leading-tight" style={{ fontSize: '4cqw' }}>{loteLongitudinal || '-'}</span>
-                                    </div>
-                                    <div>
-                                        <span className="block font-black text-black uppercase tracking-widest mb-1" style={{ fontSize: '2.5cqw' }}>Lote Transversal</span>
-                                        <span className="block font-black text-black whitespace-pre-wrap leading-tight" style={{ fontSize: '4cqw' }}>{loteTransversal || '-'}</span>
-                                    </div>
-                                </div>
-                                
-                                <div className="grid grid-cols-2 text-center border-t border-black" style={{ gap: '2cqw', marginTop: '1cqh', paddingTop: '1.5cqh' }}>
-                                    <div>
-                                        <span className="block font-black text-black uppercase tracking-widest mb-1" style={{ fontSize: '2.5cqw' }}>Ordem</span>
-                                        <span className="block font-black text-black" style={{ fontSize: '4cqw' }}>{numeroOrdem || '-'}</span>
-                                    </div>
-                                    <div>
-                                        <span className="block font-black text-black uppercase tracking-widest mb-1" style={{ fontSize: '2.5cqw' }}>Data</span>
-                                        <span className="block font-black text-black" style={{ fontSize: '4cqw' }}>{dataGeracao || '-'}</span>
-                                    </div>
-                                    <div style={{ marginTop: '0.5cqh' }}>
-                                        <span className="block font-black text-black uppercase tracking-widest mb-1" style={{ fontSize: '2.5cqw' }}>Operador</span>
-                                        <span className="block font-black text-black" style={{ fontSize: '4cqw' }}>{nomeOperador || '-'}</span>
-                                    </div>
-                                    <div style={{ marginTop: '0.5cqh' }}>
-                                        <span className="block font-black text-black uppercase tracking-widest mb-1" style={{ fontSize: '2.5cqw' }}>Peso</span>
-                                        <span className="block font-black text-black" style={{ fontSize: '4cqw' }}>{peso ? `${peso} kg` : '-'}</span>
-                                    </div>
+                                <div className="flex-1 flex items-center justify-center h-full p-2 text-center bg-black">
+                                    <span className="block font-black text-white uppercase tracking-wider leading-none" style={{ fontSize: '6cqw' }}>{nomeProduto || 'PRODUTO NÃO INFORMADO'}</span>
                                 </div>
                             </div>
                             
-                            <div className="mt-auto text-center border-t border-black" style={{ paddingTop: '1.5cqh' }}>
-                                <span className="font-bold text-black" style={{ fontSize: '3cqw' }}>ITA AÇOS - GESTÃO INTELIGENTE</span>
+                            {/* BODY: Main Content */}
+                            <div className="flex-1 flex flex-col w-full">
+                                
+                                {/* Row 1: Quantidade */}
+                                <div className="flex flex-row border-b-4 border-black" style={{ height: '22cqh' }}>
+                                    <div className="flex flex-col justify-center items-center w-full h-full bg-white">
+                                        <span className="block font-black text-black uppercase tracking-widest" style={{ fontSize: '4cqw' }}>QTD. PEÇAS</span>
+                                        <span className="block font-black text-black leading-none" style={{ fontSize: '15cqw', marginTop: '-1cqh' }}>{quantidadePecas || '-'}</span>
+                                    </div>
+                                </div>
+                                
+                                {/* Row 2: Lotes */}
+                                <div className="flex flex-row border-b-4 border-black" style={{ height: '15cqh' }}>
+                                    <div className="flex flex-col justify-center items-center w-1/2 h-full border-r-4 border-black p-1">
+                                        <span className="block font-black text-black uppercase tracking-widest" style={{ fontSize: '3cqw' }}>LOTE LONGITUDINAL</span>
+                                        <span className="block font-black text-black leading-none whitespace-pre-wrap text-center" style={{ fontSize: '6cqw' }}>{loteLongitudinal || '-'}</span>
+                                    </div>
+                                    <div className="flex flex-col justify-center items-center w-1/2 h-full p-1">
+                                        <span className="block font-black text-black uppercase tracking-widest" style={{ fontSize: '3cqw' }}>LOTE TRANSVERSAL</span>
+                                        <span className="block font-black text-black leading-none whitespace-pre-wrap text-center" style={{ fontSize: '6cqw' }}>{loteTransversal || '-'}</span>
+                                    </div>
+                                </div>
+
+                                {/* Row 3: Ordem and Peso */}
+                                <div className="flex flex-row border-b-4 border-black" style={{ height: '15cqh' }}>
+                                    <div className="flex flex-col justify-center items-center w-1/2 h-full border-r-4 border-black p-1 bg-slate-100">
+                                        <span className="block font-black text-black uppercase tracking-widest" style={{ fontSize: '3cqw' }}>ORDEM</span>
+                                        <span className="block font-black text-black leading-none text-center" style={{ fontSize: '5cqw' }}>{numeroOrdem || '-'}</span>
+                                    </div>
+                                    <div className="flex flex-col justify-center items-center w-1/2 h-full p-1 bg-slate-100">
+                                        <span className="block font-black text-black uppercase tracking-widest" style={{ fontSize: '3cqw' }}>PESO TOTAL</span>
+                                        <span className="block font-black text-black leading-none text-center" style={{ fontSize: '5cqw' }}>{peso ? `${peso} kg` : '-'}</span>
+                                    </div>
+                                </div>
+
+                                {/* Row 4: Operador and Data (Smaller at bottom) */}
+                                <div className="flex flex-row flex-1" style={{ minHeight: '10cqh' }}>
+                                    <div className="flex flex-col justify-center items-start w-3/4 h-full border-r-4 border-black" style={{ paddingLeft: '3cqw' }}>
+                                        <span className="block font-black text-black uppercase tracking-widest" style={{ fontSize: '2.5cqw' }}>OPERADOR</span>
+                                        <span className="block font-black text-black leading-none" style={{ fontSize: '4.5cqw' }}>{nomeOperador || '-'}</span>
+                                    </div>
+                                    <div className="flex flex-col justify-center items-center w-1/4 h-full">
+                                        <span className="block font-black text-black uppercase tracking-widest" style={{ fontSize: '2cqw' }}>DATA</span>
+                                        <span className="block font-black text-black leading-none" style={{ fontSize: '3.5cqw' }}>{dataGeracao || '-'}</span>
+                                    </div>
+                                </div>
+
+                            </div>
+                            
+                            {/* FOOTER */}
+                            <div className="flex items-center justify-center border-t-4 border-black bg-black" style={{ height: '6cqh' }}>
+                                <span className="font-bold text-white tracking-widest uppercase" style={{ fontSize: '2.5cqw' }}>ITA AÇOS - GESTÃO INTELIGENTE</span>
                             </div>
                         </div>
                     </div>
