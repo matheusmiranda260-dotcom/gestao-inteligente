@@ -6,7 +6,11 @@ const LabelGenerator: React.FC = () => {
     const [labelHeight, setLabelHeight] = useState<number>(15);
     const [quantidadePecas, setQuantidadePecas] = useState<string>('');
     const [loteLongitudinal, setLoteLongitudinal] = useState<string>('');
-    const [loteTransversal, setLoteTransversal] = useState<string>('');
+    const [loteVertical, setLoteVertical] = useState<string>('');
+    const [tipoLote, setTipoLote] = useState<'longitudinal_vertical' | 'superior_senozoide_inferior'>('longitudinal_vertical');
+    const [loteSuperior, setLoteSuperior] = useState<string>('');
+    const [loteSenozoide, setLoteSenozoide] = useState<string>('');
+    const [loteInferior, setLoteInferior] = useState<string>('');
     const [nomeProduto, setNomeProduto] = useState<string>('');
     const [numeroOrdem, setNumeroOrdem] = useState<string>('');
     const [nomeOperador, setNomeOperador] = useState<string>('');
@@ -87,25 +91,90 @@ const LabelGenerator: React.FC = () => {
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 mb-1">Lote Longitudinal</label>
-                                        <input 
-                                            type="text"
-                                            value={loteLongitudinal} 
-                                            onChange={(e) => setLoteLongitudinal(e.target.value)}
-                                            placeholder="Ex: Lote 1234"
-                                            className="modern-editable-input w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#002060] transition-colors"
-                                        />
+                                        <label className="block text-xs font-bold text-slate-500 mb-2">Tipo de Lote</label>
+                                        <div className="flex gap-4">
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input 
+                                                    type="radio" 
+                                                    name="tipoLote" 
+                                                    value="longitudinal_vertical" 
+                                                    checked={tipoLote === 'longitudinal_vertical'}
+                                                    onChange={() => setTipoLote('longitudinal_vertical')}
+                                                    className="w-4 h-4 text-[#002060] focus:ring-[#002060]"
+                                                />
+                                                <span className="text-sm font-bold text-slate-700">Longitudinal / Vertical</span>
+                                            </label>
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input 
+                                                    type="radio" 
+                                                    name="tipoLote" 
+                                                    value="superior_senozoide_inferior" 
+                                                    checked={tipoLote === 'superior_senozoide_inferior'}
+                                                    onChange={() => setTipoLote('superior_senozoide_inferior')}
+                                                    className="w-4 h-4 text-[#002060] focus:ring-[#002060]"
+                                                />
+                                                <span className="text-sm font-bold text-slate-700">Superior / Senozoide / Inferior</span>
+                                            </label>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 mb-1">Lote Transversal</label>
-                                        <input 
-                                            type="text"
-                                            value={loteTransversal} 
-                                            onChange={(e) => setLoteTransversal(e.target.value)}
-                                            placeholder="Ex: Lote 5678"
-                                            className="modern-editable-input w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#002060] transition-colors"
-                                        />
-                                    </div>
+
+                                    {tipoLote === 'longitudinal_vertical' ? (
+                                        <>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 mb-1">Lote Longitudinal</label>
+                                                <input 
+                                                    type="text"
+                                                    value={loteLongitudinal} 
+                                                    onChange={(e) => setLoteLongitudinal(e.target.value)}
+                                                    placeholder="Ex: Lote 1234"
+                                                    className="modern-editable-input w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#002060] transition-colors"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 mb-1">Lote Vertical</label>
+                                                <input 
+                                                    type="text"
+                                                    value={loteVertical} 
+                                                    onChange={(e) => setLoteVertical(e.target.value)}
+                                                    placeholder="Ex: Lote 5678"
+                                                    className="modern-editable-input w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#002060] transition-colors"
+                                                />
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 mb-1">Lote Superior</label>
+                                                <input 
+                                                    type="text"
+                                                    value={loteSuperior} 
+                                                    onChange={(e) => setLoteSuperior(e.target.value)}
+                                                    placeholder="Ex: Lote A"
+                                                    className="modern-editable-input w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#002060] transition-colors"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 mb-1">Lote Senozoide</label>
+                                                <input 
+                                                    type="text"
+                                                    value={loteSenozoide} 
+                                                    onChange={(e) => setLoteSenozoide(e.target.value)}
+                                                    placeholder="Ex: Lote B"
+                                                    className="modern-editable-input w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#002060] transition-colors"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 mb-1">Lote Inferior</label>
+                                                <input 
+                                                    type="text"
+                                                    value={loteInferior} 
+                                                    onChange={(e) => setLoteInferior(e.target.value)}
+                                                    placeholder="Ex: Lote C"
+                                                    className="modern-editable-input w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#002060] transition-colors"
+                                                />
+                                            </div>
+                                        </>
+                                    )}
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 mb-1">Número da Ordem</label>
                                         <input 
@@ -196,16 +265,33 @@ const LabelGenerator: React.FC = () => {
                                 </div>
                                 
                                 {/* Row 2: Lotes */}
-                                <div className="flex flex-row border-b-4 border-black" style={{ height: '15cqh' }}>
-                                    <div className="flex flex-col justify-center items-center w-1/2 h-full border-r-4 border-black p-1">
-                                        <span className="block font-black text-black uppercase tracking-widest" style={{ fontSize: '3cqw' }}>LOTE LONGITUDINAL</span>
-                                        <span className="block font-black text-black leading-none whitespace-pre-wrap text-center" style={{ fontSize: '6cqw' }}>{loteLongitudinal || '-'}</span>
+                                {tipoLote === 'longitudinal_vertical' ? (
+                                    <div className="flex flex-row border-b-4 border-black" style={{ height: '15cqh' }}>
+                                        <div className="flex flex-col justify-center items-center w-1/2 h-full border-r-4 border-black p-1">
+                                            <span className="block font-black text-black uppercase tracking-widest" style={{ fontSize: '3cqw' }}>LOTE LONGITUDINAL</span>
+                                            <span className="block font-black text-black leading-none whitespace-pre-wrap text-center" style={{ fontSize: '6cqw' }}>{loteLongitudinal || '-'}</span>
+                                        </div>
+                                        <div className="flex flex-col justify-center items-center w-1/2 h-full p-1">
+                                            <span className="block font-black text-black uppercase tracking-widest" style={{ fontSize: '3cqw' }}>LOTE VERTICAL</span>
+                                            <span className="block font-black text-black leading-none whitespace-pre-wrap text-center" style={{ fontSize: '6cqw' }}>{loteVertical || '-'}</span>
+                                        </div>
                                     </div>
-                                    <div className="flex flex-col justify-center items-center w-1/2 h-full p-1">
-                                        <span className="block font-black text-black uppercase tracking-widest" style={{ fontSize: '3cqw' }}>LOTE TRANSVERSAL</span>
-                                        <span className="block font-black text-black leading-none whitespace-pre-wrap text-center" style={{ fontSize: '6cqw' }}>{loteTransversal || '-'}</span>
+                                ) : (
+                                    <div className="flex flex-row border-b-4 border-black" style={{ height: '15cqh' }}>
+                                        <div className="flex flex-col justify-center items-center w-1/3 h-full border-r-4 border-black p-1">
+                                            <span className="block font-black text-black uppercase tracking-widest text-center" style={{ fontSize: '2.5cqw' }}>LOTE SUPERIOR</span>
+                                            <span className="block font-black text-black leading-none whitespace-pre-wrap text-center" style={{ fontSize: '5cqw' }}>{loteSuperior || '-'}</span>
+                                        </div>
+                                        <div className="flex flex-col justify-center items-center w-1/3 h-full border-r-4 border-black p-1">
+                                            <span className="block font-black text-black uppercase tracking-widest text-center" style={{ fontSize: '2.5cqw' }}>LOTE SENOZOIDE</span>
+                                            <span className="block font-black text-black leading-none whitespace-pre-wrap text-center" style={{ fontSize: '5cqw' }}>{loteSenozoide || '-'}</span>
+                                        </div>
+                                        <div className="flex flex-col justify-center items-center w-1/3 h-full p-1">
+                                            <span className="block font-black text-black uppercase tracking-widest text-center" style={{ fontSize: '2.5cqw' }}>LOTE INFERIOR</span>
+                                            <span className="block font-black text-black leading-none whitespace-pre-wrap text-center" style={{ fontSize: '5cqw' }}>{loteInferior || '-'}</span>
+                                        </div>
                                     </div>
-                                </div>
+                                )}
 
                                 {/* Row 3: Ordem and Peso */}
                                 <div className="flex flex-row border-b-4 border-black" style={{ height: '15cqh' }}>
