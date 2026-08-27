@@ -1405,8 +1405,17 @@ const MachineControl: React.FC<MachineControlProps> = ({
             glow: 'shadow-[0_0_10px_rgba(100,116,139,0.4)]',
             pulse: 'from-slate-50',
             label: 'MÁQUINA DESLIGADA'
+        },
+        Ocioso: {
+            color: 'slate',
+            text: 'text-slate-600',
+            bg: 'bg-slate-300',
+            border: 'border-slate-300',
+            glow: 'shadow-none',
+            pulse: '',
+            label: 'AGUARDANDO OPERADOR'
         }
-    };
+    } as Record<string, any>;
 
     const statusStyle = statusConfig[currentMachineStatus];
 
