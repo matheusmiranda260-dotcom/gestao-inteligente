@@ -1074,7 +1074,10 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
                     });
 
                     // activeOrder derived from the already-filtered subset
-                    const activeOrder = machineOrders.find(o => o.status === 'in_progress');
+                    const activeOrders = machineOrders.filter(o => o.status === 'in_progress');
+                    const activeOrder = activeOrders.sort((a, b) => 
+                        new Date(b.creationDate).getTime() - new Date(a.creationDate).getTime()
+                    )[0];
 
                     return (
                         <MachineStatusView 

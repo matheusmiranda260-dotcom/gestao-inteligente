@@ -40,7 +40,6 @@ export function useAllRealtimeSubscriptions(setters: RealtimeSetters, enabled: b
 
     useEffect(() => {
         if (!enabled) {
-            // Limpar todas as subscriptions
             channelsRef.current.forEach(channel => {
                 supabase.removeChannel(channel);
             });
@@ -49,9 +48,7 @@ export function useAllRealtimeSubscriptions(setters: RealtimeSetters, enabled: b
         }
 
         console.log('[Realtime] Iniciando subscriptions...');
-        const channels: RealtimeChannel[] = [];
-
-        // Helper function para criar subscriptions
+        const mainChannel = supabase.channel(`db-changes-${Date.now()}`);
 
         const createSubscription = <T extends object>(
             tableName: string,
@@ -63,195 +60,146 @@ export function useAllRealtimeSubscriptions(setters: RealtimeSetters, enabled: b
                 onDelete?: (item: T, prev: T[]) => T[];
             }
         ) => {
-            const channel = supabase
-                .channel(`realtime-${tableName}-${Date.now()}`)
-                .on(
-                    'postgres_changes',
-                    {
-                        event: '*',
-                        schema: 'public',
-                        table: tableName,
-                    },
-                    (payload) => {
-                        console.log(`[Realtime] ${tableName} - ${payload.eventType}:`, payload);
-                        const idField = options?.idField || 'id';
+            mainChannel.on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: tableName,
+                },
+                (payload) => {
+                    console.log(`[Realtime] ${tableName} - ${payload.eventType}:`, payload);
+                    const idField = options?.idField || 'id';
 
-                        switch (payload.eventType) {
-                            case 'INSERT':
-                                if (payload.new) {
-                                    const newItem = mapToCamelCase(payload.new) as T;
-                                    setter(prev => {
-                                        // Prevent duplicates
-                                        if (prev.some((item: any) => item[idField] === (newItem as any)[idField])) {
-                                            return prev;
-                                        }
-                                        return options?.onInsert
-                                            ? options.onInsert(newItem, prev)
-                                            : [...prev, newItem];
-                                    });
-                                }
-                                break;
-                            case 'UPDATE':
-                                if (payload.new) {
-                                    const updatedItem = mapToCamelCase(payload.new) as T;
-                                    setter(prev =>
-                                        options?.onUpdate
-                                            ? options.onUpdate(updatedItem, prev)
-                                            : prev.map(item =>
-                                                (item as any)[idField] === (updatedItem as any)[idField]
-                                                    ? { ...item, ...updatedItem }
-                                                    : item
-                                            )
-                                    );
-                                }
-                                break;
-                            case 'DELETE':
-                                if (payload.old) {
-                                    const deletedItem = mapToCamelCase(payload.old) as T;
-                                    setter(prev =>
-                                        options?.onDelete
-                                            ? options.onDelete(deletedItem, prev)
-                                            : prev.filter(item =>
-                                                (item as any)[idField] !== (deletedItem as any)[idField]
-                                            )
-                                    );
-                                }
-                                break;
-                        }
+                    switch (payload.eventType) {
+                        case 'INSERT':
+                            if (payload.new) {
+                                const newItem = mapToCamelCase(payload.new) as T;
+                                setter(prev => {
+                                    if (prev.some((item: any) => item[idField] === (newItem as any)[idField])) {
+                                        return prev;
+                                    }
+                                    return options?.onInsert
+                                        ? options.onInsert(newItem, prev)
+                                        : [...prev, newItem];
+                                });
+                            }
+                            break;
+                        case 'UPDATE':
+                            if (payload.new) {
+                                const updatedItem = mapToCamelCase(payload.new) as T;
+                                setter(prev =>
+                                    options?.onUpdate
+                                        ? options.onUpdate(updatedItem, prev)
+                                        : prev.map(item =>
+                                            (item as any)[idField] === (updatedItem as any)[idField]
+                                                ? { ...item, ...updatedItem }
+                                                : item
+                                        )
+                                );
+                            }
+                            break;
+                        case 'DELETE':
+                            if (payload.old) {
+                                const deletedItem = mapToCamelCase(payload.old) as T;
+                                setter(prev =>
+                                    options?.onDelete
+                                        ? options.onDelete(deletedItem, prev)
+                                        : prev.filter(item =>
+                                            (item as any)[idField] !== (deletedItem as any)[idField]
+                                        )
+                                );
+                            }
+                            break;
                     }
-                )
-                .subscribe((status, err) => {
-                    console.log(`[Realtime] ${tableName} status:`, status);
-                    if (status === 'SUBSCRIBED') {
-                        console.log(`[Realtime] ✅ Conectado com sucesso a ${tableName}`);
-                    }
-                    if (status === 'CHANNEL_ERROR') {
-                        console.error(`[Realtime] ❌ Erro ao conectar em ${tableName}:`, err);
-                    }
-                    if (status === 'TIMED_OUT') {
-                        console.warn(`[Realtime] ⚠️ Tempo limite esgotado para ${tableName}`);
-                    }
-                });
-
-            channels.push(channel);
+                }
+            );
         };
 
         // Stock Items
         createSubscription<StockItem>('stock_items', setters.setStock);
-
         // Production Orders
         createSubscription<ProductionOrderData>('production_orders', setters.setProductionOrders);
-
         // Conferences
-        createSubscription<ConferenceData>('conferences', setters.setConferences, {
-            idField: 'conferenceNumber'
-        });
-
+        createSubscription<ConferenceData>('conferences', setters.setConferences, { idField: 'conferenceNumber' });
         // Finished Goods
         createSubscription<FinishedProductItem>('finished_goods', setters.setFinishedGoods, {
-            onInsert: (item, prev) => [...prev, item].sort((a, b) =>
-                new Date(b.productionDate).getTime() - new Date(a.productionDate).getTime()
-            )
+            onInsert: (item, prev) => [...prev, item].sort((a, b) => new Date(b.productionDate).getTime() - new Date(a.productionDate).getTime())
         });
-
         // Pontas Stock
         createSubscription<PontaItem>('pontas_stock', setters.setPontasStock, {
-            onInsert: (item, prev) => [...prev, item].sort((a, b) =>
-                new Date(b.productionDate).getTime() - new Date(a.productionDate).getTime()
-            )
+            onInsert: (item, prev) => [...prev, item].sort((a, b) => new Date(b.productionDate).getTime() - new Date(a.productionDate).getTime())
         });
-
-
-
         // Transfers
         createSubscription<TransferRecord>('transfers', setters.setTransfers);
-
         // Parts Requests
         createSubscription<PartsRequest>('parts_requests', setters.setPartsRequests);
-
         // Shift Reports
         createSubscription<ShiftReport>('shift_reports', setters.setShiftReports);
-
         // Finished Goods Transfers
         createSubscription<FinishedGoodsTransferRecord>('finished_goods_transfers', setters.setFinishedGoodsTransfers);
-
-
-
         // Sticky Notes
         createSubscription<StickyNote>('sticky_notes', setters.setStickyNotes);
-
         // Meetings
         createSubscription<Meeting>('meetings', setters.setMeetings, {
-            onInsert: (item, prev) => [item, ...prev].sort((a, b) =>
-                new Date(b.meetingDate).getTime() - new Date(a.meetingDate).getTime()
-            )
+            onInsert: (item, prev) => [item, ...prev].sort((a, b) => new Date(b.meetingDate).getTime() - new Date(a.meetingDate).getTime())
         });
-
         // Meeting Categories
         createSubscription<MeetingCategory>('meeting_categories', setters.setMeetingCategories);
-
-        // Downtime Configs - Realtime sync para atualizar operadores instantaneamente
+        // Downtime Configs
         createSubscription<DowntimeConfig>('downtime_configs', setters.setDowntimeConfigs);
-
-        // Users Realtime Subscription
+        
         if (setters.setUsers) {
             createSubscription<User>('app_users', setters.setUsers);
         }
-
-        // Access Logs Realtime Subscription
         if (setters.setAccessLogs) {
             createSubscription<UserAccessLog>('user_access_logs', setters.setAccessLogs);
         }
 
         // Production Records (Trefila e Treliça)
-        const productionRecordsChannel = supabase
-            .channel(`realtime-production_records-${Date.now()}`)
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'production_records',
-                },
-                (payload) => {
-                    console.log(`[Realtime] production_records - ${payload.eventType}:`, payload);
-                    const record = mapToCamelCase(payload.eventType === 'DELETE' ? payload.old : payload.new) as ProductionRecord;
+        mainChannel.on(
+            'postgres_changes',
+            {
+                event: '*',
+                schema: 'public',
+                table: 'production_records',
+            },
+            (payload) => {
+                console.log(`[Realtime] production_records - ${payload.eventType}:`, payload);
+                const record = mapToCamelCase(payload.eventType === 'DELETE' ? payload.old : payload.new) as ProductionRecord;
 
-                    if (record.machine === 'Trefila' || record.machine.startsWith('Desbobinadeira')) {
-                        switch (payload.eventType) {
-                            case 'INSERT':
-                                setters.setTrefilaProduction(prev => [...prev, record]);
-                                break;
-                            case 'UPDATE':
-                                setters.setTrefilaProduction(prev => prev.map(r => r.id === record.id ? record : r));
-                                break;
-                            case 'DELETE':
-                                setters.setTrefilaProduction(prev => prev.filter(r => r.id !== record.id));
-                                break;
-                        }
-                    } else {
-                        switch (payload.eventType) {
-                            case 'INSERT':
-                                setters.setTrelicaProduction(prev => [...prev, record]);
-                                break;
-                            case 'UPDATE':
-                                setters.setTrelicaProduction(prev => prev.map(r => r.id === record.id ? record : r));
-                                break;
-                            case 'DELETE':
-                                setters.setTrelicaProduction(prev => prev.filter(r => r.id !== record.id));
-                                break;
-                        }
+                if (record.machine === 'Trefila' || record.machine.startsWith('Desbobinadeira')) {
+                    switch (payload.eventType) {
+                        case 'INSERT': setters.setTrefilaProduction(prev => [...prev, record]); break;
+                        case 'UPDATE': setters.setTrefilaProduction(prev => prev.map(r => r.id === record.id ? record : r)); break;
+                        case 'DELETE': setters.setTrefilaProduction(prev => prev.filter(r => r.id !== record.id)); break;
+                    }
+                } else {
+                    switch (payload.eventType) {
+                        case 'INSERT': setters.setTrelicaProduction(prev => [...prev, record]); break;
+                        case 'UPDATE': setters.setTrelicaProduction(prev => prev.map(r => r.id === record.id ? record : r)); break;
+                        case 'DELETE': setters.setTrelicaProduction(prev => prev.filter(r => r.id !== record.id)); break;
                     }
                 }
-            )
-            .subscribe((status) => {
-                console.log(`[Realtime] production_records status:`, status);
-            });
+            }
+        );
 
-        channels.push(productionRecordsChannel);
-        channelsRef.current = channels;
+        mainChannel.subscribe((status, err) => {
+            console.log(`[Realtime] Main Channel status:`, status);
+            if (status === 'SUBSCRIBED') {
+                console.log(`[Realtime] ✅ Conectado com sucesso (Multiplexed)`);
+            }
+            if (status === 'CHANNEL_ERROR') {
+                console.error(`[Realtime] ❌ Erro ao conectar:`, err);
+            }
+            if (status === 'TIMED_OUT') {
+                console.warn(`[Realtime] ⚠️ Tempo limite esgotado`);
+            }
+        });
 
-        console.log(`[Realtime] ${channels.length} subscriptions ativas`);
+        channelsRef.current = [mainChannel];
+
+        console.log(`[Realtime] Subscriptions ativas no canal principal`);
 
         // Cleanup
         return () => {
