@@ -318,6 +318,7 @@ const StockControl: React.FC<{
     const [consumingItem, setConsumingItem] = useState<StockItem | null>(null);
     const [materialFilter, setMaterialFilter] = useState('');
     const [bitolaFilter, setBitolaFilter] = useState('');
+    const [steelTypeFilter, setSteelTypeFilter] = useState('');
     const [statusFilter, setStatusFilter] = useState<string[]>([]);
     const [isStatusOpen, setIsStatusOpen] = useState(false);
     const [isMobileStatusOpen, setIsMobileStatusOpen] = useState(false);
@@ -355,13 +356,13 @@ const StockControl: React.FC<{
         }
         
         const stockBitolas = stock
-            .filter(i => i.status !== 'Consumido' && (materialFilter === '' || i.materialType === materialFilter))
+            .filter(i => i.status !== 'Consumido' && (materialFilter === '' || i.materialType === materialFilter) && (steelTypeFilter === '' || i.steelType === steelTypeFilter))
             .map(i => i.bitola);
             
         return [...new Set([...options, ...stockBitolas])]
             .filter(Boolean)
             .sort((a, b) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')));
-    }, [gauges, stock, materialFilter]);
+    }, [gauges, stock, materialFilter, steelTypeFilter]);
 
     const filtered = useMemo(() => stock.filter(i => {
         const gauge = gauges.find(g => g.materialType === i.materialType && g.gauge === i.bitola);
@@ -377,11 +378,12 @@ const StockControl: React.FC<{
 
         const passesMaterial = materialFilter === '' || i.materialType === materialFilter;
         const passesBitola = bitolaFilter === '' || i.bitola === bitolaFilter;
+        const passesSteelType = steelTypeFilter === '' || i.steelType === steelTypeFilter;
         
         if (statusFilter.length > 0) {
-            return passesSearch && passesMaterial && passesBitola && statusFilter.includes(i.status);
+            return passesSearch && passesMaterial && passesBitola && passesSteelType && statusFilter.includes(i.status);
         } else {
-            return passesSearch && passesMaterial && passesBitola && i.status !== 'Consumido';
+            return passesSearch && passesMaterial && passesBitola && passesSteelType && i.status !== 'Consumido';
         }
     }).sort((a, b) => {
         const lotA = parseInt(a.internalLot.replace(/\D/g, '')) || 0;
@@ -396,7 +398,7 @@ const StockControl: React.FC<{
             if (lotA !== lotB) return lotB - lotA;
             return b.internalLot.localeCompare(a.internalLot);
         }
-    }), [stock, searchTerm, materialFilter, bitolaFilter, statusFilter, isPrinting]);
+    }), [stock, searchTerm, materialFilter, bitolaFilter, steelTypeFilter, statusFilter, isPrinting]);
 
     const handlePrint = () => {
         setIsPrinting(true);
@@ -459,6 +461,10 @@ const StockControl: React.FC<{
                 <div className="flex justify-between items-center bg-slate-50 p-4 rounded-lg border">
                     <div className="flex gap-8">
                         <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Filtro Aço</p>
+                            <p className="text-base font-black text-slate-800">{steelTypeFilter || 'Todos'}</p>
+                        </div>
+                        <div>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Filtro Material</p>
                             <p className="text-base font-black text-slate-800">{materialFilter || 'Todos'}</p>
                         </div>
@@ -509,6 +515,13 @@ const StockControl: React.FC<{
                 <div className="flex items-center gap-6">
                     <h1 className="text-3xl font-bold text-slate-800 shrink-0 no-print">Estoque</h1>
                     <div className="hidden md:flex items-center gap-4 no-print grow">
+                        <div className="bg-white p-2 rounded-xl shadow border flex items-center gap-2 px-4 shrink-0">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase">Aço</label>
+                            <select value={steelTypeFilter} onChange={e => setSteelTypeFilter(e.target.value)} className="bg-transparent outline-none font-bold text-sm min-w-[80px]">
+                                <option value="">Todos</option>
+                                {SteelTypeOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                        </div>
                         <div className="bg-white p-2 rounded-xl shadow border flex items-center gap-2 px-4 shrink-0">
                             <label className="text-[10px] font-bold text-slate-500 uppercase">Material</label>
                             <select value={materialFilter} onChange={e => setMaterialFilter(e.target.value)} className="bg-transparent outline-none font-bold text-sm min-w-[120px]">
@@ -587,6 +600,13 @@ const StockControl: React.FC<{
                 </div>
             </header>
             <div className="md:hidden flex flex-wrap gap-2 no-print p-2">
+                <div className="bg-white p-2 rounded-lg shadow border flex items-center gap-2 px-4 shadow-sm">
+                    <label className="text-[10px] font-bold text-slate-500">Aço:</label>
+                    <select value={steelTypeFilter} onChange={e => setSteelTypeFilter(e.target.value)} className="bg-transparent outline-none font-bold text-xs">
+                        <option value="">Todos</option>
+                        {SteelTypeOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                </div>
                 <div className="bg-white p-2 rounded-lg shadow border flex items-center gap-2 px-4 shadow-sm">
                     <label className="text-[10px] font-bold text-slate-500">MP:</label>
                     <select value={materialFilter} onChange={e => setMaterialFilter(e.target.value)} className="bg-transparent outline-none font-bold text-xs">
