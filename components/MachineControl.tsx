@@ -1158,9 +1158,27 @@ const MachineControl: React.FC<MachineControlProps> = ({
     const [productionReportData, setProductionReportData] = useState<ProductionOrderData | null>(null);
 
     const activeOrder = useMemo(() => {
-        const active = productionOrders.filter(o => (o.machine === activeMachine || (activeMachine === 'Trefila 1' && o.machine === 'Trefila') || (activeMachine === 'Treliça 1' && o.machine === 'Treliça')) && o.status === 'in_progress');
+        const active = productionOrders.filter(o => {
+            const isExact = o.machine === activeMachine;
+            const isLegacyTrefilaTo1 = (o.machine === 'Trefila' && activeMachine === 'Trefila 1');
+            const isLegacyTrelicaTo1 = (o.machine === 'Treliça' && activeMachine === 'Treliça 1');
+            const isLegacyMalhaTo1 = (o.machine === 'Malha' && activeMachine === 'Malha 1');
+            return (isExact || isLegacyTrefilaTo1 || isLegacyTrelicaTo1 || isLegacyMalhaTo1) && o.status === 'in_progress';
+        });
         if (active.length === 0) return undefined;
-        return active.sort((a, b) => new Date(b.creationDate).getTime() - new Date(a.creationDate).getTime())[0];
+        return active.sort((a, b) => {
+            const timeA = new Date(a.startTime || 0).getTime();
+            const timeB = new Date(b.startTime || 0).getTime();
+            if (timeA !== timeB) {
+                return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+            }
+            const cA = new Date(a.creationDate || 0).getTime();
+            const cB = new Date(b.creationDate || 0).getTime();
+            if (cA !== cB) {
+                return (isNaN(cB) ? 0 : cB) - (isNaN(cA) ? 0 : cA);
+            }
+            return a.id.localeCompare(b.id);
+        })[0];
     }, [productionOrders, activeMachine]);
 
     // Update OS elapsed time every second when an OS is active

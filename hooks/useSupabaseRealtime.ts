@@ -50,6 +50,11 @@ export function useAllRealtimeSubscriptions(setters: RealtimeSetters, enabled: b
         console.log('[Realtime] Iniciando subscriptions...');
         const mainChannel = supabase.channel(`db-changes-${Date.now()}`);
 
+        const subscriptions = new Map<string, {
+            setter: React.Dispatch<React.SetStateAction<any>>,
+            options?: any
+        }>();
+
         const createSubscription = <T extends object>(
             tableName: string,
             setter: React.Dispatch<React.SetStateAction<T[]>>,
@@ -60,61 +65,55 @@ export function useAllRealtimeSubscriptions(setters: RealtimeSetters, enabled: b
                 onDelete?: (item: T, prev: T[]) => T[];
             }
         ) => {
-            mainChannel.on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: tableName,
-                },
-                (payload) => {
-                    console.log(`[Realtime] ${tableName} - ${payload.eventType}:`, payload);
+            subscriptions.set(tableName, { setter, options });
+        };
+
+        mainChannel.on(
+            'postgres_changes',
+            { event: '*', schema: 'public' },
+            (payload) => {
+                const sub = subscriptions.get(payload.table);
+                if (sub) {
+                    console.log(`[Realtime] ${payload.table} - ${payload.eventType}:`, payload);
+                    const { setter, options } = sub;
                     const idField = options?.idField || 'id';
 
                     switch (payload.eventType) {
                         case 'INSERT':
                             if (payload.new) {
-                                const newItem = mapToCamelCase(payload.new) as T;
-                                setter(prev => {
-                                    if (prev.some((item: any) => item[idField] === (newItem as any)[idField])) {
+                                const newItem = mapToCamelCase(payload.new);
+                                setter((prev: any[]) => {
+                                    if (prev.some(item => item[idField] === (newItem as any)[idField])) {
                                         return prev;
                                     }
-                                    return options?.onInsert
-                                        ? options.onInsert(newItem, prev)
-                                        : [...prev, newItem];
+                                    return options?.onInsert ? options.onInsert(newItem, prev) : [...prev, newItem];
                                 });
                             }
                             break;
                         case 'UPDATE':
                             if (payload.new) {
-                                const updatedItem = mapToCamelCase(payload.new) as T;
-                                setter(prev =>
+                                const updatedItem = mapToCamelCase(payload.new);
+                                setter((prev: any[]) =>
                                     options?.onUpdate
                                         ? options.onUpdate(updatedItem, prev)
-                                        : prev.map(item =>
-                                            (item as any)[idField] === (updatedItem as any)[idField]
-                                                ? { ...item, ...updatedItem }
-                                                : item
-                                        )
+                                        : prev.map(item => item[idField] === (updatedItem as any)[idField] ? { ...item, ...updatedItem } : item)
                                 );
                             }
                             break;
                         case 'DELETE':
                             if (payload.old) {
-                                const deletedItem = mapToCamelCase(payload.old) as T;
-                                setter(prev =>
+                                const deletedItem = mapToCamelCase(payload.old);
+                                setter((prev: any[]) =>
                                     options?.onDelete
                                         ? options.onDelete(deletedItem, prev)
-                                        : prev.filter(item =>
-                                            (item as any)[idField] !== (deletedItem as any)[idField]
-                                        )
+                                        : prev.filter(item => item[idField] !== (deletedItem as any)[idField])
                                 );
                             }
                             break;
                     }
                 }
-            );
-        };
+            }
+        );
 
         // Stock Items
         createSubscription<StockItem>('stock_items', setters.setStock);

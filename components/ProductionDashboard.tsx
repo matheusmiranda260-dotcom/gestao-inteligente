@@ -249,7 +249,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
 
     const thresholdMinutesForStyle = matchingConfigForStyle ? matchingConfigForStyle.thresholdMinutes : (DOWNTIME_THRESHOLDS[machineStatus.reason] || 15);
     const limitMsForStyle = thresholdMinutesForStyle * 60 * 1000;
-    const isOverLimitForStyle = machineStatus.durationMs > limitMsForStyle;
+    const isOverLimitForStyle = machineStatus.durationMs > limitMsForStyle && (machineStatus.status === 'Parada' || machineStatus.status === 'Preparacao');
 
     if (machineStatus.status === 'Parada' || machineStatus.status === 'Preparacao') {
         if (!isOverLimitForStyle && thresholdMinutesForStyle) {
@@ -294,7 +294,8 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     const lastResumeTime = useMemo(() => {
         if (!activeOrder) return 0;
         const resumes = (activeOrder.downtimeEvents || []).filter((e: any) => e.resumeTime).map((e: any) => new Date(e.resumeTime!).getTime());
-        return resumes.length ? Math.max(...resumes) : new Date(activeOrder.startTime).getTime();
+        const start = new Date(activeOrder.startTime || 0).getTime();
+        return resumes.length ? Math.max(...resumes) : (isNaN(start) ? 0 : start);
     }, [activeOrder]);
 
     const isCurrentlyProducing = machineStatus.status === 'Produzindo' || machineStatus.status === 'Preparacao';
@@ -398,7 +399,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
     const isStopped = machineStatus.status === 'Parada' || machineStatus.status === 'Preparacao';
     const isProducingLot = machineStatus.status === 'Produzindo' && (
         (machineType.startsWith('Trefila') && activeOrder?.activeLotProcessing) ||
-        (machineType.startsWith('Treliça'))
+        (machineType.startsWith('Treliça') || machineType.startsWith('Malha'))
     );
     const activeLotInfo = (isProducingLot && machineType.startsWith('Trefila')) ? stock.find(s => s.id === activeOrder?.activeLotProcessing?.lotId) : null;
 
@@ -501,7 +502,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none">
                                 • {machineType.startsWith('Trefila') 
                                     ? (activeOrder?.targetBitola || '---') 
-                                    : (activeOrder?.trelicaModel ? `${activeOrder.trelicaModel} ${activeOrder.tamanho ? `(${activeOrder.tamanho}m)` : ''}` : '---')
+                                    : (machineType.startsWith('Treliça') ? (activeOrder?.trelicaModel ? `${activeOrder.trelicaModel} ${activeOrder.tamanho ? `(${activeOrder.tamanho}m)` : ''}` : '---') : (activeOrder?.malhaModel || '---'))
                                 }
                             </span>
                             {trelicaDetails && (
@@ -541,7 +542,7 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                 <h3 className="text-4xl md:text-7xl font-black text-white text-center uppercase tracking-tighter drop-shadow-[0_10px_30px_rgba(0,0,0,0.5)] leading-tight px-4 break-words max-w-full italic">
                                     {machineType.startsWith('Trefila') 
                                         ? `${activeLotInfo?.internalLot || '---'} ${activeLotInfo?.initialQuantity ? `• ${activeLotInfo.initialQuantity} KG` : ''}` 
-                                        : `${activeOrder?.trelicaModel || '---'} ${activeOrder?.tamanho ? `(${activeOrder.tamanho}M)` : ''}`}
+                                        : (machineType.startsWith('Treliça') ? `${activeOrder?.trelicaModel || '---'} ${activeOrder?.tamanho ? `(${activeOrder.tamanho}M)` : ''}` : `${activeOrder?.malhaModel || '---'}`)}
                                 </h3>
                                 {trelicaDetails && (
                                     <div className="flex gap-6 mt-2 px-8 py-2 bg-black/40 border border-white/5 rounded-full backdrop-blur-md">
@@ -1075,9 +1076,19 @@ const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ setPage, prod
 
                     // activeOrder derived from the already-filtered subset
                     const activeOrders = machineOrders.filter(o => o.status === 'in_progress');
-                    const activeOrder = activeOrders.sort((a, b) => 
-                        new Date(b.creationDate).getTime() - new Date(a.creationDate).getTime()
-                    )[0];
+                    const activeOrder = activeOrders.sort((a, b) => {
+                        const timeA = new Date(a.startTime || 0).getTime();
+                        const timeB = new Date(b.startTime || 0).getTime();
+                        if (timeA !== timeB) {
+                            return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+                        }
+                        const cA = new Date(a.creationDate || 0).getTime();
+                        const cB = new Date(b.creationDate || 0).getTime();
+                        if (cA !== cB) {
+                            return (isNaN(cB) ? 0 : cB) - (isNaN(cA) ? 0 : cA);
+                        }
+                        return a.id.localeCompare(b.id);
+                    })[0];
 
                     return (
                         <MachineStatusView 

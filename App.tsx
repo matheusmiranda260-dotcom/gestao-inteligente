@@ -258,7 +258,7 @@ const App: React.FC = () => {
         setAccessLogs,
     }), []);
 
-    useAllRealtimeSubscriptions(realtimeSetters, !!currentUser);
+    useAllRealtimeSubscriptions(realtimeSetters, !!currentUser || page === 'productionDashboard' || page === 'pcpBoard');
 
     useEffect(() => {
         // Load stored user from localStorage if exists
