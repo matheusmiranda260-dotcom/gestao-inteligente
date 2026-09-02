@@ -1451,7 +1451,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
 
     useEffect(() => {
-        if (activeMachine.startsWith('Treliça') && activeOrder && !isMachineStopped && hasActiveShift && !showQuantityPrompt) {
+        if ((activeMachine.startsWith('Treliça') || activeMachine.startsWith('Malha')) && activeOrder && !isMachineStopped && hasActiveShift && !showQuantityPrompt) {
             const lastUpdate = activeOrder.lastQuantityUpdate || activeOrder.startTime;
             if (!lastUpdate) return;
 
@@ -1471,7 +1471,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
     }, [now, activeOrder, isMachineStopped, hasActiveShift, machineType, showQuantityPrompt, lastPromptShownAt]);
 
     useEffect(() => {
-        if (activeMachine.startsWith('Treliça') && activeOrder && hasActiveShift && !showQuantityPrompt) {
+        if ((activeMachine.startsWith('Treliça') || activeMachine.startsWith('Malha')) && activeOrder && hasActiveShift && !showQuantityPrompt) {
             const currentTime = now;
             const shiftEnd = new Date(currentTime);
             shiftEnd.setHours(17, 30, 0, 0);
@@ -1674,8 +1674,9 @@ const MachineControl: React.FC<MachineControlProps> = ({
         if (isEmergencyStopped || (!hasActiveShift && !isGestor)) return true;
         if (activeMachine.startsWith('Treliça')) return !allPackagesWeighed;
         if (activeMachine.startsWith('Trefila') || activeMachine.startsWith('Desbobinadeira')) return !allTrefilaLotsProcessed;
+        if (activeMachine.startsWith('Malha')) return false;
         return true;
-    }, [isEmergencyStopped, hasActiveShift, machineType, allPackagesWeighed, allTrefilaLotsProcessed]);
+    }, [isEmergencyStopped, hasActiveShift, machineType, allPackagesWeighed, allTrefilaLotsProcessed, activeMachine]);
 
     const handleStopMachine = (reason: string) => {
         if (!activeOrder) return;
@@ -1779,7 +1780,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
     }
 
     const proceedWithShiftEnd = (orderId: string) => {
-        if ((!activeMachine.startsWith('Treliça'))) {
+        if (!activeMachine.startsWith('Treliça') && !activeMachine.startsWith('Malha')) {
             if (endOperatorShift) {
                 const orderToEnd = productionOrders.find(o => o.id === orderId);
                 endOperatorShift(orderId, (orderToEnd?.actualProducedQuantity || 0));
