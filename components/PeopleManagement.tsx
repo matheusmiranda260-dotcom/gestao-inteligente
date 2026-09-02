@@ -3347,13 +3347,53 @@ const OrgChart: React.FC<{
                 <BlueLabelBox label="ADMINISTRAÇÃO" />
                 <button onClick={() => handleAddShift('adm')} className="no-print" style={{ marginTop: 8, marginBottom: 8, fontSize: 12, fontWeight: 'bold', color: '#16a34a', background: '#f0fdf4', border: '1px solid #16a34a', borderRadius: 4, padding: '4px 12px', cursor: 'pointer' }}>+ Novo Turno</button>
                 <VLine />
-                {Object.values(dynamicShifts).filter((s: any) => s.key.startsWith('adm')).map((s: any, idx, arr) => (
-                    <React.Fragment key={s.key}>
-                        {card(s, 'ADMINISTRAÇÃO')}
-                        {idx < arr.length - 1 && <VLine />}
-                    </React.Fragment>
-                ))}
-                <VLine />
+                {(() => {
+                    const admShifts = Object.values(dynamicShifts).filter((s: any) => s.key.startsWith('adm'));
+                    if (admShifts.length === 0) return <VLine />;
+
+                    return (
+                        <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', width: '100%' }}>
+                            {admShifts.length > 1 && (
+                                <div className="org-vline" style={{ position: 'absolute', left: '50%', top: 0, bottom: -24, width: 2, background: '#000', marginLeft: -1, zIndex: 0 }} />
+                            )}
+                            
+                            <div style={{ display: 'flex', gap: 48, alignItems: 'flex-start', justifyContent: 'center', zIndex: 1 }}>
+                                {admShifts.map((s: any, idx, arr) => {
+                                    let hlineStyle: any = { position: 'absolute', top: 0, height: 2, background: '#000' };
+                                    if (arr.length === 1) {
+                                        hlineStyle = { display: 'none' };
+                                    } else if (idx === 0) {
+                                        hlineStyle = { left: '50%', right: -24, ...hlineStyle };
+                                    } else if (idx === arr.length - 1) {
+                                        hlineStyle = { left: -24, right: '50%', ...hlineStyle };
+                                    } else {
+                                        hlineStyle = { left: -24, right: -24, ...hlineStyle };
+                                    }
+
+                                    return (
+                                        <div style={col} key={s.key}>
+                                            <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+                                                <div className="org-hline" style={hlineStyle} />
+                                                <div className="org-vline" style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
+                                            </div>
+                                            {card(s, 'ADMINISTRAÇÃO')}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    );
+                })()}
+
+                {(() => {
+                    const admShifts = Object.values(dynamicShifts).filter((s: any) => s.key.startsWith('adm'));
+                    if (admShifts.length > 1) {
+                        return <div style={{ height: 24 }} />;
+                    } else if (admShifts.length === 1) {
+                        return <VLine />;
+                    }
+                    return null;
+                })()}
                 <BlueLabelBox label="MÁQUINAS" />
                 <VLine />
 
