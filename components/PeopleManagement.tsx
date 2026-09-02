@@ -2855,24 +2855,31 @@ interface ShiftCardProps {
     onEditShiftTime: (key: string, cur: string) => void;
     onAddEmployee: (slotKey: string) => void;
     onUnassign: (slotKey: string) => void;
+    onAddSlot?: (shiftKey: string) => void;
+    onDeleteShift?: (shiftKey: string) => void;
 }
 const StaticShiftCard: React.FC<ShiftCardProps> = ({
-    shiftKey, defaultTime, slots, employees, shiftTimes, onEditShiftTime, onAddEmployee, onUnassign
+    shiftKey, defaultTime, slots, employees, shiftTimes, onEditShiftTime, onAddEmployee, onUnassign, onAddSlot, onDeleteShift
 }) => {
     const display = shiftTimes[shiftKey] || defaultTime;
     return (
         <div style={{ border: '1.5px solid #9ca3af', background: '#fff', minWidth: 220, maxWidth: 280 }}>
             <div
-                onClick={() => onEditShiftTime(shiftKey, display)}
-                title="Clique para editar horário"
                 style={{
                     background: '#f1f5f9', borderBottom: '1px solid #d1d5db', padding: '7px 12px',
                     textAlign: 'center', fontWeight: 900, fontSize: 13, textTransform: 'uppercase',
-                    color: '#1e293b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    color: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                 }}
             >
-                {display}
-                <PencilIcon className="no-print h-3.5 w-3.5 opacity-50" />
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer' }} onClick={() => onEditShiftTime(shiftKey, display)} title="Clique para editar horário">
+                    {display}
+                    <PencilIcon className="no-print h-3.5 w-3.5 opacity-50" />
+                </div>
+                {onDeleteShift && (
+                    <button onClick={(e) => { e.stopPropagation(); onDeleteShift(shiftKey); }} className="no-print" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 0 }} title="Excluir Turno">
+                        <TrashIcon className="h-4 w-4" />
+                    </button>
+                )}
             </div>
             <div style={{ padding: '10px 14px' }}>
                 {slots.map(slot => {
@@ -2914,20 +2921,30 @@ const StaticShiftCard: React.FC<ShiftCardProps> = ({
                         </div>
                     );
                 })}
+                {onAddSlot && (
+                    <div style={{ marginTop: 8, textAlign: 'center' }}>
+                        <button
+                            onClick={() => onAddSlot(shiftKey)}
+                            className="no-print"
+                            style={{ fontSize: 11, fontWeight: 'bold', color: '#0ea5e9', cursor: 'pointer', background: '#f0f9ff', border: '1px dashed #0ea5e9', borderRadius: 4, padding: '4px 8px', width: '100%' }}
+                        >
+                            + Adicionar Vaga
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );
 };
 
-// Static shift definitions — keys are stable, stored as orgPositionId in DB
-const SHIFTS = {
+// Static shift definitions fallback
+const DEFAULT_SHIFTS = {
     adm1:       { key: 'adm_t1',     def: 'TURNO 2:00 AS 11:34', slots: [{ key: 'adm_t1_enc', title: 'encarregado' }] },
     adm2:       { key: 'adm_t2',     def: 'TURNO 5:00 AS 14:44', slots: [{ key: 'adm_t2_ges', title: 'gestor qualidade' }] },
     tr1_t1:     { key: 'tr1_t1',     def: 'TURNO 7:45 AS 17:30', slots: [{ key: 'tr1_t1_op', title: 'operador' }, { key: 'tr1_t1_a1', title: 'Auxiliar' }, { key: 'tr1_t1_a2', title: 'Auxiliar' }] },
     tc1_t1:     { key: 'tc1_t1',     def: 'TURNO 5:00 AS 14:44', slots: [{ key: 'tc1_t1_op', title: 'operador' }, { key: 'tc1_t1_a1', title: 'Auxiliar' }] },
     tc1_t2:     { key: 'tc1_t2',     def: 'TURNO 2:00 AS 11:34', slots: [{ key: 'tc1_t2_op', title: 'operador' }, { key: 'tc1_t2_a1', title: 'Auxiliar' }] },
     tc2_t1:     { key: 'tc2_t1',     def: 'TURNO 5:00 AS 14:44', slots: [{ key: 'tc2_t1_op', title: 'operador' }, { key: 'tc2_t1_a1', title: 'Auxiliar' }] },
-    // tc2_t2:     { key: 'tc2_t2',     def: 'TURNO 2:00 AS 11:34', slots: [{ key: 'tc2_t2_op', title: 'operador' }, { key: 'tc2_t2_a1', title: 'Auxiliar' }] },
     malha_t1:   { key: 'malha_t1',   def: 'TURNO 7:45 AS 17:30', slots: [{ key: 'malha_t1_op', title: 'operador' }, { key: 'malha_t1_a1', title: 'Auxiliar' }, { key: 'malha_t1_a2', title: 'Auxiliar' }] },
 };
 
@@ -2945,15 +2962,53 @@ const OrgChart: React.FC<{
         try { const s = localStorage.getItem('orgShiftTimes'); return s ? JSON.parse(s) : {}; } catch { return {}; }
     });
 
+    const [dynamicShifts, setDynamicShifts] = useState<Record<string, any>>(() => {
+        try { const s = localStorage.getItem('orgDynamicShifts'); return s ? JSON.parse(s) : DEFAULT_SHIFTS; } catch { return DEFAULT_SHIFTS; }
+    });
+
+    const updateDynamicShifts = (newShifts: Record<string, any>) => {
+        setDynamicShifts(newShifts);
+        localStorage.setItem('orgDynamicShifts', JSON.stringify(newShifts));
+    };
+
+    const handleAddSlot = (shiftKey: string) => {
+        const title = prompt('Digite o cargo/função para a nova vaga (ex: Auxiliar):');
+        if (!title) return;
+        const newShifts = { ...dynamicShifts };
+        if (newShifts[shiftKey]) {
+            const newSlotKey = `${shiftKey}_s${Date.now()}`;
+            newShifts[shiftKey].slots.push({ key: newSlotKey, title });
+            updateDynamicShifts(newShifts);
+        }
+    };
+
+    const handleDeleteShift = (shiftKey: string) => {
+        if (!confirm('Tem certeza que deseja excluir este turno inteiro? Os colaboradores ficarão sem cargo no organograma.')) return;
+        const newShifts = { ...dynamicShifts };
+        delete newShifts[shiftKey];
+        updateDynamicShifts(newShifts);
+    };
+
+    const handleAddShift = (prefix: string) => {
+        const newKey = `${prefix}_${Date.now()}`;
+        const newShifts = { ...dynamicShifts };
+        newShifts[newKey] = {
+            key: newKey,
+            def: 'NOVO TURNO',
+            slots: []
+        };
+        updateDynamicShifts(newShifts);
+    };
+
     // Stats calculation
     const totalSlots = useMemo(() => {
-        return Object.values(SHIFTS).reduce((acc, s) => acc + s.slots.length, 0);
-    }, []);
+        return Object.values(dynamicShifts).reduce((acc: number, s: any) => acc + (s.slots ? s.slots.length : 0), 0);
+    }, [dynamicShifts]);
 
     const assignedCount = useMemo(() => {
-        const slotKeys = Object.values(SHIFTS).flatMap(s => s.slots.map(sl => sl.key));
+        const slotKeys = Object.values(dynamicShifts).flatMap((s: any) => s.slots?.map((sl: any) => sl.key) || []);
         return employees.filter(e => e.orgPositionId && slotKeys.includes(e.orgPositionId)).length;
-    }, [employees]);
+    }, [employees, dynamicShifts]);
 
     const vacanciesCount = totalSlots - assignedCount;
 
@@ -3118,8 +3173,10 @@ const OrgChart: React.FC<{
             shiftKey={s.key} defaultTime={s.def} slots={s.slots}
             employees={employees} shiftTimes={shiftTimes}
             onEditShiftTime={handleEditShiftTime}
-            onAddEmployee={(slotKey) => handleAddEmployee(slotKey, s.slots.find(x => x.key === slotKey)?.title || '', sector)}
+            onAddEmployee={(slotKey) => handleAddEmployee(slotKey, s.slots.find((x: any) => x.key === slotKey)?.title || '', sector)}
             onUnassign={handleUnassign}
+            onAddSlot={handleAddSlot}
+            onDeleteShift={handleDeleteShift}
         />
     );
 
@@ -3288,10 +3345,14 @@ const OrgChart: React.FC<{
                 <BlueLabelBox label="SETOR LAMINAÇÃO" />
                 <VLine />
                 <BlueLabelBox label="ADMINISTRAÇÃO" />
+                <button onClick={() => handleAddShift('adm')} className="no-print" style={{ marginTop: 8, marginBottom: 8, fontSize: 12, fontWeight: 'bold', color: '#16a34a', background: '#f0fdf4', border: '1px solid #16a34a', borderRadius: 4, padding: '4px 12px', cursor: 'pointer' }}>+ Novo Turno</button>
                 <VLine />
-                {card(SHIFTS.adm1, 'ADMINISTRAÇÃO')}
-                <VLine />
-                {card(SHIFTS.adm2, 'ADMINISTRAÇÃO')}
+                {Object.values(dynamicShifts).filter((s: any) => s.key.startsWith('adm')).map((s: any, idx, arr) => (
+                    <React.Fragment key={s.key}>
+                        {card(s, 'ADMINISTRAÇÃO')}
+                        {idx < arr.length - 1 && <VLine />}
+                    </React.Fragment>
+                ))}
                 <VLine />
                 <BlueLabelBox label="MÁQUINAS" />
                 <VLine />
@@ -3305,8 +3366,14 @@ const OrgChart: React.FC<{
                                 <div className="org-vline" style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
                             </div>
                             <BlueLabelBox label="TREFILA 1" />
+                            <button onClick={() => handleAddShift('tr1')} className="no-print" style={{ marginTop: 8, marginBottom: 8, fontSize: 10, fontWeight: 'bold', color: '#16a34a', background: '#f0fdf4', border: '1px solid #16a34a', borderRadius: 4, padding: '2px 8px', cursor: 'pointer' }}>+ Novo Turno</button>
                             <VLine />
-                            {card(SHIFTS.tr1_t1, 'TREFILA 1')}
+                            {Object.values(dynamicShifts).filter((s: any) => s.key.startsWith('tr1')).map((s: any, idx, arr) => (
+                                <React.Fragment key={s.key}>
+                                    {card(s, 'TREFILA 1')}
+                                    {idx < arr.length - 1 && <VLine />}
+                                </React.Fragment>
+                            ))}
                         </div>
 
                         <div style={col}>
@@ -3315,10 +3382,14 @@ const OrgChart: React.FC<{
                                 <div className="org-vline" style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
                             </div>
                             <BlueLabelBox label="TRELIÇA 1" />
+                            <button onClick={() => handleAddShift('tc1')} className="no-print" style={{ marginTop: 8, marginBottom: 8, fontSize: 10, fontWeight: 'bold', color: '#16a34a', background: '#f0fdf4', border: '1px solid #16a34a', borderRadius: 4, padding: '2px 8px', cursor: 'pointer' }}>+ Novo Turno</button>
                             <VLine />
-                            {card(SHIFTS.tc1_t1, 'TRELIÇA 1')}
-                            <VLine />
-                            {card(SHIFTS.tc1_t2, 'TRELIÇA 1')}
+                            {Object.values(dynamicShifts).filter((s: any) => s.key.startsWith('tc1')).map((s: any, idx, arr) => (
+                                <React.Fragment key={s.key}>
+                                    {card(s, 'TRELIÇA 1')}
+                                    {idx < arr.length - 1 && <VLine />}
+                                </React.Fragment>
+                            ))}
                         </div>
 
                         {/* TRELIÇA 2 — middle column: line extends 24px on both sides */}
@@ -3328,8 +3399,14 @@ const OrgChart: React.FC<{
                                 <div className="org-vline" style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
                             </div>
                             <BlueLabelBox label="TRELIÇA 2" />
+                            <button onClick={() => handleAddShift('tc2')} className="no-print" style={{ marginTop: 8, marginBottom: 8, fontSize: 10, fontWeight: 'bold', color: '#16a34a', background: '#f0fdf4', border: '1px solid #16a34a', borderRadius: 4, padding: '2px 8px', cursor: 'pointer' }}>+ Novo Turno</button>
                             <VLine />
-                            {card(SHIFTS.tc2_t1, 'TRELIÇA 2')}
+                            {Object.values(dynamicShifts).filter((s: any) => s.key.startsWith('tc2')).map((s: any, idx, arr) => (
+                                <React.Fragment key={s.key}>
+                                    {card(s, 'TRELIÇA 2')}
+                                    {idx < arr.length - 1 && <VLine />}
+                                </React.Fragment>
+                            ))}
                         </div>
 
                         {/* MALHA — last column: line extends left into gap */}
@@ -3340,8 +3417,14 @@ const OrgChart: React.FC<{
                                 <div className="org-vline" style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
                             </div>
                             <BlueLabelBox label="MALHA" />
+                            <button onClick={() => handleAddShift('malha')} className="no-print" style={{ marginTop: 8, marginBottom: 8, fontSize: 10, fontWeight: 'bold', color: '#16a34a', background: '#f0fdf4', border: '1px solid #16a34a', borderRadius: 4, padding: '2px 8px', cursor: 'pointer' }}>+ Novo Turno</button>
                             <VLine />
-                            {card(SHIFTS.malha_t1, 'MALHA')}
+                            {Object.values(dynamicShifts).filter((s: any) => s.key.startsWith('malha')).map((s: any, idx, arr) => (
+                                <React.Fragment key={s.key}>
+                                    {card(s, 'MALHA')}
+                                    {idx < arr.length - 1 && <VLine />}
+                                </React.Fragment>
+                            ))}
                         </div>
 
                     </div>
