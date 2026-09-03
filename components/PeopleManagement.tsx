@@ -2854,17 +2854,29 @@ const BlueLabelBox: React.FC<{ label: string }> = ({ label }) => {
     };
 
     return (
-        <input 
-            value={currentText}
-            onChange={e => setCurrentText(e.target.value)}
-            onBlur={handleBlur}
-            style={{
-                background: '#4F81BD', border: '2px solid #2F5496', color: '#fff',
-                fontWeight: 900, fontSize: 14, letterSpacing: 2, textTransform: 'uppercase',
-                padding: '10px 36px', textAlign: 'center', minWidth: 200,
-                outline: 'none', cursor: 'text'
-            }}
-        />
+        <div style={{ display: 'inline-grid', alignItems: 'center', justifyItems: 'center' }}>
+            <span style={{ 
+                visibility: 'hidden', 
+                gridArea: '1 / 1', 
+                fontWeight: 900, fontSize: 14, letterSpacing: 2, textTransform: 'uppercase', 
+                padding: '10px 36px', whiteSpace: 'nowrap', minWidth: 200
+            }}>
+                {currentText || label}
+            </span>
+            <input 
+                value={currentText}
+                onChange={e => setCurrentText(e.target.value)}
+                onBlur={handleBlur}
+                style={{
+                    gridArea: '1 / 1',
+                    width: '100%',
+                    background: '#4F81BD', border: '2px solid #2F5496', color: '#fff',
+                    fontWeight: 900, fontSize: 14, letterSpacing: 2, textTransform: 'uppercase',
+                    padding: '10px 36px', textAlign: 'center', minWidth: 200, boxSizing: 'border-box',
+                    outline: 'none', cursor: 'text'
+                }}
+            />
+        </div>
     );
 };
 
