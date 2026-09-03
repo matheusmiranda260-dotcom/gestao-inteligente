@@ -2986,7 +2986,10 @@ const OrgChart: React.FC<{
         const newShifts = { ...dynamicShifts };
         if (newShifts[shiftKey]) {
             const newSlotKey = `${shiftKey}_s${Date.now()}`;
-            newShifts[shiftKey].slots.push({ key: newSlotKey, title });
+            newShifts[shiftKey] = {
+                ...newShifts[shiftKey],
+                slots: [...(newShifts[shiftKey].slots || []), { key: newSlotKey, title }]
+            };
             updateDynamicShifts(newShifts);
         }
     };
@@ -3002,7 +3005,10 @@ const OrgChart: React.FC<{
         if (!confirm('Tem certeza que deseja excluir esta vaga?')) return;
         const newShifts = { ...dynamicShifts };
         if (newShifts[shiftKey]) {
-            newShifts[shiftKey].slots = newShifts[shiftKey].slots.filter((s: any) => s.key !== slotKey);
+            newShifts[shiftKey] = {
+                ...newShifts[shiftKey],
+                slots: (newShifts[shiftKey].slots || []).filter((s: any) => s.key !== slotKey)
+            };
             updateDynamicShifts(newShifts);
         }
     };
