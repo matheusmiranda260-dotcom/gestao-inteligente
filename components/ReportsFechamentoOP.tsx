@@ -934,7 +934,7 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
                                         )}
                                         
                                         {/* Lote autocomplete */}
-                                        <td className="border-r border-slate-300 p-1 align-top">
+                                        <td className="border-r border-slate-300 p-1 align-middle">
                                             <div className="relative w-full">
                                                 <input 
                                                     type="text" 
@@ -944,7 +944,7 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
                                                         setFilterText(row.lote);
                                                         setActiveSuggestionRowId(row.id);
                                                     }}
-                                                    className="op-editable-input text-center w-full font-black text-[13px] uppercase text-[#002060]" 
+                                                    className="op-editable-input text-center w-full font-black text-[16px] uppercase text-[#002060]" 
                                                     placeholder="Lote..." 
                                                 />
                                                 {/* Popover suggestions */}
@@ -966,12 +966,12 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
                                         </td>
 
                                         {/* Peso Etiqueta */}
-                                        <td className="border-r border-slate-300 p-1 bg-slate-50/40">
+                                        <td className="border-r border-slate-300 p-1 bg-slate-50/40 align-middle">
                                             <input 
                                                 type="number" 
                                                 value={row.pesoEtiqueta} 
                                                 onChange={e => updateRowField(row.id, 'pesoEtiqueta', e.target.value === '' ? '' : Number(e.target.value))} 
-                                                className="op-editable-input text-center w-full font-black text-[13px] text-[#002060]" 
+                                                className="op-editable-input text-center w-full font-black text-[16px] text-[#002060]" 
                                                 placeholder="0" 
                                             />
                                         </td>
