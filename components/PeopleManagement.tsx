@@ -3381,137 +3381,112 @@ const OrgChart: React.FC<{
                 {(() => {
                     const admShifts = Object.values(dynamicShifts).filter((s: any) => s.key.startsWith('adm'));
                     if (admShifts.length === 0) return <VLine />;
-                    if (admShifts.length === 1) {
-                        return (
-                            <>
-                                {card(admShifts[0], 'ADMINISTRAÇÃO')}
-                                <VLine />
-                            </>
-                        );
-                    }
-
-                    const leftShifts = admShifts.filter((_, i) => i % 2 === 0);
-                    const rightShifts = admShifts.filter((_, i) => i % 2 !== 0);
 
                     return (
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-                            <div style={{ display: 'flex', width: '100%', gap: 48, alignItems: 'stretch', justifyContent: 'center' }}>
-                                
-                                {/* Left Branch (Produção -> Máquinas) */}
-                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                    <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-                                        <div className="org-hline" style={{ position: 'absolute', top: 0, left: '50%', right: -24, height: 2, background: '#000' }} />
-                                        <div className="org-vline" style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
-                                    </div>
-                                    {leftShifts.map((s: any, idx: number) => (
-                                        <React.Fragment key={s.key}>
-                                            {card(s, 'ADMINISTRAÇÃO')}
-                                            {idx < leftShifts.length - 1 && <VLine />}
-                                        </React.Fragment>
-                                    ))}
-                                    {/* Line down and right to center */}
-                                    <div style={{ flexGrow: 1, width: 2, background: '#000' }} />
-                                    <div style={{ width: 2, height: 24, background: '#000' }} />
-                                    <div style={{ position: 'relative', width: '100%' }}>
-                                        <div className="org-hline" style={{ position: 'absolute', top: 0, left: '50%', right: -24, height: 2, background: '#000' }} />
-                                    </div>
-                                </div>
+                        <div style={{ display: 'flex', width: '100%', gap: 24, alignItems: 'flex-start', justifyContent: 'center' }}>
+                            {admShifts.map((s: any, idx, arr) => {
+                                let hlineStyle: any = { position: 'absolute', top: 0, height: 2, background: '#000' };
+                                if (arr.length === 1) {
+                                    hlineStyle = { display: 'none' };
+                                } else if (idx === 0) {
+                                    hlineStyle = { left: '50%', right: -12, ...hlineStyle };
+                                } else if (idx === arr.length - 1) {
+                                    hlineStyle = { left: -12, right: '50%', ...hlineStyle };
+                                } else {
+                                    hlineStyle = { left: -12, right: -12, ...hlineStyle };
+                                }
 
-                                {/* Right Branch (Qualidade) */}
-                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                    <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-                                        <div className="org-hline" style={{ position: 'absolute', top: 0, left: -24, right: '50%', height: 2, background: '#000' }} />
-                                        <div className="org-vline" style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
-                                    </div>
-                                    {rightShifts.map((s: any, idx: number) => (
-                                        <React.Fragment key={s.key}>
-                                            {card(s, 'ADMINISTRAÇÃO')}
-                                            {idx < rightShifts.length - 1 && <VLine />}
-                                        </React.Fragment>
-                                    ))}
-                                </div>
+                                return (
+                                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }} key={s.key}>
+                                        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+                                            <div className="org-hline" style={hlineStyle} />
+                                            <div className="org-vline" style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
+                                        </div>
+                                        {card(s, 'ADMINISTRAÇÃO')}
+                                        
+                                        {idx === 0 && (
+                                            <>
+                                                <div style={{ width: 2, height: 24, background: '#000' }} />
+                                                <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', justifyContent: 'center' }}>
+                                                    <div style={col}>
+                                                        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+                                                            <div className="org-hline" style={{ position: 'absolute', top: 0, left: '50%', right: -12, height: 2, background: '#000' }} />
+                                                            <div className="org-vline" style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
+                                                        </div>
+                                                        <BlueLabelBox label="TREFILA 1" />
+                                                        <button onClick={() => handleAddShift('tr1')} className="no-print" style={{ marginTop: 8, marginBottom: 8, fontSize: 10, fontWeight: 'bold', color: '#16a34a', background: '#f0fdf4', border: '1px solid #16a34a', borderRadius: 4, padding: '2px 8px', cursor: 'pointer' }}>+ Novo Turno</button>
+                                                        <VLine />
+                                                        {Object.values(dynamicShifts).filter((ms: any) => ms.key.startsWith('tr1')).map((ms: any, midx, marr) => (
+                                                            <React.Fragment key={ms.key}>
+                                                                {card(ms, 'TREFILA 1')}
+                                                                {midx < marr.length - 1 && <VLine />}
+                                                            </React.Fragment>
+                                                        ))}
+                                                    </div>
+                                                    
+                                                    <div style={col}>
+                                                        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+                                                            <div className="org-hline" style={{ position: 'absolute', top: 0, left: -12, right: '50%', height: 2, background: '#000' }} />
+                                                            <div className="org-vline" style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
+                                                        </div>
+                                                        <BlueLabelBox label="MALHA" />
+                                                        <button onClick={() => handleAddShift('malha')} className="no-print" style={{ marginTop: 8, marginBottom: 8, fontSize: 10, fontWeight: 'bold', color: '#16a34a', background: '#f0fdf4', border: '1px solid #16a34a', borderRadius: 4, padding: '2px 8px', cursor: 'pointer' }}>+ Novo Turno</button>
+                                                        <VLine />
+                                                        {Object.values(dynamicShifts).filter((ms: any) => ms.key.startsWith('malha')).map((ms: any, midx, marr) => (
+                                                            <React.Fragment key={ms.key}>
+                                                                {card(ms, 'MALHA')}
+                                                                {midx < marr.length - 1 && <VLine />}
+                                                            </React.Fragment>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )}
 
-                            </div>
-                            {/* Center vertical line dropping from the horizontal L-shape into MÁQUINAS */}
-                            <div style={{ width: 2, height: 24, background: '#000' }} />
+                                        {idx === 1 && (
+                                            <>
+                                                <div style={{ width: 2, height: 24, background: '#000' }} />
+                                                <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', justifyContent: 'center' }}>
+                                                    <div style={col}>
+                                                        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+                                                            <div className="org-hline" style={{ position: 'absolute', top: 0, left: '50%', right: -12, height: 2, background: '#000' }} />
+                                                            <div className="org-vline" style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
+                                                        </div>
+                                                        <BlueLabelBox label="TRELIÇA 1" />
+                                                        <button onClick={() => handleAddShift('tc1')} className="no-print" style={{ marginTop: 8, marginBottom: 8, fontSize: 10, fontWeight: 'bold', color: '#16a34a', background: '#f0fdf4', border: '1px solid #16a34a', borderRadius: 4, padding: '2px 8px', cursor: 'pointer' }}>+ Novo Turno</button>
+                                                        <VLine />
+                                                        {Object.values(dynamicShifts).filter((ms: any) => ms.key.startsWith('tc1')).map((ms: any, midx, marr) => (
+                                                            <React.Fragment key={ms.key}>
+                                                                {card(ms, 'TRELIÇA 1')}
+                                                                {midx < marr.length - 1 && <VLine />}
+                                                            </React.Fragment>
+                                                        ))}
+                                                    </div>
+                                                    
+                                                    <div style={col}>
+                                                        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+                                                            <div className="org-hline" style={{ position: 'absolute', top: 0, left: -12, right: '50%', height: 2, background: '#000' }} />
+                                                            <div className="org-vline" style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
+                                                        </div>
+                                                        <BlueLabelBox label="TRELIÇA 2" />
+                                                        <button onClick={() => handleAddShift('tc2')} className="no-print" style={{ marginTop: 8, marginBottom: 8, fontSize: 10, fontWeight: 'bold', color: '#16a34a', background: '#f0fdf4', border: '1px solid #16a34a', borderRadius: 4, padding: '2px 8px', cursor: 'pointer' }}>+ Novo Turno</button>
+                                                        <VLine />
+                                                        {Object.values(dynamicShifts).filter((ms: any) => ms.key.startsWith('tc2')).map((ms: any, midx, marr) => (
+                                                            <React.Fragment key={ms.key}>
+                                                                {card(ms, 'TRELIÇA 2')}
+                                                                {midx < marr.length - 1 && <VLine />}
+                                                            </React.Fragment>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
                     );
                 })()}
-                <BlueLabelBox label="MÁQUINAS" />
-                <VLine />
-
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', gap: 48, alignItems: 'flex-start' }}>
-
-                        <div style={col}>
-                            <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-                                <div className="org-hline" style={{ position: 'absolute', top: 0, left: '50%', right: -24, height: 2, background: '#000' }} />
-                                <div className="org-vline" style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
-                            </div>
-                            <BlueLabelBox label="TREFILA 1" />
-                            <button onClick={() => handleAddShift('tr1')} className="no-print" style={{ marginTop: 8, marginBottom: 8, fontSize: 10, fontWeight: 'bold', color: '#16a34a', background: '#f0fdf4', border: '1px solid #16a34a', borderRadius: 4, padding: '2px 8px', cursor: 'pointer' }}>+ Novo Turno</button>
-                            <VLine />
-                            {Object.values(dynamicShifts).filter((s: any) => s.key.startsWith('tr1')).map((s: any, idx, arr) => (
-                                <React.Fragment key={s.key}>
-                                    {card(s, 'TREFILA 1')}
-                                    {idx < arr.length - 1 && <VLine />}
-                                </React.Fragment>
-                            ))}
-                        </div>
-
-                        <div style={col}>
-                            <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-                                <div className="org-hline" style={{ position: 'absolute', top: 0, left: -24, right: -24, height: 2, background: '#000' }} />
-                                <div className="org-vline" style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
-                            </div>
-                            <BlueLabelBox label="TRELIÇA 1" />
-                            <button onClick={() => handleAddShift('tc1')} className="no-print" style={{ marginTop: 8, marginBottom: 8, fontSize: 10, fontWeight: 'bold', color: '#16a34a', background: '#f0fdf4', border: '1px solid #16a34a', borderRadius: 4, padding: '2px 8px', cursor: 'pointer' }}>+ Novo Turno</button>
-                            <VLine />
-                            {Object.values(dynamicShifts).filter((s: any) => s.key.startsWith('tc1')).map((s: any, idx, arr) => (
-                                <React.Fragment key={s.key}>
-                                    {card(s, 'TRELIÇA 1')}
-                                    {idx < arr.length - 1 && <VLine />}
-                                </React.Fragment>
-                            ))}
-                        </div>
-
-                        {/* TRELIÇA 2 — middle column: line extends 24px on both sides */}
-                        <div style={col}>
-                            <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-                                <div className="org-hline" style={{ position: 'absolute', top: 0, left: -24, right: -24, height: 2, background: '#000' }} />
-                                <div className="org-vline" style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
-                            </div>
-                            <BlueLabelBox label="TRELIÇA 2" />
-                            <button onClick={() => handleAddShift('tc2')} className="no-print" style={{ marginTop: 8, marginBottom: 8, fontSize: 10, fontWeight: 'bold', color: '#16a34a', background: '#f0fdf4', border: '1px solid #16a34a', borderRadius: 4, padding: '2px 8px', cursor: 'pointer' }}>+ Novo Turno</button>
-                            <VLine />
-                            {Object.values(dynamicShifts).filter((s: any) => s.key.startsWith('tc2')).map((s: any, idx, arr) => (
-                                <React.Fragment key={s.key}>
-                                    {card(s, 'TRELIÇA 2')}
-                                    {idx < arr.length - 1 && <VLine />}
-                                </React.Fragment>
-                            ))}
-                        </div>
-
-                        {/* MALHA — last column: line extends left into gap */}
-                        <div style={col}>
-                            <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-                                {/* Horizontal: from left (extends 24px past column edge) → center */}
-                                <div className="org-hline" style={{ position: 'absolute', top: 0, left: -24, right: '50%', height: 2, background: '#000' }} />
-                                <div className="org-vline" style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
-                            </div>
-                            <BlueLabelBox label="MALHA" />
-                            <button onClick={() => handleAddShift('malha')} className="no-print" style={{ marginTop: 8, marginBottom: 8, fontSize: 10, fontWeight: 'bold', color: '#16a34a', background: '#f0fdf4', border: '1px solid #16a34a', borderRadius: 4, padding: '2px 8px', cursor: 'pointer' }}>+ Novo Turno</button>
-                            <VLine />
-                            {Object.values(dynamicShifts).filter((s: any) => s.key.startsWith('malha')).map((s: any, idx, arr) => (
-                                <React.Fragment key={s.key}>
-                                    {card(s, 'MALHA')}
-                                    {idx < arr.length - 1 && <VLine />}
-                                </React.Fragment>
-                            ))}
-                        </div>
-
-                    </div>
-                </div>
 
             {/* Employee Selection Overlay */}
             {selectingFor && (
