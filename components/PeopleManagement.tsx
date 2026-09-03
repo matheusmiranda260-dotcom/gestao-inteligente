@@ -2838,15 +2838,37 @@ const VLine: React.FC<{ height?: number }> = ({ height = 32 }) => (
     <div className="org-vline" style={{ width: 2, height: height || 32, background: '#000', margin: '0 auto' }} />
 );
 
-const BlueLabelBox: React.FC<{ label: string }> = ({ label }) => (
-    <div style={{
-        background: '#4F81BD', border: '2px solid #2F5496', color: '#fff',
-        fontWeight: 900, fontSize: 14, letterSpacing: 2, textTransform: 'uppercase',
-        padding: '10px 36px', textAlign: 'center', minWidth: 200, whiteSpace: 'nowrap',
-    }}>
-        {label}
-    </div>
-);
+const BlueLabelBox: React.FC<{ label: string }> = ({ label }) => {
+    const [currentText, setCurrentText] = React.useState(label);
+    
+    React.useEffect(() => {
+        const stored = localStorage.getItem('gestao_label_' + label);
+        if (stored) setCurrentText(stored);
+    }, [label]);
+
+    const handleBlur = (e: React.FocusEvent<HTMLDivElement>) => {
+        const newVal = (e.currentTarget.textContent || '').trim();
+        const finalVal = newVal || label; // Revert to default if empty
+        setCurrentText(finalVal);
+        localStorage.setItem('gestao_label_' + label, finalVal);
+    };
+
+    return (
+        <div 
+            contentEditable 
+            suppressContentEditableWarning
+            onBlur={handleBlur}
+            style={{
+                background: '#4F81BD', border: '2px solid #2F5496', color: '#fff',
+                fontWeight: 900, fontSize: 14, letterSpacing: 2, textTransform: 'uppercase',
+                padding: '10px 36px', textAlign: 'center', minWidth: 200, whiteSpace: 'nowrap',
+                outline: 'none', cursor: 'text'
+            }}
+        >
+            {currentText}
+        </div>
+    );
+};
 
 interface SlotDef { key: string; title: string; }
 interface ShiftCardProps {
