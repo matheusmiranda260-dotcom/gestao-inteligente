@@ -8,12 +8,18 @@ interface ReportsFechamentoOPProps {
     setPage: (page: Page) => void;
 }
 
+interface SubLote {
+    id: string;
+    nome: string;
+    pesoSaida: number | '';
+}
+
 interface FechamentoOPRow {
     id: string;
     data: string;
     lote: string; // copex
     pesoEtiqueta: number | '';
-    pesoBalanca: number | '';
+    subLotes: SubLote[];
     bitola: string;
     isSeparator?: boolean;
 }
@@ -43,7 +49,7 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
         data: '',
         lote: '',
         pesoEtiqueta: '',
-        pesoBalanca: '',
+        subLotes: [{ id: Math.random().toString(36).substring(2, 9), nome: '', pesoSaida: '' }],
         bitola: ''
     });
 
@@ -130,8 +136,12 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
             if (typeof r.pesoEtiqueta === 'number') {
                 totalInput += r.pesoEtiqueta;
             }
-            if (typeof r.pesoBalanca === 'number') {
-                totalOutput += r.pesoBalanca;
+            if (r.subLotes) {
+                r.subLotes.forEach(sl => {
+                    if (typeof sl.pesoSaida === 'number') {
+                        totalOutput += sl.pesoSaida;
+                    }
+                });
             }
         });
 
@@ -204,6 +214,46 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
         setRows(prev => prev.map(r => r.id === rowId ? { ...r, [field]: value } : r));
     };
 
+    const addSubLote = (rowId: string) => {
+        setRows(prev => prev.map(r => {
+            if (r.id === rowId) {
+                let nextName = '';
+                if (r.lote) {
+                    nextName = `${r.lote}-${(r.subLotes?.length || 0) + 1}`;
+                }
+                return {
+                    ...r,
+                    subLotes: [...(r.subLotes || []), { id: Math.random().toString(36).substring(2, 9), nome: nextName, pesoSaida: '' }]
+                };
+            }
+            return r;
+        }));
+    };
+
+    const updateSubLote = (rowId: string, subLoteId: string, field: keyof SubLote, value: any) => {
+        setRows(prev => prev.map(r => {
+            if (r.id === rowId) {
+                return {
+                    ...r,
+                    subLotes: r.subLotes?.map(sl => sl.id === subLoteId ? { ...sl, [field]: value } : sl) || []
+                };
+            }
+            return r;
+        }));
+    };
+
+    const removeSubLote = (rowId: string, subLoteId: string) => {
+        setRows(prev => prev.map(r => {
+            if (r.id === rowId) {
+                return {
+                    ...r,
+                    subLotes: r.subLotes?.filter(sl => sl.id !== subLoteId) || []
+                };
+            }
+            return r;
+        }));
+    };
+
     const addRow = () => {
         setRows(prev => [...prev, createEmptyRow()]);
     };
@@ -214,7 +264,7 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
             data: '',
             lote: '',
             pesoEtiqueta: '',
-            pesoBalanca: '',
+            subLotes: [],
             bitola: '',
             isSeparator: true
         }]);
@@ -225,13 +275,13 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
     };
 
     const sortRows = () => {
-        // 1. Coleta os dados de todos os lotes preenchidos (lote, pesoEtiqueta, pesoBalanca, bitola)
+        // 1. Coleta os dados de todos os lotes preenchidos (lote, pesoEtiqueta, subLotes, bitola)
         const filledLotsData = rows
             .filter(r => !r.isSeparator && (r.lote || '').trim() !== '')
             .map(r => ({
                 lote: r.lote,
                 pesoEtiqueta: r.pesoEtiqueta,
-                pesoBalanca: r.pesoBalanca,
+                subLotes: r.subLotes,
                 bitola: r.bitola
             }));
 
@@ -263,7 +313,7 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
                     ...row,
                     lote: sortedData.lote,
                     pesoEtiqueta: sortedData.pesoEtiqueta,
-                    pesoBalanca: sortedData.pesoBalanca,
+                    subLotes: sortedData.subLotes,
                     bitola: sortedData.bitola
                 };
             }
@@ -325,7 +375,9 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
                     data: '22/05',
                     lote: item?.internalLot || String(sampleLotsLabels[idx]),
                     pesoEtiqueta: item?.labelWeight || item?.weight || sampleLabelWeights[idx],
-                    pesoBalanca: sampleScaleWeights[idx],
+                    subLotes: [
+                        { id: Math.random().toString(36).substring(2, 9), nome: `${item?.internalLot || sampleLotsLabels[idx]}-1`, pesoSaida: sampleScaleWeights[idx] }
+                    ],
                     bitola: item?.bitola || sampleGauges[idx]
                 };
             }
@@ -817,9 +869,14 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
                             <thead>
                                 <tr className="bg-[#002060] text-white text-[12px] font-black uppercase text-center border-b border-[#002060] tracking-wider leading-tight print-bg-light">
                                     <th className="border-r border-slate-300 py-2.5 align-middle text-center">Data</th>
-                                    <th className="border-r border-slate-300 py-2.5 align-middle text-center">Lote (copex)</th>
-                                    <th className="border-r border-slate-300 py-2.5 align-middle text-center">Peso Etiqueta (kg)</th>
-                                    <th className="border-r border-slate-300 py-2.5 align-middle text-center">Peso Balança (kg)</th>
+                                    <th className="border-r border-slate-300 py-2.5 align-middle text-center">Lote Principal (copex)</th>
+                                    <th className="border-r border-slate-300 py-2.5 align-middle text-center">Peso Entrada Total (kg)</th>
+                                    <th className="border-r border-slate-300 py-0 align-middle text-center p-0">
+                                        <div className="flex w-full h-full">
+                                            <div className="flex-1 py-2.5 border-r border-slate-300">Sub-Lote</div>
+                                            <div className="flex-1 py-2.5">Peso Saída Sub</div>
+                                        </div>
+                                    </th>
                                     <th className="py-2.5 align-middle text-center">Bitola</th>
                                 </tr>
                             </thead>
@@ -827,7 +884,7 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
                                 {rows.map((row, index) => {
                                     const dataRowSpan = getRowSpanForData(index);
                                     // Row is empty if no lote, peso or bitola filled
-                                const isEmptyRow = !row.isSeparator && !row.lote && row.pesoEtiqueta === '' && row.pesoBalanca === '' && !row.bitola;
+                                const isEmptyRow = !row.isSeparator && !row.lote && row.pesoEtiqueta === '' && (row.subLotes?.length === 0 || (!row.subLotes[0].nome && row.subLotes[0].pesoSaida === '')) && !row.bitola;
                                 return row.isSeparator ? (
                                         <tr key={row.id} className="print-separator-row bg-slate-200 border-y-2 border-[#002060]">
                                             <td colSpan={5} className="py-3 text-center text-[13px] font-black text-[#002060] uppercase tracking-widest relative group">
@@ -897,20 +954,48 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
                                             />
                                         </td>
 
-                                        {/* Peso Balança */}
-                                        <td className="border-r border-slate-300 p-1 relative">
-                                            <input 
-                                                type="number" 
-                                                value={row.pesoBalanca} 
-                                                onChange={e => updateRowField(row.id, 'pesoBalanca', e.target.value === '' ? '' : Number(e.target.value))} 
-                                                className="op-editable-input text-center w-full font-black text-[13px] text-[#002060]" 
-                                                placeholder="0" 
-                                            />
-                                            {Number(row.pesoEtiqueta) > 0 && Number(row.pesoBalanca) > 0 && Number(row.pesoEtiqueta) > Number(row.pesoBalanca) && (
-                                                <span className="no-print absolute right-1 top-1/2 -translate-y-1/2 text-[14px] font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 shadow-sm pointer-events-none z-10">
-                                                    {(((Number(row.pesoEtiqueta) - Number(row.pesoBalanca)) / Number(row.pesoEtiqueta)) * 100).toFixed(2).replace('.', ',')}%
-                                                </span>
-                                            )}
+                                        {/* Sub-lotes e Pesos */}
+                                        <td className="border-r border-slate-300 p-0 relative align-top">
+                                            <div className="flex flex-col h-full w-full">
+                                                {row.subLotes?.map((sl, slIndex) => (
+                                                    <div key={sl.id} className="flex border-b border-slate-300 last:border-b-0 w-full relative group/sl hover:bg-slate-100">
+                                                        <div className="flex-1 border-r border-slate-300 p-1 bg-white">
+                                                            <input 
+                                                                type="text" 
+                                                                value={sl.nome} 
+                                                                onChange={e => updateSubLote(row.id, sl.id, 'nome', e.target.value)} 
+                                                                className="op-editable-input text-center w-full font-black text-[12px] text-[#002060]" 
+                                                                placeholder="Lote-X" 
+                                                            />
+                                                        </div>
+                                                        <div className="flex-1 p-1 bg-white relative">
+                                                            <input 
+                                                                type="number" 
+                                                                value={sl.pesoSaida} 
+                                                                onChange={e => updateSubLote(row.id, sl.id, 'pesoSaida', e.target.value === '' ? '' : Number(e.target.value))} 
+                                                                className="op-editable-input text-center w-full font-black text-[12px] text-[#002060]" 
+                                                                placeholder="0" 
+                                                            />
+                                                            <button 
+                                                                onClick={() => removeSubLote(row.id, sl.id)} 
+                                                                className="absolute right-0.5 top-1/2 -translate-y-1/2 text-rose-500 hover:text-rose-700 font-bold no-print opacity-0 group-hover/sl:opacity-100 transition-opacity p-0.5 text-[10px]" 
+                                                                title="Remover sub-lote"
+                                                            >
+                                                                ✕
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                <div className="p-1 border-t border-[#002060] bg-slate-100 flex items-center justify-center no-print">
+                                                    <button onClick={() => addSubLote(row.id)} className="text-[10px] text-indigo-600 font-black hover:underline uppercase">+ Adicionar Sub-lote</button>
+                                                </div>
+                                                <div className="p-1 border-t border-[#002060] bg-slate-200 flex items-center justify-between font-black text-[12px] text-[#002060]">
+                                                    <span className="w-1/2 text-right pr-2">TOTAL:</span>
+                                                    <span className="w-1/2 text-center border-l border-[#002060]">
+                                                        {row.subLotes?.reduce((acc, curr) => acc + (typeof curr.pesoSaida === 'number' ? curr.pesoSaida : 0), 0)} kg
+                                                    </span>
+                                                </div>
+                                            </div>
                                         </td>
 
                                         {/* Bitola */}
