@@ -3162,6 +3162,7 @@ const OrgChart: React.FC<{
                 // Collect required IDs
                 const requiredIds: string[] = [];
                 Object.values(SHIFTS).forEach(s => s.slots.forEach(sl => requiredIds.push(sl.key)));
+                Object.values(dynamicShifts).forEach((s: any) => s.slots.forEach((sl: any) => requiredIds.push(sl.key)));
 
                 const missing = requiredIds.filter(id => !positions.find(p => p.id === id));
                 if (missing.length > 0) {
@@ -3180,7 +3181,7 @@ const OrgChart: React.FC<{
             } catch (err) {} finally { isSyncing = false; }
         };
         syncDB();
-    }, [positions.length, units.length]); // Only re-run if lengths change
+    }, [positions.length, units.length, dynamicShifts]); // Only re-run if lengths or dynamic shifts change
 
 
     const handleUnassign = async (slotKey: string) => {
