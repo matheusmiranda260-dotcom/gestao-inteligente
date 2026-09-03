@@ -3378,6 +3378,8 @@ const OrgChart: React.FC<{
                 <BlueLabelBox label="ADMINISTRAÇÃO" />
                 <button onClick={() => handleAddShift('adm')} className="no-print" style={{ marginTop: 8, marginBottom: 8, fontSize: 12, fontWeight: 'bold', color: '#16a34a', background: '#f0fdf4', border: '1px solid #16a34a', borderRadius: 4, padding: '4px 12px', cursor: 'pointer' }}>+ Novo Turno</button>
                 <VLine />
+                <BlueLabelBox label="MÁQUINAS" />
+                <VLine />
                 {(() => {
                     const admShifts = Object.values(dynamicShifts).filter((s: any) => s.key.startsWith('adm'));
                     if (admShifts.length === 0) return <VLine />;
