@@ -2846,27 +2846,25 @@ const BlueLabelBox: React.FC<{ label: string }> = ({ label }) => {
         if (stored) setCurrentText(stored);
     }, [label]);
 
-    const handleBlur = (e: React.FocusEvent<HTMLDivElement>) => {
-        const newVal = (e.currentTarget.textContent || '').trim();
+    const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+        const newVal = e.target.value.trim();
         const finalVal = newVal || label; // Revert to default if empty
         setCurrentText(finalVal);
         localStorage.setItem('gestao_label_' + label, finalVal);
     };
 
     return (
-        <div 
-            contentEditable 
-            suppressContentEditableWarning
+        <input 
+            value={currentText}
+            onChange={e => setCurrentText(e.target.value)}
             onBlur={handleBlur}
             style={{
                 background: '#4F81BD', border: '2px solid #2F5496', color: '#fff',
                 fontWeight: 900, fontSize: 14, letterSpacing: 2, textTransform: 'uppercase',
-                padding: '10px 36px', textAlign: 'center', minWidth: 200, whiteSpace: 'nowrap',
+                padding: '10px 36px', textAlign: 'center', minWidth: 200,
                 outline: 'none', cursor: 'text'
             }}
-        >
-            {currentText}
-        </div>
+        />
     );
 };
 
