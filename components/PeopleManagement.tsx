@@ -2984,11 +2984,13 @@ const OrgChart: React.FC<{
         const title = prompt('Digite o cargo/função para a nova vaga (ex: Auxiliar):');
         if (!title) return;
         const newShifts = { ...dynamicShifts };
-        if (newShifts[shiftKey]) {
+        const dictKey = Object.keys(newShifts).find(k => newShifts[k].key === shiftKey);
+        
+        if (dictKey && newShifts[dictKey]) {
             const newSlotKey = `${shiftKey}_s${Date.now()}`;
-            newShifts[shiftKey] = {
-                ...newShifts[shiftKey],
-                slots: [...(newShifts[shiftKey].slots || []), { key: newSlotKey, title }]
+            newShifts[dictKey] = {
+                ...newShifts[dictKey],
+                slots: [...(newShifts[dictKey].slots || []), { key: newSlotKey, title }]
             };
             updateDynamicShifts(newShifts);
         }
@@ -2997,17 +2999,21 @@ const OrgChart: React.FC<{
     const handleDeleteShift = (shiftKey: string) => {
         if (!confirm('Tem certeza que deseja excluir este turno inteiro? Os colaboradores ficarão sem cargo no organograma.')) return;
         const newShifts = { ...dynamicShifts };
-        delete newShifts[shiftKey];
-        updateDynamicShifts(newShifts);
+        const dictKey = Object.keys(newShifts).find(k => newShifts[k].key === shiftKey);
+        if (dictKey) {
+            delete newShifts[dictKey];
+            updateDynamicShifts(newShifts);
+        }
     };
 
     const handleDeleteSlot = (shiftKey: string, slotKey: string) => {
         if (!confirm('Tem certeza que deseja excluir esta vaga?')) return;
         const newShifts = { ...dynamicShifts };
-        if (newShifts[shiftKey]) {
-            newShifts[shiftKey] = {
-                ...newShifts[shiftKey],
-                slots: (newShifts[shiftKey].slots || []).filter((s: any) => s.key !== slotKey)
+        const dictKey = Object.keys(newShifts).find(k => newShifts[k].key === shiftKey);
+        if (dictKey && newShifts[dictKey]) {
+            newShifts[dictKey] = {
+                ...newShifts[dictKey],
+                slots: (newShifts[dictKey].slots || []).filter((s: any) => s.key !== slotKey)
             };
             updateDynamicShifts(newShifts);
         }
