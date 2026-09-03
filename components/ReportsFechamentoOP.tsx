@@ -80,15 +80,35 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
 
     // Autocomplete logic
     const suggestions = useMemo(() => {
-        if (!filterText.trim()) return [];
-        const lower = filterText.toLowerCase();
+        const lower = filterText ? filterText.toLowerCase().trim() : '';
         return stock
-            .filter(item => 
-                (item.internalLot && item.internalLot.toLowerCase().includes(lower)) || 
-                (item.supplierLot && item.supplierLot.toLowerCase().includes(lower))
-            )
-            .slice(0, 6);
-    }, [stock, filterText]);
+            .filter(item => {
+                // Filtra apenas os lotes disponíveis (ignora case e acentos)
+                const statusStr = item.status ? item.status.toLowerCase() : '';
+                const isDisponivel = statusStr.includes('disponível') || statusStr.includes('disponivel');
+                if (!isDisponivel) return false;
+
+                // Filtra pela bitola do fio de entrada selecionado (parse float para evitar bugs com "7" vs "7.00")
+                if (fioMaquinaEntrada) {
+                    const itemBitolaStr = String(item.bitola || '').replace(',', '.').replace(/[^\d.]/g, '');
+                    const fioStr = String(fioMaquinaEntrada || '').replace(',', '.').replace(/[^\d.]/g, '');
+                    const numItem = parseFloat(itemBitolaStr);
+                    const numFio = parseFloat(fioStr);
+
+                    if (isNaN(numItem) || numItem !== numFio) {
+                        return false;
+                    }
+                }
+
+                // Se não tiver digitado nada no filtro, já retorna true para mostrar a lista de opções!
+                if (!lower) return true;
+
+                // Verifica se o texto digitado bate com o nome do lote interno ou fornecedor
+                return (item.internalLot && item.internalLot.toLowerCase().includes(lower)) || 
+                       (item.supplierLot && item.supplierLot.toLowerCase().includes(lower));
+            })
+            .slice(0, 15); // Aumentado para 15 opções para facilitar a visualização sem digitar
+    }, [stock, filterText, fioMaquinaEntrada]);
 
     const handleLoteChange = (rowId: string, value: string) => {
         setRows(prev => prev.map(r => r.id === rowId ? { ...r, lote: value } : r));
@@ -914,33 +934,35 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
                                         )}
                                         
                                         {/* Lote autocomplete */}
-                                        <td className="border-r border-slate-300 p-1 relative">
-                                            <input 
-                                                type="text" 
-                                                value={row.lote} 
-                                                onChange={e => handleLoteChange(row.id, e.target.value)} 
-                                                onFocus={() => {
-                                                    setFilterText(row.lote);
-                                                    setActiveSuggestionRowId(row.id);
-                                                }}
-                                                className="op-editable-input text-center w-full font-black text-[13px] uppercase text-[#002060]" 
-                                                placeholder="Lote..." 
-                                            />
-                                            {/* Popover suggestions */}
-                                            {(activeSuggestionRowId === row.id && suggestions.length > 0) && (
-                                                <div ref={suggestionsRef} className="absolute left-0 right-0 top-full mt-1 bg-white border-2 border-[#002060] rounded shadow-xl z-50 text-left text-[8.5px] suggestions-dropdown max-h-[160px] overflow-y-auto font-sans">
-                                                    {suggestions.map(item => (
-                                                        <div 
-                                                            key={item.id}
-                                                            onClick={() => handleSelectSuggestion(row.id, item)}
-                                                            className="p-1.5 hover:bg-slate-100 cursor-pointer border-b border-slate-100 last:border-b-0"
-                                                        >
-                                                            <div className="font-bold text-[#002060]">{item.internalLot} {item.supplierLot ? `(${item.supplierLot})` : ''}</div>
-                                                            <div className="text-slate-500 font-medium">Forn: {item.supplier || '-'} | Peso: {item.labelWeight || item.weight || '-'} kg | Bitola: {item.bitola || '-'}</div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
+                                        <td className="border-r border-slate-300 p-1 align-top">
+                                            <div className="relative w-full">
+                                                <input 
+                                                    type="text" 
+                                                    value={row.lote} 
+                                                    onChange={e => handleLoteChange(row.id, e.target.value)} 
+                                                    onFocus={() => {
+                                                        setFilterText(row.lote);
+                                                        setActiveSuggestionRowId(row.id);
+                                                    }}
+                                                    className="op-editable-input text-center w-full font-black text-[13px] uppercase text-[#002060]" 
+                                                    placeholder="Lote..." 
+                                                />
+                                                {/* Popover suggestions */}
+                                                {(activeSuggestionRowId === row.id && suggestions.length > 0) && (
+                                                    <div ref={suggestionsRef} className="absolute left-0 right-0 top-full mt-1 bg-white border-2 border-[#002060] rounded shadow-xl z-50 text-left text-[8.5px] suggestions-dropdown max-h-[160px] overflow-y-auto font-sans">
+                                                        {suggestions.map(item => (
+                                                            <div 
+                                                                key={item.id}
+                                                                onClick={() => handleSelectSuggestion(row.id, item)}
+                                                                className="p-1.5 hover:bg-slate-100 cursor-pointer border-b border-slate-100 last:border-b-0"
+                                                            >
+                                                                <div className="font-bold text-[#002060]">{item.internalLot} {item.supplierLot ? `(${item.supplierLot})` : ''}</div>
+                                                                <div className="text-slate-500 font-medium">Forn: {item.supplier || '-'} | Peso: {item.labelWeight || item.weight || '-'} kg | Bitola: {item.bitola || '-'}</div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </td>
 
                                         {/* Peso Etiqueta */}
