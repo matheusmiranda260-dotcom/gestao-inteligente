@@ -3247,6 +3247,13 @@ const OrgChart: React.FC<{
 
     return (
         <div className="org-scroll-wrapper" style={{ overflow: 'auto', padding: '24px', background: '#f8fafc', minHeight: '600px' }}>
+            <style>
+                {`
+                    @media print {
+                        @page { size: A4 landscape !important; }
+                    }
+                `}
+            </style>
             
             {/* Local Toast System */}
             {toast && (
