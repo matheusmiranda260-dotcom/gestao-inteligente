@@ -3309,12 +3309,13 @@ const OrgChart: React.FC<{
                     box-shadow: none !important;
                     border: 2px solid #002060 !important;
                     border-radius: 8px !important;
-                    width: 1240px !important;
-                    max-width: 1240px !important;
+                    width: max-content !important;
+                    min-width: 1240px !important;
+                    max-width: max-content !important;
                 }
             `}} />
             
-            <div id="org-chart-sheet" className="max-w-[1240px] mx-auto bg-white border-2 border-[#002060] rounded-xl shadow-lg p-6 org-sheet-container relative">
+            <div id="org-chart-sheet" className="w-max min-w-[1240px] mx-auto bg-white border-2 border-[#002060] rounded-xl shadow-lg p-6 org-sheet-container relative">
                 
                 {/* CABEÇALHO PADRÃO ITA */}
                 <div className="grid grid-cols-12 border border-[#002060]">
