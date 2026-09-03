@@ -19,7 +19,8 @@ interface FechamentoOPRow {
     data: string;
     lote: string; // copex
     pesoEtiqueta: number | '';
-    subLotes: SubLote[];
+    pesoSaida?: number | ''; // Apenas usado no modo "simples"
+    subLotes: SubLote[];     // Apenas usado no modo "sublote"
     bitola: string;
     isSeparator?: boolean;
 }
@@ -42,6 +43,7 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
     const [responsavel, setResponsavel] = useState<string>('');
     const [fioMaquinaEntrada, setFioMaquinaEntrada] = useState<string>('');
     const [bitolaProduzir, setBitolaProduzir] = useState<string>('');
+    const [modoLancamento, setModoLancamento] = useState<'simples' | 'sublote'>('sublote');
 
     // Table Rows
     const createEmptyRow = (): FechamentoOPRow => ({
@@ -49,6 +51,7 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
         data: '',
         lote: '',
         pesoEtiqueta: '',
+        pesoSaida: '',
         subLotes: [{ id: Math.random().toString(36).substring(2, 9), nome: '', pesoSaida: '' }],
         bitola: ''
     });
@@ -156,12 +159,18 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
             if (typeof r.pesoEtiqueta === 'number') {
                 totalInput += r.pesoEtiqueta;
             }
-            if (r.subLotes) {
-                r.subLotes.forEach(sl => {
-                    if (typeof sl.pesoSaida === 'number') {
-                        totalOutput += sl.pesoSaida;
-                    }
-                });
+            if (modoLancamento === 'simples') {
+                if (typeof r.pesoSaida === 'number') {
+                    totalOutput += r.pesoSaida;
+                }
+            } else {
+                if (r.subLotes) {
+                    r.subLotes.forEach(sl => {
+                        if (typeof sl.pesoSaida === 'number') {
+                            totalOutput += sl.pesoSaida;
+                        }
+                    });
+                }
             }
         });
 
@@ -174,7 +183,7 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
             scrap,
             scrapPercentage
         };
-    }, [rows]);
+    }, [rows, modoLancamento]);
 
     // Local Storage Draft
     const DRAFT_KEY = 'fechamento_op_report_draft';
@@ -840,6 +849,21 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
 
                         {/* Seletores Fio Máquina de Entrada e Bitola a Produzir (visíveis na tela como select, no print/captura como texto) */}
                         <div className="flex flex-wrap items-center gap-6">
+                            {/* Toggle Modo de Lançamento (apenas tela) */}
+                            <div className="flex items-center bg-slate-200 rounded p-1 no-print">
+                                <button
+                                    onClick={() => setModoLancamento('simples')}
+                                    className={`px-3 py-1 text-[10px] font-black uppercase rounded transition-all ${modoLancamento === 'simples' ? 'bg-[#002060] text-white shadow' : 'text-slate-500 hover:text-[#002060]'}`}
+                                >
+                                    Sem Sub-lote
+                                </button>
+                                <button
+                                    onClick={() => setModoLancamento('sublote')}
+                                    className={`px-3 py-1 text-[10px] font-black uppercase rounded transition-all ${modoLancamento === 'sublote' ? 'bg-[#002060] text-white shadow' : 'text-slate-500 hover:text-[#002060]'}`}
+                                >
+                                    Com Sub-lote
+                                </button>
+                            </div>
                             <div className="flex items-center gap-2">
                                 <span className="text-[11px] font-black text-[#002060] uppercase tracking-wider op-label-print">Fio Máquina de Entrada:</span>
                                 <select 
@@ -891,12 +915,16 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
                                     <th className="border-r border-slate-300 py-2.5 align-middle text-center">Data</th>
                                     <th className="border-r border-slate-300 py-2.5 align-middle text-center">Lote Principal (copex)</th>
                                     <th className="border-r border-slate-300 py-2.5 align-middle text-center">Peso Entrada Total (kg)</th>
-                                    <th className="border-r border-slate-300 py-0 align-middle text-center p-0">
-                                        <div className="flex w-full h-full">
-                                            <div className="flex-1 py-2.5 border-r border-slate-300">Sub-Lote</div>
-                                            <div className="flex-1 py-2.5">Peso Saída Sub</div>
-                                        </div>
-                                    </th>
+                                    {modoLancamento === 'simples' ? (
+                                        <th className="border-r border-slate-300 py-2.5 align-middle text-center">Peso Saída (kg)</th>
+                                    ) : (
+                                        <th className="border-r border-slate-300 py-0 align-middle text-center p-0">
+                                            <div className="flex w-full h-full">
+                                                <div className="flex-1 py-2.5 border-r border-slate-300">Sub-Lote</div>
+                                                <div className="flex-1 py-2.5">Peso Saída Sub</div>
+                                            </div>
+                                        </th>
+                                    )}
                                     <th className="py-2.5 align-middle text-center">Bitola</th>
                                 </tr>
                             </thead>
@@ -976,49 +1004,64 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
                                             />
                                         </td>
 
-                                        {/* Sub-lotes e Pesos */}
-                                        <td className="border-r border-slate-300 p-0 relative align-top">
-                                            <div className="flex flex-col h-full w-full">
-                                                {row.subLotes?.map((sl, slIndex) => (
-                                                    <div key={sl.id} className="flex border-b border-slate-300 last:border-b-0 w-full relative group/sl hover:bg-slate-100">
-                                                        <div className="flex-1 border-r border-slate-300 p-1 bg-white">
-                                                            <input 
-                                                                type="text" 
-                                                                value={sl.nome} 
-                                                                onChange={e => updateSubLote(row.id, sl.id, 'nome', e.target.value)} 
-                                                                className="op-editable-input text-center w-full font-black text-[12px] text-[#002060]" 
-                                                                placeholder="Lote-X" 
-                                                            />
+                                        {/* Peso Saída ou Sub-lotes */}
+                                        {modoLancamento === 'simples' ? (
+                                            <td className="border-r border-slate-300 p-1 align-middle">
+                                                <input 
+                                                    type="number" 
+                                                    value={row.pesoSaida} 
+                                                    onChange={e => updateRowField(row.id, 'pesoSaida', e.target.value === '' ? '' : Number(e.target.value))} 
+                                                    className="op-editable-input text-center w-full font-black text-[16px] text-[#002060]" 
+                                                    placeholder="0" 
+                                                />
+                                            </td>
+                                        ) : (
+                                            <td className="border-r border-slate-300 p-0 relative align-top">
+                                                <div className="flex flex-col h-full w-full">
+                                                    {row.subLotes?.map((sl, slIndex) => (
+                                                        <div key={sl.id} className="flex border-b border-slate-300 last:border-b-0 w-full relative group/sl hover:bg-slate-100">
+                                                            <div className="flex-1 border-r border-slate-300 p-1 bg-slate-50/50">
+                                                                <input 
+                                                                    type="text" 
+                                                                    value={row.lote ? `${row.lote}-${slIndex + 1}` : sl.nome} 
+                                                                    readOnly
+                                                                    className="op-editable-input text-center w-full font-black text-[12px] text-slate-500 cursor-default focus:bg-transparent hover:bg-transparent" 
+                                                                    placeholder="Lote-X" 
+                                                                    title="Nome automático"
+                                                                />
+                                                            </div>
+                                                            <div className="flex-1 p-1 bg-white relative">
+                                                                <input 
+                                                                    type="number" 
+                                                                    value={sl.pesoSaida} 
+                                                                    onChange={e => updateSubLote(row.id, sl.id, 'pesoSaida', e.target.value === '' ? '' : Number(e.target.value))} 
+                                                                    className="op-editable-input text-center w-full font-black text-[12px] text-[#002060]" 
+                                                                    placeholder="0" 
+                                                                />
+                                                                <button 
+                                                                    onClick={() => removeSubLote(row.id, sl.id)} 
+                                                                    className="absolute right-0.5 top-1/2 -translate-y-1/2 text-rose-500 hover:text-rose-700 font-bold no-print opacity-0 group-hover/sl:opacity-100 transition-opacity p-0.5 text-[10px]" 
+                                                                    title="Remover sub-lote"
+                                                                >
+                                                                    ✕
+                                                                </button>
+                                                            </div>
                                                         </div>
-                                                        <div className="flex-1 p-1 bg-white relative">
-                                                            <input 
-                                                                type="number" 
-                                                                value={sl.pesoSaida} 
-                                                                onChange={e => updateSubLote(row.id, sl.id, 'pesoSaida', e.target.value === '' ? '' : Number(e.target.value))} 
-                                                                className="op-editable-input text-center w-full font-black text-[12px] text-[#002060]" 
-                                                                placeholder="0" 
-                                                            />
-                                                            <button 
-                                                                onClick={() => removeSubLote(row.id, sl.id)} 
-                                                                className="absolute right-0.5 top-1/2 -translate-y-1/2 text-rose-500 hover:text-rose-700 font-bold no-print opacity-0 group-hover/sl:opacity-100 transition-opacity p-0.5 text-[10px]" 
-                                                                title="Remover sub-lote"
-                                                            >
-                                                                ✕
-                                                            </button>
-                                                        </div>
+                                                    ))}
+                                                    <div className="p-1 border-t border-[#002060] bg-slate-100 flex items-center justify-center no-print">
+                                                        <button onClick={() => addSubLote(row.id)} className="text-[10px] text-indigo-600 font-black hover:underline uppercase">+ Adicionar Sub-lote</button>
                                                     </div>
-                                                ))}
-                                                <div className="p-1 border-t border-[#002060] bg-slate-100 flex items-center justify-center no-print">
-                                                    <button onClick={() => addSubLote(row.id)} className="text-[10px] text-indigo-600 font-black hover:underline uppercase">+ Adicionar Sub-lote</button>
+                                                    {(row.subLotes && row.subLotes.length > 1) && (
+                                                        <div className="p-1 border-t border-[#002060] bg-slate-200 flex items-center justify-between font-black text-[12px] text-[#002060]">
+                                                            <span className="w-1/2 text-right pr-2">TOTAL:</span>
+                                                            <span className="w-1/2 text-center border-l border-[#002060]">
+                                                                {row.subLotes?.reduce((acc, curr) => acc + (typeof curr.pesoSaida === 'number' ? curr.pesoSaida : 0), 0)} kg
+                                                            </span>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                <div className="p-1 border-t border-[#002060] bg-slate-200 flex items-center justify-between font-black text-[12px] text-[#002060]">
-                                                    <span className="w-1/2 text-right pr-2">TOTAL:</span>
-                                                    <span className="w-1/2 text-center border-l border-[#002060]">
-                                                        {row.subLotes?.reduce((acc, curr) => acc + (typeof curr.pesoSaida === 'number' ? curr.pesoSaida : 0), 0)} kg
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </td>
+                                            </td>
+                                        )}
 
                                         {/* Bitola */}
                                         <td className="p-1 relative group">
