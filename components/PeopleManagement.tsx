@@ -2857,9 +2857,10 @@ interface ShiftCardProps {
     onUnassign: (slotKey: string) => void;
     onAddSlot?: (shiftKey: string) => void;
     onDeleteShift?: (shiftKey: string) => void;
+    onDeleteSlot?: (shiftKey: string, slotKey: string) => void;
 }
 const StaticShiftCard: React.FC<ShiftCardProps> = ({
-    shiftKey, defaultTime, slots, employees, shiftTimes, onEditShiftTime, onAddEmployee, onUnassign, onAddSlot, onDeleteShift
+    shiftKey, defaultTime, slots, employees, shiftTimes, onEditShiftTime, onAddEmployee, onUnassign, onAddSlot, onDeleteShift, onDeleteSlot
 }) => {
     const display = shiftTimes[shiftKey] || defaultTime;
     return (
@@ -2916,6 +2917,14 @@ const StaticShiftCard: React.FC<ShiftCardProps> = ({
                                         className="no-print"
                                         style={{ background: '#dbeafe', border: 'none', borderRadius: 4, padding: '2px 7px', fontSize: 13, color: '#2563eb', cursor: 'pointer', fontWeight: 700, marginLeft: 4 }}
                                     >+</button>
+                                    {onDeleteSlot && (
+                                        <button
+                                            onClick={() => onDeleteSlot(shiftKey, slot.key)}
+                                            className="no-print"
+                                            style={{ background: '#fee2e2', border: 'none', borderRadius: 4, padding: '2px 7px', fontSize: 13, color: '#ef4444', cursor: 'pointer', fontWeight: 700, marginLeft: 4 }}
+                                            title="Excluir Vaga"
+                                        >x</button>
+                                    )}
                                 </>
                             )}
                         </div>
@@ -2987,6 +2996,15 @@ const OrgChart: React.FC<{
         const newShifts = { ...dynamicShifts };
         delete newShifts[shiftKey];
         updateDynamicShifts(newShifts);
+    };
+
+    const handleDeleteSlot = (shiftKey: string, slotKey: string) => {
+        if (!confirm('Tem certeza que deseja excluir esta vaga?')) return;
+        const newShifts = { ...dynamicShifts };
+        if (newShifts[shiftKey]) {
+            newShifts[shiftKey].slots = newShifts[shiftKey].slots.filter((s: any) => s.key !== slotKey);
+            updateDynamicShifts(newShifts);
+        }
     };
 
     const handleAddShift = (prefix: string) => {
@@ -3177,6 +3195,7 @@ const OrgChart: React.FC<{
             onUnassign={handleUnassign}
             onAddSlot={handleAddSlot}
             onDeleteShift={handleDeleteShift}
+            onDeleteSlot={handleDeleteSlot}
         />
     );
 
