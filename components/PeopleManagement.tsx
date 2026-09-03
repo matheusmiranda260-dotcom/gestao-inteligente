@@ -3350,49 +3350,61 @@ const OrgChart: React.FC<{
                 {(() => {
                     const admShifts = Object.values(dynamicShifts).filter((s: any) => s.key.startsWith('adm'));
                     if (admShifts.length === 0) return <VLine />;
+                    if (admShifts.length === 1) {
+                        return (
+                            <>
+                                {card(admShifts[0], 'ADMINISTRAÇÃO')}
+                                <VLine />
+                            </>
+                        );
+                    }
+
+                    const leftShifts = admShifts.filter((_, i) => i % 2 === 0);
+                    const rightShifts = admShifts.filter((_, i) => i % 2 !== 0);
 
                     return (
-                        <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', width: '100%' }}>
-                            {admShifts.length > 1 && (
-                                <div className="org-vline" style={{ position: 'absolute', left: '50%', top: 0, bottom: -24, width: 2, background: '#000', marginLeft: -1, zIndex: 0 }} />
-                            )}
-                            
-                            <div style={{ display: 'flex', gap: 48, alignItems: 'flex-start', justifyContent: 'center', zIndex: 1 }}>
-                                {admShifts.map((s: any, idx, arr) => {
-                                    let hlineStyle: any = { position: 'absolute', top: 0, height: 2, background: '#000' };
-                                    if (arr.length === 1) {
-                                        hlineStyle = { display: 'none' };
-                                    } else if (idx === 0) {
-                                        hlineStyle = { left: '50%', right: -24, ...hlineStyle };
-                                    } else if (idx === arr.length - 1) {
-                                        hlineStyle = { left: -24, right: '50%', ...hlineStyle };
-                                    } else {
-                                        hlineStyle = { left: -24, right: -24, ...hlineStyle };
-                                    }
-
-                                    return (
-                                        <div style={col} key={s.key}>
-                                            <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-                                                <div className="org-hline" style={hlineStyle} />
-                                                <div className="org-vline" style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
-                                            </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+                            <div style={{ display: 'flex', width: '100%', gap: 48, alignItems: 'stretch', justifyContent: 'center' }}>
+                                
+                                {/* Left Branch (Produção -> Máquinas) */}
+                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                    <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+                                        <div className="org-hline" style={{ position: 'absolute', top: 0, left: '50%', right: -24, height: 2, background: '#000' }} />
+                                        <div className="org-vline" style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
+                                    </div>
+                                    {leftShifts.map((s: any, idx: number) => (
+                                        <React.Fragment key={s.key}>
                                             {card(s, 'ADMINISTRAÇÃO')}
-                                        </div>
-                                    );
-                                })}
+                                            {idx < leftShifts.length - 1 && <VLine />}
+                                        </React.Fragment>
+                                    ))}
+                                    {/* Line down and right to center */}
+                                    <div style={{ flexGrow: 1, width: 2, background: '#000' }} />
+                                    <div style={{ width: 2, height: 24, background: '#000' }} />
+                                    <div style={{ position: 'relative', width: '100%' }}>
+                                        <div className="org-hline" style={{ position: 'absolute', top: 0, left: '50%', right: -24, height: 2, background: '#000' }} />
+                                    </div>
+                                </div>
+
+                                {/* Right Branch (Qualidade) */}
+                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                    <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+                                        <div className="org-hline" style={{ position: 'absolute', top: 0, left: -24, right: '50%', height: 2, background: '#000' }} />
+                                        <div className="org-vline" style={{ width: 2, height: 24, background: '#000', zIndex: 1 }} />
+                                    </div>
+                                    {rightShifts.map((s: any, idx: number) => (
+                                        <React.Fragment key={s.key}>
+                                            {card(s, 'ADMINISTRAÇÃO')}
+                                            {idx < rightShifts.length - 1 && <VLine />}
+                                        </React.Fragment>
+                                    ))}
+                                </div>
+
                             </div>
+                            {/* Center vertical line dropping from the horizontal L-shape into MÁQUINAS */}
+                            <div style={{ width: 2, height: 24, background: '#000' }} />
                         </div>
                     );
-                })()}
-
-                {(() => {
-                    const admShifts = Object.values(dynamicShifts).filter((s: any) => s.key.startsWith('adm'));
-                    if (admShifts.length > 1) {
-                        return <div style={{ height: 24 }} />;
-                    } else if (admShifts.length === 1) {
-                        return <VLine />;
-                    }
-                    return null;
                 })()}
                 <BlueLabelBox label="MÁQUINAS" />
                 <VLine />
