@@ -183,148 +183,98 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         return `${cap(parts[0])} ${cap(parts[parts.length - 1])}`;
     };
 
-    // Obter o operador ativo ou designado para a máquina
+    // Obter o operador ativo ou status de turno da máquina
     const getMachineOperator = (machName: string) => {
-        // 1. Verificar se há OP ativa em andamento nesta máquina
+        // 1. Encontra OP ativa/em andamento nesta máquina
         const liveOp = productionOrders.find(o => 
             (o.scheduledMachine === machName || o.machine === machName) && 
             (o.status === 'in_progress' || o.status === 'Em Produção' || o.status === 'running')
         );
 
-        let activeOpName: string | undefined;
-        if (liveOp) {
-            const logs = (liveOp.operatorLogs || []) as any[];
-            const openLog = [...logs].reverse().find(l => !l.endTime && l.operator && l.operator !== 'GHOST_ORDER_FLAG');
-            const lastLog = [...logs].reverse().find(l => l.operator && l.operator !== 'GHOST_ORDER_FLAG');
-            activeOpName = openLog?.operator || lastLog?.operator || liveOp.operator;
+        if (!liveOp) {
+            // Nenhuma ordem em andamento nesta máquina -> Turno não iniciado / Encerrado
+            return null;
         }
 
-        if (activeOpName && activeOpName !== 'gestor') {
-            const emp = findEmployeeByIdentifier(activeOpName);
-            if (emp) {
-                return {
-                    name: emp.name,
-                    displayName: formatShortName(emp.name),
-                    photoUrl: emp.photoUrl,
-                    status: 'operating' as const,
-                    statusLabel: 'Em Produção',
-                    jobTitle: emp.jobTitle || 'Operador',
-                    opNumber: liveOp?.orderNumber
-                };
-            }
-            return {
-                name: activeOpName,
-                displayName: formatShortName(activeOpName),
-                photoUrl: undefined,
-                status: 'operating' as const,
-                statusLabel: 'Em Produção',
-                jobTitle: 'Operador',
-                opNumber: liveOp?.orderNumber
-            };
-        }
-
-        // 2. Se o currentUser está atribuído/operando esta máquina agora
-        if (currentUser) {
-            const currentEmp = employees.find(e => 
-                e.id === currentUser.employeeId || 
-                (e.appUserId && e.appUserId === currentUser.id) ||
-                e.name.toLowerCase().includes(currentUser.username.toLowerCase())
-            );
-            const activeMachInStorage = typeof localStorage !== 'undefined' ? localStorage.getItem('msm_active_machine') : null;
-            
-            // Prioriza a máquina que o usuário selecionou no localStorage. Se não houver, usa a designada.
-            const targetMachine = (activeMachInStorage && currentUser.role === 'user') 
-                ? activeMachInStorage 
-                : currentEmp?.assignedMachine;
-            
-            const matchesSector = currentEmp?.sector && currentEmp.sector.toUpperCase() === machName.toUpperCase();
-            
-            if (
-                targetMachine === machName ||
-                (!targetMachine && matchesSector)
-            ) {
-                return {
-                    name: currentEmp?.name || currentUser.username,
-                    displayName: formatShortName(currentEmp?.name || currentUser.username),
-                    photoUrl: currentEmp?.photoUrl,
-                    status: 'online' as const,
-                    statusLabel: 'Conectado',
-                    jobTitle: currentEmp?.jobTitle || 'Operador',
-                    opNumber: undefined
-                };
+        // 2. Verificar se a máquina está em 'Final de Turno' (ou seja, turno encerrado)
+        const events = (liveOp.downtimeEvents || []) as any[];
+        const openDowntime = [...events].reverse().find(e => !e.resumeTime);
+        if (openDowntime) {
+            const rNorm = (openDowntime.reason || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            if (rNorm.includes('final de turno') || rNorm.includes('turno encerrado') || rNorm.includes('turno')) {
+                // Turno foi finalizado/encerrado nesta máquina
+                return null;
             }
         }
 
-        // 3. Verificar usuários online no sistema vinculados a esta máquina (priorizando Operador antes de Auxiliar)
-        const candidatesOnline = users
-            .filter(u => u.isOnline)
-            .map(u => ({ user: u, emp: employees.find(e => e.id === u.employeeId || e.appUserId === u.id) }))
-            .filter(item => {
-                if (!item.emp || !item.emp.active) return false;
-                // Descarta cargos de administração / gestão
-                const isAdm = (item.emp.sector || '').toUpperCase().includes('ADMIN') || (item.emp.jobTitle || '').toLowerCase().includes('admin');
-                if (isAdm) return false;
+        // 3. Verificar se há log com operador que assumiu/iniciou o turno (sem endTime)
+        const logs = (liveOp.operatorLogs || []) as any[];
+        const openLog = [...logs].reverse().find(l => 
+            !l.endTime && 
+            l.operator && 
+            l.operator !== 'GHOST_ORDER_FLAG' && 
+            l.action !== 'Criada no PCP' &&
+            l.operator.toLowerCase() !== 'gestor pcp' &&
+            l.operator.toLowerCase() !== 'gestor'
+        );
 
-                if (item.emp.assignedMachine) {
-                    return item.emp.assignedMachine.toLowerCase() === machName.toLowerCase();
-                }
-                return item.emp.sector && item.emp.sector.toUpperCase() === machName.toUpperCase();
-            });
-
-        // Ordena para que quem é 'operador' venha antes de 'auxiliar'
-        candidatesOnline.sort((a, b) => {
-            const isOpA = (a.emp?.jobTitle || '').toLowerCase().includes('operador') ? 1 : 0;
-            const isOpB = (b.emp?.jobTitle || '').toLowerCase().includes('operador') ? 1 : 0;
-            return isOpB - isOpA;
-        });
-
-        if (candidatesOnline.length > 0 && candidatesOnline[0].emp) {
-            const emp = candidatesOnline[0].emp;
-            return {
-                name: emp.name,
-                displayName: formatShortName(emp.name),
-                photoUrl: emp.photoUrl,
-                status: 'online' as const,
-                statusLabel: 'Conectado',
-                jobTitle: emp.jobTitle || 'Operador',
-                opNumber: undefined
-            };
+        // Se ninguém assumiu o turno (ou todos os turnos anteriores já foram encerrados)
+        if (!openLog) {
+            return null;
         }
 
-        // 4. Operador cadastrado/designado para esta máquina (Equipe Padrão)
-        const candidatesAssigned = employees
-            .filter(e => {
-                if (!e.active) return false;
-                const isAdm = (e.sector || '').toUpperCase().includes('ADMIN') || (e.jobTitle || '').toLowerCase().includes('admin');
-                if (isAdm) return false;
+        const activeOpName = openLog.operator;
 
-                if (e.assignedMachine) {
-                    return e.assignedMachine.toLowerCase() === machName.toLowerCase();
-                }
-                return e.sector && e.sector.toUpperCase() === machName.toUpperCase();
-            });
+        // 4. Buscar dados do operador (foto, nome completo, cargo) independente de quem for
+        const emp = findEmployeeByIdentifier(activeOpName);
 
-        // Prioriza 'operador' antes de auxiliar
-        candidatesAssigned.sort((a, b) => {
-            const isOpA = (a.jobTitle || '').toLowerCase().includes('operador') ? 1 : 0;
-            const isOpB = (b.jobTitle || '').toLowerCase().includes('operador') ? 1 : 0;
-            return isOpB - isOpA;
-        });
+        // Buscar se o usuário do operador está online no app
+        const appUser = users.find(u => 
+            u.username.toLowerCase() === activeOpName.toLowerCase() ||
+            (emp && (u.employeeId === emp.id || u.id === emp.appUserId))
+        );
 
-        if (candidatesAssigned.length > 0) {
-            const assignedEmp = candidatesAssigned[0];
-            return {
-                name: assignedEmp.name,
-                displayName: formatShortName(assignedEmp.name),
-                photoUrl: assignedEmp.photoUrl,
-                status: 'assigned' as const,
-                statusLabel: 'Equipe',
-                jobTitle: assignedEmp.jobTitle || 'Operador',
-                opNumber: undefined
-            };
+        const isOnlineInApp = Boolean(
+            appUser?.isOnline ||
+            (currentUser && (
+                currentUser.username.toLowerCase() === activeOpName.toLowerCase() ||
+                (emp && (currentUser.employeeId === emp.id || currentUser.id === emp.appUserId))
+            ))
+        );
+
+        // 5. Determinar estado e rótulo de produção vs online
+        const liveMachInfo = machineLiveStatus.find(m => m.machine === machName);
+        const isStopped = liveMachInfo?.state === 'stopped';
+        const isPrep = liveMachInfo?.state === 'prep';
+        const isProducing = !isStopped && !isPrep && liveMachInfo?.state !== 'offline';
+
+        let status: 'operating' | 'online' | 'offline';
+        let statusLabel: string;
+
+        if (isProducing) {
+            status = 'operating';
+            statusLabel = 'Em Produção';
+        } else if (isOnlineInApp) {
+            status = 'online';
+            statusLabel = isPrep ? 'Preparação' : isStopped ? 'Parada (Online)' : 'Online';
+        } else {
+            status = 'offline';
+            statusLabel = isPrep ? 'Preparação' : isStopped ? 'Parada' : 'Turno Aberto';
         }
 
-        return null;
+        const rawName = emp?.name || appUser?.username || activeOpName;
+
+        return {
+            name: rawName,
+            displayName: formatShortName(rawName),
+            photoUrl: emp?.photoUrl || (appUser as any)?.photoUrl,
+            status,
+            isOnline: isOnlineInApp,
+            isProducing,
+            statusLabel,
+            jobTitle: emp?.jobTitle || 'Operador',
+            opNumber: liveOp.orderNumber
+        };
     };
 
     // Estado do Drawer Lateral (Raio-X da OP)
@@ -2252,7 +2202,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                         {/* Coluna da Máquina */}
                                         <div className={`p-3.5 flex flex-col justify-between border-r border-white/5 border-l-4 ${mach.color} sticky left-0 z-20 shrink-0 shadow-lg`}>
                                             <div>
-                                                <div className="flex items-center justify-between">
+<div className="flex items-center justify-between">
                                                     <span className="text-white text-sm font-black tracking-wider block">{mach.name}</span>
                                                     <button
                                                         onClick={() => handleOpenCreateModal(mach.name)}
@@ -2268,55 +2218,79 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                     const operator = getMachineOperator(mach.name);
                                                     if (!operator) {
                                                         return (
-                                                            <div className="mt-2 py-1 px-2 rounded-lg bg-white/5 border border-white/5 flex items-center gap-1.5 text-slate-500 text-[10px]">
-                                                                <span className="w-1.5 h-1.5 rounded-full bg-slate-600" />
-                                                                <span>Sem operador</span>
+                                                            <div 
+                                                                className="mt-2 p-1.5 rounded-xl border border-white/5 bg-[#06121B]/90 flex items-center justify-between gap-1.5 text-slate-400 hover:border-white/10 transition-all shadow-inner"
+                                                                title={`Nenhum operador com turno ativo na máquina ${mach.name}. Turno Encerrado.`}
+                                                            >
+                                                                <div className="flex items-center gap-1.5 min-w-0">
+                                                                    <div className="w-6 h-6 rounded-lg bg-slate-800/80 border border-slate-700/50 flex items-center justify-center shrink-0">
+                                                                        <ClockIcon className="w-3.5 h-3.5 text-slate-400" />
+                                                                    </div>
+                                                                    <div className="flex flex-col min-w-0">
+                                                                        <span className="text-[10px] font-black tracking-wide text-slate-300 uppercase truncate">
+                                                                            Turno Encerrado
+                                                                        </span>
+                                                                        <span className="text-[8px] font-medium text-slate-400 truncate">
+                                                                            Aguardando operador
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                                <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-800/80 text-slate-400 border border-slate-700/50 shrink-0">
+                                                                    Off
+                                                                </span>
                                                             </div>
                                                         );
                                                     }
 
                                                     const isOperating = operator.status === 'operating';
-                                                    const isOnline = operator.status === 'online';
+                                                    const isOnline = operator.isOnline;
 
                                                     return (
                                                         <div 
                                                             className={`mt-2 p-1.5 rounded-xl border transition-all flex items-center gap-2 ${
                                                                 isOperating 
-                                                                    ? 'bg-emerald-950/40 border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.15)]' 
+                                                                    ? 'bg-emerald-950/40 border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.15)]' 
                                                                     : isOnline 
-                                                                        ? 'bg-cyan-950/30 border-cyan-500/30'
+                                                                        ? 'bg-cyan-950/30 border-[#00E5FF]/40 shadow-[0_0_10px_rgba(0,229,255,0.12)]'
                                                                         : 'bg-white/5 border-white/10'
                                                             }`}
-                                                            title={`${operator.name} (${operator.jobTitle}) - ${operator.statusLabel}`}
+                                                            title={`${operator.name} (${operator.jobTitle}) - ${operator.statusLabel} ${isOnline ? '(Online no App)' : '(Offline no App)'}`}
                                                         >
-                                                            {/* Avatar com Foto do Login */}
+                                                            {/* Avatar com Foto do Operador */}
                                                             <div className="relative shrink-0">
                                                                 {operator.photoUrl ? (
                                                                     <img 
                                                                         src={operator.photoUrl} 
                                                                         alt={operator.name} 
                                                                         className={`w-7 h-7 rounded-full object-cover border-2 shadow-sm ${
-                                                                            isOperating ? 'border-emerald-400 ring-1 ring-emerald-400/40' : isOnline ? 'border-cyan-400' : 'border-slate-500'
+                                                                            isOperating 
+                                                                                ? 'border-emerald-400 ring-1 ring-emerald-400/40' 
+                                                                                : isOnline 
+                                                                                    ? 'border-[#00E5FF] ring-1 ring-[#00E5FF]/40' 
+                                                                                    : 'border-slate-500'
                                                                         }`}
                                                                     />
                                                                 ) : (
                                                                     <div className={`w-7 h-7 rounded-full flex items-center justify-center font-black text-[10px] border-2 uppercase shadow-sm ${
                                                                         isOperating 
                                                                             ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400' 
-                                                                            : 'bg-cyan-500/20 text-cyan-300 border-cyan-400'
+                                                                            : isOnline 
+                                                                                ? 'bg-[#00E5FF]/20 text-[#00E5FF] border-[#00E5FF]' 
+                                                                                : 'bg-slate-800 text-slate-400 border-slate-600'
                                                                     }`}>
                                                                         {operator.displayName.slice(0, 2)}
                                                                     </div>
                                                                 )}
                                                                 {/* Ponto Indicador de Status */}
                                                                 <span 
-                                                                    className={`w-2 h-2 rounded-full absolute -bottom-0.5 -right-0.5 border border-[#08131B] ${
+                                                                    className={`w-2.5 h-2.5 rounded-full absolute -bottom-0.5 -right-0.5 border border-[#08131B] ${
                                                                         isOperating 
                                                                             ? 'bg-emerald-400 animate-pulse' 
                                                                             : isOnline 
-                                                                                ? 'bg-cyan-400' 
+                                                                                ? 'bg-[#00E5FF] animate-pulse' 
                                                                                 : 'bg-slate-500'
                                                                     }`} 
+                                                                    title={isOnline ? 'Online no App' : 'Offline no App'}
                                                                 />
                                                             </div>
 
@@ -2326,9 +2300,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                     {operator.displayName}
                                                                 </span>
                                                                 <span className={`text-[9px] font-bold tracking-wide truncate flex items-center gap-1 ${
-                                                                    isOperating ? 'text-emerald-300' : isOnline ? 'text-cyan-300' : 'text-slate-400'
+                                                                    isOperating ? 'text-emerald-300' : isOnline ? 'text-[#00E5FF]' : 'text-slate-400'
                                                                 }`}>
                                                                     {isOperating && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-ping" />}
+                                                                    {!isOperating && isOnline && <span className="w-1.5 h-1.5 rounded-full bg-[#00E5FF] inline-block animate-pulse" />}
                                                                     {operator.statusLabel}
                                                                 </span>
                                                             </div>
