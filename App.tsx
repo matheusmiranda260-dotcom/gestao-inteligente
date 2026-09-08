@@ -90,6 +90,9 @@ const App: React.FC = () => {
 
     const [pendingKaizenCount, setPendingKaizenCount] = useState(0);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [isPcpFullscreen, setIsPcpFullscreen] = useState<boolean>(() => {
+        return localStorage.getItem('pcp_fullscreen_mode') === 'true';
+    });
 
     const motivacionais = useMemo(() => [
         "A qualidade começa com você! Faça sempre o seu melhor.",
@@ -2747,22 +2750,24 @@ const App: React.FC = () => {
                 />;
             case 'laboratory': return <Laboratory setPage={setPage} currentUser={currentUser} gauges={gauges} />;
             case 'downtimeConfigs': return <DowntimeConfigManager onBack={() => setPage('menu')} showNotification={showNotification} />;
-            case 'pcpBoard': return <PCPBoard setPage={setPage} productionOrders={productionOrders} updateProductionOrder={updateProductionOrder} stock={stock} currentUser={currentUser} addProductionOrder={addProductionOrder} deleteProductionOrder={deleteProductionOrder} showNotification={showNotification} gauges={gauges} shiftReports={shiftReports} downtimeConfigs={downtimeConfigs} />;
+            case 'pcpBoard': return <PCPBoard setPage={setPage} productionOrders={productionOrders} updateProductionOrder={updateProductionOrder} stock={stock} currentUser={currentUser} addProductionOrder={addProductionOrder} deleteProductionOrder={deleteProductionOrder} showNotification={showNotification} gauges={gauges} shiftReports={shiftReports} downtimeConfigs={downtimeConfigs} isPcpFullscreen={isPcpFullscreen} setIsPcpFullscreen={setIsPcpFullscreen} />;
             default: return <Login onLogin={handleLogin} error={null} />;
         }
     };
 
+    const isPcpFocus = page === 'pcpBoard' && isPcpFullscreen;
+
     return (
-        <div className="app-container">
+        <div className={`app-container ${isPcpFocus ? 'pcp-fullscreen-active' : ''}`}>
             {notification && <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />}
-            {currentUser && page !== 'login' && (
+            {currentUser && page !== 'login' && !isPcpFocus && (
                 <>
                     <div className={`sidebar-overlay ${isMobileMenuOpen ? 'active' : ''}`} onClick={() => setIsMobileMenuOpen(false)} />
                     <Sidebar page={page} setPage={(p) => { setPage(p); setIsMobileMenuOpen(false); }} currentUser={currentUser} notificationCount={pendingKaizenCount} isMobileMenuOpen={isMobileMenuOpen} onLogout={handleLogout} />
                 </>
             )}
-            <main className="main-content">
-                {currentUser && page !== 'login' && (
+            <main className={`main-content ${isPcpFocus ? '!p-0 !m-0 !w-full !max-w-full overflow-hidden' : ''}`}>
+                {currentUser && page !== 'login' && !isPcpFocus && (
                     <header className="top-bar no-print">
                         <div className="flex items-center gap-4">
                             <button onClick={() => setIsMobileMenuOpen(true)} className="mobile-menu-btn">
@@ -2798,7 +2803,7 @@ const App: React.FC = () => {
                         </div>
                     </header>
                 )}
-                <div className={currentUser && page !== 'login' ? 'p-4' : ''}>
+                <div className={currentUser && page !== 'login' && !isPcpFocus ? 'p-4' : ''}>
                     {renderPage()}
                 </div>
             </main>

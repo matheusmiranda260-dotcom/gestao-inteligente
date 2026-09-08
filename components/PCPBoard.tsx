@@ -6,7 +6,7 @@ import {
     CalendarIcon, PlusIcon, ChevronRightIcon, XIcon, ArrowLeftIcon, 
     TrashIcon, PlayIcon, CheckCircleIcon, ClockIcon, ChartBarIcon, 
     CogIcon, WrenchScrewdriverIcon, PrinterIcon, ClipboardListIcon,
-    AdjustmentsIcon
+    AdjustmentsIcon, ChevronDownIcon, ChevronUpIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon
 } from './icons';
 import { 
     ENTRY_RINGS_LIST, 
@@ -28,6 +28,8 @@ interface PCPBoardProps {
     gauges?: StockGauge[];
     shiftReports?: ShiftReport[];
     downtimeConfigs?: DowntimeConfig[];
+    isPcpFullscreen?: boolean;
+    setIsPcpFullscreen?: (val: boolean) => void;
 }
 
 // Configurações de capacidade produtiva padrão por máquina para sugerir duração
@@ -60,8 +62,30 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     showNotification,
     gauges = [],
     shiftReports = [],
-    downtimeConfigs = []
+    downtimeConfigs = [],
+    isPcpFullscreen = false,
+    setIsPcpFullscreen
 }) => {
+    // Estado de cabeçalho minimizado/expandido (persistido)
+    const [isHeaderCollapsed, setIsHeaderCollapsed] = useState<boolean>(() => {
+        return localStorage.getItem('pcp_header_collapsed') === 'true';
+    });
+
+    const handleToggleFullscreen = () => {
+        const next = !isPcpFullscreen;
+        if (setIsPcpFullscreen) {
+            setIsPcpFullscreen(next);
+        }
+        localStorage.setItem('pcp_fullscreen_mode', String(next));
+        try {
+            if (next && !document.fullscreenElement) {
+                document.documentElement.requestFullscreen?.().catch(() => {});
+            } else if (!next && document.fullscreenElement) {
+                document.exitFullscreen?.().catch(() => {});
+            }
+        } catch {}
+    };
+
     // Estado de data de referência (inicializado com a data atual)
     const [currentDate, setCurrentDate] = useState<Date>(new Date());
 
@@ -1356,7 +1380,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     }, [gauges]);
 
     return (
-        <div className="pcp-board-container min-h-screen bg-[#08131B] text-slate-100 flex flex-col gap-4 p-2 sm:p-4 select-none">
+        <div className={`pcp-board-container min-h-screen bg-[#08131B] text-slate-100 flex flex-col gap-3 select-none ${
+            isPcpFullscreen ? 'p-1.5 sm:p-2' : 'p-2 sm:p-4'
+        }`}>
             
             {/* ESTILO CUSTOMIZADO LOCAL */}
             <style dangerouslySetInnerHTML={{ __html: `
@@ -1373,14 +1399,14 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 }
                 .pcp-timeline-grid {
                     display: grid;
-                    grid-template-columns: 180px repeat(5, minmax(140px, 1fr));
+                    grid-template-columns: 200px repeat(5, minmax(160px, 1fr));
                 }
                 .pcp-header-cell {
                     background: rgba(11, 26, 38, 0.95);
                     border-bottom: 2px solid rgba(0, 229, 255, 0.2);
                 }
                 .pcp-track-row {
-                    min-height: 125px;
+                    min-height: 140px;
                     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
                 }
                 .pcp-track-row:hover {
@@ -1389,13 +1415,13 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 .pcp-op-bar {
                     position: absolute;
                     top: 10px;
-                    height: 100px;
+                    height: 114px;
                     border-radius: 12px;
                     padding: 8px 12px;
                     box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.4);
                     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
                     z-index: 10;
-                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    border: 1px solid rgba(255, 255, 255, 0.12);
                     cursor: pointer;
                 }
                 .pcp-op-bar:hover {
@@ -1421,7 +1447,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             `}} />
 
             {/* COLUNA PRINCIPAL: TIMELINE PCP SEMANAL */}
-            <div className="flex-1 pcp-glass rounded-2xl border border-white/5 shadow-2xl flex flex-col overflow-hidden h-[calc(100vh-100px)]">
+            <div className={`flex-1 pcp-glass rounded-2xl border border-white/5 shadow-2xl flex flex-col overflow-hidden ${
+                isPcpFullscreen ? 'h-[calc(100vh-16px)]' : 'h-[calc(100vh-90px)]'
+            }`}>
                 
                 {/* Cabeçalho de Controle e Ações */}
                 <div className="p-3.5 border-b border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0 bg-[#0B1D2A]">
@@ -1439,7 +1467,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                         </div>
                     </div>
 
-                    {/* Controles: Navegação da Semana & Botão + Nova OP */}
+                    {/* Controles: Navegação da Semana & Botões de Ação */}
                     <div className="flex items-center flex-wrap gap-2.5">
                         
                         {/* Seletor de Semanas */}
@@ -1500,6 +1528,58 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                             })}
                         </div>
 
+                        {/* Botão Minimizar / Expandir Topo (KPIs e Status Máquinas) */}
+                        <button
+                            onClick={() => {
+                                setIsHeaderCollapsed(prev => {
+                                    const next = !prev;
+                                    localStorage.setItem('pcp_header_collapsed', String(next));
+                                    return next;
+                                });
+                            }}
+                            className={`font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all shadow-sm active:scale-95 whitespace-nowrap ${
+                                isHeaderCollapsed 
+                                    ? 'bg-[#00E5FF]/15 text-[#00E5FF] border border-[#00E5FF]/40 hover:bg-[#00E5FF]/25 shadow-[0_0_12px_rgba(0,229,255,0.2)]' 
+                                    : 'bg-[#0B1D2A] hover:bg-[#122b3d] text-slate-300 border border-white/10'
+                            }`}
+                            title={isHeaderCollapsed ? "Expandir indicadores e monitor de máquinas" : "Minimizar indicadores para ter mais espaço vertical no quadro"}
+                        >
+                            {isHeaderCollapsed ? (
+                                <>
+                                    <ChevronDownIcon className="w-4 h-4 text-[#00E5FF]" />
+                                    <span>Expandir Topo</span>
+                                </>
+                            ) : (
+                                <>
+                                    <ChevronUpIcon className="w-4 h-4 text-slate-400" />
+                                    <span>Minimizar Topo</span>
+                                </>
+                            )}
+                        </button>
+
+                        {/* Botão Tela Cheia / Foco Total */}
+                        <button
+                            onClick={handleToggleFullscreen}
+                            className={`font-black text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all shadow-sm active:scale-95 whitespace-nowrap ${
+                                isPcpFullscreen
+                                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 hover:bg-amber-500/30 shadow-[0_0_12px_rgba(245,158,11,0.25)]'
+                                    : 'bg-[#0B1D2A] hover:bg-[#122b3d] text-[#00E5FF] border border-[#00E5FF]/40 hover:border-[#00E5FF]'
+                            }`}
+                            title={isPcpFullscreen ? "Sair da Tela Cheia e reexibir menus de navegação" : "Tela Cheia (Oculta menu lateral e expande o quadro em 100% da tela)"}
+                        >
+                            {isPcpFullscreen ? (
+                                <>
+                                    <ArrowsPointingInIcon className="w-4 h-4 text-amber-400" />
+                                    <span>Sair Tela Cheia</span>
+                                </>
+                            ) : (
+                                <>
+                                    <ArrowsPointingOutIcon className="w-4 h-4 text-[#00E5FF]" />
+                                    <span>Tela Cheia</span>
+                                </>
+                            )}
+                        </button>
+
                         {/* Botão Metas de Paradas & Checklist */}
                         <button
                             onClick={() => setIsDowntimeLimitsModalOpen(true)}
@@ -1531,8 +1611,53 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     </div>
                 </div>
 
-                {/* Mini Dashboard em Tempo Real */}
-                <div className="bg-[#0A1B27]/80 backdrop-blur-md border border-white/10 p-3.5 rounded-2xl shadow-xl flex flex-col gap-3.5">
+                {/* Mini Dashboard em Tempo Real (Colapsável) */}
+                {isHeaderCollapsed ? (
+                    <div className="bg-[#0A1B27]/90 backdrop-blur-md border border-white/10 px-4 py-2 rounded-xl flex items-center justify-between text-xs transition-all animate-fade">
+                        <div className="flex items-center gap-4 sm:gap-6 flex-wrap">
+                            <div className="flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.6)]" />
+                                <span className="text-amber-300 font-bold text-xs">
+                                    <strong className="text-amber-100 font-black text-sm">{pcpLiveMetrics.pendingCount}</strong> na Fila ({pcpLiveMetrics.pendingWeight >= 1000 ? `${(pcpLiveMetrics.pendingWeight / 1000).toFixed(1)} t` : `${pcpLiveMetrics.pendingWeight.toLocaleString('pt-BR')} kg`})
+                                </span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-full bg-[#00E5FF] pulse-live shadow-[0_0_8px_rgba(0,229,255,0.8)]" />
+                                <span className="text-[#00E5FF] font-bold text-xs">
+                                    <strong className="text-white font-black text-sm">{pcpLiveMetrics.liveCount}</strong> Ao Vivo ({pcpLiveMetrics.liveMachinesCount} máq.)
+                                </span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
+                                <span className="text-emerald-400 font-bold text-xs">
+                                    <strong className="text-emerald-100 font-black text-sm">{pcpLiveMetrics.completedCount}</strong> Concluídas ({pcpLiveMetrics.completedWeight >= 1000 ? `${(pcpLiveMetrics.completedWeight / 1000).toFixed(1)} t` : `${pcpLiveMetrics.completedWeight.toLocaleString('pt-BR')} kg`})
+                                </span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-full bg-slate-400" />
+                                <span className="text-slate-300 font-bold text-xs">
+                                    Carga Semanal: <strong className="text-white font-black text-sm">{pcpLiveMetrics.totalWeekOps}</strong> OPs ({((pcpLiveMetrics.pendingWeight + pcpLiveMetrics.liveWeight + pcpLiveMetrics.completedWeight) / 1000).toFixed(1)} t)
+                                </span>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={() => {
+                                setIsHeaderCollapsed(false);
+                                localStorage.setItem('pcp_header_collapsed', 'false');
+                            }}
+                            className="text-xs font-bold text-[#00E5FF] hover:text-white bg-[#00E5FF]/10 hover:bg-[#00E5FF]/20 px-3 py-1.5 rounded-lg border border-[#00E5FF]/20 flex items-center gap-1.5 transition-all"
+                            title="Expandir indicadores completos e monitor de máquinas"
+                        >
+                            <ChevronDownIcon className="w-3.5 h-3.5" />
+                            <span>Mostrar Indicadores</span>
+                        </button>
+                    </div>
+                ) : (
+                <div className="bg-[#0A1B27]/80 backdrop-blur-md border border-white/10 p-3.5 rounded-2xl shadow-xl flex flex-col gap-3.5 transition-all animate-fade">
                     {/* Linha 1: Cards de Resumo */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         {/* Card 1: Agendadas / Aguardando Início (Laranja) */}
@@ -1738,6 +1863,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                         </div>
                     </div>
                 </div>
+                )}
 
                 {/* Área da Timeline */}
                 <div className="flex-1 overflow-auto bg-[#07131B]/55 scrollbar-thin scrollbar-thumb-white/5 scrollbar-track-transparent">
@@ -1745,9 +1871,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                         
                         {/* Cabeçalho dos Dias (Segunda a Sexta) */}
                         <div className="pcp-timeline-grid pcp-header-cell border-b border-white/15 sticky top-0 z-30 shrink-0">
-                            <div className="p-3.5 flex items-center justify-between font-black text-[10px] text-slate-400 tracking-wider uppercase select-none bg-[#091822]">
+                            <div className="p-3.5 flex items-center justify-between font-black text-xs text-slate-300 tracking-wider uppercase select-none bg-[#091822]">
                                 <span>MÁQUINA</span>
-                                <span className="text-[9px] text-[#00E5FF]/60 font-mono">SEMANAL</span>
+                                <span className="text-[10px] text-[#00E5FF] font-mono font-bold">SEMANAL</span>
                             </div>
                             
                             {weekDays.map((day, index) => {
@@ -1760,13 +1886,13 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             isToday ? 'bg-[#00E5FF]/5' : ''
                                         }`}
                                     >
-                                        <span className={`text-[10px] font-black tracking-widest uppercase block ${
-                                            isToday ? 'text-[#00E5FF]' : 'text-slate-400'
+                                        <span className={`text-xs font-black tracking-widest uppercase block ${
+                                            isToday ? 'text-[#00E5FF]' : 'text-slate-300'
                                         }`}>
                                             {daysNames[index]}
                                         </span>
-                                        <span className={`text-xs font-bold block mt-0.5 ${
-                                            isToday ? 'text-white font-extrabold' : 'text-slate-500'
+                                        <span className={`text-sm font-black block mt-0.5 ${
+                                            isToday ? 'text-white font-extrabold' : 'text-slate-400'
                                         }`}>
                                             {formatFriendlyDate(day)}
                                         </span>
@@ -1800,7 +1926,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                 };
 
                                 const maxTracks = Math.max(1, ...machOps.map(op => getOpTrack(op) + 1));
-                                const rowMinHeight = Math.max(125, 20 + maxTracks * 106);
+                                const rowMinHeight = Math.max(140, 24 + maxTracks * 122);
 
                                 return (
                                     <div 
@@ -1810,19 +1936,19 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                     >
                                         
                                         {/* Coluna da Máquina */}
-                                        <div className={`p-3 flex flex-col justify-between border-r border-white/5 border-l-4 ${mach.color} sticky left-0 z-20 shrink-0 shadow-lg`}>
+                                        <div className={`p-3.5 flex flex-col justify-between border-r border-white/5 border-l-4 ${mach.color} sticky left-0 z-20 shrink-0 shadow-lg`}>
                                             <div>
                                                 <div className="flex items-center justify-between">
-                                                    <span className="text-white text-xs font-black tracking-wider block">{mach.name}</span>
+                                                    <span className="text-white text-sm font-black tracking-wider block">{mach.name}</span>
                                                     <button
                                                         onClick={() => handleOpenCreateModal(mach.name)}
-                                                        className="w-5 h-5 rounded bg-white/5 hover:bg-white/20 text-slate-400 hover:text-white flex items-center justify-center transition-all"
+                                                        className="w-6 h-6 rounded-lg bg-white/10 hover:bg-[#00E5FF]/20 text-slate-300 hover:text-[#00E5FF] flex items-center justify-center transition-all"
                                                         title={`Criar OP para ${mach.name}`}
                                                     >
-                                                        <PlusIcon className="w-3 h-3" />
+                                                        <PlusIcon className="w-3.5 h-3.5" />
                                                     </button>
                                                 </div>
-                                                <span className="text-slate-400 text-[9px] font-bold uppercase tracking-wider block mt-0.5">{mach.type}</span>
+                                                <span className="text-[#00E5FF]/80 text-[10px] font-extrabold uppercase tracking-widest block mt-0.5">{mach.type}</span>
                                             </div>
 
                                             {/* Status em Tempo Real da Máquina (Parada, Produzindo, etc) */}
@@ -1953,9 +2079,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             if (spanColumns <= 0) return null;
 
                                             const track = getOpTrack(op);
-                                            const leftStyle = `calc(180px + (100% - 180px) * ${colStart / 5} + 4px)`;
-                                            const widthStyle = `calc((100% - 180px) * ${spanColumns / 5} - 8px)`;
-                                            const topStyle = `${10 + track * 106}px`;
+                                            const leftStyle = `calc(200px + (100% - 200px) * ${colStart / 5} + 4px)`;
+                                            const widthStyle = `calc((100% - 200px) * ${spanColumns / 5} - 8px)`;
+                                            const topStyle = `${10 + track * 122}px`;
 
                                             const isTrelica = op.machine === 'Treliça';
                                             const isMalha = typeof op.machine === 'string' && op.machine.startsWith('Malha');
@@ -2010,95 +2136,95 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                     }}
                                                 >
                                                     <div className="flex flex-col h-full justify-between">
-                                                        <div className="flex items-start justify-between gap-1">
+                                                        <div className="flex items-start justify-between gap-1.5">
                                                             <div className="truncate flex-1">
                                                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                                                    <span className="text-[11px] font-black text-white tracking-wide">#{title}</span>
+                                                                    <span className="text-xs sm:text-sm font-black text-white tracking-wide drop-shadow">#{title}</span>
                                                                     
                                                                     {prog.isPending && (
-                                                                        <span className="flex items-center gap-1 text-[8px] font-extrabold uppercase bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/40">
+                                                                        <span className="flex items-center gap-1 text-[9px] font-black uppercase bg-amber-500/25 text-amber-200 px-2 py-0.5 rounded border border-amber-500/50 shadow-sm">
                                                                             <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                                                                            AGENDADA (AGUARDANDO INÍCIO)
+                                                                            AGENDADA
                                                                         </span>
                                                                     )}
                                                                     {prog.isLive && prog.isStopped && (
-                                                                        <span className="flex items-center gap-1 text-[8px] font-black uppercase bg-rose-500/25 text-rose-300 px-1.5 py-0.5 rounded border border-rose-500/60 shadow-[0_0_10px_rgba(244,63,94,0.3)] animate-pulse">
+                                                                        <span className="flex items-center gap-1 text-[9px] font-black uppercase bg-rose-500/30 text-rose-200 px-2 py-0.5 rounded border border-rose-500/70 shadow-[0_0_10px_rgba(244,63,94,0.4)] animate-pulse">
                                                                             <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
                                                                             PARADA: {prog.downtimeReason} ({formatDuration(prog.downtimeDurationMs)})
                                                                         </span>
                                                                     )}
                                                                     {prog.isLive && prog.isPrep && (
-                                                                        <span className="flex items-center gap-1 text-[8px] font-black uppercase bg-amber-500/25 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/50 animate-pulse">
+                                                                        <span className="flex items-center gap-1 text-[9px] font-black uppercase bg-amber-500/30 text-amber-200 px-2 py-0.5 rounded border border-amber-500/60 animate-pulse">
                                                                             <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                                                                             PREPARAÇÃO: {prog.downtimeReason} ({formatDuration(prog.downtimeDurationMs)})
                                                                         </span>
                                                                     )}
                                                                     {prog.isLive && prog.isOffline && (
-                                                                        <span className="flex items-center gap-1 text-[8px] font-black uppercase bg-slate-500/20 text-slate-300 px-1.5 py-0.5 rounded border border-slate-500/40">
-                                                                            DESLIGADA: FINAL DE TURNO
+                                                                        <span className="flex items-center gap-1 text-[9px] font-black uppercase bg-slate-500/25 text-slate-200 px-2 py-0.5 rounded border border-slate-500/50">
+                                                                            DESLIGADA: TURNO
                                                                         </span>
                                                                     )}
                                                                     {prog.isLive && !prog.isStopped && !prog.isPrep && !prog.isOffline && (
-                                                                        <span className="flex items-center gap-1 text-[8px] font-extrabold uppercase bg-cyan-500/25 text-[#00E5FF] px-1.5 py-0.5 rounded border border-[#00E5FF]/40 ring-1 ring-[#00E5FF]/40 animate-pulse">
+                                                                        <span className="flex items-center gap-1 text-[9px] font-black uppercase bg-cyan-500/30 text-[#00E5FF] px-2 py-0.5 rounded border border-[#00E5FF]/50 ring-1 ring-[#00E5FF]/50 animate-pulse">
                                                                             <span className="w-1.5 h-1.5 rounded-full bg-[#00E5FF] pulse-live" />
-                                                                            AO VIVO (EM OPERAÇÃO)
+                                                                            AO VIVO
                                                                         </span>
                                                                     )}
                                                                     {prog.isCompleted && (
-                                                                        <span className="text-[8px] font-extrabold uppercase bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/30">
+                                                                        <span className="text-[9px] font-black uppercase bg-emerald-500/25 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/40">
                                                                             CONCLUÍDA
                                                                         </span>
                                                                     )}
                                                                 </div>
-                                                                <span className="text-[9px] text-slate-300 font-bold truncate block mt-0.5">{subtitle}</span>
+                                                                <span className="text-[10px] sm:text-xs text-slate-100 font-extrabold truncate block mt-0.5 leading-snug">{subtitle}</span>
                                                             </div>
 
-                                                            <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+                                                            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                                                                 <button 
                                                                     onClick={() => setDiagnosticOP(op)}
-                                                                    className="text-slate-400 hover:text-amber-300 p-1 rounded transition-all hover:bg-black/20"
+                                                                    className="text-amber-400 hover:text-amber-300 p-1.5 rounded-lg transition-all hover:bg-white/10 bg-white/5 border border-white/5"
                                                                     title="Diagnóstico da Produção (Planejado vs Realizado)"
                                                                 >
-                                                                    <ClipboardListIcon className="w-3 h-3 text-amber-400" />
+                                                                    <ClipboardListIcon className="w-3.5 h-3.5 text-amber-400" />
                                                                 </button>
                                                                 <button 
                                                                     onClick={() => handleGoToProduction(op)}
-                                                                    className="text-slate-400 hover:text-emerald-400 p-1 rounded transition-all hover:bg-black/20"
+                                                                    className="text-emerald-400 hover:text-emerald-300 p-1.5 rounded-lg transition-all hover:bg-white/10 bg-white/5 border border-white/5"
                                                                     title={`Enviar / Abrir no Painel da Máquina (${op.scheduledMachine || op.machine})`}
                                                                 >
-                                                                    <PlayIcon className="w-3 h-3 text-emerald-400" />
+                                                                    <PlayIcon className="w-3.5 h-3.5 text-emerald-400" />
                                                                 </button>
                                                                 <button 
                                                                     onClick={() => handlePrintOP(op)}
-                                                                    className="text-slate-400 hover:text-cyan-300 p-1 rounded transition-all hover:bg-black/20"
+                                                                    className="text-cyan-400 hover:text-cyan-300 p-1.5 rounded-lg transition-all hover:bg-white/10 bg-white/5 border border-white/5"
                                                                     title="Imprimir Ficha de Produção (A4)"
                                                                 >
-                                                                    <PrinterIcon className="w-3 h-3" />
+                                                                    <PrinterIcon className="w-3.5 h-3.5" />
                                                                 </button>
                                                                 <button 
                                                                     onClick={() => openScheduleModal(op)}
-                                                                    className="text-slate-400 hover:text-[#00E5FF] p-1 rounded transition-all hover:bg-black/20"
+                                                                    className="text-slate-300 hover:text-[#00E5FF] p-1.5 rounded-lg transition-all hover:bg-white/10 bg-white/5 border border-white/5"
                                                                     title="Reagendar"
                                                                 >
-                                                                    <CalendarIcon className="w-3 h-3" />
+                                                                    <CalendarIcon className="w-3.5 h-3.5" />
                                                                 </button>
                                                                 <button 
                                                                     onClick={() => handleRemoveSchedule(op.id)}
-                                                                    className="text-slate-400 hover:text-red-400 p-1 rounded transition-all hover:bg-black/20"
+                                                                    className="text-slate-400 hover:text-red-400 p-1.5 rounded-lg transition-all hover:bg-white/10 bg-white/5 border border-white/5"
                                                                     title="Desagendar"
                                                                 >
-                                                                    <XIcon className="w-3 h-3" />
+                                                                    <XIcon className="w-3.5 h-3.5" />
                                                                 </button>
                                                             </div>
                                                         </div>
 
                                                         {/* Mini Barra de Progresso Real */}
                                                         <div className="my-1">
-                                                            <div className="flex items-center justify-between text-[8px] font-mono text-slate-300 mb-0.5">
+                                                            <div className="flex items-center justify-between text-[10px] font-mono text-slate-200 font-bold mb-0.5">
                                                                 <span>{prog.produced.toLocaleString('pt-BR')} / {prog.target.toLocaleString('pt-BR')} {prog.unit}</span>
                                                                 <span className="font-black text-white">{prog.pct}%</span>
                                                             </div>
-                                                            <div className="w-full bg-black/40 rounded-full h-1.5 overflow-hidden border border-white/5">
+                                                            <div className="w-full bg-black/50 rounded-full h-2 overflow-hidden border border-white/10">
                                                                 <div 
                                                                     className={`h-full ${barProgressColor} rounded-full transition-all duration-500`}
                                                                     style={{ width: `${prog.pct}%` }}
@@ -2107,37 +2233,37 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                         </div>
 
                                                         {/* Controles Rápidos de Dias */}
-                                                        <div className="flex items-center justify-between bg-black/30 px-2 py-0.5 rounded text-[8px] border border-white/5 select-none" onClick={(e) => e.stopPropagation()}>
-                                                            <div className="flex items-center gap-1">
+                                                        <div className="flex items-center justify-between bg-black/40 px-2.5 py-1 rounded-md text-[9px] border border-white/10 select-none" onClick={(e) => e.stopPropagation()}>
+                                                            <div className="flex items-center gap-1.5">
                                                                 <button 
                                                                     onClick={() => handleShiftOP(op, -1)}
-                                                                    className="text-slate-400 hover:text-[#00E5FF] font-bold transition-colors active:scale-90" 
+                                                                    className="text-slate-300 hover:text-[#00E5FF] font-black text-xs transition-colors active:scale-90 p-0.5" 
                                                                     title="Mover 1 dia antes"
                                                                 >
                                                                     ◀
                                                                 </button>
-                                                                <span className="text-[7px] uppercase font-black text-slate-400 tracking-tighter">MOVER</span>
+                                                                <span className="text-[8px] uppercase font-black text-slate-300 tracking-wider">MOVER</span>
                                                                 <button 
                                                                     onClick={() => handleShiftOP(op, 1)}
-                                                                    className="text-slate-400 hover:text-[#00E5FF] font-bold transition-colors active:scale-90"
+                                                                    className="text-slate-300 hover:text-[#00E5FF] font-black text-xs transition-colors active:scale-90 p-0.5"
                                                                     title="Mover 1 dia depois"
                                                                 >
                                                                     ▶
                                                                 </button>
                                                             </div>
 
-                                                            <div className="flex items-center gap-1.5 border-l border-white/10 pl-1.5">
+                                                            <div className="flex items-center gap-2 border-l border-white/15 pl-2">
                                                                 <button 
                                                                     onClick={() => handleAdjustDuration(op, -1)}
-                                                                    className="text-slate-400 hover:text-red-400 font-black text-[10px] transition-colors active:scale-90"
+                                                                    className="text-slate-300 hover:text-red-400 font-black text-xs transition-colors active:scale-90 px-1"
                                                                     title="Diminuir duração"
                                                                 >
                                                                     -
                                                                 </button>
-                                                                <span className="font-extrabold text-white">{op.estimatedDurationDays || 1}d</span>
+                                                                <span className="font-black text-xs text-white tracking-wide">{op.estimatedDurationDays || 1}d</span>
                                                                 <button 
                                                                     onClick={() => handleAdjustDuration(op, 1)}
-                                                                    className="text-slate-400 hover:text-emerald-400 font-black text-[10px] transition-colors active:scale-90"
+                                                                    className="text-slate-300 hover:text-emerald-400 font-black text-xs transition-colors active:scale-90 px-1"
                                                                     title="Aumentar duração"
                                                                 >
                                                                     +
