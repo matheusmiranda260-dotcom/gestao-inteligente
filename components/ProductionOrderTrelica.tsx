@@ -6,6 +6,7 @@ import ProductionOrderHistoryModal from './ProductionOrderHistoryModal';
 import ProductionOrderReport from './ProductionOrderReport';
 
 import { DEFAULT_TRELICA_MODELS } from '../utils/trelicaModelsData';
+export { trelicaModels, DEFAULT_TRELICA_MODELS } from '../utils/trelicaModelsData';
 import { supabase } from '../supabaseClient';
 
 const getWeightPerMeter = (d: string) => {
@@ -186,14 +187,14 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedMachineFilter, setSelectedMachineFilter] = useState<MachineType | 'Todas'>('Todas');
 
-    const [trelicaModels, setTrelicaModels] = useState<TrelicaModel[]>(DEFAULT_TRELICA_MODELS);
+    const [availableModels, setAvailableModels] = useState<TrelicaModel[]>(DEFAULT_TRELICA_MODELS);
 
     useEffect(() => {
         const loadModels = async () => {
             try {
                 const { data, error } = await supabase.from('trelica_models').select('*');
                 if (data && data.length > 0) {
-                    setTrelicaModels(data.map(m => ({
+                    setAvailableModels(data.map(m => ({
                         ...m,
                         pesoFinal: m.peso_final,
                         pesoSuperior: m.peso_superior,
@@ -295,7 +296,7 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
             setSelectedModel(null);
         } else {
             setIsCustomModel(false);
-            const model = trelicaModels.find(m => m.cod === cod) || null;
+            const model = availableModels.find(m => m.cod === cod) || null;
             setSelectedModel(model);
         }
         // Limpar seleções
@@ -687,7 +688,7 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
                             <div className="pt-8">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 px-1">Selecione o Modelo de Engenharia</label>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                                    {trelicaModels.map(m => {
+                                    {availableModels.map(m => {
                                         const isSelected = selectedModel?.cod === m.cod;
                                         return (
                                             <button

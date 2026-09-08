@@ -58,6 +58,10 @@ export interface TrelicaModel {
     peso_superior: string;
     peso_senozoide: string;
     peso_inferior: string;
+    pesoFinal?: string;
+    pesoSuperior?: string;
+    pesoSenozoide?: string;
+    pesoInferior?: string;
     created_at?: string;
 }
 
