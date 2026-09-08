@@ -22,6 +22,7 @@ import SparePartsManager from './components/SparePartsManager';
 import ProductionControl from './components/ProductionControl';
 import { PCPBoard } from './components/PCPBoard';
 import ProductionScheduling from './components/ProductionScheduling';
+import ProductsManagement from './components/ProductsManagement';
 
 import ContinuousImprovement from './components/ContinuousImprovement';
 import WorkInstructions from './components/WorkInstructions';
@@ -2721,6 +2722,7 @@ const App: React.FC = () => {
             case 'productionDashboard': return <ProductionDashboard setPage={setPage} productionOrders={productionOrders} stock={stock} currentUser={currentUser} downtimeConfigs={downtimeConfigs} />;
 
             case 'productionScheduling': return <ProductionScheduling schedules={productionSchedules} setSchedules={setProductionSchedules} setPage={setPage} />;
+            case 'productsManagement': return <ProductsManagement setPage={setPage} currentUser={currentUser} showNotification={showNotification} />;
             case 'trefilaControl': return <ProductionControl machineCategory="Trefila" setPage={setPage} productionOrders={productionOrders} shiftReports={shiftReports} currentUser={currentUser} onUpdateReport={handleUpdateShiftReport} onDeleteReport={deleteShiftReport} updateProductionOrder={updateProductionOrder} stock={stock} />;
             case 'trelicaControl': return <ProductionControl machineCategory="Treliça" setPage={setPage} productionOrders={productionOrders} shiftReports={shiftReports} currentUser={currentUser} onUpdateReport={handleUpdateShiftReport} onDeleteReport={deleteShiftReport} updateProductionOrder={updateProductionOrder} stock={stock} />;
             case 'malhaControl': return <ProductionControl machineCategory="Malha" setPage={setPage} productionOrders={productionOrders} shiftReports={shiftReports} currentUser={currentUser} onUpdateReport={handleUpdateShiftReport} onDeleteReport={deleteShiftReport} updateProductionOrder={updateProductionOrder} stock={stock} />;

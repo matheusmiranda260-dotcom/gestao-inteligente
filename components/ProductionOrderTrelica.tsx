@@ -5,27 +5,8 @@ import { ArrowLeftIcon, WarningIcon, ClipboardListIcon, DocumentReportIcon, Chec
 import ProductionOrderHistoryModal from './ProductionOrderHistoryModal';
 import ProductionOrderReport from './ProductionOrderReport';
 
-export const trelicaModels = [
-    { cod: 'H6LE12S', modelo: 'H-6 LEVE (ESPAÇADOR)', tamanho: '12', superior: '5,4', inferior: '3,2', senozoide: '3,2', pesoFinal: '5,502', pesoSuperior: '2,158', pesoSenozoide: '1,828', pesoInferior: '1,517' },
-    { cod: 'H6_12', modelo: 'H-6', tamanho: '12', superior: '5,6', inferior: '3,8', senozoide: '3,2', pesoFinal: '6,288', pesoSuperior: '2,322', pesoSenozoide: '1,828', pesoInferior: '2,138' },
-    { cod: 'H8L6', modelo: 'H-8 LEVE', tamanho: '6', superior: '5,6', inferior: '3,2', senozoide: '3,2', pesoFinal: '2,898', pesoSuperior: '1,161', pesoSenozoide: '0,979', pesoInferior: '0,758' },
-    { cod: 'H8L12', modelo: 'H-8 LEVE', tamanho: '12', superior: '5,6', inferior: '3,2', senozoide: '3,2', pesoFinal: '5,797', pesoSuperior: '2,322', pesoSenozoide: '1,958', pesoInferior: '1,517' },
-    { cod: 'H8M6', modelo: 'H-8 MÉDIA', tamanho: '6', superior: '5,6', inferior: '3,8', senozoide: '3,2', pesoFinal: '3,209', pesoSuperior: '1,161', pesoSenozoide: '0,979', pesoInferior: '1,069' },
-    { cod: 'H8M12', modelo: 'H-8 MÉDIA', tamanho: '12', superior: '5,6', inferior: '3,8', senozoide: '3,2', pesoFinal: '6,418', pesoSuperior: '2,322', pesoSenozoide: '1,958', pesoInferior: '2,138' },
-    { cod: 'H8P6', modelo: 'H-8 PESADA', tamanho: '6', superior: '6', inferior: '3,8', senozoide: '4,2', pesoFinal: '4,087', pesoSuperior: '1,333', pesoSenozoide: '1,685', pesoInferior: '1,069' },
-    { cod: 'H8P12', modelo: 'H-8 PESADA', tamanho: '12', superior: '6', inferior: '3,8', senozoide: '4,2', pesoFinal: '8,174', pesoSuperior: '2,665', pesoSenozoide: '3,371', pesoInferior: '2,138' },
-    { cod: 'H8SP6', modelo: 'H-8 SUPER PESADO', tamanho: '6', superior: '6', inferior: '4,2', senozoide: '4,2', pesoFinal: '4,324', pesoSuperior: '1,333', pesoSenozoide: '1,686', pesoInferior: '1,305' },
-    { cod: 'H8SP12', modelo: 'H-8 SUPER PESADO', tamanho: '12', superior: '6', inferior: '4,2', senozoide: '4,2', pesoFinal: '8,647', pesoSuperior: '2,665', pesoSenozoide: '3,371', pesoInferior: '2,611' },
-    { cod: 'H10L6', modelo: 'H-10 LEVE', tamanho: '6', superior: '5,8', inferior: '3,8', senozoide: '3,8', pesoFinal: '3,843', pesoSuperior: '1,246', pesoSenozoide: '1,528', pesoInferior: '1,069' },
-    { cod: 'H10L12', modelo: 'H-10 LEVE', tamanho: '12', superior: '5,8', inferior: '3,8', senozoide: '3,8', pesoFinal: '7,686', pesoSuperior: '2,491', pesoSenozoide: '3,057', pesoInferior: '2,138' },
-    { cod: 'H10P12', modelo: 'H-10 PESADA', tamanho: '12', superior: '6', inferior: '4,2', senozoide: '4,2', pesoFinal: '9,057', pesoSuperior: '2,665', pesoSenozoide: '3,780', pesoInferior: '2,611' },
-    { cod: 'H12L6', modelo: 'H-12 LEVE', tamanho: '6', superior: '5,8', inferior: '3,8', senozoide: '3,2', pesoFinal: '3,522', pesoSuperior: '1,246', pesoSenozoide: '1,207', pesoInferior: '1,069' },
-    { cod: 'H12L12', modelo: 'H-12 LEVE', tamanho: '12', superior: '5,8', inferior: '3,8', senozoide: '3,2', pesoFinal: '7,044', pesoSuperior: '2,491', pesoSenozoide: '2,414', pesoInferior: '2,138' },
-    { cod: 'H12P6', modelo: 'H-12 PESADA', tamanho: '6', superior: '6', inferior: '5', senozoide: '4,2', pesoFinal: '5,270', pesoSuperior: '1,333', pesoSenozoide: '2,086', pesoInferior: '1,852' },
-    { cod: 'H12P12', modelo: 'H-12 PESADA', tamanho: '12', superior: '6', inferior: '5', senozoide: '4,2', pesoFinal: '10,540', pesoSuperior: '2,665', pesoSenozoide: '4,172', pesoInferior: '3,703' },
-    { cod: 'H16_12', modelo: 'H-16', tamanho: '12', superior: '6', inferior: '5', senozoide: '4,2', pesoFinal: '11,263', pesoSuperior: '2,665', pesoSenozoide: '4,894', pesoInferior: '3,703' },
-    { cod: 'H25_12', modelo: 'H-25', tamanho: '12', superior: '8', inferior: '6', senozoide: '5', pesoFinal: '20,042', pesoSuperior: '4,739', pesoSenozoide: '9,973', pesoInferior: '5,330' },
-];
+import { DEFAULT_TRELICA_MODELS } from '../utils/trelicaModelsData';
+import { supabase } from '../supabaseClient';
 
 const getWeightPerMeter = (d: string) => {
     const dNum = parseFloat(d.replace(',', '.'));
@@ -57,7 +38,7 @@ const calculateTrelicaWeights = (tamanhoStr: string, superior: string, inferior:
         pesoFinal: (wSup + wInf + wSen).toFixed(3).replace('.', ',')
     };
 };
-type TrelicaModel = typeof trelicaModels[number];
+type TrelicaModel = typeof DEFAULT_TRELICA_MODELS[number];
 type AvailableStockItem = StockItem & { availableQuantity: number };
 
 const normalizeBitola = (bitolaString: string) => parseFloat(bitolaString.replace(',', '.')).toFixed(2);
@@ -202,6 +183,31 @@ const MultiLotSelector: React.FC<MultiLotSelectorProps> = ({ label, subLabel, av
 
 const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage, stock, productionOrders, addProductionOrder, showNotification, updateProductionOrder, deleteProductionOrder, gauges, currentUser }) => {
     const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor';
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedMachineFilter, setSelectedMachineFilter] = useState<MachineType | 'Todas'>('Todas');
+
+    const [trelicaModels, setTrelicaModels] = useState<TrelicaModel[]>(DEFAULT_TRELICA_MODELS);
+
+    useEffect(() => {
+        const loadModels = async () => {
+            try {
+                const { data, error } = await supabase.from('trelica_models').select('*');
+                if (data && data.length > 0) {
+                    setTrelicaModels(data.map(m => ({
+                        ...m,
+                        pesoFinal: m.peso_final,
+                        pesoSuperior: m.peso_superior,
+                        pesoSenozoide: m.peso_senozoide,
+                        pesoInferior: m.peso_inferior
+                    })));
+                }
+            } catch (err) {
+                console.error("Failed to load models", err);
+            }
+        };
+        loadModels();
+    }, []);
+
     const [orderNumber, setOrderNumber] = useState('');
     const [selectedMachine, setSelectedMachine] = useState<MachineType>('Treliça 1');
     const [assignedMachine, setAssignedMachine] = useState<MachineType | null>(null);

@@ -322,6 +322,7 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                     <MenuItem target="productionOrder" label="Ordens (Trefila)" icon={ClipboardListIcon} />
                     <MenuItem target="productionOrderTrelica" label="Ordens (Treliça)" icon={ClipboardListIcon} />
                     <MenuItem target="productionOrderMalha" label="Ordens (Malha)" icon={ClipboardListIcon} />
+                    <MenuItem target="productsManagement" label="Fichas Técnicas" icon={AdjustmentsIcon} />
                 </div>
 
                 {/* CONTROLE DE PRODUÇÃO */}

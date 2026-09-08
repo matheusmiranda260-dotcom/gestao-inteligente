@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Page, ProductionOrderData, StockItem, User, StockGauge, ShiftReport, MachineType, Bitola, DowntimeConfig, Employee } from '../types';
 import { FioMaquinaBitolaOptions, TrefilaBitolaOptions } from '../types';
-import { trelicaModels } from './ProductionOrderTrelica';
+import { DEFAULT_TRELICA_MODELS } from '../utils/trelicaModelsData';
+import { supabase } from '../supabaseClient';
 import { 
     CalendarIcon, PlusIcon, ChevronRightIcon, XIcon, ArrowLeftIcon, 
     TrashIcon, PlayIcon, CheckCircleIcon, ClockIcon, ChartBarIcon, 
@@ -80,6 +81,30 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     const [isHeaderCollapsed, setIsHeaderCollapsed] = useState<boolean>(() => {
         return localStorage.getItem('pcp_header_collapsed') === 'true';
     });
+
+    type TrelicaModel = typeof DEFAULT_TRELICA_MODELS[number];
+    const [trelicaModels, setTrelicaModels] = useState<TrelicaModel[]>(DEFAULT_TRELICA_MODELS);
+
+    useEffect(() => {
+        const loadModels = async () => {
+            try {
+                const { data, error } = await supabase.from('trelica_models').select('*');
+                if (data && data.length > 0) {
+                    setTrelicaModels(data.map(m => ({
+                        ...m,
+                        pesoFinal: m.peso_final,
+                        pesoSuperior: m.peso_superior,
+                        pesoSenozoide: m.peso_senozoide,
+                        pesoInferior: m.peso_inferior
+                    })));
+                }
+            } catch (err) {
+                console.error("Failed to load models", err);
+            }
+        };
+        loadModels();
+    }, []);
+
 
     const handleToggleFullscreen = () => {
         const next = !isPcpFullscreen;
