@@ -89,8 +89,27 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     // Estado de data de referência (inicializado com a data atual)
     const [currentDate, setCurrentDate] = useState<Date>(new Date());
 
-    // Filtro de máquinas visíveis
-    const [selectedMachinesFilter, setSelectedMachinesFilter] = useState<string[]>(MACHINES.map(m => m.name));
+    // Filtro de máquinas visíveis (com persistência no localStorage)
+    const [selectedMachinesFilter, setSelectedMachinesFilter] = useState<string[]>(() => {
+        try {
+            const saved = localStorage.getItem('pcp_selected_machines_filter');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    const valid = parsed.filter((m: string) => MACHINES.some(mach => mach.name === m));
+                    if (valid.length > 0) return valid;
+                }
+            }
+        } catch {}
+        return MACHINES.map(m => m.name);
+    });
+
+    // Salvar filtro de máquinas sempre que alterado
+    useEffect(() => {
+        try {
+            localStorage.setItem('pcp_selected_machines_filter', JSON.stringify(selectedMachinesFilter));
+        } catch {}
+    }, [selectedMachinesFilter]);
 
     // Relógio em tempo real para os cronômetros das máquinas e paradas (atualiza a cada 1 segundo)
     const [liveNow, setLiveNow] = useState<Date>(new Date());
@@ -1502,25 +1521,56 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                         {/* Seletor de Máquinas */}
                         <div className="flex items-center gap-1 bg-[#06121B] p-1 rounded-xl border border-white/5 overflow-hidden">
+                            {/* Botão Todas as Máquinas */}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSelectedMachinesFilter(MACHINES.map(m => m.name));
+                                }}
+                                className={`px-2 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all whitespace-nowrap ${
+                                    selectedMachinesFilter.length === MACHINES.length
+                                        ? 'bg-[#00E5FF]/20 text-[#00E5FF] border border-[#00E5FF]/40 shadow-sm'
+                                        : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
+                                }`}
+                                title="Exibir todas as máquinas no quadro PCP"
+                            >
+                                Todas
+                            </button>
+
                             {MACHINES.map(mach => {
                                 const isSelected = selectedMachinesFilter.includes(mach.name);
+                                const isAllSelected = selectedMachinesFilter.length === MACHINES.length;
+                                
+                                let activeColorClass = 'bg-white/15 text-white border-white/30';
+                                if (mach.type === 'Trefila') activeColorClass = 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40';
+                                if (mach.type === 'Treliça') activeColorClass = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+                                if (mach.type === 'Malha') activeColorClass = 'bg-violet-500/20 text-violet-300 border-violet-500/40';
+
                                 return (
                                     <button
                                         key={mach.name}
+                                        type="button"
                                         onClick={() => {
-                                            if (isSelected) {
+                                            if (isAllSelected) {
+                                                // Se todas estavam ativas, um único clique isola a máquina escolhida
+                                                setSelectedMachinesFilter([mach.name]);
+                                            } else if (isSelected) {
                                                 if (selectedMachinesFilter.length > 1) {
                                                     setSelectedMachinesFilter(prev => prev.filter(m => m !== mach.name));
+                                                } else {
+                                                    // Se era a única selecionada e clicou nela de novo, volta a exibir todas
+                                                    setSelectedMachinesFilter(MACHINES.map(m => m.name));
                                                 }
                                             } else {
                                                 setSelectedMachinesFilter(prev => [...prev, mach.name]);
                                             }
                                         }}
-                                        className={`px-2 py-1.5 rounded-lg text-[9px] font-bold uppercase transition-all whitespace-nowrap ${
+                                        className={`px-2 py-1.5 rounded-lg text-[9px] font-bold uppercase transition-all whitespace-nowrap border ${
                                             isSelected 
-                                                ? 'bg-white/10 text-white shadow-sm' 
-                                                : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+                                                ? `${activeColorClass} shadow-sm` 
+                                                : 'text-slate-500 hover:text-slate-300 hover:bg-white/5 border-transparent'
                                         }`}
+                                        title={`Filtrar ${mach.name} (clique para alternar)`}
                                     >
                                         {mach.name.replace('Trefila ', 'TR ').replace('Treliça ', 'TL ').replace('Malha ', 'ML ')}
                                     </button>
