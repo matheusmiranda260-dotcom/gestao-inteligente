@@ -253,7 +253,13 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         const onlineUser = users.find(u => {
             if (!u.isOnline) return false;
             const emp = employees.find(e => e.id === u.employeeId || e.appUserId === u.id);
-            return emp && (emp.assignedMachine === machName || (emp.sector && emp.sector.toUpperCase() === machName.toUpperCase()));
+            if (!emp) return false;
+            // Se tiver máquina expressamente designada, usa ela com exclusividade
+            if (emp.assignedMachine) {
+                return emp.assignedMachine.toLowerCase() === machName.toLowerCase();
+            }
+            // Caso contrário, valida pelo setor exato
+            return emp.sector && emp.sector.toUpperCase() === machName.toUpperCase();
         });
 
         if (onlineUser) {
@@ -272,12 +278,13 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         }
 
         // 4. Operador cadastrado/designado para esta máquina
-        const assignedEmp = employees.find(e => 
-            e.active && (
-                e.assignedMachine === machName || 
-                (e.sector && e.sector.toUpperCase() === machName.toUpperCase())
-            )
-        );
+        const assignedEmp = employees.find(e => {
+            if (!e.active) return false;
+            if (e.assignedMachine) {
+                return e.assignedMachine.toLowerCase() === machName.toLowerCase();
+            }
+            return e.sector && e.sector.toUpperCase() === machName.toUpperCase();
+        });
 
         if (assignedEmp) {
             return {
