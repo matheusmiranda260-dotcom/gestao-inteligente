@@ -226,10 +226,16 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             );
             const activeMachInStorage = typeof localStorage !== 'undefined' ? localStorage.getItem('msm_active_machine') : null;
             
+            // Prioriza a máquina que o usuário selecionou no localStorage. Se não houver, usa a designada.
+            const targetMachine = (activeMachInStorage && currentUser.role === 'user') 
+                ? activeMachInStorage 
+                : currentEmp?.assignedMachine;
+            
+            const matchesSector = currentEmp?.sector && currentEmp.sector.toUpperCase() === machName.toUpperCase();
+            
             if (
-                currentEmp?.assignedMachine === machName ||
-                (activeMachInStorage === machName && currentUser.role === 'user') ||
-                (currentEmp?.sector && currentEmp.sector.toUpperCase() === machName.toUpperCase())
+                targetMachine === machName ||
+                (!targetMachine && matchesSector)
             ) {
                 return {
                     name: currentEmp?.name || currentUser.username,
