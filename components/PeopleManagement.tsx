@@ -2840,42 +2840,81 @@ const VLine: React.FC<{ height?: number }> = ({ height = 32 }) => (
 
 const BlueLabelBox: React.FC<{ label: string }> = ({ label }) => {
     const [currentText, setCurrentText] = React.useState(label);
+    const [isEditing, setIsEditing] = React.useState(false);
     
     React.useEffect(() => {
         const stored = localStorage.getItem('gestao_label_' + label);
         if (stored) setCurrentText(stored);
     }, [label]);
 
-    const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-        const newVal = e.target.value.trim();
-        const finalVal = newVal || label; // Revert to default if empty
+    const handleSave = (newVal: string) => {
+        const finalVal = newVal.trim() || label;
         setCurrentText(finalVal);
         localStorage.setItem('gestao_label_' + label, finalVal);
+        setIsEditing(false);
     };
 
     return (
-        <div style={{ display: 'inline-grid', alignItems: 'center', justifyItems: 'center' }}>
-            <span style={{ 
-                visibility: 'hidden', 
-                gridArea: '1 / 1', 
-                fontWeight: 900, fontSize: 14, letterSpacing: 2, textTransform: 'uppercase', 
-                padding: '10px 36px', whiteSpace: 'nowrap', minWidth: 200
-            }}>
-                {currentText || label}
-            </span>
-            <input 
-                value={currentText}
-                onChange={e => setCurrentText(e.target.value)}
-                onBlur={handleBlur}
-                style={{
-                    gridArea: '1 / 1',
-                    width: '100%',
-                    background: '#4F81BD', border: '2px solid #2F5496', color: '#fff',
-                    fontWeight: 900, fontSize: 14, letterSpacing: 2, textTransform: 'uppercase',
-                    padding: '10px 36px', textAlign: 'center', minWidth: 200, boxSizing: 'border-box',
-                    outline: 'none', cursor: 'text'
-                }}
-            />
+        <div 
+            onClick={() => setIsEditing(true)}
+            style={{ 
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: '#4F81BD', 
+                border: '2.5px solid #2F5496', 
+                borderRadius: '6px',
+                color: '#ffffff',
+                fontWeight: 900, 
+                fontSize: '13px', 
+                textTransform: 'uppercase',
+                padding: '10px 28px', 
+                textAlign: 'center', 
+                minWidth: '180px', 
+                boxSizing: 'border-box',
+                cursor: 'pointer',
+                lineHeight: '1.2',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.12)'
+            }}
+            title="Clique para editar este título"
+        >
+            {isEditing ? (
+                <input 
+                    autoFocus
+                    value={currentText}
+                    onChange={e => setCurrentText(e.target.value)}
+                    onBlur={e => handleSave(e.target.value)}
+                    onKeyDown={e => {
+                        if (e.key === 'Enter') handleSave((e.target as HTMLInputElement).value);
+                        if (e.key === 'Escape') setIsEditing(false);
+                    }}
+                    style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#ffffff',
+                        fontWeight: 900,
+                        fontSize: '13px',
+                        textTransform: 'uppercase',
+                        textAlign: 'center',
+                        width: '100%',
+                        outline: 'none',
+                        padding: 0,
+                        margin: 0
+                    }}
+                />
+            ) : (
+                <span style={{ 
+                    whiteSpace: 'nowrap', 
+                    display: 'block', 
+                    color: '#ffffff',
+                    fontWeight: 900,
+                    fontSize: '13px',
+                    letterSpacing: '0.5px',
+                    textTransform: 'uppercase'
+                }}>
+                    {(currentText || label).toUpperCase()}
+                </span>
+            )}
         </div>
     );
 };
@@ -3100,10 +3139,30 @@ const OrgChart: React.FC<{
                 useCORS: true,
                 logging: false,
                 backgroundColor: '#ffffff',
+                scrollX: 0,
+                scrollY: 0,
                 onclone: (clonedDoc) => {
                     const clonedElement = clonedDoc.getElementById('org-chart-sheet');
                     if (clonedElement) {
                         clonedElement.style.overflow = 'visible';
+
+                        // Substitui qualquer input remanescente por texto limpo no canvas
+                        const clonedInputs = clonedElement.querySelectorAll('input');
+                        clonedInputs.forEach((inp: any) => {
+                            const val = inp.value || inp.getAttribute('value') || '';
+                            const span = clonedDoc.createElement('span');
+                            span.textContent = val.toUpperCase();
+                            span.style.color = '#ffffff';
+                            span.style.fontWeight = '900';
+                            span.style.fontSize = '13px';
+                            span.style.textTransform = 'uppercase';
+                            span.style.letterSpacing = '0.5px';
+                            span.style.whiteSpace = 'nowrap';
+                            span.style.display = 'block';
+                            span.style.textAlign = 'center';
+                            span.style.lineHeight = '1.2';
+                            inp.parentNode?.replaceChild(span, inp);
+                        });
                     }
                 }
             });
