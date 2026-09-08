@@ -187,20 +187,38 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedMachineFilter, setSelectedMachineFilter] = useState<MachineType | 'Todas'>('Todas');
 
-    const [availableModels, setAvailableModels] = useState<TrelicaModel[]>(DEFAULT_TRELICA_MODELS);
+    const [availableModels, setAvailableModels] = useState<TrelicaModel[]>(() => {
+        try {
+            const saved = localStorage.getItem('cached_trelica_models');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            }
+        } catch (e) {}
+        return DEFAULT_TRELICA_MODELS;
+    });
 
     useEffect(() => {
         const loadModels = async () => {
             try {
+                const saved = localStorage.getItem('cached_trelica_models');
+                if (saved) {
+                    try {
+                        const parsed = JSON.parse(saved);
+                        if (Array.isArray(parsed) && parsed.length > 0) setAvailableModels(parsed);
+                    } catch (e) {}
+                }
                 const { data, error } = await supabase.from('trelica_models').select('*');
                 if (data && data.length > 0) {
-                    setAvailableModels(data.map(m => ({
+                    const mapped = data.map(m => ({
                         ...m,
                         pesoFinal: m.peso_final,
                         pesoSuperior: m.peso_superior,
                         pesoSenozoide: m.peso_senozoide,
                         pesoInferior: m.peso_inferior
-                    })));
+                    }));
+                    setAvailableModels(mapped);
+                    localStorage.setItem('cached_trelica_models', JSON.stringify(mapped));
                 }
             } catch (err) {
                 console.error("Failed to load models", err);

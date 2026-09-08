@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { Page, TrelicaModel, User } from '../types';
 import { supabase } from '../supabaseClient';
+import { DEFAULT_TRELICA_MODELS } from '../utils/trelicaModelsData';
 import { 
     PlusIcon, 
     TrashIcon, 
@@ -48,8 +49,21 @@ const calculateTrelicaWeights = (tamanhoStr: string, superior: string, inferior:
 };
 
 export const ProductsManagement: React.FC<ProductsManagementProps> = ({ setPage, currentUser, showNotification }) => {
-    const [models, setModels] = useState<TrelicaModel[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [models, setModels] = useState<TrelicaModel[]>(() => {
+        try {
+            const saved = localStorage.getItem('cached_trelica_models');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            }
+        } catch (e) {
+            console.error(e);
+        }
+        return DEFAULT_TRELICA_MODELS;
+    });
+
+    const [loading, setLoading] = useState(false);
+    const [isCloudSync, setIsCloudSync] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingModel, setEditingModel] = useState<TrelicaModel | null>(null);
 
@@ -79,16 +93,42 @@ export const ProductsManagement: React.FC<ProductsManagementProps> = ({ setPage,
                 .select('*')
                 .order('modelo', { ascending: true });
 
-            if (error) {
-                // Se a tabela não existir ainda, silencia o erro
-                if (error.code !== '42P01') {
-                    showNotification('Erro ao buscar modelos de treliça.', 'error');
-                }
+            if (!error && data && data.length > 0) {
+                const mappedData = data.map(m => ({
+                    ...m,
+                    pesoFinal: m.peso_final,
+                    pesoSuperior: m.peso_superior,
+                    pesoSenozoide: m.peso_senozoide,
+                    pesoInferior: m.peso_inferior
+                }));
+                setModels(mappedData);
+                localStorage.setItem('cached_trelica_models', JSON.stringify(mappedData));
+                setIsCloudSync(true);
             } else {
-                setModels(data || []);
+                // Tabela não existe ou está vazia no Supabase: usar cache local ou modelos padrão
+                const saved = localStorage.getItem('cached_trelica_models');
+                if (saved) {
+                    try {
+                        const parsed = JSON.parse(saved);
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                            setModels(parsed);
+                        } else {
+                            setModels(DEFAULT_TRELICA_MODELS);
+                            localStorage.setItem('cached_trelica_models', JSON.stringify(DEFAULT_TRELICA_MODELS));
+                        }
+                    } catch (e) {
+                        setModels(DEFAULT_TRELICA_MODELS);
+                    }
+                } else {
+                    setModels(DEFAULT_TRELICA_MODELS);
+                    localStorage.setItem('cached_trelica_models', JSON.stringify(DEFAULT_TRELICA_MODELS));
+                }
+                setIsCloudSync(false);
             }
         } catch (err) {
             console.error(err);
+            setModels(DEFAULT_TRELICA_MODELS);
+            setIsCloudSync(false);
         } finally {
             setLoading(false);
         }
@@ -99,7 +139,7 @@ export const ProductsManagement: React.FC<ProductsManagementProps> = ({ setPage,
         setFormData(prev => {
             const next = { ...prev, [name]: value };
             
-            // Auto calculate se os campos principais mudaram e não estamos editando os pesos manualmente
+            // Auto calculate se os campos principais mudaram
             if (['modelo', 'tamanho', 'superior', 'inferior', 'senozoide'].includes(name)) {
                 const calc = calculateTrelicaWeights(next.tamanho, next.superior, next.inferior, next.senozoide, next.modelo);
                 if (calc) {
@@ -120,50 +160,83 @@ export const ProductsManagement: React.FC<ProductsManagementProps> = ({ setPage,
         }
 
         try {
-            if (editingModel) {
-                const { error } = await supabase
-                    .from('trelica_models')
-                    .update(formData)
-                    .eq('id', editingModel.id);
-                
-                if (error) throw error;
-                showNotification('Modelo atualizado com sucesso!', 'success');
-            } else {
-                const { error } = await supabase
-                    .from('trelica_models')
-                    .insert([formData]);
-                
-                if (error) throw error;
-                showNotification('Modelo cadastrado com sucesso!', 'success');
+            // Tenta salvar no Supabase se a nuvem estiver ativa
+            if (isCloudSync) {
+                if (editingModel) {
+                    await supabase
+                        .from('trelica_models')
+                        .update(formData)
+                        .eq('id', editingModel.id);
+                } else {
+                    await supabase
+                        .from('trelica_models')
+                        .insert([formData]);
+                }
             }
+
+            // Sempre atualiza o estado local e o cache do navegador
+            setModels(prev => {
+                let updated: TrelicaModel[];
+                if (editingModel) {
+                    updated = prev.map(m => m.id === editingModel.id ? { 
+                        ...m, 
+                        ...formData,
+                        pesoFinal: formData.peso_final,
+                        pesoSuperior: formData.peso_superior,
+                        pesoSenozoide: formData.peso_senozoide,
+                        pesoInferior: formData.peso_inferior
+                    } : m);
+                } else {
+                    const newModel: TrelicaModel = {
+                        id: String(Date.now()),
+                        ...formData,
+                        pesoFinal: formData.peso_final,
+                        pesoSuperior: formData.peso_superior,
+                        pesoSenozoide: formData.peso_senozoide,
+                        pesoInferior: formData.peso_inferior
+                    };
+                    updated = [...prev, newModel];
+                }
+                localStorage.setItem('cached_trelica_models', JSON.stringify(updated));
+                return updated;
+            });
             
+            showNotification(editingModel ? 'Modelo atualizado com sucesso!' : 'Modelo cadastrado com sucesso!', 'success');
             setIsModalOpen(false);
             setEditingModel(null);
             setFormData({
                 cod: '', modelo: '', tamanho: '', superior: '', inferior: '', senozoide: '',
                 peso_final: '', peso_superior: '', peso_senozoide: '', peso_inferior: ''
             });
-            fetchModels();
         } catch (err: any) {
             showNotification('Erro ao salvar modelo: ' + err.message, 'error');
         }
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Tem certeza que deseja excluir este modelo? Ele pode estar em uso no PCP.')) return;
+        if (!confirm('Tem certeza que deseja excluir este modelo?')) return;
         
         try {
-            const { error } = await supabase
-                .from('trelica_models')
-                .delete()
-                .eq('id', id);
+            if (isCloudSync) {
+                await supabase.from('trelica_models').delete().eq('id', id);
+            }
             
-            if (error) throw error;
+            setModels(prev => {
+                const updated = prev.filter(m => m.id !== id);
+                localStorage.setItem('cached_trelica_models', JSON.stringify(updated));
+                return updated;
+            });
             showNotification('Modelo excluído com sucesso!', 'success');
-            fetchModels();
         } catch (err: any) {
             showNotification('Erro ao excluir: ' + err.message, 'error');
         }
+    };
+
+    const handleRestoreDefaults = () => {
+        if (!confirm('Deseja restaurar a lista padrão de 19 modelos de treliça?')) return;
+        setModels(DEFAULT_TRELICA_MODELS);
+        localStorage.setItem('cached_trelica_models', JSON.stringify(DEFAULT_TRELICA_MODELS));
+        showNotification('Modelos padrão restaurados com sucesso!', 'success');
     };
 
     const openEdit = (model: TrelicaModel) => {
@@ -191,6 +264,7 @@ export const ProductsManagement: React.FC<ProductsManagementProps> = ({ setPage,
                     <button 
                         onClick={() => setPage('menu')}
                         className="p-2 hover:bg-slate-700 rounded-lg transition-colors text-slate-400 hover:text-white"
+                        title="Voltar ao Menu"
                     >
                         <ArrowLeftIcon className="h-5 w-5" />
                     </button>
@@ -203,30 +277,52 @@ export const ProductsManagement: React.FC<ProductsManagementProps> = ({ setPage,
                     </div>
                 </div>
 
-                <div className="flex justify-between items-center">
-                    <div className="text-sm text-slate-400">
-                        {models.length} modelos cadastrados
+                <div className="flex flex-wrap justify-between items-center gap-4">
+                    <div className="flex items-center gap-3 text-sm text-slate-400">
+                        <span className="font-bold text-white bg-slate-700/60 px-3 py-1 rounded-full border border-slate-600">
+                            {models.length} modelos cadastrados
+                        </span>
+                        {isCloudSync ? (
+                            <span className="flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                                Sincronizado na Nuvem
+                            </span>
+                        ) : (
+                            <span className="flex items-center gap-1.5 text-xs text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20" title="Para salvar diretamente no banco de dados Supabase para todos os usuários, execute o script SQL trelica_models.sql">
+                                💾 Armazenamento Local Ativo
+                            </span>
+                        )}
                     </div>
-                    <button
-                        onClick={() => {
-                            setEditingModel(null);
-                            setFormData({
-                                cod: '', modelo: '', tamanho: '', superior: '', inferior: '', senozoide: '',
-                                peso_final: '', peso_superior: '', peso_senozoide: '', peso_inferior: ''
-                            });
-                            setIsModalOpen(true);
-                        }}
-                        className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors shadow-lg shadow-emerald-500/20"
-                    >
-                        <PlusIcon className="h-5 w-5" />
-                        Novo Modelo
-                    </button>
+
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={handleRestoreDefaults}
+                            className="bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-2 rounded-lg text-xs font-bold transition-colors border border-slate-600"
+                            title="Restaurar os 19 modelos padrão originais"
+                        >
+                            ⚡ Restaurar Padrões
+                        </button>
+                        <button
+                            onClick={() => {
+                                setEditingModel(null);
+                                setFormData({
+                                    cod: '', modelo: '', tamanho: '', superior: '', inferior: '', senozoide: '',
+                                    peso_final: '', peso_superior: '', peso_senozoide: '', peso_inferior: ''
+                                });
+                                setIsModalOpen(true);
+                            }}
+                            className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors shadow-lg shadow-emerald-500/20 text-sm"
+                        >
+                            <PlusIcon className="h-5 w-5" />
+                            Novo Modelo
+                        </button>
+                    </div>
                 </div>
             </div>
 
             {/* Content */}
             <div className="p-6">
-                {loading ? (
+                {loading && models.length === 0 ? (
                     <div className="flex justify-center items-center py-20">
                         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-emerald-500"></div>
                     </div>
@@ -248,38 +344,38 @@ export const ProductsManagement: React.FC<ProductsManagementProps> = ({ setPage,
                                 </thead>
                                 <tbody className="divide-y divide-slate-700/50">
                                     {models.map(model => (
-                                        <tr key={model.id} className="hover:bg-slate-700/30 transition-colors">
-                                            <td className="px-4 py-3 font-mono text-emerald-400">{model.cod}</td>
+                                        <tr key={model.id || model.cod} className="hover:bg-slate-700/30 transition-colors">
+                                            <td className="px-4 py-3 font-mono text-emerald-400 font-bold">{model.cod}</td>
                                             <td className="px-4 py-3 font-bold text-slate-200">{model.modelo}</td>
                                             <td className="px-4 py-3">{model.tamanho}m</td>
                                             <td className="px-4 py-3">
-                                                <div className="text-xs">{model.superior}</div>
-                                                <div className="text-[10px] text-slate-500">{model.peso_superior}kg</div>
+                                                <div className="text-xs font-semibold">{model.superior}</div>
+                                                <div className="text-[10px] text-slate-400">{model.peso_superior || model.pesoSuperior}kg</div>
                                             </td>
                                             <td className="px-4 py-3">
-                                                <div className="text-xs">{model.inferior}</div>
-                                                <div className="text-[10px] text-slate-500">{model.peso_inferior}kg</div>
+                                                <div className="text-xs font-semibold">{model.inferior}</div>
+                                                <div className="text-[10px] text-slate-400">{model.peso_inferior || model.pesoInferior}kg</div>
                                             </td>
                                             <td className="px-4 py-3">
-                                                <div className="text-xs">{model.senozoide}</div>
-                                                <div className="text-[10px] text-slate-500">{model.peso_senozoide}kg</div>
+                                                <div className="text-xs font-semibold">{model.senozoide}</div>
+                                                <div className="text-[10px] text-slate-400">{model.peso_senozoide || model.pesoSenozoide}kg</div>
                                             </td>
                                             <td className="px-4 py-3 text-right font-bold text-amber-400">
-                                                {model.peso_final} kg
+                                                {model.peso_final || model.pesoFinal} kg
                                             </td>
                                             <td className="px-4 py-3 text-right">
                                                 <div className="flex items-center justify-end gap-2">
                                                     <button 
                                                         onClick={() => openEdit(model)}
                                                         className="p-1.5 bg-sky-500/10 text-sky-400 rounded hover:bg-sky-500/20 transition-colors"
-                                                        title="Editar"
+                                                        title="Editar Modelo"
                                                     >
                                                         <WrenchScrewdriverIcon className="h-4 w-4" />
                                                     </button>
                                                     <button 
                                                         onClick={() => handleDelete(model.id)}
                                                         className="p-1.5 bg-red-500/10 text-red-400 rounded hover:bg-red-500/20 transition-colors"
-                                                        title="Excluir"
+                                                        title="Excluir Modelo"
                                                     >
                                                         <TrashIcon className="h-4 w-4" />
                                                     </button>
@@ -290,7 +386,7 @@ export const ProductsManagement: React.FC<ProductsManagementProps> = ({ setPage,
                                     {models.length === 0 && (
                                         <tr>
                                             <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
-                                                Nenhum modelo cadastrado. Execute o script SQL para criar a tabela.
+                                                Nenhum modelo disponível. Clique em "Restaurar Padrões" para carregar os modelos originais.
                                             </td>
                                         </tr>
                                     )}
@@ -374,49 +470,44 @@ export const ProductsManagement: React.FC<ProductsManagementProps> = ({ setPage,
                                 </div>
                             </div>
 
-                            <div className="bg-[#1e293b] border border-slate-700 rounded-xl p-4">
-                                <h3 className="text-sm font-bold text-emerald-400 mb-3 uppercase tracking-wider flex items-center gap-2">
-                                    <CheckCircleIcon className="h-4 w-4" />
-                                    Ficha Técnica (Pesos Kg)
-                                </h3>
-                                <p className="text-xs text-slate-400 mb-4">
-                                    Os pesos são calculados automaticamente com base no tamanho e nas bitolas inseridas, mas podem ser ajustados manualmente se necessário.
-                                </p>
-                                
+                            {/* Detalhes de Peso Calculado */}
+                            <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+                                <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-3">Pesos Teóricos (Cálculo Automático)</div>
                                 <div className="grid grid-cols-4 gap-4">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 mb-1">Peso Superior</label>
+                                        <label className="block text-[10px] text-slate-400 mb-1">Peso Sup (kg)</label>
                                         <input 
                                             type="text" name="peso_superior" value={formData.peso_superior} onChange={handleInputChange}
-                                            className="w-full bg-[#0f172a] border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300 outline-none focus:border-emerald-500"
+                                            className="w-full bg-[#0f172a] border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 outline-none"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 mb-1">Peso Senozoide</label>
+                                        <label className="block text-[10px] text-slate-400 mb-1">Peso Sen (kg)</label>
                                         <input 
                                             type="text" name="peso_senozoide" value={formData.peso_senozoide} onChange={handleInputChange}
-                                            className="w-full bg-[#0f172a] border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300 outline-none focus:border-emerald-500"
+                                            className="w-full bg-[#0f172a] border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 outline-none"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 mb-1">Peso Inferior</label>
+                                        <label className="block text-[10px] text-slate-400 mb-1">Peso Inf (kg)</label>
                                         <input 
                                             type="text" name="peso_inferior" value={formData.peso_inferior} onChange={handleInputChange}
-                                            className="w-full bg-[#0f172a] border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300 outline-none focus:border-emerald-500"
+                                            className="w-full bg-[#0f172a] border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 outline-none"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-amber-500 mb-1">Peso Total Final</label>
+                                        <label className="block text-[10px] text-amber-400 font-bold mb-1">Peso Final (kg)</label>
                                         <input 
                                             type="text" name="peso_final" value={formData.peso_final} onChange={handleInputChange}
-                                            className="w-full bg-[#0f172a] border border-amber-500/30 rounded-lg px-3 py-2 text-sm text-amber-400 font-bold outline-none focus:border-amber-500"
+                                            className="w-full bg-[#0f172a] border border-amber-500/30 rounded-lg px-3 py-1.5 text-xs text-amber-300 font-bold outline-none"
                                         />
                                     </div>
                                 </div>
                             </div>
+
                         </div>
 
-                        <div className="p-6 border-t border-slate-800 bg-slate-900/80 rounded-b-2xl flex justify-end gap-3">
+                        <div className="p-6 border-t border-slate-800 bg-slate-900 rounded-b-2xl flex justify-end gap-3">
                             <button 
                                 onClick={() => setIsModalOpen(false)}
                                 className="px-5 py-2.5 rounded-xl font-bold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"

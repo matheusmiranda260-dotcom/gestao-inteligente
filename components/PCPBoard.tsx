@@ -83,20 +83,38 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     });
 
     type TrelicaModel = typeof DEFAULT_TRELICA_MODELS[number];
-    const [trelicaModels, setTrelicaModels] = useState<TrelicaModel[]>(DEFAULT_TRELICA_MODELS);
+    const [trelicaModels, setTrelicaModels] = useState<TrelicaModel[]>(() => {
+        try {
+            const saved = localStorage.getItem('cached_trelica_models');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            }
+        } catch (e) {}
+        return DEFAULT_TRELICA_MODELS;
+    });
 
     useEffect(() => {
         const loadModels = async () => {
             try {
+                const saved = localStorage.getItem('cached_trelica_models');
+                if (saved) {
+                    try {
+                        const parsed = JSON.parse(saved);
+                        if (Array.isArray(parsed) && parsed.length > 0) setTrelicaModels(parsed);
+                    } catch (e) {}
+                }
                 const { data, error } = await supabase.from('trelica_models').select('*');
                 if (data && data.length > 0) {
-                    setTrelicaModels(data.map(m => ({
+                    const mapped = data.map(m => ({
                         ...m,
                         pesoFinal: m.peso_final,
                         pesoSuperior: m.peso_superior,
                         pesoSenozoide: m.peso_senozoide,
                         pesoInferior: m.peso_inferior
-                    })));
+                    }));
+                    setTrelicaModels(mapped);
+                    localStorage.setItem('cached_trelica_models', JSON.stringify(mapped));
                 }
             } catch (err) {
                 console.error("Failed to load models", err);
