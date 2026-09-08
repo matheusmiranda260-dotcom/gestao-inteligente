@@ -249,44 +249,64 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             }
         }
 
-        // 3. Verificar usuários online no sistema vinculados a esta máquina
-        const onlineUser = users.find(u => {
-            if (!u.isOnline) return false;
-            const emp = employees.find(e => e.id === u.employeeId || e.appUserId === u.id);
-            if (!emp) return false;
-            // Se tiver máquina expressamente designada, usa ela com exclusividade
-            if (emp.assignedMachine) {
-                return emp.assignedMachine.toLowerCase() === machName.toLowerCase();
-            }
-            // Caso contrário, valida pelo setor exato
-            return emp.sector && emp.sector.toUpperCase() === machName.toUpperCase();
+        // 3. Verificar usuários online no sistema vinculados a esta máquina (priorizando Operador antes de Auxiliar)
+        const candidatesOnline = users
+            .filter(u => u.isOnline)
+            .map(u => ({ user: u, emp: employees.find(e => e.id === u.employeeId || e.appUserId === u.id) }))
+            .filter(item => {
+                if (!item.emp || !item.emp.active) return false;
+                // Descarta cargos de administração / gestão
+                const isAdm = (item.emp.sector || '').toUpperCase().includes('ADMIN') || (item.emp.jobTitle || '').toLowerCase().includes('admin');
+                if (isAdm) return false;
+
+                if (item.emp.assignedMachine) {
+                    return item.emp.assignedMachine.toLowerCase() === machName.toLowerCase();
+                }
+                return item.emp.sector && item.emp.sector.toUpperCase() === machName.toUpperCase();
+            });
+
+        // Ordena para que quem é 'operador' venha antes de 'auxiliar'
+        candidatesOnline.sort((a, b) => {
+            const isOpA = (a.emp?.jobTitle || '').toLowerCase().includes('operador') ? 1 : 0;
+            const isOpB = (b.emp?.jobTitle || '').toLowerCase().includes('operador') ? 1 : 0;
+            return isOpB - isOpA;
         });
 
-        if (onlineUser) {
-            const emp = employees.find(e => e.id === onlineUser.employeeId || e.appUserId === onlineUser.id);
-            if (emp) {
-                return {
-                    name: emp.name,
-                    displayName: formatShortName(emp.name),
-                    photoUrl: emp.photoUrl,
-                    status: 'online' as const,
-                    statusLabel: 'Conectado',
-                    jobTitle: emp.jobTitle || 'Operador',
-                    opNumber: undefined
-                };
-            }
+        if (candidatesOnline.length > 0 && candidatesOnline[0].emp) {
+            const emp = candidatesOnline[0].emp;
+            return {
+                name: emp.name,
+                displayName: formatShortName(emp.name),
+                photoUrl: emp.photoUrl,
+                status: 'online' as const,
+                statusLabel: 'Conectado',
+                jobTitle: emp.jobTitle || 'Operador',
+                opNumber: undefined
+            };
         }
 
-        // 4. Operador cadastrado/designado para esta máquina
-        const assignedEmp = employees.find(e => {
-            if (!e.active) return false;
-            if (e.assignedMachine) {
-                return e.assignedMachine.toLowerCase() === machName.toLowerCase();
-            }
-            return e.sector && e.sector.toUpperCase() === machName.toUpperCase();
+        // 4. Operador cadastrado/designado para esta máquina (Equipe Padrão)
+        const candidatesAssigned = employees
+            .filter(e => {
+                if (!e.active) return false;
+                const isAdm = (e.sector || '').toUpperCase().includes('ADMIN') || (e.jobTitle || '').toLowerCase().includes('admin');
+                if (isAdm) return false;
+
+                if (e.assignedMachine) {
+                    return e.assignedMachine.toLowerCase() === machName.toLowerCase();
+                }
+                return e.sector && e.sector.toUpperCase() === machName.toUpperCase();
+            });
+
+        // Prioriza 'operador' antes de auxiliar
+        candidatesAssigned.sort((a, b) => {
+            const isOpA = (a.jobTitle || '').toLowerCase().includes('operador') ? 1 : 0;
+            const isOpB = (b.jobTitle || '').toLowerCase().includes('operador') ? 1 : 0;
+            return isOpB - isOpA;
         });
 
-        if (assignedEmp) {
+        if (candidatesAssigned.length > 0) {
+            const assignedEmp = candidatesAssigned[0];
             return {
                 name: assignedEmp.name,
                 displayName: formatShortName(assignedEmp.name),

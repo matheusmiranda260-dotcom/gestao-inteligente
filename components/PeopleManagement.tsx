@@ -3210,12 +3210,23 @@ const OrgChart: React.FC<{
                 await updateItem('employees', occ.id, { orgPositionId: null });
             }
 
-            // 2. Vincular o novo funcionário e sincronizar cargo/setor
+            // 2. Vincular o novo funcionário e sincronizar cargo/setor/máquina designada
             console.log('Updating employee:', employeeId, 'to', title, sector);
+
+            // Determina a máquina atribuída padrão com base no setor do organograma
+            let machineTarget: string | null = null;
+            const secUpper = (sector || '').toUpperCase();
+            if (secUpper.includes('TREFILA 1')) machineTarget = 'Trefila 1';
+            else if (secUpper.includes('TREFILA 2')) machineTarget = 'Trefila 2';
+            else if (secUpper.includes('TRELIÇA 1')) machineTarget = 'Treliça 1';
+            else if (secUpper.includes('TRELIÇA 2')) machineTarget = 'Treliça 2';
+            else if (secUpper.includes('MALHA')) machineTarget = 'Malha 1';
+
             const result = await updateItem('employees', employeeId, { 
                 orgPositionId: slotKey,
                 jobTitle: title,
-                sector: sector
+                sector: sector,
+                assignedMachine: machineTarget
             });
             console.log('Update result:', result);
 
