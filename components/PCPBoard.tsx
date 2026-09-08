@@ -4096,6 +4096,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                         type: 'start' | 'setup' | 'lubrication' | 'roll_change' | 'stop' | 'lot' | 'shift_end';
                         title: string;
                         timeStr: string;
+                        timestampMs: number;
                         durationMs?: number;
                         expectedDurationMin?: number;
                         status: 'ok' | 'warning' | 'error' | 'info';
@@ -4110,6 +4111,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                         type: 'start',
                         title: '1° Horário de Entrada / Início da Produção',
                         timeStr: formattedStartTime,
+                        timestampMs: startDateObj && !isNaN(startDateObj.getTime()) ? startDateObj.getTime() : 0,
                         status: startDateObj ? 'ok' : 'info',
                         statusText: startDateObj ? 'Início Registrado' : 'Aguardando Início',
                         observation: `Data: ${formattedStartDate || '--'} | Operador: ${op.operator || 'Não identificado'}`
@@ -4198,6 +4200,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                             type: itemType,
                             title: itemTitle,
                             timeStr: timeFormatted,
+                            timestampMs: !isNaN(stopDate.getTime()) ? stopDate.getTime() : 0,
                             durationMs: durationMs,
                             expectedDurationMin: expectedMin,
                             diffMinutes: diffMin,
@@ -4207,8 +4210,40 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                         });
                     });
 
+                    // Localizar Lote no Estoque
+                    const findStockLot = (lotObjOrId: any) => {
+                        if (!lotObjOrId) return undefined;
+                        const targetId = typeof lotObjOrId === 'string' 
+                            ? lotObjOrId 
+                            : (lotObjOrId.lotId || lotObjOrId.id || lotObjOrId.internalLot);
+                        if (!targetId) return undefined;
+                        return stock.find(s => 
+                            s.id === targetId || 
+                            s.internalLot === targetId ||
+                            (typeof lotObjOrId === 'object' && lotObjOrId.internalLot && s.internalLot === lotObjOrId.internalLot) ||
+                            (typeof lotObjOrId === 'object' && lotObjOrId.lotId && s.id === lotObjOrId.lotId)
+                        );
+                    };
+
+                    // Extrair lista de IDs de lotes selecionados no PCP
+                    let selectedLotIdsList: string[] = [];
+                    if (Array.isArray(op.selectedLotIds)) {
+                        selectedLotIdsList = op.selectedLotIds.filter(Boolean);
+                    } else if (op.selectedLotIds && typeof op.selectedLotIds === 'object') {
+                        selectedLotIdsList = Object.values(op.selectedLotIds).flat().filter(Boolean) as string[];
+                    }
+
                     // Inserir Lotes Processados no Checklist
-                    (op.processedLots || []).forEach((lot, lIdx) => {
+                    const processedLots = op.processedLots || [];
+                    const processedLotIdsSet = new Set<string>();
+
+                    processedLots.forEach((lot, lIdx) => {
+                        const stockItem = findStockLot(lot);
+                        if (lot.lotId) processedLotIdsSet.add(lot.lotId);
+                        if ((lot as any).id) processedLotIdsSet.add((lot as any).id);
+                        if (stockItem?.id) processedLotIdsSet.add(stockItem.id);
+                        if (stockItem?.internalLot) processedLotIdsSet.add(stockItem.internalLot);
+
                         const lotStart = lot.startTime ? new Date(lot.startTime) : null;
                         const lotEnd = lot.endTime ? new Date(lot.endTime) : null;
                         const lotTimeStr = lotStart && !isNaN(lotStart.getTime()) 
@@ -4216,17 +4251,124 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                             : '--:--';
                         const lotDurationMs = lotStart && lotEnd ? Math.max(0, lotEnd.getTime() - lotStart.getTime()) : undefined;
 
+                        // Identificação do Lote (Número de Lote Interno e Corrida)
+                        const lotNum = stockItem?.internalLot || (lot as any).internalLot || (lot.lotId && !lot.lotId.startsWith('STOCK-') ? lot.lotId : `${lIdx + 1}`);
+                        const corrida = stockItem?.runNumber || (lot as any).runNumber;
+                        const supplierLot = stockItem?.supplierLot || (lot as any).supplierLot;
+
+                        // Pesos
+                        const inputWeight = Number(stockItem?.initialQuantity || stockItem?.weight || stockItem?.labelWeight || (lot as any).inputWeight || (lot as any).initialWeight || 0);
+                        const outputWeight = lot.finalWeight !== null && lot.finalWeight !== undefined 
+                            ? Number(lot.finalWeight) 
+                            : (lot as any).producedWeight !== null && (lot as any).producedWeight !== undefined 
+                                ? Number((lot as any).producedWeight) 
+                                : undefined;
+
+                        // Descrição de material & bitola
+                        const bitolaDesc = stockItem?.bitola 
+                            ? (stockItem.bitola.toString().includes('mm') ? stockItem.bitola : `${stockItem.bitola}mm`) 
+                            : (op.inputBitola ? `${op.inputBitola}mm` : '');
+                        const materialDesc = stockItem?.materialType || 'Fio Máquina';
+
+                        // Montar observação detalhada com lote, corrida, pesos e duração
+                        const obsParts: string[] = [];
+                        if (materialDesc || bitolaDesc) {
+                            obsParts.push(`${materialDesc} ${bitolaDesc}`.trim());
+                        }
+                        if (inputWeight > 0 && outputWeight !== undefined && outputWeight > 0) {
+                            obsParts.push(`Entrada: ${inputWeight.toLocaleString('pt-BR')} kg ➔ Saída: ${outputWeight.toLocaleString('pt-BR')} kg`);
+                            if (inputWeight !== outputWeight) {
+                                const diff = inputWeight - outputWeight;
+                                obsParts.push(`Apara: ${diff > 0 ? '-' : '+'}${Math.abs(diff).toLocaleString('pt-BR')} kg`);
+                            }
+                        } else if (inputWeight > 0) {
+                            obsParts.push(`Peso Bobina (Entrada): ${inputWeight.toLocaleString('pt-BR')} kg`);
+                        } else if (outputWeight !== undefined && outputWeight > 0) {
+                            obsParts.push(`Peso Produzido: ${outputWeight.toLocaleString('pt-BR')} kg`);
+                        }
+
+                        if (lotDurationMs) {
+                            obsParts.push(`Duração: ${formatDuration(lotDurationMs)}`);
+                        }
+                        if ((lot as any).speed) {
+                            obsParts.push(`Velocidade: ${(lot as any).speed.toFixed(1)} m/s`);
+                        }
+                        if (supplierLot) {
+                            obsParts.push(`Lote Fornec.: ${supplierLot}`);
+                        }
+
+                        const displayWeight = outputWeight !== undefined && outputWeight > 0 
+                            ? `${outputWeight.toLocaleString('pt-BR')} kg` 
+                            : inputWeight > 0 
+                                ? `${inputWeight.toLocaleString('pt-BR')} kg` 
+                                : 'Processado';
+
+                        const titleText = corrida 
+                            ? `📦 Lote Processado: Lote #${lotNum} • Corrida: ${corrida}`
+                            : `📦 Lote Processado: Lote #${lotNum}`;
+
                         checklistItems.push({
                             id: `lot-${lIdx}`,
                             type: 'lot',
-                            title: `📦 Lote Processado: ${lot.internalLot || `Lote ${lIdx + 1}`}`,
+                            title: titleText,
                             timeStr: lotTimeStr,
+                            timestampMs: lotStart && !isNaN(lotStart.getTime()) ? lotStart.getTime() : 0,
                             durationMs: lotDurationMs,
                             status: 'ok',
-                            statusText: lot.producedWeight ? `${lot.producedWeight.toLocaleString('pt-BR')} kg` : 'Processado',
-                            observation: lot.speed ? `Velocidade Média: ${lot.speed.toFixed(1)} m/s` : undefined
+                            statusText: displayWeight,
+                            observation: obsParts.join(' • ')
                         });
                     });
+
+                    // Inserir Lotes Programados Ainda Não Processados (se houver)
+                    selectedLotIdsList.forEach((selectedId, pIdx) => {
+                        if (processedLotIdsSet.has(selectedId)) return;
+                        const stockItem = findStockLot(selectedId);
+                        if (stockItem && (processedLotIdsSet.has(stockItem.id) || (stockItem.internalLot && processedLotIdsSet.has(stockItem.internalLot)))) return;
+
+                        const lotNum = stockItem?.internalLot || selectedId;
+                        const corrida = stockItem?.runNumber;
+                        const inputWeight = Number(stockItem?.initialQuantity || stockItem?.weight || stockItem?.labelWeight || 0);
+                        const bitolaDesc = stockItem?.bitola ? (stockItem.bitola.toString().includes('mm') ? stockItem.bitola : `${stockItem.bitola}mm`) : '';
+                        const materialDesc = stockItem?.materialType || 'Fio Máquina';
+
+                        checklistItems.push({
+                            id: `pending-lot-${pIdx}`,
+                            type: 'lot',
+                            title: corrida ? `⏳ Lote Programado: Lote #${lotNum} • Corrida: ${corrida}` : `⏳ Lote Programado: Lote #${lotNum}`,
+                            timeStr: '--:--',
+                            timestampMs: Number.MAX_SAFE_INTEGER,
+                            status: 'info',
+                            statusText: inputWeight > 0 ? `${inputWeight.toLocaleString('pt-BR')} kg` : 'Aguardando',
+                            observation: `${materialDesc} ${bitolaDesc} • Aguardando processamento • Bobina: ${inputWeight > 0 ? `${inputWeight.toLocaleString('pt-BR')} kg` : 'N/D'}`
+                        });
+                    });
+
+                    // Ordenar itens cronologicamente (Início sempre em 1°, paradas e lotes por horário)
+                    checklistItems.sort((a, b) => {
+                        if (a.id === 'start-step') return -1;
+                        if (b.id === 'start-step') return 1;
+                        return a.timestampMs - b.timestampMs;
+                    });
+
+                    // Totais de Lotes e Pesos
+                    const totalSelectedLotsCount = selectedLotIdsList.length > 0 ? selectedLotIdsList.length : processedLots.length;
+                    const processedLotsCount = processedLots.length;
+
+                    const totalInputWeight = (processedLots.length > 0 ? processedLots : selectedLotIdsList).reduce((acc, lotOrId) => {
+                        const sItem = findStockLot(lotOrId);
+                        const w = Number(sItem?.initialQuantity || sItem?.weight || sItem?.labelWeight || (typeof lotOrId === 'object' ? (lotOrId as any).inputWeight : 0) || 0);
+                        return acc + w;
+                    }, 0);
+
+                    const totalProducedWeight = processedLots.reduce((acc, lot) => {
+                        const w = lot.finalWeight !== null && lot.finalWeight !== undefined 
+                            ? Number(lot.finalWeight) 
+                            : (lot as any).producedWeight !== null && (lot as any).producedWeight !== undefined 
+                                ? Number((lot as any).producedWeight) 
+                                : 0;
+                        return acc + w;
+                    }, 0) || Number(op.totalProducedWeight || op.actualProducedWeight || 0);
 
                     // Tempo Produzindo Líquido (Tempo Total - Paradas)
                     const netProducingMs = Math.max(0, totalDurationMs - totalDowntimeMs);
@@ -4257,9 +4399,22 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                     {prog.statusLabel}
                                                 </span>
                                             </div>
-                                            <p className="text-xs text-slate-400 mt-0.5">
-                                                Linha: <strong className="text-white">{machineName}</strong> • {modelSubtitle} • Operador: <strong className="text-white">{op.operator || 'Não informado'}</strong>
-                                            </p>
+                                            <div className="flex items-center gap-2 text-xs text-slate-400 mt-1 flex-wrap">
+                                                <span>Linha: <strong className="text-white">{machineName}</strong></span>
+                                                <span>•</span>
+                                                <span>{modelSubtitle}</span>
+                                                <span>•</span>
+                                                <span>Operador: <strong className="text-white">{op.operator || 'Não informado'}</strong></span>
+                                                {totalSelectedLotsCount > 0 && (
+                                                    <>
+                                                        <span>•</span>
+                                                        <span className="text-cyan-300 font-bold bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20 font-mono text-[11px] flex items-center gap-1">
+                                                            📦 {processedLotsCount}/{totalSelectedLotsCount} Lotes
+                                                            {totalProducedWeight > 0 ? ` • ⚖️ ${totalProducedWeight.toLocaleString('pt-BR')} kg` : totalInputWeight > 0 ? ` • ⚖️ ${totalInputWeight.toLocaleString('pt-BR')} kg` : ''}
+                                                        </span>
+                                                    </>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                     <button 
@@ -4314,7 +4469,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                     <div className={`p-3.5 rounded-2xl border flex flex-col justify-between ${
                                         totalLostTimeMs > 0 
                                             ? 'bg-rose-950/40 border-rose-500/40 text-rose-200' 
-                                            : 'bg-emerald-950/30 border-emerald-500/30 text-emerald-200'
+                                             : 'bg-emerald-950/30 border-emerald-500/30 text-emerald-200'
                                     }`}>
                                         <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider">
                                             <span>{totalLostTimeMs > 0 ? '🔴 Tempo Perdido (Gargalo)' : '🟢 No Padrão Estipulado'}</span>
@@ -4375,13 +4530,18 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                     <div className="flex items-center justify-between border-b border-white/5 pb-2.5">
                                         <div className="flex items-center gap-2">
                                             <span className="text-xs font-black uppercase tracking-wider text-white">
-                                                📋 Checklist de Paradas & Eventos em Tempo Real
+                                                📋 Checklist de Paradas & Lotes em Tempo Real
                                             </span>
                                             <span className="text-[10px] bg-white/5 text-slate-400 px-2 py-0.5 rounded-full font-mono">
-                                                {checklistItems.length} marcos
+                                                {checklistItems.length} registros
                                             </span>
+                                            {totalSelectedLotsCount > 0 && (
+                                                <span className="text-[10px] bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 font-bold px-2 py-0.5 rounded-md font-mono hidden sm:inline">
+                                                    {processedLotsCount} de {totalSelectedLotsCount} lotes processados
+                                                </span>
+                                            )}
                                         </div>
-                                        <span className="text-[10px] text-slate-500 hidden sm:inline">
+                                        <span className="text-[11px] text-slate-400 hidden sm:inline">
                                             Compara tempos reais com as metas de setup, lubrificação e paradas
                                         </span>
                                     </div>
@@ -4399,11 +4559,16 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             if (item.status === 'ok') badgeClass = 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400';
                                             if (item.status === 'warning') badgeClass = 'bg-amber-500/15 border-amber-500/30 text-amber-300';
                                             if (item.status === 'error') badgeClass = 'bg-rose-500/20 border-rose-500/40 text-rose-300 animate-pulse';
+                                            if (item.status === 'info') badgeClass = 'bg-cyan-500/15 border-cyan-500/30 text-cyan-300';
 
                                             return (
                                                 <div 
                                                     key={item.id}
-                                                    className="p-3 rounded-xl bg-[#0B1D2A]/80 border border-white/5 hover:border-white/15 transition-all flex items-center justify-between gap-3 text-xs"
+                                                    className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 text-xs ${
+                                                        isLot 
+                                                            ? 'bg-[#0A2234]/85 border-cyan-500/25 hover:border-cyan-500/45 shadow-sm' 
+                                                            : 'bg-[#0B1D2A]/80 border-white/5 hover:border-white/15'
+                                                    }`}
                                                 >
                                                     <div className="flex items-center gap-3">
                                                         <span className="w-16 font-mono text-[11px] font-bold text-slate-400 flex items-center gap-1">
@@ -4412,11 +4577,11 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                         </span>
 
                                                         <div className="flex flex-col">
-                                                            <span className="font-bold text-white flex items-center gap-1.5">
+                                                            <span className={`font-bold flex items-center gap-1.5 ${isLot ? 'text-cyan-100' : 'text-white'}`}>
                                                                 {item.title}
                                                             </span>
                                                             {item.observation && (
-                                                                <span className="text-[10px] text-slate-400 mt-0.5">
+                                                                <span className={`text-[10px] mt-0.5 ${isLot ? 'text-slate-300' : 'text-slate-400'}`}>
                                                                     {item.observation}
                                                                 </span>
                                                             )}
@@ -4430,7 +4595,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                             </span>
                                                         )}
                                                         <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border font-mono ${badgeClass}`}>
-                                                            {item.statusText}
+                                                            {isLot ? `⚖️ ${item.statusText}` : item.statusText}
                                                         </span>
                                                     </div>
                                                 </div>
