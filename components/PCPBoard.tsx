@@ -41,6 +41,12 @@ const CAPACITY_DEFAULTS = {
     'Malha 1': 5000        // 5.000 peças/kg por dia
 };
 
+const normalizeBitola = (b?: string | number | null): string => {
+    if (b === undefined || b === null) return '';
+    const num = parseFloat(String(b).replace('mm', '').replace(',', '.').trim());
+    return isNaN(num) ? '' : num.toFixed(2);
+};
+
 const MACHINES = [
     { name: 'Trefila 1', type: 'Trefila', color: 'border-l-cyan-500 text-cyan-400 bg-cyan-950/20' },
     { name: 'Trefila 2', type: 'Trefila', color: 'border-l-sky-500 text-sky-400 bg-sky-950/20' },
@@ -441,8 +447,32 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     const [trelicaQuantity, setTrelicaQuantity] = useState<number>(3500);
     const [isTrelicaGhostOrder, setIsTrelicaGhostOrder] = useState<boolean>(false);
     const [trelicaSuperiorLots, setTrelicaSuperiorLots] = useState<string[]>([]);
-    const [trelicaInferiorLots, setTrelicaInferiorLots] = useState<string[]>([]);
-    const [trelicaSenozoideLots, setTrelicaSenozoideLots] = useState<string[]>([]);
+    const [trelicaInferiorLeftLots, setTrelicaInferiorLeftLots] = useState<string[]>([]);
+    const [trelicaInferiorRightLots, setTrelicaInferiorRightLots] = useState<string[]>([]);
+    const [trelicaSenozoideLeftLots, setTrelicaSenozoideLeftLots] = useState<string[]>([]);
+    const [trelicaSenozoideRightLots, setTrelicaSenozoideRightLots] = useState<string[]>([]);
+    const [activeTrelicaLotTab, setActiveTrelicaLotTab] = useState<'superior' | 'inferior' | 'senozoide'>('superior');
+    const [trelicaLotSearch, setTrelicaLotSearch] = useState<string>('');
+    const [trelicaShowAllGauges, setTrelicaShowAllGauges] = useState<boolean>(false);
+
+    // Parâmetros operacionais de Treliça (Velocidade, Setup e Metas)
+    const [trelicaSpeed, setTrelicaSpeed] = useState<number>(() => {
+        const saved = localStorage.getItem('trelica-machine-speed');
+        return saved ? parseFloat(saved) : 10;
+    });
+    const [trelicaSetupTimeMin, setTrelicaSetupTimeMin] = useState<number>(() => {
+        const saved = localStorage.getItem('trelica-setup-time');
+        return saved ? parseFloat(saved) : 30;
+    });
+    const [trelicaDailyTargetOverride, setTrelicaDailyTargetOverride] = useState<number | null>(null);
+
+    useEffect(() => {
+        localStorage.setItem('trelica-machine-speed', trelicaSpeed.toString());
+    }, [trelicaSpeed]);
+
+    useEffect(() => {
+        localStorage.setItem('trelica-setup-time', trelicaSetupTimeMin.toString());
+    }, [trelicaSetupTimeMin]);
 
     // --- Campos de MALHA (Regras idênticas a ProductionOrderMalha.tsx) ---
     const [malhaModel, setMalhaModel] = useState<string>('Q92 (15x15)');
@@ -911,50 +941,164 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     // REGRAS DE LOTES DE TRELIÇA (CA-60)
     // ==========================================
     const availableCa60Stock = useMemo(() => {
-        return stock.filter(item => 
-            (item.materialType === 'CA-60' || item.materialType === 'Trefila') &&
-            (item.status === 'Disponível' || item.status === 'Disponível - Suporte Treliça') &&
-            item.remainingQuantity > 0
-        );
+        return stock
+            .filter(item => 
+                (item.materialType === 'CA-60' || item.materialType === 'Trefila') &&
+                item.status !== 'Transferido' &&
+                !item.status?.startsWith('Em Produção') &&
+                item.status !== 'Consumido para fazer treliça' &&
+                item.status !== 'Consumido' &&
+                item.remainingQuantity > 0
+            )
+            .sort((a, b) => {
+                const isSuporteA = a.status === 'Disponível - Suporte Treliça';
+                const isSuporteB = b.status === 'Disponível - Suporte Treliça';
+                if (isSuporteA && !isSuporteB) return -1;
+                if (!isSuporteA && isSuporteB) return 1;
+
+                const numA = parseInt(a.internalLot);
+                const numB = parseInt(b.internalLot);
+                if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+                if (a.internalLot !== b.internalLot) {
+                    return a.internalLot.localeCompare(b.internalLot, undefined, { numeric: true });
+                }
+                return new Date(a.entryDate || 0).getTime() - new Date(b.entryDate || 0).getTime();
+            });
     }, [stock]);
 
     // Cálculo de peso de Treliça
     const requiredTrelicaWeights = useMemo(() => {
-        if (!selectedTrelicaModel) return { sup: 0, inf: 0, sen: 0, total: 0 };
-        const pSup = parseFloat(selectedTrelicaModel.pesoSuperior.replace(',', '.')) * trelicaQuantity;
-        const pInf = parseFloat(selectedTrelicaModel.pesoInferior.replace(',', '.')) * trelicaQuantity;
-        const pSen = parseFloat(selectedTrelicaModel.pesoSenozoide.replace(',', '.')) * trelicaQuantity;
-        const pTotal = parseFloat(selectedTrelicaModel.pesoFinal.replace(',', '.')) * trelicaQuantity;
-        return { sup: pSup, inf: pInf, sen: pSen, total: pTotal };
+        if (!selectedTrelicaModel) return { sup: 0, inf: 0, infSide: 0, sen: 0, senSide: 0, total: 0 };
+        const pSup = (parseFloat(selectedTrelicaModel.pesoSuperior.replace(',', '.')) || 0) * trelicaQuantity;
+        const pInfTotal = (parseFloat(selectedTrelicaModel.pesoInferior.replace(',', '.')) || 0) * trelicaQuantity;
+        const pInfSide = pInfTotal / 2;
+        const pSenTotal = (parseFloat(selectedTrelicaModel.pesoSenozoide.replace(',', '.')) || 0) * trelicaQuantity;
+        const pSenSide = pSenTotal / 2;
+        const pTotal = (parseFloat(selectedTrelicaModel.pesoFinal.replace(',', '.')) || 0) * trelicaQuantity;
+        return { sup: pSup, inf: pInfTotal, infSide: pInfSide, sen: pSenTotal, senSide: pSenSide, total: pTotal };
     }, [selectedTrelicaModel, trelicaQuantity]);
+
+    // Cálculos Operacionais de Produção e Tempos da Treliça
+    const trelicaProductionCalculations = useMemo(() => {
+        const pieceLength = parseFloat(selectedTrelicaModel?.tamanho?.replace(',', '.') || '12') || 12;
+        const totalMeters = pieceLength * trelicaQuantity;
+        const speed = trelicaSpeed > 0 ? trelicaSpeed : 10; // m/min
+        const runMinutes = speed > 0 ? (totalMeters / speed) : 0;
+        const setupMinutes = trelicaSetupTimeMin || 0;
+        const totalMinutes = runMinutes + setupMinutes;
+        const totalHours = totalMinutes / 60;
+
+        const workHoursPerDay = dailyShiftDetails.totalWorkHours > 0 ? dailyShiftDetails.totalWorkHours : 8.8;
+        const dailyWorkMinutes = workHoursPerDay * 60;
+        const effectiveDailyMinutes = Math.max(0, dailyWorkMinutes - Math.min(setupMinutes, 60));
+        const autoDailyPieces = Math.floor((effectiveDailyMinutes * speed) / pieceLength);
+        const dailyPieces = trelicaDailyTargetOverride !== null ? trelicaDailyTargetOverride : autoDailyPieces;
+        const unitWeight = parseFloat(selectedTrelicaModel?.pesoFinal?.replace(',', '.') || '0') || 0;
+        const dailyKg = dailyPieces * unitWeight;
+
+        const estimatedDays = Math.max(1, Math.ceil(totalHours / workHoursPerDay));
+
+        return {
+            pieceLength,
+            totalMeters,
+            speed,
+            runMinutes,
+            setupMinutes,
+            totalMinutes,
+            totalHours,
+            workHoursPerDay,
+            dailyPieces,
+            dailyKg,
+            estimatedDays
+        };
+    }, [selectedTrelicaModel, trelicaQuantity, trelicaSpeed, trelicaSetupTimeMin, trelicaDailyTargetOverride, dailyShiftDetails.totalWorkHours]);
+
+    // Atualiza automaticamente duração em dias no PCP baseado no cálculo de tempos da Treliça
+    useEffect(() => {
+        if (createCategory === 'Treliça') {
+            if (trelicaProductionCalculations.estimatedDays > 0) {
+                setCreateDuration(trelicaProductionCalculations.estimatedDays);
+            }
+        }
+    }, [trelicaProductionCalculations.estimatedDays, createCategory]);
+
+    // Helpers de peso selecionado por posição
+    const getLotRemainingWeight = (lotId: string) => {
+        const item = stock.find(s => s.id === lotId || s.internalLot === lotId);
+        return item ? (item.remainingQuantity || 0) : 0;
+    };
+    const selectedSupWeight = useMemo(() => trelicaSuperiorLots.reduce((acc, id) => acc + getLotRemainingWeight(id), 0), [trelicaSuperiorLots, stock]);
+    const selectedInf1Weight = useMemo(() => trelicaInferiorLeftLots.reduce((acc, id) => acc + getLotRemainingWeight(id), 0), [trelicaInferiorLeftLots, stock]);
+    const selectedInf2Weight = useMemo(() => trelicaInferiorRightLots.reduce((acc, id) => acc + getLotRemainingWeight(id), 0), [trelicaInferiorRightLots, stock]);
+    const selectedSen1Weight = useMemo(() => trelicaSenozoideLeftLots.reduce((acc, id) => acc + getLotRemainingWeight(id), 0), [trelicaSenozoideLeftLots, stock]);
+    const selectedSen2Weight = useMemo(() => trelicaSenozoideRightLots.reduce((acc, id) => acc + getLotRemainingWeight(id), 0), [trelicaSenozoideRightLots, stock]);
+    const totalSelectedTrelicaWeight = selectedSupWeight + selectedInf1Weight + selectedInf2Weight + selectedSen1Weight + selectedSen2Weight;
+
+    // Toggle de lotes por posição
+    const handleToggleTrelicaLot = (
+        position: 'sup' | 'inf1' | 'inf2' | 'sen1' | 'sen2',
+        lotId: string,
+        isChecked: boolean
+    ) => {
+        const updateList = (prev: string[]) => 
+            isChecked ? [...prev, lotId] : prev.filter(id => id !== lotId);
+
+        if (position === 'sup') setTrelicaSuperiorLots(updateList);
+        else if (position === 'inf1') setTrelicaInferiorLeftLots(updateList);
+        else if (position === 'inf2') setTrelicaInferiorRightLots(updateList);
+        else if (position === 'sen1') setTrelicaSenozoideLeftLots(updateList);
+        else if (position === 'sen2') setTrelicaSenozoideRightLots(updateList);
+    };
+
+    const handleClearAllTrelicaLots = () => {
+        setTrelicaSuperiorLots([]);
+        setTrelicaInferiorLeftLots([]);
+        setTrelicaInferiorRightLots([]);
+        setTrelicaSenozoideLeftLots([]);
+        setTrelicaSenozoideRightLots([]);
+        showNotification?.('Seleções de lotes da treliça desmarcadas.', 'info');
+    };
 
     // Auto-selecionar lotes de CA-60 para Treliça
     const handleAutoSelectTrelicaLots = () => {
         if (!selectedTrelicaModel) return;
 
-        const supBitola = selectedTrelicaModel.superior.replace(',', '.');
-        const infBitola = selectedTrelicaModel.inferior.replace(',', '.');
-        const senBitola = selectedTrelicaModel.senozoide.replace(',', '.');
+        const supBitolaNorm = normalizeBitola(selectedTrelicaModel.superior);
+        const infBitolaNorm = normalizeBitola(selectedTrelicaModel.inferior);
+        const senBitolaNorm = normalizeBitola(selectedTrelicaModel.senozoide);
 
-        const pickLots = (bitolaStr: string, neededWeight: number) => {
-            const matching = availableCa60Stock
-                .filter(s => s.bitola?.replace(',', '.') === bitolaStr)
-                .sort((a, b) => a.remainingQuantity - b.remainingQuantity);
-            
-            const chosen: string[] = [];
+        const usedIds = new Set<string>();
+
+        const allocateLots = (bitolaNorm: string, targetWeight: number): string[] => {
+            const candidates = availableCa60Stock.filter(l => 
+                (trelicaShowAllGauges || normalizeBitola(l.bitola) === bitolaNorm) &&
+                !usedIds.has(l.id)
+            );
+
             let accumulated = 0;
-            for (const lot of matching) {
-                chosen.push(lot.id);
+            const selected: string[] = [];
+            for (const lot of candidates) {
+                selected.push(lot.id);
+                usedIds.add(lot.id);
                 accumulated += lot.remainingQuantity;
-                if (accumulated >= neededWeight) break;
+                if (accumulated >= targetWeight) break;
             }
-            return chosen;
+            return selected;
         };
 
-        setTrelicaSuperiorLots(pickLots(supBitola, requiredTrelicaWeights.sup));
-        setTrelicaInferiorLots(pickLots(infBitola, requiredTrelicaWeights.inf));
-        setTrelicaSenozoideLots(pickLots(senBitola, requiredTrelicaWeights.sen));
-        showNotification?.('Lotes de CA-60 alocados automaticamente com base no modelo!', 'success');
+        const newSup = allocateLots(supBitolaNorm, requiredTrelicaWeights.sup);
+        const newInf1 = allocateLots(infBitolaNorm, requiredTrelicaWeights.infSide);
+        const newInf2 = allocateLots(infBitolaNorm, requiredTrelicaWeights.infSide);
+        const newSen1 = allocateLots(senBitolaNorm, requiredTrelicaWeights.senSide);
+        const newSen2 = allocateLots(senBitolaNorm, requiredTrelicaWeights.senSide);
+
+        setTrelicaSuperiorLots(newSup);
+        setTrelicaInferiorLeftLots(newInf1);
+        setTrelicaInferiorRightLots(newInf2);
+        setTrelicaSenozoideLeftLots(newSen1);
+        setTrelicaSenozoideRightLots(newSen2);
+
+        showNotification?.('Lotes de CA-60 alocados automaticamente para todas as posições da treliça!', 'success');
     };
 
     // Abre modal para criar OP com data e máquina pré-selecionadas
@@ -983,10 +1127,18 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         setK7Count(3);
         setIsK7Customized(false);
         setK7Passes([]);
+
+        // Limpar seleções de Treliça
         setIsTrelicaGhostOrder(false);
         setTrelicaSuperiorLots([]);
-        setTrelicaInferiorLots([]);
-        setTrelicaSenozoideLots([]);
+        setTrelicaInferiorLeftLots([]);
+        setTrelicaInferiorRightLots([]);
+        setTrelicaSenozoideLeftLots([]);
+        setTrelicaSenozoideRightLots([]);
+        setActiveTrelicaLotTab('superior');
+        setTrelicaLotSearch('');
+        setTrelicaShowAllGauges(false);
+        setTrelicaDailyTargetOverride(null);
 
         // Gera número de OP sugerido
         const prefix = category === 'Trefila' ? 'TR' : category === 'Treliça' ? 'TL' : 'ML';
@@ -1009,7 +1161,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             setInputBitolaFilter('');
         } else if (cat === 'Treliça') {
             setCreateMachine('Treliça 1');
-            setCreateDuration(Math.max(1, Math.ceil(trelicaQuantity / CAPACITY_DEFAULTS.Treliça)));
+            setCreateDuration(trelicaProductionCalculations.estimatedDays || 1);
         } else {
             setCreateMachine('Malha 1');
             setCreateDuration(Math.max(1, Math.ceil(malhaPieces / CAPACITY_DEFAULTS['Malha 1'])));
@@ -1285,17 +1437,38 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 return;
             }
             if (trelicaQuantity <= 0) {
-                const msg = 'A quantidade deve ser maior que zero.';
+                const msg = 'A quantidade de peças deve ser maior que zero.';
                 setCreateOrderError(msg);
                 showNotification?.(msg, 'error');
                 return;
             }
 
-            const trelicaLots = isTrelicaGhostOrder ? {} : {
+            // Validação OBRIGATÓRIA de lotes de CA-60 (mesmo para Ordens Fantasma para garantir a precisão da produção)
+            const missingParts: string[] = [];
+            if (trelicaSuperiorLots.length === 0) missingParts.push('Banzo Superior');
+            if (trelicaInferiorLeftLots.length === 0) missingParts.push('Inferior (Lado 1)');
+            if (trelicaInferiorRightLots.length === 0) missingParts.push('Inferior (Lado 2)');
+            if (trelicaSenozoideLeftLots.length === 0) missingParts.push('Senozoide (Lado 1)');
+            if (trelicaSenozoideRightLots.length === 0) missingParts.push('Senozoide (Lado 2)');
+
+            if (missingParts.length > 0) {
+                const msg = `Seleção de lotes obrigatória: selecione rolos de CA-60 para ${missingParts.join(', ')} (obrigatório inclusive em Ordens Fantasma para garantir a precisão).`;
+                setCreateOrderError(msg);
+                showNotification?.(msg, 'error');
+                return;
+            }
+
+            const trelicaLots = {
                 superior: trelicaSuperiorLots[0] || null,
-                inferior1: trelicaInferiorLots[0] || null,
-                inferior2: trelicaInferiorLots[1] || trelicaInferiorLots[0] || null,
-                senozoide: trelicaSenozoideLots[0] || null
+                inferior1: trelicaInferiorLeftLots[0] || null,
+                inferior2: trelicaInferiorRightLots[0] || null,
+                senozoide1: trelicaSenozoideLeftLots[0] || null,
+                senozoide2: trelicaSenozoideRightLots[0] || null,
+                allSuperior: trelicaSuperiorLots,
+                allInferiorLeft: trelicaInferiorLeftLots,
+                allInferiorRight: trelicaInferiorRightLots,
+                allSenozoideLeft: trelicaSenozoideLeftLots,
+                allSenozoideRight: trelicaSenozoideRightLots,
             };
 
             orderData.trelicaModel = selectedTrelicaModel.modelo;
@@ -1308,6 +1481,28 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             orderData.trelicaSuperior = selectedTrelicaModel.superior;
             orderData.trelicaInferior = selectedTrelicaModel.inferior;
             orderData.trelicaSinusoide = selectedTrelicaModel.senozoide;
+
+            // Novos parâmetros operacionais de máquina, tempos e metas
+            orderData.targetSpeed = trelicaSpeed;
+            orderData.setupTimeMinutes = trelicaSetupTimeMin;
+            orderData.estimatedProductionHours = parseFloat(trelicaProductionCalculations.totalHours.toFixed(2));
+            orderData.dailyWorkHours = parseFloat(dailyShiftDetails.totalWorkHours.toFixed(2));
+            orderData.shiftConfig = shiftConfig;
+
+            orderData.operatorLogs = [{
+                operator: currentUser?.username || 'Gestor PCP',
+                action: isTrelicaGhostOrder ? 'Criada no PCP (Fantasma)' : 'Criada no PCP',
+                startTime: new Date().toISOString(),
+                details: {
+                    machineSpeed: trelicaSpeed,
+                    setupTimeMin: trelicaSetupTimeMin,
+                    dailyTargetPieces: trelicaProductionCalculations.dailyPieces,
+                    totalPlannedMeters: trelicaProductionCalculations.totalMeters,
+                    estimatedHours: trelicaProductionCalculations.totalHours,
+                    dailyWorkHours: dailyShiftDetails.totalWorkHours,
+                    shiftConfig: shiftConfig
+                }
+            }];
         } 
         
         // --- VALIDAÇÕES E DADOS ESPECÍFICOS DE MALHA ---
@@ -2478,7 +2673,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             {/* ========================================================================= */}
             {isCreateModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md animate-fade p-2 sm:p-4 overflow-y-auto">
-                    <div className="w-full max-w-5xl pcp-glass-card rounded-2xl border border-white/10 p-5 sm:p-6 flex flex-col gap-4 text-slate-100 shadow-2xl my-auto">
+                    <div className={`w-full ${createCategory === 'Treliça' ? 'max-w-6xl' : 'max-w-5xl'} pcp-glass-card rounded-2xl border border-white/10 p-5 sm:p-6 flex flex-col gap-4 text-slate-100 shadow-2xl my-auto transition-all duration-300`}>
                         
                         {/* Topo do Modal */}
                         <div className="flex items-center justify-between border-b border-white/10 pb-3">
@@ -3102,208 +3297,659 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                         {/* ========================================================== */}
                         {/* FLUXO 2: TRELIÇA (Regras idênticas a ProductionOrderTrelica.tsx) */}
                         {/* ========================================================== */}
-                        {createCategory === 'Treliça' && (
-                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-                                
-                                {/* Coluna Esquerda: Dados da Treliça */}
-                                <div className="lg:col-span-5 flex flex-col gap-3.5 bg-[#0A1822]/90 p-4 rounded-xl border border-white/5">
-                                    <h4 className="text-xs font-black uppercase text-emerald-400 tracking-wider border-b border-white/5 pb-2">
-                                        1. Parâmetros da Treliça
-                                    </h4>
+                        {createCategory === 'Treliça' && (() => {
+                            const supBitolaNorm = normalizeBitola(selectedTrelicaModel?.superior);
+                            const infBitolaNorm = normalizeBitola(selectedTrelicaModel?.inferior);
+                            const senBitolaNorm = normalizeBitola(selectedTrelicaModel?.senozoide);
 
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Máquina Destino</label>
-                                        {isMachineLocked ? (
-                                            <div className="w-full bg-[#07131B] border border-emerald-500/30 rounded-xl py-2 px-3 text-xs text-emerald-400 font-black flex items-center justify-between">
-                                                <span>{createMachine}</span>
-                                                <span className="text-[9px] text-emerald-400/90 bg-emerald-500/15 px-2 py-0.5 rounded font-mono uppercase tracking-wider">Fixada</span>
+                            // Lotes compatíveis e filtrados por arame excluindo seleções cruzadas
+                            const supCandidates = availableCa60Stock.filter(s => {
+                                const matchGauge = trelicaShowAllGauges || normalizeBitola(s.bitola) === supBitolaNorm;
+                                const notInOthers = !trelicaInferiorLeftLots.includes(s.id) &&
+                                                    !trelicaInferiorRightLots.includes(s.id) &&
+                                                    !trelicaSenozoideLeftLots.includes(s.id) &&
+                                                    !trelicaSenozoideRightLots.includes(s.id);
+                                const matchSearch = !trelicaLotSearch || (s.internalLot || '').toLowerCase().includes(trelicaLotSearch.toLowerCase());
+                                return matchGauge && notInOthers && matchSearch;
+                            });
+
+                            const inf1Candidates = availableCa60Stock.filter(s => {
+                                const matchGauge = trelicaShowAllGauges || normalizeBitola(s.bitola) === infBitolaNorm;
+                                const notInOthers = !trelicaSuperiorLots.includes(s.id) &&
+                                                    !trelicaInferiorRightLots.includes(s.id) &&
+                                                    !trelicaSenozoideLeftLots.includes(s.id) &&
+                                                    !trelicaSenozoideRightLots.includes(s.id);
+                                const matchSearch = !trelicaLotSearch || (s.internalLot || '').toLowerCase().includes(trelicaLotSearch.toLowerCase());
+                                return matchGauge && notInOthers && matchSearch;
+                            });
+
+                            const inf2Candidates = availableCa60Stock.filter(s => {
+                                const matchGauge = trelicaShowAllGauges || normalizeBitola(s.bitola) === infBitolaNorm;
+                                const notInOthers = !trelicaSuperiorLots.includes(s.id) &&
+                                                    !trelicaInferiorLeftLots.includes(s.id) &&
+                                                    !trelicaSenozoideLeftLots.includes(s.id) &&
+                                                    !trelicaSenozoideRightLots.includes(s.id);
+                                const matchSearch = !trelicaLotSearch || (s.internalLot || '').toLowerCase().includes(trelicaLotSearch.toLowerCase());
+                                return matchGauge && notInOthers && matchSearch;
+                            });
+
+                            const sen1Candidates = availableCa60Stock.filter(s => {
+                                const matchGauge = trelicaShowAllGauges || normalizeBitola(s.bitola) === senBitolaNorm;
+                                const notInOthers = !trelicaSuperiorLots.includes(s.id) &&
+                                                    !trelicaInferiorLeftLots.includes(s.id) &&
+                                                    !trelicaInferiorRightLots.includes(s.id) &&
+                                                    !trelicaSenozoideRightLots.includes(s.id);
+                                const matchSearch = !trelicaLotSearch || (s.internalLot || '').toLowerCase().includes(trelicaLotSearch.toLowerCase());
+                                return matchGauge && notInOthers && matchSearch;
+                            });
+
+                            const sen2Candidates = availableCa60Stock.filter(s => {
+                                const matchGauge = trelicaShowAllGauges || normalizeBitola(s.bitola) === senBitolaNorm;
+                                const notInOthers = !trelicaSuperiorLots.includes(s.id) &&
+                                                    !trelicaInferiorLeftLots.includes(s.id) &&
+                                                    !trelicaInferiorRightLots.includes(s.id) &&
+                                                    !trelicaSenozoideLeftLots.includes(s.id);
+                                const matchSearch = !trelicaLotSearch || (s.internalLot || '').toLowerCase().includes(trelicaLotSearch.toLowerCase());
+                                return matchGauge && notInOthers && matchSearch;
+                            });
+
+                            const hasAnyLotsSelected = trelicaSuperiorLots.length > 0 ||
+                                trelicaInferiorLeftLots.length > 0 ||
+                                trelicaInferiorRightLots.length > 0 ||
+                                trelicaSenozoideLeftLots.length > 0 ||
+                                trelicaSenozoideRightLots.length > 0;
+
+                            const isSupDone = selectedSupWeight >= requiredTrelicaWeights.sup && requiredTrelicaWeights.sup > 0;
+                            const isInfDone = (selectedInf1Weight >= requiredTrelicaWeights.infSide) && (selectedInf2Weight >= requiredTrelicaWeights.infSide) && requiredTrelicaWeights.inf > 0;
+                            const isSenDone = (selectedSen1Weight >= requiredTrelicaWeights.senSide) && (selectedSen2Weight >= requiredTrelicaWeights.senSide) && requiredTrelicaWeights.sen > 0;
+                            const isAllLotsReady = isSupDone && isInfDone && isSenDone;
+
+                            const renderLotTable = (
+                                title: string,
+                                subTitle: string,
+                                reqWeight: number,
+                                selWeight: number,
+                                candidates: typeof availableCa60Stock,
+                                selIds: string[],
+                                posKey: 'sup' | 'inf1' | 'inf2' | 'sen1' | 'sen2'
+                            ) => {
+                                const isSufficient = selWeight >= reqWeight && reqWeight > 0;
+                                const progressPct = reqWeight > 0 ? Math.min(100, (selWeight / reqWeight) * 100) : 0;
+                                const extraKg = selWeight > reqWeight ? selWeight - reqWeight : 0;
+                                const missingKg = selWeight < reqWeight ? reqWeight - selWeight : 0;
+
+                                return (
+                                    <div className="flex flex-col bg-[#07131B] rounded-xl border border-white/10 p-3 gap-2 shadow-inner">
+                                        <div className="flex justify-between items-start border-b border-white/5 pb-2">
+                                            <div>
+                                                <span className="text-xs font-black text-white block">{title}</span>
+                                                <span className="text-[10px] text-slate-400 font-medium">{subTitle}</span>
                                             </div>
-                                        ) : (
-                                            <select
-                                                value={createMachine}
-                                                onChange={(e) => setCreateMachine(e.target.value)}
-                                                className="w-full bg-[#07131B] border border-white/10 rounded-xl py-2 px-3 text-xs text-white font-bold"
-                                            >
-                                                <option value="Treliça 1">Treliça 1</option>
-                                                <option value="Treliça 2">Treliça 2</option>
-                                            </select>
-                                        )}
-                                    </div>
+                                            <div className="text-right">
+                                                <div className="flex items-baseline justify-end gap-1.5 font-mono">
+                                                    <span className="text-[10px] text-slate-400">Meta: <strong>{reqWeight.toFixed(1)}kg</strong></span>
+                                                    <span>•</span>
+                                                    <span className={`text-xs font-black ${isSufficient ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                                        {selWeight.toFixed(1)} kg
+                                                    </span>
+                                                </div>
+                                                <div className="w-28 bg-white/10 rounded-full h-1.5 mt-1 overflow-hidden ml-auto">
+                                                    <div
+                                                        className={`h-full rounded-full transition-all duration-300 ${isSufficient ? 'bg-emerald-500' : 'bg-amber-400'}`}
+                                                        style={{ width: `${progressPct}%` }}
+                                                    />
+                                                </div>
+                                                {extraKg > 0 && (
+                                                    <span className="text-[8px] font-bold text-emerald-400 block mt-0.5 font-mono">
+                                                        +{extraKg.toFixed(1)} kg extra
+                                                    </span>
+                                                )}
+                                                {!isSufficient && missingKg > 0 && selWeight > 0 && (
+                                                    <span className="text-[8px] font-bold text-amber-400 block mt-0.5 font-mono">
+                                                        faltam {missingKg.toFixed(1)} kg
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
 
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Número da Ordem</label>
-                                        <input
-                                            type="text"
-                                            value={createOrderNumber}
-                                            onChange={(e) => setCreateOrderNumber(e.target.value)}
-                                            placeholder="Ex: TL-4520"
-                                            autoComplete="off"
-                                            className="w-full bg-[#07131B] border border-white/10 rounded-xl py-2 px-3 text-xs focus:outline-none focus:border-[#00E5FF]/50 focus:bg-[#07131B] focus:text-white text-white font-bold"
-                                        />
+                                        {/* Tabela de Lotes Disponíveis */}
+                                        <div className="overflow-y-auto max-h-[220px] rounded-lg border border-white/5 bg-[#050E15]">
+                                            <table className="w-full text-xs text-left">
+                                                <thead className="bg-[#0B1E2C] text-[9px] text-slate-400 uppercase sticky top-0 border-b border-white/10 z-10">
+                                                    <tr>
+                                                        <th className="p-2 w-8 text-center">#</th>
+                                                        <th className="p-2">Lote Interno</th>
+                                                        <th className="p-2">Bitola</th>
+                                                        <th className="p-2 text-right">Disponível</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-white/5 font-mono text-[11px]">
+                                                    {candidates.map(lot => {
+                                                        const isSelected = selIds.includes(lot.id);
+                                                        return (
+                                                            <tr
+                                                                key={lot.id}
+                                                                onClick={() => handleToggleTrelicaLot(posKey, lot.id, !isSelected)}
+                                                                className={`cursor-pointer transition-colors ${
+                                                                    isSelected 
+                                                                        ? 'bg-emerald-500/15 text-white' 
+                                                                        : 'hover:bg-white/[0.03] text-slate-300'
+                                                                }`}
+                                                            >
+                                                                <td className="p-2 text-center">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={isSelected}
+                                                                        onChange={(e) => handleToggleTrelicaLot(posKey, lot.id, e.target.checked)}
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                        className="h-3.5 w-3.5 rounded border-slate-700 bg-[#07131B] text-emerald-500 focus:ring-emerald-500 cursor-pointer"
+                                                                    />
+                                                                </td>
+                                                                <td className="p-2 font-bold text-white flex items-center gap-1.5">
+                                                                    <span>{lot.internalLot}</span>
+                                                                    {lot.status === 'Disponível - Suporte Treliça' && (
+                                                                        <span className="text-[7px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1 py-0.2 rounded uppercase">
+                                                                            Suporte
+                                                                        </span>
+                                                                    )}
+                                                                </td>
+                                                                <td className="p-2 text-cyan-400 font-semibold">{lot.bitola} mm</td>
+                                                                <td className="p-2 text-right font-black text-emerald-400">
+                                                                    {lot.remainingQuantity.toFixed(2)} kg
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                    {candidates.length === 0 && (
+                                                        <tr>
+                                                            <td colSpan={4} className="p-6 text-center text-slate-500 text-[10px] italic">
+                                                                Nenhum rolo compatível disponível no estoque.
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
+                                );
+                            };
 
-                                    {/* Ordem Fantasma Treliça */}
-                                    <div className="flex items-center gap-2 p-2.5 bg-amber-500/10 rounded-xl border border-amber-500/20">
-                                        <input
-                                            type="checkbox"
-                                            id="isTrelicaGhostOrderPCP"
-                                            checked={isTrelicaGhostOrder}
-                                            onChange={(e) => setIsTrelicaGhostOrder(e.target.checked)}
-                                            className="h-4 w-4 rounded border-slate-700 bg-[#07131B] text-amber-500 focus:ring-amber-500 cursor-pointer"
-                                        />
-                                        <label htmlFor="isTrelicaGhostOrderPCP" className="text-xs font-bold text-amber-400 cursor-pointer">
-                                            Ordem Fantasma (Não reservar rolos de CA-60)
-                                        </label>
-                                    </div>
+                            return (
+                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                                    
+                                    {/* Coluna Esquerda: Parâmetros da Treliça e Esquema de Tempos */}
+                                    <div className="lg:col-span-5 flex flex-col gap-3 bg-[#0A1822]/90 p-4 rounded-xl border border-white/5">
+                                        <h4 className="text-xs font-black uppercase text-emerald-400 tracking-wider border-b border-white/5 pb-2">
+                                            1. Parâmetros da Treliça & Esquema de Tempos
+                                        </h4>
 
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Modelo da Treliça</label>
-                                        <select
-                                            value={selectedTrelicaCod}
-                                            onChange={(e) => setSelectedTrelicaCod(e.target.value)}
-                                            className="w-full bg-[#07131B] border border-white/10 rounded-xl py-2 px-3 text-xs text-white font-bold"
-                                        >
-                                            {trelicaModels.map(m => (
-                                                <option key={m.cod} value={m.cod}>
-                                                    {m.modelo} - {m.tamanho}m (Sup: {m.superior} | Inf: {m.inferior} | Sen: {m.senozoide})
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Quantidade a Produzir (peças)</label>
-                                        <input
-                                            type="number"
-                                            value={trelicaQuantity}
-                                            onChange={(e) => {
-                                                const val = Number(e.target.value);
-                                                setTrelicaQuantity(val);
-                                                setCreateDuration(Math.max(1, Math.ceil(val / CAPACITY_DEFAULTS.Treliça)));
-                                            }}
-                                            className="w-full bg-[#07131B] border border-white/10 rounded-xl py-2 px-3 text-xs text-white font-bold"
-                                        />
-                                    </div>
-
-                                    {/* Agendamento */}
-                                    <div className="pt-2 border-t border-white/5 grid grid-cols-2 gap-2">
                                         <div className="flex flex-col gap-1">
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Data Início</label>
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Máquina Destino</label>
+                                            {isMachineLocked ? (
+                                                <div className="w-full bg-[#07131B] border border-emerald-500/30 rounded-xl py-2 px-3 text-xs text-emerald-400 font-black flex items-center justify-between">
+                                                    <span>{createMachine}</span>
+                                                    <span className="text-[9px] text-emerald-400/90 bg-emerald-500/15 px-2 py-0.5 rounded font-mono uppercase tracking-wider">Fixada</span>
+                                                </div>
+                                            ) : (
+                                                <select
+                                                    value={createMachine}
+                                                    onChange={(e) => setCreateMachine(e.target.value)}
+                                                    className="w-full bg-[#07131B] border border-white/10 rounded-xl py-2 px-3 text-xs text-white font-bold"
+                                                >
+                                                    <option value="Treliça 1">Treliça 1</option>
+                                                    <option value="Treliça 2">Treliça 2</option>
+                                                </select>
+                                            )}
+                                        </div>
+
+                                        <div className="flex flex-col gap-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Número da Ordem</label>
                                             <input
-                                                type="date"
-                                                value={createStartDate}
-                                                onChange={(e) => setCreateStartDate(e.target.value)}
-                                                className="w-full bg-[#07131B] border border-white/10 rounded-xl py-1.5 px-2.5 text-xs text-white"
+                                                type="text"
+                                                value={createOrderNumber}
+                                                onChange={(e) => setCreateOrderNumber(e.target.value)}
+                                                placeholder="Ex: TL-4520"
+                                                autoComplete="off"
+                                                className="w-full bg-[#07131B] border border-white/10 rounded-xl py-2 px-3 text-xs focus:outline-none focus:border-emerald-500/50 focus:bg-[#07131B] focus:text-white text-white font-bold"
                                             />
                                         </div>
 
-                                        <div className="flex flex-col gap-1">
-                                            <div className="flex justify-between items-center">
-                                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Duração (dias)</label>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setTempShiftConfig({ ...shiftConfig });
-                                                        setIsWorkHoursModalOpen(true);
-                                                    }}
-                                                    className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 hover:text-white transition-all text-[9px] font-mono cursor-pointer active:scale-95"
-                                                    title="Configurar jornada de trabalho diária (início, almoço e fim)"
-                                                >
-                                                    <ClockIcon className="w-2.5 h-2.5" />
-                                                    <span>{dailyShiftDetails.totalWorkHours.toFixed(1)}h/dia</span>
-                                                    <span className="text-[8px] opacity-75">⚙️</span>
-                                                </button>
+                                        {/* Ordem Fantasma Treliça */}
+                                        <div className="flex flex-col gap-1 p-2.5 bg-amber-500/10 rounded-xl border border-amber-500/20">
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="checkbox"
+                                                    id="isTrelicaGhostOrderPCP"
+                                                    checked={isTrelicaGhostOrder}
+                                                    onChange={(e) => setIsTrelicaGhostOrder(e.target.checked)}
+                                                    className="h-4 w-4 rounded border-slate-700 bg-[#07131B] text-amber-500 focus:ring-amber-500 cursor-pointer"
+                                                />
+                                                <label htmlFor="isTrelicaGhostOrderPCP" className="text-xs font-bold text-amber-400 cursor-pointer">
+                                                    Ordem Fantasma (Não reservar rolos de CA-60)
+                                                </label>
                                             </div>
-                                            <div className="flex items-center gap-2 bg-[#07131B] border border-white/10 rounded-xl p-1 justify-between">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setCreateDuration(prev => Math.max(1, prev - 1))}
-                                                    className="w-6 h-6 rounded bg-white/5 hover:bg-white/10 text-xs font-bold text-slate-300"
-                                                >
-                                                    -
-                                                </button>
-                                                <span className="text-xs font-bold text-white">{createDuration}d</span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setCreateDuration(prev => prev + 1)}
-                                                    className="w-6 h-6 rounded bg-white/5 hover:bg-white/10 text-xs font-bold text-slate-300"
-                                                >
-                                                    +
-                                                </button>
+                                            <p className="text-[9px] text-amber-300/80 pl-6 leading-tight">
+                                                A seleção dos lotes continua obrigatória para garantir o cálculo preciso de peso, tempos e calibração da OP.
+                                            </p>
+                                        </div>
+
+                                        <div className="flex flex-col gap-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Modelo da Treliça</label>
+                                            <select
+                                                value={selectedTrelicaCod}
+                                                onChange={(e) => setSelectedTrelicaCod(e.target.value)}
+                                                className="w-full bg-[#07131B] border border-white/10 rounded-xl py-2 px-3 text-xs text-white font-bold"
+                                            >
+                                                {trelicaModels.map(m => (
+                                                    <option key={m.cod} value={m.cod}>
+                                                        {m.modelo} - {m.tamanho}m (Sup: {m.superior} | Inf: {m.inferior} | Sen: {m.senozoide})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div className="flex flex-col gap-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Quantidade a Produzir (peças)</label>
+                                            <input
+                                                type="number"
+                                                value={trelicaQuantity}
+                                                onChange={(e) => {
+                                                    const val = Number(e.target.value);
+                                                    setTrelicaQuantity(val);
+                                                }}
+                                                className="w-full bg-[#07131B] border border-white/10 rounded-xl py-2 px-3 text-xs text-white font-bold"
+                                            />
+                                        </div>
+
+                                        {/* ========================================================== */}
+                                        {/* ESQUEMA OPERACIONAL DE TEMPOS, VELOCIDADE E SETUP */}
+                                        {/* ========================================================== */}
+                                        <div className="bg-[#07131B] p-3 rounded-xl border border-emerald-500/20 flex flex-col gap-2.5">
+                                            <div className="flex justify-between items-center border-b border-white/5 pb-1">
+                                                <span className="text-[10px] font-black uppercase text-emerald-400 tracking-wider flex items-center gap-1">
+                                                    ⏱️ Parâmetros Operacionais da Máquina
+                                                </span>
+                                                <span className="text-[9px] font-mono text-slate-400">
+                                                    {trelicaProductionCalculations.totalMeters.toLocaleString('pt-BR')} m totais
+                                                </span>
+                                            </div>
+
+                                            <div className="grid grid-cols-3 gap-2">
+                                                <div className="flex flex-col gap-0.5">
+                                                    <label className="text-[9px] font-bold text-slate-400 uppercase">Velocidade</label>
+                                                    <div className="relative flex items-center">
+                                                        <input
+                                                            type="number"
+                                                            step="0.5"
+                                                            min="1"
+                                                            value={trelicaSpeed}
+                                                            onChange={(e) => setTrelicaSpeed(Math.max(1, Number(e.target.value)))}
+                                                            className="w-full bg-[#0A1822] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-black text-emerald-400 focus:outline-none focus:border-emerald-500"
+                                                        />
+                                                        <span className="absolute right-1.5 text-[8px] text-slate-500 font-bold pointer-events-none">m/min</span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex flex-col gap-0.5">
+                                                    <label className="text-[9px] font-bold text-slate-400 uppercase">Tempo Setup</label>
+                                                    <div className="relative flex items-center">
+                                                        <input
+                                                            type="number"
+                                                            step="5"
+                                                            min="0"
+                                                            value={trelicaSetupTimeMin}
+                                                            onChange={(e) => setTrelicaSetupTimeMin(Math.max(0, Number(e.target.value)))}
+                                                            className="w-full bg-[#0A1822] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-black text-amber-400 focus:outline-none focus:border-amber-500"
+                                                        />
+                                                        <span className="absolute right-1.5 text-[8px] text-slate-500 font-bold pointer-events-none">min</span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex flex-col gap-0.5">
+                                                    <div className="flex justify-between items-center">
+                                                        <label className="text-[9px] font-bold text-slate-400 uppercase">Meta Diária</label>
+                                                        {trelicaDailyTargetOverride !== null && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setTrelicaDailyTargetOverride(null)}
+                                                                className="text-[7px] text-cyan-400 hover:underline font-bold"
+                                                                title="Resetar para meta automática calculada"
+                                                            >
+                                                                auto
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                    <div className="relative flex items-center">
+                                                        <input
+                                                            type="number"
+                                                            min="1"
+                                                            value={trelicaProductionCalculations.dailyPieces}
+                                                            onChange={(e) => setTrelicaDailyTargetOverride(Math.max(1, Number(e.target.value)))}
+                                                            className="w-full bg-[#0A1822] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-black text-cyan-400 focus:outline-none focus:border-cyan-500"
+                                                        />
+                                                        <span className="absolute right-1.5 text-[8px] text-slate-500 font-bold pointer-events-none">pçs</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Detalhamento dos Tempos */}
+                                            <div className="grid grid-cols-3 gap-1.5 py-1 text-center bg-white/[0.02] p-1.5 rounded-lg border border-white/5 font-mono text-[10px]">
+                                                <div>
+                                                    <span className="text-slate-400 block text-[8px] uppercase">Solda / Corrida</span>
+                                                    <strong className="text-emerald-400 block mt-0.5">
+                                                        {formatDurationHoursMin(trelicaProductionCalculations.runMinutes)}
+                                                    </strong>
+                                                    <span className="text-[8px] text-slate-500">
+                                                        ~{(trelicaProductionCalculations.runMinutes / 60).toFixed(1)}h
+                                                    </span>
+                                                </div>
+                                                <div className="border-x border-white/5">
+                                                    <span className="text-slate-400 block text-[8px] uppercase">Setup Inicial</span>
+                                                    <strong className="text-amber-400 block mt-0.5">
+                                                        {trelicaSetupTimeMin}m
+                                                    </strong>
+                                                    <span className="text-[8px] text-slate-500">
+                                                        preparação
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-slate-400 block text-[8px] uppercase">Total Estimado</span>
+                                                    <strong className="text-cyan-400 block mt-0.5">
+                                                        {formatDurationHoursMin(trelicaProductionCalculations.totalMinutes)}
+                                                    </strong>
+                                                    <span className="text-[8px] text-slate-500">
+                                                        ~{trelicaProductionCalculations.totalHours.toFixed(1)}h
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex justify-between items-center text-[10px] text-slate-400 px-1 pt-1 border-t border-white/5">
+                                                <span>Ritmo Diário:</span>
+                                                <strong className="text-emerald-300 font-mono">
+                                                    ~{trelicaProductionCalculations.dailyPieces} pçs/dia ({trelicaProductionCalculations.dailyKg.toFixed(0)} kg/dia)
+                                                </strong>
+                                            </div>
+                                        </div>
+
+                                        {/* Agendamento */}
+                                        <div className="pt-2 border-t border-white/5 grid grid-cols-2 gap-2">
+                                            <div className="flex flex-col gap-1">
+                                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Data Início</label>
+                                                <input
+                                                    type="date"
+                                                    value={createStartDate}
+                                                    onChange={(e) => setCreateStartDate(e.target.value)}
+                                                    className="w-full bg-[#07131B] border border-white/10 rounded-xl py-1.5 px-2.5 text-xs text-white"
+                                                />
+                                            </div>
+
+                                            <div className="flex flex-col gap-1">
+                                                <div className="flex justify-between items-center">
+                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Duração (dias)</label>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setTempShiftConfig({ ...shiftConfig });
+                                                            setIsWorkHoursModalOpen(true);
+                                                        }}
+                                                        className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 hover:text-white transition-all text-[9px] font-mono cursor-pointer active:scale-95"
+                                                        title="Configurar jornada de trabalho diária (início, almoço e fim)"
+                                                    >
+                                                        <ClockIcon className="w-2.5 h-2.5" />
+                                                        <span>{dailyShiftDetails.totalWorkHours.toFixed(1)}h/dia</span>
+                                                        <span className="text-[8px] opacity-75">⚙️</span>
+                                                    </button>
+                                                </div>
+                                                <div className="flex items-center gap-2 bg-[#07131B] border border-white/10 rounded-xl p-1 justify-between">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setCreateDuration(prev => Math.max(1, prev - 1))}
+                                                        className="w-6 h-6 rounded bg-white/5 hover:bg-white/10 text-xs font-bold text-slate-300"
+                                                    >
+                                                        -
+                                                    </button>
+                                                    <span className="text-xs font-bold text-white">{createDuration}d</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setCreateDuration(prev => prev + 1)}
+                                                        className="w-6 h-6 rounded bg-white/5 hover:bg-white/10 text-xs font-bold text-slate-300"
+                                                    >
+                                                        +
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
 
-                                {/* Coluna Direita: Necessidade de Matéria-Prima (Superior, Inferior, Senozoide) */}
-                                <div className="lg:col-span-7 flex flex-col gap-3 bg-[#0A1822]/90 p-4 rounded-xl border border-white/5">
-                                    <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                                        <div>
-                                            <h4 className="text-xs font-black uppercase text-emerald-400 tracking-wider">
-                                                2. Cálculo de Matéria-Prima (CA-60)
-                                            </h4>
-                                            <p className="text-[10px] text-slate-400">Peso teórico necessário para fabricar as {trelicaQuantity} peças</p>
+                                    {/* ========================================================== */}
+                                    {/* Coluna Direita: Seleção Completa de Lotes de CA-60 */}
+                                    {/* ========================================================== */}
+                                    <div className="lg:col-span-7 flex flex-col gap-3 bg-[#0A1822]/90 p-4 rounded-xl border border-white/5">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/5 pb-2 gap-2">
+                                            <div>
+                                                <h4 className="text-xs font-black uppercase text-emerald-400 tracking-wider flex items-center gap-1.5">
+                                                    <ClipboardListIcon className="w-4 h-4 text-emerald-400" />
+                                                    2. Seleção de Rolos de CA-60 (Matéria-Prima)
+                                                </h4>
+                                                <p className="text-[10px] text-slate-400">
+                                                    Marque os rolos em estoque para cada arame 
+                                                    <strong className="text-amber-400 font-normal"> (obrigatório inclusive em Ordens Fantasma)</strong>
+                                                </p>
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                {hasAnyLotsSelected && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleClearAllTrelicaLots}
+                                                        className="text-[10px] text-slate-400 hover:text-red-400 underline font-bold"
+                                                    >
+                                                        Desmarcar todos
+                                                    </button>
+                                                )}
+
+                                                <button
+                                                    type="button"
+                                                    onClick={handleAutoSelectTrelicaLots}
+                                                    className="bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 text-[10px] font-black px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 active:scale-95 shadow-sm"
+                                                    title="Seleciona automaticamente rolos compatíveis para todas as posições"
+                                                >
+                                                    ⚡ Auto-Selecionar Lotes
+                                                </button>
+                                            </div>
                                         </div>
 
-                                        {!isTrelicaGhostOrder && (
+                                        {/* Cartões de Status / Tabs para Superior, Inferiores e Senozoides */}
+                                        <div className="grid grid-cols-3 gap-2">
                                             <button
                                                 type="button"
-                                                onClick={handleAutoSelectTrelicaLots}
-                                                className="bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 text-[10px] font-black px-3 py-1.5 rounded-lg transition-all flex items-center gap-1"
+                                                onClick={() => setActiveTrelicaLotTab('superior')}
+                                                className={`p-2.5 rounded-xl border text-left transition-all ${
+                                                    activeTrelicaLotTab === 'superior'
+                                                        ? 'bg-cyan-500/15 border-cyan-500/50 shadow-md shadow-cyan-500/10'
+                                                        : 'bg-[#07131B] border-white/5 hover:border-white/20'
+                                                }`}
                                             >
-                                                ⚡ Auto-Selecionar Lotes
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-[9px] font-black uppercase text-cyan-400">Superior (1x)</span>
+                                                    {isSupDone && <span className="text-[9px]">✅</span>}
+                                                </div>
+                                                <div className="text-xs font-black text-white mt-0.5">⌀ {selectedTrelicaModel?.superior} mm</div>
+                                                <div className="text-[10px] font-mono text-slate-400 mt-1 flex justify-between">
+                                                    <span>{trelicaSuperiorLots.length} rolo(s)</span>
+                                                    <strong className={isSupDone ? 'text-emerald-400' : 'text-amber-400'}>
+                                                        {selectedSupWeight.toFixed(0)}/{requiredTrelicaWeights.sup.toFixed(0)}kg
+                                                    </strong>
+                                                </div>
                                             </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => setActiveTrelicaLotTab('inferior')}
+                                                className={`p-2.5 rounded-xl border text-left transition-all ${
+                                                    activeTrelicaLotTab === 'inferior'
+                                                        ? 'bg-emerald-500/15 border-emerald-500/50 shadow-md shadow-emerald-500/10'
+                                                        : 'bg-[#07131B] border-white/5 hover:border-white/20'
+                                                }`}
+                                            >
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-[9px] font-black uppercase text-emerald-400">Inferiores (2x)</span>
+                                                    {isInfDone && <span className="text-[9px]">✅</span>}
+                                                </div>
+                                                <div className="text-xs font-black text-white mt-0.5">⌀ {selectedTrelicaModel?.inferior} mm</div>
+                                                <div className="text-[10px] font-mono text-slate-400 mt-1 flex justify-between">
+                                                    <span>{(trelicaInferiorLeftLots.length + trelicaInferiorRightLots.length)} rolo(s)</span>
+                                                    <strong className={isInfDone ? 'text-emerald-400' : 'text-amber-400'}>
+                                                        {(selectedInf1Weight + selectedInf2Weight).toFixed(0)}/{requiredTrelicaWeights.inf.toFixed(0)}kg
+                                                    </strong>
+                                                </div>
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => setActiveTrelicaLotTab('senozoide')}
+                                                className={`p-2.5 rounded-xl border text-left transition-all ${
+                                                    activeTrelicaLotTab === 'senozoide'
+                                                        ? 'bg-purple-500/15 border-purple-500/50 shadow-md shadow-purple-500/10'
+                                                        : 'bg-[#07131B] border-white/5 hover:border-white/20'
+                                                }`}
+                                            >
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-[9px] font-black uppercase text-purple-400">Senozoides (2x)</span>
+                                                    {isSenDone && <span className="text-[9px]">✅</span>}
+                                                </div>
+                                                <div className="text-xs font-black text-white mt-0.5">⌀ {selectedTrelicaModel?.senozoide} mm</div>
+                                                <div className="text-[10px] font-mono text-slate-400 mt-1 flex justify-between">
+                                                    <span>{(trelicaSenozoideLeftLots.length + trelicaSenozoideRightLots.length)} rolo(s)</span>
+                                                    <strong className={isSenDone ? 'text-emerald-400' : 'text-amber-400'}>
+                                                        {(selectedSen1Weight + selectedSen2Weight).toFixed(0)}/{requiredTrelicaWeights.sen.toFixed(0)}kg
+                                                    </strong>
+                                                </div>
+                                            </button>
+                                        </div>
+
+                                        {/* Barra de Filtro de Busca de Lotes */}
+                                        <div className="flex items-center justify-between gap-3 bg-[#07131B] p-2 rounded-xl border border-white/5">
+                                            <input
+                                                type="text"
+                                                value={trelicaLotSearch}
+                                                onChange={(e) => setTrelicaLotSearch(e.target.value)}
+                                                placeholder="🔍 Filtrar rolos por lote interno..."
+                                                className="w-full bg-transparent border-none text-xs text-white placeholder-slate-500 focus:outline-none"
+                                            />
+                                            <div className="flex items-center gap-2 whitespace-nowrap pl-2 border-l border-white/10">
+                                                <input
+                                                    type="checkbox"
+                                                    id="trelicaShowAllGauges"
+                                                    checked={trelicaShowAllGauges}
+                                                    onChange={(e) => setTrelicaShowAllGauges(e.target.checked)}
+                                                    className="h-3.5 w-3.5 rounded border-slate-700 bg-[#07131B] text-emerald-500 focus:ring-emerald-500 cursor-pointer"
+                                                />
+                                                <label htmlFor="trelicaShowAllGauges" className="text-[10px] text-slate-400 font-bold cursor-pointer">
+                                                    Exibir todas as bitolas
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        {/* Conteúdo da Tab Ativa: BANZO SUPERIOR */}
+                                        {activeTrelicaLotTab === 'superior' && (
+                                            <div className="flex flex-col gap-2">
+                                                {renderLotTable(
+                                                    `Banzo Superior (1x)`,
+                                                    `Bitola nominal: ${selectedTrelicaModel?.superior} mm`,
+                                                    requiredTrelicaWeights.sup,
+                                                    selectedSupWeight,
+                                                    supCandidates,
+                                                    trelicaSuperiorLots,
+                                                    'sup'
+                                                )}
+                                            </div>
                                         )}
-                                    </div>
 
-                                    {/* Cartões dos 3 Arames */}
-                                    <div className="grid grid-cols-3 gap-3">
-                                        <div className="bg-[#07131B] p-3 rounded-xl border border-white/5 flex flex-col justify-between">
-                                            <span className="text-[10px] font-bold uppercase text-slate-400">Superior</span>
-                                            <span className="text-xs font-black text-cyan-400 mt-1">Bitola: {selectedTrelicaModel?.superior} mm</span>
-                                            <span className="text-sm font-black text-white mt-1">
-                                                {requiredTrelicaWeights.sup.toFixed(1)} kg
-                                            </span>
-                                            <span className="text-[9px] text-slate-500 mt-1">
-                                                {trelicaSuperiorLots.length} lote(s) alocado(s)
-                                            </span>
-                                        </div>
+                                        {/* Conteúdo da Tab Ativa: BANZOS INFERIORES (LADO 1 E LADO 2) */}
+                                        {activeTrelicaLotTab === 'inferior' && (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                {renderLotTable(
+                                                    `Inferior - Lado 1`,
+                                                    `Bitola nominal: ${selectedTrelicaModel?.inferior} mm`,
+                                                    requiredTrelicaWeights.infSide,
+                                                    selectedInf1Weight,
+                                                    inf1Candidates,
+                                                    trelicaInferiorLeftLots,
+                                                    'inf1'
+                                                )}
+                                                {renderLotTable(
+                                                    `Inferior - Lado 2`,
+                                                    `Bitola nominal: ${selectedTrelicaModel?.inferior} mm`,
+                                                    requiredTrelicaWeights.infSide,
+                                                    selectedInf2Weight,
+                                                    inf2Candidates,
+                                                    trelicaInferiorRightLots,
+                                                    'inf2'
+                                                )}
+                                            </div>
+                                        )}
 
-                                        <div className="bg-[#07131B] p-3 rounded-xl border border-white/5 flex flex-col justify-between">
-                                            <span className="text-[10px] font-bold uppercase text-slate-400">Inferior (2x)</span>
-                                            <span className="text-xs font-black text-emerald-400 mt-1">Bitola: {selectedTrelicaModel?.inferior} mm</span>
-                                            <span className="text-sm font-black text-white mt-1">
-                                                {requiredTrelicaWeights.inf.toFixed(1)} kg
-                                            </span>
-                                            <span className="text-[9px] text-slate-500 mt-1">
-                                                {trelicaInferiorLots.length} lote(s) alocado(s)
-                                            </span>
-                                        </div>
+                                        {/* Conteúdo da Tab Ativa: SENOZOIDES (LADO 1 E LADO 2) */}
+                                        {activeTrelicaLotTab === 'senozoide' && (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                {renderLotTable(
+                                                    `Senozoide - Lado 1`,
+                                                    `Bitola nominal: ${selectedTrelicaModel?.senozoide} mm`,
+                                                    requiredTrelicaWeights.senSide,
+                                                    selectedSen1Weight,
+                                                    sen1Candidates,
+                                                    trelicaSenozoideLeftLots,
+                                                    'sen1'
+                                                )}
+                                                {renderLotTable(
+                                                    `Senozoide - Lado 2`,
+                                                    `Bitola nominal: ${selectedTrelicaModel?.senozoide} mm`,
+                                                    requiredTrelicaWeights.senSide,
+                                                    selectedSen2Weight,
+                                                    sen2Candidates,
+                                                    trelicaSenozoideRightLots,
+                                                    'sen2'
+                                                )}
+                                            </div>
+                                        )}
 
-                                        <div className="bg-[#07131B] p-3 rounded-xl border border-white/5 flex flex-col justify-between">
-                                            <span className="text-[10px] font-bold uppercase text-slate-400">Senozoide (2x)</span>
-                                            <span className="text-xs font-black text-purple-400 mt-1">Bitola: {selectedTrelicaModel?.senozoide} mm</span>
-                                            <span className="text-sm font-black text-white mt-1">
-                                                {requiredTrelicaWeights.sen.toFixed(1)} kg
-                                            </span>
-                                            <span className="text-[9px] text-slate-500 mt-1">
-                                                {trelicaSenozoideLots.length} lote(s) alocado(s)
-                                            </span>
-                                        </div>
-                                    </div>
+                                        {/* Resumo Geral de Matéria-Prima Treliça */}
+                                        <div className="bg-[#07131B] p-3 rounded-xl border border-white/5 mt-auto flex flex-col gap-1.5">
+                                            <div className="flex justify-between text-xs text-slate-300">
+                                                <span>Peso Teórico Total da Produção:</span>
+                                                <span className="font-black text-white">
+                                                    {requiredTrelicaWeights.total.toFixed(2)} kg
+                                                </span>
+                                            </div>
 
-                                    {/* Resumo Treliça */}
-                                    <div className="bg-[#07131B] p-3 rounded-xl border border-white/5 mt-auto">
-                                        <div className="flex justify-between text-xs text-slate-300">
-                                            <span>Peso Teórico Total da Produção:</span>
-                                            <span className="font-black text-emerald-400 text-sm">
-                                                {requiredTrelicaWeights.total.toFixed(2)} kg
-                                            </span>
+                                            <div className="flex justify-between text-xs">
+                                                <span className="text-slate-400">Total Alocado nos Rolos Selecionados:</span>
+                                                <span className={`font-black ${isAllLotsReady ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                                    {totalSelectedTrelicaWeight.toFixed(2)} kg
+                                                </span>
+                                            </div>
+
+                                            <div className="pt-1.5 border-t border-white/5 flex items-center justify-between text-[10px]">
+                                                {isAllLotsReady ? (
+                                                    <span className="text-emerald-400 font-bold flex items-center gap-1">
+                                                        ✓ Todos os 5 arames devidamente abastecidos (+{(totalSelectedTrelicaWeight - requiredTrelicaWeights.total).toFixed(1)} kg extra)
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-amber-400 font-bold flex items-center gap-1">
+                                                        ⚠️ Seleção incompleta ou abaixo da meta (verifique as 3 abas acima)
+                                                    </span>
+                                                )}
+
+                                                <span className="text-slate-500 font-mono">
+                                                    {(trelicaSuperiorLots.length + trelicaInferiorLeftLots.length + trelicaInferiorRightLots.length + trelicaSenozoideLeftLots.length + trelicaSenozoideRightLots.length)} rolo(s) marcados
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        )}
+                            );
+                        })()}
 
                         {/* ========================================================== */}
                         {/* FLUXO 3: MALHA (Regras idênticas a ProductionOrderMalha.tsx) */}
