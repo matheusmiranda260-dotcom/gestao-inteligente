@@ -2749,9 +2749,23 @@ const App: React.FC = () => {
                     onDeleteCategory={handleDeleteMeetingCategory}
                 />;
             case 'laboratory': return <Laboratory setPage={setPage} currentUser={currentUser} gauges={gauges} />;
-            case 'downtimeConfigs': return <DowntimeConfigManager onBack={() => setPage('menu')} showNotification={showNotification} />;
-            case 'pcpBoard': return <PCPBoard setPage={setPage} productionOrders={productionOrders} updateProductionOrder={updateProductionOrder} stock={stock} currentUser={currentUser} addProductionOrder={addProductionOrder} deleteProductionOrder={deleteProductionOrder} showNotification={showNotification} gauges={gauges} shiftReports={shiftReports} downtimeConfigs={downtimeConfigs} isPcpFullscreen={isPcpFullscreen} setIsPcpFullscreen={setIsPcpFullscreen} />;
-            default: return <Login onLogin={handleLogin} error={null} />;
+            case 'pcpBoard': return <PCPBoard 
+                setPage={setPage} 
+                productionOrders={productionOrders} 
+                updateProductionOrder={updateProductionOrder} 
+                stock={stock} 
+                currentUser={currentUser} 
+                addProductionOrder={addProductionOrder} 
+                deleteProductionOrder={deleteProductionOrder} 
+                showNotification={showNotification} 
+                gauges={gauges} 
+                shiftReports={shiftReports} 
+                downtimeConfigs={downtimeConfigs} 
+                isPcpFullscreen={isPcpFullscreen} 
+                setIsPcpFullscreen={setIsPcpFullscreen} 
+                employees={employees}
+                users={users}
+            />;
         }
     };
 
