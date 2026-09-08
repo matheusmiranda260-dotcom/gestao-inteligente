@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Page, StockItem, ProductionRecord, StockGauge } from '../types';
+import type { Page, StockItem, ProductionRecord, StockGauge, ProductionOrderData, ShiftReport } from '../types';
 import ReportsTrelica from './ReportsTrelica';
 import ReportsTrefila from './ReportsTrefila';
 import ReportsOPTrefila from './ReportsOPTrefila';
@@ -16,10 +16,19 @@ interface ReportsProps {
     malhaProduction: ProductionRecord[];
     setPage: (page: Page) => void;
     gauges: StockGauge[];
+    productionOrders?: ProductionOrderData[];
+    shiftReports?: ShiftReport[];
 }
 
-const Reports: React.FC<ReportsProps> = ({ stock, trefilaProduction, trelicaProduction, malhaProduction, setPage, gauges }) => {
-    const [activeTab, setActiveTab] = useState<'trelica' | 'malha' | 'trefila' | 'op_trefila' | 'fechamento_op' | 'requisicao_transferencia' | 'final_trelica' | 'gerar_etiqueta'>('trelica');
+const Reports: React.FC<ReportsProps> = ({ stock, trefilaProduction, trelicaProduction, malhaProduction, setPage, gauges, productionOrders = [], shiftReports = [] }) => {
+    const [activeTab, setActiveTab] = useState<'trelica' | 'malha' | 'trefila' | 'op_trefila' | 'fechamento_op' | 'requisicao_transferencia' | 'final_trelica' | 'gerar_etiqueta'>(() => {
+        const savedTab = localStorage.getItem('reports_active_tab');
+        if (savedTab) {
+            localStorage.removeItem('reports_active_tab');
+            return savedTab as any;
+        }
+        return 'trelica';
+    });
 
     return (
         <div className="flex flex-col h-full bg-slate-100">
@@ -126,11 +135,15 @@ const Reports: React.FC<ReportsProps> = ({ stock, trefilaProduction, trelicaProd
                 ) : activeTab === 'trefila' ? (
                     <ReportsTrefila 
                         setPage={setPage} 
+                        productionOrders={productionOrders}
+                        shiftReports={shiftReports}
+                        stock={stock}
                     />
                 ) : activeTab === 'op_trefila' ? (
                     <ReportsOPTrefila 
                         stock={stock}
                         setPage={setPage}
+                        productionOrders={productionOrders}
                     />
                 ) : activeTab === 'requisicao_transferencia' ? (
                     <ReportsRequisicaoTransferencia 

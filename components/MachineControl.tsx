@@ -367,10 +367,11 @@ const CompletionModal: React.FC<{
     );
 };
 const MachineSpeedModal: React.FC<{
+    initialSpeed?: number;
     onClose: () => void;
     onSubmit: (speed: number) => void;
-}> = ({ onClose, onSubmit }) => {
-    const [speed, setSpeed] = useState<string>('');
+}> = ({ initialSpeed, onClose, onSubmit }) => {
+    const [speed, setSpeed] = useState<string>(initialSpeed ? initialSpeed.toString().replace('.', ',') : '');
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -3097,15 +3098,6 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                             <div className={`bg-white p-6 rounded-2xl shadow-sm ${mobileTab !== 'process' ? 'hidden lg:block' : 'animate-fade-in'}`}>
                                                 <div className="flex justify-between items-center mb-4">
                                                     <h3 className="text-lg font-bold text-slate-700">Fila de Lotes (Matéria-Prima)</h3>
-                                                    {(activeOrder.isGhostOrder || activeOrder.machine.startsWith('Trefila') || activeOrder.machine.startsWith('Desbobinadeira')) && (
-                                                        <button
-                                                            onClick={() => setShowLotSelectionModal(true)}
-                                                            className="flex items-center gap-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-4 py-2 rounded-xl text-xs font-bold border border-indigo-100 transition"
-                                                        >
-                                                            <ArchiveIcon className="h-4 w-4" />
-                                                            SELECIONAR DO ESTOQUE
-                                                        </button>
-                                                    )}
                                                 </div>
                                                 <div className="overflow-x-auto">
                                                     {waitingLots.length > 0 ? (
@@ -3758,6 +3750,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
             {showSpeedModal && (
                 <MachineSpeedModal
+                    initialSpeed={activeOrder?.targetSpeed}
                     onClose={() => {
                         setShowSpeedModal(false);
                         setSelectedLotForSpeed(null);

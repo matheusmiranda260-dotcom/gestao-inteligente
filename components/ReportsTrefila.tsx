@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import type { Page } from '../types';
+import type { Page, ProductionOrderData, ShiftReport, StockItem } from '../types';
 import html2canvas from 'html2canvas';
 import { supabase } from '../services/supabaseService';
 
 interface ReportsTrefilaProps {
     setPage: (page: Page) => void;
+    productionOrders?: ProductionOrderData[];
+    shiftReports?: ShiftReport[];
+    stock?: StockItem[];
 }
 
 // Interfaces locais para estruturação do Relatório da Trefila
@@ -90,7 +93,12 @@ const RulerIcon = ({ className = "h-5 w-5" }: { className?: string }) => (
     </svg>
 );
 
-const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({ setPage }) => {
+const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({ 
+    setPage, 
+    productionOrders = [], 
+    shiftReports = [], 
+    stock = [] 
+}) => {
     // 1. Estados de Controle
     const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toLocaleDateString('sv'));
     const [loading, setLoading] = useState<boolean>(false);
@@ -106,6 +114,11 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({ setPage }) => {
     // Estados do modal de histórico
     const [showHistoryModal, setShowHistoryModal] = useState<boolean>(false);
     const [historyDates, setHistoryDates] = useState<string[]>([]);
+
+    // 1.1 Estados de Sincronização Automática com a Produção Diária (Chão de Fábrica)
+    const [selectedMachine, setSelectedMachine] = useState<string>('Trefila 1');
+    const [selectedOPId, setSelectedOPId] = useState<string>('');
+    const [autoSyncEnabled, setAutoSyncEnabled] = useState<boolean>(true);
 
     // 2. Estados dos Campos do Formulário
     const [productionOrder, setProductionOrder] = useState<string>('');
@@ -136,6 +149,161 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({ setPage }) => {
         const id = Math.random().toString(36).substring(2, 9);
         setToasts(prev => [...prev, { message, type, id }]);
         setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 5000);
+    };
+
+    // OPs disponíveis para a máquina e data selecionada
+    const availableOPs = useMemo(() => {
+        const selDateOnly = selectedDate.includes('T') ? selectedDate.split('T')[0] : selectedDate;
+        return (productionOrders || []).filter(op => {
+            const opMachine = op.scheduledMachine || (op.machine as string);
+            const isTargetMach = opMachine === selectedMachine || 
+                                 opMachine?.toLowerCase() === selectedMachine.toLowerCase() || 
+                                 (selectedMachine === 'Trefila 1' && opMachine === 'Trefila');
+            if (!isTargetMach) return false;
+
+            const plannedDate = op.plannedStartDate ? op.plannedStartDate.split('T')[0] : '';
+            const startDate = op.startTime ? op.startTime.split('T')[0] : '';
+            const creationDate = op.creationDate ? op.creationDate.split('T')[0] : '';
+            
+            const hasEventOnDate = (op.downtimeEvents || []).some(e => e.stopTime && e.stopTime.startsWith(selDateOnly)) ||
+                                   (op.processedLots || []).some(l => l.startTime && l.startTime.startsWith(selDateOnly));
+
+            return plannedDate === selDateOnly || startDate === selDateOnly || creationDate === selDateOnly || hasEventOnDate || (op.status === 'Ativa');
+        });
+    }, [productionOrders, selectedMachine, selectedDate]);
+
+    // Função que sincroniza a evolução do dia com a ficha de papel
+    const syncDailyEvolution = (targetOpId?: string, forceToast = false) => {
+        const selDateOnly = selectedDate.includes('T') ? selectedDate.split('T')[0] : selectedDate;
+
+        let targetOP: ProductionOrderData | undefined;
+        if (targetOpId) {
+            targetOP = (productionOrders || []).find(o => o.id === targetOpId);
+        } else if (selectedOPId) {
+            targetOP = (productionOrders || []).find(o => o.id === selectedOPId);
+        }
+
+        // Se não houver OP específica escolhida, busca a OP ativa ou a primeira disponível da máquina
+        if (!targetOP) {
+            targetOP = availableOPs.find(o => o.status === 'Ativa') || availableOPs[0];
+        }
+
+        if (!targetOP) {
+            // Se não encontrou OP da data, tenta buscar a OP ativa da máquina em qualquer data
+            targetOP = (productionOrders || []).find(o => {
+                const opMach = o.scheduledMachine || (o.machine as string);
+                return (opMach === selectedMachine || opMach?.toLowerCase() === selectedMachine.toLowerCase() || (selectedMachine === 'Trefila 1' && opMach === 'Trefila')) && (o.status === 'Ativa' || o.status === 'Inativa');
+            });
+        }
+
+        if (!targetOP) {
+            if (forceToast) {
+                showToast(`Nenhuma OP encontrada para a máquina ${selectedMachine} na data selecionada.`, 'warning');
+            }
+            return;
+        }
+
+        // 1. Preencher Metadados
+        setProductionOrder(targetOP.orderNumber || '');
+        if (targetOP.operator) {
+            setOperator(targetOP.operator);
+        } else {
+            // Tenta buscar no shiftReports
+            const relatedReport = (shiftReports || []).find(r => r.productionOrderId === targetOP?.id || r.orderNumber === targetOP?.orderNumber);
+            if (relatedReport?.operator) setOperator(relatedReport.operator);
+        }
+
+        const inBitola = targetOP.inputBitola || '8.00';
+        const outBitola = targetOP.targetBitola || '6.00';
+        setProductDescriptionIn(`${inBitola}mm -- FIO MÁQUINA--`);
+        setProductDescriptionOut(`${outBitola}mm ---CA60--`);
+
+        // 2. Preencher Paradas (downtimeEvents)
+        const formatTime = (iso?: string) => {
+            if (!iso) return '00:00:00';
+            const d = new Date(iso);
+            return !isNaN(d.getTime()) ? d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '00:00:00';
+        };
+
+        const rawEvents = targetOP.downtimeEvents || [];
+        // Filtra eventos da data selecionada, ou se for a OP ativa traz os eventos recentes
+        const relevantEvents = rawEvents.filter(e => !e.stopTime || e.stopTime.startsWith(selDateOnly) || rawEvents.length <= 20);
+
+        const newStops: StopRow[] = relevantEvents.map((ev, idx) => ({
+            id: `auto-stop-${idx}-${Date.now()}`,
+            inicio: formatTime(ev.stopTime),
+            fim: ev.resumeTime ? formatTime(ev.resumeTime) : formatTime(new Date().toISOString()),
+            motivo: ev.reason || 'Outros'
+        }));
+
+        if (newStops.length > 0) {
+            setStops(newStops);
+        }
+
+        // 3. Preencher Lotes de Produção (processedLots, weighedPackages ou shiftReports)
+        const newUpdates: ProductionUpdateRow[] = [];
+        const dateShort = selDateOnly.split('-').slice(1).reverse().join('/'); // dd/mm
+
+        (targetOP.processedLots || []).forEach((lot, idx) => {
+            newUpdates.push({
+                id: `lot-${idx}-${Date.now()}`,
+                data: lot.startTime ? new Date(lot.startTime).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : dateShort,
+                kgEntrada: Number(lot.weight || lot.initialWeight || 0),
+                saida: Number(lot.producedWeight || lot.weight || 0),
+                bitola: `${outBitola} mm`
+            });
+        });
+
+        // Se houver weighedPackages não computados
+        (targetOP.weighedPackages || []).forEach((pkg, pIdx) => {
+            if (!newUpdates.some(u => u.saida === pkg.weight)) {
+                newUpdates.push({
+                    id: `pkg-${pIdx}-${Date.now()}`,
+                    data: dateShort,
+                    kgEntrada: 0,
+                    saida: Number(pkg.weight || 0),
+                    bitola: `${outBitola} mm`
+                });
+            }
+        });
+
+        // Se ainda não houver lotes mas houver shiftReports com peso
+        if (newUpdates.length === 0) {
+            const reportsForOP = (shiftReports || []).filter(r => r.productionOrderId === targetOP?.id || r.orderNumber === targetOP?.orderNumber);
+            reportsForOP.forEach((rep, rIdx) => {
+                if (rep.totalProducedWeight) {
+                    newUpdates.push({
+                        id: `rep-${rIdx}-${Date.now()}`,
+                        data: rep.date || dateShort,
+                        kgEntrada: 0,
+                        saida: Number(rep.totalProducedWeight),
+                        bitola: `${outBitola} mm`
+                    });
+                }
+            });
+        }
+
+        if (newUpdates.length > 0) {
+            setProductionUpdates(newUpdates);
+        }
+
+        // 4. Calcular Horas Trabalhadas
+        if (targetOP.startTime) {
+            const startD = new Date(targetOP.startTime);
+            const nowD = new Date();
+            const diffSec = Math.max(0, Math.floor((nowD.getTime() - startD.getTime()) / 1000));
+            if (diffSec > 0 && diffSec < 24 * 3600) {
+                const pad = (n: number) => String(n).padStart(2, '0');
+                const h = Math.floor(diffSec / 3600);
+                const m = Math.floor((diffSec % 3600) / 60);
+                const s = diffSec % 60;
+                setStats(prev => ({ ...prev, horasTrabalhadas: `${pad(h)}:${pad(m)}:${pad(s)}` }));
+            }
+        }
+
+        if (forceToast) {
+            showToast(`✅ Ficha auto-preenchida com os dados da OP #${targetOP.orderNumber}!`, 'success');
+        }
     };
 
     // 4. Helpers de Cálculo
@@ -286,18 +454,26 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({ setPage }) => {
             const saved = localStorage.getItem(DRAFT_KEY);
             if (saved) {
                 const data = JSON.parse(saved);
-                if (data.selectedDate) setSelectedDate(data.selectedDate);
-                setProductionOrder(data.productionOrder || '');
-                setOperator(data.operator || '');
-                setProductDescriptionIn(data.productDescriptionIn || '8mm -- FIO MÁQUINA--');
-                setProductDescriptionOut(data.productDescriptionOut || '6mm ---CA60--');
-                setStops(data.stops || []);
-                setStats(data.stats || { horasTrabalhadas: '09:45:00', pesoEntrada: 0, pesoSaida: 0, sucata: 0, metrosProduzidos: 0, velocidade: 0 });
-                setProductionUpdates(data.productionUpdates || []);
-                showToast('Rascunho da Trefila carregado.', 'info');
+                // Se houver rascunho salvo para a data selecionada
+                if (data.selectedDate && data.selectedDate === selectedDate && (data.productionOrder || data.stops?.length > 0)) {
+                    setSelectedDate(data.selectedDate);
+                    setProductionOrder(data.productionOrder || '');
+                    setOperator(data.operator || '');
+                    setProductDescriptionIn(data.productDescriptionIn || '8mm -- FIO MÁQUINA--');
+                    setProductDescriptionOut(data.productDescriptionOut || '6mm ---CA60--');
+                    setStops(data.stops || []);
+                    setStats(data.stats || { horasTrabalhadas: '09:45:00', pesoEntrada: 0, pesoSaida: 0, sucata: 0, metrosProduzidos: 0, velocidade: 0 });
+                    setProductionUpdates(data.productionUpdates || []);
+                    showToast('Rascunho salvo carregado.', 'info');
+                } else {
+                    syncDailyEvolution();
+                }
+            } else {
+                syncDailyEvolution();
             }
         } catch (e) {
             console.error('Erro ao carregar rascunho', e);
+            syncDailyEvolution();
         } finally {
             setLoading(false);
         }
@@ -334,6 +510,13 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({ setPage }) => {
     useEffect(() => {
         loadDraft();
     }, []);
+
+    // Sincronização automática quando a máquina, OP ou data mudar
+    useEffect(() => {
+        if (autoSyncEnabled && !loading) {
+            syncDailyEvolution(selectedOPId || undefined);
+        }
+    }, [selectedMachine, selectedOPId, selectedDate, autoSyncEnabled]);
 
     // Autosave
     useEffect(() => {
@@ -901,6 +1084,13 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({ setPage }) => {
                 </div>
                 
                 <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                    <button 
+                        onClick={() => syncDailyEvolution(undefined, true)} 
+                        className="bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-black py-1.5 px-3 rounded text-xs shadow flex items-center gap-1.5 active:scale-95 transition-all animate-pulse"
+                        title="Puxar OP, operador, paradas e pesagens automaticamente do chão de fábrica"
+                    >
+                        <span>⚡ Sincronizar com Produção do Dia</span>
+                    </button>
                     <button onClick={handleLoadSampleData} className="bg-amber-500 hover:bg-amber-600 text-white font-bold py-1.5 px-3 rounded text-xs shadow">
                         ⭐ Carregar Modelo de Teste
                     </button>
@@ -922,11 +1112,64 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({ setPage }) => {
                 </div>
             </header>
 
-            {/* Filtros - No Print */}
-            <section className="bg-white p-4 rounded border border-slate-200 shadow-sm mb-4 flex flex-col sm:flex-row items-center justify-between gap-4 no-print">
-                <div>
-                    <span className="text-xs font-bold text-slate-500 uppercase">Configurações de Relatório</span>
+            {/* Filtros e Controles de Sincronização - No Print */}
+            <section className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm mb-4 flex flex-wrap items-center justify-between gap-3 no-print">
+                <div className="flex flex-wrap items-center gap-3">
+                    {/* Seletor de Máquina */}
+                    <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-slate-700 text-xs uppercase">Linha:</span>
+                        <div className="flex rounded-lg border border-slate-300 p-0.5 bg-slate-100">
+                            {['Trefila 1', 'Trefila 2'].map(mach => (
+                                <button
+                                    key={mach}
+                                    type="button"
+                                    onClick={() => { setSelectedMachine(mach); setSelectedOPId(''); }}
+                                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                                        selectedMachine === mach ? 'bg-[#002060] text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                                    }`}
+                                >
+                                    {mach}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Seletor de OP do Dia */}
+                    {availableOPs.length > 0 && (
+                        <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-slate-700 text-xs">OP do Dia:</span>
+                            <select
+                                value={selectedOPId || (availableOPs.find(o => o.orderNumber === productionOrder)?.id || availableOPs[0]?.id || '')}
+                                onChange={e => {
+                                    setSelectedOPId(e.target.value);
+                                    syncDailyEvolution(e.target.value, true);
+                                }}
+                                className="p-1 border border-slate-300 rounded text-xs font-bold text-slate-800 bg-white"
+                            >
+                                {availableOPs.map(o => (
+                                    <option key={o.id} value={o.id}>
+                                        OP #{o.orderNumber} ({o.status}) - {o.targetBitola}mm
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
+                    {/* Toggle de Auto-Preenchimento Ao Vivo */}
+                    <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-700 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
+                        <input
+                            type="checkbox"
+                            checked={autoSyncEnabled}
+                            onChange={e => setAutoSyncEnabled(e.target.checked)}
+                            className="rounded text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 cursor-pointer"
+                        />
+                        <span className="flex items-center gap-1">
+                            <span className={`w-2 h-2 rounded-full ${autoSyncEnabled ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+                            Auto-Evolução Ao Vivo
+                        </span>
+                    </label>
                 </div>
+
                 <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                     <span className="font-bold text-slate-700 text-xs">Data:</span>
                     <input
@@ -935,6 +1178,14 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({ setPage }) => {
                         onChange={e => setSelectedDate(e.target.value)}
                         className="p-1 border border-slate-300 rounded text-xs font-bold text-slate-800 cursor-pointer"
                     />
+                    <button
+                        type="button"
+                        onClick={() => setSelectedDate(new Date().toLocaleDateString('sv'))}
+                        className="px-2 py-1 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-[11px] font-bold rounded"
+                        title="Ir para o dia de hoje"
+                    >
+                        Hoje
+                    </button>
                 </div>
             </section>
 

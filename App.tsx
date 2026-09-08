@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'; // Refresh Trigger
-import type { Page, User, Employee, StockItem, ConferenceData, ProductionOrderData, TransferRecord, Bitola, MachineType, PartsRequest, ShiftReport, ProductionRecord, TransferredLotInfo, ProcessedLot, DowntimeEvent, OperatorLog, TrelicaSelectedLots, WeighedPackage, FinishedProductItem, Ponta, PontaItem, FinishedGoodsTransferRecord, TransferredFinishedGoodInfo, KaizenProblem, Meeting, MeetingItem, MeetingCategory, StockMovement, DowntimeConfig, UserAccessLog } from './types';
+import type { Page, User, Employee, StockItem, ConferenceData, ProductionOrderData, TransferRecord, Bitola, MachineType, PartsRequest, ShiftReport, ProductionRecord, TransferredLotInfo, ProcessedLot, DowntimeEvent, OperatorLog, TrelicaSelectedLots, WeighedPackage, FinishedProductItem, Ponta, PontaItem, FinishedGoodsTransferRecord, TransferredFinishedGoodInfo, KaizenProblem, Meeting, MeetingItem, MeetingCategory, StockMovement, DowntimeConfig, UserAccessLog, ProductionSchedule } from './types';
 import { FioMaquinaBitolaOptions, TrefilaBitolaOptions } from './types';
 import Login from './components/Login';
 import MainMenu from './components/MainMenu';
@@ -21,6 +21,7 @@ import TrelicaStockManager from './components/TrelicaStockManager';
 import SparePartsManager from './components/SparePartsManager';
 import ProductionControl from './components/ProductionControl';
 import { PCPBoard } from './components/PCPBoard';
+import ProductionScheduling from './components/ProductionScheduling';
 
 import ContinuousImprovement from './components/ContinuousImprovement';
 import WorkInstructions from './components/WorkInstructions';
@@ -85,6 +86,7 @@ const App: React.FC = () => {
     const [meetings, setMeetings] = useState<Meeting[]>([]);
     const [meetingCategories, setMeetingCategories] = useState<MeetingCategory[]>([]);
     const [downtimeConfigs, setDowntimeConfigs] = useState<DowntimeConfig[]>([]);
+    const [productionSchedules, setProductionSchedules] = useState<ProductionSchedule[]>([]);
 
     const [pendingKaizenCount, setPendingKaizenCount] = useState(0);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -137,7 +139,7 @@ const App: React.FC = () => {
                     fetchedUsers, fetchedEmployees, fetchedStock, fetchedConferences, fetchedTransfers,
                     fetchedOrders, fetchedFinishedGoods, fetchedPontas, fetchedFGTransfers,
                     fetchedParts, fetchedReports, fetchedProductionRecords, fetchedGauges, fetchedNotes, fetchedMeetings, fetchedCategories, fetchedDowntimeConfigs,
-                    fetchedAccessLogs
+                    fetchedAccessLogs, fetchedSchedules
                 ] = await Promise.all([
                     fetchTable<User>('app_users'),
                     fetchTable<Employee>('employees'),
@@ -157,7 +159,8 @@ const App: React.FC = () => {
                     fetchTable<Meeting>('meetings').catch(() => []),
                     fetchTable<MeetingCategory>('meeting_categories').catch(() => []),
                     fetchTable<DowntimeConfig>('downtime_configs').catch(() => []),
-                    fetchTable<UserAccessLog>('user_access_logs').catch(() => [])
+                    fetchTable<UserAccessLog>('user_access_logs').catch(() => []),
+                    fetchTable<ProductionSchedule>('production_schedules').catch(() => [])
                 ]);
 
                 setUsers(fetchedUsers);
@@ -165,9 +168,22 @@ const App: React.FC = () => {
                 setEmployees(fetchedEmployees);
                 setStock(fetchedStock);
                 setConferences(fetchedConferences);
-                setTransfers(fetchedTransfers);
-                setProductionOrders(fetchedOrders);
-                setFinishedGoods(fetchedFinishedGoods);
+                const hydratedOrders = (fetchedOrders || []).map((o: any) => {
+                    if (o.summary && typeof o.summary === 'object') {
+                        return {
+                            ...o.summary,
+                            ...o,
+                            targetSpeed: o.targetSpeed ?? o.summary.target_speed ?? o.summary.targetSpeed,
+                            rollChangeTimeMinutes: o.rollChangeTimeMinutes ?? o.summary.roll_change_time_minutes ?? o.summary.rollChangeTimeMinutes,
+                            setupTimeMinutes: o.setupTimeMinutes ?? o.summary.setup_time_minutes ?? o.summary.setupTimeMinutes,
+                            estimatedProductionHours: o.estimatedProductionHours ?? o.summary.estimated_production_hours ?? o.summary.estimatedProductionHours,
+                            dailyWorkHours: o.dailyWorkHours ?? o.summary.daily_work_hours ?? o.summary.dailyWorkHours,
+                            shiftConfig: o.shiftConfig ?? o.summary.shift_config ?? o.summary.shiftConfig,
+                        };
+                    }
+                    return o;
+                });
+                setProductionOrders(hydratedOrders);
                 setPontasStock(fetchedPontas);
                 setFinishedGoodsTransfers(fetchedFGTransfers);
                 setPartsRequests(fetchedParts);
@@ -178,6 +194,7 @@ const App: React.FC = () => {
                 setMeetings(fetchedMeetings || []);
                 setMeetingCategories(fetchedCategories || []);
                 setDowntimeConfigs(fetchedDowntimeConfigs || []);
+                setProductionSchedules(fetchedSchedules || []);
 
                 // Split production records
                 setTrefilaProduction(fetchedProductionRecords.filter(r => r.machine.startsWith('Trefila')));
@@ -1016,17 +1033,26 @@ const App: React.FC = () => {
     };
 
     const addProductionOrder = async (orderData: Omit<ProductionOrderData, 'id' | 'status' | 'creationDate'>) => {
-        const { isGhostOrder, inputBitola, trelicaSuperior, trelicaInferior, trelicaSinusoide, os_items, ...orderDataToSave } = orderData as any;
+        const { isGhostOrder, inputBitola, trelicaSuperior, trelicaInferior, trelicaSinusoide, os_items, operator, ...orderDataToSave } = orderData as any;
+        
+        // Build initial operator logs if provided
+        let initialOperatorLogs = orderDataToSave.operatorLogs || [];
+        if (isGhostOrder && initialOperatorLogs.length === 0) {
+            initialOperatorLogs = [{ operator: 'GHOST_ORDER_FLAG', action: inputBitola || '', startTime: new Date().toISOString() }];
+        } else if (operator && initialOperatorLogs.length === 0) {
+            initialOperatorLogs = [{ operator, action: 'Criada no PCP', startTime: new Date().toISOString() }];
+        }
+
         const newOrder: Record<string, any> = {
             ...orderDataToSave,
             // id is NOT set here to allow insertItem to generate a proper UUID for Supabase
             status: 'pending',
             creationDate: new Date().toISOString(),
-            downtimeEvents: [],
-            processedLots: [],
-            operatorLogs: isGhostOrder ? [{ operator: 'GHOST_ORDER_FLAG', action: inputBitola || '', startTime: new Date().toISOString() }] : [],
-            weighedPackages: [],
-            pontas: [],
+            downtimeEvents: orderDataToSave.downtimeEvents || [],
+            processedLots: orderDataToSave.processedLots || [],
+            operatorLogs: initialOperatorLogs,
+            weighedPackages: orderDataToSave.weighedPackages || [],
+            pontas: orderDataToSave.pontas || [],
             // Preserve ghost/desbobinadeira fields
             isGhostOrder: isGhostOrder ?? false,
             inputBitola: inputBitola || null,
@@ -1038,6 +1064,9 @@ const App: React.FC = () => {
 
         try {
             const savedOrder = await insertItem<ProductionOrderData>('production_orders', newOrder);
+
+            // CRITICAL: Immediately update local state so the order is immediately visible everywhere without needing a page refresh
+            setProductionOrders(prev => [savedOrder, ...prev.filter(o => o.id !== savedOrder.id)]);
 
             // Update stock items status
             if (!orderData.isGhostOrder) {
@@ -1091,10 +1120,12 @@ const App: React.FC = () => {
             }
 
             showNotification('Ordem de produção criada com sucesso!', 'success');
+            return savedOrder;
         } catch (error: any) {
             console.error('Error creating production order:', error);
             const detail = error?.message || error?.details || error?.hint || JSON.stringify(error);
             showNotification(`Erro ao criar ordem de produção: ${detail}`, 'error');
+            throw error;
         }
     };
 
@@ -2685,10 +2716,12 @@ const App: React.FC = () => {
             case 'productionOrderMalha': return <ProductionOrderMalha setPage={setPage} stock={stock} productionOrders={productionOrders} addProductionOrder={addProductionOrder} showNotification={showNotification} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} gauges={gauges} currentUser={currentUser} />;
             case 'productionOrderDesbobinadeira': return <ProductionOrderDesbobinadeira setPage={setPage} stock={stock} productionOrders={productionOrders} addProductionOrder={addProductionOrder} showNotification={showNotification} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} gauges={gauges} currentUser={currentUser} />;
             case 'productionDashboard': return <ProductionDashboard setPage={setPage} productionOrders={productionOrders} stock={stock} currentUser={currentUser} downtimeConfigs={downtimeConfigs} />;
+
+            case 'productionScheduling': return <ProductionScheduling schedules={productionSchedules} setSchedules={setProductionSchedules} setPage={setPage} />;
             case 'trefilaControl': return <ProductionControl machineCategory="Trefila" setPage={setPage} productionOrders={productionOrders} shiftReports={shiftReports} currentUser={currentUser} onUpdateReport={handleUpdateShiftReport} onDeleteReport={deleteShiftReport} updateProductionOrder={updateProductionOrder} stock={stock} />;
             case 'trelicaControl': return <ProductionControl machineCategory="Treliça" setPage={setPage} productionOrders={productionOrders} shiftReports={shiftReports} currentUser={currentUser} onUpdateReport={handleUpdateShiftReport} onDeleteReport={deleteShiftReport} updateProductionOrder={updateProductionOrder} stock={stock} />;
             case 'malhaControl': return <ProductionControl machineCategory="Malha" setPage={setPage} productionOrders={productionOrders} shiftReports={shiftReports} currentUser={currentUser} onUpdateReport={handleUpdateShiftReport} onDeleteReport={deleteShiftReport} updateProductionOrder={updateProductionOrder} stock={stock} />;
-            case 'reports': return <Reports setPage={setPage} stock={stock} trefilaProduction={trefilaProduction} trelicaProduction={trelicaProduction} malhaProduction={malhaProduction} gauges={gauges} />;
+            case 'reports': return <Reports setPage={setPage} stock={stock} trefilaProduction={trefilaProduction} trelicaProduction={trelicaProduction} malhaProduction={malhaProduction} gauges={gauges} productionOrders={productionOrders} shiftReports={shiftReports} />;
             case 'userManagement': return <UserManagement users={users} employees={employees} addUser={addUser} updateUser={updateUser} deleteUser={deleteUser} setPage={setPage} accessLogs={accessLogs} />;
             case 'finishedGoods': return <FinishedGoods finishedGoods={finishedGoods} pontasStock={pontasStock} setPage={setPage} finishedGoodsTransfers={finishedGoodsTransfers} createFinishedGoodsTransfer={createFinishedGoodsTransfer} onDelete={deleteFinishedGoods} onUpdateFinishedGood={updateFinishedGood} onUpdatePonta={updatePonta} currentUser={currentUser} users={users} />;
             case 'trelicaStock': return <TrelicaStockManager finishedGoods={finishedGoods} setPage={setPage} createFinishedGoodsTransfer={createFinishedGoodsTransfer} onDelete={deleteFinishedGoods} onUpdateQuantity={updateFinishedGood} onAddManual={addManualFinishedGood} currentUser={currentUser} productionOrders={productionOrders} stock={stock} users={users} onUpdateFinishedGood={updateFinishedGood} onResetStock={resetTrelicaStock} />;
@@ -2714,7 +2747,7 @@ const App: React.FC = () => {
                 />;
             case 'laboratory': return <Laboratory setPage={setPage} currentUser={currentUser} gauges={gauges} />;
             case 'downtimeConfigs': return <DowntimeConfigManager onBack={() => setPage('menu')} showNotification={showNotification} />;
-            case 'pcpBoard': return <PCPBoard setPage={setPage} productionOrders={productionOrders} updateProductionOrder={updateProductionOrder} stock={stock} currentUser={currentUser} />;
+            case 'pcpBoard': return <PCPBoard setPage={setPage} productionOrders={productionOrders} updateProductionOrder={updateProductionOrder} stock={stock} currentUser={currentUser} addProductionOrder={addProductionOrder} deleteProductionOrder={deleteProductionOrder} showNotification={showNotification} gauges={gauges} shiftReports={shiftReports} downtimeConfigs={downtimeConfigs} />;
             default: return <Login onLogin={handleLogin} error={null} />;
         }
     };

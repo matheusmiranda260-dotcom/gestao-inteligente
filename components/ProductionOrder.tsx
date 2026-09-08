@@ -116,18 +116,8 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
             showNotification(`O número de ordem "${orderNumber}" já existe.`, 'error');
             return;
         }
-        if (!isGhostOrder && selectedLotIds.length === 0) {
-            showNotification('Selecione pelo menos um lote para a produção.', 'error');
-            return;
-        }
-
-        if (isGhostOrder && (!ghostTargetWeight || parseFloat(ghostTargetWeight) <= 0)) {
-            showNotification('Informe um peso válido para a produção fantasma.', 'error');
-            return;
-        }
-
-        if (isGhostOrder && !inputBitolaFilter) {
-            showNotification('Informe a bitola de entrada (Fio Máquina) obrigatória.', 'error');
+        if (selectedLotIds.length === 0) {
+            showNotification('Selecione pelo menos um lote para a produção (obrigatório inclusive em ordens fantasma).', 'error');
             return;
         }
 
@@ -136,10 +126,77 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
             machine: selectedMachine,
             targetBitola,
             selectedLotIds: selectedLotIds,
-            totalWeight: isGhostOrder ? parseFloat(ghostTargetWeight.replace(',', '.')) : totalSelectedWeight,
+            totalWeight: totalSelectedWeight,
             isGhostOrder: isGhostOrder,
-            inputBitola: inputBitolaFilter
+            inputBitola: inputBitolaFilter || (availableLots.find(l => l.id === selectedLotIds[0])?.bitola) || null
         });
+
+        // Pre-fill Ficha OP Trefila draft automatically
+        try {
+            const selectedLotsData = selectedLotIds.map(id => stock.find(s => s.id === id || s.internalLot === id)).filter(Boolean) as StockItem[];
+            const today = new Date().toISOString().split('T')[0];
+            const dateParts = today.split('-');
+            const dateFormatted = `${dateParts[2]}/${dateParts[1]}`;
+
+            const rows = selectedLotsData.map(item => ({
+                id: Math.random().toString(36).substring(2, 9),
+                data: dateFormatted,
+                lote: item.internalLot || item.supplierLot || '',
+                fornecedor: item.supplier || '',
+                certificado: item.conferenceNumber || '',
+                corrida: item.runNumber || '',
+                notaFiscal: item.nfe || '',
+                pesoEtiqueta: item.labelWeight || item.weight || '',
+                pesoBalanca: '',
+                massaLinear: '',
+                bitolaMm: '',
+                rt: '',
+                le: '',
+                caractGeo: '',
+                dobramento: '',
+                verifMarcacao: '',
+                alongamento: '',
+                aprovacao: ''
+            }));
+
+            while (rows.length < 8) {
+                rows.push({
+                    id: Math.random().toString(36).substring(2, 9),
+                    data: '', lote: '', fornecedor: '', certificado: '', corrida: '',
+                    notaFiscal: '', pesoEtiqueta: '', pesoBalanca: '', massaLinear: '',
+                    bitolaMm: '', rt: '', le: '', caractGeo: '', dobramento: '',
+                    verifMarcacao: '', alongamento: '', aprovacao: ''
+                });
+            }
+
+            const inBitolaVal = inputBitolaFilter || (availableLots.find(l => l.id === selectedLotIds[0])?.bitola) || '';
+            const inBitolaStr = inBitolaVal ? (inBitolaVal.includes('mm') ? inBitolaVal : `${inBitolaVal}mm`) : '';
+            const outBitolaStr = targetBitola ? (targetBitola.includes('mm') ? targetBitola : `${targetBitola}mm`) : '';
+
+            const draft = {
+                opNumber: orderNumber.trim(),
+                machine: selectedMachine,
+                selectedDate: today,
+                bitolaEntrada: inBitolaStr,
+                bitolaSaida: outBitolaStr,
+                responsavelHeader: currentUser?.name || currentUser?.username || '',
+                bitolaAferida: '',
+                liberacao: '',
+                setup: {
+                    pass1: { aneisEntrada: '', aneisSaida: '', mmEntrada: '', mmSaida: '' },
+                    pass2: { aneisEntrada: '', aneisSaida: '', mmEntrada: '', mmSaida: '' },
+                    pass3: { aneisEntrada: '', aneisSaida: '', mmEntrada: '', mmSaida: '' },
+                    pass4: { aneisEntrada: '', aneisSaida: '', mmEntrada: '', mmSaida: '' },
+                },
+                rows,
+                porcentagemPerca: '',
+                responsavelFooter: '',
+                responsavelLab: ''
+            };
+            localStorage.setItem('trefila_op_report_draft', JSON.stringify(draft));
+            localStorage.setItem('trefila_op_selected_number', orderNumber.trim());
+            localStorage.setItem(`trefila_op_report_${orderNumber.trim()}`, JSON.stringify(draft));
+        } catch (e) {}
 
         // Reset form
         setOrderNumber('');
@@ -234,34 +291,25 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
                                         required
                                     />
                                 </div>
-                                <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-lg border border-amber-100">
+                                <div className="flex items-start gap-2.5 p-3 bg-amber-50 rounded-lg border border-amber-200">
                                     <input
                                         type="checkbox"
                                         id="isGhostOrder"
                                         checked={isGhostOrder}
                                         onChange={(e) => setIsGhostOrder(e.target.checked)}
-                                        className="h-5 w-5 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                                        className="h-5 w-5 mt-0.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer shrink-0"
                                     />
-                                    <label htmlFor="isGhostOrder" className="text-sm font-bold text-amber-800">
-                                        Ordem Fantasma (Não mexe no estoque)
-                                    </label>
-                                </div>
-                                {isGhostOrder && (
-                                    <div className="animate-fade-in">
-                                        <label htmlFor="ghostWeight" className="block text-sm font-medium text-slate-700">Peso Total a Produzir (kg)</label>
-                                        <input
-                                            type="text"
-                                            inputMode="decimal"
-                                            id="ghostWeight"
-                                            value={ghostTargetWeight}
-                                            onChange={(e) => setGhostTargetWeight(e.target.value)}
-                                            className="mt-1 p-2 w-full border border-amber-300 rounded-md bg-amber-50 shadow-inner font-bold"
-                                            placeholder="Ex: 1000,00"
-                                            required={isGhostOrder}
-                                        />
-                                        <p className="text-[10px] text-amber-600 mt-1 font-semibold uppercase">Será usado apenas para referência de produção</p>
+                                    <div className="flex flex-col">
+                                        <label htmlFor="isGhostOrder" className="text-sm font-bold text-amber-800 cursor-pointer">
+                                            Ordem Fantasma (Simulação / Sem reserva e sem baixa)
+                                        </label>
+                                        <p className="text-xs text-amber-700 mt-0.5">
+                                            {isGhostOrder 
+                                                ? '⚠️ Seleção de lotes obrigatória: os lotes de Fio Máquina devem ser marcados na tabela para cálculo exato de produção. Esta ordem não bloqueará os lotes e não baixará o estoque ao concluir.' 
+                                                : 'Ordem regular: os lotes selecionados serão reservados e baixados normalmente na produção.'}
+                                        </p>
                                     </div>
-                                )}
+                                </div>
                                 <div>
                                     <label htmlFor="inputBitolaFilter" className="block text-sm font-medium text-slate-700">Bitola de Entrada (Fio Máquina)</label>
                                     <select

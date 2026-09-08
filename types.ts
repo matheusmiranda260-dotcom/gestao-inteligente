@@ -1,6 +1,6 @@
 // types.ts
 
-export type Page = 'login' | 'menu' | 'stock' | 'stockAdd' | 'stockTransfer' | 'documents' | 'finishedGoods' | 'trelicaStock' | 'productionOrderTrelica' | 'productionOrder' | 'productionDashboard' | 'meetingsTasks' | 'continuousImprovement' | 'peopleManagement' | 'trefila' | 'trefilaInProgress' | 'trefilaPending' | 'trefilaCompleted' | 'trefilaRings' | 'trefilaBitolaCheck' | 'trefilaReports' | 'trefilaWeighing' | 'trefilaTemplates' | 'trefilaParts' | 'trelica' | 'trelicaInProgress' | 'trelicaPending' | 'trelicaCompleted' | 'trelicaReports' | 'trelicaParts' | 'malha' | 'malhaInProgress' | 'malhaPending' | 'malhaCompleted' | 'malhaReports' | 'productionOrderMalha' | 'malhaControl' | 'reports' | 'laboratory' | 'userManagement' | 'gaugesManager' | 'partsManager' | 'workInstructions' | 'people' | 'finished_goods' | 'spare_parts' | 'quality' | 'instructions' | 'weighing' | 'meetings' | 'downtimeConfigs' | 'desbobinadeira' | 'desbobinadeiraDashboard' | 'desbobinadeiraInProgress' | 'desbobinadeiraPending' | 'desbobinadeiraCompleted' | 'desbobinadeiraReports' | 'productionOrderDesbobinadeira' | 'trefilaControl' | 'trelicaControl' | 'pcpBoard';
+export type Page = 'login' | 'menu' | 'stock' | 'stockAdd' | 'stockTransfer' | 'documents' | 'finishedGoods' | 'trelicaStock' | 'productionOrderTrelica' | 'productionOrder' | 'productionDashboard' | 'meetingsTasks' | 'continuousImprovement' | 'peopleManagement' | 'trefila' | 'trefilaInProgress' | 'trefilaPending' | 'trefilaCompleted' | 'trefilaRings' | 'trefilaBitolaCheck' | 'trefilaReports' | 'trefilaWeighing' | 'trefilaTemplates' | 'trefilaParts' | 'trelica' | 'trelicaInProgress' | 'trelicaPending' | 'trelicaCompleted' | 'trelicaReports' | 'trelicaParts' | 'malha' | 'malhaInProgress' | 'malhaPending' | 'malhaCompleted' | 'malhaReports' | 'productionOrderMalha' | 'malhaControl' | 'reports' | 'laboratory' | 'userManagement' | 'gaugesManager' | 'partsManager' | 'workInstructions' | 'people' | 'finished_goods' | 'spare_parts' | 'quality' | 'instructions' | 'weighing' | 'meetings' | 'downtimeConfigs' | 'desbobinadeira' | 'desbobinadeiraDashboard' | 'desbobinadeiraInProgress' | 'desbobinadeiraPending' | 'desbobinadeiraCompleted' | 'desbobinadeiraReports' | 'productionOrderDesbobinadeira' | 'trefilaControl' | 'trelicaControl' | 'pcpBoard' | 'productionScheduling';
 
 export interface DowntimeConfig {
     id: string;
@@ -8,6 +8,17 @@ export interface DowntimeConfig {
     thresholdMinutes: number;
     machineType: string;
     isActive: boolean;
+}
+
+export interface ProductionSchedule {
+    id: string;
+    machine: string; // 'Trefila', 'Treliça 1', 'Treliça 2', 'Malha'
+    date: string; // YYYY-MM-DD
+    item: string; // Product name or details
+    targetQuantity: number; // Numeric target
+    status: 'Agendado' | 'Em Produção' | 'Concluído';
+    notes?: string;
+    createdAt?: string;
 }
 
 export interface Document {
@@ -165,6 +176,14 @@ export interface ProductionOrderData {
     plannedStartDate?: string;
     plannedEndDate?: string;
     estimatedDurationDays?: number;
+    targetSpeed?: number;
+    rollChangeTimeMinutes?: number;
+    setupTimeMinutes?: number;
+    estimatedProductionHours?: number;
+    dailyWorkHours?: number;
+    shiftConfig?: { workStart: string; lunchStart: string; lunchEnd: string; workEnd: string };
+    k7Count?: number;
+    k7Setup?: any[];
 }
 
 export interface TransferRecord {

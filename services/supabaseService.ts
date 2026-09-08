@@ -158,6 +158,71 @@ export const fetchByColumn = async <T>(table: string, column: string, value: str
     return mapToCamelCase(allData) as T[];
 };
 
+const KNOWN_COLUMNS_BY_TABLE: Record<string, Set<string>> = {
+    production_orders: new Set([
+        'id',
+        'order_number',
+        'machine',
+        'target_bitola',
+        'trelica_model',
+        'tamanho',
+        'quantity_to_produce',
+        'selected_lot_ids',
+        'total_weight',
+        'planned_output_weight',
+        'status',
+        'creation_date',
+        'start_time',
+        'end_time',
+        'downtime_events',
+        'processed_lots',
+        'actual_produced_weight',
+        'operator_logs',
+        'active_lot_processing',
+        'actual_produced_quantity',
+        'scrap_weight',
+        'weighed_packages',
+        'pontas',
+        'updated_at',
+        'lastquantityupdate',
+        'last_quantity_update',
+        'is_ghost_order',
+        'input_bitola',
+        'os_items',
+        'summary',
+        'os_progress',
+        'scheduled_machine',
+        'planned_start_date',
+        'planned_end_date',
+        'estimated_duration_days',
+        'malha_model',
+        'malha_pieces'
+    ])
+};
+
+const sanitizeForTable = (table: string, snakeObj: Record<string, any>) => {
+    const validCols = KNOWN_COLUMNS_BY_TABLE[table];
+    if (!validCols) return { payload: snakeObj, extra: {} };
+
+    const payload: Record<string, any> = {};
+    const extra: Record<string, any> = {};
+
+    for (const [key, value] of Object.entries(snakeObj)) {
+        if (validCols.has(key)) {
+            payload[key] = value;
+        } else {
+            extra[key] = value;
+        }
+    }
+
+    if (Object.keys(extra).length > 0 && validCols.has('summary')) {
+        const currentSummary = typeof payload.summary === 'object' && payload.summary !== null ? payload.summary : {};
+        payload.summary = { ...currentSummary, ...extra };
+    }
+
+    return { payload, extra };
+};
+
 /** Insert item with automatic UUID generation for missing id */
 export const insertItem = async <T extends { id?: string }>(
     table: string,
@@ -184,8 +249,9 @@ export const insertItem = async <T extends { id?: string }>(
         (item as any).id = generatedId;
     }
     const snakeItem = mapToSnakeCase(item);
-    console.log(`Inserting into ${table}:`, snakeItem);
-    const { data, error } = await supabase.from(table).insert(snakeItem).select().single();
+    const { payload } = sanitizeForTable(table, snakeItem);
+    console.log(`Inserting into ${table}:`, payload);
+    const { data, error } = await supabase.from(table).insert(payload).select().single();
     if (error) {
         console.error(`Error inserting into ${table}:`, error);
         console.error('Error details:', {
@@ -194,32 +260,37 @@ export const insertItem = async <T extends { id?: string }>(
             details: error.details,
             hint: error.hint,
         });
-        console.error('Data attempted to insert:', snakeItem);
+        console.error('Data attempted to insert:', payload);
         throw error;
     }
-    return mapToCamelCase(data) as T;
+    const camelResult = mapToCamelCase(data) as any;
+    return { ...item, ...camelResult } as T;
 };
 
 /** Update item with mapping */
 export const updateItem = async <T>(table: string, id: string, updates: Partial<T>): Promise<T> => {
     const snakeUpdates = mapToSnakeCase(updates);
-    const { data, error } = await supabase.from(table).update(snakeUpdates).eq('id', id).select().single();
+    const { payload } = sanitizeForTable(table, snakeUpdates);
+    const { data, error } = await supabase.from(table).update(payload).eq('id', id).select().single();
     if (error) {
         console.error(`Error updating ${table}:`, error);
         throw error;
     }
-    return mapToCamelCase(data) as T;
+    const camelResult = mapToCamelCase(data) as any;
+    return { ...updates, ...camelResult } as T;
 };
 
 /** Upsert item (Insert or Update if exists) */
 export const upsertItem = async <T>(table: string, item: T, onConflict: string = 'id'): Promise<T> => {
     const snakeItem = mapToSnakeCase(item);
-    const { data, error } = await supabase.from(table).upsert(snakeItem, { onConflict }).select().single();
+    const { payload } = sanitizeForTable(table, snakeItem);
+    const { data, error } = await supabase.from(table).upsert(payload, { onConflict }).select().single();
     if (error) {
         console.error(`Error upserting into ${table}:`, error);
         throw error;
     }
-    return mapToCamelCase(data) as T;
+    const camelResult = mapToCamelCase(data) as any;
+    return { ...item, ...camelResult } as T;
 };
 
 /** Delete item by id */

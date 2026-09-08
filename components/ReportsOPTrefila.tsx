@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import type { Page, StockItem } from '../types';
+import type { Page, StockItem, ProductionOrderData } from '../types';
 import html2canvas from 'html2canvas';
 
 interface ReportsOPTrefilaProps {
     stock: StockItem[];
     setPage: (page: Page) => void;
+    productionOrders?: ProductionOrderData[];
 }
 
 interface OPRow {
@@ -54,12 +55,17 @@ const CalendarIcon = ({ className = "h-5 w-5" }: { className?: string }) => (
     </svg>
 );
 
-const ReportsOPTrefila: React.FC<ReportsOPTrefilaProps> = ({ stock = [], setPage }) => {
+const ReportsOPTrefila: React.FC<ReportsOPTrefilaProps> = ({ stock = [], setPage, productionOrders = [] }) => {
     // 1. Estados de Controle
     const [loading, setLoading] = useState<boolean>(false);
     const [toasts, setToasts] = useState<Toast[]>([]);
     const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toLocaleDateString('sv'));
     const dateInputRef = useRef<HTMLInputElement>(null);
+
+    // Estados de Identificação da OP
+    const [opNumber, setOpNumber] = useState<string>('');
+    const [machineName, setMachineName] = useState<string>('Trefila 1');
+    const [selectedOPId, setSelectedOPId] = useState<string>('');
 
     // 2. Estados da Ficha OP Trefila
     const [bitolaEntrada, setBitolaEntrada] = useState<string>('');
@@ -187,6 +193,9 @@ const ReportsOPTrefila: React.FC<ReportsOPTrefilaProps> = ({ stock = [], setPage
             const saved = localStorage.getItem(DRAFT_KEY);
             if (saved) {
                 const data = JSON.parse(saved);
+                if (data.opNumber) setOpNumber(data.opNumber);
+                if (data.machineName) setMachineName(data.machineName);
+                if (data.selectedOPId) setSelectedOPId(data.selectedOPId);
                 if (data.selectedDate) setSelectedDate(data.selectedDate);
                 setBitolaEntrada(data.bitolaEntrada || '');
                 setBitolaSaida(data.bitolaSaida || '');
@@ -194,11 +203,11 @@ const ReportsOPTrefila: React.FC<ReportsOPTrefilaProps> = ({ stock = [], setPage
                 setBitolaAferida(data.bitolaAferida || '');
                 setLiberacao(data.liberacao || '');
                 if (data.setup) setSetup(data.setup);
-                if (data.rows) setRows(data.rows);
+                if (data.rows && data.rows.length > 0) setRows(data.rows);
                 setPorcentagemPerca(data.porcentagemPerca || '');
                 setResponsavelFooter(data.responsavelFooter || '');
                 setResponsavelLab(data.responsavelLab || '');
-                showToast('Rascunho Ordem Produção Trefila carregado.', 'info');
+                showToast('Ficha Ordem de Produção Trefila carregada.', 'info');
             }
         } catch (e) {
             console.error('Erro ao carregar rascunho de OP Trefila', e);
@@ -209,6 +218,9 @@ const ReportsOPTrefila: React.FC<ReportsOPTrefilaProps> = ({ stock = [], setPage
 
     const saveDraft = () => {
         const payload = {
+            opNumber,
+            machineName,
+            selectedOPId,
             selectedDate,
             bitolaEntrada,
             bitolaSaida,
@@ -223,8 +235,98 @@ const ReportsOPTrefila: React.FC<ReportsOPTrefilaProps> = ({ stock = [], setPage
         };
         try {
             localStorage.setItem(DRAFT_KEY, JSON.stringify(payload));
+            if (opNumber.trim()) {
+                localStorage.setItem(`trefila_op_report_${opNumber.trim()}`, JSON.stringify(payload));
+            }
         } catch (e) {
             console.error('Erro ao salvar rascunho:', e);
+        }
+    };
+
+    // Função para carregar e preencher automaticamente todos os campos a partir de uma OP selecionada
+    const loadOPData = (op: ProductionOrderData, notify: boolean = true) => {
+        setSelectedOPId(op.id || op.orderNumber);
+        setOpNumber(op.orderNumber);
+        setMachineName(op.scheduledMachine || (op.machine as string) || 'Trefila 1');
+        if (op.plannedStartDate) {
+            setSelectedDate(op.plannedStartDate);
+        }
+        
+        // Bitolas de entrada e saída
+        const bitolaIn = op.inputBitola ? (op.inputBitola.includes('mm') ? op.inputBitola : `${op.inputBitola}mm`) : '';
+        const bitolaOut = op.targetBitola ? (op.targetBitola.includes('mm') ? op.targetBitola : `${op.targetBitola}mm`) : '';
+        setBitolaEntrada(bitolaIn);
+        setBitolaSaida(bitolaOut);
+
+        if (op.operator) {
+            setResponsavelHeader(op.operator);
+        }
+
+        // Se houver rascunho salvo anteriormente para essa OP específica, restaura
+        const savedOPDraft = localStorage.getItem(`trefila_op_report_${op.orderNumber}`);
+        if (savedOPDraft) {
+            try {
+                const parsed = JSON.parse(savedOPDraft);
+                if (parsed.rows && parsed.rows.length > 0) {
+                    setRows(parsed.rows);
+                    if (parsed.setup) setSetup(parsed.setup);
+                    if (parsed.bitolaAferida) setBitolaAferida(parsed.bitolaAferida);
+                    if (parsed.liberacao) setLiberacao(parsed.liberacao);
+                    if (parsed.porcentagemPerca) setPorcentagemPerca(parsed.porcentagemPerca);
+                    if (parsed.responsavelHeader) setResponsavelHeader(parsed.responsavelHeader);
+                    if (parsed.responsavelFooter) setResponsavelFooter(parsed.responsavelFooter);
+                    if (parsed.responsavelLab) setResponsavelLab(parsed.responsavelLab);
+                    if (notify) showToast(`OP #${op.orderNumber} carregada do histórico!`, 'success');
+                    return;
+                }
+            } catch (e) {}
+        }
+
+        // Caso contrário, preenche os lotes da OP a partir do estoque
+        let lotIds: string[] = [];
+        if (Array.isArray(op.selectedLotIds)) {
+            lotIds = op.selectedLotIds;
+        } else if (op.selectedLotIds && typeof op.selectedLotIds === 'object') {
+            lotIds = Object.values(op.selectedLotIds).filter(Boolean) as string[];
+        }
+
+        const dateParts = op.plannedStartDate ? op.plannedStartDate.split('-') : (selectedDate ? selectedDate.split('-') : []);
+        const defaultDateFormatted = dateParts.length === 3 ? `${dateParts[2]}/${dateParts[1]}` : '';
+
+        const selectedLots = lotIds.map(id => stock.find(s => s.id === id || s.internalLot === id)).filter(Boolean) as StockItem[];
+
+        if (!bitolaIn && selectedLots[0]?.bitola) {
+            setBitolaEntrada(`${selectedLots[0].bitola}mm`);
+        }
+
+        const newRows: OPRow[] = selectedLots.map(item => ({
+            id: Math.random().toString(36).substring(2, 9),
+            data: defaultDateFormatted,
+            lote: item.internalLot || item.supplierLot || '',
+            fornecedor: item.supplier || '',
+            certificado: item.conferenceNumber || '',
+            corrida: item.runNumber || '',
+            notaFiscal: item.nfe || '',
+            pesoEtiqueta: item.labelWeight || item.weight || '',
+            pesoBalanca: '',
+            massaLinear: '',
+            bitolaMm: '',
+            rt: '',
+            le: '',
+            caractGeo: '',
+            dobramento: '',
+            verifMarcacao: '',
+            alongamento: '',
+            aprovacao: ''
+        }));
+
+        while (newRows.length < 8) {
+            newRows.push(createEmptyRow());
+        }
+
+        setRows(newRows);
+        if (notify) {
+            showToast(`OP #${op.orderNumber} vinculada com ${selectedLots.length} lote(s) preenchidos!`, 'success');
         }
     };
 
@@ -232,14 +334,26 @@ const ReportsOPTrefila: React.FC<ReportsOPTrefilaProps> = ({ stock = [], setPage
         loadDraft();
     }, []);
 
-    // Autosave with small delay
+    // Se houver uma OP selecionada via PCP para ser aberta nesta tela:
+    useEffect(() => {
+        const targetOrderNumber = localStorage.getItem('trefila_op_selected_number');
+        if (targetOrderNumber && productionOrders && productionOrders.length > 0) {
+            const found = productionOrders.find(o => o.orderNumber.trim().toLowerCase() === targetOrderNumber.trim().toLowerCase());
+            if (found) {
+                loadOPData(found, false);
+                localStorage.removeItem('trefila_op_selected_number');
+            }
+        }
+    }, [productionOrders]);
+
+    // Autosave com pequeno atraso
     useEffect(() => {
         if (loading) return;
         const timer = setTimeout(() => {
             saveDraft();
         }, 800);
         return () => clearTimeout(timer);
-    }, [selectedDate, bitolaEntrada, bitolaSaida, responsavelHeader, bitolaAferida, liberacao, setup, rows, porcentagemPerca, responsavelFooter, responsavelLab, loading]);
+    }, [opNumber, machineName, selectedOPId, selectedDate, bitolaEntrada, bitolaSaida, responsavelHeader, bitolaAferida, liberacao, setup, rows, porcentagemPerca, responsavelFooter, responsavelLab, loading]);
 
     // 6. Operações de Tabela
     const updateRowField = (rowId: string, field: keyof OPRow, value: any) => {
@@ -258,6 +372,9 @@ const ReportsOPTrefila: React.FC<ReportsOPTrefilaProps> = ({ stock = [], setPage
         const confirm = window.confirm("Deseja realmente limpar toda a Ficha Ordem de Produção Trefila?");
         if (!confirm) return;
 
+        setOpNumber('');
+        setMachineName('Trefila 1');
+        setSelectedOPId('');
         setBitolaEntrada('');
         setBitolaSaida('');
         setResponsavelHeader('');
@@ -274,6 +391,7 @@ const ReportsOPTrefila: React.FC<ReportsOPTrefilaProps> = ({ stock = [], setPage
         setResponsavelFooter('');
         setResponsavelLab('');
         localStorage.removeItem(DRAFT_KEY);
+        localStorage.removeItem('trefila_op_selected_number');
         showToast('Formulário redefinido com sucesso.', 'success');
     };
 
@@ -535,13 +653,16 @@ const ReportsOPTrefila: React.FC<ReportsOPTrefilaProps> = ({ stock = [], setPage
                 </div>
                 
                 <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                    <button onClick={() => setPage('pcpBoard')} className="bg-slate-800 hover:bg-slate-900 text-cyan-300 font-bold py-1.5 px-3 rounded text-xs shadow flex items-center gap-1 transition">
+                        ⬅️ Voltar ao PCP
+                    </button>
                     <button onClick={loadSampleData} className="bg-amber-500 hover:bg-amber-600 text-white font-bold py-1.5 px-3 rounded text-xs shadow">
                         ⭐ Carregar Modelo de Teste
                     </button>
                     <button onClick={copyToClipboard} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 px-3 rounded text-xs shadow flex items-center gap-1">
                         🟢 Copiar Imagem (Zap)
                     </button>
-                    <button onClick={() => window.print()} className="bg-slate-700 hover:bg-slate-800 text-white font-bold py-1.5 px-3 rounded text-xs shadow">
+                    <button onClick={() => window.print()} className="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-1.5 px-3 rounded text-xs shadow flex items-center gap-1">
                         🖨️ Imprimir Ficha A4
                     </button>
                     <button onClick={clearForm} className="bg-slate-200 hover:bg-rose-600 hover:text-white text-slate-700 font-bold py-1.5 px-2 rounded text-xs transition-colors">
@@ -550,18 +671,62 @@ const ReportsOPTrefila: React.FC<ReportsOPTrefilaProps> = ({ stock = [], setPage
                 </div>
             </header>
 
-            {/* Filtros - No Print */}
-            <section className="bg-white p-4 rounded border border-slate-200 shadow-sm mb-4 flex flex-col sm:flex-row items-center justify-between gap-4 no-print">
-                <div>
-                    <span className="text-xs font-bold text-slate-500 uppercase">Configurações de Relatório</span>
+            {/* Vincular Ordem do PCP - No Print */}
+            <section className="bg-gradient-to-r from-slate-900 to-[#081b29] text-white p-3.5 rounded-xl border border-cyan-500/30 shadow-md mb-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 no-print">
+                <div className="flex items-center gap-2.5 flex-1">
+                    <div className="w-8 h-8 rounded-lg bg-cyan-500/20 text-[#00E5FF] flex items-center justify-center border border-[#00E5FF]/40 shrink-0 text-sm">
+                        📋
+                    </div>
+                    <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[11px] font-black text-[#00E5FF] uppercase tracking-wider">
+                                Vincular Ordem de Produção do PCP (Preenchimento Automático)
+                            </span>
+                            {opNumber && (
+                                <span className="text-[10px] font-black bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/40 uppercase">
+                                    OP #{opNumber} Carregada
+                                </span>
+                            )}
+                        </div>
+                        <select
+                            value={selectedOPId}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                if (!val) {
+                                    setSelectedOPId('');
+                                    return;
+                                }
+                                const found = (productionOrders || []).find(o => o.id === val || o.orderNumber === val);
+                                if (found) {
+                                    loadOPData(found, true);
+                                }
+                            }}
+                            className="w-full bg-slate-950/90 border border-white/20 text-white text-xs font-bold rounded-lg p-2 focus:ring-2 focus:ring-[#00E5FF] outline-none"
+                        >
+                            <option value="">-- Selecione uma OP do PCP para carregar sem retrabalho --</option>
+                            {(productionOrders || [])
+                                .filter(o => !o.machine || o.machine.toLowerCase().includes('trefila') || (o.scheduledMachine && o.scheduledMachine.toLowerCase().includes('trefila')))
+                                .map(op => {
+                                    let numLots = 0;
+                                    if (Array.isArray(op.selectedLotIds)) numLots = op.selectedLotIds.length;
+                                    else if (op.selectedLotIds) numLots = Object.keys(op.selectedLotIds).length;
+                                    return (
+                                        <option key={op.id || op.orderNumber} value={op.id || op.orderNumber}>
+                                            OP #{op.orderNumber} • {op.scheduledMachine || op.machine} • {op.targetBitola ? `${op.targetBitola} mm` : ''} • {op.totalWeight ? `${op.totalWeight.toLocaleString('pt-BR')} kg` : ''} • {numLots} rolo(s) • Início: {op.plannedStartDate || 'S/D'}
+                                        </option>
+                                    );
+                                })}
+                        </select>
+                    </div>
                 </div>
-                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                    <span className="font-bold text-slate-700 text-xs">Data:</span>
+
+                <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+                    <span className="font-bold text-slate-300 text-xs">Data da OP:</span>
                     <input
                         type="date"
                         value={selectedDate}
                         onChange={e => setSelectedDate(e.target.value)}
-                        className="p-1 border border-slate-300 rounded text-xs font-bold text-slate-800 cursor-pointer"
+                        className="p-1.5 bg-slate-950 border border-white/20 rounded text-xs font-bold text-white cursor-pointer"
                     />
                 </div>
             </section>
@@ -584,7 +749,24 @@ const ReportsOPTrefila: React.FC<ReportsOPTrefilaProps> = ({ stock = [], setPage
                             <h2 className="text-base md:text-lg font-black uppercase tracking-wider text-[#002060] leading-none">
                                 Ordem de Produção - Trefila
                             </h2>
-                            <p className="text-[10px] font-extrabold text-slate-500 uppercase mt-0.5">
+                            <div className="flex items-center justify-center gap-2 mt-1">
+                                <span className="text-[10px] font-black text-[#002060] uppercase tracking-wider">
+                                    OP Nº:
+                                </span>
+                                <input
+                                    type="text"
+                                    value={opNumber}
+                                    onChange={e => setOpNumber(e.target.value)}
+                                    placeholder="Ex: TR-1025"
+                                    className="op-editable-input text-xs font-black text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-300 text-center min-w-[90px]"
+                                />
+                                {machineName && (
+                                    <span className="text-[9px] font-black text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-300 uppercase">
+                                        {machineName}
+                                    </span>
+                                )}
+                            </div>
+                            <p className="text-[9px] font-extrabold text-slate-500 uppercase mt-0.5">
                                 Setor Laminação e Trefilação
                             </p>
                         </div>

@@ -232,12 +232,21 @@ const MainMenu: React.FC<MainMenuProps> = ({ setPage, onLogout, currentUser }) =
                 )}
 
                 {/* CONTROLE DE PRODUÇÃO */}
-                {(hasPermission('trefilaControl') || hasPermission('trelicaControl') || isGestor) && (
+                {(hasPermission('trefilaControl') || hasPermission('trelicaControl') || hasPermission('productionScheduling') || isGestor) && (
                     <section>
                         <div className="section-title">
                             <h2>Controle de Produção</h2>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                            {(isGestor || hasPermission('productionScheduling')) && (
+                                <MenuButton
+                                    onClick={() => setPage('productionScheduling')}
+                                    label="Programação (Máquinas)"
+                                    description="Agendamento de produção e painel de carga por máquina."
+                                    icon={<ClipboardListIcon />}
+                                    color="indigo"
+                                />
+                            )}
                             {isGestor && (
                                 <MenuButton
                                     onClick={() => setPage('pcpBoard')}
