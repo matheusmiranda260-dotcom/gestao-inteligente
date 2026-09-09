@@ -1617,6 +1617,7 @@ const App: React.FC = () => {
 
         try {
             await insertItem<ShiftReport>('shift_reports', report);
+            setShiftReports(prev => [...(prev || []), report]);
         } catch (error) {
             showNotification('Erro ao salvar relatório de turno.', 'error');
         }
@@ -1632,21 +1633,19 @@ const App: React.FC = () => {
 
         const now = new Date().toISOString();
 
-        let operatorLog: OperatorLog | undefined;
+        const logsToReport: OperatorLog[] = [];
         // Close ALL open logs for this order to avoid ghost shifts on the dashboard
         const newLogs = (order.operatorLogs || []).map(log => {
             if (!log.endTime) {
-                // If it's the current user, we capture it for the report
-                if (log.operator === currentUser?.username) {
-                    operatorLog = {
-                        ...log,
-                        endTime: now,
-                        endQuantity: finalQuantity !== undefined ? finalQuantity : (order.actualProducedQuantity || 0)
-                    };
-                    return operatorLog;
+                const closedLog: OperatorLog = {
+                    ...log,
+                    endTime: now,
+                    endQuantity: finalQuantity !== undefined ? finalQuantity : (order.actualProducedQuantity || 0)
+                };
+                if (log.operator && log.operator !== 'GHOST_ORDER_FLAG') {
+                    logsToReport.push(closedLog);
                 }
-                // For others, just close it
-                return { ...log, endTime: now, endQuantity: order.actualProducedQuantity || 0 };
+                return closedLog;
             }
             return log;
         });
@@ -1678,12 +1677,12 @@ const App: React.FC = () => {
         try {
             const updatedOrder = await updateItem<ProductionOrderData>('production_orders', orderId, updates);
 
-            if (operatorLog) {
-                await generateShiftReport(updatedOrder, operatorLog);
+            for (const logToReport of logsToReport) {
+                await generateShiftReport(updatedOrder, logToReport);
             }
 
             setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
-            showNotification('Turno finalizado.', 'success');
+            showNotification('Turno finalizado com sucesso e registrado no PCP.', 'success');
         } catch (error) {
             showNotification('Erro ao finalizar turno.', 'error');
         }

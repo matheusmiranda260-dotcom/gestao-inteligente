@@ -1765,6 +1765,226 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         };
     };
 
+    // Helper para extrair a data YYYY-MM-DD em horário local a partir de string ISO
+    const getIsoDateStr = (iso?: string | null): string => {
+        if (!iso) return '';
+        try {
+            const d = new Date(iso);
+            if (isNaN(d.getTime())) return String(iso).split('T')[0];
+            return formatDateString(d);
+        } catch {
+            return String(iso).split('T')[0];
+        }
+    };
+
+    // Helper para obter estatísticas de produção de uma OP em um dia específico da semana
+    const getOpDayStats = (op: ProductionOrderData, date: Date, machName: string) => {
+        const dateStr = formatDateString(date);
+        const todayStr = formatDateString(new Date());
+        const isToday = dateStr === todayStr;
+        const isPast = dateStr < todayStr;
+        const isFuture = dateStr > todayStr;
+
+        const isTrelica = typeof op.machine === 'string' && op.machine.startsWith('Treliça') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Treliça'));
+        const isMalha = typeof op.machine === 'string' && op.machine.startsWith('Malha') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Malha'));
+        const isTrefila = typeof op.machine === 'string' && op.machine.startsWith('Trefila') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Trefila'));
+        const unit = isTrelica || isMalha ? 'pçs' : 'kg';
+
+        // 1. Relatórios de Turno desta OP nesta data específica
+        const matchingReports = (shiftReports || []).filter(r => {
+            const isThisOp = r.productionOrderId === op.id || r.orderNumber === op.orderNumber;
+            if (!isThisOp) return false;
+            const repDate = r.date || getIsoDateStr(r.shiftStartTime || r.shiftEndTime);
+            return repDate === dateStr;
+        });
+        const reportsDayQty = matchingReports.reduce((acc, r) => acc + (isTrefila ? (Number(r.totalProducedWeight) || 0) : (Number(r.totalProducedQuantity) || 0)), 0);
+        const reportOperators = [...new Set(matchingReports.map(r => r.operator).filter(Boolean))].map(formatShortName).join(', ');
+
+        // 2. Lotes processados e PESADOS finalizados nesta data (Trefila)
+        const dayLotsWeight = (op.processedLots || []).reduce((acc: number, l: any) => {
+            if (l.finalWeight === null || l.finalWeight === undefined || isNaN(Number(l.finalWeight))) return acc;
+            const lotDate = getIsoDateStr(l.endTime || l.startTime);
+            if (lotDate === dateStr) {
+                return acc + Number(l.finalWeight);
+            }
+            return acc;
+        }, 0);
+
+        // 3. Pacotes pesados nesta data (Treliça)
+        const dayPackagesQty = (op.weighedPackages || []).reduce((acc: number, p: any) => {
+            if (!p.timestamp) return acc;
+            const pkgDate = getIsoDateStr(p.timestamp);
+            if (pkgDate === dateStr) {
+                return acc + (Number(p.quantity) || 200);
+            }
+            return acc;
+        }, 0);
+
+        // 4. Logs de operador desta data
+        const dayLogs = (op.operatorLogs || []).filter(l => {
+            const s = getIsoDateStr(l.startTime);
+            const e = getIsoDateStr(l.endTime);
+            return s === dateStr || e === dateStr;
+        });
+        const logOperators = dayLogs.map(l => formatShortName(l.operator)).filter(Boolean)[0] || '';
+
+        // Total acumulado real da OP
+        const totalOverall = isTrefila 
+            ? (Number(op.actualProducedWeight) || Number(op.totalProducedWeight) || 0) 
+            : (Number(op.actualProducedQuantity) || 0);
+
+        // Produção isolada de HOJE
+        let todayProduced = 0;
+        if (isTrefila) {
+            todayProduced = dayLotsWeight > 0 ? dayLotsWeight : reportsDayQty;
+        } else {
+            const openLog = (op.operatorLogs || []).find((l: any) => !l.endTime);
+            let liveShiftPcs = 0;
+            if (openLog && openLog.startQuantity !== undefined) {
+                liveShiftPcs = Math.max(0, totalOverall - Number(openLog.startQuantity));
+            }
+            todayProduced = Math.max(dayPackagesQty + reportsDayQty, liveShiftPcs);
+        }
+
+        // Produção realizada nos dias anteriores a hoje
+        const totalPastProduced = Math.max(0, totalOverall - todayProduced);
+
+        let produced = 0;
+        let operatorName = '';
+        let status: 'live' | 'closed' | 'planned' | 'idle' = 'idle';
+
+        if (isToday) {
+            const isLive = op.status === 'in_progress' || op.status === 'Em Produção';
+            const liveOperator = getMachineOperator(machName);
+
+            if (isLive) {
+                status = 'live';
+                operatorName = liveOperator?.displayName || (liveOperator?.name ? formatShortName(liveOperator.name) : '') || 'Operando';
+                produced = todayProduced;
+            } else if (reportsDayQty > 0 || dayLotsWeight > 0 || dayPackagesQty > 0 || todayProduced > 0) {
+                // Houve produção hoje, mas turno atual não está em andamento agora
+                status = 'closed';
+                produced = todayProduced > 0 ? todayProduced : (isTrefila ? (dayLotsWeight > 0 ? dayLotsWeight : reportsDayQty) : (reportsDayQty > 0 ? reportsDayQty : dayPackagesQty));
+                operatorName = reportOperators || logOperators || 'Turno Encerrado';
+            } else {
+                status = 'idle';
+                produced = 0;
+            }
+        } else if (isPast) {
+            if (reportsDayQty > 0) {
+                status = 'closed';
+                produced = reportsDayQty;
+                operatorName = reportOperators || logOperators || 'Encerrado';
+            } else if (isTrefila && dayLotsWeight > 0) {
+                status = 'closed';
+                produced = dayLotsWeight;
+                operatorName = reportOperators || logOperators || 'Encerrado';
+            } else if (!isTrefila && dayPackagesQty > 0) {
+                status = 'closed';
+                produced = dayPackagesQty;
+                operatorName = reportOperators || logOperators || 'Encerrado';
+            } else if (dayLogs.length > 0) {
+                const logsQty = dayLogs.reduce((acc: number, l: any) => {
+                    if (l.endQuantity !== undefined && l.startQuantity !== undefined) {
+                        return acc + Math.max(0, (Number(l.endQuantity) || 0) - (Number(l.startQuantity) || 0));
+                    }
+                    return acc;
+                }, 0);
+                if (logsQty > 0) {
+                    status = 'closed';
+                    produced = logsQty;
+                    operatorName = logOperators || 'Encerrado';
+                }
+            }
+
+            // SE NENHUM LOG ESPECÍFICO GRAVOU A DATA EXATA, MAS HÁ PRODUÇÃO REGISTRADA ANTES DE HOJE:
+            if (produced === 0 && totalPastProduced > 0) {
+                const opStart = op.plannedStartDate || '';
+                const opEnd = op.plannedEndDate || opStart;
+                if (dateStr >= opStart && dateStr <= opEnd) {
+                    status = 'closed';
+                    produced = totalPastProduced;
+                    const priorLogs = (op.operatorLogs || []).filter((l: any) => l.endTime);
+                    const lastPriorLog = priorLogs[priorLogs.length - 1];
+                    const priorOp = lastPriorLog?.operator || (op.operatorLogs || [])[0]?.operator || op.operator;
+                    operatorName = priorOp ? formatShortName(priorOp) : 'Encerrado';
+                }
+            }
+        } else {
+            // isFuture
+            status = 'planned';
+            const totalTarget = op.quantityToProduce || op.totalWeight || (isTrefila ? 18000 : 3500);
+            const durationDays = Math.max(1, op.estimatedDurationDays || 1);
+            produced = Math.round(totalTarget / durationDays);
+        }
+
+        return {
+            dateStr,
+            isToday,
+            isPast,
+            isFuture,
+            status,
+            produced,
+            unit,
+            operatorName,
+            matchingReportsCount: matchingReports.length
+        };
+    };
+
+    // Helper para obter resumo diário consolidado da máquina em cada dia
+    const getMachineDayProduction = (machName: string, date: Date) => {
+        const dateStr = formatDateString(date);
+        const todayStr = formatDateString(new Date());
+        const isToday = dateStr === todayStr;
+        const isPast = dateStr < todayStr;
+        const isFuture = dateStr > todayStr;
+        const isTrefila = machName.startsWith('Trefila');
+        const unit = isTrefila ? 'kg' : 'pçs';
+
+        // OPs nesta máquina no dia
+        const machOpsOnDay = scheduledOrders.filter(op => {
+            if (op.scheduledMachine !== machName && op.machine !== machName) return false;
+            const start = op.plannedStartDate || '';
+            const end = op.plannedEndDate || start;
+            return start <= dateStr && end >= dateStr;
+        });
+
+        let totalProduced = 0;
+        let liveOpFound = false;
+        let mainOperator = '';
+
+        machOpsOnDay.forEach(op => {
+            const stats = getOpDayStats(op, date, machName);
+            totalProduced += stats.produced;
+            if (stats.status === 'live') liveOpFound = true;
+            if (stats.operatorName && !mainOperator) mainOperator = stats.operatorName;
+        });
+
+        const machineDayReports = (shiftReports || []).filter(r => {
+            if (r.machine !== machName) return false;
+            const repDate = r.date || getIsoDateStr(r.shiftStartTime || r.shiftEndTime);
+            return repDate === dateStr;
+        });
+
+        if (totalProduced === 0 && machineDayReports.length > 0) {
+            totalProduced = machineDayReports.reduce((acc, r) => acc + (isTrefila ? (r.totalProducedWeight || 0) : (r.totalProducedQuantity || 0)), 0);
+            if (!mainOperator) mainOperator = machineDayReports[0].operator || '';
+        }
+
+        return {
+            dateStr,
+            isToday,
+            isPast,
+            isFuture,
+            hasOps: machOpsOnDay.length > 0,
+            isLive: isToday && liveOpFound,
+            totalProduced,
+            unit,
+            operatorName: mainOperator,
+            opsCount: machOpsOnDay.length
+        };
+    };
+
     // Bitolas disponíveis de CA-60 para Trefila
     const availableTrefilaGauges = useMemo(() => {
         const customGauges = gauges.filter(g => g.materialType === 'CA-60').map(g => g.gauge);
@@ -1804,7 +2024,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     border-bottom: 2px solid rgba(0, 229, 255, 0.2);
                 }
                 .pcp-track-row {
-                    min-height: 160px;
+                    min-height: 185px;
                     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
                 }
                 .pcp-track-row:hover {
@@ -1813,7 +2033,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 .pcp-op-bar {
                     position: absolute;
                     top: 10px;
-                    height: 136px;
+                    min-height: 165px;
                     border-radius: 12px;
                     padding: 8px 10px;
                     box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.4);
@@ -2233,7 +2453,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                 };
 
                                 const maxTracks = Math.max(1, ...machOps.map(op => getOpTrack(op) + 1));
-                                const rowMinHeight = Math.max(160, 20 + maxTracks * 144);
+                                const rowMinHeight = Math.max(185, 20 + maxTracks * 180);
 
                                 return (
                                     <div 
@@ -2445,13 +2665,39 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                         {Array.from({ length: 5 }).map((_, colIndex) => {
                                             const targetDay = weekDays[colIndex];
                                             const targetDayStr = formatDateString(targetDay);
+                                            const dayMachProd = getMachineDayProduction(mach.name, targetDay);
                                             return (
                                                 <div 
                                                     key={colIndex}
                                                     onClick={() => handleOpenCreateModal(mach.name, targetDayStr)}
-                                                    className="border-l border-white/5 relative bg-transparent flex items-center justify-center group/cell cursor-pointer hover:bg-white/[0.02]"
+                                                    className={`border-l border-white/5 relative flex flex-col justify-between p-2 group/cell cursor-pointer transition-colors ${
+                                                        dayMachProd.isToday 
+                                                            ? 'bg-[#00E5FF]/[0.03] hover:bg-[#00E5FF]/[0.07]' 
+                                                            : 'bg-transparent hover:bg-white/[0.02]'
+                                                    }`}
                                                     title={`Clique para programar OP em ${mach.name} no dia ${formatFriendlyDate(targetDay)}`}
                                                 >
+                                                    {/* Monitor Diário na Célula da Grade */}
+                                                    <div className="flex items-center justify-between gap-1 z-0 select-none">
+                                                        {dayMachProd.totalProduced > 0 || dayMachProd.isLive ? (
+                                                            <div className={`px-2 py-0.5 rounded-md text-[9px] font-black font-mono border flex items-center gap-1.5 shadow-sm ${
+                                                                dayMachProd.isLive 
+                                                                    ? 'bg-[#00E5FF]/20 text-[#00E5FF] border-[#00E5FF]/40 shadow-[0_0_8px_rgba(0,229,255,0.2)]' 
+                                                                    : dayMachProd.isPast 
+                                                                        ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' 
+                                                                        : 'bg-slate-800/80 text-slate-300 border-white/10'
+                                                            }`}>
+                                                                {dayMachProd.isLive && <span className="w-1.5 h-1.5 rounded-full bg-[#00E5FF] pulse-live" />}
+                                                                {dayMachProd.isPast && <span className="text-emerald-400 font-bold">✓</span>}
+                                                                <span>{dayMachProd.totalProduced.toLocaleString('pt-BR')} {dayMachProd.unit}</span>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-[8px] text-slate-600 font-mono pl-1 opacity-60">
+                                                                {['Seg', 'Ter', 'Qua', 'Qui', 'Sex'][colIndex]}
+                                                            </span>
+                                                        )}
+                                                    </div>
+
                                                     <div className="opacity-0 group-hover/cell:opacity-100 transition-opacity duration-150 absolute inset-0 flex items-center justify-center bg-black/10">
                                                         <span className="text-[10px] font-black text-slate-300 bg-[#0B1D2A]/90 border border-white/10 px-2.5 py-1 rounded-lg hover:text-[#00E5FF] hover:border-[#00E5FF]/40 transition-all flex items-center gap-1 shadow-lg">
                                                             <PlusIcon className="w-3 h-3 text-[#00E5FF]" />
@@ -2485,7 +2731,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             const track = getOpTrack(op);
                                             const leftStyle = `calc(200px + (100% - 200px) * ${colStart / 5} + 4px)`;
                                             const widthStyle = `calc((100% - 200px) * ${spanColumns / 5} - 8px)`;
-                                            const topStyle = `${10 + track * 144}px`;
+                                            const topStyle = `${10 + track * 175}px`;
 
                                             const isTrelica = typeof op.machine === 'string' && op.machine.startsWith('Treliça') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Treliça'));
                                             const isMalha = typeof op.machine === 'string' && op.machine.startsWith('Malha') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Malha'));
@@ -2690,6 +2936,95 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                 </div>
                                                             </div>
                                                         )}
+
+                                                        {/* Faixa de Segmentação Diária da OP (Produção por dia alinhada às colunas) */}
+                                                        <div 
+                                                            className="grid gap-1.5 my-1.5 p-1 bg-black/40 rounded-xl border border-white/10"
+                                                            style={{ gridTemplateColumns: `repeat(${spanColumns}, minmax(0, 1fr))` }}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        >
+                                                            {Array.from({ length: spanColumns }).map((_, idx) => {
+                                                                const dayIdx = colStart + idx;
+                                                                const currentDay = weekDays[dayIdx];
+                                                                const dayStats = getOpDayStats(op, currentDay, mach.name);
+                                                                const dayColName = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'][dayIdx] || '';
+
+                                                                return (
+                                                                    <div 
+                                                                        key={dayIdx} 
+                                                                        className={`flex flex-col justify-between p-1.5 rounded-lg border text-left transition-all ${
+                                                                            dayStats.isToday 
+                                                                                ? 'bg-[#00E5FF]/15 border-[#00E5FF]/50 text-white shadow-[0_0_10px_rgba(0,229,255,0.2)] ring-1 ring-[#00E5FF]/30' 
+                                                                                : dayStats.isPast 
+                                                                                    ? 'bg-[#06181b]/90 border-emerald-500/30 text-emerald-200' 
+                                                                                    : 'bg-black/40 border-white/5 text-slate-400'
+                                                                        }`}
+                                                                        title={`Dia: ${dayColName} ${formatFriendlyDate(currentDay)} | ${
+                                                                            dayStats.isToday 
+                                                                                ? `Produção do Turno Ao Vivo: ${dayStats.produced.toLocaleString('pt-BR')} ${dayStats.unit}` 
+                                                                                : dayStats.isPast 
+                                                                                    ? `Total Concluído: ${dayStats.produced.toLocaleString('pt-BR')} ${dayStats.unit}` 
+                                                                                    : `Meta Planejada: ~${dayStats.produced.toLocaleString('pt-BR')} ${dayStats.unit}`
+                                                                        }`}
+                                                                    >
+                                                                        <div className="flex items-center justify-between gap-1 text-[8px] font-black uppercase tracking-wider">
+                                                                            <span className={dayStats.isToday ? 'text-[#00E5FF]' : dayStats.isPast ? 'text-emerald-400' : 'text-slate-400'}>
+                                                                                {dayColName} {formatFriendlyDate(currentDay)}
+                                                                            </span>
+                                                                            {dayStats.isToday && (
+                                                                                <span className="flex items-center gap-0.5 text-[7px] font-black uppercase px-1 py-0.2 rounded bg-[#00E5FF]/20 text-[#00E5FF] border border-[#00E5FF]/40">
+                                                                                    <span className="w-1 h-1 rounded-full bg-[#00E5FF] pulse-live" />
+                                                                                    Ao Vivo
+                                                                                </span>
+                                                                            )}
+                                                                            {dayStats.isPast && (
+                                                                                <span className="text-[7px] font-bold px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                                                                    ✓ Fechado
+                                                                                </span>
+                                                                            )}
+                                                                            {dayStats.isFuture && (
+                                                                                <span className="text-[7px] font-bold px-1 py-0.2 rounded bg-white/5 text-slate-400 border border-white/5">
+                                                                                    🎯 Meta
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+
+                                                                        <div className="flex items-baseline gap-1 my-0.5">
+                                                                            <span className={`text-[11px] sm:text-xs font-black font-mono tracking-tight ${
+                                                                                dayStats.isToday 
+                                                                                    ? 'text-white drop-shadow' 
+                                                                                    : dayStats.isPast 
+                                                                                        ? 'text-emerald-300' 
+                                                                                        : 'text-slate-300'
+                                                                            }`}>
+                                                                                {dayStats.isFuture ? `~${dayStats.produced.toLocaleString('pt-BR')}` : dayStats.produced.toLocaleString('pt-BR')}
+                                                                            </span>
+                                                                            <span className="text-[7.5px] font-bold text-slate-400 font-mono">{dayStats.unit}</span>
+                                                                        </div>
+
+                                                                        <div className="flex items-center justify-between text-[7.5px] text-slate-300 truncate pt-0.5 border-t border-white/5">
+                                                                            <span className="truncate flex items-center gap-1 font-medium">
+                                                                                {dayStats.isToday && (
+                                                                                    <>
+                                                                                        <span className="text-[#00E5FF]">⚡</span>
+                                                                                        <strong className="text-white truncate">{dayStats.operatorName || 'Turno Ativo'}</strong>
+                                                                                    </>
+                                                                                )}
+                                                                                {dayStats.isPast && (
+                                                                                    <>
+                                                                                        <span className="text-slate-400">👤</span>
+                                                                                        <span className="truncate">{dayStats.operatorName || 'Encerrado'}</span>
+                                                                                    </>
+                                                                                )}
+                                                                                {dayStats.isFuture && (
+                                                                                    <span className="text-slate-500 italic">Planejado</span>
+                                                                                )}
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
 
                                                         {/* Mini Barra de Progresso Real */}
                                                         <div className="shrink-0 my-0.5">
