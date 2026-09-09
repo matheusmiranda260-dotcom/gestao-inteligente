@@ -1804,7 +1804,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     border-bottom: 2px solid rgba(0, 229, 255, 0.2);
                 }
                 .pcp-track-row {
-                    min-height: 140px;
+                    min-height: 160px;
                     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
                 }
                 .pcp-track-row:hover {
@@ -1813,9 +1813,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 .pcp-op-bar {
                     position: absolute;
                     top: 10px;
-                    height: 114px;
+                    height: 136px;
                     border-radius: 12px;
-                    padding: 8px 12px;
+                    padding: 8px 10px;
                     box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.4);
                     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
                     z-index: 10;
@@ -2233,7 +2233,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                 };
 
                                 const maxTracks = Math.max(1, ...machOps.map(op => getOpTrack(op) + 1));
-                                const rowMinHeight = Math.max(140, 24 + maxTracks * 122);
+                                const rowMinHeight = Math.max(160, 20 + maxTracks * 144);
 
                                 return (
                                     <div 
@@ -2485,14 +2485,58 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             const track = getOpTrack(op);
                                             const leftStyle = `calc(200px + (100% - 200px) * ${colStart / 5} + 4px)`;
                                             const widthStyle = `calc((100% - 200px) * ${spanColumns / 5} - 8px)`;
-                                            const topStyle = `${10 + track * 122}px`;
+                                            const topStyle = `${10 + track * 144}px`;
 
                                             const isTrelica = typeof op.machine === 'string' && op.machine.startsWith('Treliça') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Treliça'));
                                             const isMalha = typeof op.machine === 'string' && op.machine.startsWith('Malha') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Malha'));
+                                            const isTrefila = typeof op.machine === 'string' && op.machine.startsWith('Trefila') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Trefila'));
                                             const title = op.orderNumber;
                                             const subtitle = isTrelica ? `${op.trelicaModel} (${op.tamanho || '6m'})` : isMalha ? op.malhaModel : `Bitola ${op.targetBitola}mm`;
                                             
                                             const prog = getOPProgress(op);
+
+                                            let trefilaDashStats = null;
+                                            if (isTrefila && prog.isLive && op.activeLotProcessing && op.activeLotProcessing.lotId) {
+                                                const activeLotInfo = stock.find(s => s.id === op.activeLotProcessing!.lotId);
+                                                const lotIdStr = activeLotInfo?.internalLot || op.activeLotProcessing.lotId || '---';
+                                                const initialWeight = activeLotInfo?.initialQuantity || op.totalWeight || 0;
+                                                const speed = op.activeLotProcessing.speed || 1.5;
+                                                const bitola = op.targetBitola ? parseFloat(op.targetBitola.replace(',', '.')) : 0;
+
+                                                if (bitola > 0 && speed > 0) {
+                                                    const lotStartTime = new Date(op.activeLotProcessing.startTime).getTime();
+                                                    const linearMass = bitola * bitola * 0.006162;
+                                                    const massPerSecond = speed * linearMass;
+                                                    
+                                                    if (massPerSecond > 0) {
+                                                        const totalDurationSeconds = initialWeight > 0 ? (initialWeight / massPerSecond) : 0;
+                                                        const lotDowntimeMs = (op.downtimeEvents || []).reduce((acc: number, e: any) => {
+                                                            const stop = new Date(e.stopTime).getTime();
+                                                            if (stop < lotStartTime) {
+                                                                if (!e.resumeTime) return acc;
+                                                                const resume = new Date(e.resumeTime).getTime();
+                                                                if (resume <= lotStartTime) return acc;
+                                                                return acc + (resume - lotStartTime);
+                                                            }
+                                                            const resume = e.resumeTime ? new Date(e.resumeTime).getTime() : liveNow.getTime();
+                                                            return acc + (resume - stop);
+                                                        }, 0);
+                                                        const totalElapsedMs = Math.max(0, liveNow.getTime() - lotStartTime);
+                                                        const elapsedUptimeMs = Math.max(0, totalElapsedMs - lotDowntimeMs);
+                                                        const elapsedUptimeSeconds = elapsedUptimeMs / 1000;
+                                                        const remainingSeconds = Math.max(0, totalDurationSeconds - elapsedUptimeSeconds);
+                                                        const isDelayed = totalDurationSeconds > 0 && elapsedUptimeSeconds > totalDurationSeconds;
+
+                                                        trefilaDashStats = {
+                                                            lotIdStr,
+                                                            lotWeight: initialWeight,
+                                                            elapsedMs: totalElapsedMs,
+                                                            remainingSeconds,
+                                                            isDelayed
+                                                        };
+                                                    }
+                                                }
+                                            }
 
                                             let barBg = 'bg-[#1C1408]/95 border-l-amber-500 border-amber-500/30 hover:bg-[#261B0B] text-amber-100';
                                             let barProgressColor = 'bg-amber-400';
@@ -2583,38 +2627,38 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                 <span className="text-[10px] sm:text-xs text-slate-100 font-extrabold truncate block mt-0.5 leading-snug">{subtitle}</span>
                                                             </div>
 
-                                                            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                                            <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                                                                 <button 
                                                                     onClick={() => setDiagnosticOP(op)}
-                                                                    className="text-amber-400 hover:text-amber-300 p-1.5 rounded-lg transition-all hover:bg-white/10 bg-white/5 border border-white/5"
+                                                                    className="text-amber-400 hover:text-amber-300 p-1 rounded-lg transition-all hover:bg-white/10 bg-white/5 border border-white/5"
                                                                     title="Diagnóstico da Produção (Planejado vs Realizado)"
                                                                 >
                                                                     <ClipboardListIcon className="w-3.5 h-3.5 text-amber-400" />
                                                                 </button>
                                                                 <button 
                                                                     onClick={() => handleGoToProduction(op)}
-                                                                    className="text-emerald-400 hover:text-emerald-300 p-1.5 rounded-lg transition-all hover:bg-white/10 bg-white/5 border border-white/5"
+                                                                    className="text-emerald-400 hover:text-emerald-300 p-1 rounded-lg transition-all hover:bg-white/10 bg-white/5 border border-white/5"
                                                                     title={`Enviar / Abrir no Painel da Máquina (${op.scheduledMachine || op.machine})`}
                                                                 >
                                                                     <PlayIcon className="w-3.5 h-3.5 text-emerald-400" />
                                                                 </button>
                                                                 <button 
                                                                     onClick={() => handlePrintOP(op)}
-                                                                    className="text-cyan-400 hover:text-cyan-300 p-1.5 rounded-lg transition-all hover:bg-white/10 bg-white/5 border border-white/5"
+                                                                    className="text-cyan-400 hover:text-cyan-300 p-1 rounded-lg transition-all hover:bg-white/10 bg-white/5 border border-white/5"
                                                                     title="Imprimir Ficha de Produção (A4)"
                                                                 >
                                                                     <PrinterIcon className="w-3.5 h-3.5" />
                                                                 </button>
                                                                 <button 
                                                                     onClick={() => openScheduleModal(op)}
-                                                                    className="text-slate-300 hover:text-[#00E5FF] p-1.5 rounded-lg transition-all hover:bg-white/10 bg-white/5 border border-white/5"
+                                                                    className="text-slate-300 hover:text-[#00E5FF] p-1 rounded-lg transition-all hover:bg-white/10 bg-white/5 border border-white/5"
                                                                     title="Reagendar"
                                                                 >
                                                                     <CalendarIcon className="w-3.5 h-3.5" />
                                                                 </button>
                                                                 <button 
                                                                     onClick={() => handleRemoveSchedule(op.id)}
-                                                                    className="text-slate-400 hover:text-red-400 p-1.5 rounded-lg transition-all hover:bg-white/10 bg-white/5 border border-white/5"
+                                                                    className="text-slate-400 hover:text-red-400 p-1 rounded-lg transition-all hover:bg-white/10 bg-white/5 border border-white/5"
                                                                     title="Desagendar"
                                                                 >
                                                                     <XIcon className="w-3.5 h-3.5" />
@@ -2622,9 +2666,34 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                             </div>
                                                         </div>
 
+                                                        {trefilaDashStats && (
+                                                            <div className="flex items-center justify-between gap-1 text-[9px] sm:text-[9.5px] font-mono font-bold bg-[#020b11]/90 px-2 py-1 rounded-md border border-[#00E5FF]/40 shadow-sm shrink-0 my-0.5 overflow-hidden">
+                                                                <div className="flex items-center gap-1 min-w-0 truncate">
+                                                                    <span className="text-[#00E5FF] font-black truncate">
+                                                                        Lote {trefilaDashStats.lotIdStr}
+                                                                    </span>
+                                                                    <span className="text-slate-300 font-medium text-[8px] sm:text-[8.5px]">
+                                                                        ({trefilaDashStats.lotWeight.toLocaleString('pt-BR')}kg)
+                                                                    </span>
+                                                                </div>
+                                                                <div className="flex items-center gap-1.5 shrink-0 text-[8.5px] sm:text-[9px]">
+                                                                    <span className="text-slate-300">
+                                                                        Feito: <strong className="text-cyan-200 font-black">{formatDuration(trefilaDashStats.elapsedMs)}</strong>
+                                                                    </span>
+                                                                    <span className={`px-1.5 py-0.5 rounded font-black ${
+                                                                        trefilaDashStats.isDelayed 
+                                                                            ? "bg-rose-500/30 text-rose-300 border border-rose-500/60 shadow-[0_0_8px_rgba(244,63,94,0.3)]" 
+                                                                            : "bg-emerald-500/30 text-emerald-300 border border-emerald-500/60"
+                                                                    }`}>
+                                                                        {trefilaDashStats.isDelayed ? 'Atraso: ' : 'Rest: '}{formatDuration(trefilaDashStats.remainingSeconds * 1000)}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        )}
+
                                                         {/* Mini Barra de Progresso Real */}
-                                                        <div className="my-1">
-                                                            <div className="flex items-center justify-between text-[10px] font-mono text-slate-200 font-bold mb-0.5">
+                                                        <div className="shrink-0 my-0.5">
+                                                            <div className="flex items-center justify-between text-[10px] font-mono text-slate-200 font-bold mb-0.5 leading-none">
                                                                 <span>{prog.produced.toLocaleString('pt-BR')} / {prog.target.toLocaleString('pt-BR')} {prog.unit}</span>
                                                                 <span className="font-black text-white">{prog.pct}%</span>
                                                             </div>
@@ -2637,7 +2706,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                         </div>
 
                                                         {/* Controles Rápidos de Dias */}
-                                                        <div className="flex items-center justify-between bg-black/40 px-2.5 py-1 rounded-md text-[9px] border border-white/10 select-none" onClick={(e) => e.stopPropagation()}>
+                                                        <div className="flex items-center justify-between bg-black/50 px-2 py-0.5 rounded-md text-[9px] border border-white/10 select-none shrink-0" onClick={(e) => e.stopPropagation()}>
                                                             <div className="flex items-center gap-1.5">
                                                                 <button 
                                                                     onClick={() => handleShiftOP(op, -1)}
