@@ -2487,8 +2487,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             const widthStyle = `calc((100% - 200px) * ${spanColumns / 5} - 8px)`;
                                             const topStyle = `${10 + track * 122}px`;
 
-                                            const isTrelica = op.machine === 'Treliça';
-                                            const isMalha = typeof op.machine === 'string' && op.machine.startsWith('Malha');
+                                            const isTrelica = typeof op.machine === 'string' && op.machine.startsWith('Treliça') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Treliça'));
+                                            const isMalha = typeof op.machine === 'string' && op.machine.startsWith('Malha') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Malha'));
                                             const title = op.orderNumber;
                                             const subtitle = isTrelica ? `${op.trelicaModel} (${op.tamanho || '6m'})` : isMalha ? op.malhaModel : `Bitola ${op.targetBitola}mm`;
                                             
