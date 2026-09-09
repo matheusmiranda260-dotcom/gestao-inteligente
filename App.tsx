@@ -118,6 +118,12 @@ const App: React.FC = () => {
     }, [motivacionais]);
 
     useEffect(() => {
+        if (page === 'productionDashboard') {
+            setPage('pcpBoard');
+        }
+    }, [page]);
+
+    useEffect(() => {
         if (currentUser?.employeeId) {
             const checkTasks = async () => {
                 try {
@@ -289,8 +295,8 @@ const App: React.FC = () => {
                 const user = JSON.parse(storedUser);
                 if (user.sessionVersion === SESSION_VERSION) {
                     setCurrentUser(user);
-                    if (page === 'login') {
-                        setPage(user.role === 'gestor' || user.role === 'admin' ? 'productionDashboard' : 'menu');
+                    if (page === 'login' || page === 'productionDashboard') {
+                        setPage(user.role === 'gestor' || user.role === 'admin' ? 'pcpBoard' : 'menu');
                     }
                 } else {
                     localStorage.removeItem('msm_user');
@@ -386,7 +392,7 @@ const App: React.FC = () => {
         };
         setCurrentUser(appUser);
         localStorage.setItem('msm_user', JSON.stringify(appUser));
-        setPage(role === 'gestor' ? 'productionDashboard' : 'menu');
+        setPage(role === 'gestor' ? 'pcpBoard' : 'menu');
     };
 
     const handleLogin = async (username: string, password: string): Promise<void> => {
@@ -435,7 +441,7 @@ const App: React.FC = () => {
 
                 setCurrentUser(appUser);
                 localStorage.setItem('msm_user', JSON.stringify(appUser));
-                setPage(appUser.role === 'gestor' || appUser.role === 'admin' ? 'productionDashboard' : 'menu');
+                setPage(appUser.role === 'gestor' || appUser.role === 'admin' ? 'pcpBoard' : 'menu');
                 showNotification(`Bem-vindo, ${appUser.username}!`, 'success');
                 return;
             }
@@ -452,7 +458,7 @@ const App: React.FC = () => {
                 };
                 setCurrentUser(adminUser);
                 localStorage.setItem('msm_user', JSON.stringify(adminUser));
-                setPage('productionDashboard');
+                setPage('pcpBoard');
                 showNotification('Login realizado com sucesso (Modo Gestor).', 'success');
                 return;
             }
@@ -2795,8 +2801,9 @@ const App: React.FC = () => {
                                     page === 'trelicaInProgress' ? 'Produção Treliça' :
                                         page === 'trefilaControl' ? 'Controle Trefila' :
                                             page === 'trelicaControl' ? 'Controle Treliça' :
-                                                page === 'productionDashboard' ? 'Painel de Controle' :
-                                                    page.charAt(0).toUpperCase() + page.slice(1).replace(/([A-Z])/g, ' $1')}
+                                                page === 'pcpBoard' ? 'Quadro PCP' :
+                                                    page === 'productionDashboard' ? 'Painel de Controle' :
+                                                        page.charAt(0).toUpperCase() + page.slice(1).replace(/([A-Z])/g, ' $1')}
                             </span>
                         </div>
                         

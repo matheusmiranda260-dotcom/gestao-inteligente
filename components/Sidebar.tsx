@@ -76,6 +76,16 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
         if (targetPage === 'peopleManagement' && currentUser.employeeId) return true;
 
         // Specific permissions check
+        if (targetPage === 'pcpBoard') {
+            return !!(
+                currentUser.permissions?.pcpBoard || 
+                currentUser.permissions?.productionScheduling || 
+                currentUser.permissions?.trefilaControl || 
+                currentUser.permissions?.trelicaControl || 
+                currentUser.permissions?.malhaControl
+            );
+        }
+
         return !!currentUser.permissions?.[targetPage];
     };
 
@@ -128,8 +138,7 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                 {/* VISÃO GERAL */}
                 <div className="sidebar-category">
                     <div className="sidebar-category-title">{isCollapsed ? '📊' : '📊 Visão Geral'}</div>
-                    <MenuItem target="productionDashboard" label="Dashboard" icon={ChartBarIcon} highlight />
-                    <MenuItem target="meetingsTasks" label="Reuniões e Tarefas" icon={ClipboardListIcon} highlight />
+                    <MenuItem target="pcpBoard" label="Quadro PCP" icon={ClipboardListIcon} highlight />
                 </div>
 
                 {/* PRODUÇÃO */}
@@ -319,22 +328,8 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                         </>
                     )}
 
-                    <MenuItem target="productionOrder" label="Ordens (Trefila)" icon={ClipboardListIcon} />
-                    <MenuItem target="productionOrderTrelica" label="Ordens (Treliça)" icon={ClipboardListIcon} />
-                    <MenuItem target="productionOrderMalha" label="Ordens (Malha)" icon={ClipboardListIcon} />
                     <MenuItem target="productsManagement" label="Fichas Técnicas" icon={AdjustmentsIcon} />
                 </div>
-
-                {/* CONTROLE DE PRODUÇÃO */}
-                {(isGestor || hasPermission('trefilaControl') || hasPermission('trelicaControl') || hasPermission('malhaControl')) && (
-                    <div className="sidebar-category">
-                        <div className="sidebar-category-title">{isCollapsed ? '📈' : '📈 Controle de Produção'}</div>
-                        <MenuItem target="pcpBoard" label="Quadro PCP" icon={ClipboardListIcon} />
-                        <MenuItem target="trefilaControl" label="Evolução – Trefila" icon={DocumentReportIcon} />
-                        <MenuItem target="trelicaControl" label="Evolução – Treliça" icon={DocumentReportIcon} />
-                        <MenuItem target="malhaControl" label="Evolução – Malha" icon={DocumentReportIcon} />
-                    </div>
-                )}
 
                 {/* ESTOQUE */}
                 <div className="sidebar-category">
