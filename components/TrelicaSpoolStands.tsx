@@ -69,47 +69,59 @@ export const TrelicaSpoolStands: React.FC<TrelicaSpoolStandsProps> = ({
     useEffect(() => {
         loadStands();
 
-        // Escutar atualizações via Supabase Realtime
-        const channel = supabase
-            .channel(`spool-stands-${machineName}`)
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'trelica_spool_stands',
-                    filter: `machine_name=eq.${machineName}`
-                },
-                (payload) => {
-                    if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
-                        const updated = payload.new as any;
-                        setStands(prev => {
-                            const index = prev.findIndex(s => s.id === updated.id || s.stand_index === updated.stand_index);
-                            if (index >= 0) {
-                                const copy = [...prev];
-                                copy[index] = {
-                                    ...copy[index],
-                                    current_lot_id: updated.current_lot_id,
-                                    current_lot_number: updated.current_lot_number,
-                                    current_gauge: updated.current_gauge,
-                                    initial_weight: Number(updated.initial_weight) || 0,
-                                    remaining_weight: Number(updated.remaining_weight) || 0,
-                                    status: updated.status || 'empty',
-                                    last_changed_at: updated.last_changed_at,
-                                    last_changed_by: updated.last_changed_by,
-                                    updated_at: updated.updated_at
-                                };
-                                return copy;
-                            }
-                            return prev;
-                        });
+        // Escutar atualizações via Supabase Realtime com identificador único por instância
+        const channelName = `spool-stands-${machineName}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+        let channel: any = null;
+        try {
+            channel = supabase
+                .channel(channelName)
+                .on(
+                    'postgres_changes',
+                    {
+                        event: '*',
+                        schema: 'public',
+                        table: 'trelica_spool_stands',
+                        filter: `machine_name=eq.${machineName}`
+                    },
+                    (payload) => {
+                        if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
+                            const updated = payload.new as any;
+                            setStands(prev => {
+                                const index = prev.findIndex(s => s.id === updated.id || s.stand_index === updated.stand_index);
+                                if (index >= 0) {
+                                    const copy = [...prev];
+                                    copy[index] = {
+                                        ...copy[index],
+                                        current_lot_id: updated.current_lot_id,
+                                        current_lot_number: updated.current_lot_number,
+                                        current_gauge: updated.current_gauge,
+                                        initial_weight: Number(updated.initial_weight) || 0,
+                                        remaining_weight: Number(updated.remaining_weight) || 0,
+                                        status: updated.status || 'empty',
+                                        last_changed_at: updated.last_changed_at,
+                                        last_changed_by: updated.last_changed_by,
+                                        updated_at: updated.updated_at
+                                    };
+                                    return copy;
+                                }
+                                return prev;
+                            });
+                        }
                     }
-                }
-            )
-            .subscribe();
+                )
+                .subscribe();
+        } catch (subErr) {
+            console.warn('Erro ao assinar canal realtime de porta-rolos:', subErr);
+        }
 
         return () => {
-            supabase.removeChannel(channel);
+            if (channel) {
+                try {
+                    supabase.removeChannel(channel);
+                } catch (e) {
+                    console.warn('Erro ao remover canal realtime:', e);
+                }
+            }
         };
     }, [machineName]);
 
