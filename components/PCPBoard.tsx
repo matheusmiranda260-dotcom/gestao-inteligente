@@ -1,8 +1,15 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Page, ProductionOrderData, StockItem, User, StockGauge, ShiftReport, MachineType, Bitola, DowntimeConfig, Employee } from '../types';
+import type { Page, ProductionOrderData, StockItem, User, StockGauge, ShiftReport, MachineType, Bitola, DowntimeConfig, Employee, PcpShiftConfig, PcpHoliday } from '../types';
 import { FioMaquinaBitolaOptions, TrefilaBitolaOptions } from '../types';
 import { DEFAULT_TRELICA_MODELS } from '../utils/trelicaModelsData';
 import { supabase } from '../supabaseClient';
+import { 
+    fetchPcpShiftConfig, 
+    savePcpShiftConfig, 
+    fetchPcpHolidays, 
+    addPcpHoliday, 
+    deletePcpHoliday 
+} from '../services/supabaseService';
 import { 
     CalendarIcon, PlusIcon, ChevronRightIcon, XIcon, ArrowLeftIcon, 
     TrashIcon, PlayIcon, CheckCircleIcon, ClockIcon, ChartBarIcon, 
@@ -428,14 +435,16 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     const [k7Passes, setK7Passes] = useState<K7PassSetup[]>([]);
     const [isK7Customized, setIsK7Customized] = useState<boolean>(false);
 
-    // --- Configuração da Jornada Diária de Trabalho (Horas úteis por dia) ---
+    // --- Configuração da Jornada Diária de Trabalho e Feriados (Sincronizado no Supabase) ---
     const [isWorkHoursModalOpen, setIsWorkHoursModalOpen] = useState(false);
-    const [shiftConfig, setShiftConfig] = useState<{
-        workStart: string;
-        lunchStart: string;
-        lunchEnd: string;
-        workEnd: string;
-    }>(() => {
+    const [activeShiftTab, setActiveShiftTab] = useState<'hours' | 'holidays'>('hours');
+    const [holidays, setHolidays] = useState<PcpHoliday[]>([]);
+    const [newHolidayDate, setNewHolidayDate] = useState<string>('');
+    const [newHolidayDesc, setNewHolidayDesc] = useState<string>('');
+    const [isSavingShift, setIsSavingShift] = useState<boolean>(false);
+    const [isAddingHoliday, setIsAddingHoliday] = useState<boolean>(false);
+
+    const [shiftConfig, setShiftConfig] = useState<PcpShiftConfig>(() => {
         try {
             const saved = localStorage.getItem('pcp_daily_shift_config');
             if (saved) return JSON.parse(saved);
@@ -443,13 +452,83 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             console.error('Erro ao ler jornada do localStorage:', e);
         }
         return {
+            id: 'default',
             workStart: '07:00',
             lunchStart: '12:00',
             lunchEnd: '13:00',
-            workEnd: '17:00'
+            workEnd: '17:00',
+            workDays: [1, 2, 3, 4, 5]
         };
     });
-    const [tempShiftConfig, setTempShiftConfig] = useState(shiftConfig);
+    const [tempShiftConfig, setTempShiftConfig] = useState<PcpShiftConfig>(shiftConfig);
+
+    // Carregar configurações de jornada e feriados do Supabase e escutar em tempo real
+    useEffect(() => {
+        let isMounted = true;
+
+        const loadScheduleAndHolidays = async () => {
+            try {
+                const [dbShift, dbHolidays] = await Promise.all([
+                    fetchPcpShiftConfig(),
+                    fetchPcpHolidays()
+                ]);
+
+                if (isMounted) {
+                    if (dbShift) {
+                        const fullShift: PcpShiftConfig = {
+                            id: 'default',
+                            workStart: dbShift.workStart || '07:00',
+                            lunchStart: dbShift.lunchStart || '12:00',
+                            lunchEnd: dbShift.lunchEnd || '13:00',
+                            workEnd: dbShift.workEnd || '17:00',
+                            workDays: dbShift.workDays || [1, 2, 3, 4, 5]
+                        };
+                        setShiftConfig(fullShift);
+                        setTempShiftConfig(fullShift);
+                        localStorage.setItem('pcp_daily_shift_config', JSON.stringify(fullShift));
+                    }
+                    if (dbHolidays && dbHolidays.length > 0) {
+                        setHolidays(dbHolidays);
+                    }
+                }
+            } catch (err) {
+                console.warn('Erro ao carregar jornada/feriados do Supabase:', err);
+            }
+        };
+
+        loadScheduleAndHolidays();
+
+        // Escutar alterações em tempo real para sincronizar múltiplos computadores
+        const channel = supabase.channel(`pcp-schedule-sync-${Date.now()}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'pcp_shift_config' }, async () => {
+                const updated = await fetchPcpShiftConfig();
+                if (updated && isMounted) {
+                    const fullShift: PcpShiftConfig = {
+                        id: 'default',
+                        workStart: updated.workStart || '07:00',
+                        lunchStart: updated.lunchStart || '12:00',
+                        lunchEnd: updated.lunchEnd || '13:00',
+                        workEnd: updated.workEnd || '17:00',
+                        workDays: updated.workDays || [1, 2, 3, 4, 5]
+                    };
+                    setShiftConfig(fullShift);
+                    setTempShiftConfig(fullShift);
+                    localStorage.setItem('pcp_daily_shift_config', JSON.stringify(fullShift));
+                }
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'pcp_holidays' }, async () => {
+                const list = await fetchPcpHolidays();
+                if (isMounted) {
+                    setHolidays(list);
+                }
+            })
+            .subscribe();
+
+        return () => {
+            isMounted = false;
+            supabase.removeChannel(channel);
+        };
+    }, []);
 
     // --- Campos de TRELIÇA (Regras idênticas a ProductionOrderTrelica.tsx) ---
     const [selectedTrelicaCod, setSelectedTrelicaCod] = useState<string>(trelicaModels[0]?.cod || 'H8L6');
@@ -518,6 +597,67 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
     const formatFriendlyDate = (date: Date): string => {
         return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    };
+
+    // Mapeamento e Sets de Feriados para consultas rápidas O(1)
+    const holidaysMap = useMemo(() => {
+        const map = new Map<string, string>();
+        holidays.forEach(h => {
+            if (h.date) map.set(h.date, h.description || 'Feriado');
+        });
+        return map;
+    }, [holidays]);
+
+    const holidaysSet = useMemo(() => new Set(holidays.map(h => h.date)), [holidays]);
+    const activeWorkDays = useMemo(() => shiftConfig.workDays || [1, 2, 3, 4, 5], [shiftConfig.workDays]);
+
+    // Verifica se uma data específica é dia útil (dentro dos dias de expediente da empresa e não é feriado)
+    const isWorkingDay = (d: Date | string): boolean => {
+        const date = typeof d === 'string' ? new Date(d + 'T00:00:00') : new Date(d);
+        const dayOfWeek = date.getDay(); // 0=Dom, 1=Seg, 2=Ter, 3=Qua, 4=Qui, 5=Sex, 6=Sáb
+        if (!activeWorkDays.includes(dayOfWeek)) {
+            return false;
+        }
+        const dateStr = formatDateString(date);
+        if (holidaysSet.has(dateStr)) {
+            return false;
+        }
+        return true;
+    };
+
+    // Calcula a data final com base em X dias úteis a partir da data de início (Segunda a Sexta, pulando feriados)
+    const calculateEndDateByWorkDays = (startDateStr: string, durationWorkingDays: number): string => {
+        const days = Math.max(1, durationWorkingDays);
+        const cur = new Date(startDateStr + 'T00:00:00');
+        
+        // Se a data de início informada não for dia útil, avança até o primeiro dia útil disponível
+        while (!isWorkingDay(cur)) {
+            cur.setDate(cur.getDate() + 1);
+        }
+
+        // Já estamos no 1º dia útil. Contamos os dias restantes
+        let counted = 1;
+        while (counted < days) {
+            cur.setDate(cur.getDate() + 1);
+            if (isWorkingDay(cur)) {
+                counted++;
+            }
+        }
+        return formatDateString(cur);
+    };
+
+    // Desloca uma data em +/- dias úteis (para a função MOVER ◀ ▶)
+    const shiftWorkingDay = (currentDateStr: string, direction: number): string => {
+        const cur = new Date(currentDateStr + 'T00:00:00');
+        const step = direction >= 0 ? 1 : -1;
+        let found = false;
+        while (!found) {
+            cur.setDate(cur.getDate() + step);
+            if (isWorkingDay(cur)) {
+                found = true;
+            }
+        }
+        return formatDateString(cur);
     };
 
     // Gera o intervalo de Segunda a Sexta da semana selecionada
@@ -821,19 +961,77 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         return calculateShiftDetails(tempShiftConfig);
     }, [tempShiftConfig]);
 
-    const handleSaveShiftConfig = () => {
+    const handleSaveShiftConfig = async () => {
         if (!tempShiftDetails.isValid) {
             showNotification?.(tempShiftDetails.errorMessage || 'Verifique os horários informados.', 'error');
             return;
         }
-        setShiftConfig(tempShiftConfig);
+        setIsSavingShift(true);
         try {
+            setShiftConfig(tempShiftConfig);
             localStorage.setItem('pcp_daily_shift_config', JSON.stringify(tempShiftConfig));
+            await savePcpShiftConfig(tempShiftConfig);
+            showNotification?.(`Jornada salva no banco de dados: ${tempShiftDetails.totalWorkHours.toFixed(1)}h de produção por dia!`, 'success');
+            setIsWorkHoursModalOpen(false);
         } catch (e) {
-            console.error('Erro ao salvar jornada:', e);
+            console.error('Erro ao salvar jornada no Supabase:', e);
+            showNotification?.(`Jornada aplicada: ${tempShiftDetails.totalWorkHours.toFixed(1)}h/dia. Lembre-se de aplicar o SQL no Supabase.`, 'info');
+            setIsWorkHoursModalOpen(false);
+        } finally {
+            setIsSavingShift(false);
         }
-        setIsWorkHoursModalOpen(false);
-        showNotification?.(`Jornada atualizada: ${tempShiftDetails.totalWorkHours.toFixed(1)}h de produção por dia!`, 'success');
+    };
+
+    const handleAddHoliday = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        if (!newHolidayDate || !newHolidayDesc.trim()) {
+            showNotification?.('Informe a data e o nome do feriado.', 'error');
+            return;
+        }
+        if (holidaysSet.has(newHolidayDate)) {
+            showNotification?.('Já existe um feriado cadastrado nesta data.', 'error');
+            return;
+        }
+
+        setIsAddingHoliday(true);
+        try {
+            const added = await addPcpHoliday({
+                date: newHolidayDate,
+                description: newHolidayDesc.trim()
+            });
+            if (added) {
+                setHolidays(prev => [...prev, added].sort((a, b) => a.date.localeCompare(b.date)));
+            }
+            setNewHolidayDate('');
+            setNewHolidayDesc('');
+            showNotification?.('Feriado cadastrado com sucesso no banco de dados!', 'success');
+        } catch (err: any) {
+            console.error('Erro ao adicionar feriado:', err);
+            const fallback: PcpHoliday = {
+                id: 'temp-' + Date.now(),
+                date: newHolidayDate,
+                description: newHolidayDesc.trim()
+            };
+            setHolidays(prev => [...prev, fallback].sort((a, b) => a.date.localeCompare(b.date)));
+            setNewHolidayDate('');
+            setNewHolidayDesc('');
+            showNotification?.('Feriado adicionado! Execute o script SQL no Supabase para sincronizar entre todos os computadores.', 'info');
+        } finally {
+            setIsAddingHoliday(false);
+        }
+    };
+
+    const handleDeleteHoliday = async (id: string, desc: string) => {
+        if (!confirm(`Deseja remover o feriado "${desc}"?`)) return;
+        try {
+            await deletePcpHoliday(id);
+            setHolidays(prev => prev.filter(h => h.id !== id));
+            showNotification?.(`Feriado "${desc}" removido com sucesso.`, 'success');
+        } catch (err) {
+            console.error('Erro ao excluir feriado:', err);
+            setHolidays(prev => prev.filter(h => h.id !== id));
+            showNotification?.('Feriado removido da lista.', 'info');
+        }
     };
 
     // ==========================================
@@ -1314,10 +1512,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             return;
         }
 
-        const start = new Date(createStartDate + 'T00:00:00');
-        const end = new Date(start);
-        end.setDate(start.getDate() + createDuration - 1);
-        const endDateStr = formatDateString(end);
+        const endDateStr = calculateEndDateByWorkDays(createStartDate, createDuration);
 
         let orderData: any = {
             orderNumber: createOrderNumber.trim(),
@@ -1588,14 +1783,12 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     const handleSaveSchedule = async () => {
         if (!selectedOP) return;
 
-        const start = new Date(scheduleStartDate + 'T00:00:00');
-        const end = new Date(start);
-        end.setDate(start.getDate() + scheduleDuration - 1);
+        const endDateStr = calculateEndDateByWorkDays(scheduleStartDate, scheduleDuration);
 
         const updates: Partial<ProductionOrderData> = {
             scheduledMachine: scheduleMachine,
             plannedStartDate: scheduleStartDate,
-            plannedEndDate: formatDateString(end),
+            plannedEndDate: endDateStr,
             estimatedDurationDays: scheduleDuration
         };
 
@@ -1647,22 +1840,17 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         }
     };
 
-    // Deslocar OP (+/- dias)
+    // Deslocar OP (+/- dias úteis)
     const handleShiftOP = async (op: ProductionOrderData, daysToShift: number) => {
         if (!op.plannedStartDate) return;
         
-        const start = new Date(op.plannedStartDate + 'T00:00:00');
-        start.setDate(start.getDate() + daysToShift);
-        
-        const newStartStr = formatDateString(start);
+        const newStartStr = shiftWorkingDay(op.plannedStartDate, daysToShift);
         const duration = op.estimatedDurationDays || 1;
-        
-        const end = new Date(start);
-        end.setDate(start.getDate() + duration - 1);
+        const newEndStr = calculateEndDateByWorkDays(newStartStr, duration);
         
         const updates: Partial<ProductionOrderData> = {
             plannedStartDate: newStartStr,
-            plannedEndDate: formatDateString(end)
+            plannedEndDate: newEndStr
         };
 
         try {
@@ -1672,20 +1860,17 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         }
     };
 
-    // Ajusta a duração da OP (+1 ou -1 dia)
+    // Ajusta a duração da OP (+1 ou -1 dia útil)
     const handleAdjustDuration = async (op: ProductionOrderData, durationDelta: number) => {
         if (!op.plannedStartDate) return;
         
         const currentDuration = op.estimatedDurationDays || 1;
         const newDuration = Math.max(1, currentDuration + durationDelta);
-        
-        const start = new Date(op.plannedStartDate + 'T00:00:00');
-        const end = new Date(start);
-        end.setDate(start.getDate() + newDuration - 1);
+        const newEndStr = calculateEndDateByWorkDays(op.plannedStartDate, newDuration);
         
         const updates: Partial<ProductionOrderData> = {
             estimatedDurationDays: newDuration,
-            plannedEndDate: formatDateString(end)
+            plannedEndDate: newEndStr
         };
 
         try {
@@ -1805,6 +1990,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         const isToday = dateStr === todayStr;
         const isPast = dateStr < todayStr;
         const isFuture = dateStr > todayStr;
+        const isHoliday = holidaysMap.has(dateStr);
+        const holidayName = holidaysMap.get(dateStr) || '';
 
         const isTrelica = typeof op.machine === 'string' && op.machine.startsWith('Treliça') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Treliça'));
         const isMalha = typeof op.machine === 'string' && op.machine.startsWith('Malha') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Malha'));
@@ -1890,6 +2077,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             } else {
                 status = 'idle';
                 produced = 0;
+                if (isHoliday) {
+                    operatorName = holidayName;
+                }
             }
         } else if (isPast) {
             if (reportsDayQty > 0) {
@@ -1917,12 +2107,21 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     operatorName = logOperators || 'Encerrado';
                 }
             }
+            if (produced === 0 && isHoliday) {
+                operatorName = holidayName;
+            }
         } else {
             // isFuture
-            status = 'planned';
-            const totalTarget = op.quantityToProduce || op.totalWeight || (isTrefila ? 18000 : 3500);
-            const durationDays = Math.max(1, op.estimatedDurationDays || 1);
-            produced = Math.round(totalTarget / durationDays);
+            if (isHoliday) {
+                status = 'idle';
+                produced = 0;
+                operatorName = holidayName;
+            } else {
+                status = 'planned';
+                const totalTarget = op.quantityToProduce || op.totalWeight || (isTrefila ? 18000 : 3500);
+                const durationDays = Math.max(1, op.estimatedDurationDays || 1);
+                produced = Math.round(totalTarget / durationDays);
+            }
         }
 
         return {
@@ -1930,6 +2129,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             isToday,
             isPast,
             isFuture,
+            isHoliday,
+            holidayName,
             status,
             produced,
             unit,
@@ -2409,27 +2610,43 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                             </div>
                             
                             {weekDays.map((day, index) => {
-                                const isToday = formatDateString(day) === formatDateString(new Date());
+                                const dayDateStr = formatDateString(day);
+                                const isToday = dayDateStr === formatDateString(new Date());
+                                const isHoliday = holidaysMap.has(dayDateStr);
+                                const holidayName = holidaysMap.get(dayDateStr);
                                 const daysNames = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'];
                                 return (
                                     <div 
                                         key={index} 
-                                        className={`p-2.5 sm:p-3 text-center flex flex-col justify-center border-l border-white/5 relative ${
-                                            isToday ? 'bg-[#00E5FF]/5' : ''
+                                        className={`p-2 sm:p-2.5 text-center flex flex-col justify-center border-l border-white/5 relative ${
+                                            isToday ? 'bg-[#00E5FF]/10' : isHoliday ? 'bg-rose-500/10' : ''
                                         }`}
                                     >
-                                        <span className={`text-xs sm:text-sm font-black tracking-widest uppercase block ${
-                                            isToday ? 'text-[#00E5FF]' : 'text-slate-300'
-                                        }`}>
-                                            {daysNames[index]}
-                                        </span>
+                                        <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                                            <span className={`text-xs sm:text-sm font-black tracking-widest uppercase block ${
+                                                isToday ? 'text-[#00E5FF]' : isHoliday ? 'text-rose-400' : 'text-slate-300'
+                                            }`}>
+                                                {daysNames[index]}
+                                            </span>
+                                            {isHoliday && (
+                                                <span 
+                                                    className="bg-rose-500/25 text-rose-300 text-[9px] font-black px-1.5 py-0.5 rounded border border-rose-500/50 shadow-sm truncate max-w-[130px]"
+                                                    title={`Feriado: ${holidayName}`}
+                                                >
+                                                    🌴 {holidayName}
+                                                </span>
+                                            )}
+                                        </div>
                                         <span className={`text-sm sm:text-base font-black block mt-0.5 ${
-                                            isToday ? 'text-white font-extrabold' : 'text-slate-400'
+                                            isToday ? 'text-white font-extrabold' : isHoliday ? 'text-rose-200' : 'text-slate-400'
                                         }`}>
                                             {formatFriendlyDate(day)}
                                         </span>
                                         {isToday && (
                                             <div className="absolute bottom-0 left-0 w-full h-[2px] bg-[#00E5FF]" />
+                                        )}
+                                        {isHoliday && !isToday && (
+                                            <div className="absolute bottom-0 left-0 w-full h-[2px] bg-rose-500/70" />
                                         )}
                                     </div>
                                 );
@@ -2673,6 +2890,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             const targetDay = weekDays[colIndex];
                                             const targetDayStr = formatDateString(targetDay);
                                             const dayMachProd = getMachineDayProduction(mach.name, targetDay);
+                                            const isHolidayCell = holidaysMap.has(targetDayStr);
+                                            const holidayCellName = holidaysMap.get(targetDayStr);
                                             return (
                                                 <div 
                                                     key={colIndex}
@@ -2680,9 +2899,11 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                     className={`border-l border-white/5 relative flex flex-col justify-between p-2 group/cell cursor-pointer transition-colors ${
                                                         dayMachProd.isToday 
                                                             ? 'bg-[#00E5FF]/[0.03] hover:bg-[#00E5FF]/[0.07]' 
-                                                            : 'bg-transparent hover:bg-white/[0.02]'
+                                                            : isHolidayCell 
+                                                                ? 'bg-rose-500/[0.04] hover:bg-rose-500/[0.08]' 
+                                                                : 'bg-transparent hover:bg-white/[0.02]'
                                                     }`}
-                                                    title={`Clique para programar OP em ${mach.name} no dia ${formatFriendlyDate(targetDay)}`}
+                                                    title={isHolidayCell ? `Feriado: ${holidayCellName}. Clique para programar OP` : `Clique para programar OP em ${mach.name} no dia ${formatFriendlyDate(targetDay)}`}
                                                 >
                                                     {/* Monitor Diário na Célula da Grade */}
                                                     <div className="flex items-center justify-between gap-1 z-0 select-none">
@@ -2698,6 +2919,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                 {dayMachProd.isPast && <span className="text-emerald-400 font-bold">✓</span>}
                                                                 <span>{dayMachProd.totalProduced.toLocaleString('pt-BR')} {dayMachProd.unit}</span>
                                                             </div>
+                                                        ) : isHolidayCell ? (
+                                                            <span className="text-[9px] text-rose-300/80 font-bold font-mono pl-1 flex items-center gap-1 truncate max-w-[120px]" title={holidayCellName}>
+                                                                🌴 {holidayCellName}
+                                                            </span>
                                                         ) : (
                                                             <span className="text-[8px] text-slate-600 font-mono pl-1 opacity-60">
                                                                 {['Seg', 'Ter', 'Qua', 'Qui', 'Sex'][colIndex]}
@@ -2983,18 +3208,20 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                         ? 'bg-black/25 border-white/5 text-slate-500'
                                                                                         : 'bg-black/20 border-white/5 text-slate-400'
                                                                         }`}
-                                                                        title={`Dia: ${dayColName} ${formatFriendlyDate(currentDay)} | ${
+                                                                        title={`Dia: ${dayColName} ${formatFriendlyDate(currentDay)}${dayStats.isHoliday ? ` (Feriado: ${dayStats.holidayName})` : ''} | ${
                                                                             dayStats.isToday 
                                                                                 ? `Produção do Turno Ao Vivo: ${dayStats.produced.toLocaleString('pt-BR')} ${dayStats.unit}` 
                                                                                 : hasRealPastProd
                                                                                     ? `Total Produzido no Dia: ${dayStats.produced.toLocaleString('pt-BR')} ${dayStats.unit}` 
-                                                                                    : isIdlePast
-                                                                                        ? `Sem produção registrada neste dia`
-                                                                                        : `Meta Planejada: ~${dayStats.produced.toLocaleString('pt-BR')} ${dayStats.unit}`
+                                                                                    : dayStats.isHoliday
+                                                                                        ? `Feriado: ${dayStats.holidayName || 'Sem expediente'}`
+                                                                                        : isIdlePast
+                                                                                            ? `Sem produção registrada neste dia`
+                                                                                            : `Meta Planejada: ~${dayStats.produced.toLocaleString('pt-BR')} ${dayStats.unit}`
                                                                         }`}
                                                                     >
                                                                         <div className="flex items-center justify-between gap-1 text-[9px] sm:text-[10px] font-black uppercase tracking-wider">
-                                                                            <span className={dayStats.isToday ? 'text-[#00E5FF]' : hasRealPastProd ? 'text-emerald-400' : 'text-slate-400'}>
+                                                                            <span className={dayStats.isToday ? 'text-[#00E5FF]' : dayStats.isHoliday ? 'text-rose-400' : hasRealPastProd ? 'text-emerald-400' : 'text-slate-400'}>
                                                                                 {dayColName} {formatFriendlyDate(currentDay)}
                                                                             </span>
                                                                             {dayStats.isToday && (
@@ -3003,17 +3230,22 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                     Ao Vivo
                                                                                 </span>
                                                                             )}
+                                                                            {dayStats.isHoliday && !dayStats.isToday && (
+                                                                                <span className="text-[8px] font-black px-1 py-0.5 rounded bg-rose-500/25 text-rose-300 border border-rose-500/40" title={`Feriado: ${dayStats.holidayName}`}>
+                                                                                    🌴 Feriado
+                                                                                </span>
+                                                                            )}
                                                                             {hasRealPastProd && (
                                                                                 <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                                                                                     ✓ Fechado
                                                                                 </span>
                                                                             )}
-                                                                            {isIdlePast && (
+                                                                            {isIdlePast && !dayStats.isHoliday && (
                                                                                 <span className="text-[8px] font-medium px-1 py-0.5 rounded bg-white/5 text-slate-500 border border-white/5">
                                                                                     Sem prod.
                                                                                 </span>
                                                                             )}
-                                                                            {dayStats.isFuture && (
+                                                                            {dayStats.isFuture && !dayStats.isHoliday && (
                                                                                 <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-white/5 text-slate-400 border border-white/5">
                                                                                     🎯 Meta
                                                                                 </span>
@@ -3021,38 +3253,47 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                         </div>
 
                                                                         <div className="flex items-baseline gap-1 my-0.5">
-                                                                            <span className={`text-xs sm:text-sm md:text-base font-black font-mono tracking-tight ${
-                                                                                dayStats.isToday 
-                                                                                    ? 'text-white drop-shadow' 
-                                                                                    : hasRealPastProd
-                                                                                        ? 'text-emerald-300' 
-                                                                                        : isIdlePast
-                                                                                            ? 'text-slate-500'
-                                                                                            : 'text-slate-300'
-                                                                            }`}>
-                                                                                {dayStats.isFuture ? `~${dayStats.produced.toLocaleString('pt-BR')}` : dayStats.produced.toLocaleString('pt-BR')}
-                                                                            </span>
-                                                                            <span className="text-[9px] font-bold text-slate-400 font-mono">{dayStats.unit}</span>
+                                                                            {dayStats.isHoliday && dayStats.produced === 0 ? (
+                                                                                <span className="text-xs font-black text-rose-300/90 font-mono tracking-tight">
+                                                                                    Folga / Feriado
+                                                                                </span>
+                                                                            ) : (
+                                                                                <>
+                                                                                    <span className={`text-xs sm:text-sm md:text-base font-black font-mono tracking-tight ${
+                                                                                        dayStats.isToday 
+                                                                                            ? 'text-white drop-shadow' 
+                                                                                            : hasRealPastProd
+                                                                                                ? 'text-emerald-300' 
+                                                                                                : isIdlePast
+                                                                                                    ? 'text-slate-500'
+                                                                                                    : 'text-slate-300'
+                                                                                    }`}>
+                                                                                        {dayStats.isFuture ? `~${dayStats.produced.toLocaleString('pt-BR')}` : dayStats.produced.toLocaleString('pt-BR')}
+                                                                                    </span>
+                                                                                    <span className="text-[9px] font-bold text-slate-400 font-mono">{dayStats.unit}</span>
+                                                                                </>
+                                                                            )}
                                                                         </div>
 
                                                                         <div className="flex items-center justify-between text-[8.5px] sm:text-[9.5px] text-slate-300 truncate pt-0.5 border-t border-white/5">
                                                                             <span className="truncate flex items-center gap-1 font-semibold">
-                                                                                {dayStats.isToday && (
+                                                                                {dayStats.isHoliday ? (
+                                                                                    <span className="text-rose-300 truncate font-bold">
+                                                                                        🌴 {dayStats.holidayName || 'Sem expediente'}
+                                                                                    </span>
+                                                                                ) : dayStats.isToday ? (
                                                                                     <>
                                                                                         <span className="text-[#00E5FF]">⚡</span>
                                                                                         <strong className="text-white truncate">{dayStats.operatorName || 'Turno Ativo'}</strong>
                                                                                     </>
-                                                                                )}
-                                                                                {hasRealPastProd && (
+                                                                                ) : hasRealPastProd ? (
                                                                                     <>
                                                                                         <span className="text-slate-400">👤</span>
                                                                                         <span className="truncate">{dayStats.operatorName || 'Encerrado'}</span>
                                                                                     </>
-                                                                                )}
-                                                                                {isIdlePast && (
+                                                                                ) : isIdlePast ? (
                                                                                     <span className="text-slate-500 truncate">{dayStats.operatorName ? `👤 ${dayStats.operatorName}` : 'Sem turno'}</span>
-                                                                                )}
-                                                                                {dayStats.isFuture && (
+                                                                                ) : (
                                                                                     <span className="text-slate-500 italic">Planejado</span>
                                                                                 )}
                                                                             </span>
@@ -4645,24 +4886,24 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             )}
 
             {/* ========================================================================= */}
-            {/* SUB-JANELA / MODAL: CONFIGURAÇÃO DA JORNADA DE TRABALHO DIÁRIA */}
+            {/* SUB-JANELA / MODAL: CONFIGURAÇÃO DA JORNADA DE TRABALHO & FERIADOS */}
             {/* ========================================================================= */}
             {isWorkHoursModalOpen && (
                 <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-md animate-fade p-3 sm:p-4">
-                    <div className="w-full max-w-lg pcp-glass-card rounded-2xl border border-white/15 p-5 sm:p-6 flex flex-col gap-4 text-slate-100 shadow-2xl">
+                    <div className="w-full max-w-xl pcp-glass-card rounded-2xl border border-white/15 p-5 sm:p-6 flex flex-col gap-4 text-slate-100 shadow-2xl max-h-[90vh] overflow-hidden">
                         
                         {/* Cabeçalho */}
-                        <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                        <div className="flex items-center justify-between border-b border-white/10 pb-3 shrink-0">
                             <div className="flex items-center gap-2.5">
                                 <div className="w-9 h-9 rounded-xl bg-[#00E5FF]/15 text-[#00E5FF] flex items-center justify-center border border-[#00E5FF]/30">
                                     <ClockIcon className="w-5 h-5" />
                                 </div>
                                 <div>
                                     <h3 className="text-sm font-black uppercase tracking-wider text-white flex items-center gap-2">
-                                        Jornada Diária de Produção
+                                        Jornada & Feriados da Produção
                                     </h3>
-                                    <p className="text-[11px] text-slate-400">
-                                        Informe os horários de início, pausa de almoço e término do turno
+                                    <p className="text-[11px] text-cyan-300/80 font-medium">
+                                        Configuração central salva no Supabase (sincronizada em todos os computadores)
                                     </p>
                                 </div>
                             </div>
@@ -4675,190 +4916,372 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                             </button>
                         </div>
 
-                        {/* Perguntas e Entradas de Horários */}
-                        <div className="flex flex-col gap-2.5">
-                            
-                            {/* Pergunta 1: Hora Início */}
-                            <div className="flex items-center justify-between bg-[#08131B] p-3 rounded-xl border border-white/5 hover:border-cyan-500/20 transition-all">
-                                <div className="flex items-center gap-2.5">
-                                    <span className="w-6 h-6 rounded-full bg-cyan-500/20 text-[#00E5FF] font-bold text-xs flex items-center justify-center">1</span>
-                                    <div>
-                                        <span className="text-xs font-bold text-slate-200 block">Hora de Início</span>
-                                        <span className="text-[10px] text-slate-400">Horário em que as máquinas começam a operar</span>
-                                    </div>
-                                </div>
-                                <input
-                                    type="time"
-                                    value={tempShiftConfig.workStart}
-                                    onChange={(e) => setTempShiftConfig(prev => ({ ...prev, workStart: e.target.value }))}
-                                    style={{ colorScheme: 'dark' }}
-                                    className="bg-[#0B1D2A] border border-cyan-500/30 rounded-lg px-2.5 py-1.5 text-xs font-bold font-mono focus:outline-none focus:border-[#00E5FF] text-white"
-                                />
-                            </div>
-
-                            {/* Pergunta 2: Hora Parada Almoço (Início) */}
-                            <div className="flex items-center justify-between bg-[#08131B] p-3 rounded-xl border border-white/5 hover:border-amber-500/20 transition-all">
-                                <div className="flex items-center gap-2.5">
-                                    <span className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 font-bold text-xs flex items-center justify-center">2</span>
-                                    <div>
-                                        <span className="text-xs font-bold text-amber-300 block">Hora Parada pra Almoço (Início)</span>
-                                        <span className="text-[10px] text-slate-400">Pausa das máquinas para refeição</span>
-                                    </div>
-                                </div>
-                                <input
-                                    type="time"
-                                    value={tempShiftConfig.lunchStart}
-                                    onChange={(e) => setTempShiftConfig(prev => ({ ...prev, lunchStart: e.target.value }))}
-                                    style={{ colorScheme: 'dark' }}
-                                    className="bg-[#0B1D2A] border border-amber-500/30 rounded-lg px-2.5 py-1.5 text-xs font-bold font-mono focus:outline-none focus:border-amber-400 text-white"
-                                />
-                            </div>
-
-                            {/* Pergunta 3: Hora Retorno Almoço */}
-                            <div className="flex items-center justify-between bg-[#08131B] p-3 rounded-xl border border-white/5 hover:border-amber-500/20 transition-all">
-                                <div className="flex items-center gap-2.5">
-                                    <span className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 font-bold text-xs flex items-center justify-center">3</span>
-                                    <div>
-                                        <span className="text-xs font-bold text-amber-300 block">Hora Retorno do Almoço</span>
-                                        <span className="text-[10px] text-slate-400">Retorno da equipe às máquinas</span>
-                                    </div>
-                                </div>
-                                <input
-                                    type="time"
-                                    value={tempShiftConfig.lunchEnd}
-                                    onChange={(e) => setTempShiftConfig(prev => ({ ...prev, lunchEnd: e.target.value }))}
-                                    style={{ colorScheme: 'dark' }}
-                                    className="bg-[#0B1D2A] border border-amber-500/30 rounded-lg px-2.5 py-1.5 text-xs font-bold font-mono focus:outline-none focus:border-amber-400 text-white"
-                                />
-                            </div>
-
-                            {/* Pergunta 4: Hora Fim do Expediente */}
-                            <div className="flex items-center justify-between bg-[#08131B] p-3 rounded-xl border border-white/5 hover:border-cyan-500/20 transition-all">
-                                <div className="flex items-center gap-2.5">
-                                    <span className="w-6 h-6 rounded-full bg-cyan-500/20 text-[#00E5FF] font-bold text-xs flex items-center justify-center">4</span>
-                                    <div>
-                                        <span className="text-xs font-bold text-slate-200 block">Hora Fim da Jornada</span>
-                                        <span className="text-[10px] text-slate-400">Encerramento da produção no dia</span>
-                                    </div>
-                                </div>
-                                <input
-                                    type="time"
-                                    value={tempShiftConfig.workEnd}
-                                    onChange={(e) => setTempShiftConfig(prev => ({ ...prev, workEnd: e.target.value }))}
-                                    style={{ colorScheme: 'dark' }}
-                                    className="bg-[#0B1D2A] border border-cyan-500/30 rounded-lg px-2.5 py-1.5 text-xs font-bold font-mono focus:outline-none focus:border-[#00E5FF] text-white"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Card de Cálculo em Tempo Real */}
-                        <div className="bg-[#0B1D2A] p-4 rounded-xl border border-cyan-500/30 space-y-2.5">
-                            <div className="flex justify-between items-center text-xs">
-                                <div>
-                                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
-                                        Tempo de Produção por Dia:
-                                    </span>
-                                    <span className="text-[11px] text-slate-300">
-                                        Carga horária líquida trabalhada
-                                    </span>
-                                </div>
-                                <div className="text-right font-mono">
-                                    <span className="text-xl font-black text-[#00E5FF] block">
-                                        {formatMinutesToHoursMinutes(tempShiftDetails.totalWorkMinutes)}
-                                    </span>
-                                    <span className="text-[10px] text-cyan-300/90 font-bold">
-                                        {tempShiftDetails.totalWorkHours.toFixed(2).replace('.', ',')} horas / dia
-                                    </span>
-                                </div>
-                            </div>
-
-                            {/* Resumo visual dos turnos */}
-                            <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/10 text-center font-mono text-[10px]">
-                                <div className="bg-[#07131B] p-2 rounded-lg border border-white/5">
-                                    <span className="text-[9px] text-slate-400 uppercase block">1º Período</span>
-                                    <strong className="text-cyan-400 block mt-0.5">{formatMinutesToHoursMinutes(tempShiftDetails.morningMinutes)}</strong>
-                                    <span className="text-[8px] text-slate-500 font-sans">{tempShiftConfig.workStart || '--:--'} às {tempShiftConfig.lunchStart || '--:--'}</span>
-                                </div>
-
-                                <div className="bg-[#07131B] p-2 rounded-lg border border-white/5">
-                                    <span className="text-[9px] text-amber-400 uppercase block">Almoço</span>
-                                    <strong className="text-amber-300 block mt-0.5">{formatMinutesToHoursMinutes(tempShiftDetails.lunchMinutes)}</strong>
-                                    <span className="text-[8px] text-slate-500 font-sans">{tempShiftConfig.lunchStart || '--:--'} às {tempShiftConfig.lunchEnd || '--:--'}</span>
-                                </div>
-
-                                <div className="bg-[#07131B] p-2 rounded-lg border border-white/5">
-                                    <span className="text-[9px] text-slate-400 uppercase block">2º Período</span>
-                                    <strong className="text-cyan-400 block mt-0.5">{formatMinutesToHoursMinutes(tempShiftDetails.afternoonMinutes)}</strong>
-                                    <span className="text-[8px] text-slate-500 font-sans">{tempShiftConfig.lunchEnd || '--:--'} às {tempShiftConfig.workEnd || '--:--'}</span>
-                                </div>
-                            </div>
-
-                            {/* Simulação com a OP Atual */}
-                            {trefilaProductionCalculations.totalHours > 0 && tempShiftDetails.totalWorkHours > 0 && (
-                                <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px]">
-                                    <span className="text-slate-400">Impacto na OP de {formatDurationHoursMin(trefilaProductionCalculations.totalMinutes)}:</span>
-                                    <span className="font-mono font-bold text-white bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20 text-[#00E5FF]">
-                                        ~{(trefilaProductionCalculations.totalHours / tempShiftDetails.totalWorkHours).toFixed(1)} dias de fábrica
-                                    </span>
-                                </div>
-                            )}
-
-                            {!tempShiftDetails.isValid && (
-                                <div className="text-[10px] text-red-400 bg-red-500/10 p-2 rounded-lg border border-red-500/20">
-                                    ⚠️ {tempShiftDetails.errorMessage}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Botões de Predefinições Rápidas */}
-                        <div className="flex items-center gap-1.5 justify-center flex-wrap pt-1">
-                            <span className="text-[9px] text-slate-400 uppercase font-bold mr-1">Atalhos:</span>
+                        {/* Abas de Navegação */}
+                        <div className="flex items-center gap-2 border-b border-white/10 pb-2 shrink-0">
                             <button
                                 type="button"
-                                onClick={() => setTempShiftConfig({ workStart: '07:00', lunchStart: '12:00', lunchEnd: '13:00', workEnd: '17:00' })}
-                                className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-[9px] text-slate-300 font-mono transition-colors"
+                                onClick={() => setActiveShiftTab('hours')}
+                                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${
+                                    activeShiftTab === 'hours'
+                                        ? 'bg-[#00E5FF]/20 text-[#00E5FF] border border-[#00E5FF]/40 shadow-sm'
+                                        : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
+                                }`}
                             >
-                                07h-17h (9h)
+                                <ClockIcon className="w-4 h-4" />
+                                <span>Horários do Turno</span>
                             </button>
+
                             <button
                                 type="button"
-                                onClick={() => setTempShiftConfig({ workStart: '07:00', lunchStart: '12:00', lunchEnd: '13:00', workEnd: '16:48' })}
-                                className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-[9px] text-slate-300 font-mono transition-colors"
+                                onClick={() => setActiveShiftTab('holidays')}
+                                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${
+                                    activeShiftTab === 'holidays'
+                                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm'
+                                        : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
+                                }`}
                             >
-                                CLT 44h (8.8h)
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setTempShiftConfig({ workStart: '08:00', lunchStart: '12:00', lunchEnd: '13:00', workEnd: '17:00' })}
-                                className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-[9px] text-slate-300 font-mono transition-colors"
-                            >
-                                08h-17h (8h)
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setTempShiftConfig({ workStart: '06:00', lunchStart: '', lunchEnd: '', workEnd: '14:00' })}
-                                className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-[9px] text-slate-300 font-mono transition-colors"
-                            >
-                                6h-14h (8h contínuo)
+                                <CalendarIcon className="w-4 h-4" />
+                                <span>Feriados & Folgas ({holidays.length})</span>
                             </button>
                         </div>
 
-                        {/* Ações */}
-                        <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-white/10">
-                            <button
-                                type="button"
-                                onClick={() => setIsWorkHoursModalOpen(false)}
-                                className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold text-slate-300 transition-colors"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleSaveShiftConfig}
-                                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#00E5FF] to-[#00B4D8] hover:brightness-110 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg shadow-[#00E5FF]/20 active:scale-95 transition-all"
-                            >
-                                Salvar Jornada
-                            </button>
+                        {/* Conteúdo da Aba 1: Horários do Turno */}
+                        {activeShiftTab === 'hours' && (
+                            <div className="flex flex-col gap-3 overflow-y-auto pr-1">
+                                {/* Entradas de Horários */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                    {/* Pergunta 1: Hora Início */}
+                                    <div className="flex items-center justify-between bg-[#08131B] p-2.5 rounded-xl border border-white/5 hover:border-cyan-500/20 transition-all">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-[#00E5FF] font-bold text-[11px] flex items-center justify-center">1</span>
+                                            <div>
+                                                <span className="text-xs font-bold text-slate-200 block">Hora de Início</span>
+                                                <span className="text-[9px] text-slate-400">Início das máquinas</span>
+                                            </div>
+                                        </div>
+                                        <input
+                                            type="time"
+                                            value={tempShiftConfig.workStart}
+                                            onChange={(e) => setTempShiftConfig(prev => ({ ...prev, workStart: e.target.value }))}
+                                            style={{ colorScheme: 'dark' }}
+                                            className="bg-[#0B1D2A] border border-cyan-500/30 rounded-lg px-2 py-1 text-xs font-bold font-mono focus:outline-none focus:border-[#00E5FF] text-white"
+                                        />
+                                    </div>
+
+                                    {/* Pergunta 2: Parada Almoço (Início) */}
+                                    <div className="flex items-center justify-between bg-[#08131B] p-2.5 rounded-xl border border-white/5 hover:border-amber-500/20 transition-all">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 font-bold text-[11px] flex items-center justify-center">2</span>
+                                            <div>
+                                                <span className="text-xs font-bold text-amber-300 block">Almoço (Início)</span>
+                                                <span className="text-[9px] text-slate-400">Pausa para refeição</span>
+                                            </div>
+                                        </div>
+                                        <input
+                                            type="time"
+                                            value={tempShiftConfig.lunchStart}
+                                            onChange={(e) => setTempShiftConfig(prev => ({ ...prev, lunchStart: e.target.value }))}
+                                            style={{ colorScheme: 'dark' }}
+                                            className="bg-[#0B1D2A] border border-amber-500/30 rounded-lg px-2 py-1 text-xs font-bold font-mono focus:outline-none focus:border-amber-400 text-white"
+                                        />
+                                    </div>
+
+                                    {/* Pergunta 3: Retorno Almoço */}
+                                    <div className="flex items-center justify-between bg-[#08131B] p-2.5 rounded-xl border border-white/5 hover:border-amber-500/20 transition-all">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 font-bold text-[11px] flex items-center justify-center">3</span>
+                                            <div>
+                                                <span className="text-xs font-bold text-amber-300 block">Retorno Almoço</span>
+                                                <span className="text-[9px] text-slate-400">Fim da refeição</span>
+                                            </div>
+                                        </div>
+                                        <input
+                                            type="time"
+                                            value={tempShiftConfig.lunchEnd}
+                                            onChange={(e) => setTempShiftConfig(prev => ({ ...prev, lunchEnd: e.target.value }))}
+                                            style={{ colorScheme: 'dark' }}
+                                            className="bg-[#0B1D2A] border border-amber-500/30 rounded-lg px-2 py-1 text-xs font-bold font-mono focus:outline-none focus:border-amber-400 text-white"
+                                        />
+                                    </div>
+
+                                    {/* Pergunta 4: Fim da Jornada */}
+                                    <div className="flex items-center justify-between bg-[#08131B] p-2.5 rounded-xl border border-white/5 hover:border-cyan-500/20 transition-all">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-[#00E5FF] font-bold text-[11px] flex items-center justify-center">4</span>
+                                            <div>
+                                                <span className="text-xs font-bold text-slate-200 block">Fim do Turno</span>
+                                                <span className="text-[9px] text-slate-400">Término da produção</span>
+                                            </div>
+                                        </div>
+                                        <input
+                                            type="time"
+                                            value={tempShiftConfig.workEnd}
+                                            onChange={(e) => setTempShiftConfig(prev => ({ ...prev, workEnd: e.target.value }))}
+                                            style={{ colorScheme: 'dark' }}
+                                            className="bg-[#0B1D2A] border border-cyan-500/30 rounded-lg px-2 py-1 text-xs font-bold font-mono focus:outline-none focus:border-[#00E5FF] text-white"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Card de Cálculo em Tempo Real */}
+                                <div className="bg-[#0B1D2A] p-3.5 rounded-xl border border-cyan-500/30 space-y-2.5">
+                                    <div className="flex justify-between items-center text-xs">
+                                        <div>
+                                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                                                Tempo Útil de Produção por Dia:
+                                            </span>
+                                            <span className="text-[11px] text-slate-300">
+                                                Carga horária líquida trabalhada
+                                            </span>
+                                        </div>
+                                        <div className="text-right font-mono">
+                                            <span className="text-xl font-black text-[#00E5FF] block">
+                                                {formatMinutesToHoursMinutes(tempShiftDetails.totalWorkMinutes)}
+                                            </span>
+                                            <span className="text-[10px] text-cyan-300/90 font-bold">
+                                                {tempShiftDetails.totalWorkHours.toFixed(2).replace('.', ',')} horas / dia
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Resumo visual dos turnos */}
+                                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/10 text-center font-mono text-[10px]">
+                                        <div className="bg-[#07131B] p-2 rounded-lg border border-white/5">
+                                            <span className="text-[9px] text-slate-400 uppercase block">1º Período</span>
+                                            <strong className="text-cyan-400 block mt-0.5">{formatMinutesToHoursMinutes(tempShiftDetails.morningMinutes)}</strong>
+                                            <span className="text-[8px] text-slate-500 font-sans">{tempShiftConfig.workStart || '--:--'} às {tempShiftConfig.lunchStart || '--:--'}</span>
+                                        </div>
+
+                                        <div className="bg-[#07131B] p-2 rounded-lg border border-white/5">
+                                            <span className="text-[9px] text-amber-400 uppercase block">Almoço</span>
+                                            <strong className="text-amber-300 block mt-0.5">{formatMinutesToHoursMinutes(tempShiftDetails.lunchMinutes)}</strong>
+                                            <span className="text-[8px] text-slate-500 font-sans">{tempShiftConfig.lunchStart || '--:--'} às {tempShiftConfig.lunchEnd || '--:--'}</span>
+                                        </div>
+
+                                        <div className="bg-[#07131B] p-2 rounded-lg border border-white/5">
+                                            <span className="text-[9px] text-slate-400 uppercase block">2º Período</span>
+                                            <strong className="text-cyan-400 block mt-0.5">{formatMinutesToHoursMinutes(tempShiftDetails.afternoonMinutes)}</strong>
+                                            <span className="text-[8px] text-slate-500 font-sans">{tempShiftConfig.lunchEnd || '--:--'} às {tempShiftConfig.workEnd || '--:--'}</span>
+                                        </div>
+                                    </div>
+
+                                    {!tempShiftDetails.isValid && (
+                                        <div className="text-[10px] text-red-400 bg-red-500/10 p-2 rounded-lg border border-red-500/20">
+                                            ⚠️ {tempShiftDetails.errorMessage}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Botões de Predefinições Rápidas */}
+                                <div className="flex items-center gap-1.5 justify-center flex-wrap pt-1">
+                                    <span className="text-[9px] text-slate-400 uppercase font-bold mr-1">Atalhos:</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setTempShiftConfig(prev => ({ ...prev, workStart: '07:00', lunchStart: '12:00', lunchEnd: '13:00', workEnd: '17:00' }))}
+                                        className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-[9px] text-slate-300 font-mono transition-colors"
+                                    >
+                                        07h-17h (9h)
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setTempShiftConfig(prev => ({ ...prev, workStart: '07:00', lunchStart: '12:00', lunchEnd: '13:00', workEnd: '16:48' }))}
+                                        className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-[9px] text-slate-300 font-mono transition-colors"
+                                    >
+                                        CLT 44h (8.8h)
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setTempShiftConfig(prev => ({ ...prev, workStart: '08:00', lunchStart: '12:00', lunchEnd: '13:00', workEnd: '17:00' }))}
+                                        className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-[9px] text-slate-300 font-mono transition-colors"
+                                    >
+                                        08h-17h (8h)
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setTempShiftConfig(prev => ({ ...prev, workStart: '06:00', lunchStart: '', lunchEnd: '', workEnd: '14:00' }))}
+                                        className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-[9px] text-slate-300 font-mono transition-colors"
+                                    >
+                                        6h-14h (8h contínuo)
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Conteúdo da Aba 2: Feriados & Folgas */}
+                        {activeShiftTab === 'holidays' && (
+                            <div className="flex flex-col gap-3 overflow-y-auto pr-1">
+                                {/* Seletor dos Dias de Expediente da Semana */}
+                                <div className="bg-[#08131B] p-3 rounded-xl border border-white/5">
+                                    <span className="text-xs font-bold text-white block mb-1">
+                                        Dias de Expediente da Fábrica
+                                    </span>
+                                    <p className="text-[10px] text-slate-400 mb-2">
+                                        Selecione os dias da semana em que as máquinas operam (dias desmarcados não contam na duração das OPs):
+                                    </p>
+                                    <div className="grid grid-cols-5 gap-1.5">
+                                        {[
+                                            { day: 1, label: 'Segunda' },
+                                            { day: 2, label: 'Terça' },
+                                            { day: 3, label: 'Quarta' },
+                                            { day: 4, label: 'Quinta' },
+                                            { day: 5, label: 'Sexta' }
+                                        ].map(({ day, label }) => {
+                                            const isChecked = (tempShiftConfig.workDays || [1, 2, 3, 4, 5]).includes(day);
+                                            return (
+                                                <label 
+                                                    key={day}
+                                                    className={`flex flex-col items-center justify-center p-2 rounded-lg border text-center cursor-pointer select-none transition-all ${
+                                                        isChecked 
+                                                            ? 'bg-cyan-500/15 border-[#00E5FF]/40 text-[#00E5FF] font-black' 
+                                                            : 'bg-white/5 border-white/5 text-slate-500 hover:text-slate-300'
+                                                    }`}
+                                                >
+                                                    <input 
+                                                        type="checkbox"
+                                                        className="hidden"
+                                                        checked={isChecked}
+                                                        onChange={(e) => {
+                                                            const currentDays = tempShiftConfig.workDays || [1, 2, 3, 4, 5];
+                                                            const newDays = e.target.checked
+                                                                ? [...currentDays, day].sort()
+                                                                : currentDays.filter(d => d !== day);
+                                                            if (newDays.length === 0) {
+                                                                showNotification?.('Mantenha ao menos 1 dia de expediente na semana.', 'error');
+                                                                return;
+                                                            }
+                                                            setTempShiftConfig(prev => ({ ...prev, workDays: newDays }));
+                                                        }}
+                                                    />
+                                                    <span className="text-xs">{label}</span>
+                                                    <span className="text-[9px] mt-0.5 opacity-80">{isChecked ? '✓ Trabalha' : 'Folga'}</span>
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* Formulário para Cadastrar Novo Feriado */}
+                                <form onSubmit={handleAddHoliday} className="bg-[#0B1D2A] p-3 rounded-xl border border-rose-500/30 flex flex-col gap-2">
+                                    <div className="flex items-center gap-1.5 text-xs font-black uppercase text-rose-300 tracking-wider">
+                                        <PlusIcon className="w-4 h-4 text-rose-400" />
+                                        <span>Adicionar Feriado / Dia Sem Produção</span>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                                        <div className="sm:col-span-5">
+                                            <input 
+                                                type="date"
+                                                value={newHolidayDate}
+                                                onChange={(e) => setNewHolidayDate(e.target.value)}
+                                                style={{ colorScheme: 'dark' }}
+                                                className="w-full bg-[#08131B] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-white focus:outline-none focus:border-rose-400"
+                                                required
+                                            />
+                                        </div>
+                                        <div className="sm:col-span-7 flex items-center gap-2">
+                                            <input 
+                                                type="text"
+                                                placeholder="Ex: Feriado Tiradentes, Manutenção"
+                                                value={newHolidayDesc}
+                                                onChange={(e) => setNewHolidayDesc(e.target.value)}
+                                                className="w-full bg-[#08131B] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white placeholder:text-slate-600 focus:outline-none focus:border-rose-400"
+                                                required
+                                            />
+                                            <button
+                                                type="submit"
+                                                disabled={isAddingHoliday}
+                                                className="px-3 py-1.5 bg-rose-500 hover:bg-rose-400 disabled:opacity-50 text-slate-950 font-black text-xs uppercase tracking-wider rounded-lg transition-all active:scale-95 whitespace-nowrap shadow-sm"
+                                            >
+                                                {isAddingHoliday ? 'Salvando...' : '+ Cadastrar'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+
+                                {/* Lista de Feriados Cadastrados */}
+                                <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
+                                    <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-slate-400 px-1">
+                                        <span>Feriados Cadastrados ({holidays.length})</span>
+                                        <span>Ação</span>
+                                    </div>
+
+                                    {holidays.length === 0 ? (
+                                        <div className="text-center py-6 border border-dashed border-white/10 rounded-xl text-xs text-slate-500 font-medium">
+                                            Nenhum feriado cadastrado. Cadastre acima para que o PCP pule os dias automaticamente.
+                                        </div>
+                                    ) : (
+                                        holidays.map(h => {
+                                            const parts = h.date ? h.date.split('-') : [];
+                                            const formattedDate = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : h.date;
+                                            
+                                            // Dia da semana do feriado
+                                            const d = new Date(h.date + 'T00:00:00');
+                                            const weekDayName = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][d.getDay()] || '';
+
+                                            return (
+                                                <div 
+                                                    key={h.id} 
+                                                    className="flex items-center justify-between bg-[#08131B] p-2 rounded-xl border border-white/5 hover:border-white/15 transition-all text-xs"
+                                                >
+                                                    <div className="flex items-center gap-2.5 min-w-0">
+                                                        <span className="px-2 py-0.5 rounded bg-rose-500/15 border border-rose-500/30 text-rose-300 font-mono font-black text-[11px] shrink-0">
+                                                            {formattedDate}
+                                                        </span>
+                                                        <div className="flex flex-col min-w-0">
+                                                            <span className="font-bold text-white truncate text-xs">
+                                                                {h.description}
+                                                            </span>
+                                                            <span className="text-[10px] text-slate-400">
+                                                                {weekDayName}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDeleteHoliday(h.id, h.description)}
+                                                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors shrink-0"
+                                                        title="Excluir feriado"
+                                                    >
+                                                        <TrashIcon className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Rodapé e Ações */}
+                        <div className="flex items-center justify-between gap-2.5 pt-3 border-t border-white/10 shrink-0">
+                            <div className="flex items-center gap-1.5 text-[10px] text-cyan-300/80 font-mono font-bold">
+                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                                <span>Supabase Sincronizado</span>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsWorkHoursModalOpen(false)}
+                                    className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold text-slate-300 transition-colors"
+                                >
+                                    Fechar
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={isSavingShift}
+                                    onClick={handleSaveShiftConfig}
+                                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#00E5FF] to-[#00B4D8] hover:brightness-110 disabled:opacity-50 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg shadow-[#00E5FF]/20 active:scale-95 transition-all flex items-center gap-1.5"
+                                >
+                                    {isSavingShift ? (
+                                        <span>Salvando...</span>
+                                    ) : (
+                                        <>
+                                            <CheckCircleIcon className="w-4 h-4 text-slate-950 stroke-[2.5]" />
+                                            <span>Salvar Jornada</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

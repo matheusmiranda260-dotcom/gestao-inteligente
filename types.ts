@@ -714,3 +714,21 @@ export const DOWNTIME_THRESHOLDS: Record<string, number> = {
     'Outros': 15,
     'Preparação': 15
 };
+
+export interface PcpShiftConfig {
+    id: string;
+    workStart: string;
+    lunchStart: string;
+    lunchEnd: string;
+    workEnd: string;
+    workDays?: number[]; // [1, 2, 3, 4, 5] -> Seg a Sex
+    updatedAt?: string;
+}
+
+export interface PcpHoliday {
+    id: string;
+    date: string; // 'YYYY-MM-DD'
+    description: string;
+    createdAt?: string;
+}
+

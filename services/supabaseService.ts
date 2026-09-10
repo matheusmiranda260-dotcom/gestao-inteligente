@@ -12,6 +12,8 @@ import {
     ShiftReport,
     ProductionRecord,
     User,
+    PcpShiftConfig,
+    PcpHoliday,
 } from '../types';
 
 /** Generic fetch function returning raw data */
@@ -371,3 +373,117 @@ export const uploadFile = async (bucket: string, path: string, file: File): Prom
     const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(path);
     return publicUrl;
 };
+
+/** Obter Configuração de Jornada do PCP */
+export const fetchPcpShiftConfig = async (): Promise<PcpShiftConfig | null> => {
+    try {
+        const { data, error } = await supabase
+            .from('pcp_shift_config')
+            .select('*')
+            .eq('id', 'default')
+            .maybeSingle();
+
+        if (error) {
+            console.warn('Erro ao buscar pcp_shift_config:', error);
+            return null;
+        }
+        if (!data) return null;
+        return mapToCamelCase(data) as PcpShiftConfig;
+    } catch (err) {
+        console.warn('Exceção ao buscar pcp_shift_config:', err);
+        return null;
+    }
+};
+
+/** Salvar Configuração de Jornada do PCP */
+export const savePcpShiftConfig = async (config: Partial<PcpShiftConfig>): Promise<PcpShiftConfig | null> => {
+    try {
+        const snake = mapToSnakeCase({
+            id: 'default',
+            workStart: config.workStart || '07:00',
+            lunchStart: config.lunchStart || '12:00',
+            lunchEnd: config.lunchEnd || '13:00',
+            workEnd: config.workEnd || '17:00',
+            workDays: config.workDays || [1, 2, 3, 4, 5],
+            updatedAt: new Date().toISOString()
+        });
+
+        const { data, error } = await supabase
+            .from('pcp_shift_config')
+            .upsert(snake, { onConflict: 'id' })
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Erro ao salvar pcp_shift_config:', error);
+            throw error;
+        }
+        return mapToCamelCase(data) as PcpShiftConfig;
+    } catch (err) {
+        console.error('Exceção ao salvar pcp_shift_config:', err);
+        throw err;
+    }
+};
+
+/** Obter Feriados Cadastrados */
+export const fetchPcpHolidays = async (): Promise<PcpHoliday[]> => {
+    try {
+        const { data, error } = await supabase
+            .from('pcp_holidays')
+            .select('*')
+            .order('date', { ascending: true });
+
+        if (error) {
+            console.warn('Erro ao buscar pcp_holidays:', error);
+            return [];
+        }
+        return (data || []).map(item => mapToCamelCase(item)) as PcpHoliday[];
+    } catch (err) {
+        console.warn('Exceção ao buscar pcp_holidays:', err);
+        return [];
+    }
+};
+
+/** Adicionar Feriado */
+export const addPcpHoliday = async (holiday: { date: string; description: string }): Promise<PcpHoliday | null> => {
+    try {
+        const snake = {
+            date: holiday.date,
+            description: holiday.description.trim()
+        };
+        const { data, error } = await supabase
+            .from('pcp_holidays')
+            .insert(snake)
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Erro ao adicionar pcp_holiday:', error);
+            throw error;
+        }
+        return mapToCamelCase(data) as PcpHoliday;
+    } catch (err) {
+        console.error('Exceção ao adicionar pcp_holiday:', err);
+        throw err;
+    }
+};
+
+/** Excluir Feriado */
+export const deletePcpHoliday = async (id: string): Promise<boolean> => {
+    try {
+        const { error } = await supabase
+            .from('pcp_holidays')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            console.error('Erro ao excluir pcp_holiday:', error);
+            throw error;
+        }
+        return true;
+    } catch (err) {
+        console.error('Exceção ao excluir pcp_holiday:', err);
+        throw err;
+    }
+};
+
