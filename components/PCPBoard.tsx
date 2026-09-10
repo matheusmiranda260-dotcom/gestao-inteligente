@@ -2444,7 +2444,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                 };
 
                                 const maxTracks = Math.max(1, ...machOps.map(op => getOpTrack(op) + 1));
-                                const rowMinHeight = Math.max(185, 20 + maxTracks * 180);
+                                const rowMinHeight = Math.max(220, 20 + maxTracks * 240);
 
                                 return (
                                     <div 
@@ -2729,7 +2729,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             const track = getOpTrack(op);
                                             const leftStyle = `calc(200px + (100% - 200px) * ${colStart / 5} + 4px)`;
                                             const widthStyle = `calc((100% - 200px) * ${spanColumns / 5} - 8px)`;
-                                            const topStyle = `${10 + track * 175}px`;
+                                            const topStyle = `${10 + track * 235}px`;
 
                                             const isTrelica = typeof op.machine === 'string' && op.machine.startsWith('Treliça') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Treliça'));
                                             const isMalha = typeof op.machine === 'string' && op.machine.startsWith('Malha') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Malha'));
@@ -2768,7 +2768,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                         const totalElapsedMs = Math.max(0, liveNow.getTime() - lotStartTime);
                                                         const elapsedUptimeMs = Math.max(0, totalElapsedMs - lotDowntimeMs);
                                                         const elapsedUptimeSeconds = elapsedUptimeMs / 1000;
-                                                        const remainingSeconds = Math.max(0, totalDurationSeconds - elapsedUptimeSeconds);
+                                                        const remainingSecondsRaw = totalDurationSeconds - elapsedUptimeSeconds;
+                                                        const remainingSeconds = Math.max(0, remainingSecondsRaw);
+                                                        const delayedSeconds = Math.max(0, -remainingSecondsRaw);
                                                         const isDelayed = totalDurationSeconds > 0 && elapsedUptimeSeconds > totalDurationSeconds;
 
                                                         trefilaDashStats = {
@@ -2776,6 +2778,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                             lotWeight: initialWeight,
                                                             elapsedMs: totalElapsedMs,
                                                             remainingSeconds,
+                                                            delayedSeconds,
                                                             isDelayed
                                                         };
                                                     }
@@ -2929,7 +2932,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                             ? "bg-rose-500/30 text-rose-300 border border-rose-500/60 shadow-[0_0_8px_rgba(244,63,94,0.3)]" 
                                                                             : "bg-emerald-500/30 text-emerald-300 border border-emerald-500/60"
                                                                     }`}>
-                                                                        {trefilaDashStats.isDelayed ? 'Atraso: ' : 'Rest: '}{formatDuration(trefilaDashStats.remainingSeconds * 1000)}
+                                                                        {trefilaDashStats.isDelayed ? 'Atraso: ' : 'Rest: '}{formatDuration((trefilaDashStats.isDelayed ? trefilaDashStats.delayedSeconds : trefilaDashStats.remainingSeconds) * 1000)}
                                                                     </span>
                                                                 </div>
                                                             </div>
