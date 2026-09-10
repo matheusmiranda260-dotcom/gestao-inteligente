@@ -53,8 +53,9 @@ const getGaugeOptionsForMaterial = (material: string, gauges: StockGauge[]): Gau
         });
     });
 
-    baseGauges.forEach(bg => {
-        if (!options.some(o => o.gauge === bg)) {
+    // Only fallback to baseGauges IF no gauges are registered at all for this material in DB
+    if (customGauges.length === 0) {
+        baseGauges.forEach(bg => {
             const defDesc = `${material} ${bg.replace('.', ',')} mm`;
             options.push({
                 gauge: bg,
@@ -63,8 +64,8 @@ const getGaugeOptionsForMaterial = (material: string, gauges: StockGauge[]): Gau
                 key: `${bg}::::${defDesc}`,
                 label: `${bg.replace('.', ',')} mm - ${defDesc}`
             });
-        }
-    });
+        });
+    }
 
     return options.sort((a, b) => {
         const diff = parseFloat(a.gauge.replace(',', '.')) - parseFloat(b.gauge.replace(',', '.'));
@@ -448,12 +449,13 @@ const StockControl: React.FC<{
             }
         });
 
-        // 2. Default base gauges if missing
+        // 2. Default base gauges ONLY if a material has ZERO registered gauges in DB
         const materialsToInclude = materialFilter ? [materialFilter] : ['Fio Máquina', 'CA-60'];
         materialsToInclude.forEach(mat => {
-            const baseGauges = mat === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions;
-            baseGauges.forEach(bg => {
-                if (!options.some(o => o.materialType === mat && o.gauge === bg)) {
+            const registeredCount = gauges.filter(g => g.materialType === mat).length;
+            if (registeredCount === 0) {
+                const baseGauges = mat === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions;
+                baseGauges.forEach(bg => {
                     const desc = `${mat} ${bg.replace('.', ',')} mm`;
                     const key = `${mat}::${bg}::::${desc}`;
                     const matPrefix = !materialFilter ? `[${mat}] ` : '';
@@ -465,8 +467,8 @@ const StockControl: React.FC<{
                         description: desc,
                         label: `${matPrefix}${bg.replace('.', ',')} mm - ${desc}`
                     });
-                }
-            });
+                });
+            }
         });
 
         // 3. Fallback for any stock items not covered
@@ -968,10 +970,18 @@ const EditStockItemModal: React.FC<{ item: StockItem; onClose: () => void; onSav
     const [formData, setFormData] = useState<StockItem>({ ...item });
 
     const materialGauges = useMemo(() => {
-        const baseOptions = formData.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions;
         const customOptions = gauges.filter(g => g.materialType === formData.materialType).map(g => g.gauge);
-        
-        return [...new Set([...baseOptions, ...customOptions])]
+        if (customOptions.length > 0) {
+            return [...new Set(customOptions)]
+                .filter(Boolean)
+                .sort((a, b) => {
+                    const numA = parseFloat(a.replace(',', '.'));
+                    const numB = parseFloat(b.replace(',', '.'));
+                    return numA - numB;
+                });
+        }
+        const baseOptions = formData.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions;
+        return [...new Set(baseOptions)]
             .filter(Boolean)
             .sort((a, b) => {
                 const numA = parseFloat(a.replace(',', '.'));

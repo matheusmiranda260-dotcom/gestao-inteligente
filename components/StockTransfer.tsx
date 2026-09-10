@@ -38,8 +38,8 @@ const StockTransfer: React.FC<StockTransferProps> = ({ stock, transfers, setPage
         const fmGaugesFromDB = gauges.filter(g => g.materialType === 'Fio Máquina').map(g => String(g.gauge));
         const caGaugesFromDB = gauges.filter(g => g.materialType === 'CA-60').map(g => String(g.gauge));
 
-        const finalFM = [...new Set([...FioMaquinaBitolaOptions, ...fmGaugesFromDB])];
-        const finalCA = [...new Set([...CA60BitolaOptions, ...caGaugesFromDB])];
+        const finalFM = fmGaugesFromDB.length > 0 ? fmGaugesFromDB : FioMaquinaBitolaOptions;
+        const finalCA = caGaugesFromDB.length > 0 ? caGaugesFromDB : CA60BitolaOptions;
 
         return [...new Set([...finalFM, ...finalCA])].sort((a, b) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')));
     }, [gauges]);
@@ -363,7 +363,8 @@ const StockTransfer: React.FC<StockTransferProps> = ({ stock, transfers, setPage
                                                     {(() => {
                                                         const materialGaugesFromDB = gauges.filter(g => g.materialType === req.materialType).map(g => g.gauge);
                                                         const defaultOptions = req.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions;
-                                                        const combinedOptions = [...new Set([...defaultOptions, ...materialGaugesFromDB])].sort((a, b) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')));
+                                                        const optionsToUse = materialGaugesFromDB.length > 0 ? materialGaugesFromDB : defaultOptions;
+                                                        const combinedOptions = [...new Set(optionsToUse)].sort((a, b) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')));
                                                         return combinedOptions.map(b => <option key={b} value={b}>{b}</option>);
                                                     })()}
                                                 </select>
