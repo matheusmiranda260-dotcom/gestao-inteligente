@@ -128,6 +128,8 @@ export interface StockItem {
     lastAuditDate?: string;
     auditObservation?: string;
     steelType?: string;
+    productCode?: string;
+    description?: string;
 }
 
 export interface ConferenceLotData {
@@ -138,6 +140,8 @@ export interface ConferenceLotData {
     bitola: Bitola;
     labelWeight: number;
     supplier?: string;
+    productCode?: string;
+    description?: string;
 }
 
 export interface ConferenceData {

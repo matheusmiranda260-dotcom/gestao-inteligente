@@ -249,9 +249,23 @@ export const insertItem = async <T extends { id?: string }>(
         (item as any).id = generatedId;
     }
     const snakeItem = mapToSnakeCase(item);
-    const { payload } = sanitizeForTable(table, snakeItem);
+    let { payload } = sanitizeForTable(table, snakeItem);
     console.log(`Inserting into ${table}:`, payload);
-    const { data, error } = await supabase.from(table).insert(payload).select().single();
+    let { data, error } = await supabase.from(table).insert(payload).select().single();
+    
+    // Resilience fallback: if a column does not exist yet in the DB schema, strip it and retry
+    if (error && (error.code === 'PGRST204' || error.code === '42703')) {
+        console.warn(`Column missing in ${table}, retrying without potential new columns...`, error.message);
+        const fallbackPayload = { ...payload };
+        delete fallbackPayload.description;
+        delete fallbackPayload.product_code;
+        const retry = await supabase.from(table).insert(fallbackPayload).select().single();
+        if (!retry.error) {
+            data = retry.data;
+            error = null;
+        }
+    }
+
     if (error) {
         console.error(`Error inserting into ${table}:`, error);
         console.error('Error details:', {
@@ -270,8 +284,22 @@ export const insertItem = async <T extends { id?: string }>(
 /** Update item with mapping */
 export const updateItem = async <T>(table: string, id: string, updates: Partial<T>): Promise<T> => {
     const snakeUpdates = mapToSnakeCase(updates);
-    const { payload } = sanitizeForTable(table, snakeUpdates);
-    const { data, error } = await supabase.from(table).update(payload).eq('id', id).select().single();
+    let { payload } = sanitizeForTable(table, snakeUpdates);
+    let { data, error } = await supabase.from(table).update(payload).eq('id', id).select().single();
+
+    // Resilience fallback: if a column does not exist yet in the DB schema, strip it and retry
+    if (error && (error.code === 'PGRST204' || error.code === '42703')) {
+        console.warn(`Column missing in ${table}, retrying update without potential new columns...`, error.message);
+        const fallbackPayload = { ...payload };
+        delete fallbackPayload.description;
+        delete fallbackPayload.product_code;
+        const retry = await supabase.from(table).update(fallbackPayload).eq('id', id).select().single();
+        if (!retry.error) {
+            data = retry.data;
+            error = null;
+        }
+    }
+
     if (error) {
         console.error(`Error updating ${table}:`, error);
         throw error;

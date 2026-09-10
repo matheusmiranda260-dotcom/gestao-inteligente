@@ -27,6 +27,52 @@ const getStatusBadge = (status: string) => {
     }
 };
 
+interface GaugeOption {
+    gauge: string;
+    code?: string;
+    description?: string;
+    key: string;
+    label: string;
+}
+
+const getGaugeOptionsForMaterial = (material: string, gauges: StockGauge[]): GaugeOption[] => {
+    const customGauges = gauges.filter(g => g.materialType === material);
+    const baseGauges = material === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions;
+    
+    const options: GaugeOption[] = [];
+
+    customGauges.forEach(g => {
+        const desc = g.description ? ` - ${g.description}` : '';
+        const code = g.productCode ? ` (${g.productCode})` : '';
+        options.push({
+            gauge: g.gauge,
+            code: g.productCode,
+            description: g.description,
+            key: `${g.gauge}::${g.productCode || ''}::${g.description || ''}`,
+            label: `${g.gauge.replace('.', ',')} mm${desc}${code}`
+        });
+    });
+
+    baseGauges.forEach(bg => {
+        if (!options.some(o => o.gauge === bg)) {
+            const defDesc = `${material} ${bg.replace('.', ',')} mm`;
+            options.push({
+                gauge: bg,
+                code: '',
+                description: defDesc,
+                key: `${bg}::::${defDesc}`,
+                label: `${bg.replace('.', ',')} mm - ${defDesc}`
+            });
+        }
+    });
+
+    return options.sort((a, b) => {
+        const diff = parseFloat(a.gauge.replace(',', '.')) - parseFloat(b.gauge.replace(',', '.'));
+        if (diff !== 0) return diff;
+        return (a.description || '').localeCompare(b.description || '');
+    });
+};
+
 const AddConferencePage: React.FC<{
     onClose: () => void;
     onSubmit: (data: ConferenceData) => Promise<void> | void;
@@ -45,9 +91,20 @@ const AddConferencePage: React.FC<{
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
-    const [lots, setLots] = useState<Partial<ConferenceLotData>[]>([{
-        internalLot: '', runNumber: '', steelType: '1006', bitola: '8.00', materialType: 'Fio Máquina', labelWeight: 0
-    }]);
+    const [lots, setLots] = useState<Partial<ConferenceLotData>[]>(() => {
+        const defaultOpts = getGaugeOptionsForMaterial('Fio Máquina', gauges);
+        const first = defaultOpts[0];
+        return [{
+            internalLot: '', 
+            runNumber: '', 
+            steelType: '1006', 
+            bitola: first ? first.gauge : '8.00', 
+            materialType: 'Fio Máquina', 
+            productCode: first?.code || '',
+            description: first?.description || '',
+            labelWeight: 0
+        }];
+    });
     const [duplicateErrors, setDuplicateErrors] = useState<Record<number, string>>({});
     const [historyOpen, setHistoryOpen] = useState(false);
     const [conferenceNumberError, setConferenceNumberError] = useState<string>('');
@@ -90,16 +147,31 @@ const AddConferencePage: React.FC<{
         (newLots[index] as any)[field] = value;
 
         if (field === 'materialType') {
-            const base = value === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions;
-            const custom = gauges.filter(g => g.materialType === value).map(g => g.gauge);
-            const all = [...new Set([...base, ...custom])];
-            
-            if (!all.includes(newLots[index].bitola || '')) {
-                newLots[index].bitola = all[0] || '';
+            const opts = getGaugeOptionsForMaterial(value, gauges);
+            if (opts.length > 0) {
+                newLots[index].bitola = opts[0].gauge;
+                newLots[index].productCode = opts[0].code || '';
+                newLots[index].description = opts[0].description || '';
             }
         }
 
         setLots(newLots);
+    };
+
+    const handleGaugeSelect = (index: number, key: string) => {
+        const currentLot = lots[index];
+        const opts = getGaugeOptionsForMaterial(currentLot?.materialType || 'Fio Máquina', gauges);
+        const selected = opts.find(o => o.key === key);
+        if (selected) {
+            const newLots = [...lots];
+            newLots[index] = {
+                ...newLots[index],
+                bitola: selected.gauge,
+                productCode: selected.code || '',
+                description: selected.description || ''
+            };
+            setLots(newLots);
+        }
     };
 
     const handleGlobalScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -242,50 +314,28 @@ const AddConferencePage: React.FC<{
                                         <td className="p-2"><input type="text" value={lot.runNumber || ''} onChange={e => handleLotChange(index, 'runNumber', e.target.value)} className="w-full p-2 border rounded text-center" required /></td>
                                         <td className="p-2"><select value={lot.materialType} onChange={e => handleLotChange(index, 'materialType', e.target.value)} className="w-full p-2 border rounded text-center">{MaterialOptions.map(m => <option key={m} value={m}>{m}</option>)}</select></td>
                                         <td className="p-2">
-                                            <select value={lot.bitola} onChange={e => handleLotChange(index, 'bitola', e.target.value)} className="w-full p-2 border rounded text-center">
-                                                {(() => {
-                                                    const baseGauges = lot.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions;
-                                                    const customGauges = gauges.filter(g => g.materialType === lot.materialType);
-                                                    
-                                                    const allOptions: Array<{ gauge: string; code?: string; description?: string; key: string }> = [];
-                                                    
-                                                    customGauges.forEach(g => {
-                                                        allOptions.push({
-                                                            gauge: g.gauge,
-                                                            code: g.productCode,
-                                                            description: g.description,
-                                                            key: `${g.gauge}-${g.description || ''}-${g.productCode || ''}`
-                                                        });
-                                                    });
+                                            {(() => {
+                                                const opts = getGaugeOptionsForMaterial(lot.materialType || 'Fio Máquina', gauges);
+                                                const currentKey = opts.find(o => 
+                                                    o.gauge === lot.bitola && 
+                                                    ((lot.productCode && o.code === lot.productCode) || 
+                                                     (lot.description && o.description === lot.description))
+                                                )?.key || opts.find(o => o.gauge === lot.bitola)?.key || (opts[0]?.key || '');
 
-                                                    baseGauges.forEach(bg => {
-                                                        if (!allOptions.some(o => o.gauge === bg)) {
-                                                            allOptions.push({
-                                                                gauge: bg,
-                                                                code: '',
-                                                                description: `${lot.materialType} ${bg.replace('.', ',')} mm`,
-                                                                key: `${bg}-default`
-                                                            });
-                                                        }
-                                                    });
-
-                                                    return allOptions
-                                                        .sort((a, b) => {
-                                                            const diff = parseFloat(a.gauge.replace(',', '.')) - parseFloat(b.gauge.replace(',', '.'));
-                                                            if (diff !== 0) return diff;
-                                                            return (a.description || '').localeCompare(b.description || '');
-                                                        })
-                                                        .map(opt => {
-                                                            const descText = opt.description ? ` - ${opt.description}` : '';
-                                                            const codeText = opt.code ? ` (${opt.code})` : '';
-                                                            return (
-                                                                <option key={opt.key} value={opt.gauge}>
-                                                                    {opt.gauge.replace('.', ',')} mm{descText}{codeText}
-                                                                </option>
-                                                            );
-                                                        });
-                                                })()}
-                                            </select>
+                                                return (
+                                                    <select 
+                                                        value={currentKey} 
+                                                        onChange={e => handleGaugeSelect(index, e.target.value)} 
+                                                        className="w-full p-2 border rounded text-center text-xs font-bold"
+                                                    >
+                                                        {opts.map(opt => (
+                                                            <option key={opt.key} value={opt.key}>
+                                                                {opt.label}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                );
+                                            })()}
                                         </td>
                                         <td className="p-2">
                                             <input
@@ -360,43 +410,158 @@ const StockControl: React.FC<{
         }
     }, [isPrinting]);
 
-    const availableBitolas = useMemo(() => {
-        let options: string[] = [];
-        if (materialFilter === 'Fio Máquina') {
-            options = [...FioMaquinaBitolaOptions, ...gauges.filter(g => g.materialType === 'Fio Máquina').map(g => g.gauge)];
-        } else if (materialFilter === 'CA-60') {
-            options = [...CA60BitolaOptions, ...gauges.filter(g => g.materialType === 'CA-60').map(g => g.gauge)];
-        } else {
-            options = [...FioMaquinaBitolaOptions, ...CA60BitolaOptions, ...gauges.map(g => g.gauge)];
-        }
-        
-        const stockBitolas = stock
-            .filter(i => i.status !== 'Consumido' && (materialFilter === '' || i.materialType === materialFilter) && (steelTypeFilter === '' || i.steelType === steelTypeFilter))
-            .map(i => i.bitola);
+    const handleMaterialFilterChange = (newMat: string) => {
+        setMaterialFilter(newMat);
+        setBitolaFilter(''); // Reset to avoid cross-material mixup
+    };
+
+    const availableBitolaOptions = useMemo(() => {
+        const options: Array<{
+            key: string;
+            gauge: string;
+            materialType: string;
+            productCode?: string;
+            description?: string;
+            label: string;
+        }> = [];
+
+        // 1. Custom registered gauges from Cadastro
+        const relevantGauges = materialFilter 
+            ? gauges.filter(g => g.materialType === materialFilter)
+            : gauges;
+
+        relevantGauges.forEach(g => {
+            const descText = g.description ? ` - ${g.description}` : '';
+            const codeText = g.productCode ? ` (${g.productCode})` : '';
+            const matPrefix = !materialFilter ? `[${g.materialType}] ` : '';
+            const key = `${g.materialType}::${g.gauge}::${g.productCode || ''}::${g.description || ''}`;
             
-        return [...new Set([...options, ...stockBitolas])]
-            .filter(Boolean)
-            .sort((a, b) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')));
+            if (!options.some(o => o.key === key)) {
+                options.push({
+                    key,
+                    gauge: g.gauge,
+                    materialType: g.materialType,
+                    productCode: g.productCode,
+                    description: g.description,
+                    label: `${matPrefix}${g.gauge.replace('.', ',')} mm${descText}${codeText}`
+                });
+            }
+        });
+
+        // 2. Default base gauges if missing
+        const materialsToInclude = materialFilter ? [materialFilter] : ['Fio Máquina', 'CA-60'];
+        materialsToInclude.forEach(mat => {
+            const baseGauges = mat === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions;
+            baseGauges.forEach(bg => {
+                if (!options.some(o => o.materialType === mat && o.gauge === bg)) {
+                    const desc = `${mat} ${bg.replace('.', ',')} mm`;
+                    const key = `${mat}::${bg}::::${desc}`;
+                    const matPrefix = !materialFilter ? `[${mat}] ` : '';
+                    options.push({
+                        key,
+                        gauge: bg,
+                        materialType: mat,
+                        productCode: '',
+                        description: desc,
+                        label: `${matPrefix}${bg.replace('.', ',')} mm - ${desc}`
+                    });
+                }
+            });
+        });
+
+        // 3. Fallback for any stock items not covered
+        stock.forEach(i => {
+            if (i.status === 'Consumido') return;
+            if (materialFilter && i.materialType !== materialFilter) return;
+            if (steelTypeFilter && i.steelType !== steelTypeFilter) return;
+
+            const exists = options.some(o => 
+                o.materialType === i.materialType && 
+                o.gauge === i.bitola &&
+                (!i.productCode || o.productCode === i.productCode) &&
+                (!i.description || o.description === i.description)
+            );
+
+            if (!exists) {
+                const desc = i.description || `${i.materialType} ${i.bitola.replace('.', ',')} mm`;
+                const code = i.productCode || '';
+                const key = `${i.materialType}::${i.bitola}::${code}::${desc}`;
+                const matPrefix = !materialFilter ? `[${i.materialType}] ` : '';
+                const codeText = code ? ` (${code})` : '';
+                options.push({
+                    key,
+                    gauge: i.bitola,
+                    materialType: i.materialType,
+                    productCode: code,
+                    description: desc,
+                    label: `${matPrefix}${i.bitola.replace('.', ',')} mm - ${desc}${codeText}`
+                });
+            }
+        });
+
+        return options.sort((a, b) => {
+            if (!materialFilter && a.materialType !== b.materialType) {
+                return a.materialType.localeCompare(b.materialType);
+            }
+            const diff = parseFloat(a.gauge.replace(',', '.')) - parseFloat(b.gauge.replace(',', '.'));
+            if (diff !== 0) return diff;
+            return (a.description || '').localeCompare(b.description || '');
+        });
     }, [gauges, stock, materialFilter, steelTypeFilter]);
 
     const filtered = useMemo(() => stock.filter(i => {
-        const gauge = gauges.find(g => g.materialType === i.materialType && g.gauge === i.bitola);
-        const productCode = gauge?.productCode || '';
-        const description = gauge?.description || '';
+        const matchingGauge = gauges.find(g =>
+            g.materialType === i.materialType &&
+            g.gauge === i.bitola &&
+            ((i.productCode && g.productCode === i.productCode) ||
+             (i.description && g.description === i.description))
+        ) || gauges.find(g => g.materialType === i.materialType && g.gauge === i.bitola);
+
+        const itemDescription = i.description || matchingGauge?.description || '';
+        const itemProductCode = i.productCode || matchingGauge?.productCode || '';
 
         const searchLower = searchTerm.trim().toLowerCase();
         const passesSearch = searchLower.length > 0 ? (
             (i.internalLot || '').toLowerCase().includes(searchLower) ||
             (i.nfe || '').toLowerCase().includes(searchLower) ||
             (i.steelType || '').toLowerCase().includes(searchLower) ||
-            (productCode || '').toLowerCase().includes(searchLower) ||
-            (description || '').toLowerCase().includes(searchLower)
+            (itemProductCode || '').toLowerCase().includes(searchLower) ||
+            (itemDescription || '').toLowerCase().includes(searchLower) ||
+            (i.bitola || '').toLowerCase().includes(searchLower)
         ) : true;
 
         const passesMaterial = materialFilter === '' || i.materialType === materialFilter;
-        const passesBitola = bitolaFilter === '' || i.bitola === bitolaFilter;
         const passesSteelType = steelTypeFilter === '' || i.steelType === steelTypeFilter;
-        
+
+        let passesBitola = true;
+        if (bitolaFilter !== '') {
+            const selectedOpt = availableBitolaOptions.find(o => o.key === bitolaFilter);
+            if (selectedOpt) {
+                const matchMat = i.materialType === selectedOpt.materialType;
+                const matchGauge = i.bitola === selectedOpt.gauge;
+                
+                if (matchMat && matchGauge) {
+                    if (selectedOpt.productCode) {
+                        if (i.productCode) {
+                            passesBitola = i.productCode === selectedOpt.productCode;
+                        } else if (matchingGauge?.productCode) {
+                            passesBitola = matchingGauge.productCode === selectedOpt.productCode;
+                        } else {
+                            passesBitola = !selectedOpt.description || itemDescription === selectedOpt.description;
+                        }
+                    } else if (selectedOpt.description) {
+                        passesBitola = itemDescription === selectedOpt.description;
+                    } else {
+                        passesBitola = true;
+                    }
+                } else {
+                    passesBitola = false;
+                }
+            } else {
+                passesBitola = i.bitola === bitolaFilter;
+            }
+        }
+
         if (statusFilter.length > 0) {
             return passesSearch && passesMaterial && passesBitola && passesSteelType && statusFilter.includes(i.status);
         } else {
@@ -487,16 +652,10 @@ const StockControl: React.FC<{
                         </div>
                         <div>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Filtro Bitola</p>
-                            <p className="text-base font-black text-slate-800">{bitolaFilter || 'Todas'}</p>
+                            <p className="text-base font-black text-slate-800">
+                                {bitolaFilter ? (availableBitolaOptions.find(o => o.key === bitolaFilter)?.label || bitolaFilter) : 'Todas'}
+                            </p>
                         </div>
-                        {bitolaFilter && gauges.find(g => g.gauge === bitolaFilter && (materialFilter === '' || g.materialType === materialFilter))?.productCode && (
-                            <div>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Cód. Produto</p>
-                                <p className="text-base font-black text-slate-800">
-                                    {gauges.find(g => g.gauge === bitolaFilter && (materialFilter === '' || g.materialType === materialFilter))?.productCode}
-                                </p>
-                            </div>
-                        )}
                         <div>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status</p>
                             <p className="text-base font-black text-slate-800 max-w-[150px] truncate">{statusFilter.length === 0 ? 'Todos' : statusFilter.join(', ')}</p>
@@ -541,18 +700,33 @@ const StockControl: React.FC<{
                         </div>
                         <div className="bg-white p-2 rounded-xl shadow border flex items-center gap-2 px-4 shrink-0">
                             <label className="text-[10px] font-bold text-slate-500 uppercase">Material</label>
-                            <select value={materialFilter} onChange={e => setMaterialFilter(e.target.value)} className="bg-transparent outline-none font-bold text-sm min-w-[120px]">
+                            <select value={materialFilter} onChange={e => handleMaterialFilterChange(e.target.value)} className="bg-transparent outline-none font-bold text-sm min-w-[120px]">
                                 <option value="">Todos</option>
                                 {MaterialOptions.map(m => <option key={m} value={m}>{m}</option>)}
                             </select>
                         </div>
                         <div className="bg-white p-2 rounded-xl shadow border flex items-center gap-2 px-4 shrink-0">
                             <label className="text-[10px] font-bold text-slate-500 uppercase">Bitola</label>
-                            <select value={bitolaFilter} onChange={e => setBitolaFilter(e.target.value)} className="bg-transparent outline-none font-bold text-sm min-w-[80px]">
+                            <select value={bitolaFilter} onChange={e => setBitolaFilter(e.target.value)} className="bg-transparent outline-none font-bold text-sm min-w-[120px] max-w-[280px]">
                                 <option value="">Todas</option>
-                                {availableBitolas.map(b => (
-                                    <option key={b} value={b}>{b}</option>
-                                ))}
+                                {!materialFilter ? (
+                                    <>
+                                        <optgroup label="Fio Máquina">
+                                            {availableBitolaOptions.filter(o => o.materialType === 'Fio Máquina').map(o => (
+                                                <option key={o.key} value={o.key}>{o.label}</option>
+                                            ))}
+                                        </optgroup>
+                                        <optgroup label="CA-60">
+                                            {availableBitolaOptions.filter(o => o.materialType === 'CA-60').map(o => (
+                                                <option key={o.key} value={o.key}>{o.label}</option>
+                                            ))}
+                                        </optgroup>
+                                    </>
+                                ) : (
+                                    availableBitolaOptions.map(o => (
+                                        <option key={o.key} value={o.key}>{o.label}</option>
+                                    ))
+                                )}
                             </select>
                         </div>
                         <div className="bg-white p-2 rounded-xl shadow border flex items-center gap-2 px-4 shrink-0 relative" ref={statusDesktopRef}>
@@ -626,18 +800,33 @@ const StockControl: React.FC<{
                 </div>
                 <div className="bg-white p-2 rounded-lg shadow border flex items-center gap-2 px-4 shadow-sm">
                     <label className="text-[10px] font-bold text-slate-500">MP:</label>
-                    <select value={materialFilter} onChange={e => setMaterialFilter(e.target.value)} className="bg-transparent outline-none font-bold text-xs">
+                    <select value={materialFilter} onChange={e => handleMaterialFilterChange(e.target.value)} className="bg-transparent outline-none font-bold text-xs">
                         <option value="">Todos</option>
                         {MaterialOptions.map(m => <option key={m} value={m}>{m}</option>)}
                     </select>
                 </div>
                 <div className="bg-white p-2 rounded-lg shadow border flex items-center gap-2 px-4 shadow-sm">
                     <label className="text-[10px] font-bold text-slate-500">Ø:</label>
-                    <select value={bitolaFilter} onChange={e => setBitolaFilter(e.target.value)} className="bg-transparent outline-none font-bold text-xs">
+                    <select value={bitolaFilter} onChange={e => setBitolaFilter(e.target.value)} className="bg-transparent outline-none font-bold text-xs max-w-[150px]">
                         <option value="">Todas</option>
-                        {availableBitolas.map(b => (
-                            <option key={b} value={b}>{b}</option>
-                        ))}
+                        {!materialFilter ? (
+                            <>
+                                <optgroup label="Fio Máquina">
+                                    {availableBitolaOptions.filter(o => o.materialType === 'Fio Máquina').map(o => (
+                                        <option key={o.key} value={o.key}>{o.label}</option>
+                                    ))}
+                                </optgroup>
+                                <optgroup label="CA-60">
+                                    {availableBitolaOptions.filter(o => o.materialType === 'CA-60').map(o => (
+                                        <option key={o.key} value={o.key}>{o.label}</option>
+                                    ))}
+                                </optgroup>
+                            </>
+                        ) : (
+                            availableBitolaOptions.map(o => (
+                                <option key={o.key} value={o.key}>{o.label}</option>
+                            ))
+                        )}
                     </select>
                 </div>
                 <div className="bg-white p-2 rounded-lg shadow border flex items-center gap-2 px-4 shadow-sm relative" ref={statusMobileRef}>
@@ -708,17 +897,26 @@ const StockControl: React.FC<{
                                     <td className="p-3 text-center text-slate-500">{item.materialType}</td>
                                     <td className="p-3 text-center">
                                         <div className="flex flex-col items-center">
-                                            <span className="font-black text-blue-600">{item.bitola.replace('.', ',')}</span>
+                                            <span className="font-black text-blue-600">{item.bitola.replace('.', ',')} mm</span>
                                             {(() => {
-                                                const gauge = gauges.find(g => g.materialType === item.materialType && g.gauge === item.bitola);
+                                                const matchingGauge = gauges.find(g =>
+                                                    g.materialType === item.materialType &&
+                                                    g.gauge === item.bitola &&
+                                                    ((item.productCode && g.productCode === item.productCode) ||
+                                                     (item.description && g.description === item.description))
+                                                ) || gauges.find(g => g.materialType === item.materialType && g.gauge === item.bitola);
+
+                                                const displayDesc = item.description || matchingGauge?.description;
+                                                const displayCode = item.productCode || matchingGauge?.productCode;
+
                                                 return (
                                                     <>
-                                                        {gauge?.description && (
-                                                            <span className="text-[10px] text-slate-700 font-semibold max-w-[150px] truncate" title={gauge.description}>
-                                                                {gauge.description}
+                                                        {displayDesc && (
+                                                            <span className="text-[10px] text-slate-700 font-semibold max-w-[170px] truncate" title={displayDesc}>
+                                                                {displayDesc}
                                                             </span>
                                                         )}
-                                                        {gauge?.productCode ? <span className="text-[9px] text-slate-500 font-black uppercase print:text-black">{gauge.productCode}</span> : null}
+                                                        {displayCode ? <span className="text-[9px] text-slate-500 font-black uppercase print:text-black">{displayCode}</span> : null}
                                                     </>
                                                 );
                                             })()}
@@ -825,14 +1023,14 @@ const EditStockItemModal: React.FC<{ item: StockItem; onClose: () => void; onSav
                                 value={formData.materialType}
                                 onChange={e => {
                                     const val = e.target.value;
-                                    const base = val === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions;
-                                    const custom = gauges.filter(g => g.materialType === val).map(g => g.gauge);
-                                    const all = [...new Set([...base, ...custom])];
-                                    
+                                    const newOpts = getGaugeOptionsForMaterial(val, gauges);
+                                    const first = newOpts[0];
                                     setFormData(p => ({
                                         ...p,
                                         materialType: val,
-                                        bitola: all.includes(p.bitola) ? p.bitola : (all[0] || '')
+                                        bitola: first ? first.gauge : p.bitola,
+                                        productCode: first?.code || '',
+                                        description: first?.description || ''
                                     }));
                                 }}
                                 className="w-full px-3 py-2 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
@@ -841,51 +1039,39 @@ const EditStockItemModal: React.FC<{ item: StockItem; onClose: () => void; onSav
                             </select>
                         </div>
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-slate-500 uppercase">Bitola</label>
-                            <select value={formData.bitola} onChange={e => setFormData({ ...formData, bitola: e.target.value })} className="w-full px-3 py-2 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                                {(() => {
-                                    const baseGauges = formData.materialType === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions;
-                                    const customGauges = gauges.filter(g => g.materialType === formData.materialType);
-                                    
-                                    const allOptions: Array<{ gauge: string; code?: string; description?: string; key: string }> = [];
-                                    
-                                    customGauges.forEach(g => {
-                                        allOptions.push({
-                                            gauge: g.gauge,
-                                            code: g.productCode,
-                                            description: g.description,
-                                            key: `${g.gauge}-${g.description || ''}-${g.productCode || ''}`
-                                        });
-                                    });
+                            <label className="text-xs font-bold text-slate-500 uppercase">Bitola & Descrição</label>
+                            {(() => {
+                                const opts = getGaugeOptionsForMaterial(formData.materialType, gauges);
+                                const currentKey = opts.find(o => 
+                                    o.gauge === formData.bitola && 
+                                    ((formData.productCode && o.code === formData.productCode) || 
+                                     (formData.description && o.description === formData.description))
+                                )?.key || opts.find(o => o.gauge === formData.bitola)?.key || (opts[0]?.key || '');
 
-                                    baseGauges.forEach(bg => {
-                                        if (!allOptions.some(o => o.gauge === bg)) {
-                                            allOptions.push({
-                                                gauge: bg,
-                                                code: '',
-                                                description: `${formData.materialType} ${bg.replace('.', ',')} mm`,
-                                                key: `${bg}-default`
-                                            });
-                                        }
-                                    });
-
-                                    return allOptions
-                                        .sort((a, b) => {
-                                            const diff = parseFloat(a.gauge.replace(',', '.')) - parseFloat(b.gauge.replace(',', '.'));
-                                            if (diff !== 0) return diff;
-                                            return (a.description || '').localeCompare(b.description || '');
-                                        })
-                                        .map(opt => {
-                                            const descText = opt.description ? ` - ${opt.description}` : '';
-                                            const codeText = opt.code ? ` (${opt.code})` : '';
-                                            return (
-                                                <option key={opt.key} value={opt.gauge}>
-                                                    {opt.gauge.replace('.', ',')} mm{descText}{codeText}
-                                                </option>
-                                            );
-                                        });
-                                })()}
-                            </select>
+                                return (
+                                    <select 
+                                        value={currentKey} 
+                                        onChange={e => {
+                                            const selected = opts.find(o => o.key === e.target.value);
+                                            if (selected) {
+                                                setFormData(p => ({
+                                                    ...p,
+                                                    bitola: selected.gauge,
+                                                    productCode: selected.code || '',
+                                                    description: selected.description || ''
+                                                }));
+                                            }
+                                        }} 
+                                        className="w-full px-3 py-2 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-xs font-bold"
+                                    >
+                                        {opts.map(opt => (
+                                            <option key={opt.key} value={opt.key}>
+                                                {opt.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                );
+                            })()}
                         </div>
                     </div>
 
