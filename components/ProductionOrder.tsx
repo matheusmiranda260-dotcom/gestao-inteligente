@@ -323,27 +323,43 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
                                             const baseGauges = FioMaquinaBitolaOptions;
                                             const customGauges = gauges.filter(g => g.materialType === 'Fio Máquina');
                                             
-                                            const allOptions = [
-                                                ...baseGauges.map(g => ({ gauge: g, code: '' })),
-                                                ...customGauges.map(g => ({ gauge: g.gauge, code: g.productCode }))
-                                            ];
+                                            const allOptions: Array<{ gauge: string; code?: string; description?: string; key: string }> = [];
+                                            
+                                            customGauges.forEach(g => {
+                                                allOptions.push({
+                                                    gauge: g.gauge,
+                                                    code: g.productCode,
+                                                    description: g.description,
+                                                    key: `${g.gauge}-${g.description || ''}-${g.productCode || ''}`
+                                                });
+                                            });
 
-                                            const map = new Map();
-                                            allOptions.forEach(opt => {
-                                                const existing = map.get(opt.gauge);
-                                                if (!existing || (opt.code && !existing.code)) {
-                                                    map.set(opt.gauge, opt);
+                                            baseGauges.forEach(bg => {
+                                                if (!allOptions.some(o => o.gauge === bg)) {
+                                                    allOptions.push({
+                                                        gauge: bg,
+                                                        code: '',
+                                                        description: `Fio Máquina ${bg.replace('.', ',')} mm`,
+                                                        key: `${bg}-default`
+                                                    });
                                                 }
                                             });
 
-                                            const uniqueOptions = Array.from(map.values())
-                                                .sort((a, b) => parseFloat(a.gauge.replace(',', '.')) - parseFloat(b.gauge.replace(',', '.')));
-
-                                            return uniqueOptions.map(opt => (
-                                                <option key={`${opt.gauge}-${opt.code}`} value={opt.gauge}>
-                                                    {opt.gauge.replace('.', ',')} {opt.code ? `(${opt.code})` : ''}
-                                                </option>
-                                            ));
+                                            return allOptions
+                                                .sort((a, b) => {
+                                                    const diff = parseFloat(a.gauge.replace(',', '.')) - parseFloat(b.gauge.replace(',', '.'));
+                                                    if (diff !== 0) return diff;
+                                                    return (a.description || '').localeCompare(b.description || '');
+                                                })
+                                                .map(opt => {
+                                                    const descText = opt.description ? ` - ${opt.description}` : '';
+                                                    const codeText = opt.code ? ` (${opt.code})` : '';
+                                                    return (
+                                                        <option key={opt.key} value={opt.gauge}>
+                                                            {opt.gauge.replace('.', ',')} mm{descText}{codeText}
+                                                        </option>
+                                                    );
+                                                });
                                         })()}
                                     </select>
                                 </div>
@@ -359,34 +375,49 @@ const ProductionOrder: React.FC<ProductionOrderProps> = ({ setPage, stock, produ
                                             const baseGauges = TrefilaBitolaOptions;
                                             const customGauges = gauges.filter(g => g.materialType === 'CA-60');
                                             
-                                            const allOptions = [
-                                                ...baseGauges.map(g => ({ gauge: g, code: '' })),
-                                                ...customGauges.map(g => ({ gauge: g.gauge, code: g.productCode }))
-                                            ];
+                                            const allOptions: Array<{ gauge: string; code?: string; description?: string; key: string }> = [];
+                                            
+                                            customGauges.forEach(g => {
+                                                allOptions.push({
+                                                    gauge: g.gauge,
+                                                    code: g.productCode,
+                                                    description: g.description,
+                                                    key: `${g.gauge}-${g.description || ''}-${g.productCode || ''}`
+                                                });
+                                            });
 
-                                            const map = new Map();
-                                            allOptions.forEach(opt => {
-                                                const existing = map.get(opt.gauge);
-                                                if (!existing || (opt.code && !existing.code)) {
-                                                    map.set(opt.gauge, opt);
+                                            baseGauges.forEach(bg => {
+                                                if (!allOptions.some(o => o.gauge === bg)) {
+                                                    allOptions.push({
+                                                        gauge: bg,
+                                                        code: '',
+                                                        description: `CA-60 ${bg.replace('.', ',')} mm`,
+                                                        key: `${bg}-default`
+                                                    });
                                                 }
                                             });
 
-                                            const uniqueOptions = Array.from(map.values())
-                                                .sort((a, b) => parseFloat(a.gauge.replace(',', '.')) - parseFloat(b.gauge.replace(',', '.')));
-
-                                            return uniqueOptions
+                                            return allOptions
                                                 .filter(opt => {
                                                     if (inputBitolaFilter === '') return true;
                                                     const inputBitolaNum = parseFloat(inputBitolaFilter.replace(',', '.'));
                                                     const targetBitolaNum = parseFloat(opt.gauge.replace(',', '.'));
                                                     return targetBitolaNum < inputBitolaNum;
                                                 })
-                                                .map(opt => (
-                                                    <option key={`${opt.gauge}-${opt.code}`} value={opt.gauge}>
-                                                        {opt.gauge.replace('.', ',')} {opt.code ? `(${opt.code})` : ''}
-                                                    </option>
-                                                ));
+                                                .sort((a, b) => {
+                                                    const diff = parseFloat(a.gauge.replace(',', '.')) - parseFloat(b.gauge.replace(',', '.'));
+                                                    if (diff !== 0) return diff;
+                                                    return (a.description || '').localeCompare(b.description || '');
+                                                })
+                                                .map(opt => {
+                                                    const descText = opt.description ? ` - ${opt.description}` : '';
+                                                    const codeText = opt.code ? ` (${opt.code})` : '';
+                                                    return (
+                                                        <option key={opt.key} value={opt.gauge}>
+                                                            {opt.gauge.replace('.', ',')} mm{descText}{codeText}
+                                                        </option>
+                                                    );
+                                                });
                                         })()}
                                     </select>
                                 </div>

@@ -455,6 +455,7 @@ export interface StockGauge {
     minWeight?: number;
     idealWeight?: number;
     productCode?: string;
+    description?: string;
 }
 
 export interface LabAnalysisEntry {

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atualizar Tabela de Bitolas (Descrição e Variações) - MSM</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0F3F5C 0%, #0a2a3d 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: #0F3F5C;
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            margin-bottom: 8px;
+        }
+
+        .content {
+            padding: 35px;
+        }
+
+        .step {
+            background: #f8f9fa;
+            border-left: 4px solid #00E5FF;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+        }
+
+        .step-number {
+            display: inline-block;
+            background: #0F3F5C;
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 28px;
+            font-weight: bold;
+            margin-right: 10px;
+            font-size: 14px;
+        }
+
+        .step-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #0F3F5C;
+            margin-bottom: 8px;
+        }
+
+        .btn {
+            background: #00E5FF;
+            color: #06121B;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-block;
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            background: #00b4cc;
+            transform: translateY(-2px);
+        }
+
+        .sql-box {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            max-height: 280px;
+            overflow-y: auto;
+            margin: 12px 0;
+            white-space: pre-wrap;
+        }
+
+        .badge-success {
+            background: #e6ffed;
+            color: #22863a;
+            border: 1px solid #34d058;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-top: 15px;
+            display: none;
+            font-weight: 500;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚙️ Atualização do Banco: Descrição de Produtos</h1>
+            <p>Permite descrições detalhadas (ex: rolo 2000kg vs 200kg) e não mistura Fio Máquina com CA-60</p>
+        </div>
+
+        <div class="content">
+            <div class="step">
+                <div class="step-title">
+                    <span class="step-number">1</span>
+                    Copiar Script SQL de Atualização
+                </div>
+                <p>Clique no botão abaixo para copiar o script que adiciona a coluna <code>description</code> e permite variações de produtos com a mesma bitola:</p>
+                <div class="sql-box" id="sqlScript">-- 1. Adiciona a coluna description na tabela stock_gauges caso não exista
+ALTER TABLE public.stock_gauges ADD COLUMN IF NOT EXISTS description TEXT;
+
+-- 2. Remove a restrição UNIQUE restritiva antiga que impedia ter a mesma bitola com descrições diferentes (ex: rolo 2000kg vs rolo 200kg)
+ALTER TABLE public.stock_gauges DROP CONSTRAINT IF EXISTS stock_gauges_material_type_gauge_key;
+
+-- 3. Atualiza os registros existentes sem descrição com um valor padrão amigável
+UPDATE public.stock_gauges 
+SET description = material_type || ' ' || REPLACE(gauge, '.', ',') || 'mm'
+WHERE description IS NULL OR description = '';</div>
+                <button class="btn" onclick="copySQL()">📋 Copiar Script SQL</button>
+                <div id="copySuccess" class="badge-success">
+                    ✅ Script copiado para a área de transferência!
+                </div>
+            </div>
+
+            <div class="step">
+                <div class="step-title">
+                    <span class="step-number">2</span>
+                    Executar no Supabase SQL Editor
+                </div>
+                <p>1. Acesse o painel do seu Supabase.</p>
+                <p>2. Clique em <strong>SQL Editor</strong> no menu lateral esquerdo.</p>
+                <p>3. Cole o código copiado e clique em <strong>Run (Executar)</strong>.</p>
+                <br>
+                <a href="https://supabase.com/dashboard" target="_blank" class="btn" style="background:#0F3F5C; color:white;">Abrir Supabase Dashboard ↗</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function copySQL() {
+            const sql = document.getElementById('sqlScript').textContent;
+            navigator.clipboard.writeText(sql).then(() => {
+                const badge = document.getElementById('copySuccess');
+                badge.style.display = 'block';
+                setTimeout(() => {
+                    badge.style.display = 'none';
+                }, 4000);
+            });
+        }
+    </script>
+</body>
+
+</html>

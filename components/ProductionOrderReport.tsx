@@ -426,7 +426,9 @@ const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportDat
                                     {inputBitola}mm -- FIO MAQUINA--
                                     {(() => {
                                         const gauge = gauges.find(g => g.materialType === 'Fio Máquina' && g.gauge === inputBitola);
-                                        return gauge?.productCode ? ` [${gauge.productCode}]` : '';
+                                        const desc = gauge?.description ? ` (${gauge.description})` : '';
+                                        const code = gauge?.productCode ? ` [${gauge.productCode}]` : '';
+                                        return `${desc}${code}`;
                                     })()}
                                 </span>
                             </div>
@@ -435,7 +437,9 @@ const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportDat
                                     {reportData.targetBitola}mm ---CA60--
                                     {(() => {
                                         const gauge = gauges.find(g => g.materialType === 'CA-60' && g.gauge === reportData.targetBitola);
-                                        return gauge?.productCode ? ` [${gauge.productCode}]` : '';
+                                        const desc = gauge?.description ? ` (${gauge.description})` : '';
+                                        const code = gauge?.productCode ? ` [${gauge.productCode}]` : '';
+                                        return `${desc}${code}`;
                                     })()}
                                 </span>
                             </div>
@@ -822,7 +826,12 @@ const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportDat
                                             {inputBitola} mm
                                             {(() => {
                                                 const gauge = gauges.find(g => g.materialType === 'Fio Máquina' && g.gauge === inputBitola);
-                                                return gauge?.productCode ? <span className="text-[10px] text-slate-400 font-bold ml-1">({gauge.productCode})</span> : null;
+                                                return (
+                                                    <>
+                                                        {gauge?.description && <span className="text-[11px] text-slate-600 block font-normal">{gauge.description}</span>}
+                                                        {gauge?.productCode ? <span className="text-[10px] text-slate-400 font-bold">({gauge.productCode})</span> : null}
+                                                    </>
+                                                );
                                             })()}
                                         </p>
                                     </div>
@@ -832,7 +841,12 @@ const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportDat
                                             {reportData.targetBitola} mm
                                             {(() => {
                                                 const gauge = gauges.find(g => g.materialType === 'CA-60' && g.gauge === reportData.targetBitola);
-                                                return gauge?.productCode ? <span className="text-[10px] text-slate-400 font-bold ml-1">({gauge.productCode})</span> : null;
+                                                return (
+                                                    <>
+                                                        {gauge?.description && <span className="text-[11px] text-slate-600 block font-normal">{gauge.description}</span>}
+                                                        {gauge?.productCode ? <span className="text-[10px] text-slate-400 font-bold">({gauge.productCode})</span> : null}
+                                                    </>
+                                                );
                                             })()}
                                         </p>
                                     </div>
