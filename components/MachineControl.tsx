@@ -8,6 +8,7 @@ import ProductionOrderReport from './ProductionOrderReport';
 import { insertItem, deleteItem, updateItem, fetchTable, fetchByColumn } from '../services/supabaseService';
 import { trelicaModels } from './ProductionOrderTrelica';
 import TrefilaCalculation from './TrefilaCalculation';
+import TrelicaSpoolStands from './TrelicaSpoolStands';
 
 
 const IdleActivityLogger: React.FC<{
@@ -3287,6 +3288,27 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                         </>
                                     ) : (
                                         <>
+                                            {/* RACK DOS 5 PORTA-ROLOS DA TRELIÇA (GÊMEO DIGITAL CAD) */}
+                                            {activeMachine.startsWith('Treliça') && (
+                                                <div className="mb-6">
+                                                    <TrelicaSpoolStands
+                                                        machineName={activeMachine}
+                                                        stock={stock}
+                                                        activeOrder={activeOrder}
+                                                        currentUser={currentUser}
+                                                        onSpoolChange={(stand, newLot) => {
+                                                            if (addLotToOrder && activeOrder) {
+                                                                try {
+                                                                    addLotToOrder(activeOrder.id, newLot.id);
+                                                                } catch (e) {
+                                                                    console.warn('Auto addLotToOrder:', e);
+                                                                }
+                                                            }
+                                                        }}
+                                                    />
+                                                </div>
+                                            )}
+
                                             <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm">
                                                 <h3 className="text-lg font-bold text-slate-700 mb-4">Registro de Pacotes</h3>
                                                 <p className="text-sm text-slate-500 mb-6 bg-blue-50 p-3 rounded-lg border border-blue-100 flex gap-2">

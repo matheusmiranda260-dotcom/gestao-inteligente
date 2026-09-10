@@ -732,3 +732,22 @@ export interface PcpHoliday {
     createdAt?: string;
 }
 
+export type TrelicaStandRoleType = 'superior' | 'senozoide_left' | 'senozoide_right' | 'inferior_left' | 'inferior_right';
+
+export interface TrelicaSpoolStand {
+    id: string;
+    machine_name: string; // 'Treliça 1' | 'Treliça 2'
+    stand_index: number; // 1 to 5
+    role_name: string; // 'Banzo Superior (1x)', 'Senoide Lado 1 (1x)', etc.
+    role_type: TrelicaStandRoleType;
+    current_lot_id?: string | null;
+    current_lot_number?: string | null;
+    current_gauge?: string | null;
+    initial_weight?: number;
+    remaining_weight?: number;
+    status: 'active' | 'empty' | 'warning' | 'changing';
+    last_changed_at?: string;
+    last_changed_by?: string;
+    updated_at?: string;
+}
+

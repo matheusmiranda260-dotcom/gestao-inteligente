@@ -8,8 +8,10 @@ import {
     savePcpShiftConfig, 
     fetchPcpHolidays, 
     addPcpHoliday, 
-    deletePcpHoliday 
+    deletePcpHoliday,
+    fetchTrelicaSpoolStands
 } from '../services/supabaseService';
+import TrelicaSpoolStands from './TrelicaSpoolStands';
 import { 
     CalendarIcon, PlusIcon, ChevronRightIcon, XIcon, ArrowLeftIcon, 
     TrashIcon, PlayIcon, CheckCircleIcon, ClockIcon, ChartBarIcon, 
@@ -542,6 +544,48 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     const [activeTrelicaLotTab, setActiveTrelicaLotTab] = useState<'superior' | 'inferior' | 'senozoide'>('superior');
     const [trelicaLotSearch, setTrelicaLotSearch] = useState<string>('');
     const [trelicaShowAllGauges, setTrelicaShowAllGauges] = useState<boolean>(false);
+    const [viewSpoolStandsMachine, setViewSpoolStandsMachine] = useState<string | null>(null);
+
+    // Carrega os 5 lotes dos porta-rolos atualmente montados na máquina para a nova ordem
+    const handleLoadSpoolStandsToOrder = async () => {
+        try {
+            const stands = await fetchTrelicaSpoolStands(createMachine);
+            if (!stands || stands.length === 0) {
+                showNotification?.(`Nenhum porta-rolo cadastrado para a ${createMachine}.`, 'info');
+                return;
+            }
+
+            let loadedCount = 0;
+            stands.forEach(s => {
+                if (s.current_lot_id) {
+                    if (s.role_type === 'superior') {
+                        setTrelicaSuperiorLots([s.current_lot_id]);
+                        loadedCount++;
+                    } else if (s.role_type === 'senozoide_left') {
+                        setTrelicaSenozoideLeftLots([s.current_lot_id]);
+                        loadedCount++;
+                    } else if (s.role_type === 'senozoide_right') {
+                        setTrelicaSenozoideRightLots([s.current_lot_id]);
+                        loadedCount++;
+                    } else if (s.role_type === 'inferior_left') {
+                        setTrelicaInferiorLeftLots([s.current_lot_id]);
+                        loadedCount++;
+                    } else if (s.role_type === 'inferior_right') {
+                        setTrelicaInferiorRightLots([s.current_lot_id]);
+                        loadedCount++;
+                    }
+                }
+            });
+
+            if (loadedCount > 0) {
+                showNotification?.(`✓ ${loadedCount} bobina(s) montada(s) na ${createMachine} foram vinculadas à nova ordem!`, 'success');
+            } else {
+                showNotification?.(`Os porta-rolos da ${createMachine} estão vazios no momento.`, 'info');
+            }
+        } catch (e) {
+            console.error('Erro ao carregar porta-rolos:', e);
+        }
+    };
 
     // Parâmetros operacionais de Treliça (Velocidade, Setup e Metas)
     const [trelicaSpeed, setTrelicaSpeed] = useState<number>(() => {
@@ -2883,6 +2927,20 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                     </div>
                                                 );
                                             })()}
+
+                                            {/* Mini Widget dos 5 Porta-Rolos (Treliça) */}
+                                            {mach.name.startsWith('Treliça') && (
+                                                <div 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setViewSpoolStandsMachine(mach.name);
+                                                    }}
+                                                    className="mt-2 cursor-pointer hover:scale-[1.02] transition-transform"
+                                                    title="Clique para abrir o Gêmeo Digital dos 5 Porta-Rolos"
+                                                >
+                                                    <TrelicaSpoolStands machineName={mach.name} isCompact={true} stock={stock} />
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Grade de fundo (5 Colunas de dias) */}
@@ -4459,6 +4517,15 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                     title="Seleciona automaticamente rolos compatíveis para todas as posições"
                                                 >
                                                     ⚡ Auto-Selecionar Lotes
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={handleLoadSpoolStandsToOrder}
+                                                    className="bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/40 text-[10px] font-black px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 active:scale-95 shadow-sm"
+                                                    title={`Carregar as bobinas atualmente montadas nos 5 porta-rolos da ${createMachine}`}
+                                                >
+                                                    📥 Aproveitar Rolos da {createMachine}
                                                 </button>
                                             </div>
                                         </div>
@@ -6493,6 +6560,47 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                         </div>
                     );
                 })()
+            )}
+
+            {/* MODAL / SUB-JANELA: GÊMEO DIGITAL DOS 5 PORTA-ROLOS DA TRELIÇA */}
+            {viewSpoolStandsMachine && (
+                <div 
+                    className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-fade-in"
+                    onClick={() => setViewSpoolStandsMachine(null)}
+                >
+                    <div 
+                        className="bg-[#0A1620] border border-white/20 w-full max-w-5xl rounded-3xl p-4 sm:p-6 shadow-2xl flex flex-col gap-4 max-h-[95vh] overflow-y-auto"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-9 h-9 rounded-xl bg-blue-500/20 border border-blue-500/40 flex items-center justify-center text-blue-400 font-black text-lg">
+                                    ⚙️
+                                </div>
+                                <div>
+                                    <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                                        PORTA-ROLOS & DESBOBINADORES: <span className="text-blue-400 font-mono">{viewSpoolStandsMachine}</span>
+                                    </h3>
+                                    <p className="text-xs text-slate-400">
+                                        Monitoramento e troca de bobinas em tempo real (1 Superior • 2 Senozoides • 2 Inferiores)
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setViewSpoolStandsMachine(null)}
+                                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center font-bold text-sm transition"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <TrelicaSpoolStands
+                            machineName={viewSpoolStandsMachine}
+                            stock={stock}
+                            currentUser={currentUser}
+                        />
+                    </div>
+                </div>
             )}
         </div>
     );

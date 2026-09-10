@@ -14,6 +14,7 @@ import {
     User,
     PcpShiftConfig,
     PcpHoliday,
+    TrelicaSpoolStand,
 } from '../types';
 
 /** Generic fetch function returning raw data */
@@ -484,6 +485,165 @@ export const deletePcpHoliday = async (id: string): Promise<boolean> => {
     } catch (err) {
         console.error('Exceção ao excluir pcp_holiday:', err);
         throw err;
+    }
+};
+
+/** Configuração Padrão dos 5 Porta-Rolos por Máquina (Fallback) */
+export const getDefaultSpoolStands = (machineName: string = 'Treliça 1'): TrelicaSpoolStand[] => [
+    {
+        id: `${machineName}-stand-1`,
+        machine_name: machineName,
+        stand_index: 1,
+        role_name: 'Banzo Superior (1x)',
+        role_type: 'superior',
+        current_lot_id: null,
+        current_lot_number: null,
+        current_gauge: null,
+        initial_weight: 0,
+        remaining_weight: 0,
+        status: 'empty'
+    },
+    {
+        id: `${machineName}-stand-2`,
+        machine_name: machineName,
+        stand_index: 2,
+        role_name: 'Senoide Lado 1 (1x)',
+        role_type: 'senozoide_left',
+        current_lot_id: null,
+        current_lot_number: null,
+        current_gauge: null,
+        initial_weight: 0,
+        remaining_weight: 0,
+        status: 'empty'
+    },
+    {
+        id: `${machineName}-stand-3`,
+        machine_name: machineName,
+        stand_index: 3,
+        role_name: 'Senoide Lado 2 (1x)',
+        role_type: 'senozoide_right',
+        current_lot_id: null,
+        current_lot_number: null,
+        current_gauge: null,
+        initial_weight: 0,
+        remaining_weight: 0,
+        status: 'empty'
+    },
+    {
+        id: `${machineName}-stand-4`,
+        machine_name: machineName,
+        stand_index: 4,
+        role_name: 'Inferior Lado 1 (1x)',
+        role_type: 'inferior_left',
+        current_lot_id: null,
+        current_lot_number: null,
+        current_gauge: null,
+        initial_weight: 0,
+        remaining_weight: 0,
+        status: 'empty'
+    },
+    {
+        id: `${machineName}-stand-5`,
+        machine_name: machineName,
+        stand_index: 5,
+        role_name: 'Inferior Lado 2 (1x)',
+        role_type: 'inferior_right',
+        current_lot_id: null,
+        current_lot_number: null,
+        current_gauge: null,
+        initial_weight: 0,
+        remaining_weight: 0,
+        status: 'empty'
+    }
+];
+
+/** Buscar Porta-Rolos das Máquinas de Treliça (com fallback de cache) */
+export const fetchTrelicaSpoolStands = async (machineName?: string): Promise<TrelicaSpoolStand[]> => {
+    try {
+        let query = supabase.from('trelica_spool_stands').select('*').order('stand_index', { ascending: true });
+        if (machineName) {
+            query = query.eq('machine_name', machineName);
+        }
+
+        const { data, error } = await query;
+        if (error) {
+            console.warn('Tabela trelica_spool_stands ainda não criada ou inacessível:', error.message);
+            // Fallback localStorage
+            const localKey = machineName ? `cached_spool_stands_${machineName}` : 'cached_spool_stands_all';
+            const saved = localStorage.getItem(localKey);
+            if (saved) {
+                try {
+                    return JSON.parse(saved);
+                } catch (e) {}
+            }
+            return machineName ? getDefaultSpoolStands(machineName) : [...getDefaultSpoolStands('Treliça 1'), ...getDefaultSpoolStands('Treliça 2')];
+        }
+
+        if (data && data.length > 0) {
+            const mapped = data.map(item => ({
+                id: item.id,
+                machine_name: item.machine_name,
+                stand_index: item.stand_index,
+                role_name: item.role_name,
+                role_type: item.role_type,
+                current_lot_id: item.current_lot_id,
+                current_lot_number: item.current_lot_number,
+                current_gauge: item.current_gauge,
+                initial_weight: Number(item.initial_weight) || 0,
+                remaining_weight: Number(item.remaining_weight) || 0,
+                status: item.status || 'empty',
+                last_changed_at: item.last_changed_at,
+                last_changed_by: item.last_changed_by,
+                updated_at: item.updated_at
+            })) as TrelicaSpoolStand[];
+
+            const localKey = machineName ? `cached_spool_stands_${machineName}` : 'cached_spool_stands_all';
+            localStorage.setItem(localKey, JSON.stringify(mapped));
+            return mapped;
+        }
+
+        return machineName ? getDefaultSpoolStands(machineName) : [...getDefaultSpoolStands('Treliça 1'), ...getDefaultSpoolStands('Treliça 2')];
+    } catch (err) {
+        console.warn('Exceção ao carregar trelica_spool_stands:', err);
+        return machineName ? getDefaultSpoolStands(machineName) : [...getDefaultSpoolStands('Treliça 1'), ...getDefaultSpoolStands('Treliça 2')];
+    }
+};
+
+/** Atualizar Porta-Rolo no Banco e Realtime */
+export const updateTrelicaSpoolStand = async (
+    id: string,
+    updates: Partial<TrelicaSpoolStand>
+): Promise<TrelicaSpoolStand | null> => {
+    try {
+        const payload: any = {
+            updated_at: new Date().toISOString()
+        };
+
+        if (updates.current_lot_id !== undefined) payload.current_lot_id = updates.current_lot_id;
+        if (updates.current_lot_number !== undefined) payload.current_lot_number = updates.current_lot_number;
+        if (updates.current_gauge !== undefined) payload.current_gauge = updates.current_gauge;
+        if (updates.initial_weight !== undefined) payload.initial_weight = updates.initial_weight;
+        if (updates.remaining_weight !== undefined) payload.remaining_weight = updates.remaining_weight;
+        if (updates.status !== undefined) payload.status = updates.status;
+        if (updates.last_changed_at !== undefined) payload.last_changed_at = updates.last_changed_at;
+        if (updates.last_changed_by !== undefined) payload.last_changed_by = updates.last_changed_by;
+
+        const { data, error } = await supabase
+            .from('trelica_spool_stands')
+            .update(payload)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) {
+            console.warn('Erro ao atualizar trelica_spool_stand:', error.message);
+            return null;
+        }
+
+        return data as TrelicaSpoolStand;
+    } catch (err) {
+        console.error('Exceção ao atualizar trelica_spool_stand:', err);
+        return null;
     }
 };
 
