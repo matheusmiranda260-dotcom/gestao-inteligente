@@ -512,6 +512,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
     const mondayStr = useMemo(() => formatDateString(weekDays[0]), [weekDays]);
     const fridayStr = useMemo(() => formatDateString(weekDays[4]), [weekDays]);
+    const todayStr = useMemo(() => formatDateString(new Date()), []);
 
     // OPs Agendadas para a semana atual
     const scheduledOrders = useMemo(() => {
@@ -520,11 +521,15 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             if (op.status === 'Cancelada') return false;
 
             const opStart = op.plannedStartDate;
-            const opEnd = op.plannedEndDate || opStart;
+            let opEnd = op.plannedEndDate || opStart;
+            const isOpLive = op.status === 'in_progress' || op.status === 'Em Produção';
+            if (isOpLive && todayStr > opEnd) {
+                opEnd = todayStr;
+            }
 
             return opStart <= fridayStr && opEnd >= mondayStr;
         });
-    }, [productionOrders, mondayStr, fridayStr]);
+    }, [productionOrders, mondayStr, fridayStr, todayStr]);
 
     // Métricas do Mini Dashboard em Tempo Real do PCP
     const pcpLiveMetrics = useMemo(() => {
