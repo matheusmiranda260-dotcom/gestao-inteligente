@@ -2045,6 +2045,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     z-index: 10;
                     border: 1px solid rgba(255, 255, 255, 0.12);
                     cursor: pointer;
+                    overflow: hidden;
                 }
                 .pcp-op-bar:hover {
                     transform: translateY(-2px);
@@ -2458,8 +2459,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                                 const maxTracks = Math.max(1, ...machOps.map(op => getOpTrack(op) + 1));
                                 const rowMinHeight = maxTracks > 1 
-                                    ? (16 + maxTracks * 180) 
-                                    : (isPcpFullscreen ? 140 : 175);
+                                    ? (16 + maxTracks * 195) 
+                                    : (isPcpFullscreen ? 185 : 205);
 
                                 return (
                                     <div 
@@ -2745,7 +2746,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             const leftStyle = `calc(200px + (100% - 200px) * ${colStart / 5} + 4px)`;
                                             const widthStyle = `calc((100% - 200px) * ${spanColumns / 5} - 8px)`;
                                             const cardVerticalStyle = maxTracks > 1
-                                                ? { top: `${6 + track * 180}px`, height: '174px' }
+                                                ? { top: `${6 + track * 195}px`, height: '185px' }
                                                 : { top: '6px', bottom: '6px' };
 
                                             const isTrelica = typeof op.machine === 'string' && op.machine.startsWith('Treliça') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Treliça'));
@@ -2847,43 +2848,43 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                         ...cardVerticalStyle
                                                     }}
                                                 >
-                                                    <div className="flex flex-col h-full justify-between">
-                                                        <div className="flex items-start justify-between gap-1.5">
+                                                    <div className="flex flex-col h-full justify-between gap-1">
+                                                        <div className="flex items-start justify-between gap-1.5 shrink-0">
                                                             <div className="truncate flex-1">
                                                                 <div className="flex items-center gap-1.5 flex-wrap">
                                                                     <span className="text-sm sm:text-base font-black text-white tracking-wide drop-shadow">#{title}</span>
                                                                     
                                                                     {prog.isPending && (
-                                                                        <span className="flex items-center gap-1 text-[10px] sm:text-xs font-black uppercase bg-amber-500/25 text-amber-200 px-2.5 py-0.5 rounded border border-amber-500/50 shadow-sm">
+                                                                        <span className="flex items-center gap-1 text-[9px] sm:text-[10px] font-black uppercase bg-amber-500/25 text-amber-200 px-2 py-0.5 rounded border border-amber-500/50 shadow-sm">
                                                                             <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                                                                             AGENDADA
                                                                         </span>
                                                                     )}
                                                                     {prog.isLive && prog.isStopped && (
-                                                                        <span className="flex items-center gap-1 text-[10px] sm:text-xs font-black uppercase bg-rose-500/30 text-rose-200 px-2.5 py-0.5 rounded border border-rose-500/70 shadow-[0_0_10px_rgba(244,63,94,0.4)] animate-pulse">
+                                                                        <span className="flex items-center gap-1 text-[9px] sm:text-[10px] font-black uppercase bg-rose-500/30 text-rose-200 px-2 py-0.5 rounded border border-rose-500/70 shadow-[0_0_10px_rgba(244,63,94,0.4)] animate-pulse">
                                                                             <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
                                                                             PARADA: {prog.downtimeReason} ({formatDuration(prog.downtimeDurationMs)})
                                                                         </span>
                                                                     )}
                                                                     {prog.isLive && prog.isPrep && (
-                                                                        <span className="flex items-center gap-1 text-[10px] sm:text-xs font-black uppercase bg-amber-500/30 text-amber-200 px-2.5 py-0.5 rounded border border-amber-500/60 animate-pulse">
+                                                                        <span className="flex items-center gap-1 text-[9px] sm:text-[10px] font-black uppercase bg-amber-500/30 text-amber-200 px-2 py-0.5 rounded border border-amber-500/60 animate-pulse">
                                                                             <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                                                                             PREPARAÇÃO: {prog.downtimeReason} ({formatDuration(prog.downtimeDurationMs)})
                                                                         </span>
                                                                     )}
                                                                     {prog.isLive && prog.isOffline && (
-                                                                        <span className="flex items-center gap-1 text-[10px] sm:text-xs font-black uppercase bg-slate-500/25 text-slate-200 px-2.5 py-0.5 rounded border border-slate-500/50">
+                                                                        <span className="flex items-center gap-1 text-[9px] sm:text-[10px] font-black uppercase bg-slate-500/25 text-slate-200 px-2 py-0.5 rounded border border-slate-500/50">
                                                                             DESLIGADA: TURNO
                                                                         </span>
                                                                     )}
                                                                     {prog.isLive && !prog.isStopped && !prog.isPrep && !prog.isOffline && (
-                                                                        <span className="flex items-center gap-1 text-[10px] sm:text-xs font-black uppercase bg-cyan-500/30 text-[#00E5FF] px-2.5 py-0.5 rounded border border-[#00E5FF]/50 ring-1 ring-[#00E5FF]/50 animate-pulse">
+                                                                        <span className="flex items-center gap-1 text-[9px] sm:text-[10px] font-black uppercase bg-cyan-500/30 text-[#00E5FF] px-2 py-0.5 rounded border border-[#00E5FF]/50 ring-1 ring-[#00E5FF]/50 animate-pulse">
                                                                             <span className="w-1.5 h-1.5 rounded-full bg-[#00E5FF] pulse-live" />
                                                                             AO VIVO
                                                                         </span>
                                                                     )}
                                                                     {prog.isCompleted && (
-                                                                        <span className="text-[10px] sm:text-xs font-black uppercase bg-emerald-500/25 text-emerald-300 px-2.5 py-0.5 rounded border border-emerald-500/40">
+                                                                        <span className="text-[9px] sm:text-[10px] font-black uppercase bg-emerald-500/25 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/40">
                                                                             CONCLUÍDA
                                                                         </span>
                                                                     )}
@@ -2931,20 +2932,20 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                         </div>
 
                                                         {trefilaDashStats && (
-                                                            <div className="flex items-center justify-between gap-1.5 text-xs font-mono font-bold bg-[#020b11]/90 px-2.5 py-1 rounded-md border border-[#00E5FF]/40 shadow-sm shrink-0 my-0.5 overflow-hidden">
+                                                            <div className="flex items-center justify-between gap-1.5 text-xs font-mono font-bold bg-[#020b11]/90 px-2.5 py-0.5 rounded-md border border-[#00E5FF]/40 shadow-sm shrink-0 overflow-hidden">
                                                                 <div className="flex items-center gap-1.5 min-w-0 truncate">
-                                                                    <span className="text-[#00E5FF] font-black text-xs sm:text-sm truncate">
+                                                                    <span className="text-[#00E5FF] font-black text-xs truncate">
                                                                         Lote {trefilaDashStats.lotIdStr}
                                                                     </span>
-                                                                    <span className="text-slate-300 font-bold text-[10px] sm:text-xs">
+                                                                    <span className="text-slate-300 font-bold text-[10px]">
                                                                         ({trefilaDashStats.lotWeight.toLocaleString('pt-BR')}kg)
                                                                     </span>
                                                                 </div>
-                                                                <div className="flex items-center gap-2 shrink-0 text-[10px] sm:text-xs">
+                                                                <div className="flex items-center gap-2 shrink-0 text-[10px]">
                                                                     <span className="text-slate-300">
                                                                         Feito: <strong className="text-cyan-200 font-black">{formatDuration(trefilaDashStats.elapsedMs)}</strong>
                                                                     </span>
-                                                                    <span className={`px-2 py-0.5 rounded font-black ${
+                                                                    <span className={`px-1.5 py-0.5 rounded font-black ${
                                                                         trefilaDashStats.isDelayed 
                                                                             ? "bg-rose-500/30 text-rose-300 border border-rose-500/60 shadow-[0_0_8px_rgba(244,63,94,0.3)]" 
                                                                             : "bg-emerald-500/30 text-emerald-300 border border-emerald-500/60"
@@ -2957,7 +2958,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                                                         {/* Faixa de Segmentação Diária da OP (Produção por dia alinhada às colunas) */}
                                                         <div 
-                                                            className="grid gap-1.5 my-1 p-1.5 bg-black/40 rounded-xl border border-white/10 flex-1 min-h-0"
+                                                            className="grid gap-1.5 p-1 bg-black/40 rounded-xl border border-white/10 flex-1 min-h-[58px]"
                                                             style={{ gridTemplateColumns: `repeat(${spanColumns}, minmax(0, 1fr))` }}
                                                             onClick={(e) => e.stopPropagation()}
                                                         >
@@ -2992,48 +2993,46 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                         : `Meta Planejada: ~${dayStats.produced.toLocaleString('pt-BR')} ${dayStats.unit}`
                                                                         }`}
                                                                     >
-                                                                        <div className="flex items-center justify-between gap-1 text-[9.5px] sm:text-[10.5px] font-black uppercase tracking-wider">
+                                                                        <div className="flex items-center justify-between gap-1 text-[9px] sm:text-[10px] font-black uppercase tracking-wider">
                                                                             <span className={dayStats.isToday ? 'text-[#00E5FF]' : hasRealPastProd ? 'text-emerald-400' : 'text-slate-400'}>
                                                                                 {dayColName} {formatFriendlyDate(currentDay)}
                                                                             </span>
                                                                             {dayStats.isToday && (
-                                                                                <span className="flex items-center gap-0.5 text-[8px] sm:text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-[#00E5FF]/20 text-[#00E5FF] border border-[#00E5FF]/40">
+                                                                                <span className="flex items-center gap-0.5 text-[8px] font-black uppercase px-1 py-0.5 rounded bg-[#00E5FF]/20 text-[#00E5FF] border border-[#00E5FF]/40">
                                                                                     <span className="w-1.5 h-1.5 rounded-full bg-[#00E5FF] pulse-live" />
                                                                                     Ao Vivo
                                                                                 </span>
                                                                             )}
                                                                             {hasRealPastProd && (
-                                                                                <span className="text-[8px] sm:text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                                                                <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                                                                                     ✓ Fechado
                                                                                 </span>
                                                                             )}
                                                                             {isIdlePast && (
-                                                                                <span className="text-[8px] sm:text-[9px] font-medium px-1.5 py-0.5 rounded bg-white/5 text-slate-500 border border-white/5">
+                                                                                <span className="text-[8px] font-medium px-1 py-0.5 rounded bg-white/5 text-slate-500 border border-white/5">
                                                                                     Sem prod.
                                                                                 </span>
                                                                             )}
                                                                             {dayStats.isFuture && (
-                                                                                <span className="text-[8px] sm:text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-400 border border-white/5">
+                                                                                <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-white/5 text-slate-400 border border-white/5">
                                                                                     🎯 Meta
                                                                                 </span>
                                                                             )}
                                                                         </div>
 
-                                                                        <div className="flex items-baseline justify-between gap-1 my-0.5">
-                                                                            <div className="flex items-baseline gap-1">
-                                                                                <span className={`text-xs sm:text-sm md:text-base font-black font-mono tracking-tight ${
-                                                                                    dayStats.isToday 
-                                                                                        ? 'text-white drop-shadow' 
-                                                                                        : hasRealPastProd
-                                                                                            ? 'text-emerald-300' 
-                                                                                            : isIdlePast
-                                                                                                ? 'text-slate-500'
-                                                                                                : 'text-slate-300'
-                                                                                }`}>
-                                                                                    {dayStats.isFuture ? `~${dayStats.produced.toLocaleString('pt-BR')}` : dayStats.produced.toLocaleString('pt-BR')}
-                                                                                </span>
-                                                                                <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 font-mono">{dayStats.unit}</span>
-                                                                            </div>
+                                                                        <div className="flex items-baseline gap-1 my-0.5">
+                                                                            <span className={`text-xs sm:text-sm md:text-base font-black font-mono tracking-tight ${
+                                                                                dayStats.isToday 
+                                                                                    ? 'text-white drop-shadow' 
+                                                                                    : hasRealPastProd
+                                                                                        ? 'text-emerald-300' 
+                                                                                        : isIdlePast
+                                                                                            ? 'text-slate-500'
+                                                                                            : 'text-slate-300'
+                                                                            }`}>
+                                                                                {dayStats.isFuture ? `~${dayStats.produced.toLocaleString('pt-BR')}` : dayStats.produced.toLocaleString('pt-BR')}
+                                                                            </span>
+                                                                            <span className="text-[9px] font-bold text-slate-400 font-mono">{dayStats.unit}</span>
                                                                         </div>
 
                                                                         <div className="flex items-center justify-between text-[8.5px] sm:text-[9.5px] text-slate-300 truncate pt-0.5 border-t border-white/5">
@@ -3063,56 +3062,61 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                             })}
                                                         </div>
 
-                                                        {/* Mini Barra de Progresso Real */}
-                                                        <div className="shrink-0 my-0.5">
-                                                            <div className="flex items-center justify-between text-xs sm:text-sm font-mono text-slate-200 font-bold mb-0.5 leading-none">
-                                                                <span>{prog.produced.toLocaleString('pt-BR')} / {prog.target.toLocaleString('pt-BR')} {prog.unit}</span>
-                                                                <span className="font-black text-white">{prog.pct}%</span>
-                                                            </div>
-                                                            <div className="w-full bg-black/50 rounded-full h-2 sm:h-2.5 overflow-hidden border border-white/10">
-                                                                <div 
-                                                                    className={`h-full ${barProgressColor} rounded-full transition-all duration-500`}
-                                                                    style={{ width: `${prog.pct}%` }}
-                                                                />
-                                                            </div>
-                                                        </div>
+                                                        {/* Rodapé Integrado: Controles de Dias + Barra de Progresso Real (1 linha) */}
+                                                        <div className="flex items-center justify-between gap-2 bg-black/60 px-2 py-1 rounded-lg border border-white/10 select-none shrink-0" onClick={(e) => e.stopPropagation()}>
+                                                            {/* Controles Rápidos: MOVER e DURAÇÃO */}
+                                                            <div className="flex items-center gap-1.5 shrink-0">
+                                                                <div className="flex items-center gap-1 bg-white/5 px-1.5 py-0.5 rounded border border-white/5">
+                                                                    <button 
+                                                                        onClick={() => handleShiftOP(op, -1)}
+                                                                        className="text-slate-300 hover:text-[#00E5FF] font-black text-xs transition-colors active:scale-90 p-0.5" 
+                                                                        title="Mover 1 dia antes"
+                                                                    >
+                                                                        ◀
+                                                                    </button>
+                                                                    <span className="text-[9px] uppercase font-black text-slate-300 tracking-wider">MOVER</span>
+                                                                    <button 
+                                                                        onClick={() => handleShiftOP(op, 1)}
+                                                                        className="text-slate-300 hover:text-[#00E5FF] font-black text-xs transition-colors active:scale-90 p-0.5"
+                                                                        title="Mover 1 dia depois"
+                                                                    >
+                                                                        ▶
+                                                                    </button>
+                                                                </div>
 
-                                                        {/* Controles Rápidos de Dias */}
-                                                        <div className="flex items-center justify-between bg-black/50 px-2.5 py-1 rounded-md text-[10px] sm:text-xs border border-white/10 select-none shrink-0" onClick={(e) => e.stopPropagation()}>
-                                                            <div className="flex items-center gap-2">
-                                                                <button 
-                                                                    onClick={() => handleShiftOP(op, -1)}
-                                                                    className="text-slate-300 hover:text-[#00E5FF] font-black text-sm transition-colors active:scale-90 p-0.5" 
-                                                                    title="Mover 1 dia antes"
-                                                                >
-                                                                    ◀
-                                                                </button>
-                                                                <span className="text-[9px] sm:text-[10px] uppercase font-black text-slate-300 tracking-wider">MOVER</span>
-                                                                <button 
-                                                                    onClick={() => handleShiftOP(op, 1)}
-                                                                    className="text-slate-300 hover:text-[#00E5FF] font-black text-sm transition-colors active:scale-90 p-0.5"
-                                                                    title="Mover 1 dia depois"
-                                                                >
-                                                                    ▶
-                                                                </button>
+                                                                <div className="flex items-center gap-1 bg-white/5 px-1.5 py-0.5 rounded border border-white/5">
+                                                                    <button 
+                                                                        onClick={() => handleAdjustDuration(op, -1)}
+                                                                        className="text-slate-300 hover:text-red-400 font-black text-xs transition-colors active:scale-90 px-0.5"
+                                                                        title="Diminuir duração"
+                                                                    >
+                                                                        -
+                                                                    </button>
+                                                                    <span className="font-black text-xs text-white tracking-wide">{op.estimatedDurationDays || 1}d</span>
+                                                                    <button 
+                                                                        onClick={() => handleAdjustDuration(op, 1)}
+                                                                        className="text-slate-300 hover:text-emerald-400 font-black text-xs transition-colors active:scale-90 px-0.5"
+                                                                        title="Aumentar duração"
+                                                                    >
+                                                                        +
+                                                                    </button>
+                                                                </div>
                                                             </div>
 
-                                                            <div className="flex items-center gap-2 border-l border-white/15 pl-2">
-                                                                <button 
-                                                                    onClick={() => handleAdjustDuration(op, -1)}
-                                                                    className="text-slate-300 hover:text-red-400 font-black text-sm transition-colors active:scale-90 px-1"
-                                                                    title="Diminuir duração"
-                                                                >
-                                                                    -
-                                                                </button>
-                                                                <span className="font-black text-xs sm:text-sm text-white tracking-wide">{op.estimatedDurationDays || 1}d</span>
-                                                                <button 
-                                                                    onClick={() => handleAdjustDuration(op, 1)}
-                                                                    className="text-slate-300 hover:text-emerald-400 font-black text-sm transition-colors active:scale-90 px-1"
-                                                                    title="Aumentar duração"
-                                                                >
-                                                                    +
-                                                                </button>
+                                                            {/* Barra de Progresso Real Compacta e Precisa */}
+                                                            <div className="flex items-center gap-2 flex-1 max-w-[280px] min-w-0">
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex items-center justify-between text-[10.5px] font-mono font-bold text-slate-200 leading-none">
+                                                                        <span className="truncate">{prog.produced.toLocaleString('pt-BR')} / {prog.target.toLocaleString('pt-BR')} {prog.unit}</span>
+                                                                        <span className="font-black text-white ml-1">{prog.pct}%</span>
+                                                                    </div>
+                                                                    <div className="w-full bg-black/60 rounded-full h-1.5 overflow-hidden border border-white/10 mt-1">
+                                                                        <div 
+                                                                            className={`h-full ${barProgressColor} rounded-full transition-all duration-500`}
+                                                                            style={{ width: `${prog.pct}%` }}
+                                                                        />
+                                                                    </div>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
