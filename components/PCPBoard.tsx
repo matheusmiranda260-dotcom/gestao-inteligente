@@ -1896,20 +1896,6 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     operatorName = logOperators || 'Encerrado';
                 }
             }
-
-            // SE NENHUM LOG ESPECÍFICO GRAVOU A DATA EXATA, MAS HÁ PRODUÇÃO REGISTRADA ANTES DE HOJE:
-            if (produced === 0 && totalPastProduced > 0) {
-                const opStart = op.plannedStartDate || '';
-                const opEnd = op.plannedEndDate || opStart;
-                if (dateStr >= opStart && dateStr <= opEnd) {
-                    status = 'closed';
-                    produced = totalPastProduced;
-                    const priorLogs = (op.operatorLogs || []).filter((l: any) => l.endTime);
-                    const lastPriorLog = priorLogs[priorLogs.length - 1];
-                    const priorOp = lastPriorLog?.operator || (op.operatorLogs || [])[0]?.operator || op.operator;
-                    operatorName = priorOp ? formatShortName(priorOp) : 'Encerrado';
-                }
-            }
         } else {
             // isFuture
             status = 'planned';
@@ -2711,8 +2697,15 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                         {/* Elementos de Barra de OPs sobrepostos na linha */}
                                         {machOps.map(op => {
                                             const startStr = op.plannedStartDate!;
-                                            const endStr = op.plannedEndDate || startStr;
+                                            let endStr = op.plannedEndDate || startStr;
                                             
+                                            // Se a OP está Ao Vivo / Em Produção hoje e a data final planejada for anterior a hoje,
+                                            // estendemos dinamicamente até hoje para que a OP permaneça visível na coluna do dia atual
+                                            const isOpLive = op.status === 'in_progress' || op.status === 'Em Produção';
+                                            if (isOpLive && todayStr > endStr) {
+                                                endStr = todayStr;
+                                            }
+
                                             let colStart = 0;
                                             if (startStr >= mondayStr) {
                                                 const startIdx = weekDays.findIndex(d => formatDateString(d) === startStr);
@@ -2939,7 +2932,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                                                         {/* Faixa de Segmentação Diária da OP (Produção por dia alinhada às colunas) */}
                                                         <div 
-                                                            className="grid gap-1.5 my-1.5 p-1 bg-black/40 rounded-xl border border-white/10"
+                                                            className="grid gap-1 my-1 p-1 bg-black/40 rounded-xl border border-white/10"
                                                             style={{ gridTemplateColumns: `repeat(${spanColumns}, minmax(0, 1fr))` }}
                                                             onClick={(e) => e.stopPropagation()}
                                                         >
@@ -2949,26 +2942,33 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                 const dayStats = getOpDayStats(op, currentDay, mach.name);
                                                                 const dayColName = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'][dayIdx] || '';
 
+                                                                const hasRealPastProd = dayStats.isPast && dayStats.produced > 0;
+                                                                const isIdlePast = dayStats.isPast && dayStats.produced === 0;
+
                                                                 return (
                                                                     <div 
                                                                         key={dayIdx} 
                                                                         className={`flex flex-col justify-between p-1.5 rounded-lg border text-left transition-all ${
                                                                             dayStats.isToday 
-                                                                                ? 'bg-[#00E5FF]/15 border-[#00E5FF]/50 text-white shadow-[0_0_10px_rgba(0,229,255,0.2)] ring-1 ring-[#00E5FF]/30' 
-                                                                                : dayStats.isPast 
-                                                                                    ? 'bg-[#06181b]/90 border-emerald-500/30 text-emerald-200' 
-                                                                                    : 'bg-black/40 border-white/5 text-slate-400'
+                                                                                ? 'bg-[#00E5FF]/15 border-[#00E5FF]/60 text-white shadow-[0_0_10px_rgba(0,229,255,0.2)] ring-1 ring-[#00E5FF]/30' 
+                                                                                : hasRealPastProd
+                                                                                    ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-100 shadow-sm' 
+                                                                                    : isIdlePast
+                                                                                        ? 'bg-black/25 border-white/5 text-slate-500'
+                                                                                        : 'bg-black/20 border-white/5 text-slate-400'
                                                                         }`}
                                                                         title={`Dia: ${dayColName} ${formatFriendlyDate(currentDay)} | ${
                                                                             dayStats.isToday 
                                                                                 ? `Produção do Turno Ao Vivo: ${dayStats.produced.toLocaleString('pt-BR')} ${dayStats.unit}` 
-                                                                                : dayStats.isPast 
-                                                                                    ? `Total Concluído: ${dayStats.produced.toLocaleString('pt-BR')} ${dayStats.unit}` 
-                                                                                    : `Meta Planejada: ~${dayStats.produced.toLocaleString('pt-BR')} ${dayStats.unit}`
+                                                                                : hasRealPastProd
+                                                                                    ? `Total Produzido no Dia: ${dayStats.produced.toLocaleString('pt-BR')} ${dayStats.unit}` 
+                                                                                    : isIdlePast
+                                                                                        ? `Sem produção registrada neste dia`
+                                                                                        : `Meta Planejada: ~${dayStats.produced.toLocaleString('pt-BR')} ${dayStats.unit}`
                                                                         }`}
                                                                     >
                                                                         <div className="flex items-center justify-between gap-1 text-[8px] font-black uppercase tracking-wider">
-                                                                            <span className={dayStats.isToday ? 'text-[#00E5FF]' : dayStats.isPast ? 'text-emerald-400' : 'text-slate-400'}>
+                                                                            <span className={dayStats.isToday ? 'text-[#00E5FF]' : hasRealPastProd ? 'text-emerald-400' : 'text-slate-400'}>
                                                                                 {dayColName} {formatFriendlyDate(currentDay)}
                                                                             </span>
                                                                             {dayStats.isToday && (
@@ -2977,9 +2977,14 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                     Ao Vivo
                                                                                 </span>
                                                                             )}
-                                                                            {dayStats.isPast && (
+                                                                            {hasRealPastProd && (
                                                                                 <span className="text-[7px] font-bold px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                                                                                     ✓ Fechado
+                                                                                </span>
+                                                                            )}
+                                                                            {isIdlePast && (
+                                                                                <span className="text-[7px] font-medium px-1 py-0.2 rounded bg-white/5 text-slate-500 border border-white/5">
+                                                                                    Sem prod.
                                                                                 </span>
                                                                             )}
                                                                             {dayStats.isFuture && (
@@ -2989,17 +2994,21 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                             )}
                                                                         </div>
 
-                                                                        <div className="flex items-baseline gap-1 my-0.5">
-                                                                            <span className={`text-[11px] sm:text-xs font-black font-mono tracking-tight ${
-                                                                                dayStats.isToday 
-                                                                                    ? 'text-white drop-shadow' 
-                                                                                    : dayStats.isPast 
-                                                                                        ? 'text-emerald-300' 
-                                                                                        : 'text-slate-300'
-                                                                            }`}>
-                                                                                {dayStats.isFuture ? `~${dayStats.produced.toLocaleString('pt-BR')}` : dayStats.produced.toLocaleString('pt-BR')}
-                                                                            </span>
-                                                                            <span className="text-[7.5px] font-bold text-slate-400 font-mono">{dayStats.unit}</span>
+                                                                        <div className="flex items-baseline justify-between gap-1 my-0.5">
+                                                                            <div className="flex items-baseline gap-1">
+                                                                                <span className={`text-[11px] sm:text-xs font-black font-mono tracking-tight ${
+                                                                                    dayStats.isToday 
+                                                                                        ? 'text-white drop-shadow' 
+                                                                                        : hasRealPastProd
+                                                                                            ? 'text-emerald-300' 
+                                                                                            : isIdlePast
+                                                                                                ? 'text-slate-500'
+                                                                                                : 'text-slate-300'
+                                                                                }`}>
+                                                                                    {dayStats.isFuture ? `~${dayStats.produced.toLocaleString('pt-BR')}` : dayStats.produced.toLocaleString('pt-BR')}
+                                                                                </span>
+                                                                                <span className="text-[7.5px] font-bold text-slate-400 font-mono">{dayStats.unit}</span>
+                                                                            </div>
                                                                         </div>
 
                                                                         <div className="flex items-center justify-between text-[7.5px] text-slate-300 truncate pt-0.5 border-t border-white/5">
@@ -3010,11 +3019,14 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                         <strong className="text-white truncate">{dayStats.operatorName || 'Turno Ativo'}</strong>
                                                                                     </>
                                                                                 )}
-                                                                                {dayStats.isPast && (
+                                                                                {hasRealPastProd && (
                                                                                     <>
                                                                                         <span className="text-slate-400">👤</span>
                                                                                         <span className="truncate">{dayStats.operatorName || 'Encerrado'}</span>
                                                                                     </>
+                                                                                )}
+                                                                                {isIdlePast && (
+                                                                                    <span className="text-slate-600 truncate">{dayStats.operatorName ? `👤 ${dayStats.operatorName}` : 'Sem turno'}</span>
                                                                                 )}
                                                                                 {dayStats.isFuture && (
                                                                                     <span className="text-slate-500 italic">Planejado</span>
