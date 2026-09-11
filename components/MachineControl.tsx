@@ -3295,6 +3295,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                         machineName={activeMachine}
                                                         stock={stock}
                                                         activeOrder={activeOrder}
+                                                        productionOrders={productionOrders}
                                                         currentUser={currentUser}
                                                         onSpoolChange={(stand, newLot) => {
                                                             if (addLotToOrder && activeOrder) {

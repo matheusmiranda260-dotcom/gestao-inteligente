@@ -751,3 +751,27 @@ export interface TrelicaSpoolStand {
     updated_at?: string;
 }
 
+export interface TrelicaSpoolHistoryEntry {
+    id: string;
+    machine_name: string; // 'Treliça 1' | 'Treliça 2'
+    order_id?: string | null;
+    order_number?: string | null;
+    trelica_model?: string | null;
+    stand_index: number; // 1 a 5
+    role_name: string; // 'Banzo Superior (1x)', etc.
+    role_type: TrelicaStandRoleType;
+    lot_id: string;
+    lot_number: string;
+    gauge: string;
+    start_produced_pieces?: number;
+    end_produced_pieces?: number | null;
+    pieces_produced: number;
+    installed_at: string;
+    removed_at?: string | null;
+    installed_by?: string | null;
+    removed_by?: string | null;
+    status: 'active' | 'completed';
+    created_at?: string;
+}
+
+

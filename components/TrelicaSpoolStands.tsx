@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { TrelicaSpoolStand, StockItem, ProductionOrderData, User, TrelicaStandRoleType } from '../types';
 import { fetchTrelicaSpoolStands, updateTrelicaSpoolStand, getDefaultSpoolStands } from '../services/supabaseService';
+import { DEFAULT_TRELICA_MODELS } from '../utils/trelicaModelsData';
 import { supabase } from '../supabaseClient';
 import { WarningIcon, CheckCircleIcon, CogIcon, ClockIcon } from './icons';
 
@@ -8,6 +9,7 @@ interface TrelicaSpoolStandsProps {
     machineName: string; // 'Treliça 1' ou 'Treliça 2'
     stock?: StockItem[];
     activeOrder?: ProductionOrderData | null;
+    productionOrders?: ProductionOrderData[];
     currentUser?: User | null;
     onSpoolChange?: (stand: TrelicaSpoolStand, newLot: StockItem) => void;
     isCompact?: boolean;
@@ -18,6 +20,7 @@ export const TrelicaSpoolStands: React.FC<TrelicaSpoolStandsProps> = ({
     machineName,
     stock = [],
     activeOrder = null,
+    productionOrders = [],
     currentUser = null,
     onSpoolChange,
     isCompact = false,
@@ -27,25 +30,95 @@ export const TrelicaSpoolStands: React.FC<TrelicaSpoolStandsProps> = ({
     const [isLoading, setIsLoading] = useState(true);
     const [selectedStandForChange, setSelectedStandForChange] = useState<TrelicaSpoolStand | null>(null);
     const [lotSearchTerm, setLotSearchTerm] = useState('');
-    const [showAllGauges, setShowAllGauges] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [notification, setNotification] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null);
+    const [fetchedOrder, setFetchedOrder] = useState<ProductionOrderData | null>(null);
+
+    // Resolução da OP atual para a máquina (passada diretamente ou buscada de productionOrders)
+    const effectiveOrder = useMemo(() => {
+        if (activeOrder) return activeOrder;
+        if (productionOrders && productionOrders.length > 0) {
+            const isMachMatch = (o: ProductionOrderData) => (
+                o.machine === machineName || 
+                (machineName.startsWith('Treliça') && (o.machine === 'Treliça' || (o.machine && o.machine.startsWith('Treliça'))))
+            );
+
+            // 1. Ordem em produção ativa
+            const active = productionOrders.find(o => isMachMatch(o) && (o.status === 'in_progress' || o.status === 'Em Produção'));
+            if (active) return active;
+
+            // 2. Ordem agendada / pendente
+            const pending = productionOrders.find(o => isMachMatch(o) && (o.status === 'pending' || o.status === 'Aberta' || o.status === 'Em Espera'));
+            if (pending) return pending;
+
+            // 3. Qualquer ordem da máquina
+            const anyOrder = productionOrders.find(isMachMatch);
+            if (anyOrder) return anyOrder;
+        }
+        return fetchedOrder;
+    }, [activeOrder, productionOrders, machineName, fetchedOrder]);
+
+    // Buscar no Supabase a OP recente se não veio nas props
+    useEffect(() => {
+        if (!effectiveOrder) {
+            supabase
+                .from('production_orders')
+                .select('*')
+                .or(`machine.eq.${machineName},machine.eq.Treliça`)
+                .order('creation_date', { ascending: false })
+                .limit(1)
+                .then(({ data, error }) => {
+                    if (!error && data && data.length > 0) {
+                        setFetchedOrder(data[0] as any);
+                    }
+                });
+        }
+    }, [machineName, effectiveOrder]);
 
     // Extrair bitolas exigidas pelo modelo atual de treliça da OP
     const requiredGauges = useMemo(() => {
-        if (!activeOrder) return { superior: '', senozoide: '', inferior: '' };
-        
-        // Tentativa de extrair do objeto activeOrder
-        const sup = (activeOrder as any).trelicaSuperior || activeOrder.inputBitola || '';
-        const sen = (activeOrder as any).trelicaSinusoide || '';
-        const inf = (activeOrder as any).trelicaInferior || '';
+        let sup = '';
+        let sen = '';
+        let inf = '';
 
-        return {
-            superior: sup ? String(sup).trim() : '',
-            senozoide: sen ? String(sen).trim() : '',
-            inferior: inf ? String(inf).trim() : ''
+        if (effectiveOrder) {
+            sup = (effectiveOrder as any).trelicaSuperior || (effectiveOrder as any).trelica_superior || (effectiveOrder as any).targetBitola || (effectiveOrder as any).target_bitola || effectiveOrder.inputBitola || '';
+            sen = (effectiveOrder as any).trelicaSinusoide || (effectiveOrder as any).trelica_sinusoide || '';
+            inf = (effectiveOrder as any).trelicaInferior || (effectiveOrder as any).trelica_inferior || '';
+
+            // Se não veio nas propriedades diretas, buscar pelo modelo no catálogo
+            const rawModel = (effectiveOrder.trelicaModel || (effectiveOrder as any).trelica_model || effectiveOrder.productName || (effectiveOrder as any).modelo || '').toString().trim();
+            const cleanStr = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const cleanModel = cleanStr(rawModel);
+
+            if ((!sup || !sen || !inf) && cleanModel && Array.isArray(DEFAULT_TRELICA_MODELS)) {
+                const found = DEFAULT_TRELICA_MODELS.find(m => {
+                    const mMod = cleanStr(m?.modelo || '');
+                    const mCod = cleanStr(m?.cod || '');
+                    return (mMod && cleanModel.includes(mMod)) || (mCod && cleanModel.includes(mCod)) || (mMod && mMod.includes(cleanModel));
+                });
+                if (found) {
+                    if (!sup) sup = found.superior;
+                    if (!sen) sen = found.senozoide;
+                    if (!inf) inf = found.inferior;
+                }
+            }
+        }
+
+        const formatG = (v: any, fallback: string) => {
+            if (!v) return fallback;
+            const n = parseFloat(String(v).replace(',', '.'));
+            return isNaN(n) ? fallback : n.toFixed(2);
         };
-    }, [activeOrder]);
+
+        // Padrão: Superior 5.80 / 6.00, Senozoide 4.20, Inferior 3.80
+        return {
+            superior: formatG(sup, '5.80'),
+            senozoide: formatG(sen, '4.20'),
+            inferior: formatG(inf, '3.80'),
+            hasOp: !!effectiveOrder
+        };
+    }, [effectiveOrder]);
 
     const showToast = (msg: string, type: 'success' | 'error' | 'info' = 'info') => {
         setNotification({ msg, type });
@@ -126,17 +199,79 @@ export const TrelicaSpoolStands: React.FC<TrelicaSpoolStandsProps> = ({
     }, [machineName]);
 
     // Retorna a bitola requerida para a função do stand
-    const getTargetGaugeForRole = (roleType: TrelicaStandRoleType): string => {
+    const getTargetGaugeForRole = (roleType?: TrelicaStandRoleType): string => {
+        if (!roleType) return '';
         if (roleType === 'superior') return requiredGauges.superior;
         if (roleType.startsWith('senozoide')) return requiredGauges.senozoide;
         if (roleType.startsWith('inferior')) return requiredGauges.inferior;
         return '';
     };
 
+    // Extrai os lotes pré-selecionados na ordem para esta posição/função específica
+    const getDesignatedLotIdsForRole = (roleType?: TrelicaStandRoleType): string[] => {
+        if (!roleType || !effectiveOrder) return [];
+        let lots = effectiveOrder.selectedLotIds || (effectiveOrder as any).selected_lot_ids;
+        if (!lots) return [];
+
+        if (typeof lots === 'string') {
+            try { lots = JSON.parse(lots); } catch (e) {}
+        }
+
+        if (Array.isArray(lots)) {
+            // Se for array de IDs simples, filtrar por bitola do rolo
+            const target = getTargetGaugeForRole(roleType);
+            const targetVal = parseFloat(target.replace(',', '.'));
+            return lots.filter(id => {
+                const item = stock.find(s => String(s.id) === String(id));
+                if (!item) return true;
+                const gVal = parseFloat(String(item.bitola || '0').replace(',', '.'));
+                return !isNaN(gVal) && !isNaN(targetVal) ? Math.abs(gVal - targetVal) < 0.05 : true;
+            }).map(String);
+        }
+
+        if (typeof lots === 'object' && lots !== null) {
+            let arr: any[] = [];
+            if (roleType === 'superior') {
+                arr = lots.allSuperior || lots.all_superior || 
+                      (lots.superior ? (Array.isArray(lots.superior) ? lots.superior : [lots.superior]) : []) || 
+                      (lots.longitudinal ? [lots.longitudinal] : []);
+            } else if (roleType === 'senozoide_left') {
+                arr = lots.allSenozoideLeft || lots.all_senozoide_left ||
+                      (lots.senozoide1 ? (Array.isArray(lots.senozoide1) ? lots.senozoide1 : [lots.senozoide1]) : []) ||
+                      (lots.allSenozoide ? lots.allSenozoide : []) ||
+                      (lots.senozoide ? (Array.isArray(lots.senozoide) ? lots.senozoide : [lots.senozoide]) : []) ||
+                      (lots.sinusoidal ? [lots.sinusoidal] : []);
+            } else if (roleType === 'senozoide_right') {
+                arr = lots.allSenozoideRight || lots.all_senozoide_right ||
+                      (lots.senozoide2 ? (Array.isArray(lots.senozoide2) ? lots.senozoide2 : [lots.senozoide2]) : []) ||
+                      (lots.allSenozoide ? lots.allSenozoide : []) ||
+                      (lots.senozoide ? (Array.isArray(lots.senozoide) ? lots.senozoide : [lots.senozoide]) : []) ||
+                      (lots.sinusoidal2 ? [lots.sinusoidal2] : []);
+            } else if (roleType === 'inferior_left') {
+                arr = lots.allInferiorLeft || lots.all_inferior_left ||
+                      (lots.inferior1 ? (Array.isArray(lots.inferior1) ? lots.inferior1 : [lots.inferior1]) : []) ||
+                      (lots.allInferior ? lots.allInferior : []) ||
+                      (lots.inferior ? (Array.isArray(lots.inferior) ? lots.inferior : [lots.inferior]) : []) ||
+                      (lots.diagonal ? [lots.diagonal] : []);
+            } else if (roleType === 'inferior_right') {
+                arr = lots.allInferiorRight || lots.all_inferior_right ||
+                      (lots.inferior2 ? (Array.isArray(lots.inferior2) ? lots.inferior2 : [lots.inferior2]) : []) ||
+                      (lots.allInferior ? lots.allInferior : []) ||
+                      (lots.inferior ? (Array.isArray(lots.inferior) ? lots.inferior : [lots.inferior]) : []) ||
+                      (lots.diagonal2 ? [lots.diagonal2] : []);
+            }
+            return Array.isArray(arr) ? arr.filter(Boolean).map(String) : [];
+        }
+
+        return [];
+    };
+
     // Lotes disponíveis de CA-60 no estoque
+    // REGRA ESTRITA: Só poder selecionar os rolos exatos (ex: se o superior for 5,8 só aparece 5,8 e os lotes selecionados na ordem)
     const availableCa60Lots = useMemo(() => {
         if (!selectedStandForChange) return [];
         const targetGauge = getTargetGaugeForRole(selectedStandForChange.role_type);
+        const designatedIds = getDesignatedLotIdsForRole(selectedStandForChange.role_type);
 
         return stock
             .filter(item => {
@@ -145,15 +280,27 @@ export const TrelicaSpoolStands: React.FC<TrelicaSpoolStandsProps> = ({
                 if (!isCa60) return false;
 
                 // Não pode ser consumido ou transferido
-                if (item.status === 'Transferido' || item.status === 'Consumido para fazer treliça') {
+                if (item.status === 'Transferido' || item.status === 'Consumido para fazer treliça' || item.status === 'Consumido') {
                     return false;
                 }
 
-                // Filtro por bitola exigida (se não estiver com o checkbox de exibir tudo marcado)
-                if (!showAllGauges && targetGauge) {
-                    const itemGaugeNorm = parseFloat(String(item.bitola || '0').replace(',', '.')).toFixed(2);
-                    const targetGaugeNorm = parseFloat(targetGauge.replace(',', '.')).toFixed(2);
-                    if (itemGaugeNorm !== targetGaugeNorm) return false;
+                // Saldo disponível > 0
+                if ((item.remainingQuantity || 0) <= 0) return false;
+
+                // REGRA 1: Se foram selecionados lotes para este rolo na ordem, SÓ MOSTRAR ESSES LOTES!
+                if (designatedIds.length > 0) {
+                    if (!designatedIds.includes(String(item.id))) {
+                        return false;
+                    }
+                }
+
+                // REGRA 2: Só pode selecionar a bitola exata (ex: se o superior for 5,8 só aparece 5,8!)
+                if (targetGauge) {
+                    const itemGaugeVal = parseFloat(String(item.bitola || '0').replace(',', '.'));
+                    const targetGaugeVal = parseFloat(targetGauge.replace(',', '.'));
+                    if (isNaN(itemGaugeVal) || isNaN(targetGaugeVal) || Math.abs(itemGaugeVal - targetGaugeVal) > 0.04) {
+                        return false;
+                    }
                 }
 
                 // Filtro por texto de busca
@@ -164,9 +311,20 @@ export const TrelicaSpoolStands: React.FC<TrelicaSpoolStandsProps> = ({
                     if (!lotNum.includes(search) && !nfe.includes(search)) return false;
                 }
 
-                return (item.remainingQuantity || 0) > 0;
+                return true;
             })
             .sort((a, b) => {
+                // REGRA: Se houver lotes pré-selecionados na ordem, manter a exata ordem em que foram selecionados na OP
+                if (designatedIds.length > 0) {
+                    const idxA = designatedIds.indexOf(String(a.id));
+                    const idxB = designatedIds.indexOf(String(b.id));
+                    if (idxA !== -1 && idxB !== -1) {
+                        return idxA - idxB;
+                    }
+                    if (idxA !== -1) return -1;
+                    if (idxB !== -1) return 1;
+                }
+
                 // Prioridade para lotes já no suporte de treliça
                 const aSup = a.status === 'Disponível - Suporte Treliça';
                 const bSup = b.status === 'Disponível - Suporte Treliça';
@@ -175,7 +333,7 @@ export const TrelicaSpoolStands: React.FC<TrelicaSpoolStandsProps> = ({
 
                 return (b.remainingQuantity || 0) - (a.remainingQuantity || 0);
             });
-    }, [stock, selectedStandForChange, showAllGauges, lotSearchTerm, requiredGauges]);
+    }, [stock, selectedStandForChange, lotSearchTerm, requiredGauges, effectiveOrder]);
 
     // Executar a Troca do Rolo na Posição Selecionada
     const handleConfirmSpoolChange = async (lot: StockItem) => {
@@ -543,28 +701,47 @@ export const TrelicaSpoolStands: React.FC<TrelicaSpoolStandsProps> = ({
                         {/* Alerta de Bitola Exigida */}
                         {(() => {
                             const target = getTargetGaugeForRole(selectedStandForChange.role_type);
+                            const designated = getDesignatedLotIdsForRole(selectedStandForChange.role_type);
                             return (
-                                <div className="bg-[#07131B] p-3 rounded-xl border border-blue-500/30 flex items-center justify-between text-xs">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-blue-400 text-lg">ℹ️</span>
-                                        <div>
-                                            <div className="font-bold text-white">Bitola Recomendada para este Rolo:</div>
-                                            <div className="text-slate-400 text-[11px]">
-                                                {target ? `O modelo atual exige bitola ⌀ ${target} mm` : 'Nenhuma bitola fixada na OP atual.'}
+                                <div className="bg-[#07131B] p-3 rounded-xl border border-blue-500/30 flex flex-col gap-2 text-xs">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-blue-400 text-lg">🎯</span>
+                                            <div>
+                                                <div className="font-bold text-white">
+                                                    Bitola Exata Requerida para este Rolo:
+                                                </div>
+                                                <div className="text-slate-400 text-[11px]">
+                                                    {effectiveOrder 
+                                                        ? `OP #${effectiveOrder.orderNumber || ''} • Modelo: ${effectiveOrder.trelicaModel || 'Treliça'}` 
+                                                        : 'Configuração Padrão da Máquina'}
+                                                </div>
                                             </div>
                                         </div>
+                                        {target && (
+                                            <span className="text-sm font-black text-emerald-400 font-mono bg-emerald-500/15 px-3 py-1 rounded-lg border border-emerald-500/30 shadow-sm">
+                                                ⌀ {target} mm
+                                            </span>
+                                        )}
                                     </div>
-                                    {target && (
-                                        <span className="text-sm font-black text-blue-400 font-mono bg-blue-500/15 px-2.5 py-1 rounded-lg border border-blue-500/30">
-                                            ⌀ {target} mm
-                                        </span>
+
+                                    {designated.length > 0 && (
+                                        <div className="bg-blue-950/40 border border-blue-500/30 rounded-lg px-2.5 py-1.5 flex items-center justify-between text-[11px] text-blue-200">
+                                            <span className="flex items-center gap-1.5 font-bold">
+                                                <span>🔒</span>
+                                                <span>Lotes selecionados na Ordem de Produção:</span>
+                                            </span>
+                                            <span className="font-black bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded border border-blue-400/30">
+                                                {designated.length} lote(s) na ordem
+                                            </span>
+                                        </div>
                                     )}
                                 </div>
                             );
                         })()}
 
-                        {/* Barra de Busca de Lotes e Toggle de Bitola */}
-                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                        {/* Barra de Busca de Lotes */}
+                        <div className="flex items-center gap-2">
                             <div className="flex-1 bg-[#07131B] border border-white/10 rounded-xl px-3 py-2 flex items-center gap-2">
                                 <span className="text-slate-400 text-xs">🔍</span>
                                 <input
@@ -575,27 +752,31 @@ export const TrelicaSpoolStands: React.FC<TrelicaSpoolStandsProps> = ({
                                     className="w-full bg-transparent text-xs text-white placeholder-slate-500 focus:outline-none"
                                 />
                             </div>
-                            <div className="flex items-center gap-1.5 px-2 py-1 bg-[#07131B] rounded-xl border border-white/5">
-                                <input
-                                    type="checkbox"
-                                    id="showAllGaugesModal"
-                                    checked={showAllGauges}
-                                    onChange={(e) => setShowAllGauges(e.target.checked)}
-                                    className="h-3.5 w-3.5 rounded border-slate-700 bg-slate-900 text-blue-500 cursor-pointer"
-                                />
-                                <label htmlFor="showAllGaugesModal" className="text-[10.5px] text-slate-300 font-bold cursor-pointer whitespace-nowrap">
-                                    Mostrar outras bitolas
-                                </label>
-                            </div>
+                            {(() => {
+                                const target = getTargetGaugeForRole(selectedStandForChange.role_type);
+                                return (
+                                    <div className="flex items-center gap-1.5 px-3 py-2 bg-[#07131B] rounded-xl border border-emerald-500/20 text-emerald-400 text-[11px] font-black font-mono whitespace-nowrap">
+                                        <span>🔒</span>
+                                        <span>Bitola ⌀ {target} mm</span>
+                                    </div>
+                                );
+                            })()}
                         </div>
 
                         {/* Lista de Bobinas Disponíveis */}
                         <div className="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
                             {availableCa60Lots.length === 0 ? (
                                 <div className="text-center py-8 text-slate-400 bg-[#07131B] rounded-xl border border-dashed border-white/10 p-4">
-                                    <p className="font-bold text-sm">Nenhum lote compatível encontrado.</p>
-                                    <p className="text-xs text-slate-500 mt-1">
-                                        Verifique se há lotes de CA-60 cadastrados no estoque com a bitola exigida ou marque "Mostrar outras bitolas".
+                                    <p className="font-bold text-sm text-slate-300">Nenhum lote compatível encontrado.</p>
+                                    <p className="text-xs text-slate-400 mt-1">
+                                        {(() => {
+                                            const target = getTargetGaugeForRole(selectedStandForChange.role_type);
+                                            const designated = getDesignatedLotIdsForRole(selectedStandForChange.role_type);
+                                            if (designated.length > 0) {
+                                                return `Não há saldo disponível dentre os lotes selecionados na OP com bitola exata de ⌀ ${target} mm.`;
+                                            }
+                                            return `Não há lotes de CA-60 disponíveis no estoque com a bitola exata de ⌀ ${target} mm.`;
+                                        })()}
                                     </p>
                                 </div>
                             ) : (
@@ -603,6 +784,9 @@ export const TrelicaSpoolStands: React.FC<TrelicaSpoolStandsProps> = ({
                                     const isSuporte = lot.status === 'Disponível - Suporte Treliça';
                                     const target = getTargetGaugeForRole(selectedStandForChange.role_type);
                                     const isGaugeMatch = target && parseFloat(String(lot.bitola || '0').replace(',', '.')).toFixed(2) === parseFloat(target.replace(',', '.')).toFixed(2);
+                                    const designated = getDesignatedLotIdsForRole(selectedStandForChange.role_type);
+                                    const designatedIndex = designated.indexOf(String(lot.id));
+                                    const isDesignated = designatedIndex !== -1;
 
                                     return (
                                         <div
@@ -619,13 +803,18 @@ export const TrelicaSpoolStands: React.FC<TrelicaSpoolStandsProps> = ({
                                                         <span className="font-black text-white text-sm font-mono">
                                                             LOTE #{lot.internalLot}
                                                         </span>
+                                                        {isDesignated && (
+                                                            <span className="text-[9px] font-black bg-indigo-500/25 text-indigo-300 border border-indigo-500/40 px-1.5 py-0.5 rounded">
+                                                                #{designatedIndex + 1} na OP
+                                                            </span>
+                                                        )}
                                                         {isSuporte && (
                                                             <span className="text-[9px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded">
                                                                 No Suporte
                                                             </span>
                                                         )}
                                                         {isGaugeMatch && (
-                                                            <span className="text-[9px] font-black bg-blue-500/20 text-blue-300 border border-blue-500/30 px-1.5 py-0.5 rounded">
+                                                            <span className="text-[9px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded">
                                                                 ✓ Bitola Exata
                                                             </span>
                                                         )}

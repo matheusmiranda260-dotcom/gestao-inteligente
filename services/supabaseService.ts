@@ -15,6 +15,7 @@ import {
     PcpShiftConfig,
     PcpHoliday,
     TrelicaSpoolStand,
+    TrelicaSpoolHistoryEntry,
 } from '../types';
 
 /** Generic fetch function returning raw data */
@@ -646,4 +647,233 @@ export const updateTrelicaSpoolStand = async (
         return null;
     }
 };
+
+/** Carregar Histórico de Troca de Rolos da Treliça */
+export const fetchTrelicaSpoolHistory = async (
+    machineName?: string
+): Promise<TrelicaSpoolHistoryEntry[]> => {
+    try {
+        let query = supabase
+            .from('trelica_spool_history')
+            .select('*')
+            .order('installed_at', { ascending: false })
+            .limit(200);
+
+        if (machineName) {
+            query = query.eq('machine_name', machineName);
+        }
+
+        const { data, error } = await query;
+
+        if (!error && data && data.length > 0) {
+            const mapped = data.map((item: any) => ({
+                id: item.id,
+                machine_name: item.machine_name,
+                order_id: item.order_id,
+                order_number: item.order_number,
+                trelica_model: item.trelica_model,
+                stand_index: Number(item.stand_index),
+                role_name: item.role_name,
+                role_type: item.role_type,
+                lot_id: item.lot_id,
+                lot_number: item.lot_number,
+                gauge: item.gauge,
+                start_produced_pieces: Number(item.start_produced_pieces) || 0,
+                end_produced_pieces: item.end_produced_pieces !== null && item.end_produced_pieces !== undefined ? Number(item.end_produced_pieces) : null,
+                pieces_produced: Number(item.pieces_produced) || 0,
+                installed_at: item.installed_at,
+                removed_at: item.removed_at,
+                installed_by: item.installed_by,
+                removed_by: item.removed_by,
+                status: item.status || 'active',
+                created_at: item.created_at
+            })) as TrelicaSpoolHistoryEntry[];
+
+            localStorage.setItem('cached_spool_history', JSON.stringify(mapped));
+            return mapped;
+        }
+
+        // Fallback para cache local se a tabela ainda não foi criada no banco
+        const cached = localStorage.getItem('cached_spool_history');
+        if (cached) {
+            try {
+                const parsed = JSON.parse(cached) as TrelicaSpoolHistoryEntry[];
+                return machineName ? parsed.filter(p => p.machine_name === machineName) : parsed;
+            } catch (e) {
+                console.warn('Erro ao ler cache local de spool_history:', e);
+            }
+        }
+
+        return [];
+    } catch (err) {
+        console.warn('Exceção ao buscar trelica_spool_history:', err);
+        const cached = localStorage.getItem('cached_spool_history');
+        if (cached) {
+            try {
+                const parsed = JSON.parse(cached) as TrelicaSpoolHistoryEntry[];
+                return machineName ? parsed.filter(p => p.machine_name === machineName) : parsed;
+            } catch (e) {}
+        }
+        return [];
+    }
+};
+
+/** Registrar Entrada de Nova Bobina no Histórico */
+export const createSpoolHistoryEntry = async (
+    entry: Omit<TrelicaSpoolHistoryEntry, 'id' | 'created_at'>
+): Promise<TrelicaSpoolHistoryEntry> => {
+    const newId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `spool-hist-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const fullEntry: TrelicaSpoolHistoryEntry = {
+        ...entry,
+        id: newId,
+        created_at: new Date().toISOString()
+    };
+
+    // Atualizar cache local imediatamente
+    try {
+        const cachedStr = localStorage.getItem('cached_spool_history');
+        const list: TrelicaSpoolHistoryEntry[] = cachedStr ? JSON.parse(cachedStr) : [];
+        const updatedList = [fullEntry, ...list.filter(item => item.id !== newId)];
+        localStorage.setItem('cached_spool_history', JSON.stringify(updatedList.slice(0, 300)));
+    } catch (e) {
+        console.warn('Erro ao salvar spool_history em cache:', e);
+    }
+
+    // Persistir no Supabase
+    try {
+        const { data, error } = await supabase
+            .from('trelica_spool_history')
+            .insert({
+                id: fullEntry.id,
+                machine_name: fullEntry.machine_name,
+                order_id: fullEntry.order_id,
+                order_number: fullEntry.order_number,
+                trelica_model: fullEntry.trelica_model,
+                stand_index: fullEntry.stand_index,
+                role_name: fullEntry.role_name,
+                role_type: fullEntry.role_type,
+                lot_id: fullEntry.lot_id,
+                lot_number: fullEntry.lot_number,
+                gauge: fullEntry.gauge,
+                start_produced_pieces: fullEntry.start_produced_pieces || 0,
+                pieces_produced: fullEntry.pieces_produced || 0,
+                installed_at: fullEntry.installed_at,
+                installed_by: fullEntry.installed_by,
+                status: 'active'
+            })
+            .select()
+            .single();
+
+        if (error) {
+            console.warn('Erro ao gravar trelica_spool_history no banco:', error.message);
+        } else if (data) {
+            return {
+                ...fullEntry,
+                id: data.id
+            };
+        }
+    } catch (err) {
+        console.warn('Exceção ao gravar trelica_spool_history:', err);
+    }
+
+    return fullEntry;
+};
+
+/** Finalizar Bobina no Histórico (Registrar Saída e Peças Produzidas) */
+export const finishSpoolHistoryEntry = async (
+    machineName: string,
+    standIndex: number,
+    removedBy: string,
+    currentProducedPieces: number
+): Promise<void> => {
+    const now = new Date().toISOString();
+
+    // Atualizar no cache local primeiro
+    let activeEntryId: string | null = null;
+    try {
+        const cachedStr = localStorage.getItem('cached_spool_history');
+        if (cachedStr) {
+            const list: TrelicaSpoolHistoryEntry[] = JSON.parse(cachedStr);
+            const activeIdx = list.findIndex(
+                item => item.machine_name === machineName && item.stand_index === standIndex && item.status === 'active'
+            );
+            if (activeIdx >= 0) {
+                const item = list[activeIdx];
+                activeEntryId = item.id;
+                const startPieces = item.start_produced_pieces || 0;
+                const piecesProduced = Math.max(0, currentProducedPieces - startPieces);
+                list[activeIdx] = {
+                    ...item,
+                    removed_at: now,
+                    removed_by: removedBy,
+                    end_produced_pieces: currentProducedPieces,
+                    pieces_produced: piecesProduced,
+                    status: 'completed'
+                };
+                localStorage.setItem('cached_spool_history', JSON.stringify(list));
+            }
+        }
+    } catch (e) {
+        console.warn('Erro ao atualizar cache local na finalização de spool:', e);
+    }
+
+    // Persistir no Supabase
+    try {
+        if (activeEntryId) {
+            // Localizar e atualizar por ID
+            const { data: existing } = await supabase
+                .from('trelica_spool_history')
+                .select('*')
+                .eq('id', activeEntryId)
+                .single();
+
+            if (existing) {
+                const startPieces = Number(existing.start_produced_pieces) || 0;
+                const piecesProduced = Math.max(0, currentProducedPieces - startPieces);
+
+                await supabase
+                    .from('trelica_spool_history')
+                    .update({
+                        removed_at: now,
+                        removed_by: removedBy,
+                        end_produced_pieces: currentProducedPieces,
+                        pieces_produced: piecesProduced,
+                        status: 'completed'
+                    })
+                    .eq('id', activeEntryId);
+                return;
+            }
+        }
+
+        // Se não achou por ID, buscar o ativo mais recente daquela máquina e stand
+        const { data: latestActive } = await supabase
+            .from('trelica_spool_history')
+            .select('*')
+            .eq('machine_name', machineName)
+            .eq('stand_index', standIndex)
+            .eq('status', 'active')
+            .order('installed_at', { ascending: false })
+            .limit(1);
+
+        if (latestActive && latestActive.length > 0) {
+            const target = latestActive[0];
+            const startPieces = Number(target.start_produced_pieces) || 0;
+            const piecesProduced = Math.max(0, currentProducedPieces - startPieces);
+
+            await supabase
+                .from('trelica_spool_history')
+                .update({
+                    removed_at: now,
+                    removed_by: removedBy,
+                    end_produced_pieces: currentProducedPieces,
+                    pieces_produced: piecesProduced,
+                    status: 'completed'
+                })
+                .eq('id', target.id);
+        }
+    } catch (err) {
+        console.warn('Exceção ao finalizar trelica_spool_history:', err);
+    }
+};
+
 

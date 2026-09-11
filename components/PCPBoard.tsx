@@ -2938,7 +2938,12 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                     className="mt-2 cursor-pointer hover:scale-[1.02] transition-transform"
                                                     title="Clique para abrir o Gêmeo Digital dos 5 Porta-Rolos"
                                                 >
-                                                    <TrelicaSpoolStands machineName={mach.name} isCompact={true} stock={stock} />
+                                                    <TrelicaSpoolStands 
+                                                        machineName={mach.name} 
+                                                        isCompact={true} 
+                                                        stock={stock} 
+                                                        productionOrders={productionOrders}
+                                                    />
                                                 </div>
                                             )}
                                         </div>
@@ -6598,6 +6603,11 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                             machineName={viewSpoolStandsMachine}
                             stock={stock}
                             currentUser={currentUser}
+                            productionOrders={productionOrders}
+                            activeOrder={productionOrders.find(o => 
+                                (o.machine === viewSpoolStandsMachine || (viewSpoolStandsMachine.startsWith('Treliça') && o.machine === 'Treliça')) && 
+                                (o.status === 'in_progress' || o.status === 'Em Produção' || o.status === 'pending' || o.status === 'Aberta')
+                            ) || null}
                         />
                     </div>
                 </div>

@@ -188,6 +188,52 @@ VALUES
     ('Treliça 2', 4, 'Inferior Lado 1 (1x)', 'inferior_left', 'empty'),
     ('Treliça 2', 5, 'Inferior Lado 2 (1x)', 'inferior_right', 'empty')
 ON CONFLICT (machine_name, stand_index) DO NOTHING;
+
+-- =========================================================================
+-- TABELA DE HISTÓRICO DE TROCA DE ROLOS DA TRELIÇA (RELATÓRIO PCP)
+-- =========================================================================
+CREATE TABLE IF NOT EXISTS public.trelica_spool_history (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    machine_name TEXT NOT NULL,
+    order_id TEXT,
+    order_number TEXT,
+    trelica_model TEXT,
+    stand_index INTEGER NOT NULL,
+    role_name TEXT NOT NULL,
+    role_type TEXT NOT NULL,
+    lot_id TEXT NOT NULL,
+    lot_number TEXT NOT NULL,
+    gauge TEXT NOT NULL,
+    start_produced_pieces INTEGER DEFAULT 0,
+    end_produced_pieces INTEGER,
+    pieces_produced INTEGER DEFAULT 0,
+    installed_at TIMESTAMPTZ DEFAULT now(),
+    removed_at TIMESTAMPTZ,
+    installed_by TEXT,
+    removed_by TEXT,
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.trelica_spool_history ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Permitir leitura de historico de rolos para todos" ON public.trelica_spool_history;
+CREATE POLICY "Permitir leitura de historico de rolos para todos" ON public.trelica_spool_history
+    FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Permitir alteração de historico de rolos para todos" ON public.trelica_spool_history;
+CREATE POLICY "Permitir alteração de historico de rolos para todos" ON public.trelica_spool_history
+    FOR ALL USING (true);
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.trelica_spool_history;
+    END IF;
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+    WHEN OTHERS THEN NULL;
+END $$;
     </textarea>
 
     <script>

@@ -1070,6 +1070,9 @@ const App: React.FC = () => {
             // Preserve ghost/desbobinadeira fields
             isGhostOrder: isGhostOrder ?? false,
             inputBitola: inputBitola || null,
+            trelicaSuperior: trelicaSuperior || orderDataToSave.trelicaSuperior || null,
+            trelicaInferior: trelicaInferior || orderDataToSave.trelicaInferior || null,
+            trelicaSinusoide: trelicaSinusoide || orderDataToSave.trelicaSinusoide || null,
             // Ensure quantityToProduce defaults to 0 if not provided (Desbobinadeira doesn't use it)
             quantityToProduce: orderDataToSave.quantityToProduce ?? 0,
             // os_items: store directly (already extracted to avoid mapToSnakeCase double-converting)
