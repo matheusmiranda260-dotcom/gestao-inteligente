@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Page, ProductionOrderData, StockItem, User, StockGauge, ShiftReport, MachineType, Bitola, DowntimeConfig, Employee, PcpShiftConfig, PcpHoliday, TrelicaSpoolStand } from '../types';
 import { FioMaquinaBitolaOptions, TrefilaBitolaOptions } from '../types';
 import { DEFAULT_TRELICA_MODELS } from '../utils/trelicaModelsData';
@@ -69,6 +69,46 @@ const MACHINES = [
 const DEFAULT_MALHA_MODELS = [
     'Q92 (15x15)', 'Q138 (10x10)', 'Q196 (10x10)', 'Q283 (10x10)', 'M150 (15x15)'
 ];
+
+// Helpers de Manipulação de Datas do Quadro PCP
+// Regra de Negócio:
+// - De Segunda a Sexta: retorna a Segunda-feira da semana em andamento.
+// - No Sábado ou Domingo: reconhece automaticamente a próxima semana (Segunda-feira seguinte).
+export const getMonday = (d: Date): Date => {
+    const date = new Date(d);
+    const day = date.getDay(); // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
+    let diff: number;
+    if (day === 0) {
+        // Domingo: avança 1 dia para a próxima Segunda-feira
+        diff = 1;
+    } else if (day === 6) {
+        // Sábado: avança 2 dias para a próxima Segunda-feira
+        diff = 2;
+    } else {
+        // Segunda a Sexta: ajusta para a Segunda da semana atual
+        diff = 1 - day;
+    }
+    date.setDate(date.getDate() + diff);
+    date.setHours(0, 0, 0, 0);
+    return date;
+};
+
+export const addDays = (date: Date, days: number): Date => {
+    const result = new Date(date);
+    result.setDate(result.getDate() + days);
+    return result;
+};
+
+export const formatDateString = (date: Date): string => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+};
+
+export const formatFriendlyDate = (date: Date): string => {
+    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+};
 
 export const PCPBoard: React.FC<PCPBoardProps> = ({
     setPage,
@@ -165,8 +205,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
     }, [isPcpFullscreen, setIsPcpFullscreen]);
 
-    // Estado de data de referência (inicializado com a data atual)
-    const [currentDate, setCurrentDate] = useState<Date>(new Date());
+    // Estado de data de referência (inicializado com a segunda-feira da semana ativa)
+    const [currentDate, setCurrentDate] = useState<Date>(() => getMonday(new Date()));
 
     // Filtro de máquinas visíveis (com persistência no localStorage)
     const [selectedMachinesFilter, setSelectedMachinesFilter] = useState<string[]>(() => {
@@ -198,6 +238,64 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             setLiveNow(new Date());
         }, 1000);
         return () => clearInterval(timer);
+    }, []);
+
+    // Sincronização automática da semana no Quadro PCP:
+    // Garante que o sistema acompanhe sempre a semana de trabalho atual.
+    // No Sábado ou Domingo, reconhece automaticamente a próxima semana (Segunda a Sexta).
+    const activeMondayStr = useMemo(() => formatDateString(getMonday(liveNow)), [liveNow]);
+    const isCurrentWeek = useMemo(() => {
+        return formatDateString(getMonday(currentDate)) === activeMondayStr;
+    }, [currentDate, activeMondayStr]);
+
+    const isWeekend = useMemo(() => {
+        const d = liveNow.getDay();
+        return d === 0 || d === 6;
+    }, [liveNow]);
+
+    const prevActiveMondayRef = useRef<string>(activeMondayStr);
+
+    // Se o quadro estiver aberto e virar o dia/semana (ex: virada de Sexta para Sábado ou Domingo para Segunda),
+    // atualiza automaticamente a data de referência se o usuário estiver acompanhando a semana atual
+    useEffect(() => {
+        if (prevActiveMondayRef.current !== activeMondayStr) {
+            setCurrentDate(prev => {
+                const prevDisplayedMonday = formatDateString(getMonday(prev));
+                if (prevDisplayedMonday === prevActiveMondayRef.current) {
+                    return getMonday(new Date());
+                }
+                return prev;
+            });
+            prevActiveMondayRef.current = activeMondayStr;
+        }
+    }, [activeMondayStr]);
+
+    // Ao reativar a janela ou retornar para a aba (ex: tela ligada no galpão)
+    useEffect(() => {
+        const handleVisibilityOrFocus = () => {
+            if (document.visibilityState === 'visible') {
+                const now = new Date();
+                setLiveNow(now);
+                const currentActiveMonday = formatDateString(getMonday(now));
+                if (prevActiveMondayRef.current !== currentActiveMonday) {
+                    setCurrentDate(prev => {
+                        const prevDisplayedMonday = formatDateString(getMonday(prev));
+                        if (prevDisplayedMonday === prevActiveMondayRef.current) {
+                            return getMonday(now);
+                        }
+                        return prev;
+                    });
+                    prevActiveMondayRef.current = currentActiveMonday;
+                }
+            }
+        };
+
+        window.addEventListener('focus', handleVisibilityOrFocus);
+        document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+        return () => {
+            window.removeEventListener('focus', handleVisibilityOrFocus);
+            document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+        };
     }, []);
 
     const formatDuration = (ms: number) => {
@@ -647,33 +745,6 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     const [malhaPieces, setMalhaPieces] = useState<number>(1000);
     const [malhaBitola, setMalhaBitola] = useState<Bitola>('4.20');
 
-    // Helpers de Manipulação de Datas
-    const getMonday = (d: Date): Date => {
-        const date = new Date(d);
-        const day = date.getDay();
-        const diff = date.getDate() - day + (day === 0 ? -6 : 1); // ajusta para segunda-feira
-        date.setDate(diff);
-        date.setHours(0, 0, 0, 0);
-        return date;
-    };
-
-    const addDays = (date: Date, days: number): Date => {
-        const result = new Date(date);
-        result.setDate(result.getDate() + days);
-        return result;
-    };
-
-    const formatDateString = (date: Date): string => {
-        const y = date.getFullYear();
-        const m = String(date.getMonth() + 1).padStart(2, '0');
-        const d = String(date.getDate()).padStart(2, '0');
-        return `${y}-${m}-${d}`;
-    };
-
-    const formatFriendlyDate = (date: Date): string => {
-        return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-    };
-
     // Mapeamento e Sets de Feriados para consultas rápidas O(1)
     const holidaysMap = useMemo(() => {
         const map = new Map<string, string>();
@@ -743,7 +814,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
     const mondayStr = useMemo(() => formatDateString(weekDays[0]), [weekDays]);
     const fridayStr = useMemo(() => formatDateString(weekDays[4]), [weekDays]);
-    const todayStr = useMemo(() => formatDateString(new Date()), []);
+    const todayStr = useMemo(() => formatDateString(liveNow), [liveNow]);
 
     // OPs Agendadas para a semana atual
     const scheduledOrders = useMemo(() => {
@@ -907,13 +978,16 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
     // Navegar entre semanas
     const changeWeek = (weeks: number) => {
-        const newDate = new Date(currentDate);
-        newDate.setDate(newDate.getDate() + (weeks * 7));
-        setCurrentDate(newDate);
+        setCurrentDate(prev => {
+            const baseMonday = getMonday(prev);
+            const newDate = new Date(baseMonday);
+            newDate.setDate(newDate.getDate() + (weeks * 7));
+            return newDate;
+        });
     };
 
     const resetToToday = () => {
-        setCurrentDate(new Date());
+        setCurrentDate(getMonday(new Date()));
     };
 
     // ==========================================
@@ -2416,9 +2490,19 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                             <button
                                 onClick={resetToToday}
-                                className="px-3 py-1 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-bold text-slate-300 hover:text-white transition-all whitespace-nowrap"
+                                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                                    isCurrentWeek
+                                        ? 'bg-[#00E5FF]/15 text-[#00E5FF] border border-[#00E5FF]/40 shadow-sm'
+                                        : 'bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-transparent'
+                                }`}
+                                title={isWeekend ? "Fim de semana: reconhecendo a próxima semana de produção" : "Ir para a semana atual"}
                             >
-                                Semana Atual
+                                <span>Semana Atual</span>
+                                {isWeekend && isCurrentWeek && (
+                                    <span className="text-[9px] px-1 py-0.2 rounded bg-[#00E5FF]/20 text-[#00E5FF] font-black uppercase tracking-wider">
+                                        Próx.
+                                    </span>
+                                )}
                             </button>
 
                             <div className="px-3 py-1 text-xs font-black text-[#00E5FF] tracking-wider whitespace-nowrap">
@@ -3013,33 +3097,27 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                 </div>
                                             )}
 
-                                            {/* Mini Widget da Cabeça de Solda & Eletrodos (Treliça) */}
+                                            {/* Mini Botão Compacto: Comando Solda (Treliça) */}
                                             {mach.name.startsWith('Treliça') && (
-                                                <div 
+                                                <button 
+                                                    type="button"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         setViewWeldingHeadMachine(mach.name);
                                                     }}
-                                                    className="mt-2 p-2.5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/5 border border-amber-500/30 hover:border-amber-400 hover:bg-amber-500/20 cursor-pointer transition flex items-center justify-between group shadow-sm shadow-amber-950/20"
-                                                    title="Clique para abrir o Gêmeo Digital da Cabeça de Solda, Relatórios e Calibrador de Layout"
+                                                    className="mt-1.5 w-full py-1 px-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 hover:border-amber-400/60 transition-all flex items-center justify-between text-left group"
+                                                    title="Clique para abrir o Comando da Cabeça de Solda, Relatórios e Calibração"
                                                 >
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="w-6 h-6 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300 text-xs font-bold shadow-inner">
-                                                            ⚡
-                                                        </div>
-                                                        <div className="text-left">
-                                                            <span className="text-[11px] font-black text-amber-300 block uppercase tracking-tight">
-                                                                Cabeça de Solda
-                                                            </span>
-                                                            <span className="text-[9px] text-slate-400 font-mono flex items-center gap-1">
-                                                                <span>8 Eletrodos</span> • <span className="text-cyan-300">Relatórios & Calibração</span>
-                                                            </span>
-                                                        </div>
+                                                    <div className="flex items-center gap-1.5 min-w-0">
+                                                        <span className="text-[11px] leading-none text-amber-400">⚡</span>
+                                                        <span className="text-[10px] font-bold text-amber-300 uppercase tracking-tight truncate">
+                                                            Comando Solda
+                                                        </span>
                                                     </div>
-                                                    <span className="text-xs text-amber-400 group-hover:translate-x-1 transition-transform">
+                                                    <span className="text-[10px] text-amber-400/70 group-hover:text-amber-300 group-hover:translate-x-0.5 transition-all">
                                                         ➔
                                                     </span>
-                                                </div>
+                                                </button>
                                             )}
                                         </div>
 
