@@ -134,6 +134,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         return localStorage.getItem('pcp_header_collapsed') === 'true';
     });
 
+    const [selectedDailyReport, setSelectedDailyReport] = useState<{ op: ProductionOrderData, date: Date, dateStr: string, dayName: string, produced: number, unit: string } | null>(null);
+
     type TrelicaModel = typeof DEFAULT_TRELICA_MODELS[number];
     const [trelicaModels, setTrelicaModels] = useState<TrelicaModel[]>(() => {
         try {
@@ -3520,7 +3522,12 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                 return (
                                                                     <div 
                                                                         key={dayIdx} 
-                                                                        className={`flex flex-col justify-between p-1.5 rounded-lg border text-left transition-all ${
+                                                                        onClick={() => {
+                                                                            if (hasRealPastProd || dayStats.isToday) {
+                                                                                setSelectedDailyReport({ op, date: currentDay, dateStr: formatDateString(currentDay), dayName: dayColName, produced: dayStats.produced, unit: dayStats.unit });
+                                                                            }
+                                                                        }}
+                                                                        className={`flex flex-col justify-between p-1.5 rounded-lg border text-left transition-all ${hasRealPastProd || dayStats.isToday ? 'cursor-pointer hover:brightness-110 hover:shadow-md' : ''} ${
                                                                             dayStats.isToday 
                                                                                 ? 'bg-[#00E5FF]/15 border-[#00E5FF]/60 text-white shadow-[0_0_10px_rgba(0,229,255,0.2)] ring-1 ring-[#00E5FF]/30' 
                                                                                 : hasRealPastProd
@@ -6981,6 +6988,86 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     }}
                     users={users}
                 />
+            )}
+
+            {/* Modal de Relatório Diário (Paradas e Motivos) */}
+            {selectedDailyReport && (
+                <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-[140] p-4 animate-fade" onClick={() => setSelectedDailyReport(null)}>
+                    <div className="bg-[#0A1B27] rounded-2xl border border-white/15 shadow-2xl w-full max-w-xl text-slate-100 flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between p-4 border-b border-white/10">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-[#00E5FF]/15 border border-[#00E5FF]/30 flex items-center justify-center text-[#00E5FF]">
+                                    <CalendarIcon className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-black uppercase tracking-wider text-white">
+                                        Relatório Diário • {selectedDailyReport.dayName} {formatFriendlyDate(selectedDailyReport.date)}
+                                    </h3>
+                                    <p className="text-xs text-slate-400">
+                                        OP #{selectedDailyReport.op.orderNumber} • Produzido: {selectedDailyReport.produced.toLocaleString('pt-BR')} {selectedDailyReport.unit}
+                                    </p>
+                                </div>
+                            </div>
+                            <button onClick={() => setSelectedDailyReport(null)} className="p-2 text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors">
+                                <XIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="p-4 overflow-y-auto">
+                            <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">Paradas e Motivos (Deste Dia)</h4>
+                            {(() => {
+                                const dayStops = (selectedDailyReport.op.downtimeEvents || []).filter((e: any) => {
+                                    if (!e || !e.stopTime) return false;
+                                    const stopTimeStr = typeof e.stopTime === 'string' 
+                                        ? e.stopTime 
+                                        : (e.stopTime instanceof Date ? e.stopTime.toISOString() : String(e.stopTime));
+                                    
+                                    // Compara com a data local do stopTime
+                                    const dt = new Date(e.stopTime);
+                                    if (isNaN(dt.getTime())) return false; // Data inválida
+                                    
+                                    const y = dt.getFullYear();
+                                    const m = String(dt.getMonth() + 1).padStart(2, '0');
+                                    const d = String(dt.getDate()).padStart(2, '0');
+                                    const localDateStr = `${y}-${m}-${d}`;
+                                    
+                                    return localDateStr === selectedDailyReport.dateStr || stopTimeStr.startsWith(selectedDailyReport.dateStr);
+                                });
+
+                                if (dayStops.length === 0) {
+                                    return <div className="p-4 bg-white/5 rounded-xl border border-white/10 text-center text-slate-500 text-xs font-bold">Nenhuma parada registrada neste dia.</div>;
+                                }
+                                return (
+                                    <div className="flex flex-col gap-2">
+                                        {dayStops.map((stop: any, idx: number) => {
+                                            const stopDate = new Date(stop.stopTime);
+                                            const resumeDate = stop.resumeTime ? new Date(stop.resumeTime) : null;
+                                            const durationMs = resumeDate ? resumeDate.getTime() - stopDate.getTime() : new Date().getTime() - stopDate.getTime();
+                                            const durationMin = Math.round(durationMs / 60000);
+                                            
+                                            // Handle Invalid Date for display
+                                            const isValidStop = !isNaN(stopDate.getTime());
+                                            
+                                            return (
+                                                <div key={idx} className="p-3 bg-black/40 rounded-xl border border-white/5 flex items-center justify-between">
+                                                    <div>
+                                                        <div className="text-sm font-bold text-rose-400">{stop.reason || 'Sem motivo'}</div>
+                                                        <div className="text-xs text-slate-500 font-mono">
+                                                            {isValidStop ? stopDate.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}) : 'Hora inválida'} 
+                                                            {resumeDate && !isNaN(resumeDate.getTime()) ? ` - ${resumeDate.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}` : (!resumeDate ? ' (Em andamento)' : '')}
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-sm font-black text-slate-300 bg-white/5 px-2 py-1 rounded-lg border border-white/10">
+                                                        {durationMin >= 0 ? durationMin : 0} min
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                );
+                            })()}
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );
