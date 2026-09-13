@@ -654,25 +654,33 @@ const TrelicaWeldingHead: React.FC<TrelicaWeldingHeadProps> = ({
 
     const compatibleStocks = useMemo(() => {
         if (!activeConfigForStocks) return [];
-        // 1. Prioriza pelo código exato do produto (1000 a 1011)
-        const exactMatches = electrodeStockList.filter(s => 
-            (s.productCode === activeConfigForStocks.productCode || s.bitola === activeConfigForStocks.productCode) && 
-            (s.remainingQuantity || 0) > 0
-        );
-        if (exactMatches.length > 0) return exactMatches;
+        const targetCode = String(activeConfigForStocks.productCode).trim();
+        
+        // Busca estritamente pelo código cadastrado no Gestão de Lotes (productCode ou bitola ou gauges)
+        return electrodeStockList.filter(s => {
+            const itemCode = String(s.productCode || '').trim();
+            const itemBitola = String(s.bitola || '').trim();
+            const qty = Number(s.remainingQuantity || 0);
+            if (qty <= 0) return false;
 
-        // 2. Fallback por descrição ou tipo
-        const descMatches = electrodeStockList.filter(s => 
-            (s.description?.toLowerCase().includes(activeConfigForStocks.shortLabel.toLowerCase()) || 
-             s.description?.toLowerCase().includes(activeConfigForStocks.type.toLowerCase()) ||
-             s.description?.toLowerCase().includes(activeConfigForStocks.modelDescription.toLowerCase())) &&
-            (s.remainingQuantity || 0) > 0
-        );
-        if (descMatches.length > 0) return descMatches;
+            // Match direto por productCode ou bitola
+            if (itemCode === targetCode || itemBitola === targetCode) {
+                return true;
+            }
 
-        // 3. Fallback: todos os lotes de eletrodos com saldo
-        return electrodeStockList.filter(s => (s.remainingQuantity || 0) > 0);
-    }, [electrodeStockList, activeConfigForStocks]);
+            // Match cruzado com o cadastro de bitolas/modelos (gauges)
+            if (gauges && gauges.length > 0) {
+                const matchInGauges = gauges.some(g => 
+                    g.materialType === 'Eletrodos Treliças' &&
+                    (String(g.productCode || '').trim() === targetCode || String(g.gauge || '').trim() === targetCode) &&
+                    (String(g.gauge || '').trim() === itemBitola || String(g.productCode || '').trim() === itemCode)
+                );
+                if (matchInGauges) return true;
+            }
+
+            return false;
+        });
+    }, [electrodeStockList, activeConfigForStocks, gauges]);
 
     // Iniciar operação direta para o operador
     const startOperation = (type: 'limpeza' | 'ajuste' | 'troca', targetPos?: TrelicaElectrodePosition) => {
@@ -687,11 +695,25 @@ const TrelicaWeldingHead: React.FC<TrelicaWeldingHeadProps> = ({
         const targetCfg = ELECTRODE_POSITIONS_CONFIG.find(c => c.position === pos);
         let defaultStockId = '';
         if (type === 'troca' && targetCfg) {
-            const matches = electrodeStockList.filter(s => 
-                (s.productCode === targetCfg.productCode || s.bitola === targetCfg.productCode) && 
-                (s.remainingQuantity || 0) > 0
-            );
-            defaultStockId = matches[0]?.id || electrodeStockList.find(s => (s.remainingQuantity || 0) > 0)?.id || '';
+            const targetCode = String(targetCfg.productCode).trim();
+            const matches = electrodeStockList.filter(s => {
+                const itemCode = String(s.productCode || '').trim();
+                const itemBitola = String(s.bitola || '').trim();
+                const qty = Number(s.remainingQuantity || 0);
+                if (qty <= 0) return false;
+
+                if (itemCode === targetCode || itemBitola === targetCode) return true;
+                if (gauges && gauges.length > 0) {
+                    return gauges.some(g => 
+                        g.materialType === 'Eletrodos Treliças' &&
+                        (String(g.productCode || '').trim() === targetCode || String(g.gauge || '').trim() === targetCode) &&
+                        (String(g.gauge || '').trim() === itemBitola || String(g.productCode || '').trim() === itemCode)
+                    );
+                }
+                return false;
+            });
+            // Apenas define defaultStockId se houver lote com o código exato
+            defaultStockId = matches[0]?.id || '';
         }
 
         setActiveOperation({
