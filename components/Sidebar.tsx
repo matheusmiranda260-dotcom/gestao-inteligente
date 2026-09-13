@@ -427,7 +427,9 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
                     <MenuItem target="documents" label="Documentos" icon={DocumentTextIcon} />
                     <MenuItem target="workInstructions" label="Instruções" icon={DocumentTextIcon} />
                     <MenuItem target="partsManager" label="Peças" icon={WrenchScrewdriverIcon} />
+                    <MenuItem target="electrodesStock" label="Eletrodos" icon={AdjustmentsIcon} />
                 </div>
+
 
                 {/* SISTEMA */}
                 {(hasPermission('userManagement') || hasPermission('gaugesManager') || hasPermission('downtimeConfigs')) && (

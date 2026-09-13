@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Page, ProductionOrderData, StockItem, User, StockGauge, ShiftReport, MachineType, Bitola, DowntimeConfig, Employee, PcpShiftConfig, PcpHoliday } from '../types';
+import type { Page, ProductionOrderData, StockItem, User, StockGauge, ShiftReport, MachineType, Bitola, DowntimeConfig, Employee, PcpShiftConfig, PcpHoliday, TrelicaSpoolStand } from '../types';
 import { FioMaquinaBitolaOptions, TrefilaBitolaOptions } from '../types';
 import { DEFAULT_TRELICA_MODELS } from '../utils/trelicaModelsData';
 import { supabase } from '../supabaseClient';
@@ -12,6 +12,7 @@ import {
     fetchTrelicaSpoolStands
 } from '../services/supabaseService';
 import TrelicaSpoolStands from './TrelicaSpoolStands';
+import TrelicaWeldingHead from './TrelicaWeldingHead';
 import { 
     CalendarIcon, PlusIcon, ChevronRightIcon, XIcon, ArrowLeftIcon, 
     TrashIcon, PlayIcon, CheckCircleIcon, ClockIcon, ChartBarIcon, 
@@ -534,6 +535,12 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
     // --- Campos de TRELIÇA (Regras idênticas a ProductionOrderTrelica.tsx) ---
     const [selectedTrelicaCod, setSelectedTrelicaCod] = useState<string>(trelicaModels[0]?.cod || 'H8L6');
+
+    // Modelo de Treliça Selecionado
+    const selectedTrelicaModel = useMemo(() => {
+        return trelicaModels.find(m => m.cod === selectedTrelicaCod) || trelicaModels[0];
+    }, [selectedTrelicaCod]);
+
     const [trelicaQuantity, setTrelicaQuantity] = useState<number>(3500);
     const [isTrelicaGhostOrder, setIsTrelicaGhostOrder] = useState<boolean>(false);
     const [trelicaSuperiorLots, setTrelicaSuperiorLots] = useState<string[]>([]);
@@ -545,11 +552,40 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     const [trelicaLotSearch, setTrelicaLotSearch] = useState<string>('');
     const [trelicaShowAllGauges, setTrelicaShowAllGauges] = useState<boolean>(false);
     const [viewSpoolStandsMachine, setViewSpoolStandsMachine] = useState<string | null>(null);
+    const [viewWeldingHeadMachine, setViewWeldingHeadMachine] = useState<string | null>(null);
+    const [isSpoolStandsFullscreen, setIsSpoolStandsFullscreen] = useState<boolean>(true);
+    const [machineMountedStands, setMachineMountedStands] = useState<TrelicaSpoolStand[]>([]);
 
-    // Carrega os 5 lotes dos porta-rolos atualmente montados na máquina para a nova ordem
+    // Carregar automaticamente o estado dos porta-rolos ao abrir modal para Treliça
+    useEffect(() => {
+        if (isCreateModalOpen && createCategory === 'Treliça' && createMachine.startsWith('Treliça')) {
+            fetchTrelicaSpoolStands(createMachine).then(data => {
+                setMachineMountedStands(data || []);
+            }).catch(() => {});
+        }
+    }, [isCreateModalOpen, createMachine, createCategory]);
+
+    // Calcular quantas bobinas já montadas na máquina batem exatamente com as bitolas do modelo da OP
+    const compatibleStandsForNewOp = useMemo(() => {
+        if (!selectedTrelicaModel || !machineMountedStands || machineMountedStands.length === 0) return [];
+        const supG = normalizeBitola(selectedTrelicaModel.superior);
+        const infG = normalizeBitola(selectedTrelicaModel.inferior);
+        const senG = normalizeBitola(selectedTrelicaModel.senozoide);
+
+        return machineMountedStands.filter(s => {
+            if (!s.current_lot_id || !s.current_gauge) return false;
+            const g = normalizeBitola(s.current_gauge);
+            if (s.role_type === 'superior') return g === supG;
+            if (s.role_type.startsWith('senozoide')) return g === senG;
+            if (s.role_type.startsWith('inferior')) return g === infG;
+            return false;
+        });
+    }, [selectedTrelicaModel, machineMountedStands]);
+
+    // Carrega os lotes dos porta-rolos atualmente montados na máquina para a nova ordem
     const handleLoadSpoolStandsToOrder = async () => {
         try {
-            const stands = await fetchTrelicaSpoolStands(createMachine);
+            const stands = machineMountedStands.length > 0 ? machineMountedStands : await fetchTrelicaSpoolStands(createMachine);
             if (!stands || stands.length === 0) {
                 showNotification?.(`Nenhum porta-rolo cadastrado para a ${createMachine}.`, 'info');
                 return;
@@ -559,19 +595,19 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             stands.forEach(s => {
                 if (s.current_lot_id) {
                     if (s.role_type === 'superior') {
-                        setTrelicaSuperiorLots([s.current_lot_id]);
+                        setTrelicaSuperiorLots(prev => [s.current_lot_id, ...prev.filter(id => id !== s.current_lot_id)]);
                         loadedCount++;
                     } else if (s.role_type === 'senozoide_left') {
-                        setTrelicaSenozoideLeftLots([s.current_lot_id]);
+                        setTrelicaSenozoideLeftLots(prev => [s.current_lot_id, ...prev.filter(id => id !== s.current_lot_id)]);
                         loadedCount++;
                     } else if (s.role_type === 'senozoide_right') {
-                        setTrelicaSenozoideRightLots([s.current_lot_id]);
+                        setTrelicaSenozoideRightLots(prev => [s.current_lot_id, ...prev.filter(id => id !== s.current_lot_id)]);
                         loadedCount++;
                     } else if (s.role_type === 'inferior_left') {
-                        setTrelicaInferiorLeftLots([s.current_lot_id]);
+                        setTrelicaInferiorLeftLots(prev => [s.current_lot_id, ...prev.filter(id => id !== s.current_lot_id)]);
                         loadedCount++;
                     } else if (s.role_type === 'inferior_right') {
-                        setTrelicaInferiorRightLots([s.current_lot_id]);
+                        setTrelicaInferiorRightLots(prev => [s.current_lot_id, ...prev.filter(id => id !== s.current_lot_id)]);
                         loadedCount++;
                     }
                 }
@@ -610,11 +646,6 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     const [malhaModel, setMalhaModel] = useState<string>('Q92 (15x15)');
     const [malhaPieces, setMalhaPieces] = useState<number>(1000);
     const [malhaBitola, setMalhaBitola] = useState<Bitola>('4.20');
-
-    // Modelo de Treliça Selecionado
-    const selectedTrelicaModel = useMemo(() => {
-        return trelicaModels.find(m => m.cod === selectedTrelicaCod) || trelicaModels[0];
-    }, [selectedTrelicaCod]);
 
     // Helpers de Manipulação de Datas
     const getMonday = (d: Date): Date => {
@@ -1315,7 +1346,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         showNotification?.('Seleções de lotes da treliça desmarcadas.', 'info');
     };
 
-    // Auto-selecionar lotes de CA-60 para Treliça
+    // Auto-selecionar lotes de CA-60 para Treliça (priorizando bobinas já montadas nos suportes)
     const handleAutoSelectTrelicaLots = () => {
         if (!selectedTrelicaModel) return;
 
@@ -1325,14 +1356,38 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
         const usedIds = new Set<string>();
 
-        const allocateLots = (bitolaNorm: string, targetWeight: number): string[] => {
+        // Localizar ID da bobina que já está montada com bitola compatível
+        const getMountedLotId = (roleType: string, bitolaNorm: string): string | undefined => {
+            const match = machineMountedStands.find(s => 
+                s.role_type === roleType && 
+                s.current_lot_id && 
+                normalizeBitola(s.current_gauge || '') === bitolaNorm &&
+                !usedIds.has(s.current_lot_id)
+            );
+            return match?.current_lot_id;
+        };
+
+        const allocateLots = (bitolaNorm: string, targetWeight: number, preferredFirstLotId?: string): string[] => {
+            const selected: string[] = [];
+            let accumulated = 0;
+
+            // Prioridade 1: Bobina que já está montada no suporte da máquina!
+            if (preferredFirstLotId) {
+                const mountedItem = availableCa60Stock.find(l => l.id === preferredFirstLotId);
+                if (mountedItem && !usedIds.has(mountedItem.id)) {
+                    selected.push(mountedItem.id);
+                    usedIds.add(mountedItem.id);
+                    accumulated += (mountedItem.remainingQuantity || 0);
+                }
+            }
+
+            if (accumulated >= targetWeight) return selected;
+
             const candidates = availableCa60Stock.filter(l => 
                 (trelicaShowAllGauges || normalizeBitola(l.bitola) === bitolaNorm) &&
                 !usedIds.has(l.id)
             );
 
-            let accumulated = 0;
-            const selected: string[] = [];
             for (const lot of candidates) {
                 selected.push(lot.id);
                 usedIds.add(lot.id);
@@ -1342,11 +1397,17 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             return selected;
         };
 
-        const newSup = allocateLots(supBitolaNorm, requiredTrelicaWeights.sup);
-        const newInf1 = allocateLots(infBitolaNorm, requiredTrelicaWeights.infSide);
-        const newInf2 = allocateLots(infBitolaNorm, requiredTrelicaWeights.infSide);
-        const newSen1 = allocateLots(senBitolaNorm, requiredTrelicaWeights.senSide);
-        const newSen2 = allocateLots(senBitolaNorm, requiredTrelicaWeights.senSide);
+        const supPref = getMountedLotId('superior', supBitolaNorm);
+        const inf1Pref = getMountedLotId('inferior_left', infBitolaNorm);
+        const inf2Pref = getMountedLotId('inferior_right', infBitolaNorm);
+        const sen1Pref = getMountedLotId('senozoide_left', senBitolaNorm);
+        const sen2Pref = getMountedLotId('senozoide_right', senBitolaNorm);
+
+        const newSup = allocateLots(supBitolaNorm, requiredTrelicaWeights.sup, supPref);
+        const newInf1 = allocateLots(infBitolaNorm, requiredTrelicaWeights.infSide, inf1Pref);
+        const newInf2 = allocateLots(infBitolaNorm, requiredTrelicaWeights.infSide, inf2Pref);
+        const newSen1 = allocateLots(senBitolaNorm, requiredTrelicaWeights.senSide, sen1Pref);
+        const newSen2 = allocateLots(senBitolaNorm, requiredTrelicaWeights.senSide, sen2Pref);
 
         setTrelicaSuperiorLots(newSup);
         setTrelicaInferiorLeftLots(newInf1);
@@ -1354,7 +1415,12 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         setTrelicaSenozoideLeftLots(newSen1);
         setTrelicaSenozoideRightLots(newSen2);
 
-        showNotification?.('Lotes de CA-60 alocados automaticamente para todas as posições da treliça!', 'success');
+        const mountedUsedCount = [supPref, inf1Pref, inf2Pref, sen1Pref, sen2Pref].filter(Boolean).length;
+        if (mountedUsedCount > 0) {
+            showNotification?.(`⚡ Lotes alocados! ${mountedUsedCount} bobina(s) que já estavam nos suportes da ${createMachine} foram priorizadas automaticamente.`, 'success');
+        } else {
+            showNotification?.('Lotes de CA-60 alocados automaticamente para todas as posições da treliça!', 'success');
+        }
     };
 
     // Abre modal para criar OP com data e máquina pré-selecionadas
@@ -2946,6 +3012,35 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                     />
                                                 </div>
                                             )}
+
+                                            {/* Mini Widget da Cabeça de Solda & Eletrodos (Treliça) */}
+                                            {mach.name.startsWith('Treliça') && (
+                                                <div 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setViewWeldingHeadMachine(mach.name);
+                                                    }}
+                                                    className="mt-2 p-2.5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/5 border border-amber-500/30 hover:border-amber-400 hover:bg-amber-500/20 cursor-pointer transition flex items-center justify-between group shadow-sm shadow-amber-950/20"
+                                                    title="Clique para abrir o Gêmeo Digital da Cabeça de Solda, Relatórios e Calibrador de Layout"
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-6 h-6 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300 text-xs font-bold shadow-inner">
+                                                            ⚡
+                                                        </div>
+                                                        <div className="text-left">
+                                                            <span className="text-[11px] font-black text-amber-300 block uppercase tracking-tight">
+                                                                Cabeça de Solda
+                                                            </span>
+                                                            <span className="text-[9px] text-slate-400 font-mono flex items-center gap-1">
+                                                                <span>8 Eletrodos</span> • <span className="text-cyan-300">Relatórios & Calibração</span>
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <span className="text-xs text-amber-400 group-hover:translate-x-1 transition-transform">
+                                                        ➔
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Grade de fundo (5 Colunas de dias) */}
@@ -4534,6 +4629,36 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                 </button>
                                             </div>
                                         </div>
+
+                                        {/* BANNER DE DETECÇÃO INTELIGENTE DE BOBINAS MONTADAS NA MÁQUINA */}
+                                        {compatibleStandsForNewOp.length > 0 && (
+                                            <div className="bg-gradient-to-r from-blue-950/80 via-[#0A1D2B] to-emerald-950/60 p-3 rounded-2xl border border-emerald-500/40 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fade-in">
+                                                <div className="flex items-center gap-2.5">
+                                                    <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-bold text-base shadow flex-shrink-0">
+                                                        💡
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs font-black text-white flex items-center gap-1.5 flex-wrap">
+                                                            <span>SETUP INTELIGENTE: {compatibleStandsForNewOp.length} BOBINA(S) MONTADAS NA {createMachine}!</span>
+                                                            <span className="text-[9px] font-mono bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30 font-bold">
+                                                                Bitolas Compatíveis ✓
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-[11px] text-slate-300 mt-0.5">
+                                                            Os porta-rolos já estão abastecidos com {compatibleStandsForNewOp.map(s => `${(s.role_name ? s.role_name.replace('Porta-Rolo ', '') : s.role_type)}: Lote #${s.current_lot_number || s.current_lot_id || '--'} (⌀${s.current_gauge || '--'}mm)`).join(' • ')}. Deseja aproveitar estas bobinas nesta OP para evitar setup de troca de rolo?
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleLoadSpoolStandsToOrder}
+                                                    className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black text-xs transition active:scale-95 shadow-md flex items-center gap-1.5 flex-shrink-0"
+                                                >
+                                                    <span>⚡</span>
+                                                    <span>Aproveitar {compatibleStandsForNewOp.length} Bobinas Montadas</span>
+                                                </button>
+                                            </div>
+                                        )}
 
                                         {/* Cartões de Status / Tabs para Superior, Inferiores e Senozoides */}
                                         <div className="grid grid-cols-3 gap-2">
@@ -6570,33 +6695,51 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             {/* MODAL / SUB-JANELA: GÊMEO DIGITAL DOS 5 PORTA-ROLOS DA TRELIÇA */}
             {viewSpoolStandsMachine && (
                 <div 
-                    className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-fade-in"
+                    className={`fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center ${
+                        isSpoolStandsFullscreen ? 'p-0' : 'p-2 sm:p-4'
+                    } animate-fade-in`}
                     onClick={() => setViewSpoolStandsMachine(null)}
                 >
                     <div 
-                        className="bg-[#0A1620] border border-white/20 w-full max-w-5xl rounded-3xl p-4 sm:p-6 shadow-2xl flex flex-col gap-4 max-h-[95vh] overflow-y-auto"
+                        className={`bg-[#0A1620] border border-white/20 shadow-2xl flex flex-col transition-all duration-200 ${
+                            isSpoolStandsFullscreen 
+                                ? 'w-full h-full rounded-none p-3 sm:p-5 overflow-y-auto custom-scrollbar' 
+                                : 'w-full max-w-[98vw] 2xl:max-w-[1720px] max-h-[97vh] rounded-3xl p-3 sm:p-5 overflow-y-auto custom-scrollbar'
+                        }`}
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                        <div className="flex items-center justify-between border-b border-white/10 pb-2.5 mb-1">
                             <div className="flex items-center gap-2.5">
-                                <div className="w-9 h-9 rounded-xl bg-blue-500/20 border border-blue-500/40 flex items-center justify-center text-blue-400 font-black text-lg">
+                                <div className="w-8 h-8 rounded-xl bg-blue-500/20 border border-blue-500/40 flex items-center justify-center text-blue-400 font-black text-base">
                                     ⚙️
                                 </div>
                                 <div>
-                                    <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                                    <h3 className="text-sm sm:text-base font-black text-white flex items-center gap-2">
                                         PORTA-ROLOS & DESBOBINADORES: <span className="text-blue-400 font-mono">{viewSpoolStandsMachine}</span>
                                     </h3>
-                                    <p className="text-xs text-slate-400">
+                                    <p className="text-[11px] text-slate-400">
                                         Monitoramento e troca de bobinas em tempo real (1 Superior • 2 Senozoides • 2 Inferiores)
                                     </p>
                                 </div>
                             </div>
-                            <button
-                                onClick={() => setViewSpoolStandsMachine(null)}
-                                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center font-bold text-sm transition"
-                            >
-                                ✕
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsSpoolStandsFullscreen(!isSpoolStandsFullscreen)}
+                                    className="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white flex items-center gap-1.5 font-bold text-xs transition border border-white/10"
+                                    title={isSpoolStandsFullscreen ? "Restaurar para Janela Enquadrada" : "Expandir para Tela Cheia Total"}
+                                >
+                                    <span>{isSpoolStandsFullscreen ? '🗗 Janela' : '⛶ Tela Cheia'}</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setViewSpoolStandsMachine(null)}
+                                    className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center font-bold text-xs transition"
+                                    title="Fechar"
+                                >
+                                    ✕
+                                </button>
+                            </div>
                         </div>
 
                         <TrelicaSpoolStands
@@ -6608,6 +6751,21 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                 (o.machine === viewSpoolStandsMachine || (viewSpoolStandsMachine.startsWith('Treliça') && o.machine === 'Treliça')) && 
                                 (o.status === 'in_progress' || o.status === 'Em Produção' || o.status === 'pending' || o.status === 'Aberta')
                             ) || null}
+                        />
+                    </div>
+                </div>
+            )}
+
+            {/* Modal da Cabeça de Solda, Relatórios e Calibração de Eletrodos no Quadro PCP */}
+            {viewWeldingHeadMachine && (
+                <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center z-[115] p-3 sm:p-6 animate-fade-in">
+                    <div className="w-full max-w-7xl max-h-[94vh] overflow-y-auto custom-scrollbar">
+                        <TrelicaWeldingHead
+                            machineName={viewWeldingHeadMachine}
+                            readOnly={false}
+                            onClose={() => setViewWeldingHeadMachine(null)}
+                            stock={stock}
+                            gauges={gauges}
                         />
                     </div>
                 </div>

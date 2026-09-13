@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'; // Refresh Trigger
-import type { Page, User, Employee, StockItem, ConferenceData, ProductionOrderData, TransferRecord, Bitola, MachineType, PartsRequest, ShiftReport, ProductionRecord, TransferredLotInfo, ProcessedLot, DowntimeEvent, OperatorLog, TrelicaSelectedLots, WeighedPackage, FinishedProductItem, Ponta, PontaItem, FinishedGoodsTransferRecord, TransferredFinishedGoodInfo, KaizenProblem, Meeting, MeetingItem, MeetingCategory, StockMovement, DowntimeConfig, UserAccessLog, ProductionSchedule } from './types';
-import { FioMaquinaBitolaOptions, TrefilaBitolaOptions } from './types';
+import type { Page, User, Employee, StockItem, ConferenceData, ProductionOrderData, TransferRecord, Bitola, MaterialType, MachineType, PartsRequest, ShiftReport, ProductionRecord, TransferredLotInfo, ProcessedLot, DowntimeEvent, OperatorLog, TrelicaSelectedLots, WeighedPackage, FinishedProductItem, Ponta, PontaItem, FinishedGoodsTransferRecord, TransferredFinishedGoodInfo, KaizenProblem, Meeting, MeetingItem, MeetingCategory, StockMovement, DowntimeConfig, UserAccessLog, ProductionSchedule } from './types';
+import { FioMaquinaBitolaOptions, TrefilaBitolaOptions, DefaultElectrodeGauges } from './types';
 import Login from './components/Login';
 import MainMenu from './components/MainMenu';
 import StockControl from './components/StockControl';
@@ -19,6 +19,7 @@ import { trelicaModels } from './components/ProductionOrderTrelica';
 import FinishedGoods from './components/FinishedGoods';
 import TrelicaStockManager from './components/TrelicaStockManager';
 import SparePartsManager from './components/SparePartsManager';
+import ElectrodeStockManager from './components/ElectrodeStockManager';
 import ProductionControl from './components/ProductionControl';
 import { PCPBoard } from './components/PCPBoard';
 import ProductionScheduling from './components/ProductionScheduling';
@@ -40,7 +41,7 @@ import DowntimeConfigManager from './components/DowntimeConfigManager';
 import { supabase } from './supabaseClient';
 import type { StockGauge, StickyNote } from './types';
 
-import { fetchTable, insertItem, updateItem, deleteItem, deleteItemByColumn, updateItemByColumn, mapToCamelCase, fetchByColumn } from './services/supabaseService';
+import { fetchTable, insertItem, updateItem, deleteItem, deleteItemByColumn, updateItemByColumn, mapToCamelCase, fetchByColumn, deductTrelicaSpoolStandConsumption } from './services/supabaseService';
 import { useAllRealtimeSubscriptions } from './hooks/useSupabaseRealtime';
 
 const SESSION_VERSION = 1;
@@ -199,7 +200,20 @@ const App: React.FC = () => {
                 setPartsRequests(fetchedParts);
                 setShiftReports(fetchedReports);
 
-                setGauges(fetchedGauges || []);
+                const baseGauges = fetchedGauges || [];
+                const hasElectrodeGauges = baseGauges.some(g => g.materialType === 'Eletrodos Treliças');
+                if (!hasElectrodeGauges) {
+                    const defaultElStockGauges = DefaultElectrodeGauges.map(e => ({
+                        id: `default_el_${e.productCode}`,
+                        materialType: e.materialType,
+                        gauge: e.gauge,
+                        productCode: e.productCode,
+                        description: e.description
+                    })) as StockGauge[];
+                    setGauges([...baseGauges, ...defaultElStockGauges]);
+                } else {
+                    setGauges(baseGauges);
+                }
                 setStickyNotes(fetchedNotes || []);
                 setMeetings(fetchedMeetings || []);
                 setMeetingCategories(fetchedCategories || []);
@@ -546,58 +560,64 @@ const App: React.FC = () => {
 
     const deleteGauge = async (id: string) => {
         try {
-            await deleteItem('stock_gauges', id);
+            if (!id.startsWith('default_el_')) {
+                await deleteItem('stock_gauges', id);
+            }
             setGauges(prev => prev.filter(g => g.id !== id));
-            showNotification('Bitola removida com sucesso!', 'success');
+            showNotification('Item removido com sucesso!', 'success');
         } catch (error) {
-            showNotification('Erro ao remover bitola.', 'error');
+            setGauges(prev => prev.filter(g => g.id !== id));
+            showNotification('Item removido com sucesso!', 'success');
         }
     };
 
     const updateGauge = async (id: string, data: Partial<StockGauge>) => {
         try {
-            await updateItem<StockGauge>('stock_gauges', id, data);
+            if (!id.startsWith('default_el_')) {
+                await updateItem<StockGauge>('stock_gauges', id, data);
+            }
             setGauges(prev => prev.map(g => g.id === id ? { ...g, ...data } : g));
-            showNotification('Bitola atualizada com sucesso!', 'success');
+            showNotification('Produto atualizado com sucesso!', 'success');
         } catch (error) {
             console.error(error);
-            showNotification('Erro ao atualizar bitola.', 'error');
+            setGauges(prev => prev.map(g => g.id === id ? { ...g, ...data } : g));
+            showNotification('Produto atualizado localmente!', 'info');
         }
     };
 
     const restoreDefaultGauges = async () => {
-        if (!confirm('Deseja restaurar as bitolas padrão do sistema? Isso adicionará as bitolas comuns se estiverem faltando.')) return;
+        if (!confirm('Deseja restaurar as bitolas e modelos de eletrodos padrão do sistema?')) return;
 
         try {
-            const defaults = [
-                ...FioMaquinaBitolaOptions.map(g => ({ materialType: 'Fio Máquina', gauge: g })),
-                ...TrefilaBitolaOptions.map(g => ({ materialType: 'CA-60', gauge: g }))
+            const defaults: Array<{ materialType: MaterialType; gauge: string; description: string; productCode?: string }> = [
+                ...FioMaquinaBitolaOptions.map(g => ({ materialType: 'Fio Máquina' as MaterialType, gauge: g, description: `Fio Máquina ${g}mm`, productCode: undefined })),
+                ...TrefilaBitolaOptions.map(g => ({ materialType: 'CA-60' as MaterialType, gauge: g, description: `CA-60 ${g}mm`, productCode: undefined })),
+                ...DefaultElectrodeGauges.map(e => ({ materialType: e.materialType, gauge: e.gauge, productCode: e.productCode, description: e.description }))
             ];
 
             let addedCount = 0;
             // Iterate sequentially to avoid race conditions or heavy load
             for (const item of defaults) {
                 // Check if exists in local state
-                if (gauges.some(g => g.materialType === item.materialType && g.gauge === item.gauge)) continue;
+                if (gauges.some(g => g.materialType === item.materialType && (g.gauge === item.gauge || (g.productCode && item.productCode && g.productCode === item.productCode)))) continue;
 
                 try {
                     const saved = await insertItem<StockGauge>('stock_gauges', item as StockGauge);
                     setGauges(prev => [...prev, saved]);
                     addedCount++;
                 } catch (e) {
-                    // Constraint violation likely if parallel usage or race condition, ignore
                     console.warn('Skipping or error adding gauge', item, e);
                 }
             }
 
             if (addedCount > 0) {
-                showNotification(`${addedCount} bitolas padrão restauradas com sucesso!`, 'success');
+                showNotification(`${addedCount} produtos/eletrodos padrão restaurados com sucesso!`, 'success');
             } else {
-                showNotification('Todas as bitolas padrão já estavam cadastradas.', 'info');
+                showNotification('Todos os produtos e eletrodos padrão já estavam cadastrados.', 'info');
             }
         } catch (error) {
             console.error(error);
-            showNotification('Erro ao restaurar bitolas. Verifique se a tabela foi criada.', 'error');
+            showNotification('Erro ao restaurar padrões. Verifique se a tabela foi criada.', 'error');
         }
     };
 
@@ -624,7 +644,7 @@ const App: React.FC = () => {
                 internalLot: lot.internalLot,
                 supplierLot: '', // No longer used in UI
                 runNumber: lot.runNumber,
-                steelType: lot.steelType || '1006',
+                steelType: lot.materialType === 'Eletrodos Treliças' ? '' : (lot.steelType || '1006'),
                 materialType: lot.materialType,
                 bitola: lot.bitola,
                 productCode: lot.productCode || '',
@@ -2264,12 +2284,26 @@ const App: React.FC = () => {
     const updateProducedQuantity = async (orderId: string, quantity: number) => {
         try {
             const now = new Date().toISOString();
+            const currentOrder = productionOrders.find(o => o.id === orderId);
+            const prevQty = Number(currentOrder?.actualProducedQuantity) || 0;
+            const deltaPieces = Math.max(0, quantity - prevQty);
+
             const updatedOrder = await updateItem<ProductionOrderData>('production_orders', orderId, {
                 actualProducedQuantity: quantity,
                 lastQuantityUpdate: now
             });
             setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
             showNotification('Contagem de peças atualizada.', 'success');
+
+            // Se for máquina de Treliça e houve acréscimo de peças, abater o consumo das bobinas nos porta-rolos
+            const machine = currentOrder?.machine || updatedOrder?.machine || '';
+            if (machine.startsWith('Treliça') && deltaPieces > 0) {
+                const model = currentOrder?.trelicaModel || (currentOrder as any)?.trelica_model || updatedOrder?.trelicaModel || '';
+                const tamanho = currentOrder?.tamanho || updatedOrder?.tamanho;
+                deductTrelicaSpoolStandConsumption(machine, model, tamanho, deltaPieces).catch(e => {
+                    console.warn('Erro ao abater nível das bobinas:', e);
+                });
+            }
         } catch (error) { showNotification('Erro ao atualizar contagem.', 'error'); }
     };
 
@@ -2745,6 +2779,7 @@ const App: React.FC = () => {
 
 
             case 'partsManager': return <SparePartsManager />;
+            case 'electrodesStock': return <StockControl stock={stock} conferences={conferences} transfers={transfers} setPage={setPage} addConference={addConference} deleteStockItem={deleteStockItem} updateStockItem={(item) => updateStockItem(item.id, item)} createTransfer={createTransfer} editConference={editConference} deleteConference={deleteConference} productionOrders={productionOrders} initialView="list" initialTab="eletrodos" gauges={gauges} currentUser={currentUser} />;
             case 'continuousImprovement': return <ContinuousImprovement setPage={setPage} />;
             case 'workInstructions': return <WorkInstructions setPage={setPage} />;
             case 'peopleManagement': return <PeopleManagement setPage={setPage} currentUser={currentUser} />;

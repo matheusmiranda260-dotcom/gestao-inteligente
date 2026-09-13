@@ -1,6 +1,6 @@
 // types.ts
 
-export type Page = 'login' | 'menu' | 'stock' | 'stockAdd' | 'stockTransfer' | 'documents' | 'finishedGoods' | 'trelicaStock' | 'productionOrderTrelica' | 'productionOrder' | 'productionDashboard' | 'meetingsTasks' | 'continuousImprovement' | 'peopleManagement' | 'trefila' | 'trefilaInProgress' | 'trefilaPending' | 'trefilaCompleted' | 'trefilaRings' | 'trefilaBitolaCheck' | 'trefilaReports' | 'trefilaWeighing' | 'trefilaTemplates' | 'trefilaParts' | 'trelica' | 'trelicaInProgress' | 'trelicaPending' | 'trelicaCompleted' | 'trelicaReports' | 'trelicaParts' | 'malha' | 'malhaInProgress' | 'malhaPending' | 'malhaCompleted' | 'malhaReports' | 'productionOrderMalha' | 'malhaControl' | 'reports' | 'laboratory' | 'userManagement' | 'gaugesManager' | 'partsManager' | 'workInstructions' | 'people' | 'finished_goods' | 'spare_parts' | 'quality' | 'instructions' | 'weighing' | 'meetings' | 'downtimeConfigs' | 'desbobinadeira' | 'desbobinadeiraDashboard' | 'desbobinadeiraInProgress' | 'desbobinadeiraPending' | 'desbobinadeiraCompleted' | 'desbobinadeiraReports' | 'productionOrderDesbobinadeira' | 'trefilaControl' | 'trelicaControl' | 'pcpBoard' | 'productionScheduling' | 'productsManagement';
+export type Page = 'login' | 'menu' | 'stock' | 'stockAdd' | 'stockTransfer' | 'documents' | 'finishedGoods' | 'trelicaStock' | 'productionOrderTrelica' | 'productionOrder' | 'productionDashboard' | 'meetingsTasks' | 'continuousImprovement' | 'peopleManagement' | 'trefila' | 'trefilaInProgress' | 'trefilaPending' | 'trefilaCompleted' | 'trefilaRings' | 'trefilaBitolaCheck' | 'trefilaReports' | 'trefilaWeighing' | 'trefilaTemplates' | 'trefilaParts' | 'trelica' | 'trelicaInProgress' | 'trelicaPending' | 'trelicaCompleted' | 'trelicaReports' | 'trelicaParts' | 'malha' | 'malhaInProgress' | 'malhaPending' | 'malhaCompleted' | 'malhaReports' | 'productionOrderMalha' | 'malhaControl' | 'reports' | 'laboratory' | 'userManagement' | 'gaugesManager' | 'partsManager' | 'electrodesStock' | 'workInstructions' | 'people' | 'finished_goods' | 'spare_parts' | 'quality' | 'instructions' | 'weighing' | 'meetings' | 'downtimeConfigs' | 'desbobinadeira' | 'desbobinadeiraDashboard' | 'desbobinadeiraInProgress' | 'desbobinadeiraPending' | 'desbobinadeiraCompleted' | 'desbobinadeiraReports' | 'productionOrderDesbobinadeira' | 'trefilaControl' | 'trelicaControl' | 'pcpBoard' | 'productionScheduling' | 'productsManagement';
 
 export interface DowntimeConfig {
     id: string;
@@ -42,7 +42,7 @@ export interface EmployeeDocument {
 
 export type MachineType = 'Trefila 1' | 'Trefila 2' | 'Treliça 1' | 'Treliça 2' | 'Malha' | 'Malha 1' | 'Malha 2' | 'Corte-01' | 'Corte-02' | 'Trefila' | 'Treliça' | 'Geral' | 'Empilhadeira' | 'Desbobinadeira 1';
 
-export type MaterialType = 'Arame' | 'Treliça' | 'Ponta' | 'Fio Máquina' | 'Sucata' | 'CA-60' | 'CA-50';
+export type MaterialType = 'Arame' | 'Treliça' | 'Ponta' | 'Fio Máquina' | 'Sucata' | 'CA-60' | 'CA-50' | 'Eletrodos Treliças';
 
 export type Bitola = string; // e.g., '3.40', '4,20', '8.00'
 
@@ -180,6 +180,7 @@ export interface ProductionOrderData {
     averageSpeed?: number;
     summary?: any;
     selectedLotIds?: any;
+    usedLotIds?: string[];
     totalWeight?: number;
     weighedPackages?: any[];
     processedLots?: any[];
@@ -693,7 +694,23 @@ export interface UserAccessLog {
 }
 
 export const trelicaLabels = ['H08 (8m)', 'H12 (12m)', 'H6 (6m)', 'H10 (10m)'];
-export const MaterialOptions = ['Fio Máquina', 'CA-60'];
+export const MaterialOptions = ['Fio Máquina', 'CA-60', 'Eletrodos Treliças'];
+
+export const DefaultElectrodeGauges: Array<{ materialType: MaterialType; gauge: string; productCode: string; description: string }> = [
+    { materialType: 'Eletrodos Treliças', gauge: '1000', productCode: '1000', description: 'Eletrodo Superior (D)' },
+    { materialType: 'Eletrodos Treliças', gauge: '1001', productCode: '1001', description: 'Eletrodo Superior (E)' },
+    { materialType: 'Eletrodos Treliças', gauge: '1002', productCode: '1002', description: 'Base Eletrodo Superior (D)' },
+    { materialType: 'Eletrodos Treliças', gauge: '1003', productCode: '1003', description: 'Base Eletrodo Superior (E)' },
+    { materialType: 'Eletrodos Treliças', gauge: '1004', productCode: '1004', description: 'Eletrodo Inferior (D)' },
+    { materialType: 'Eletrodos Treliças', gauge: '1005', productCode: '1005', description: 'Eletrodo Inferior (E)' },
+    { materialType: 'Eletrodos Treliças', gauge: '1006', productCode: '1006', description: 'Base Eletrodo Inferior (D)' },
+    { materialType: 'Eletrodos Treliças', gauge: '1007', productCode: '1007', description: 'Base Eletrodo Inferior (E)' },
+    { materialType: 'Eletrodos Treliças', gauge: '1008', productCode: '1008', description: 'Eletrodo Central Triangular' },
+    { materialType: 'Eletrodos Treliças', gauge: '1009', productCode: '1009', description: 'Base Central Geral' },
+    { materialType: 'Eletrodos Treliças', gauge: '1010', productCode: '1010', description: 'Eletrodo da Lateral da Base (D)' },
+    { materialType: 'Eletrodos Treliças', gauge: '1011', productCode: '1011', description: 'Eletrodo da Lateral da Base (E)' },
+];
+
 export const FioMaquinaBitolaOptions = ['8.00', '6.50', '6.35', '5.50'];
 export const CA60BitolaOptions = ['3.20', '3.40', '3.80', '4.10', '4.20', '4.50', '4.60', '4.90', '5.00', '5.40', '5.60', '5.80', '5.90', '6.00'];
 export const TrefilaBitolaOptions = CA60BitolaOptions; // Keeping for compatibility
@@ -773,5 +790,95 @@ export interface TrelicaSpoolHistoryEntry {
     status: 'active' | 'completed';
     created_at?: string;
 }
+
+// ==========================================
+// ELETRODOS DE SOLDA DA TRELIÇA (7 POSIÇÕES)
+// ==========================================
+export type TrelicaElectrodePosition =
+    | 'base_sup_esq'
+    | 'superior_esq'
+    | 'base_sup_dir'
+    | 'superior_dir'
+    | 'central_triangular'
+    | 'base_inf_esq'
+    | 'inferior_esq'
+    | 'base_inf_dir'
+    | 'inferior_dir'
+    | 'lateral_esq'
+    | 'lateral_dir'
+    | 'base_lateral';
+
+export type TrelicaElectrodeType =
+    | 'Superior'
+    | 'Base Superior'
+    | 'Central Triangular'
+    | 'Inferior'
+    | 'Base Inferior'
+    | 'Base'
+    | 'Base Lateral'
+    | 'Lateral';
+
+export interface TrelicaElectrodeStock {
+    id: string;
+    lot_number: string;
+    type: TrelicaElectrodeType;
+    material?: string; // ex: 'CuCrZr (Cobre Cromo Zircônio)' | 'Cobre Berílio'
+    quantity: number; // Saldo em estoque (unidades)
+    benchmark_lifespan_meters: number; // Ex: 12000 metros (benchmark padrão)
+    supplier?: string;
+    cost_unit?: number;
+    notes?: string;
+    status?: 'novo' | 'retificado';
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface TrelicaMachineElectrode {
+    id: string;
+    machine_name: string; // 'Treliça 1' | 'Treliça 2'
+    position: TrelicaElectrodePosition;
+    position_label: string; // 'Superior Esquerdo', etc.
+    lot_id?: string | null;
+    lot_number?: string | null;
+    electrode_type: TrelicaElectrodeType;
+    installed_at?: string;
+    installed_by?: string;
+    meters_produced: number; // Metros de treliça soldados desde instalação
+    pieces_produced: number; // Peças de treliça soldadas
+    benchmark_meters: number; // Meta de durabilidade
+    status: 'active' | 'empty' | 'warning' | 'critical';
+    last_dressed_at?: string; // Data da última retífica / dressagem
+    dress_count?: number; // Quantidade de vezes que foi retificado
+    last_cleaned_at?: string; // Data da última limpeza
+    clean_count?: number; // Quantidade de limpezas realizadas
+    last_cleaned_by?: string;
+    cleaning_type?: string;
+    last_adjusted_at?: string; // Data da última regulagem de altura/ângulo
+    last_adjusted_by?: string;
+    last_adjustment_type?: string; // 'Regulagem de Altura', 'Ajuste de Ângulo', etc.
+    last_adjustment_notes?: string;
+    updated_at?: string;
+}
+
+export interface TrelicaElectrodeHistory {
+    id: string;
+    machine_name: string;
+    position: TrelicaElectrodePosition;
+    position_label: string;
+    lot_id: string;
+    lot_number: string;
+    electrode_type: TrelicaElectrodeType;
+    installed_at: string;
+    removed_at: string;
+    installed_by?: string;
+    removed_by?: string;
+    meters_produced: number;
+    pieces_produced: number;
+    reason: 'Desgaste Normal' | 'Trinca / Quebra' | 'Queima / Superaquecimento' | 'Envio para Retífica' | 'Troca Preventiva' | 'Ajuste de Setup' | 'Limpeza de Eletrodo' | 'Ajuste de Altura / Ângulo' | string;
+    destination?: 'Sucata / Descarte' | 'Retífica / Usinagem' | 'Retorno ao Estoque' | 'Mantido na Máquina';
+    notes?: string;
+    created_at?: string;
+}
+
 
 

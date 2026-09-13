@@ -1,14 +1,15 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import type { Page, MachineType, StockItem, ProductionOrderData, User, PartsRequest, ShiftReport, TrelicaSelectedLots, Ponta, StockGauge, Employee, DowntimeConfig } from '../types';
+import type { Page, MachineType, StockItem, ProductionOrderData, User, PartsRequest, ShiftReport, TrelicaSelectedLots, Ponta, StockGauge, Employee, DowntimeConfig, TrelicaSpoolStand } from '../types';
 import { DOWNTIME_THRESHOLDS } from '../types';
 import { ArrowLeftIcon, PlayIcon, PauseIcon, ClockIcon, WarningIcon, StopIcon, CheckCircleIcon, WrenchScrewdriverIcon, ArchiveIcon, ClipboardListIcon, CogIcon, DocumentReportIcon, ScaleIcon, TrashIcon, CalculatorIcon, ChartBarIcon, ExclamationIcon, SaveIcon, XCircleIcon, ChevronDownIcon, AdjustmentsIcon, ChevronRightIcon } from './icons';
 import PartsRequestModal from './PartsRequestModal';
 import ShiftReportsModal from './ShiftReportsModal';
 import ProductionOrderReport from './ProductionOrderReport';
-import { insertItem, deleteItem, updateItem, fetchTable, fetchByColumn } from '../services/supabaseService';
+import { insertItem, deleteItem, updateItem, fetchTable, fetchByColumn, fetchTrelicaSpoolStands } from '../services/supabaseService';
 import { trelicaModels } from './ProductionOrderTrelica';
 import TrefilaCalculation from './TrefilaCalculation';
 import TrelicaSpoolStands from './TrelicaSpoolStands';
+import TrelicaWeldingHead, { getLocalMachineElectrodes, saveLocalMachineElectrodes } from './TrelicaWeldingHead';
 
 
 const IdleActivityLogger: React.FC<{
@@ -516,42 +517,200 @@ const QuantityPromptModal: React.FC<{
     onClose: () => void;
     onSubmit: (quantity: number) => void;
     currentQuantity: number;
-}> = ({ onClose, onSubmit, currentQuantity }) => {
+    machineName?: string;
+    order?: ProductionOrderData | null;
+}> = ({ onClose, onSubmit, currentQuantity, machineName, order }) => {
     const [quantity, setQuantity] = useState(currentQuantity);
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+    const isTrelica = machineName?.startsWith('Treliça');
+    const isBelowMinimum = quantity < currentQuantity;
+
+    // Calcular peso estimado do acréscimo de peças
+    const pieceDelta = Math.max(0, quantity - currentQuantity);
+    const trelicaUnitWeight = order?.totalWeight && order?.quantityToProduce 
+        ? (order.totalWeight / order.quantityToProduce) 
+        : (isTrelica ? 6.4 : 0);
+    const estimatedWireKg = pieceDelta * trelicaUnitWeight;
+
+    const handleQuickAdd = (addQty: number) => {
+        const base = Math.max(currentQuantity, quantity);
+        setQuantity(base + addQty);
+        setErrorMsg(null);
+    };
+
+    const handleChange = (valStr: string) => {
+        const val = parseInt(valStr, 10);
+        if (isNaN(val)) {
+            setQuantity(0);
+            setErrorMsg(`A quantidade não pode ficar vazia. Mínimo: ${currentQuantity} peças.`);
+            return;
+        }
+        setQuantity(val);
+        if (val < currentQuantity) {
+            setErrorMsg(`⚠️ Atenção: Você não pode informar um valor menor que ${currentQuantity} peças (já confirmadas anteriormente). Isso evita distorções no cálculo de consumo das bobinas de arame.`);
+        } else {
+            setErrorMsg(null);
+        }
+    };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        if (quantity < currentQuantity) {
+            setErrorMsg(`Erro: Não é permitido registrar quantidade inferior a ${currentQuantity} peças.`);
+            return;
+        }
         onSubmit(quantity);
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
-            <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-xl w-full max-w-md">
-                <h2 className="text-2xl font-bold text-slate-800 mb-2">Produção do Turno</h2>
-                <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg mb-6">
-                    <p className="text-amber-800 text-sm font-bold flex items-center gap-2">
-                        <ClockIcon className="h-4 w-4" /> Atualização Obrigatória (10 min)
-                    </p>
-                    <p className="text-amber-700 text-xs mt-1">Informe a quantidade total produzida <strong>desde o início do seu turno</strong>.</p>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+            <form onSubmit={handleSubmit} className="bg-[#0B1A24] border border-white/20 p-6 rounded-2xl shadow-2xl w-full max-w-lg flex flex-col gap-4 text-white">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                    <div className="flex items-center gap-2.5">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-bold text-xl">
+                            📊
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-black text-white">Atualização de Produção</h2>
+                            <p className="text-xs text-slate-400">
+                                {isTrelica ? 'Ciclo inteligente a cada 5 min • Sincronia de Bobinas' : 'Atualização de Produção do Turno'}
+                            </p>
+                        </div>
+                    </div>
+                    <span className="text-[10px] font-mono font-bold px-2.5 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                        {machineName || 'Máquina'}
+                    </span>
                 </div>
+
+                {/* Banner Informativo */}
+                <div className="bg-blue-950/40 border border-blue-500/30 p-3 rounded-xl flex items-start gap-2.5 text-xs text-blue-200">
+                    <ClockIcon className="h-4 w-4 text-blue-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                        <div className="font-bold text-white flex items-center gap-2">
+                            <span>Último registro confirmado:</span>
+                            <span className="font-mono text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded border border-emerald-500/30 text-xs font-black">
+                                {currentQuantity} peças
+                            </span>
+                        </div>
+                        <p className="text-[11px] text-slate-300 mt-1">
+                            Informe a contagem total produzida no seu turno até agora. O sistema calculará o consumo exato dos rolos da máquina.
+                        </p>
+                    </div>
+                </div>
+
+                {/* Alerta de Erro se tentar digitar menos que o já registrado */}
+                {isBelowMinimum && (
+                    <div className="bg-rose-950/60 border border-rose-500/50 p-3 rounded-xl flex items-start gap-2 text-xs text-rose-200 animate-pulse">
+                        <span className="text-base">⛔</span>
+                        <div>
+                            <span className="font-black text-white">Quantidade Bloqueada!</span>
+                            <p className="text-[11px] text-rose-300 mt-0.5">
+                                {errorMsg || `A quantidade não pode ser menor que ${currentQuantity} peças (valor já registrado). Para evitar erros no nível das bobinas, digite um valor igual ou maior.`}
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {/* Campo Principal de Quantidade */}
                 <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Total Produzido no Turno</label>
-                    <div className="relative group">
+                    <div className="flex items-center justify-between mb-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                            Total Produzido no Turno
+                        </label>
+                        <span className="text-[10px] font-mono text-slate-400">
+                            Mínimo obrigatório: <strong className="text-white">{currentQuantity} pçs</strong>
+                        </span>
+                    </div>
+
+                    <div className="relative">
                         <input
                             type="number"
-                            value={quantity}
-                            onChange={e => setQuantity(parseInt(e.target.value, 10) || 0)}
-                            className="mt-1 p-8 w-full border-4 border-slate-100 rounded-[2.5rem] text-7xl text-center font-black text-emerald-600 focus:border-emerald-500 transition-all outline-none bg-slate-50/50 group-hover:bg-white"
+                            min={currentQuantity}
+                            value={quantity === 0 && currentQuantity === 0 ? '' : quantity}
+                            onChange={e => handleChange(e.target.value)}
+                            className={`w-full p-5 border-2 rounded-2xl text-5xl text-center font-black transition-all outline-none bg-black/40 text-white ${
+                                isBelowMinimum
+                                    ? 'border-rose-500 text-rose-300 focus:border-rose-400 ring-2 ring-rose-500/20'
+                                    : 'border-emerald-500/50 focus:border-emerald-400 ring-2 ring-emerald-500/20'
+                            }`}
                             required
                             autoFocus
                             onFocus={(e) => e.target.select()}
                         />
-                        <div className="absolute top-1/2 -translate-y-1/2 right-8 text-slate-300 font-black text-2xl uppercase tracking-widest pointer-events-none">pçs</div>
+                        <div className="absolute top-1/2 -translate-y-1/2 right-5 text-slate-500 font-black text-lg uppercase pointer-events-none font-mono">
+                            pçs
+                        </div>
                     </div>
                 </div>
-                <div className="flex justify-end gap-4 mt-8 pt-4 border-t">
-                    <button type="button" onClick={onClose} className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-4 rounded-lg transition">Cancelar</button>
-                    <button type="submit" className="bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-700 transition">Registrar</button>
+
+                {/* Botões Rápidos de Acréscimo (+50, +100, +200 pçs) */}
+                <div className="flex flex-col gap-1.5">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+                        Atalhos Rápidos de Acréscimo:
+                    </span>
+                    <div className="grid grid-cols-3 gap-2">
+                        <button
+                            type="button"
+                            onClick={() => handleQuickAdd(50)}
+                            className="bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 rounded-xl py-2 text-xs font-bold text-slate-200 transition flex items-center justify-center gap-1"
+                        >
+                            <span>+50</span>
+                            <span className="text-[10px] text-slate-400">pçs</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleQuickAdd(100)}
+                            className="bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 rounded-xl py-2 text-xs font-bold text-slate-200 transition flex items-center justify-center gap-1"
+                        >
+                            <span>+100</span>
+                            <span className="text-[10px] text-slate-400">pçs</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleQuickAdd(200)}
+                            className="bg-emerald-600/30 hover:bg-emerald-600/50 active:scale-95 border border-emerald-500/40 rounded-xl py-2 text-xs font-black text-emerald-300 transition flex items-center justify-center gap-1 shadow-sm"
+                            title="Pacote padrão de Treliça (200 peças)"
+                        >
+                            <span>+200</span>
+                            <span className="text-[10px] text-emerald-400 font-bold">(1 Pacote)</span>
+                        </button>
+                    </div>
+                </div>
+
+                {/* Indicador de impacto do acréscimo nos rolos */}
+                {pieceDelta > 0 && (
+                    <div className="bg-emerald-950/30 border border-emerald-500/25 p-2.5 rounded-xl flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-1.5 text-emerald-300">
+                            <span>⚡</span>
+                            <span>Acréscimo neste reporte:</span>
+                            <strong className="font-mono font-black text-white">+{pieceDelta} pçs</strong>
+                        </div>
+                        {estimatedWireKg > 0 && (
+                            <div className="text-[11px] text-slate-300 font-mono">
+                                Consumo estimado: <strong className="text-emerald-400 font-black">~{estimatedWireKg.toFixed(1)} kg</strong>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Rodapé com Ações */}
+                <div className="flex justify-end gap-3 pt-3 border-t border-white/10">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="bg-white/10 hover:bg-white/15 text-slate-300 hover:text-white font-bold py-2.5 px-4 rounded-xl text-xs transition"
+                    >
+                        Adiar / Cancelar
+                    </button>
+                    <button
+                        type="submit"
+                        disabled={isBelowMinimum}
+                        className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black py-2.5 px-6 rounded-xl text-xs transition shadow-lg shadow-emerald-900/40 flex items-center gap-1.5"
+                    >
+                        <span>✓</span>
+                        <span>Confirmar Produção</span>
+                    </button>
                 </div>
             </form>
         </div>
@@ -1068,8 +1227,33 @@ const MachineControl: React.FC<MachineControlProps> = ({
                 newMap.delete(pkgData.packageNumber);
                 return newMap;
             });
+
+            // Acumula desgaste/metros nos 7 eletrodos de solda da Treliça
+            if (activeMachine.startsWith('Treliça')) {
+                try {
+                    const pieceLength = parseFloat(String(activeOrder.tamanho || '6').replace(',', '.')) || 6;
+                    const packageMeters = pkgData.quantity * pieceLength;
+                    const currentEls = getLocalMachineElectrodes(activeMachine);
+                    const updatedEls = currentEls.map(el => {
+                        const newMeters = (el.meters_produced || 0) + packageMeters;
+                        const newPieces = (el.pieces_produced || 0) + pkgData.quantity;
+                        const isCrit = newMeters >= (el.benchmark_meters || 15000) * 0.9;
+                        const isWarn = newMeters >= (el.benchmark_meters || 15000) * 0.7;
+                        return {
+                            ...el,
+                            meters_produced: newMeters,
+                            pieces_produced: newPieces,
+                            status: isCrit ? ('critical' as const) : isWarn ? ('warning' as const) : ('active' as const)
+                        };
+                    });
+                    saveLocalMachineElectrodes(activeMachine, updatedEls);
+                } catch (err) {
+                    console.warn('Erro ao acumular metros nos eletrodos:', err);
+                }
+            }
         }
     };
+
 
     const handleRecordPackageWeight = (packageNumber: number, quantity: number) => {
         const weightStr = pendingPackageWeights.get(packageNumber);
@@ -1360,6 +1544,19 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
     const isMachineStopped = currentMachineStatus === 'Parada' || currentMachineStatus === 'Preparacao';
     const isEmergencyStopped = currentMachineStatus === 'Parada';
+
+    const [showReadOnlyStandsModal, setShowReadOnlyStandsModal] = useState(false);
+    const [showElectrodesModal, setShowElectrodesModal] = useState(false);
+    const [showTrocaDeRoloInOtherStop, setShowTrocaDeRoloInOtherStop] = useState(false);
+    const [machineStandsSummary, setMachineStandsSummary] = useState<TrelicaSpoolStand[]>([]);
+
+    useEffect(() => {
+        if (activeMachine.startsWith('Treliça')) {
+            fetchTrelicaSpoolStands(activeMachine).then(data => {
+                setMachineStandsSummary(data || []);
+            }).catch(() => {});
+        }
+    }, [activeMachine, isMachineStopped]);
     const statusStartTime = useMemo(() => {
         if (!activeOrder) return null;
         if (isMachineStopped) {
@@ -1461,16 +1658,17 @@ const MachineControl: React.FC<MachineControlProps> = ({
             const nowMs = now.getTime();
             const diff = nowMs - baseTime;
 
-            // Se já passaram 10 min desde o último reporte E 10 min desde o último alerta mostrado nesta sessão
-            const isIntervalElapsed = diff > 10 * 60 * 1000; // 10 minutes
-            const isLastPromptElapsed = nowMs - lastPromptShownAt > 10 * 60 * 1000; // 10 minutes cooldown
+            // Treliça: ciclo a cada 5 minutos conforme solicitação para acompanhamento contínuo dos rolos; outras máquinas: 10 min
+            const promptIntervalMs = activeMachine.startsWith('Treliça') ? 5 * 60 * 1000 : 10 * 60 * 1000;
+            const isIntervalElapsed = diff > promptIntervalMs;
+            const isLastPromptElapsed = nowMs - lastPromptShownAt > promptIntervalMs;
 
             if (isIntervalElapsed && isLastPromptElapsed) {
                 setShowQuantityPrompt(true);
                 setLastPromptShownAt(nowMs);
             }
         }
-    }, [now, activeOrder, isMachineStopped, hasActiveShift, machineType, showQuantityPrompt, lastPromptShownAt]);
+    }, [now, activeOrder, isMachineStopped, hasActiveShift, machineType, showQuantityPrompt, lastPromptShownAt, activeMachine]);
 
     useEffect(() => {
         if ((activeMachine.startsWith('Treliça') || activeMachine.startsWith('Malha')) && activeOrder && hasActiveShift && !showQuantityPrompt) {
@@ -1884,8 +2082,243 @@ const MachineControl: React.FC<MachineControlProps> = ({
                     const limitMs = limitMinutes * 60 * 1000;
                     const isOverLimit = durationMs > limitMs;
 
+                    const isTrocaDeRolo = activeMachine.startsWith('Treliça') && (
+                        showTrocaDeRoloInOtherStop ||
+                        (normReason.includes('troca') && normReason.includes('rolo')) ||
+                        normReason.includes('troca de rolo') ||
+                        normReason.includes('rolo') ||
+                        normReason.includes('bobina')
+                    );
+
+                    const handleResumeAction = () => {
+                        if (isOverLimit && !downtimeJustification.trim()) {
+                            alert('Por favor, detalhe o motivo de ter excedido o limite de tempo para prosseguir.');
+                            return;
+                        }
+                        if (logResumeProduction) {
+                            logResumeProduction(activeOrder.id, isOverLimit ? downtimeJustification : undefined);
+                            setDowntimeJustification('');
+                            setShowTrocaDeRoloInOtherStop(false);
+                        }
+                    };
+
+                    // SE A PARADA FOR ESPECIFICAMENTE POR TROCA DE ROLO (OU ACIONADA NELA):
+                    if (isTrocaDeRolo) {
+                        return (
+                            <div className="fixed inset-0 flex flex-col z-[100] bg-slate-950/95 backdrop-blur-2xl overflow-y-auto p-3 sm:p-6 custom-scrollbar animate-fade-in">
+                                <div className="max-w-7xl mx-auto w-full flex flex-col gap-4 my-auto">
+                                    {/* Header de Parada Operacional: Troca de Rolo */}
+                                    <div className={`p-4 sm:p-6 rounded-3xl border ${isOverLimit ? 'bg-rose-950/70 border-rose-500/60 shadow-rose-900/30' : 'bg-slate-900/90 border-amber-500/40 shadow-amber-900/20'} shadow-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4`}>
+                                        <div className="flex items-center gap-3.5">
+                                            {showTrocaDeRoloInOtherStop && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowTrocaDeRoloInOtherStop(false)}
+                                                    className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition flex items-center gap-1"
+                                                >
+                                                    ← Voltar
+                                                </button>
+                                            )}
+                                            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-bold shadow-lg flex-shrink-0 ${isOverLimit ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 animate-pulse' : 'bg-amber-500/20 text-amber-400 border border-amber-500/40'}`}>
+                                                🔄
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full uppercase font-black tracking-wider ${isOverLimit ? 'bg-rose-500 text-white animate-pulse' : 'bg-amber-500 text-slate-950'}`}>
+                                                        {isOverLimit ? '⚠️ LIMITE DE PARADA EXCEDIDO' : 'PARADA ATIVA: TROCA DE ROLO'}
+                                                    </span>
+                                                    <span className="text-xs font-mono text-slate-400">Máquina: <strong className="text-white">{activeMachine}</strong></span>
+                                                    <span className="text-xs font-mono text-slate-400">OP: <strong className="text-cyan-400">#{activeOrder.orderNumber}</strong></span>
+                                                </div>
+                                                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight mt-1">
+                                                    PAINEL DE TROCA DE BOBINAS / PORTA-ROLOS
+                                                </h2>
+                                                <p className="text-xs text-slate-300 mt-0.5">
+                                                    A máquina está oficialmente parada. Selecione abaixo o suporte que deseja abastecer ou descarregar.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Cronômetro e Botão de Retomada no Topo */}
+                                        <div className="flex items-center gap-3 sm:gap-4 w-full md:w-auto justify-between md:justify-end flex-wrap">
+                                            <div className="bg-slate-950 px-4 py-2 rounded-2xl border border-white/10 text-right">
+                                                <span className="text-[9px] font-mono text-slate-400 uppercase tracking-widest block">Tempo Parada</span>
+                                                <span className={`text-2xl font-black font-mono ${isOverLimit ? 'text-rose-400' : 'text-amber-400'}`}>
+                                                    {formatDuration(durationMs)}
+                                                </span>
+                                                <span className="text-[10px] text-slate-400 block font-mono">Limite: {limitMinutes} min</span>
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={handleResumeAction}
+                                                className="px-5 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black text-xs sm:text-sm uppercase tracking-wider transition active:scale-95 shadow-xl shadow-emerald-500/20 flex items-center gap-2 flex-shrink-0"
+                                            >
+                                                <PlayIcon className="h-5 w-5" />
+                                                <span>Concluir Troca & Retomar Máquina</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Justificativa caso tenha excedido o limite */}
+                                    {isOverLimit && (
+                                        <div className="bg-rose-950/70 border border-rose-500/50 p-4 rounded-2xl animate-fade-in-up">
+                                            <label className="text-[10px] font-black text-rose-300 uppercase tracking-widest mb-1.5 block">
+                                                Justificativa Obrigatória de Atraso na Troca de Rolo
+                                            </label>
+                                            <textarea
+                                                value={downtimeJustification}
+                                                onChange={(e) => setDowntimeJustification(e.target.value)}
+                                                placeholder="Descreva detalhadamente o motivo do atraso (ex: arame embaraçado no desbobinador, atraso na empilhadeira, solda demorada...)"
+                                                className="w-full p-3 bg-rose-900/30 border border-rose-500/40 rounded-xl text-white text-sm font-medium focus:border-rose-400 outline-none resize-none h-20 placeholder:text-rose-300/40"
+                                            />
+                                        </div>
+                                    )}
+
+                                    {/* Gêmeo Digital dos Porta-Rolos Interativo e Liberado */}
+                                    <div className="bg-[#07131B] p-3 sm:p-5 rounded-3xl border border-white/10 shadow-2xl">
+                                        <TrelicaSpoolStands
+                                            machineName={activeMachine}
+                                            stock={stock}
+                                            activeOrder={activeOrder}
+                                            productionOrders={productionOrders}
+                                            currentUser={currentUser}
+                                            readOnly={false}
+                                            onSpoolChange={(stand, newLot) => {
+                                                if (addLotToOrder && activeOrder) {
+                                                    try {
+                                                        addLotToOrder(activeOrder.id, newLot.id);
+                                                    } catch (e) {
+                                                        console.warn('Auto addLotToOrder:', e);
+                                                    }
+                                                }
+                                            }}
+                                        />
+                                    </div>
+
+                                    {/* Rodapé de Confirmação */}
+                                    <div className="p-4 bg-slate-900/90 rounded-2xl border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+                                        <p className="text-xs text-slate-300 font-medium">
+                                            ✓ Bobinas instaladas e sincronizadas no sistema. Quando estiver pronto para religar a máquina:
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={handleResumeAction}
+                                            className="w-full sm:w-auto px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider transition active:scale-95 shadow-lg shadow-emerald-900/40 flex items-center justify-center gap-2 flex-shrink-0"
+                                        >
+                                            <PlayIcon className="h-4 w-4" />
+                                            <span>Retomar Produção Agora</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    }
+
+                    // SE A PARADA FOR ESPECIFICAMENTE POR ELETRODOS (LIMPEZA, AJUSTE OU TROCA):
+                    const isParadaEletrodo = activeMachine.startsWith('Treliça') && (
+                        normReason.includes('eletrodo') ||
+                        normReason.includes('limpeza de eletrodo') ||
+                        normReason.includes('troca de eletrodo') ||
+                        normReason.includes('ajuste de eletrodo') ||
+                        normReason.includes('solda')
+                    );
+
+                    if (isParadaEletrodo) {
+                        return (
+                            <div className="fixed inset-0 flex flex-col z-[100] bg-slate-950/95 backdrop-blur-2xl overflow-y-auto p-3 sm:p-6 custom-scrollbar animate-fade-in">
+                                <div className="max-w-7xl mx-auto w-full flex flex-col gap-4 my-auto">
+                                    {/* Header de Parada Operacional: Eletrodos */}
+                                    <div className={`p-4 sm:p-6 rounded-3xl border ${isOverLimit ? 'bg-rose-950/70 border-rose-500/60 shadow-rose-900/30' : 'bg-slate-900/90 border-cyan-500/40 shadow-cyan-900/20'} shadow-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4`}>
+                                        <div className="flex items-center gap-3.5">
+                                            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-bold shadow-lg flex-shrink-0 ${isOverLimit ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 animate-pulse' : 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40'}`}>
+                                                ⚡
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full uppercase font-black tracking-wider ${isOverLimit ? 'bg-rose-500 text-white animate-pulse' : 'bg-cyan-500 text-slate-950'}`}>
+                                                        {isOverLimit ? '⚠️ LIMITE DE PARADA EXCEDIDO' : `PARADA ATIVA: ${reason.toUpperCase()}`}
+                                                    </span>
+                                                    <span className="text-xs font-mono text-slate-400">Máquina: <strong className="text-white">{activeMachine}</strong></span>
+                                                    <span className="text-xs font-mono text-slate-400">OP: <strong className="text-cyan-400">#{activeOrder.orderNumber}</strong></span>
+                                                </div>
+                                                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight mt-1">
+                                                    CABEÇA DE SOLDA: LIMPEZA, AJUSTE & TROCA DE ELETRODOS
+                                                </h2>
+                                                <p className="text-xs text-slate-300 mt-0.5">
+                                                    A máquina está oficialmente parada. Selecione o eletrodo desejado no desenho para efetuar a limpeza, regulagem ou substituição.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Cronômetro e Botão de Retomada no Topo */}
+                                        <div className="flex items-center gap-3 sm:gap-4 w-full md:w-auto justify-between md:justify-end flex-wrap">
+                                            <div className="bg-slate-950 px-4 py-2 rounded-2xl border border-white/10 text-right">
+                                                <span className="text-[9px] font-mono text-slate-400 uppercase tracking-widest block">Tempo Parada</span>
+                                                <span className={`text-2xl font-black font-mono ${isOverLimit ? 'text-rose-400' : 'text-cyan-400'}`}>
+                                                    {formatDuration(durationMs)}
+                                                </span>
+                                                <span className="text-[10px] text-slate-400 block font-mono">Limite: {limitMinutes} min</span>
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={handleResumeAction}
+                                                className="px-5 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black text-xs sm:text-sm uppercase tracking-wider transition active:scale-95 shadow-xl shadow-emerald-500/20 flex items-center gap-2 flex-shrink-0"
+                                            >
+                                                <PlayIcon className="h-5 w-5" />
+                                                <span>Concluir Eletrodos & Retomar Máquina</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Justificativa caso tenha excedido o limite */}
+                                    {isOverLimit && (
+                                        <div className="bg-rose-950/70 border border-rose-500/50 p-4 rounded-2xl animate-fade-in-up">
+                                            <label className="text-[10px] font-black text-rose-300 uppercase tracking-widest mb-1.5 block">
+                                                Justificativa Obrigatória de Atraso no Procedimento dos Eletrodos
+                                            </label>
+                                            <textarea
+                                                value={downtimeJustification}
+                                                onChange={(e) => setDowntimeJustification(e.target.value)}
+                                                placeholder="Descreva detalhadamente o motivo do atraso (ex: ajuste fino de altura demorado, remoção difícil de carepa de solda...)"
+                                                className="w-full p-3 bg-rose-900/30 border border-rose-500/40 rounded-xl text-white text-sm font-medium focus:border-rose-400 outline-none resize-none h-20 placeholder:text-rose-300/40"
+                                            />
+                                        </div>
+                                    )}
+
+                                    {/* Gêmeo Digital da Cabeça de Solda (Interativo) */}
+                                    <div className="bg-[#07131B] p-2 sm:p-4 rounded-3xl border border-white/10 shadow-2xl">
+                                        <TrelicaWeldingHead
+                                            machineName={activeMachine}
+                                            readOnly={false}
+                                            stock={stock}
+                                            gauges={gauges}
+                                        />
+                                    </div>
+
+                                    {/* Rodapé de Confirmação */}
+                                    <div className="p-4 bg-slate-900/90 rounded-2xl border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+                                        <p className="text-xs text-slate-300 font-medium">
+                                            ✓ Procedimento de eletrodo concluído. Quando estiver pronto para religar a máquina:
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={handleResumeAction}
+                                            className="w-full sm:w-auto px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider transition active:scale-95 shadow-lg shadow-emerald-900/40 flex items-center justify-center gap-2 flex-shrink-0"
+                                        >
+                                            <PlayIcon className="h-4 w-4" />
+                                            <span>Retomar Produção Agora</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    }
+
                     if (currentMachineStatus === 'Preparacao' && !isOverLimit) return null;
 
+                    // PARADA OPERACIONAL PADRÃO (OUTROS MOTIVOS: ENROSCO, MANUTENÇÃO, ETC.)
                     return (
                         <div className={`fixed inset-0 flex items-center justify-center z-[100] p-4 transition-all duration-500 ${isOverLimit ? 'bg-rose-600/90 animate-stop-pulse' : 'bg-amber-500/90 animate-warning-pulse'} backdrop-blur-xl`}>
                             <div className="text-center p-8 bg-white rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] w-full max-w-sm mx-auto animate-zoom-in border border-white/20">
@@ -1923,6 +2356,28 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                     )}
                                 </div>
 
+                                {activeMachine.startsWith('Treliça') && (
+                                    <div className="flex flex-col gap-2 mb-4">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowTrocaDeRoloInOtherStop(true)}
+                                            className="w-full py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-xs transition flex items-center justify-center gap-2 active:scale-95 shadow-sm"
+                                        >
+                                            <span>🔄</span>
+                                            <span>Aproveitar Parada p/ Trocar Rolo</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowElectrodesModal(true)}
+                                            className="w-full py-2.5 px-4 rounded-xl bg-cyan-950/60 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-700/50 font-black text-xs transition flex items-center justify-center gap-2 active:scale-95 shadow-sm"
+                                        >
+                                            <span>⚡</span>
+                                            <span>Inspecionar / Trocar Eletrodos</span>
+                                        </button>
+                                    </div>
+                                )}
+
+
                                 {isOverLimit && (
                                     <div className="mb-6 text-left animate-fade-in-up">
                                         <label className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-2 block">
@@ -1938,16 +2393,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                 )}
 
                                 <button
-                                    onClick={() => {
-                                        if (isOverLimit && !downtimeJustification.trim()) {
-                                            alert('Por favor, detalhe o motivo de ter excedido o limite de tempo para prosseguir.');
-                                            return;
-                                        }
-                                        if (logResumeProduction) {
-                                            logResumeProduction(activeOrder.id, isOverLimit ? downtimeJustification : undefined);
-                                            setDowntimeJustification('');
-                                        }
-                                    }}
+                                    onClick={handleResumeAction}
                                     className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all duration-300 shadow-lg flex items-center justify-center gap-3 mb-6 ${
                                         isOverLimit 
                                         ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-200 hover:scale-[1.02] active:scale-[0.98]' 
@@ -2082,6 +2528,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
                     onClose={() => setShowQuantityPrompt(false)}
                     onSubmit={handleUpdateQuantity}
                     currentQuantity={Math.max(0, (promptOrder.actualProducedQuantity || 0) - (currentOperatorLog?.startQuantity || 0))}
+                    machineName={activeMachine}
+                    order={promptOrder}
                 />
             )}
             {showPartsRequestModal && activeOrder && (
@@ -2207,6 +2655,83 @@ const MachineControl: React.FC<MachineControlProps> = ({
                     }
                 }} />
             )}
+
+            {/* Modal de Visualização Somente Leitura dos Porta-Rolos (Sem Burlar Parada) */}
+            {showReadOnlyStandsModal && activeMachine.startsWith('Treliça') && (
+                <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-[90] p-3 sm:p-6 animate-fade-in">
+                    <div className="bg-[#0A1622] rounded-3xl border border-white/10 shadow-2xl w-full max-w-7xl max-h-[90vh] overflow-y-auto p-4 sm:p-6 custom-scrollbar">
+                        <div className="flex items-center justify-between pb-4 mb-4 border-b border-white/10 flex-wrap gap-3">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 bg-cyan-500/20 rounded-2xl text-cyan-400 text-xl font-bold border border-cyan-500/30">
+                                    👁️
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-lg font-black text-white uppercase tracking-tight">
+                                            Visualização dos Porta-Rolos ({activeMachine})
+                                        </h3>
+                                        <span className="text-[10px] font-mono bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/30 font-bold">
+                                            🔒 Somente Leitura
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-slate-300 mt-0.5">
+                                        A máquina continua em operação. Para carregar ou descarregar bobinas, realize a parada por <strong>"Troca de Rolo"</strong>.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2.5">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowReadOnlyStandsModal(false);
+                                        if (logDowntime && activeOrder) {
+                                            logDowntime(activeOrder.id, 'Troca de Rolo');
+                                        } else {
+                                            setShowDowntimeModal(true);
+                                        }
+                                    }}
+                                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs transition active:scale-95 shadow-md flex items-center gap-1.5"
+                                >
+                                    <span>⏸️</span>
+                                    <span>Parar Máquina p/ Trocar</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowReadOnlyStandsModal(false)}
+                                    className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition"
+                                >
+                                    <XCircleIcon className="h-6 w-6" />
+                                </button>
+                            </div>
+                        </div>
+
+                        <TrelicaSpoolStands
+                            machineName={activeMachine}
+                            stock={stock}
+                            activeOrder={activeOrder}
+                            productionOrders={productionOrders}
+                            currentUser={currentUser}
+                            readOnly={true}
+                        />
+                    </div>
+                </div>
+            )}
+
+            {/* Modal do Gêmeo Digital da Cabeça de Solda (7 Eletrodos) */}
+            {showElectrodesModal && activeMachine.startsWith('Treliça') && (
+                <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center z-[105] p-3 sm:p-6 animate-fade-in">
+                    <div className="w-full max-w-7xl max-h-[92vh] overflow-y-auto custom-scrollbar">
+                        <TrelicaWeldingHead
+                            machineName={activeMachine}
+                            readOnly={!isMachineStopped && !isGestor}
+                            onClose={() => setShowElectrodesModal(false)}
+                            stock={stock}
+                            gauges={gauges}
+                        />
+                    </div>
+                </div>
+            )}
+
 
 
             {/* Machine Header for better context on mobile */}
@@ -2493,11 +3018,18 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                             )}
 
                                             {/* Card de Status Principal - Novo Design Pulsante */}
-                                            <div className={`p-6 rounded-3xl border-4 transition-all duration-1000 ${
-                                                isActiveProcess ? 'bg-emerald-50 border-emerald-500/50 animate-producing-pulse shadow-[0_0_30px_rgba(16,185,129,0.2)]' :
-                                                isUnderStopAlerta ? 'bg-rose-50 border-rose-500/50 animate-stop-pulse shadow-[0_0_30px_rgba(244,63,94,0.2)]' :
-                                                'bg-white border-slate-100'
-                                            } hidden md:block`}>
+                                            <div 
+                                                onClick={() => {
+                                                    if (isUnderStopAlerta && activeOrder) {
+                                                        setShowDowntimeModal(true);
+                                                    }
+                                                }}
+                                                title={isUnderStopAlerta ? "Clique para abrir o Menu Operacional de Paradas / Troca de Rolo" : undefined}
+                                                className={`p-6 rounded-3xl border-4 transition-all duration-1000 ${
+                                                    isActiveProcess ? 'bg-emerald-50 border-emerald-500/50 animate-producing-pulse shadow-[0_0_30px_rgba(16,185,129,0.2)]' :
+                                                    isUnderStopAlerta ? 'bg-rose-50 border-rose-500/50 animate-stop-pulse shadow-[0_0_30px_rgba(244,63,94,0.2)] cursor-pointer hover:border-amber-400 hover:shadow-amber-500/20' :
+                                                    'bg-white border-slate-100'
+                                                } hidden md:block`}>
                                                 <div className="flex items-center gap-6">
                                                     <div className={`w-20 h-20 rounded-3xl flex items-center justify-center shadow-lg transition-transform duration-500 ${
                                                         isActiveProcess ? 'bg-emerald-600 rotate-12 scale-110' :
@@ -3288,35 +3820,23 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                         </>
                                     ) : (
                                         <>
-                                            {/* RACK DOS 5 PORTA-ROLOS DA TRELIÇA (GÊMEO DIGITAL CAD) */}
-                                            {activeMachine.startsWith('Treliça') && (
-                                                <div className="mb-6">
-                                                    <TrelicaSpoolStands
-                                                        machineName={activeMachine}
-                                                        stock={stock}
-                                                        activeOrder={activeOrder}
-                                                        productionOrders={productionOrders}
-                                                        currentUser={currentUser}
-                                                        onSpoolChange={(stand, newLot) => {
-                                                            if (addLotToOrder && activeOrder) {
-                                                                try {
-                                                                    addLotToOrder(activeOrder.id, newLot.id);
-                                                                } catch (e) {
-                                                                    console.warn('Auto addLotToOrder:', e);
-                                                                }
-                                                            }
-                                                        }}
-                                                    />
+                                            <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-100">
+                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 mb-4 border-b border-slate-100 gap-2">
+                                                    <div className="flex items-center gap-3 flex-wrap">
+                                                        <h3 className="text-base sm:text-lg font-black text-slate-800 tracking-tight flex items-center gap-2">
+                                                            <span>📦 Registro de Pacotes</span>
+                                                            <span className="text-xs font-normal text-slate-400 font-sans">(200 pçs / pct)</span>
+                                                        </h3>
+                                                        <span className="text-[11px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                                                            {trelicaPackages.filter(p => p.status === 'Concluído').length} de {trelicaPackages.length} concluídos
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-xs text-slate-500 font-medium hidden sm:inline">
+                                                        ⚖️ Digite o peso do pacote e pressione Enter ou clique em Salvar
+                                                    </span>
                                                 </div>
-                                            )}
 
-                                            <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm">
-                                                <h3 className="text-lg font-bold text-slate-700 mb-4">Registro de Pacotes</h3>
-                                                <p className="text-sm text-slate-500 mb-6 bg-blue-50 p-3 rounded-lg border border-blue-100 flex gap-2">
-                                                    <ExclamationIcon className="h-5 w-5 text-blue-500 flex-shrink-0" />
-                                                    Pese cada pacote de 200 peças e registre abaixo.
-                                                </p>
-                                                <div className="overflow-auto max-h-[500px] md:border border-slate-100 rounded-xl">
+                                                <div className="overflow-auto max-h-[520px] md:border border-slate-100 rounded-xl">
                                                     {/* Desktop Table View */}
                                                     <table className="w-full text-sm hidden md:table">
                                                         <thead className="bg-slate-50 text-left sticky top-0 z-10">
@@ -3328,91 +3848,152 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                             </tr>
                                                         </thead>
                                                         <tbody className="divide-y divide-slate-100">
-                                                            {trelicaPackages.map(pkg => (
-                                                                <tr key={pkg.packageNumber} className={pkg.status === 'Concluído' ? 'bg-slate-50/50' : 'bg-white'}>
-                                                                    <td className="p-4 font-bold text-slate-700 text-lg">#{pkg.packageNumber}</td>
-                                                                    <td className="p-4 text-slate-600">{pkg.quantity} pçs</td>
-                                                                    <td className="p-4">
-                                                                        {pkg.status === 'Concluído' ? (
-                                                                            <span className="font-mono font-bold text-slate-700 text-lg">{pkg.weight?.toFixed(2)}</span>
-                                                                        ) : (
-                                                                            <div className="relative">
-                                                                                <input
-                                                                                    type="text"
-                                                                                    inputMode="decimal"
-                                                                                    value={pendingPackageWeights.get(pkg.packageNumber) || ''}
-                                                                                    onChange={e => handlePendingPackageWeightChange(pkg.packageNumber, e.target.value)}
-                                                                                    className="w-full p-3 border-2 border-slate-200 rounded-xl text-lg font-medium focus:border-indigo-500 focus:ring-0 transition"
-                                                                                    placeholder="0.00"
-                                                                                />
-                                                                                <span className="absolute right-3 top-3.5 text-slate-400 text-sm font-bold">kg</span>
-                                                                            </div>
-                                                                        )}
-                                                                    </td>
-                                                                    <td className="p-4 text-center">
-                                                                        {pkg.status === 'Concluído' ? (
-                                                                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800 uppercase tracking-wide">
-                                                                                OK
-                                                                            </span>
-                                                                        ) : (
-                                                                            <button
-                                                                                onClick={() => handleRecordPackageWeight(pkg.packageNumber, pkg.quantity)}
-                                                                                className="bg-indigo-600 text-white text-sm font-bold py-2 px-4 rounded-xl hover:bg-indigo-700 shadow-md transition w-full"
-                                                                            >
-                                                                                Salvar
-                                                                            </button>
-                                                                        )}
-                                                                    </td>
-                                                                </tr>
-                                                            ))}
+                                                            {(() => {
+                                                                const nextPendingPkgNum = trelicaPackages.find(p => p.status !== 'Concluído')?.packageNumber;
+                                                                return trelicaPackages.map(pkg => {
+                                                                    const isNext = pkg.packageNumber === nextPendingPkgNum;
+                                                                    return (
+                                                                        <tr 
+                                                                            key={pkg.packageNumber} 
+                                                                            className={
+                                                                                pkg.status === 'Concluído' 
+                                                                                    ? 'bg-slate-50/50' 
+                                                                                    : isNext 
+                                                                                        ? 'bg-indigo-50/30 ring-1 ring-inset ring-indigo-200' 
+                                                                                        : 'bg-white'
+                                                                            }
+                                                                        >
+                                                                            <td className="p-4 font-bold text-slate-700 text-lg">
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <span>#{pkg.packageNumber}</span>
+                                                                                    {isNext && (
+                                                                                        <span className="text-[9px] font-black uppercase bg-indigo-500 text-white px-2 py-0.5 rounded-full animate-pulse">
+                                                                                            Próximo
+                                                                                        </span>
+                                                                                    )}
+                                                                                </div>
+                                                                            </td>
+                                                                            <td className="p-4 text-slate-600 font-medium">{pkg.quantity} pçs</td>
+                                                                            <td className="p-4">
+                                                                                {pkg.status === 'Concluído' ? (
+                                                                                    <span className="font-mono font-black text-slate-800 text-lg">{pkg.weight?.toFixed(2)} kg</span>
+                                                                                ) : (
+                                                                                    <div className="relative max-w-xs">
+                                                                                        <input
+                                                                                            type="text"
+                                                                                            inputMode="decimal"
+                                                                                            value={pendingPackageWeights.get(pkg.packageNumber) || ''}
+                                                                                            onChange={e => handlePendingPackageWeightChange(pkg.packageNumber, e.target.value)}
+                                                                                            onKeyDown={e => {
+                                                                                                if (e.key === 'Enter') {
+                                                                                                    e.preventDefault();
+                                                                                                    handleRecordPackageWeight(pkg.packageNumber, pkg.quantity);
+                                                                                                }
+                                                                                            }}
+                                                                                            className="w-full p-3 border-2 border-slate-200 rounded-xl text-lg font-bold text-slate-800 focus:border-indigo-500 focus:ring-0 transition"
+                                                                                            placeholder="0.00"
+                                                                                        />
+                                                                                        <span className="absolute right-3 top-3.5 text-slate-400 text-sm font-bold">kg</span>
+                                                                                    </div>
+                                                                                )}
+                                                                            </td>
+                                                                            <td className="p-4 text-center">
+                                                                                {pkg.status === 'Concluído' ? (
+                                                                                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800 uppercase tracking-wide">
+                                                                                        ✓ OK
+                                                                                    </span>
+                                                                                ) : (
+                                                                                    <button
+                                                                                        onClick={() => handleRecordPackageWeight(pkg.packageNumber, pkg.quantity)}
+                                                                                        className="bg-indigo-600 text-white text-sm font-bold py-2.5 px-5 rounded-xl hover:bg-indigo-700 shadow-md transition w-full max-w-xs active:scale-95"
+                                                                                    >
+                                                                                        Salvar
+                                                                                    </button>
+                                                                                )}
+                                                                            </td>
+                                                                        </tr>
+                                                                    );
+                                                                });
+                                                            })()}
                                                         </tbody>
                                                     </table>
 
                                                     {/* Mobile Card View for Packages */}
-                                                    <div className="flex flex-col gap-4 md:hidden pb-4">
-                                                        {trelicaPackages.map(pkg => (
-                                                            <div key={pkg.packageNumber} className={`p-4 rounded-2xl border-2 ${pkg.status === 'Concluído' ? 'bg-slate-50 border-slate-100' : 'bg-white border-indigo-50 shadow-sm'}`}>
-                                                                <div className="flex justify-between items-center mb-3">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <span className="bg-slate-200 text-slate-600 w-8 h-8 flex items-center justify-center rounded-full font-bold text-sm">#{pkg.packageNumber}</span>
-                                                                        <span className="text-slate-500 text-sm">{pkg.quantity} pçs</span>
-                                                                    </div>
-                                                                    {pkg.status === 'Concluído' && (
-                                                                        <div className="flex items-center gap-1 text-emerald-600 font-bold bg-emerald-50 px-2.5 py-1 rounded-lg text-xs uppercase tracking-wide">
-                                                                            <CheckCircleIcon className="h-4 w-4" /> Registrado
+                                                    <div className="flex flex-col gap-3 md:hidden pb-4">
+                                                        {(() => {
+                                                            const nextPendingPkgNum = trelicaPackages.find(p => p.status !== 'Concluído')?.packageNumber;
+                                                            return trelicaPackages.map(pkg => {
+                                                                const isNext = pkg.packageNumber === nextPendingPkgNum;
+                                                                return (
+                                                                    <div 
+                                                                        key={pkg.packageNumber} 
+                                                                        className={`p-3.5 rounded-2xl border-2 transition ${
+                                                                            pkg.status === 'Concluído' 
+                                                                                ? 'bg-slate-50/70 border-slate-100' 
+                                                                                : isNext 
+                                                                                    ? 'bg-white border-indigo-400 shadow-md ring-2 ring-indigo-100' 
+                                                                                    : 'bg-white border-slate-200 shadow-sm'
+                                                                        }`}
+                                                                    >
+                                                                        <div className="flex justify-between items-center mb-2.5">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className={`w-8 h-8 flex items-center justify-center rounded-xl font-bold text-sm ${
+                                                                                    pkg.status === 'Concluído' ? 'bg-slate-200 text-slate-600' : 'bg-indigo-600 text-white shadow-sm'
+                                                                                }`}>
+                                                                                    #{pkg.packageNumber}
+                                                                                </span>
+                                                                                <span className="text-slate-500 font-medium text-xs">{pkg.quantity} peças</span>
+                                                                                {isNext && (
+                                                                                    <span className="text-[9px] font-black uppercase bg-indigo-500 text-white px-2 py-0.5 rounded-full animate-pulse">
+                                                                                        Próximo
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                            {pkg.status === 'Concluído' && (
+                                                                                <div className="flex items-center gap-1 text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-lg text-xs uppercase tracking-wide">
+                                                                                    <CheckCircleIcon className="h-4 w-4" /> Registrado
+                                                                                </div>
+                                                                            )}
                                                                         </div>
-                                                                    )}
-                                                                </div>
 
-                                                                {pkg.status === 'Concluído' ? (
-                                                                    <div className="flex items-end justify-between">
-                                                                        <span className="text-xs text-slate-400 uppercase font-bold">Peso Registrado</span>
-                                                                        <span className="text-2xl font-mono font-bold text-slate-700">{pkg.weight?.toFixed(2)} <span className="text-sm">kg</span></span>
+                                                                        {pkg.status === 'Concluído' ? (
+                                                                            <div className="flex items-end justify-between pt-1 border-t border-slate-100">
+                                                                                <span className="text-xs text-slate-400 uppercase font-bold">Peso Registrado</span>
+                                                                                <span className="text-xl font-mono font-black text-slate-700">{pkg.weight?.toFixed(2)} <span className="text-xs">kg</span></span>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div className="flex gap-2 items-end pt-1">
+                                                                                <div className="flex-1 relative">
+                                                                                    <label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Peso (kg)</label>
+                                                                                    <input
+                                                                                        type="text"
+                                                                                        inputMode="decimal"
+                                                                                        value={pendingPackageWeights.get(pkg.packageNumber) || ''}
+                                                                                        onChange={e => handlePendingPackageWeightChange(pkg.packageNumber, e.target.value)}
+                                                                                        onKeyDown={e => {
+                                                                                            if (e.key === 'Enter') {
+                                                                                                e.preventDefault();
+                                                                                                handleRecordPackageWeight(pkg.packageNumber, pkg.quantity);
+                                                                                            }
+                                                                                        }}
+                                                                                        className="w-full h-12 pl-3 pr-10 border-2 border-slate-200 rounded-xl text-lg font-bold text-slate-800 focus:border-indigo-500 focus:ring-0 transition"
+                                                                                        placeholder="0.00"
+                                                                                    />
+                                                                                    <span className="absolute right-3 top-7 text-slate-400 text-xs font-bold">kg</span>
+                                                                                </div>
+                                                                                <button
+                                                                                    onClick={() => handleRecordPackageWeight(pkg.packageNumber, pkg.quantity)}
+                                                                                    className="h-12 px-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-lg shadow-indigo-200 active:scale-95 transition flex items-center justify-center gap-1.5"
+                                                                                >
+                                                                                    <CheckCircleIcon className="h-5 w-5" />
+                                                                                    <span className="font-bold text-sm">Salvar</span>
+                                                                                </button>
+                                                                            </div>
+                                                                        )}
                                                                     </div>
-                                                                ) : (
-                                                                    <div className="flex gap-2 items-end">
-                                                                        <div className="flex-1 relative">
-                                                                            <label className="text-xs text-slate-400 font-bold uppercase mb-1 block">Peso (kg)</label>
-                                                                            <input
-                                                                                type="text"
-                                                                                inputMode="decimal"
-                                                                                value={pendingPackageWeights.get(pkg.packageNumber) || ''}
-                                                                                onChange={e => handlePendingPackageWeightChange(pkg.packageNumber, e.target.value)}
-                                                                                className="w-full h-12 pl-3 pr-10 border-2 border-slate-200 rounded-xl text-xl font-bold text-slate-800 focus:border-indigo-500 focus:ring-0 transition"
-                                                                                placeholder="0.00"
-                                                                            />
-                                                                        </div>
-                                                                        <button
-                                                                            onClick={() => handleRecordPackageWeight(pkg.packageNumber, pkg.quantity)}
-                                                                            className="h-12 px-5 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-200 active:scale-95 transition flex items-center justify-center gap-2"
-                                                                        >
-                                                                            <CheckCircleIcon className="h-6 w-6" />
-                                                                            <span className="font-bold">OK</span>
-                                                                        </button>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        ))}
+                                                                );
+                                                            });
+                                                        })()}
                                                     </div>
                                                 </div>
                                             </div>
@@ -3447,7 +4028,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                 <span className="inline tracking-tight">INICIAR TURNO</span>
                                             </button>
                                         ) : (
-                                            <div className="w-full md:w-auto flex relative items-center">
+                                            <div className="w-full md:w-auto flex relative items-center gap-2">
                                                 <button
                                                     onClick={isMachineStopped ? (() => { if (activeOrder && logResumeProduction) logResumeProduction(activeOrder.id); }) : (() => setShowDowntimeModal(true))}
                                                     className={`w-full h-24 md:h-20 rounded-3xl flex flex-col items-center justify-center gap-1 transition-all duration-500 shadow-2xl relative overflow-hidden group border-[3px]
@@ -3474,6 +4055,18 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                         </span>
                                                     </div>
                                                 </button>
+
+                                                {isMachineStopped && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowDowntimeModal(true)}
+                                                        className="h-24 md:h-20 px-4 rounded-3xl bg-slate-900 hover:bg-slate-800 text-amber-400 font-black text-xs uppercase flex flex-col items-center justify-center gap-1.5 shadow-xl active:scale-95 transition border-2 border-amber-500/50 flex-shrink-0"
+                                                        title="Abrir Menu Operacional (Troca de Rolo, etc.)"
+                                                    >
+                                                        <PauseIcon className="h-6 w-6 text-amber-400" />
+                                                        <span className="text-[10px] font-black tracking-wider text-center leading-tight whitespace-nowrap">Menu de<br/>Paradas</span>
+                                                    </button>
+                                                )}
                                                 
                                                 {/* Botão Split (Seta) Menu para Mobile da Trefila */}
                                                 <button
@@ -3502,6 +4095,19 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                             <CheckCircleIcon className="h-6 w-6 text-slate-500" />
                                                             <span>Fechar OP</span>
                                                         </button>
+
+                                                        {isMachineStopped && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    setShowMobileActions(false);
+                                                                    setShowDowntimeModal(true);
+                                                                }}
+                                                                className="p-3 text-amber-600 hover:bg-amber-50/50 font-bold flex items-center gap-3 transition"
+                                                            >
+                                                                <PauseIcon className="h-6 w-6 text-amber-500" />
+                                                                <span>Menu de Paradas</span>
+                                                            </button>
+                                                        )}
 
                                                         <button
                                                             onClick={() => {

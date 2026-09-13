@@ -17,6 +17,7 @@ import {
     TrelicaSpoolStand,
     TrelicaSpoolHistoryEntry,
 } from '../types';
+import { DEFAULT_TRELICA_MODELS } from '../utils/trelicaModelsData';
 
 /** Generic fetch function returning raw data */
 export const fetchData = async <T>(table: string): Promise<T[]> => {
@@ -239,8 +240,8 @@ export const insertItem = async <T extends { id?: string }>(
             generatedId = (crypto as any).randomUUID();
         } else if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
             // Browser compliant UUID v4 generator
-            generatedId = ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, (c: any) =>
-                (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+            generatedId = ('10000000-1000-4000-8000-100000000000').replace(/[018]/g, (c: any) =>
+                (Number(c) ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> (Number(c) / 4)).toString(16)
             );
         } else {
             // Pure JS fallback
@@ -645,6 +646,69 @@ export const updateTrelicaSpoolStand = async (
     } catch (err) {
         console.error('Exceção ao atualizar trelica_spool_stand:', err);
         return null;
+    }
+};
+
+/**
+ * Abater o peso consumido nos 5 porta-rolos ativos de uma máquina de Treliça
+ * de acordo com a quantidade de peças produzidas e o modelo da treliça.
+ */
+export const deductTrelicaSpoolStandConsumption = async (
+    machineName: string,
+    trelicaModel: string,
+    tamanho: string | undefined,
+    deltaPieces: number
+): Promise<TrelicaSpoolStand[]> => {
+    if (deltaPieces <= 0) return [];
+
+    try {
+        const rawModel = (trelicaModel || '').toString().trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+        const foundModel = DEFAULT_TRELICA_MODELS.find(m => {
+            const mMod = (m?.modelo || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            const mCod = (m?.cod || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            const matchModel = (mMod && (rawModel.includes(mMod) || mMod.includes(rawModel))) || (mCod && rawModel.includes(mCod));
+            if (!matchModel) return false;
+            if (tamanho && m.tamanho) return String(m.tamanho) === String(tamanho);
+            return true;
+        }) || DEFAULT_TRELICA_MODELS[0];
+
+        const pesoSup = parseFloat(String(foundModel.pesoSuperior || foundModel.peso_superior || '2.322').replace(',', '.'));
+        const pesoSen = parseFloat(String(foundModel.pesoSenozoide || foundModel.peso_senozoide || '1.958').replace(',', '.')) / 2;
+        const pesoInf = parseFloat(String(foundModel.pesoInferior || foundModel.peso_inferior || '1.517').replace(',', '.')) / 2;
+
+        const currentStands = await fetchTrelicaSpoolStands(machineName);
+        const updatedStands: TrelicaSpoolStand[] = [];
+
+        for (const stand of currentStands) {
+            if (!stand.current_lot_id || stand.status !== 'active') {
+                updatedStands.push(stand);
+                continue;
+            }
+
+            let consumptionPerPiece = pesoSup;
+            if (stand.role_type === 'superior') {
+                consumptionPerPiece = pesoSup;
+            } else if (stand.role_type.startsWith('senozoide')) {
+                consumptionPerPiece = pesoSen;
+            } else if (stand.role_type.startsWith('inferior')) {
+                consumptionPerPiece = pesoInf;
+            }
+
+            const consumedWeight = deltaPieces * consumptionPerPiece;
+            const currentRem = Number(stand.remaining_weight) || Number(stand.initial_weight) || 0;
+            const newRemainingWeight = Math.max(0, parseFloat((currentRem - consumedWeight).toFixed(3)));
+
+            const updated = await updateTrelicaSpoolStand(stand.id, {
+                remaining_weight: newRemainingWeight
+            });
+
+            updatedStands.push(updated || { ...stand, remaining_weight: newRemainingWeight });
+        }
+
+        return updatedStands;
+    } catch (err) {
+        console.warn('Erro ao abater consumo de porta-rolos:', err);
+        return [];
     }
 };
 
