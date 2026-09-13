@@ -43,6 +43,7 @@ interface PCPBoardProps {
     setIsPcpFullscreen?: (val: boolean) => void;
     employees?: Employee[];
     users?: User[];
+    updateProducedQuantity?: (orderId: string, quantity: number) => Promise<void>;
 }
 
 // Configurações de capacidade produtiva padrão por máquina para sugerir duração
@@ -125,7 +126,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     isPcpFullscreen = false,
     setIsPcpFullscreen,
     employees = [],
-    users = []
+    users = [],
+    updateProducedQuantity
 }) => {
     // Estado de cabeçalho minimizado/expandido (persistido)
     const [isHeaderCollapsed, setIsHeaderCollapsed] = useState<boolean>(() => {
@@ -446,6 +448,89 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
     // Estado do Drawer Lateral (Raio-X da OP)
     const [drawerOP, setDrawerOP] = useState<ProductionOrderData | null>(null);
+
+    // Estado do Modal de Ajuste de Quantidade Produzida pelo Gestor
+    const [adjustQuantityOP, setAdjustQuantityOP] = useState<ProductionOrderData | null>(null);
+    const [showManagerAuthForAdjust, setShowManagerAuthForAdjust] = useState(false);
+    const [pendingAdjustOP, setPendingAdjustOP] = useState<ProductionOrderData | null>(null);
+
+    const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor' || currentUser?.username?.toLowerCase() === 'admin' || currentUser?.username?.toLowerCase() === 'gestor' || currentUser?.username?.toLowerCase().includes('matheusmiranda');
+
+    const handleOpenAdjustQuantity = (op: ProductionOrderData) => {
+        if (isGestor) {
+            setAdjustQuantityOP(op);
+        } else {
+            setPendingAdjustOP(op);
+            setShowManagerAuthForAdjust(true);
+        }
+    };
+
+    const handleManagerAuthSuccessForAdjust = () => {
+        setShowManagerAuthForAdjust(false);
+        if (pendingAdjustOP) {
+            setAdjustQuantityOP(pendingAdjustOP);
+            setPendingAdjustOP(null);
+        }
+    };
+
+    const handleSaveAdjustQuantity = async (orderId: string, newQty: number, reason: string) => {
+        const targetOrder = productionOrders.find(o => o.id === orderId);
+        if (!targetOrder) return;
+
+        const isTrefila = typeof targetOrder.machine === 'string' && targetOrder.machine.startsWith('Trefila') || (typeof targetOrder.scheduledMachine === 'string' && targetOrder.scheduledMachine.startsWith('Trefila'));
+        const now = new Date().toISOString();
+
+        try {
+            if (isTrefila) {
+                await updateProductionOrder(orderId, {
+                    actualProducedWeight: newQty,
+                    totalProducedWeight: newQty,
+                    lastQuantityUpdate: now
+                });
+            } else {
+                if (updateProducedQuantity) {
+                    await updateProducedQuantity(orderId, newQty);
+                } else {
+                    await updateProductionOrder(orderId, {
+                        actualProducedQuantity: newQty,
+                        lastQuantityUpdate: now
+                    });
+                }
+            }
+
+            // Se houver turno ativo do operador (sem endTime), manter coerência do startQuantity caso a quantidade total seja reduzida
+            if (targetOrder.operatorLogs && targetOrder.operatorLogs.length > 0) {
+                const activeLogIndex = targetOrder.operatorLogs.findIndex((l: any) => !l.endTime);
+                if (activeLogIndex !== -1) {
+                    const activeLog = targetOrder.operatorLogs[activeLogIndex];
+                    const startQty = Number(activeLog.startQuantity) || 0;
+                    if (newQty < startQty) {
+                        const updatedLogs = [...targetOrder.operatorLogs];
+                        updatedLogs[activeLogIndex] = {
+                            ...activeLog,
+                            startQuantity: Math.max(0, newQty)
+                        };
+                        await updateProductionOrder(orderId, {
+                            operatorLogs: updatedLogs
+                        });
+                    }
+                }
+            }
+
+            if (showNotification) {
+                showNotification(
+                    `Quantidade da OP #${targetOrder.orderNumber} atualizada para ${newQty.toLocaleString('pt-BR')} ${isTrefila ? 'kg' : 'pçs'}! Painel do operador sincronizado com sucesso.`,
+                    'success'
+                );
+            }
+            setAdjustQuantityOP(null);
+        } catch (err) {
+            console.error('Erro ao ajustar quantidade produzida:', err);
+            if (showNotification) {
+                showNotification('Erro ao salvar ajuste de quantidade.', 'error');
+            }
+        }
+    };
 
     // Estado do Modal de Diagnóstico da Produção (Planejado vs Realizado)
     const [diagnosticOP, setDiagnosticOP] = useState<ProductionOrderData | null>(null);
@@ -3494,8 +3579,15 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                     Folga / Feriado
                                                                                 </span>
                                                                             ) : (
-                                                                                <>
-                                                                                    <span className={`text-xs sm:text-sm md:text-base font-black font-mono tracking-tight ${
+                                                                                <div 
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        handleOpenAdjustQuantity(op);
+                                                                                    }}
+                                                                                    className="flex items-baseline gap-1 cursor-pointer group/qty hover:bg-white/10 px-1 py-0.5 -mx-1 rounded transition-all select-none"
+                                                                                    title="Clique para ajustar quantidade produzida (Gestor)"
+                                                                                >
+                                                                                    <span className={`text-xs sm:text-sm md:text-base font-black font-mono tracking-tight group-hover/qty:text-[#00E5FF] transition-colors ${
                                                                                         dayStats.isToday 
                                                                                             ? 'text-white drop-shadow' 
                                                                                             : hasRealPastProd
@@ -3506,8 +3598,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                     }`}>
                                                                                         {dayStats.isFuture ? `~${dayStats.produced.toLocaleString('pt-BR')}` : dayStats.produced.toLocaleString('pt-BR')}
                                                                                     </span>
-                                                                                    <span className="text-[9px] font-bold text-slate-400 font-mono">{dayStats.unit}</span>
-                                                                                </>
+                                                                                    <span className="text-[9px] font-bold text-slate-400 font-mono group-hover/qty:text-[#00E5FF] transition-colors">{dayStats.unit}</span>
+                                                                                    <span className="opacity-0 group-hover/qty:opacity-100 text-[9px] text-[#00E5FF] transition-opacity ml-0.5" title="Ajustar Quantidade">✏️</span>
+                                                                                </div>
                                                                             )}
                                                                         </div>
 
@@ -3581,10 +3674,20 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                             </div>
 
                                                             {/* Barra de Progresso Real Compacta e Precisa */}
-                                                            <div className="flex items-center gap-2 flex-1 max-w-[280px] min-w-0">
+                                                            <div 
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleOpenAdjustQuantity(op);
+                                                                }}
+                                                                className="flex items-center gap-2 flex-1 max-w-[280px] min-w-0 cursor-pointer group/footprog hover:bg-white/10 px-2 py-0.5 rounded-lg transition-all select-none"
+                                                                title="Clique para ajustar quantidade produzida (Gestor)"
+                                                            >
                                                                 <div className="flex-1 min-w-0">
                                                                     <div className="flex items-center justify-between text-[10.5px] font-mono font-bold text-slate-200 leading-none">
-                                                                        <span className="truncate">{prog.produced.toLocaleString('pt-BR')} / {prog.target.toLocaleString('pt-BR')} {prog.unit}</span>
+                                                                        <span className="truncate group-hover/footprog:text-[#00E5FF] transition-colors">
+                                                                            {prog.produced.toLocaleString('pt-BR')} / {prog.target.toLocaleString('pt-BR')} {prog.unit}
+                                                                            <span className="opacity-0 group-hover/footprog:opacity-100 text-[10px] text-[#00E5FF] ml-1 transition-opacity">✏️</span>
+                                                                        </span>
                                                                         <span className="font-black text-white ml-1">{prog.pct}%</span>
                                                                     </div>
                                                                     <div className="w-full bg-black/60 rounded-full h-1.5 overflow-hidden border border-white/10 mt-1">
@@ -5793,6 +5896,16 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                         <span>Meta: {prog.target.toLocaleString('pt-BR')} {prog.unit}</span>
                                         <span>Restante: {Math.max(0, prog.target - prog.produced).toLocaleString('pt-BR')} {prog.unit}</span>
                                     </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => handleOpenAdjustQuantity(drawerOP)}
+                                        className="mt-2 w-full py-2 px-3 rounded-xl bg-[#00E5FF]/15 hover:bg-[#00E5FF]/25 border border-[#00E5FF]/40 hover:border-[#00E5FF]/70 text-[#00E5FF] font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(0,229,255,0.15)] cursor-pointer active:scale-98"
+                                        title="Ajustar quantidade produzida desta OP no PCP e sincronizar com o operador"
+                                    >
+                                        <span>✏️</span>
+                                        <span>Ajustar Quantidade Produzida (Gestor)</span>
+                                    </button>
                                 </div>
                             );
                         })()}
@@ -6848,6 +6961,371 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     </div>
                 </div>
             )}
+
+            {/* Modal de Ajuste de Quantidade Produzida pelo Gestor */}
+            {adjustQuantityOP && (
+                <AdjustQuantityModal
+                    order={adjustQuantityOP}
+                    onClose={() => setAdjustQuantityOP(null)}
+                    onSave={handleSaveAdjustQuantity}
+                />
+            )}
+
+            {/* Modal de Autorização do Gestor para Ajuste de Quantidade */}
+            {showManagerAuthForAdjust && (
+                <ManagerAuthModalForAdjust
+                    onSuccess={handleManagerAuthSuccessForAdjust}
+                    onCancel={() => {
+                        setShowManagerAuthForAdjust(false);
+                        setPendingAdjustOP(null);
+                    }}
+                    users={users}
+                />
+            )}
+        </div>
+    );
+};
+
+// ============================================================================
+// COMPONENTE: Modal de Ajuste de Quantidade Produzida pelo Gestor
+// ============================================================================
+const AdjustQuantityModal: React.FC<{
+    order: ProductionOrderData;
+    onClose: () => void;
+    onSave: (orderId: string, newQty: number, reason: string) => Promise<void>;
+}> = ({ order, onClose, onSave }) => {
+    const isTrefila = typeof order.machine === 'string' && order.machine.startsWith('Trefila') || (typeof order.scheduledMachine === 'string' && order.scheduledMachine.startsWith('Trefila'));
+    const isTrelica = typeof order.machine === 'string' && order.machine.startsWith('Treliça') || (typeof order.scheduledMachine === 'string' && order.scheduledMachine.startsWith('Treliça'));
+    const unit = isTrefila ? 'kg' : 'pçs';
+
+    const currentTotal = isTrefila 
+        ? (Number(order.actualProducedWeight) || Number(order.totalProducedWeight) || 0) 
+        : (Number(order.actualProducedQuantity) || 0);
+    
+    const target = isTrefila 
+        ? (order.totalWeight || order.quantityToProduce || 18000) 
+        : (order.quantityToProduce || (isTrelica ? 3500 : 5000));
+
+    const [qty, setQty] = useState<number>(currentTotal);
+    const [reason, setReason] = useState<string>('Ajuste manual de contagem (Gestor)');
+    const [isSaving, setIsSaving] = useState(false);
+
+    const delta = qty - currentTotal;
+
+    // Turno ativo do operador (se houver)
+    const activeLog = (order.operatorLogs || []).find((l: any) => !l.endTime);
+    const startQty = Number(activeLog?.startQuantity) || 0;
+    const currentShiftQty = Math.max(0, currentTotal - startQty);
+    const newShiftQty = Math.max(0, qty - startQty);
+
+    const quickSteps = isTrefila 
+        ? [-1000, -500, -100, -50, 50, 100, 500, 1000]
+        : [-100, -50, -20, -10, -5, -1, 1, 5, 10, 20, 50, 100];
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSaving(true);
+        try {
+            await onSave(order.id, Math.max(0, qty), reason);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/85 backdrop-blur-md animate-fade p-3 sm:p-4 overflow-y-auto">
+            <div className="w-full max-w-xl pcp-glass-card rounded-2xl border border-white/10 p-5 sm:p-6 flex flex-col gap-4 text-slate-100 shadow-2xl my-auto">
+                {/* Topo do Modal */}
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-[#00E5FF]/15 border border-[#00E5FF]/30 flex items-center justify-center text-[#00E5FF] shadow-[0_0_15px_rgba(0,229,255,0.2)]">
+                            <AdjustmentsIcon className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h3 className="text-base font-black uppercase tracking-wider text-white">
+                                    Ajustar Quantidade Produzida
+                                </h3>
+                                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-[#00E5FF]/20 text-[#00E5FF] border border-[#00E5FF]/40 font-mono">
+                                    GESTOR
+                                </span>
+                            </div>
+                            <p className="text-xs text-slate-400 font-mono">
+                                OP #{order.orderNumber} • {order.scheduledMachine || (order.machine as string)} {order.trelicaModel ? `• ${order.trelicaModel}` : order.targetBitola ? `• Bitola ${order.targetBitola}mm` : ''}
+                            </p>
+                        </div>
+                    </div>
+                    <button 
+                        type="button" 
+                        onClick={onClose} 
+                        className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-all cursor-pointer"
+                    >
+                        <XIcon className="w-5 h-5" />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                    {/* Resumo Atual */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                        <div className="bg-[#08131B] p-3 rounded-xl border border-white/5 flex flex-col">
+                            <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Produção Atual</span>
+                            <span className="text-xl font-black text-white font-mono mt-0.5">
+                                {currentTotal.toLocaleString('pt-BR')} <span className="text-xs font-bold text-slate-400">{unit}</span>
+                            </span>
+                        </div>
+                        <div className="bg-[#08131B] p-3 rounded-xl border border-white/5 flex flex-col">
+                            <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Meta Total</span>
+                            <span className="text-xl font-black text-slate-300 font-mono mt-0.5">
+                                {target.toLocaleString('pt-BR')} <span className="text-xs font-bold text-slate-400">{unit}</span>
+                            </span>
+                        </div>
+                        {activeLog ? (
+                            <div className="bg-[#08131B] p-3 rounded-xl border border-[#00E5FF]/20 flex flex-col col-span-2 sm:col-span-1">
+                                <span className="text-[10px] font-bold uppercase text-[#00E5FF] tracking-wider truncate">Turno de {activeLog.operator || 'Operador'}</span>
+                                <span className="text-xl font-black text-[#00E5FF] font-mono mt-0.5">
+                                    {currentShiftQty.toLocaleString('pt-BR')} <span className="text-xs font-bold text-[#00E5FF]/70">{unit}</span>
+                                </span>
+                            </div>
+                        ) : (
+                            <div className="bg-[#08131B] p-3 rounded-xl border border-white/5 flex flex-col col-span-2 sm:col-span-1">
+                                <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Status da OP</span>
+                                <span className="text-sm font-bold text-slate-300 mt-1 truncate">
+                                    {order.status === 'in_progress' || order.status === 'Em Produção' ? '⚡ Ao Vivo' : order.status === 'completed' ? '✓ Concluída' : '⏳ Agendada'}
+                                </span>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Controlador Principal da Nova Quantidade */}
+                    <div className="bg-[#0B1D2A]/90 p-4 rounded-2xl border border-white/10 flex flex-col gap-3">
+                        <div className="flex items-center justify-between">
+                            <label className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                                Definir Nova Quantidade Produzida:
+                            </label>
+                            <button
+                                type="button"
+                                onClick={() => setQty(currentTotal)}
+                                className="text-[10px] font-bold text-slate-400 hover:text-white underline cursor-pointer"
+                            >
+                                Restaurar Inicial
+                            </button>
+                        </div>
+
+                        {/* Campo de Entrada com Steppers Grandes */}
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setQty(prev => Math.max(0, prev - (isTrefila ? 50 : 1)))}
+                                className="w-12 h-12 rounded-xl bg-white/5 hover:bg-rose-500/20 text-slate-200 hover:text-rose-300 border border-white/10 hover:border-rose-500/40 text-2xl font-black flex items-center justify-center transition-all active:scale-95 cursor-pointer select-none"
+                                title="Diminuir 1 unidade"
+                            >
+                                -
+                            </button>
+                            
+                            <div className="relative flex-1">
+                                <input
+                                    type="number"
+                                    min="0"
+                                    value={qty}
+                                    onChange={(e) => setQty(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                                    className="w-full h-12 bg-black/50 border border-white/15 focus:border-[#00E5FF] focus:ring-1 focus:ring-[#00E5FF] rounded-xl text-center text-2xl font-black font-mono text-white tracking-wider outline-none transition-all"
+                                    required
+                                    autoFocus
+                                />
+                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-slate-400">
+                                    {unit}
+                                </span>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => setQty(prev => prev + (isTrefila ? 50 : 1))}
+                                className="w-12 h-12 rounded-xl bg-white/5 hover:bg-emerald-500/20 text-slate-200 hover:text-emerald-300 border border-white/10 hover:border-emerald-500/40 text-2xl font-black flex items-center justify-center transition-all active:scale-95 cursor-pointer select-none"
+                                title="Aumentar 1 unidade"
+                            >
+                                +
+                            </button>
+                        </div>
+
+                        {/* Botões Rápidos de Ajuste (+ e -) */}
+                        <div className="flex flex-col gap-1.5 pt-1">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ajuste Rápido (Tanto pra mais ou pra menos):</span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                                {quickSteps.map(step => (
+                                    <button
+                                        key={step}
+                                        type="button"
+                                        onClick={() => setQty(prev => Math.max(0, prev + step))}
+                                        className={`px-2.5 py-1 rounded-lg text-xs font-mono font-black border transition-all active:scale-95 cursor-pointer ${
+                                            step < 0 
+                                                ? 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border-rose-500/30 hover:border-rose-500/50' 
+                                                : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-500/30 hover:border-emerald-500/50'
+                                        }`}
+                                    >
+                                        {step > 0 ? `+${step}` : step}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Indicador em Tempo Real da Diferença e Efeito no Painel */}
+                        <div className={`p-3 rounded-xl border flex items-center justify-between text-xs transition-all ${
+                            delta > 0 
+                                ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200' 
+                                : delta < 0 
+                                    ? 'bg-amber-950/40 border-amber-500/40 text-amber-200' 
+                                    : 'bg-black/30 border-white/5 text-slate-400'
+                        }`}>
+                            <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-base shrink-0">{delta > 0 ? '📈' : delta < 0 ? '📉' : '⚖️'}</span>
+                                <div className="flex flex-col min-w-0">
+                                    <span className="font-bold">
+                                        {delta > 0 
+                                            ? `Acréscimo de +${delta.toLocaleString('pt-BR')} ${unit}` 
+                                            : delta < 0 
+                                                ? `Redução de ${delta.toLocaleString('pt-BR')} ${unit}` 
+                                                : 'Nenhuma alteração na quantidade'}
+                                    </span>
+                                    <span className="text-[11px] opacity-80 truncate">
+                                        No Painel do Operador passará a exibir: <strong className="font-black text-[#00E5FF] underline">{qty.toLocaleString('pt-BR')} {unit}</strong>
+                                    </span>
+                                    {activeLog && (
+                                        <span className="text-[10px] text-[#00E5FF]/80 mt-0.5">
+                                            Peças no turno de {activeLog.operator}: {newShiftQty.toLocaleString('pt-BR')} {unit}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                            <span className="text-xs font-mono font-black px-2 py-0.5 rounded bg-black/40 border border-white/10 shrink-0 ml-2">
+                                {Math.min(100, Math.round((qty / (target || 1)) * 100))}%
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Motivo do Ajuste */}
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                            Motivo do Ajuste (Auditoria):
+                        </label>
+                        <select
+                            value={reason}
+                            onChange={(e) => setReason(e.target.value)}
+                            className="bg-[#08131B] border border-white/15 focus:border-[#00E5FF] rounded-xl px-3 py-2 text-xs text-slate-200 outline-none cursor-pointer"
+                        >
+                            <option value="Ajuste manual de contagem (Gestor)">Ajuste manual de contagem (Gestor)</option>
+                            <option value="Correção de refugo ou pontas de solda">Correção de refugo ou pontas de solda</option>
+                            <option value="Contagem física do lote / amarrado">Contagem física do lote / amarrado</option>
+                            <option value="Ajuste por parada de setup">Ajuste por parada de setup</option>
+                            <option value="Outro motivo operacional">Outro motivo operacional</option>
+                        </select>
+                    </div>
+
+                    {/* Ações */}
+                    <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-white/10">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            disabled={isSaving}
+                            className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-bold text-xs transition cursor-pointer"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={isSaving}
+                            className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#00E5FF] to-emerald-400 hover:from-[#00c8df] hover:to-emerald-500 text-slate-950 font-black text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-[0_0_20px_rgba(0,229,255,0.3)] disabled:opacity-50 cursor-pointer active:scale-98"
+                        >
+                            {isSaving ? (
+                                <span>Salvando...</span>
+                            ) : (
+                                <>
+                                    <span>✓</span>
+                                    <span>Salvar e Atualizar Painel do Operador</span>
+                                </>
+                            )}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+// ============================================================================
+// COMPONENTE: Modal de Autorização do Gestor para Ajuste de Quantidade
+// ============================================================================
+const ManagerAuthModalForAdjust: React.FC<{
+    onSuccess: () => void;
+    onCancel: () => void;
+    users: User[];
+}> = ({ onSuccess, onCancel, users }) => {
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+        const manager = users.find(u => (u.role === 'gestor' || u.role === 'admin') && u.password === password);
+        if (manager) {
+            onSuccess();
+        } else {
+            setError('Senha de gestor incorreta ou usuário sem permissão.');
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-[130] p-4 animate-fade">
+            <form onSubmit={handleSubmit} className="bg-[#0A1B27] p-6 rounded-2xl border border-white/15 shadow-2xl w-full max-w-md text-slate-100 flex flex-col gap-4">
+                <div className="flex items-center gap-3 border-b border-white/10 pb-3">
+                    <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 text-xl font-bold">
+                        🔒
+                    </div>
+                    <div>
+                        <h3 className="text-base font-black uppercase tracking-wider text-white">
+                            Autorização de Gestor
+                        </h3>
+                        <p className="text-xs text-slate-400">
+                            Apenas o gestor pode alterar a quantidade produzida
+                        </p>
+                    </div>
+                </div>
+
+                <p className="text-xs text-slate-300 leading-relaxed">
+                    Esta alteração atualiza a contagem no Quadro PCP e no painel do operador da máquina em tempo real. Digite a senha do gestor ou administrador para prosseguir:
+                </p>
+
+                <div>
+                    <label className="block text-xs font-bold uppercase text-slate-400 mb-1">
+                        Senha do Gestor
+                    </label>
+                    <input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full p-2.5 bg-black/50 border border-white/15 focus:border-[#00E5FF] rounded-xl text-white outline-none font-mono"
+                        required
+                        autoFocus
+                        placeholder="Digite a senha..."
+                    />
+                    {error && <p className="text-rose-400 text-xs mt-1.5 font-bold flex items-center gap-1">⚠️ {error}</p>}
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2 border-t border-white/10">
+                    <button 
+                        type="button" 
+                        onClick={onCancel} 
+                        className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-bold text-xs transition cursor-pointer"
+                    >
+                        Cancelar
+                    </button>
+                    <button 
+                        type="submit" 
+                        className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs uppercase tracking-wider transition shadow-lg shadow-amber-500/20 cursor-pointer active:scale-98"
+                    >
+                        Autorizar e Ajustar
+                    </button>
+                </div>
+            </form>
         </div>
     );
 };

@@ -2814,6 +2814,7 @@ const App: React.FC = () => {
                 setIsPcpFullscreen={setIsPcpFullscreen} 
                 employees={employees}
                 users={users}
+                updateProducedQuantity={updateProducedQuantity}
             />;
         }
     };
