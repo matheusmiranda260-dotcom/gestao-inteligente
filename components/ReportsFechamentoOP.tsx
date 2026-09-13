@@ -1006,7 +1006,7 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
 
                                         {/* Peso Saída ou Sub-lotes */}
                                         {modoLancamento === 'simples' ? (
-                                            <td className="border-r border-slate-300 p-1 align-middle">
+                                            <td className="border-r border-slate-300 p-1 align-middle relative">
                                                 <input 
                                                     type="number" 
                                                     value={row.pesoSaida} 
@@ -1014,6 +1014,11 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
                                                     className="op-editable-input text-center w-full font-black text-[16px] text-[#002060]" 
                                                     placeholder="0" 
                                                 />
+                                                {(typeof row.pesoEtiqueta === 'number' && typeof row.pesoSaida === 'number' && row.pesoEtiqueta > 0 && row.pesoSaida > 0) && (
+                                                    <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[10.5px] font-bold text-rose-500 bg-rose-50 px-1 rounded no-print pointer-events-none border border-rose-100">
+                                                        {(((row.pesoEtiqueta - row.pesoSaida) / row.pesoEtiqueta) * 100).toFixed(2).replace('.', ',')}%
+                                                    </span>
+                                                )}
                                             </td>
                                         ) : (
                                             <td className="border-r border-slate-300 p-0 relative align-top">
@@ -1038,6 +1043,20 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
                                                                     className="op-editable-input text-center w-full font-black text-[12px] text-[#002060]" 
                                                                     placeholder="0" 
                                                                 />
+                                                                {(() => {
+                                                                    const pesoIn = typeof row.pesoEtiqueta === 'number' ? row.pesoEtiqueta : 0;
+                                                                    const pesoOut = typeof sl.pesoSaida === 'number' ? sl.pesoSaida : 0;
+                                                                    // Only show % per sublote if there's only 1 sublote (otherwise it's confusing without a total)
+                                                                    if (pesoIn > 0 && pesoOut > 0 && row.subLotes?.length === 1) {
+                                                                        const perc = (((pesoIn - pesoOut) / pesoIn) * 100).toFixed(2).replace('.', ',');
+                                                                        return (
+                                                                            <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[9px] font-bold text-rose-500 bg-rose-50 px-1 rounded no-print pointer-events-none border border-rose-100">
+                                                                                {perc}%
+                                                                            </span>
+                                                                        );
+                                                                    }
+                                                                    return null;
+                                                                })()}
                                                                 <button 
                                                                     onClick={() => removeSubLote(row.id, sl.id)} 
                                                                     className="absolute right-0.5 top-1/2 -translate-y-1/2 text-rose-500 hover:text-rose-700 font-bold no-print opacity-0 group-hover/sl:opacity-100 transition-opacity p-0.5 text-[10px]" 
@@ -1052,11 +1071,24 @@ const ReportsFechamentoOP: React.FC<ReportsFechamentoOPProps> = ({ stock = [], s
                                                         <button onClick={() => addSubLote(row.id)} className="text-[10px] text-indigo-600 font-black hover:underline uppercase">+ Adicionar Sub-lote</button>
                                                     </div>
                                                     {(row.subLotes && row.subLotes.length > 1) && (
-                                                        <div className="p-1 border-t border-[#002060] bg-slate-200 flex items-center justify-between font-black text-[12px] text-[#002060]">
+                                                        <div className="p-1 border-t border-[#002060] bg-slate-200 flex items-center justify-between font-black text-[12px] text-[#002060] relative">
                                                             <span className="w-1/2 text-right pr-2">TOTAL:</span>
                                                             <span className="w-1/2 text-center border-l border-[#002060]">
                                                                 {row.subLotes?.reduce((acc, curr) => acc + (typeof curr.pesoSaida === 'number' ? curr.pesoSaida : 0), 0)} kg
                                                             </span>
+                                                            {(() => {
+                                                                const pesoIn = typeof row.pesoEtiqueta === 'number' ? row.pesoEtiqueta : 0;
+                                                                const pesoOut = row.subLotes?.reduce((acc, curr) => acc + (typeof curr.pesoSaida === 'number' ? curr.pesoSaida : 0), 0) || 0;
+                                                                if (pesoIn > 0 && pesoOut > 0) {
+                                                                    const perc = (((pesoIn - pesoOut) / pesoIn) * 100).toFixed(2).replace('.', ',');
+                                                                    return (
+                                                                        <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[10px] font-bold text-rose-600 bg-rose-50 px-1 rounded no-print pointer-events-none border border-rose-200">
+                                                                            {perc}%
+                                                                        </span>
+                                                                    );
+                                                                }
+                                                                return null;
+                                                            })()}
                                                         </div>
                                                     )}
                                                 </div>
