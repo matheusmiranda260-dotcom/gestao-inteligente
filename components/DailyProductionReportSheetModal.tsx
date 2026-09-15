@@ -11,6 +11,8 @@ export interface DailyProductionReportSheetModalProps {
     op: ProductionOrderData;
     shiftReports?: ShiftReport[];
     productionOrders?: ProductionOrderData[];
+    initialProduced?: number;
+    initialOperator?: string;
 }
 
 interface StopRow {
@@ -95,6 +97,8 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
     dateStr: initialDateStr,
     op,
     shiftReports = [],
+    initialProduced,
+    initialOperator,
 }) => {
     // Normalização da máquina (ex: Treliça 1, Treliça 2)
     const machine = useMemo(() => {
@@ -232,35 +236,78 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         const targetQ = op.quantityToProduce || op.targetQuantity || 4500;
         const defaultSize = extractPieceSize(prodDesc);
 
-        // Identificar operadores de cada turno nos relatórios de turno ou paradas
+        // 1. Relatórios de Turno desta OP nesta data específica
         const dayShiftReports = shiftReports.filter(r => {
-            const rDate = r.date?.split(' ')[0] || (r.shiftStartTime ? r.shiftStartTime.split('T')[0] : '');
+            const isThisOp = r.productionOrderId === op.id || r.orderNumber === op.orderNumber;
+            if (!isThisOp) return false;
+            const rDate = getLocalDateString(r.date || r.shiftStartTime || r.shiftEndTime);
             return rDate === selectedDate;
         });
 
-        let opA = '';
+        let opA = initialOperator || '';
         let opB = '';
         let piecesA = 0;
         let piecesB = 0;
+        let hasTurnoBReport = false;
 
         dayShiftReports.forEach(r => {
             const shiftName = (r.shift || '').toLowerCase();
             const sStart = r.shiftStartTime ? new Date(r.shiftStartTime) : null;
             const hour = sStart && !isNaN(sStart.getTime()) ? sStart.getHours() : -1;
-            const isTurnoA = shiftName.includes('a') || (hour >= 5 && hour < 14);
+            
+            // Turno B apenas se explicitamente marcado ou se o turno iniciou após as 15h (sem ser A)
+            const isTurnoB = shiftName.includes('b') || shiftName.includes('2') || (hour >= 15 && !shiftName.includes('a'));
 
-            if (isTurnoA) {
+            if (!isTurnoB) {
                 if (!opA && r.operator) opA = r.operator;
                 piecesA += Number(r.totalProducedQuantity || 0);
             } else {
+                hasTurnoBReport = true;
                 if (!opB && r.operator) opB = r.operator;
                 piecesB += Number(r.totalProducedQuantity || 0);
             }
         });
 
+        // 2. Se não encontrou quantidade em shiftReports, checar operatorLogs desta data
+        if (piecesA === 0 && piecesB === 0) {
+            const dayLogs = (op.operatorLogs || []).filter(l => {
+                const s = getLocalDateString(l.startTime);
+                const e = getLocalDateString(l.endTime);
+                return s === selectedDate || e === selectedDate;
+            });
+
+            dayLogs.forEach(l => {
+                if (!opA && l.operator) opA = l.operator;
+                if (l.endQuantity !== undefined && l.startQuantity !== undefined) {
+                    const diff = Math.max(0, (Number(l.endQuantity) || 0) - (Number(l.startQuantity) || 0));
+                    piecesA += diff;
+                }
+            });
+        }
+
+        // 3. Se ainda assim estiver zerado, mas tivermos a quantidade calculada pelo PCP no card do dia
+        if (piecesA === 0 && piecesB === 0) {
+            if (initialProduced !== undefined && initialProduced > 0) {
+                piecesA = initialProduced;
+            }
+        }
+
         // Coletar paradas do dia
         const stopsListA: StopRow[] = [];
         const stopsListB: StopRow[] = [];
+
+        // Helper para checar se é parada de desligamento de fábrica / fim de expediente (interjornada)
+        const isInterjornadaStop = (reason: string, durationMin: number, startH: number) => {
+            const rLower = (reason || '').toLowerCase();
+            const isTurnoEndReason = rLower.includes('final de turno') || 
+                                     rLower.includes('fim de turno') || 
+                                     rLower.includes('desligada: turno') || 
+                                     rLower.includes('encerramento');
+            // Se for encerramento/final de turno ou parada que passou a noite inteira desligada
+            if (isTurnoEndReason && (durationMin > 180 || durationMin === 0)) return true;
+            if (durationMin > 480 && (startH >= 17 || startH < 6)) return true;
+            return false;
+        };
 
         // 1. De activeOp.downtimeEvents
         (op.downtimeEvents || []).forEach((e: any, idx: number) => {
@@ -268,24 +315,28 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             const sDate = new Date(e.stopTime);
             if (isNaN(sDate.getTime())) return;
 
-            const y = sDate.getFullYear();
-            const m = String(sDate.getMonth() + 1).padStart(2, '0');
-            const d = String(sDate.getDate()).padStart(2, '0');
-            const eventDateStr = `${y}-${m}-${d}`;
-
+            const eventDateStr = getLocalDateString(e.stopTime);
             if (eventDateStr !== selectedDate) return;
 
             const rDate = e.resumeTime ? new Date(e.resumeTime) : null;
             const startH = sDate.getHours();
             const startM = sDate.getMinutes();
 
+            const endH = rDate && !isNaN(rDate.getTime()) ? rDate.getHours() : startH;
+            const endM = rDate && !isNaN(rDate.getTime()) ? rDate.getMinutes() : startM;
+
+            const durMs = rDate && !isNaN(rDate.getTime()) ? (rDate.getTime() - sDate.getTime()) : 0;
+            const durMin = durMs > 0 ? Math.round(durMs / 60000) : (Number(e.durationMin) || 0);
+
+            // Desconsiderar paradas de máquina desligada fora do expediente (interjornada noturna)
+            if (isInterjornadaStop(e.reason, durMin, startH)) {
+                return;
+            }
+
             const startTimeStr = `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`;
             const endTimeStr = rDate && !isNaN(rDate.getTime())
-                ? `${String(rDate.getHours()).padStart(2, '0')}:${String(rDate.getMinutes()).padStart(2, '0')}`
+                ? `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`
                 : startTimeStr;
-
-            // Turno A: ~05:00 até ~14:17
-            const isTurnoA = (startH > 5 || (startH === 5 && startM >= 0)) && (startH < 14 || (startH === 14 && startM <= 17));
 
             const row: StopRow = {
                 id: `auto-op-stop-${idx}`,
@@ -294,7 +345,10 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 motivo: (e.reason || 'PARADA DE MÁQUINA').toUpperCase()
             };
 
-            if (isTurnoA) {
+            // Se não há Turno B confirmado (sem operador e sem produção no Turno B) ou se ocorreu até o fim da tarde (ex: 18h), pertence ao Turno A
+            const belongsToTurnoB = hasTurnoBReport && startH >= 17;
+
+            if (!belongsToTurnoB) {
                 stopsListA.push(row);
                 if (!opA && e.operator) opA = e.operator;
             } else {
@@ -311,14 +365,21 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 const rDate = e.resumeTime ? new Date(e.resumeTime) : null;
                 const startH = sDate.getHours();
                 const startM = sDate.getMinutes();
+                const endH = rDate && !isNaN(rDate.getTime()) ? rDate.getHours() : startH;
+                const endM = rDate && !isNaN(rDate.getTime()) ? rDate.getMinutes() : startM;
+
+                const durMs = rDate && !isNaN(rDate.getTime()) ? (rDate.getTime() - sDate.getTime()) : 0;
+                const durMin = durMs > 0 ? Math.round(durMs / 60000) : (Number(e.durationMin) || 0);
+
+                if (isInterjornadaStop(e.reason, durMin, startH)) return;
 
                 const startTimeStr = `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`;
                 const endTimeStr = rDate && !isNaN(rDate.getTime())
-                    ? `${String(rDate.getHours()).padStart(2, '0')}:${String(rDate.getMinutes()).padStart(2, '0')}`
+                    ? `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`
                     : startTimeStr;
 
-                const isTurnoA = (startH > 5 || (startH === 5 && startM >= 0)) && (startH < 14 || (startH === 14 && startM <= 17));
-                const targetList = isTurnoA ? stopsListA : stopsListB;
+                const isTurnoB = hasTurnoBReport && (r.shift?.toLowerCase().includes('b') || startH >= 17);
+                const targetList = isTurnoB ? stopsListB : stopsListA;
 
                 const isDupe = targetList.some(s => s.inicio === startTimeStr && s.motivo === (e.reason || '').toUpperCase());
                 if (!isDupe) {
@@ -332,18 +393,14 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             });
         });
 
-        // Se a contagem total de peças no dia é maior que 0 mas shiftReports não separou
-        const opDailyProduced = (op.actualProducedQuantity || 0);
-        if (piecesA === 0 && piecesB === 0 && opDailyProduced > 0) {
-            piecesA = opDailyProduced;
-        }
+        const hasRealTurnoB = hasTurnoBReport || piecesB > 0 || stopsListB.length > 0 || Boolean(opB);
 
         return {
             productionOrder: prodOrder,
             productDescription: prodDesc,
             piecesToProduce: targetQ,
             operatorShiftA: opA || '',
-            operatorShiftB: opB || '',
+            operatorShiftB: hasRealTurnoB ? opB : '',
             stopsShiftA: stopsListA,
             stopsShiftB: stopsListB,
             statsShiftA: {
@@ -352,9 +409,9 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 tamanhoPeca: defaultSize
             },
             statsShiftB: {
-                horasTrabalhadas: '09:00:00',
+                horasTrabalhadas: hasRealTurnoB ? '09:00:00' : '00:00:00',
                 pecasProduzidas: piecesB,
-                tamanhoPeca: defaultSize === 12 ? 6 : defaultSize
+                tamanhoPeca: hasRealTurnoB ? (defaultSize === 12 ? 6 : defaultSize) : 0
             },
             productionUpdates: []
         };
@@ -389,7 +446,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 setStopsShiftA(dbReport.stops_shift_a || []);
                 setStopsShiftB(dbReport.stops_shift_b || []);
                 setStatsShiftA(dbReport.stats_shift_a || { horasTrabalhadas: '09:00:00', pecasProduzidas: 0, tamanhoPeca: 12 });
-                setStatsShiftB(dbReport.stats_shift_b || { horasTrabalhadas: '09:00:00', pecasProduzidas: 0, tamanhoPeca: 6 });
+                setStatsShiftB(dbReport.stats_shift_b || { horasTrabalhadas: '00:00:00', pecasProduzidas: 0, tamanhoPeca: 0 });
                 setProductionUpdates(dbReport.production_updates || []);
                 setSaveStatus('saved');
                 showToast(`Relatório do dia ${targetDate.split('-').reverse().join('/')} carregado do banco.`, 'info');
@@ -910,15 +967,15 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                         />
                     </div>
 
-                    {/* Botão Recarregar Dados da OP */}
+                    {/* Botão Sincronizar Dados do Chão de Fábrica */}
                     <button
                         type="button"
                         onClick={handleReloadAutoData}
-                        className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
-                        title="Recarregar dados automáticos do chão de fábrica desta OP"
+                        className="px-3 py-1.5 rounded-xl bg-[#00E5FF]/15 hover:bg-[#00E5FF]/25 text-[#00E5FF] hover:text-white border border-[#00E5FF]/40 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer active:scale-95"
+                        title="Sincronizar e recarregar dados exatos do chão de fábrica e PCP desta data"
                     >
                         <span>🔄</span>
-                        <span className="hidden sm:inline">Recarregar OP</span>
+                        <span className="hidden sm:inline">Sincronizar Chão de Fábrica</span>
                     </button>
 
                     {/* Botão Salvar Manual */}
@@ -1199,13 +1256,25 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                             <div className="border border-[#002060] rounded-lg overflow-hidden bg-white shadow-sm flex flex-col">
                                 <div className="bg-[#002060] text-white py-2 px-3 flex items-center justify-between text-[11px] font-black tracking-wider">
                                     <span className="uppercase">PARADAS E SEUS MOTIVOS – TURNO B</span>
-                                    <button
-                                        type="button"
-                                        onClick={() => addStopRow('B')}
-                                        className="border border-white hover:bg-white hover:text-[#002060] text-white text-[9px] font-bold px-2 py-0.5 rounded transition-all no-print cursor-pointer uppercase"
-                                    >
-                                        + Linha
-                                    </button>
+                                    <div className="flex items-center gap-1.5 no-print">
+                                        {stopsShiftB.length > 0 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setStopsShiftB([])}
+                                                className="border border-white/50 hover:bg-rose-600/30 text-white text-[9px] font-bold px-1.5 py-0.5 rounded transition-all cursor-pointer uppercase"
+                                                title="Limpar paradas do Turno B"
+                                            >
+                                                Limpar
+                                            </button>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={() => addStopRow('B')}
+                                            className="border border-white hover:bg-white hover:text-[#002060] text-white text-[9px] font-bold px-2 py-0.5 rounded transition-all cursor-pointer uppercase"
+                                        >
+                                            + Linha
+                                        </button>
+                                    </div>
                                 </div>
                                 <table className="w-full border-collapse">
                                     <thead>
@@ -1373,9 +1442,23 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
 
                             {/* Estatísticas Turno B */}
                             <div className="border border-[#002060] rounded-lg overflow-hidden bg-white shadow-sm flex flex-col">
-                                <div className="bg-[#002060] text-white py-2 px-3 flex items-center gap-1.5 text-[11px] font-black tracking-wider uppercase">
-                                    <GaugeIcon className="h-4 w-4 text-white" />
-                                    <span>ESTATÍSTICA DO DIA – TURNO B</span>
+                                <div className="bg-[#002060] text-white py-2 px-3 flex items-center justify-between text-[11px] font-black tracking-wider uppercase">
+                                    <div className="flex items-center gap-1.5">
+                                        <GaugeIcon className="h-4 w-4 text-white" />
+                                        <span>ESTATÍSTICA DO DIA – TURNO B</span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setStatsShiftB(prev => ({ ...prev, horasTrabalhadas: '00:00:00', pecasProduzidas: 0 }));
+                                            setStopsShiftB([]);
+                                            setOperatorShiftB('');
+                                        }}
+                                        className="border border-white/50 hover:bg-white hover:text-[#002060] text-white text-[9px] font-bold px-1.5 py-0.5 rounded transition-all no-print cursor-pointer"
+                                        title="Zerar Turno B (caso não tenha havido 2º turno neste dia)"
+                                    >
+                                        Sem 2º Turno
+                                    </button>
                                 </div>
                                 <div className="p-3 divide-y divide-slate-100 flex flex-col justify-between h-full">
                                     {/* Horas Trabalhadas */}

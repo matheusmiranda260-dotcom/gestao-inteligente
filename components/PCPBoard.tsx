@@ -7503,6 +7503,7 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                     op={activeOp}
                     shiftReports={shiftReports}
                     productionOrders={productionOrders}
+                    initialProduced={selectedDateStr === data.dateStr ? data.produced : undefined}
                 />
             )}
         </div>
