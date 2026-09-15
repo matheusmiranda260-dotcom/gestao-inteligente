@@ -13,6 +13,7 @@ import {
 } from '../services/supabaseService';
 import TrelicaSpoolStands from './TrelicaSpoolStands';
 import TrelicaWeldingHead from './TrelicaWeldingHead';
+import DailyProductionReportSheetModal from './DailyProductionReportSheetModal';
 import { 
     CalendarIcon, PlusIcon, ChevronRightIcon, XIcon, ArrowLeftIcon, 
     TrashIcon, PlayIcon, CheckCircleIcon, ClockIcon, ChartBarIcon, 
@@ -135,6 +136,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     });
 
     const [selectedDailyReport, setSelectedDailyReport] = useState<{ op: ProductionOrderData, date: Date, dateStr: string, dayName: string, produced: number, unit: string } | null>(null);
+    const [officialReportModalData, setOfficialReportModalData] = useState<{ op: ProductionOrderData; dateStr: string; machine: string } | null>(null);
 
     type TrelicaModel = typeof DEFAULT_TRELICA_MODELS[number];
     const [trelicaModels, setTrelicaModels] = useState<TrelicaModel[]>(() => {
@@ -5934,6 +5936,24 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                         <span>🛑</span>
                                         <span>Ver Paradas e Motivos (Por Dia)</span>
                                     </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const today = new Date();
+                                            const dateStr = formatDateString(today);
+                                            setOfficialReportModalData({
+                                                op: drawerOP,
+                                                dateStr,
+                                                machine: drawerOP.scheduledMachine || (drawerOP.machine as string) || 'Treliça 1'
+                                            });
+                                        }}
+                                        className="mt-2 w-full py-2 px-3 rounded-xl bg-gradient-to-r from-blue-600/25 to-indigo-600/25 hover:from-blue-600/35 hover:to-indigo-600/35 border border-blue-500/40 hover:border-blue-400 text-blue-200 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(59,130,246,0.2)] cursor-pointer active:scale-98"
+                                        title="Abrir Ficha Oficial de Produção Diária (Impressão e WhatsApp)"
+                                    >
+                                        <span>📄</span>
+                                        <span>Ficha Diária Oficial (A4 / WhatsApp)</span>
+                                    </button>
                                 </div>
                             );
                         })()}
@@ -7021,6 +7041,19 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     shiftReports={shiftReports}
                 />
             )}
+
+            {/* Modal da Ficha Oficial de Produção Diária (Aberto via Gaveta ou Atalho) */}
+            {officialReportModalData && (
+                <DailyProductionReportSheetModal
+                    isOpen={Boolean(officialReportModalData)}
+                    onClose={() => setOfficialReportModalData(null)}
+                    machine={officialReportModalData.machine}
+                    dateStr={officialReportModalData.dateStr}
+                    op={officialReportModalData.op}
+                    shiftReports={shiftReports}
+                    productionOrders={productionOrders}
+                />
+            )}
         </div>
     );
 };
@@ -7052,6 +7085,7 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
 }) => {
     const activeOp = productionOrders.find(o => o.id === data.op.id) || data.op;
     const [selectedDateStr, setSelectedDateStr] = useState<string>(data.dateStr);
+    const [showOfficialReport, setShowOfficialReport] = useState<boolean>(false);
 
     const parseDateOnly = (val: any): string => {
         if (!val) return '';
@@ -7255,9 +7289,21 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                             </p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors cursor-pointer">
-                        <XIcon className="w-5 h-5" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setShowOfficialReport(true)}
+                            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_15px_rgba(59,130,246,0.35)] transition-all cursor-pointer active:scale-95 border border-blue-400/40"
+                            title="Gerar Ficha Oficial de Controle de Produção Diária (Impressão e WhatsApp)"
+                        >
+                            <span>📄</span>
+                            <span className="hidden sm:inline">Ficha Diária Oficial (Impressão / WhatsApp)</span>
+                            <span className="sm:hidden">Ficha Oficial</span>
+                        </button>
+                        <button onClick={onClose} className="p-2 text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors cursor-pointer" title="Fechar modal">
+                            <XIcon className="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Seletor de Dia (Abas Rápidas) */}
@@ -7327,8 +7373,18 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                             {formattedDuration}
                         </span>
                     </div>
-                    <div className="bg-black/30 p-2.5 rounded-xl border border-white/5 flex flex-col col-span-2 sm:col-span-1">
-                        <span className="text-[10px] font-bold uppercase text-slate-400">Produzido no Dia</span>
+                    <div className="bg-black/30 p-2.5 rounded-xl border border-white/5 flex flex-col col-span-2 sm:col-span-1 justify-between">
+                        <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold uppercase text-slate-400">Produzido no Dia</span>
+                            <button
+                                type="button"
+                                onClick={() => setShowOfficialReport(true)}
+                                className="text-[10px] font-black text-[#00E5FF] hover:underline flex items-center gap-1 cursor-pointer"
+                                title="Abrir Ficha Diária Oficial deste dia"
+                            >
+                                <span>📄 Ficha Oficial</span>
+                            </button>
+                        </div>
                         <span className="text-lg font-black text-[#00E5FF] font-mono mt-0.5">
                             {data.dateStr === selectedDateStr ? data.produced.toLocaleString('pt-BR') : '-'} <span className="text-xs font-bold text-[#00E5FF]/70">{data.unit}</span>
                         </span>
@@ -7436,6 +7492,19 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                     </button>
                 </div>
             </div>
+
+            {/* Modal da Ficha Oficial de Produção Diária (Impressão e WhatsApp) */}
+            {showOfficialReport && (
+                <DailyProductionReportSheetModal
+                    isOpen={showOfficialReport}
+                    onClose={() => setShowOfficialReport(false)}
+                    machine={activeOp.scheduledMachine || (activeOp.machine as string) || 'Treliça 1'}
+                    dateStr={selectedDateStr === 'ALL' ? data.dateStr : selectedDateStr}
+                    op={activeOp}
+                    shiftReports={shiftReports}
+                    productionOrders={productionOrders}
+                />
+            )}
         </div>
     );
 };
