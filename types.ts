@@ -42,7 +42,7 @@ export interface EmployeeDocument {
 
 export type MachineType = 'Trefila 1' | 'Trefila 2' | 'Treliça 1' | 'Treliça 2' | 'Malha' | 'Malha 1' | 'Malha 2' | 'Corte-01' | 'Corte-02' | 'Trefila' | 'Treliça' | 'Geral' | 'Empilhadeira' | 'Desbobinadeira 1';
 
-export type MaterialType = 'Arame' | 'Treliça' | 'Ponta' | 'Fio Máquina' | 'Sucata' | 'CA-60' | 'CA-50' | 'Eletrodos Treliças';
+export type MaterialType = 'Arame' | 'Treliça' | 'Ponta' | 'Fio Máquina' | 'Sucata' | 'CA-60' | 'CA-50' | 'Eletrodos Treliças' | 'Sabão';
 
 export type Bitola = string; // e.g., '3.40', '4,20', '8.00'
 
@@ -284,18 +284,25 @@ export interface ShiftReport {
     totalPcs?: number;
     scraps?: { type: string; weight: number }[];
     stops?: { reason: string; duration: number }[];
+    isOvertime?: boolean;
+    managerAuthorized?: string;
+    autoClosed?: boolean;
+    observation?: string;
 }
 
 export interface ProcessedLot {
     lotId: string;
-    finalWeight: number | null;
-    measuredGauge?: number;
+    finalWeight?: number;
+    processedWeight?: number;
+    grossWeight?: number;
+    initialWeight?: number;
+    spoolWeight?: number;
+    wasteWeight?: number;
     startTime: string;
     endTime: string;
 }
 
 export interface DowntimeEvent {
-    id?: string;
     stopTime: string;
     resumeTime: string | null;
     reason: string;
@@ -308,6 +315,10 @@ export interface OperatorLog {
     endTime?: string | null;
     startQuantity?: number;
     endQuantity?: number;
+    isOvertime?: boolean;
+    managerAuthorized?: string;
+    autoClosed?: boolean;
+    pendingOperatorCheckin?: boolean;
 }
 
 export interface WeighedPackage {
@@ -461,6 +472,15 @@ export interface StockGauge {
     idealWeight?: number;
     productCode?: string;
     description?: string;
+    // Parâmetros técnicos para Treliça
+    tamanho?: string;
+    superior?: string;
+    inferior?: string;
+    senozoide?: string;
+    peso_final?: string;
+    peso_superior?: string;
+    peso_inferior?: string;
+    peso_senozoide?: string;
 }
 
 export interface LabAnalysisEntry {
@@ -694,7 +714,33 @@ export interface UserAccessLog {
 }
 
 export const trelicaLabels = ['H08 (8m)', 'H12 (12m)', 'H6 (6m)', 'H10 (10m)'];
-export const MaterialOptions = ['Fio Máquina', 'CA-60', 'Eletrodos Treliças'];
+export const MaterialOptions = ['Fio Máquina', 'CA-60', 'Eletrodos Treliças', 'Sabão', 'Treliça'];
+
+export const DefaultSabaoGauges: Array<{ materialType: MaterialType; gauge: string; productCode: string; description: string }> = [
+    { materialType: 'Sabão', gauge: 'Saco 25kg', productCode: '00010', description: 'Condat' },
+];
+
+export const DefaultTrelicaGauges: Array<Omit<StockGauge, 'id'> & { id?: string }> = [
+    { materialType: 'Treliça', gauge: '12m', productCode: 'H6LE12S', description: 'H-6 LEVE (ESPAÇADOR)', tamanho: '12', superior: '5,4', inferior: '3,2', senozoide: '3,2', peso_final: '5,502', peso_superior: '2,158', peso_senozoide: '1,828', peso_inferior: '1,517' },
+    { materialType: 'Treliça', gauge: '12m', productCode: 'H6_12', description: 'H-6', tamanho: '12', superior: '5,6', inferior: '3,8', senozoide: '3,2', peso_final: '6,288', peso_superior: '2,322', peso_senozoide: '1,828', peso_inferior: '2,138' },
+    { materialType: 'Treliça', gauge: '6m', productCode: 'H8L6', description: 'H-8 LEVE', tamanho: '6', superior: '5,6', inferior: '3,2', senozoide: '3,2', peso_final: '2,898', peso_superior: '1,161', peso_senozoide: '0,979', peso_inferior: '0,758' },
+    { materialType: 'Treliça', gauge: '12m', productCode: 'H8L12', description: 'H-8 LEVE', tamanho: '12', superior: '5,6', inferior: '3,2', senozoide: '3,2', peso_final: '5,797', peso_superior: '2,322', peso_senozoide: '1,958', peso_inferior: '1,517' },
+    { materialType: 'Treliça', gauge: '6m', productCode: 'H8M6', description: 'H-8 MÉDIA', tamanho: '6', superior: '5,6', inferior: '3,8', senozoide: '3,2', peso_final: '3,209', peso_superior: '1,161', peso_senozoide: '0,979', peso_inferior: '1,069' },
+    { materialType: 'Treliça', gauge: '12m', productCode: 'H8M12', description: 'H-8 MÉDIA', tamanho: '12', superior: '5,6', inferior: '3,8', senozoide: '3,2', peso_final: '6,418', peso_superior: '2,322', peso_senozoide: '1,958', peso_inferior: '2,138' },
+    { materialType: 'Treliça', gauge: '6m', productCode: 'H8P6', description: 'H-8 PESADA', tamanho: '6', superior: '6', inferior: '3,8', senozoide: '4,2', peso_final: '4,087', peso_superior: '1,333', peso_senozoide: '1,685', peso_inferior: '1,069' },
+    { materialType: 'Treliça', gauge: '12m', productCode: 'H8P12', description: 'H-8 PESADA', tamanho: '12', superior: '6', inferior: '3,8', senozoide: '4,2', peso_final: '8,174', peso_superior: '2,665', peso_senozoide: '3,371', peso_inferior: '2,138' },
+    { materialType: 'Treliça', gauge: '6m', productCode: 'H8SP6', description: 'H-8 SUPER PESADO', tamanho: '6', superior: '6', inferior: '4,2', senozoide: '4,2', peso_final: '4,324', peso_superior: '1,333', peso_senozoide: '1,686', peso_inferior: '1,305' },
+    { materialType: 'Treliça', gauge: '12m', productCode: 'H8SP12', description: 'H-8 SUPER PESADO', tamanho: '12', superior: '6', inferior: '4,2', senozoide: '4,2', peso_final: '8,647', peso_superior: '2,665', peso_senozoide: '3,371', peso_inferior: '2,611' },
+    { materialType: 'Treliça', gauge: '6m', productCode: 'H10L6', description: 'H-10 LEVE', tamanho: '6', superior: '5,8', inferior: '3,8', senozoide: '3,8', peso_final: '3,843', peso_superior: '1,246', peso_senozoide: '1,528', peso_inferior: '1,069' },
+    { materialType: 'Treliça', gauge: '12m', productCode: 'H10L12', description: 'H-10 LEVE', tamanho: '12', superior: '5,8', inferior: '3,8', senozoide: '3,8', peso_final: '7,686', peso_superior: '2,491', peso_senozoide: '3,057', peso_inferior: '2,138' },
+    { materialType: 'Treliça', gauge: '12m', productCode: 'H10P12', description: 'H-10 PESADA', tamanho: '12', superior: '6', inferior: '4,2', senozoide: '4,2', peso_final: '9,057', peso_superior: '2,665', peso_senozoide: '3,780', peso_inferior: '2,611' },
+    { materialType: 'Treliça', gauge: '6m', productCode: 'H12L6', description: 'H-12 LEVE', tamanho: '6', superior: '5,8', inferior: '3,8', senozoide: '3,2', peso_final: '3,522', peso_superior: '1,246', peso_senozoide: '1,207', peso_inferior: '1,069' },
+    { materialType: 'Treliça', gauge: '12m', productCode: 'H12L12', description: 'H-12 LEVE', tamanho: '12', superior: '5,8', inferior: '3,8', senozoide: '3,2', peso_final: '7,044', peso_superior: '2,491', peso_senozoide: '2,414', peso_inferior: '2,138' },
+    { materialType: 'Treliça', gauge: '6m', productCode: 'H12P6', description: 'H-12 PESADA', tamanho: '6', superior: '6', inferior: '5', senozoide: '4,2', peso_final: '5,270', peso_superior: '1,333', peso_senozoide: '2,086', peso_inferior: '1,852' },
+    { materialType: 'Treliça', gauge: '12m', productCode: 'H12P12', description: 'H-12 PESADA', tamanho: '12', superior: '6', inferior: '5', senozoide: '4,2', peso_final: '10,540', peso_superior: '2,665', peso_senozoide: '4,172', peso_inferior: '3,703' },
+    { materialType: 'Treliça', gauge: '12m', productCode: 'H16_12', description: 'H-16', tamanho: '12', superior: '6', inferior: '5', senozoide: '4,2', peso_final: '11,263', peso_superior: '2,665', peso_senozoide: '4,894', peso_inferior: '3,703' },
+    { materialType: 'Treliça', gauge: '12m', productCode: 'H25_12', description: 'H-25', tamanho: '12', superior: '8', inferior: '6', senozoide: '5', peso_final: '20,042', peso_superior: '4,739', peso_senozoide: '9,973', peso_inferior: '5,330' },
+];
 
 export const DefaultElectrodeGauges: Array<{ materialType: MaterialType; gauge: string; productCode: string; description: string }> = [
     { materialType: 'Eletrodos Treliças', gauge: '1000', productCode: '1000', description: 'Eletrodo Superior (D)' },
@@ -732,6 +778,22 @@ export const DOWNTIME_THRESHOLDS: Record<string, number> = {
     'Preparação': 15
 };
 
+export interface MachineShiftConfig {
+    workStart: string;
+    workEnd: string;
+    noLunch?: boolean;
+    lunchStart?: string;
+    lunchEnd?: string;
+    shiftCount?: 1 | 2;
+    shift2Start?: string;
+    shift2End?: string;
+    workDays?: number[]; // [1, 2, 3, 4, 5]
+    autoStartShift?: boolean;
+    autoEndShift?: boolean;
+    autoEndTimeoutMin?: number; // padrão: 5 min
+    requireManagerAuthForOvertime?: boolean;
+}
+
 export interface PcpShiftConfig {
     id: string;
     workStart: string;
@@ -739,6 +801,12 @@ export interface PcpShiftConfig {
     lunchEnd: string;
     workEnd: string;
     workDays?: number[]; // [1, 2, 3, 4, 5] -> Seg a Sex
+    noLunch?: boolean;
+    autoStartShift?: boolean;
+    autoEndShift?: boolean;
+    autoEndTimeoutMin?: number;
+    requireManagerAuthForOvertime?: boolean;
+    machineConfigs?: Record<string, MachineShiftConfig>;
     updatedAt?: string;
 }
 

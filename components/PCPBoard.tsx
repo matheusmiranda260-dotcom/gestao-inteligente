@@ -11,6 +11,12 @@ import {
     deletePcpHoliday,
     fetchTrelicaSpoolStands
 } from '../services/supabaseService';
+import { 
+    resolveMachineShiftConfig, 
+    checkMachineShiftStatus, 
+    DEFAULT_MACHINE_SHIFTS, 
+    DEFAULT_GLOBAL_SHIFT_CONFIG 
+} from '../services/shiftConfigService';
 import TrelicaSpoolStands from './TrelicaSpoolStands';
 import TrelicaWeldingHead from './TrelicaWeldingHead';
 import DailyProductionReportSheetModal from './DailyProductionReportSheetModal';
@@ -391,8 +397,37 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             l.operator.toLowerCase() !== 'gestor'
         );
 
+        // Se há log aberto mas é auto-iniciado aguardando o operador conectar
+        if (openLog && (openLog.pendingOperatorCheckin || (openLog.operator && openLog.operator.toUpperCase().includes('SISTEMA')))) {
+            return {
+                id: 'auto-shift',
+                name: 'Turno Aberto (Auto)',
+                firstName: 'Aguardando',
+                jobTitle: 'Aguardando Operador',
+                photoUrl: null,
+                status: 'online' as const,
+                statusLabel: 'Aguardando Check-in',
+                isOnline: false,
+                isAutoStartedWaitingCheckin: true
+            };
+        }
+
         // Se ninguém assumiu o turno (ou todos os turnos anteriores já foram encerrados)
         if (!openLog) {
+            const shiftEval = checkMachineShiftStatus(machName, shiftConfig);
+            if (shiftEval.autoStartShift && shiftEval.inShiftWindow) {
+                return {
+                    id: 'auto-shift',
+                    name: 'Turno Aberto (Auto)',
+                    firstName: 'Aguardando',
+                    jobTitle: 'Aguardando Operador',
+                    photoUrl: null,
+                    status: 'online' as const,
+                    statusLabel: 'Aguardando Check-in',
+                    isOnline: false,
+                    isAutoStartedWaitingCheckin: true
+                };
+            }
             return null;
         }
 
@@ -634,6 +669,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     const [isSavingShift, setIsSavingShift] = useState<boolean>(false);
     const [isAddingHoliday, setIsAddingHoliday] = useState<boolean>(false);
 
+    const [selectedMachineShiftTab, setSelectedMachineShiftTab] = useState<string>('GLOBAL');
     const [shiftConfig, setShiftConfig] = useState<PcpShiftConfig>(() => {
         try {
             const saved = localStorage.getItem('pcp_daily_shift_config');
@@ -642,12 +678,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             console.error('Erro ao ler jornada do localStorage:', e);
         }
         return {
-            id: 'default',
-            workStart: '07:00',
-            lunchStart: '12:00',
-            lunchEnd: '13:00',
-            workEnd: '17:00',
-            workDays: [1, 2, 3, 4, 5]
+            ...DEFAULT_GLOBAL_SHIFT_CONFIG,
+            machineConfigs: { ...DEFAULT_MACHINE_SHIFTS }
         };
     });
     const [tempShiftConfig, setTempShiftConfig] = useState<PcpShiftConfig>(shiftConfig);
@@ -671,7 +703,13 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                             lunchStart: dbShift.lunchStart || '12:00',
                             lunchEnd: dbShift.lunchEnd || '13:00',
                             workEnd: dbShift.workEnd || '17:00',
-                            workDays: dbShift.workDays || [1, 2, 3, 4, 5]
+                            workDays: dbShift.workDays || [1, 2, 3, 4, 5],
+                            noLunch: Boolean(dbShift.noLunch),
+                            autoStartShift: dbShift.autoStartShift !== false,
+                            autoEndShift: dbShift.autoEndShift !== false,
+                            autoEndTimeoutMin: dbShift.autoEndTimeoutMin || 5,
+                            requireManagerAuthForOvertime: dbShift.requireManagerAuthForOvertime !== false,
+                            machineConfigs: dbShift.machineConfigs || { ...DEFAULT_MACHINE_SHIFTS }
                         };
                         setShiftConfig(fullShift);
                         setTempShiftConfig(fullShift);
@@ -699,7 +737,13 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                         lunchStart: updated.lunchStart || '12:00',
                         lunchEnd: updated.lunchEnd || '13:00',
                         workEnd: updated.workEnd || '17:00',
-                        workDays: updated.workDays || [1, 2, 3, 4, 5]
+                        workDays: updated.workDays || [1, 2, 3, 4, 5],
+                        noLunch: Boolean(updated.noLunch),
+                        autoStartShift: updated.autoStartShift !== false,
+                        autoEndShift: updated.autoEndShift !== false,
+                        autoEndTimeoutMin: updated.autoEndTimeoutMin || 5,
+                        requireManagerAuthForOvertime: updated.requireManagerAuthForOvertime !== false,
+                        machineConfigs: updated.machineConfigs || { ...DEFAULT_MACHINE_SHIFTS }
                     };
                     setShiftConfig(fullShift);
                     setTempShiftConfig(fullShift);
@@ -1144,11 +1188,23 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     };
 
     // Helper para calcular detalhamento de jornada e horas úteis líquidas diárias
-    const calculateShiftDetails = (cfg: { workStart: string; lunchStart: string; lunchEnd: string; workEnd: string }) => {
-        const startMin = parseTimeToMinutes(cfg.workStart);
-        const lunchStartMin = parseTimeToMinutes(cfg.lunchStart);
-        const lunchEndMin = parseTimeToMinutes(cfg.lunchEnd);
-        const endMin = parseTimeToMinutes(cfg.workEnd);
+    const calculateShiftDetails = (cfg?: { workStart?: string; lunchStart?: string; lunchEnd?: string; workEnd?: string; noLunch?: boolean } | null) => {
+        if (!cfg) {
+            return {
+                morningMinutes: 0,
+                lunchMinutes: 0,
+                afternoonMinutes: 0,
+                totalWorkMinutes: 480,
+                totalWorkHours: 8,
+                isValid: true,
+                errorMessage: ''
+            };
+        }
+        const startMin = parseTimeToMinutes(cfg.workStart || '07:00');
+        const isNoLunch = Boolean(cfg.noLunch);
+        const lunchStartMin = isNoLunch ? 0 : parseTimeToMinutes(cfg.lunchStart || '');
+        const lunchEndMin = isNoLunch ? 0 : parseTimeToMinutes(cfg.lunchEnd || '');
+        const endMin = parseTimeToMinutes(cfg.workEnd || '17:00');
 
         let morningMinutes = 0;
         let lunchMinutes = 0;
@@ -1160,7 +1216,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         if (endMin <= startMin) {
             isValid = false;
             errorMessage = 'O horário de encerramento deve ser maior que o de início.';
-        } else if (lunchStartMin && lunchEndMin) {
+        } else if (!isNoLunch && lunchStartMin && lunchEndMin) {
             if (lunchStartMin <= startMin || lunchEndMin >= endMin || lunchEndMin <= lunchStartMin) {
                 isValid = false;
                 errorMessage = 'O intervalo de almoço deve estar entre o início e o fim da jornada.';
@@ -1195,9 +1251,49 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         return calculateShiftDetails(shiftConfig);
     }, [shiftConfig]);
 
+    const currentTabShiftConfig = useMemo(() => {
+        if (selectedMachineShiftTab === 'GLOBAL') {
+            return {
+                workStart: tempShiftConfig?.workStart || '07:00',
+                lunchStart: tempShiftConfig?.lunchStart || '12:00',
+                lunchEnd: tempShiftConfig?.lunchEnd || '13:00',
+                workEnd: tempShiftConfig?.workEnd || '17:00',
+                noLunch: Boolean(tempShiftConfig?.noLunch),
+                autoStartShift: tempShiftConfig?.autoStartShift !== false,
+                autoEndShift: tempShiftConfig?.autoEndShift !== false,
+                autoEndTimeoutMin: tempShiftConfig?.autoEndTimeoutMin || 5,
+                requireManagerAuthForOvertime: tempShiftConfig?.requireManagerAuthForOvertime !== false,
+                shiftCount: 1 as const
+            };
+        }
+        return tempShiftConfig?.machineConfigs?.[selectedMachineShiftTab] || resolveMachineShiftConfig(selectedMachineShiftTab, tempShiftConfig);
+    }, [selectedMachineShiftTab, tempShiftConfig]);
+
+    const currentTabConfig = currentTabShiftConfig;
+
     const tempShiftDetails = useMemo(() => {
-        return calculateShiftDetails(tempShiftConfig);
-    }, [tempShiftConfig]);
+        return calculateShiftDetails(currentTabShiftConfig);
+    }, [currentTabShiftConfig]);
+
+    const updateCurrentTabConfig = (updates: any) => {
+        if (selectedMachineShiftTab === 'GLOBAL') {
+            setTempShiftConfig(prev => ({ ...prev, ...updates }));
+        } else {
+            setTempShiftConfig(prev => {
+                const currentM = prev.machineConfigs?.[selectedMachineShiftTab] || resolveMachineShiftConfig(selectedMachineShiftTab, prev);
+                return {
+                    ...prev,
+                    machineConfigs: {
+                        ...(prev.machineConfigs || {}),
+                        [selectedMachineShiftTab]: {
+                            ...currentM,
+                            ...updates
+                        }
+                    }
+                };
+            });
+        }
+    };
 
     const handleSaveShiftConfig = async () => {
         if (!tempShiftDetails.isValid) {
@@ -2730,7 +2826,12 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                         {/* Botão Jornada Diária de Produção */}
                         <button
-                            onClick={() => setIsWorkHoursModalOpen(true)}
+                            onClick={() => {
+                                setTempShiftConfig(shiftConfig);
+                                setSelectedMachineShiftTab('GLOBAL');
+                                setActiveShiftTab('hours');
+                                setIsWorkHoursModalOpen(true);
+                            }}
                             className="bg-[#0B1D2A] hover:bg-[#122b3d] border border-cyan-500/30 hover:border-[#00E5FF] text-cyan-300 font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all shadow-sm active:scale-95 whitespace-nowrap"
                             title="Configurar Horários da Jornada de Trabalho"
                         >
@@ -3007,6 +3108,32 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                 </div>
                                                                 <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-800/80 text-slate-400 border border-slate-700/50 shrink-0">
                                                                     Off
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    }
+
+                                                    if ((operator as any).isAutoStartedWaitingCheckin) {
+                                                        return (
+                                                            <div 
+                                                                className="mt-2 p-1.5 rounded-xl border border-amber-500/50 bg-gradient-to-r from-amber-950/40 via-[#081822] to-cyan-950/30 flex items-center justify-between gap-1.5 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.25)] transition-all animate-pulse"
+                                                                title={`Turno iniciado automaticamente pelo sistema para ${mach.name}. Aguardando check-in do operador no aplicativo.`}
+                                                            >
+                                                                <div className="flex items-center gap-1.5 min-w-0">
+                                                                    <div className="w-6 h-6 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0 text-amber-400">
+                                                                        <ClockIcon className="w-3.5 h-3.5" />
+                                                                    </div>
+                                                                    <div className="flex flex-col min-w-0">
+                                                                        <span className="text-[10px] font-black tracking-wide text-amber-300 uppercase truncate">
+                                                                            Turno Aberto (Auto)
+                                                                        </span>
+                                                                        <span className="text-[8px] font-bold text-cyan-300 truncate">
+                                                                            Aguardando Check-in
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                                <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0">
+                                                                    Auto
                                                                 </span>
                                                             </div>
                                                         );
@@ -5336,6 +5463,74 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                         {/* Conteúdo da Aba 1: Horários do Turno */}
                         {activeShiftTab === 'hours' && (
                             <div className="flex flex-col gap-3 overflow-y-auto pr-1">
+                                {/* Sub-Seletor de Escopo: Geral Fábrica ou Máquina Específica */}
+                                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 border-b border-white/10 scrollbar-thin">
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedMachineShiftTab('GLOBAL')}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                                            selectedMachineShiftTab === 'GLOBAL'
+                                                ? 'bg-[#00E5FF]/20 text-[#00E5FF] border border-[#00E5FF]/40 shadow-sm'
+                                                : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
+                                        }`}
+                                    >
+                                        <span>🏢 Geral (Fábrica)</span>
+                                    </button>
+                                    {MACHINES.map(m => {
+                                        const isCustom = Boolean(tempShiftConfig.machineConfigs?.[m.name]);
+                                        const isSelected = selectedMachineShiftTab === m.name;
+                                        return (
+                                            <button
+                                                key={m.name}
+                                                type="button"
+                                                onClick={() => setSelectedMachineShiftTab(m.name)}
+                                                className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                                                    isSelected
+                                                        ? 'bg-cyan-500/25 text-[#00E5FF] border border-[#00E5FF]/50 shadow-sm'
+                                                        : isCustom
+                                                            ? 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 border border-emerald-500/30'
+                                                            : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
+                                                }`}
+                                            >
+                                                <span>{m.name}</span>
+                                                {isCustom && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Jornada personalizada" />}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Banner e Atalhos Rápidos por Máquina */}
+                                {selectedMachineShiftTab !== 'GLOBAL' && (
+                                    <div className="flex items-center justify-between bg-[#0B1D2A] p-2.5 rounded-xl border border-white/10 text-xs gap-2 flex-wrap">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <div className="w-2 h-2 rounded-full bg-[#00E5FF] animate-pulse shrink-0" />
+                                            <span className="font-bold text-slate-200 truncate">
+                                                Configurando: <strong className="text-[#00E5FF]">{selectedMachineShiftTab}</strong>
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            {selectedMachineShiftTab.startsWith('Trefila') && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => updateCurrentTabConfig({ workStart: '07:45', workEnd: '17:33', noLunch: true, shiftCount: 1 })}
+                                                    className="px-2 py-1 rounded-lg bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 border border-cyan-500/40 text-[10px] font-black uppercase tracking-wider transition active:scale-95"
+                                                >
+                                                    ⚡ Aplicar 07:45 às 17:33 (Sem Almoço)
+                                                </button>
+                                            )}
+                                            {selectedMachineShiftTab.startsWith('Treliça') && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => updateCurrentTabConfig({ workStart: '05:00', workEnd: '14:44', noLunch: false, lunchStart: '11:30', lunchEnd: '12:30', shiftCount: 2, shift2Start: '14:00', shift2End: '23:59' })}
+                                                    className="px-2 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/40 text-[10px] font-black uppercase tracking-wider transition active:scale-95"
+                                                >
+                                                    ⚡ 2 Turnos Treliça (A e B)
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
                                 {/* Entradas de Horários */}
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                     {/* Pergunta 1: Hora Início */}
@@ -5349,53 +5544,17 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                         </div>
                                         <input
                                             type="time"
-                                            value={tempShiftConfig.workStart}
-                                            onChange={(e) => setTempShiftConfig(prev => ({ ...prev, workStart: e.target.value }))}
+                                            value={currentTabConfig.workStart || '07:00'}
+                                            onChange={(e) => updateCurrentTabConfig({ workStart: e.target.value })}
                                             style={{ colorScheme: 'dark' }}
                                             className="bg-[#0B1D2A] border border-cyan-500/30 rounded-lg px-2 py-1 text-xs font-bold font-mono focus:outline-none focus:border-[#00E5FF] text-white"
                                         />
                                     </div>
 
-                                    {/* Pergunta 2: Parada Almoço (Início) */}
-                                    <div className="flex items-center justify-between bg-[#08131B] p-2.5 rounded-xl border border-white/5 hover:border-amber-500/20 transition-all">
-                                        <div className="flex items-center gap-2">
-                                            <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 font-bold text-[11px] flex items-center justify-center">2</span>
-                                            <div>
-                                                <span className="text-xs font-bold text-amber-300 block">Almoço (Início)</span>
-                                                <span className="text-[9px] text-slate-400">Pausa para refeição</span>
-                                            </div>
-                                        </div>
-                                        <input
-                                            type="time"
-                                            value={tempShiftConfig.lunchStart}
-                                            onChange={(e) => setTempShiftConfig(prev => ({ ...prev, lunchStart: e.target.value }))}
-                                            style={{ colorScheme: 'dark' }}
-                                            className="bg-[#0B1D2A] border border-amber-500/30 rounded-lg px-2 py-1 text-xs font-bold font-mono focus:outline-none focus:border-amber-400 text-white"
-                                        />
-                                    </div>
-
-                                    {/* Pergunta 3: Retorno Almoço */}
-                                    <div className="flex items-center justify-between bg-[#08131B] p-2.5 rounded-xl border border-white/5 hover:border-amber-500/20 transition-all">
-                                        <div className="flex items-center gap-2">
-                                            <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 font-bold text-[11px] flex items-center justify-center">3</span>
-                                            <div>
-                                                <span className="text-xs font-bold text-amber-300 block">Retorno Almoço</span>
-                                                <span className="text-[9px] text-slate-400">Fim da refeição</span>
-                                            </div>
-                                        </div>
-                                        <input
-                                            type="time"
-                                            value={tempShiftConfig.lunchEnd}
-                                            onChange={(e) => setTempShiftConfig(prev => ({ ...prev, lunchEnd: e.target.value }))}
-                                            style={{ colorScheme: 'dark' }}
-                                            className="bg-[#0B1D2A] border border-amber-500/30 rounded-lg px-2 py-1 text-xs font-bold font-mono focus:outline-none focus:border-amber-400 text-white"
-                                        />
-                                    </div>
-
-                                    {/* Pergunta 4: Fim da Jornada */}
+                                    {/* Fim do Turno */}
                                     <div className="flex items-center justify-between bg-[#08131B] p-2.5 rounded-xl border border-white/5 hover:border-cyan-500/20 transition-all">
                                         <div className="flex items-center gap-2">
-                                            <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-[#00E5FF] font-bold text-[11px] flex items-center justify-center">4</span>
+                                            <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-[#00E5FF] font-bold text-[11px] flex items-center justify-center">2</span>
                                             <div>
                                                 <span className="text-xs font-bold text-slate-200 block">Fim do Turno</span>
                                                 <span className="text-[9px] text-slate-400">Término da produção</span>
@@ -5403,12 +5562,171 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                         </div>
                                         <input
                                             type="time"
-                                            value={tempShiftConfig.workEnd}
-                                            onChange={(e) => setTempShiftConfig(prev => ({ ...prev, workEnd: e.target.value }))}
+                                            value={currentTabConfig.workEnd || '17:00'}
+                                            onChange={(e) => updateCurrentTabConfig({ workEnd: e.target.value })}
                                             style={{ colorScheme: 'dark' }}
                                             className="bg-[#0B1D2A] border border-cyan-500/30 rounded-lg px-2 py-1 text-xs font-bold font-mono focus:outline-none focus:border-[#00E5FF] text-white"
                                         />
                                     </div>
+
+                                    {/* Toggle: Sem Parada de Almoço */}
+                                    <div className="sm:col-span-2 bg-[#08131B] p-2.5 rounded-xl border border-white/5 flex items-center justify-between">
+                                        <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                                            <input 
+                                                type="checkbox"
+                                                checked={Boolean(currentTabConfig.noLunch)}
+                                                onChange={(e) => updateCurrentTabConfig({ noLunch: e.target.checked })}
+                                                className="w-4 h-4 rounded text-[#00E5FF] focus:ring-0 bg-[#0B1D2A] border-white/20 accent-[#00E5FF]"
+                                            />
+                                            <div>
+                                                <span className="text-xs font-bold text-slate-200 block">Sem Parada de Almoço (Turno Contínuo)</span>
+                                                <span className="text-[10px] text-slate-400">Máquina opera em regime contínuo sem intervalo de refeição</span>
+                                            </div>
+                                        </label>
+                                        {Boolean(currentTabConfig.noLunch) && (
+                                            <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                                                Contínuo
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {/* Horários de Almoço (se houver intervalo) */}
+                                    {!currentTabConfig.noLunch && (
+                                        <>
+                                            {/* Parada Almoço (Início) */}
+                                            <div className="flex items-center justify-between bg-[#08131B] p-2.5 rounded-xl border border-white/5 hover:border-amber-500/20 transition-all">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 font-bold text-[11px] flex items-center justify-center">3</span>
+                                                    <div>
+                                                        <span className="text-xs font-bold text-amber-300 block">Almoço (Início)</span>
+                                                        <span className="text-[9px] text-slate-400">Pausa para refeição</span>
+                                                    </div>
+                                                </div>
+                                                <input
+                                                    type="time"
+                                                    value={currentTabConfig.lunchStart || '12:00'}
+                                                    onChange={(e) => updateCurrentTabConfig({ lunchStart: e.target.value })}
+                                                    style={{ colorScheme: 'dark' }}
+                                                    className="bg-[#0B1D2A] border border-amber-500/30 rounded-lg px-2 py-1 text-xs font-bold font-mono focus:outline-none focus:border-amber-400 text-white"
+                                                />
+                                            </div>
+
+                                            {/* Retorno Almoço */}
+                                            <div className="flex items-center justify-between bg-[#08131B] p-2.5 rounded-xl border border-white/5 hover:border-amber-500/20 transition-all">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 font-bold text-[11px] flex items-center justify-center">4</span>
+                                                    <div>
+                                                        <span className="text-xs font-bold text-amber-300 block">Retorno Almoço</span>
+                                                        <span className="text-[9px] text-slate-400">Fim da refeição</span>
+                                                    </div>
+                                                </div>
+                                                <input
+                                                    type="time"
+                                                    value={currentTabConfig.lunchEnd || '13:00'}
+                                                    onChange={(e) => updateCurrentTabConfig({ lunchEnd: e.target.value })}
+                                                    style={{ colorScheme: 'dark' }}
+                                                    className="bg-[#0B1D2A] border border-amber-500/30 rounded-lg px-2 py-1 text-xs font-bold font-mono focus:outline-none focus:border-amber-400 text-white"
+                                                />
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {/* Configuração de 2 Turnos */}
+                                    <div className="sm:col-span-2 bg-[#08131B] p-3 rounded-xl border border-white/5 space-y-2.5">
+                                        <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                                            <input
+                                                type="checkbox"
+                                                checked={currentTabConfig.shiftCount === 2}
+                                                onChange={(e) => updateCurrentTabConfig({ 
+                                                    shiftCount: e.target.checked ? 2 : 1, 
+                                                    shift2Start: e.target.checked ? (currentTabConfig.shift2Start || '14:00') : undefined, 
+                                                    shift2End: e.target.checked ? (currentTabConfig.shift2End || '23:59') : undefined 
+                                                })}
+                                                className="w-4 h-4 rounded text-emerald-400 focus:ring-0 bg-[#0B1D2A] border-white/20 accent-emerald-400"
+                                            />
+                                            <div>
+                                                <span className="text-xs font-bold text-slate-200 block">Operar em 2 Turnos (Turno A e Turno B)</span>
+                                                <span className="text-[10px] text-slate-400">Habilita revezamento de turnos diários para esta máquina</span>
+                                            </div>
+                                        </label>
+
+                                        {currentTabConfig.shiftCount === 2 && (
+                                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/10 animate-fade">
+                                                <div>
+                                                    <span className="text-[10px] font-bold text-emerald-400 block mb-1">Início do Turno B</span>
+                                                    <input
+                                                        type="time"
+                                                        value={currentTabConfig.shift2Start || '14:00'}
+                                                        onChange={(e) => updateCurrentTabConfig({ shift2Start: e.target.value })}
+                                                        style={{ colorScheme: 'dark' }}
+                                                        className="w-full bg-[#0B1D2A] border border-emerald-500/30 rounded-lg px-2 py-1.5 text-xs font-bold font-mono focus:outline-none focus:border-emerald-400 text-white"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <span className="text-[10px] font-bold text-emerald-400 block mb-1">Término do Turno B</span>
+                                                    <input
+                                                        type="time"
+                                                        value={currentTabConfig.shift2End || '23:59'}
+                                                        onChange={(e) => updateCurrentTabConfig({ shift2End: e.target.value })}
+                                                        style={{ colorScheme: 'dark' }}
+                                                        className="w-full bg-[#0B1D2A] border border-emerald-500/30 rounded-lg px-2 py-1.5 text-xs font-bold font-mono focus:outline-none focus:border-emerald-400 text-white"
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Automações Inteligentes e Segurança */}
+                                <div className="bg-[#08131B] p-3.5 rounded-xl border border-white/10 space-y-2.5">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-[#00E5FF] block">
+                                        ⚙️ Automações e Segurança de Turno
+                                    </span>
+                                    
+                                    <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                                        <input
+                                            type="checkbox"
+                                            checked={currentTabConfig.autoStartShift !== false}
+                                            onChange={(e) => updateCurrentTabConfig({ autoStartShift: e.target.checked })}
+                                            className="w-4 h-4 rounded text-[#00E5FF] focus:ring-0 bg-[#0B1D2A] border-white/20 accent-[#00E5FF] mt-0.5"
+                                        />
+                                        <div>
+                                            <span className="text-xs font-bold text-slate-200 block">Iniciar turno automaticamente no horário programado</span>
+                                            <span className="text-[10px] text-slate-400 leading-tight block">
+                                                O sistema abre a contabilidade do turno pontualmente e exibe "Aguardando Check-in do Operador"
+                                            </span>
+                                        </div>
+                                    </label>
+
+                                    <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                                        <input
+                                            type="checkbox"
+                                            checked={currentTabConfig.autoEndShift !== false}
+                                            onChange={(e) => updateCurrentTabConfig({ autoEndShift: e.target.checked })}
+                                            className="w-4 h-4 rounded text-amber-400 focus:ring-0 bg-[#0B1D2A] border-white/20 accent-amber-400 mt-0.5"
+                                        />
+                                        <div>
+                                            <span className="text-xs font-bold text-amber-300 block">Encerramento automático com timer de 5 minutos</span>
+                                            <span className="text-[10px] text-slate-400 leading-tight block">
+                                                No término do turno, exibe contagem regressiva de 5 min na máquina e fecha com o último relato caso o operador não finalize
+                                            </span>
+                                        </div>
+                                    </label>
+
+                                    <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                                        <input
+                                            type="checkbox"
+                                            checked={currentTabConfig.requireManagerAuthForOvertime !== false}
+                                            onChange={(e) => updateCurrentTabConfig({ requireManagerAuthForOvertime: e.target.checked })}
+                                            className="w-4 h-4 rounded text-rose-400 focus:ring-0 bg-[#0B1D2A] border-white/20 accent-rose-400 mt-0.5"
+                                        />
+                                        <div>
+                                            <span className="text-xs font-bold text-rose-300 block">Exigir senha do gestor para iniciar/estender em Hora Extra</span>
+                                            <span className="text-[10px] text-slate-400 leading-tight block">
+                                                Bloqueia logins fora da jornada da máquina sem senha de gestor
+                                            </span>
+                                        </div>
+                                    </label>
                                 </div>
 
                                 {/* Card de Cálculo em Tempo Real */}
@@ -5416,7 +5734,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                     <div className="flex justify-between items-center text-xs">
                                         <div>
                                             <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
-                                                Tempo Útil de Produção por Dia:
+                                                Tempo Útil Calculado ({selectedMachineShiftTab === 'GLOBAL' ? 'Padrão' : selectedMachineShiftTab}):
                                             </span>
                                             <span className="text-[11px] text-slate-300">
                                                 Carga horária líquida trabalhada
@@ -5432,65 +5750,11 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                         </div>
                                     </div>
 
-                                    {/* Resumo visual dos turnos */}
-                                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/10 text-center font-mono text-[10px]">
-                                        <div className="bg-[#07131B] p-2 rounded-lg border border-white/5">
-                                            <span className="text-[9px] text-slate-400 uppercase block">1º Período</span>
-                                            <strong className="text-cyan-400 block mt-0.5">{formatMinutesToHoursMinutes(tempShiftDetails.morningMinutes)}</strong>
-                                            <span className="text-[8px] text-slate-500 font-sans">{tempShiftConfig.workStart || '--:--'} às {tempShiftConfig.lunchStart || '--:--'}</span>
-                                        </div>
-
-                                        <div className="bg-[#07131B] p-2 rounded-lg border border-white/5">
-                                            <span className="text-[9px] text-amber-400 uppercase block">Almoço</span>
-                                            <strong className="text-amber-300 block mt-0.5">{formatMinutesToHoursMinutes(tempShiftDetails.lunchMinutes)}</strong>
-                                            <span className="text-[8px] text-slate-500 font-sans">{tempShiftConfig.lunchStart || '--:--'} às {tempShiftConfig.lunchEnd || '--:--'}</span>
-                                        </div>
-
-                                        <div className="bg-[#07131B] p-2 rounded-lg border border-white/5">
-                                            <span className="text-[9px] text-slate-400 uppercase block">2º Período</span>
-                                            <strong className="text-cyan-400 block mt-0.5">{formatMinutesToHoursMinutes(tempShiftDetails.afternoonMinutes)}</strong>
-                                            <span className="text-[8px] text-slate-500 font-sans">{tempShiftConfig.lunchEnd || '--:--'} às {tempShiftConfig.workEnd || '--:--'}</span>
-                                        </div>
-                                    </div>
-
                                     {!tempShiftDetails.isValid && (
                                         <div className="text-[10px] text-red-400 bg-red-500/10 p-2 rounded-lg border border-red-500/20">
                                             ⚠️ {tempShiftDetails.errorMessage}
                                         </div>
                                     )}
-                                </div>
-
-                                {/* Botões de Predefinições Rápidas */}
-                                <div className="flex items-center gap-1.5 justify-center flex-wrap pt-1">
-                                    <span className="text-[9px] text-slate-400 uppercase font-bold mr-1">Atalhos:</span>
-                                    <button
-                                        type="button"
-                                        onClick={() => setTempShiftConfig(prev => ({ ...prev, workStart: '07:00', lunchStart: '12:00', lunchEnd: '13:00', workEnd: '17:00' }))}
-                                        className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-[9px] text-slate-300 font-mono transition-colors"
-                                    >
-                                        07h-17h (9h)
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setTempShiftConfig(prev => ({ ...prev, workStart: '07:00', lunchStart: '12:00', lunchEnd: '13:00', workEnd: '16:48' }))}
-                                        className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-[9px] text-slate-300 font-mono transition-colors"
-                                    >
-                                        CLT 44h (8.8h)
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setTempShiftConfig(prev => ({ ...prev, workStart: '08:00', lunchStart: '12:00', lunchEnd: '13:00', workEnd: '17:00' }))}
-                                        className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-[9px] text-slate-300 font-mono transition-colors"
-                                    >
-                                        08h-17h (8h)
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setTempShiftConfig(prev => ({ ...prev, workStart: '06:00', lunchStart: '', lunchEnd: '', workEnd: '14:00' }))}
-                                        className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-[9px] text-slate-300 font-mono transition-colors"
-                                    >
-                                        6h-14h (8h contínuo)
-                                    </button>
                                 </div>
                             </div>
                         )}

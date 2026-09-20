@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react'; // Refresh Trigger
-import type { Page, User, Employee, StockItem, ConferenceData, ProductionOrderData, TransferRecord, Bitola, MaterialType, MachineType, PartsRequest, ShiftReport, ProductionRecord, TransferredLotInfo, ProcessedLot, DowntimeEvent, OperatorLog, TrelicaSelectedLots, WeighedPackage, FinishedProductItem, Ponta, PontaItem, FinishedGoodsTransferRecord, TransferredFinishedGoodInfo, KaizenProblem, Meeting, MeetingItem, MeetingCategory, StockMovement, DowntimeConfig, UserAccessLog, ProductionSchedule } from './types';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import type { Page, User, Employee, StockItem, ConferenceData, ProductionOrderData, TransferRecord, Bitola, MaterialType, MachineType, PartsRequest, ShiftReport, ProductionRecord, TransferredLotInfo, ProcessedLot, DowntimeEvent, OperatorLog, TrelicaSelectedLots, WeighedPackage, FinishedProductItem, Ponta, PontaItem, FinishedGoodsTransferRecord, TransferredFinishedGoodInfo, KaizenProblem, Meeting, MeetingItem, MeetingCategory, StockMovement, DowntimeConfig, UserAccessLog, ProductionSchedule, PcpShiftConfig } from './types';
 import { FioMaquinaBitolaOptions, TrefilaBitolaOptions, DefaultElectrodeGauges } from './types';
 import Login from './components/Login';
 import MainMenu from './components/MainMenu';
@@ -41,7 +41,8 @@ import DowntimeConfigManager from './components/DowntimeConfigManager';
 import { supabase } from './supabaseClient';
 import type { StockGauge, StickyNote } from './types';
 
-import { fetchTable, insertItem, updateItem, deleteItem, deleteItemByColumn, updateItemByColumn, mapToCamelCase, fetchByColumn, deductTrelicaSpoolStandConsumption } from './services/supabaseService';
+import { fetchTable, insertItem, updateItem, deleteItem, deleteItemByColumn, updateItemByColumn, mapToCamelCase, fetchByColumn, deductTrelicaSpoolStandConsumption, fetchPcpShiftConfig } from './services/supabaseService';
+import { DEFAULT_GLOBAL_SHIFT_CONFIG, DEFAULT_MACHINE_SHIFTS } from './services/shiftConfigService';
 import { useAllRealtimeSubscriptions } from './hooks/useSupabaseRealtime';
 
 const SESSION_VERSION = 1;
@@ -89,6 +90,17 @@ const App: React.FC = () => {
     const [meetingCategories, setMeetingCategories] = useState<MeetingCategory[]>([]);
     const [downtimeConfigs, setDowntimeConfigs] = useState<DowntimeConfig[]>([]);
     const [productionSchedules, setProductionSchedules] = useState<ProductionSchedule[]>([]);
+
+    const [pcpShiftConfig, setPcpShiftConfig] = useState<PcpShiftConfig>(() => {
+        try {
+            const raw = localStorage.getItem('pcp_daily_shift_config');
+            if (raw) return JSON.parse(raw);
+        } catch (_) {}
+        return {
+            ...DEFAULT_GLOBAL_SHIFT_CONFIG,
+            machineConfigs: { ...DEFAULT_MACHINE_SHIFTS }
+        };
+    });
 
     const [pendingKaizenCount, setPendingKaizenCount] = useState(0);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -225,6 +237,10 @@ const App: React.FC = () => {
                 setTrelicaProduction(fetchedProductionRecords.filter(r => r.machine.startsWith('Treliça')));
                 setMalhaProduction(fetchedProductionRecords.filter(r => r.machine.toLowerCase().startsWith('malha')));
 
+                const dbShift = await fetchPcpShiftConfig();
+                if (dbShift) {
+                    setPcpShiftConfig(dbShift);
+                }
 
             } catch (error) {
                 console.error("Failed to load data from Supabase", error);
@@ -644,7 +660,7 @@ const App: React.FC = () => {
                 internalLot: lot.internalLot,
                 supplierLot: '', // No longer used in UI
                 runNumber: lot.runNumber,
-                steelType: lot.materialType === 'Eletrodos Treliças' ? '' : (lot.steelType || '1006'),
+                steelType: (lot.materialType === 'Eletrodos Treliças' || lot.materialType === 'Sabão') ? '' : (lot.steelType || '1006'),
                 materialType: lot.materialType,
                 bitola: lot.bitola,
                 productCode: lot.productCode || '',
@@ -1489,7 +1505,10 @@ const App: React.FC = () => {
         }
     };
 
-    const startOperatorShift = async (orderId: string) => {
+    const startOperatorShift = async (
+        orderId: string, 
+        options?: { isOvertime?: boolean; managerAuthorized?: string; checkinOnly?: boolean }
+    ) => {
         if (!currentUser) return;
         const now = new Date().toISOString();
 
@@ -1497,21 +1516,44 @@ const App: React.FC = () => {
         const order = fetchedOrders[0];
         if (!order) return;
 
-        // Close ALL open logs for any operator before starting the current user's
-        const newLogs = (order.operatorLogs || []).map(log => {
-            if (!log.endTime) {
-                return { ...log, endTime: now, endQuantity: order.actualProducedQuantity || 0 };
-            }
-            return log;
-        });
+        // Verificar se já existia um log aberto aguardando check-in (auto-iniciado pelo sistema)
+        const openCheckinLogIndex = (order.operatorLogs || []).findIndex(
+            l => !l.endTime && (l.pendingOperatorCheckin || (l.operator && l.operator.toUpperCase().includes('SISTEMA')))
+        );
 
-        // Start the new log for the current user
-        const updatedLogs = [...newLogs, {
-            operator: currentUser.username,
-            startTime: now,
-            endTime: null,
-            startQuantity: order.actualProducedQuantity || 0
-        }];
+        let updatedLogs: OperatorLog[];
+        if (openCheckinLogIndex >= 0) {
+            // Preserva o horário de início oficial do turno agendado!
+            updatedLogs = (order.operatorLogs || []).map((log, idx) => {
+                if (idx === openCheckinLogIndex) {
+                    return {
+                        ...log,
+                        operator: currentUser.username,
+                        pendingOperatorCheckin: false,
+                        isOvertime: options?.isOvertime !== undefined ? options.isOvertime : log.isOvertime,
+                        managerAuthorized: options?.managerAuthorized || log.managerAuthorized
+                    };
+                }
+                return log;
+            });
+        } else {
+            // Fecha logs anteriores se houver
+            const newLogs = (order.operatorLogs || []).map(log => {
+                if (!log.endTime) {
+                    return { ...log, endTime: now, endQuantity: order.actualProducedQuantity || 0 };
+                }
+                return log;
+            });
+
+            updatedLogs = [...newLogs, {
+                operator: currentUser.username,
+                startTime: now,
+                endTime: null,
+                startQuantity: order.actualProducedQuantity || 0,
+                isOvertime: Boolean(options?.isOvertime),
+                managerAuthorized: options?.managerAuthorized
+            }];
+        }
 
         // Close ALL open downtime events (not just the last one!)
         const closedEvents = (order.downtimeEvents || []).map(event =>
@@ -1538,7 +1580,8 @@ const App: React.FC = () => {
 
         try {
             await updateItem('production_orders', orderId, updates);
-            showNotification('Turno iniciado.', 'success');
+            setProductionOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updates } : o));
+            showNotification(openCheckinLogIndex >= 0 ? 'Check-in confirmado! Turno vinculado ao seu usuário.' : 'Turno iniciado.', 'success');
         } catch (error) {
             showNotification('Erro ao iniciar turno.', 'error');
         }
@@ -1640,6 +1683,10 @@ const App: React.FC = () => {
             totalProducedMeters,
             totalScrapWeight,
             scrapPercentage,
+            isOvertime: operatorLog.isOvertime,
+            managerAuthorized: operatorLog.managerAuthorized,
+            autoClosed: operatorLog.autoClosed,
+            observation: observation || (operatorLog.autoClosed ? 'Encerramento Automático pelo Sistema (Operador ausente)' : undefined)
         };
 
         try {
@@ -1651,9 +1698,11 @@ const App: React.FC = () => {
     };
 
 
-    const endOperatorShift = async (orderId: string, finalQuantity?: number) => {
-        if (!currentUser) return;
-
+    const endOperatorShift = async (
+        orderId: string, 
+        finalQuantity?: number, 
+        options?: { autoClosed?: boolean; observation?: string; isOvertime?: boolean; managerAuthorized?: string }
+    ) => {
         const fetchedOrders = await fetchByColumn<ProductionOrderData>('production_orders', 'id', orderId);
         const order = fetchedOrders[0];
         if (!order) return;
@@ -1667,7 +1716,10 @@ const App: React.FC = () => {
                 const closedLog: OperatorLog = {
                     ...log,
                     endTime: now,
-                    endQuantity: finalQuantity !== undefined ? finalQuantity : (order.actualProducedQuantity || 0)
+                    endQuantity: finalQuantity !== undefined ? finalQuantity : (order.actualProducedQuantity || 0),
+                    autoClosed: options?.autoClosed,
+                    isOvertime: options?.isOvertime !== undefined ? options.isOvertime : log.isOvertime,
+                    managerAuthorized: options?.managerAuthorized || log.managerAuthorized
                 };
                 if (log.operator && log.operator !== 'GHOST_ORDER_FLAG') {
                     logsToReport.push(closedLog);
@@ -1697,7 +1749,8 @@ const App: React.FC = () => {
         newDowntimeEvents.push({
             stopTime: now,
             resumeTime: null,
-            reason: 'Final de Turno'
+            reason: 'Final de Turno',
+            justification: options?.autoClosed ? 'Encerramento Automático pelo Sistema' : undefined
         });
         updates.downtimeEvents = newDowntimeEvents;
 
@@ -1705,11 +1758,11 @@ const App: React.FC = () => {
             const updatedOrder = await updateItem<ProductionOrderData>('production_orders', orderId, updates);
 
             for (const logToReport of logsToReport) {
-                await generateShiftReport(updatedOrder, logToReport);
+                await generateShiftReport(updatedOrder, logToReport, options?.observation || (options?.autoClosed ? 'Encerramento Automático pelo Sistema (Operador ausente)' : undefined));
             }
 
             setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
-            showNotification('Turno finalizado com sucesso e registrado no PCP.', 'success');
+            showNotification(options?.autoClosed ? 'Turno encerrado automaticamente pelo sistema.' : 'Turno finalizado com sucesso e registrado no PCP.', 'success');
         } catch (error) {
             showNotification('Erro ao finalizar turno.', 'error');
         }
@@ -2720,7 +2773,8 @@ const App: React.FC = () => {
             addPartsRequest, logPostProductionActivity, completeProduction, recordPackageWeight,
             updateProducedQuantity, users, deleteShiftReport, gauges, cancelProductionOrder,
             pauseProductionOrder, addLotToOrder, downtimeConfigs,
-            updateProductionOrder, onUpdateReport: handleUpdateShiftReport
+            updateProductionOrder, onUpdateReport: handleUpdateShiftReport,
+            pcpShiftConfig
         };
 
         switch (page) {

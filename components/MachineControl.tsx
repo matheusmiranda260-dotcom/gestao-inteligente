@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import type { Page, MachineType, StockItem, ProductionOrderData, User, PartsRequest, ShiftReport, TrelicaSelectedLots, Ponta, StockGauge, Employee, DowntimeConfig, TrelicaSpoolStand } from '../types';
+import type { Page, MachineType, StockItem, ProductionOrderData, User, PartsRequest, ShiftReport, TrelicaSelectedLots, Ponta, StockGauge, Employee, DowntimeConfig, TrelicaSpoolStand, PcpShiftConfig } from '../types';
 import { DOWNTIME_THRESHOLDS } from '../types';
 import { ArrowLeftIcon, PlayIcon, PauseIcon, ClockIcon, WarningIcon, StopIcon, CheckCircleIcon, WrenchScrewdriverIcon, ArchiveIcon, ClipboardListIcon, CogIcon, DocumentReportIcon, ScaleIcon, TrashIcon, CalculatorIcon, ChartBarIcon, ExclamationIcon, SaveIcon, XCircleIcon, ChevronDownIcon, AdjustmentsIcon, ChevronRightIcon } from './icons';
 import PartsRequestModal from './PartsRequestModal';
 import ShiftReportsModal from './ShiftReportsModal';
 import ProductionOrderReport from './ProductionOrderReport';
 import { insertItem, deleteItem, updateItem, fetchTable, fetchByColumn, fetchTrelicaSpoolStands } from '../services/supabaseService';
+import { checkMachineShiftStatus, resolveMachineShiftConfig } from '../services/shiftConfigService';
 import { trelicaModels } from './ProductionOrderTrelica';
 import TrefilaCalculation from './TrefilaCalculation';
 import TrelicaSpoolStands from './TrelicaSpoolStands';
@@ -908,8 +909,8 @@ interface MachineControlProps {
     logPostProductionActivity?: (activity: string) => void;
     updateProducedQuantity?: (orderId: string, quantity: number) => void;
     startProductionOrder?: (orderId: string) => void;
-    startOperatorShift?: (orderId: string) => void;
-    endOperatorShift?: (orderId: string, finalQuantity?: number) => void;
+    startOperatorShift?: (orderId: string, options?: { isOvertime?: boolean; managerAuthorized?: string; checkinOnly?: boolean }) => void | Promise<void>;
+    endOperatorShift?: (orderId: string, finalQuantity?: number, options?: { autoClosed?: boolean; observation?: string; isOvertime?: boolean; managerAuthorized?: string }) => void | Promise<void>;
     logDowntime?: (orderId: string, reason: string) => void;
     logResumeProduction?: (orderId: string) => void;
     startLotProcessing?: (orderId: string, lotId: string, speed: number) => void;
@@ -928,6 +929,7 @@ interface MachineControlProps {
     downtimeConfigs?: DowntimeConfig[];
     updateProductionOrder?: (orderId: string, updates: Partial<ProductionOrderData>) => void;
     onUpdateReport?: (reportId: string, updates: Partial<ShiftReport>) => Promise<void>;
+    pcpShiftConfig?: PcpShiftConfig;
 }
 
 const formatDuration = (ms: number) => {
@@ -988,7 +990,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
     recordLotWeight, recordPackageWeight, completeProduction, addPartsRequest,
     logPostProductionActivity, updateProducedQuantity, deleteShiftReport,
     cancelProductionOrder, pauseProductionOrder, addLotToOrder, initialView, initialModal, gauges = [],
-    downtimeConfigs = [], updateProductionOrder, onUpdateReport
+    downtimeConfigs = [], updateProductionOrder, onUpdateReport, pcpShiftConfig
 }) => {
     const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor' || currentUser?.username?.toLowerCase() === 'admin' || currentUser?.username?.toLowerCase() === 'gestor' || currentUser?.username?.toLowerCase().includes('matheusmiranda');
     const [activeMachine, setActiveMachine] = useState<MachineType>(() => {
@@ -1128,9 +1130,46 @@ const MachineControl: React.FC<MachineControlProps> = ({
     const [showSpeedModal, setShowSpeedModal] = useState(false);
     const [selectedLotForSpeed, setSelectedLotForSpeed] = useState<string | null>(null);
     const [previousStopReason, setPreviousStopReason] = useState<string | null>(null);
+    const [showManagerAuthForOvertimeStart, setShowManagerAuthForOvertimeStart] = useState(false);
+    const [showManagerAuthForOvertimeExtend, setShowManagerAuthForOvertimeExtend] = useState(false);
+    const [authorizedOvertimeForCurrentShift, setAuthorizedOvertimeForCurrentShift] = useState(false);
+    const [showAutoEndCountdownModal, setShowAutoEndCountdownModal] = useState(false);
+    const [pendingStartIsOvertime, setPendingStartIsOvertime] = useState(false);
+    const [pendingStartManager, setPendingStartManager] = useState<string | undefined>(undefined);
 
-    const handleStartShift = () => {
+    const shiftEvaluation = useMemo(() => {
+        return checkMachineShiftStatus(activeMachine, pcpShiftConfig, now);
+    }, [activeMachine, pcpShiftConfig, now]);
+
+    const shiftStatus = useMemo(() => {
+        return {
+            isOvertime: shiftEvaluation.isOvertime && !authorizedOvertimeForCurrentShift,
+            progress: shiftEvaluation.progressPercent,
+            timeStatusText: shiftEvaluation.statusText,
+            shiftName: shiftEvaluation.shiftName,
+            shiftLabel: shiftEvaluation.shiftLabel,
+            inShiftWindow: shiftEvaluation.inShiftWindow,
+            isAutoEndCountdown: shiftEvaluation.isAutoEndCountdown,
+            remainingCountdownSeconds: shiftEvaluation.remainingCountdownSeconds,
+            autoStartShift: shiftEvaluation.autoStartShift,
+            autoEndShift: shiftEvaluation.autoEndShift,
+            requireManagerAuthForOvertime: shiftEvaluation.requireManagerAuthForOvertime,
+            workStart: shiftEvaluation.workStart,
+            workEnd: shiftEvaluation.workEnd,
+        };
+    }, [shiftEvaluation, authorizedOvertimeForCurrentShift]);
+
+    const handleStartShift = (forceOvertime = false, managerAuthUser?: string) => {
         if (!activeOrder || !startOperatorShift) return;
+
+        // Se fora do horário programado e não for gestor nem já autorizado, exigir senha de gestor
+        if (!shiftEvaluation.inShiftWindow && !isGestor && shiftEvaluation.requireManagerAuthForOvertime && !forceOvertime) {
+            setShowManagerAuthForOvertimeStart(true);
+            return;
+        }
+
+        const isOt = forceOvertime || !shiftEvaluation.inShiftWindow;
+        const mgrAuth = managerAuthUser || (isOt && isGestor ? currentUser?.username : undefined);
 
         // Check for ANY active downtime event from previous shift (not just the last array element)
         const openEvent = (activeOrder.downtimeEvents || []).find(e =>
@@ -1139,10 +1178,12 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
         if (openEvent) {
             setPreviousStopReason(openEvent.reason);
+            setPendingStartIsOvertime(isOt);
+            setPendingStartManager(mgrAuth);
             setShowResumePreviousStopModal(true);
         } else {
             // Normal start — all events are administrative, just begin
-            startOperatorShift(activeOrder.id);
+            startOperatorShift(activeOrder.id, { isOvertime: isOt, managerAuthorized: mgrAuth });
         }
     };
 
@@ -1206,7 +1247,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
         if (!activeOrder || !startOperatorShift) return;
 
         // Start the shift first
-        await startOperatorShift(activeOrder.id);
+        await startOperatorShift(activeOrder.id, { isOvertime: pendingStartIsOvertime, managerAuthorized: pendingStartManager });
 
         // If user wants to resume production immediately
         if (shouldResume && logResumeProduction) {
@@ -1216,6 +1257,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
         setShowResumePreviousStopModal(false);
         setPreviousStopReason(null);
+        setPendingStartIsOvertime(false);
+        setPendingStartManager(undefined);
     };
 
     const executeRecordPackageWeight = (pkgData: { packageNumber: number; quantity: number; weight: number; }) => {
@@ -1670,25 +1713,62 @@ const MachineControl: React.FC<MachineControlProps> = ({
         }
     }, [now, activeOrder, isMachineStopped, hasActiveShift, machineType, showQuantityPrompt, lastPromptShownAt, activeMachine]);
 
+    // Reset autorização de hora extra quando o turno ou a OP mudar
     useEffect(() => {
-        if ((activeMachine.startsWith('Treliça') || activeMachine.startsWith('Malha')) && activeOrder && hasActiveShift && !showQuantityPrompt) {
-            const currentTime = now;
-            const shiftEnd = new Date(currentTime);
-            shiftEnd.setHours(17, 30, 0, 0);
+        setAuthorizedOvertimeForCurrentShift(false);
+        setShowAutoEndCountdownModal(false);
+    }, [activeOrder?.id, currentOperatorLog?.startTime]);
 
-            const todayStr = currentTime.toISOString().split('T')[0];
-            if (currentTime >= shiftEnd && lastShiftEndPromptDate !== todayStr) {
-                const shiftStartTime = currentOperatorLog ? new Date(currentOperatorLog.startTime).getTime() : 0;
-                if (shiftStartTime < shiftEnd.getTime()) {
-                    setShowQuantityPrompt(true);
-                    setLastShiftEndPromptDate(todayStr); // Only mark as shown if we actually show it
-                } else {
-                    // Start date is later than shift end (Overtime), so mark as handled to avoid loop
-                    setLastShiftEndPromptDate(todayStr);
+    // Monitoramento de Fim de Turno e Contagem Regressiva de Auto-Encerramento
+    useEffect(() => {
+        if (!activeOrder || !hasActiveShift || !shiftStatus.autoEndShift) {
+            setShowAutoEndCountdownModal(false);
+            return;
+        }
+
+        // Se o turno estiver apenas aberto aguardando check-in do operador, não abre modal de encerramento
+        if (currentOperatorLog?.pendingOperatorCheckin) {
+            setShowAutoEndCountdownModal(false);
+            return;
+        }
+
+        // Se o operador já teve hora extra autorizada nesta sessão de turno, descarta contagem de fechamento
+        if (authorizedOvertimeForCurrentShift) {
+            setShowAutoEndCountdownModal(false);
+            return;
+        }
+
+        // Se passou do horário de término do turno
+        if (shiftEvaluation.isOvertime && !shiftStatus.inShiftWindow) {
+            if (shiftStatus.isAutoEndCountdown) {
+                setShowAutoEndCountdownModal(true);
+            } else {
+                // Tempo de tolerância esgotou (ex: 5 min) -> Executar auto-encerramento pelo sistema!
+                setShowAutoEndCountdownModal(false);
+                if (endOperatorShift && activeOrder) {
+                    const finalQty = activeOrder.actualProducedQuantity || 0;
+                    endOperatorShift(activeOrder.id, finalQty, {
+                        autoClosed: true,
+                        observation: `Encerramento automático pelo sistema por fim do ${shiftStatus.shiftName} (${shiftStatus.shiftLabel}). Quantidade registrada: ${finalQty}.`
+                    });
                 }
             }
+        } else {
+            setShowAutoEndCountdownModal(false);
         }
-    }, [now, activeOrder, hasActiveShift, lastShiftEndPromptDate, showQuantityPrompt, machineType]);
+    }, [
+        activeOrder,
+        hasActiveShift,
+        shiftStatus.autoEndShift,
+        shiftStatus.isAutoEndCountdown,
+        shiftEvaluation.isOvertime,
+        shiftStatus.inShiftWindow,
+        shiftStatus.shiftName,
+        shiftStatus.shiftLabel,
+        authorizedOvertimeForCurrentShift,
+        currentOperatorLog?.pendingOperatorCheckin,
+        endOperatorShift
+    ]);
 
     useEffect(() => {
         if (justCompletedOrderId) {
@@ -1717,88 +1797,6 @@ const MachineControl: React.FC<MachineControlProps> = ({
             setShowPartsRequestModal(false);
         }
     }, [initialModal]);
-
-    const shiftStatus = useMemo(() => {
-        const currentTime = now;
-        
-        // The shift metadata (Name/Label) should always reflect the ACTUAL current time
-        // whereas the progress/overtime logic depends on when the operator actually started.
-        const actualStart = currentOperatorLog ? new Date(currentOperatorLog.startTime) : null;
-        
-        const refHour = currentTime.getHours();
-        const refMinutes = currentTime.getMinutes();
-        const timeVal = refHour + refMinutes / 60;
-
-        let shiftName = 'Turno Padrão';
-        let shiftLabel = '07:45 - 17:30';
-        let startH = 7, startM = 45;
-        let endH = 17, endM = 30;
-
-        // Configuração de 2 turnos para a Treliça
-        if (activeMachine.startsWith('Treliça')) {
-            if (timeVal >= 4 && timeVal < 14) { 
-                // Turno A (Inicia entre 04:00 e 13:59)
-                shiftName = 'Turno A';
-                shiftLabel = '05:00 - 14:44';
-                startH = 5; startM = 0;
-                endH = 14; endM = 44;
-            } else {
-                // Turno B (Inicia a partir das 14:00)
-                shiftName = 'Turno B';
-                shiftLabel = '14:00 - 00:00';
-                startH = 14; startM = 0;
-                endH = 23; endM = 59;
-            }
-        }
-
-        const shiftStart = new Date(currentTime);
-        shiftStart.setHours(startH, startM, 0, 0);
-
-        const shiftEnd = new Date(currentTime);
-        shiftEnd.setHours(endH, endM, 59, 999);
-
-        // Ajuste caso o Turno B ultrapasse a meia-noite (para turnos noturnos no futuro)
-        if (endH < startH && currentTime.getHours() <= endH) {
-             shiftStart.setDate(shiftStart.getDate() - 1);
-        } else if (endH < startH && currentTime.getHours() >= startH) {
-             shiftEnd.setDate(shiftEnd.getDate() + 1);
-        }
-
-        const nowMs = currentTime.getTime();
-        const startMs = shiftStart.getTime();
-        const endMs = shiftEnd.getTime();
-
-        const totalShiftDuration = endMs - startMs;
-        const elapsedSinceStart = nowMs - startMs;
-
-        let progress = 0;
-        let isOvertime = false;
-        let timeStatusText = '';
-
-        if (nowMs <= endMs) {
-            // Dentro do turno
-            if (nowMs < startMs) {
-                timeStatusText = `Turno inicia em ${formatDuration(startMs - nowMs)}`;
-            } else {
-                progress = (elapsedSinceStart / totalShiftDuration) * 100;
-                const remainingMs = endMs - nowMs;
-                timeStatusText = `Faltam ${formatDuration(remainingMs)}`;
-            }
-        } else {
-            // Passou do horário do turno
-            progress = 100;
-            isOvertime = true;
-            timeStatusText = `+${formatDuration(nowMs - endMs)} (Extra)`;
-        }
-
-        return {
-            isOvertime,
-            progress: Math.max(0, Math.min(100, progress)),
-            timeStatusText,
-            shiftName,
-            shiftLabel
-        };
-    }, [now, currentOperatorLog, activeOrder?.machine]);
 
 
     const { waitingLots, completedLots } = useMemo(() => {
@@ -1992,22 +1990,11 @@ const MachineControl: React.FC<MachineControlProps> = ({
     };
 
     const handleShiftEndRequest = (orderId: string) => {
-        const now = new Date();
-        const dayOfWeek = now.getDay(); // 0 = Sunday, 6 = Saturday
-        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-
-        const currentHour = now.getHours();
-        const currentMinute = now.getMinutes();
-        const currentMins = currentHour * 60 + currentMinute;
-
-        // Turno A: 14:17 = 857. Tolerance 10 min: 14:07 (847) to 14:27 (867)
-        // Turno B: 23:34 = 1414. Tolerance 10 min: 23:24 (1404) to 23:44 (1424)
-        const inWindowA = currentMins >= 847 && currentMins <= 867;
-        const inWindowB = currentMins >= 1404 && currentMins <= 1424;
-
         setPendingShiftEnd(orderId);
 
-        if (!isWeekend && !inWindowA && !inWindowB && !isGestor) {
+        // Se o encerramento for antes do horário oficial e a máquina exigir autorização, pedir senha do gestor
+        const isNearOrPastEnd = shiftStatus.isAutoEndCountdown || shiftEvaluation.isOvertime;
+        if (!isNearOrPastEnd && !isGestor && shiftStatus.requireManagerAuthForOvertime) {
             setShowManagerAuthForShiftEnd(true);
             return;
         }
@@ -2413,41 +2400,70 @@ const MachineControl: React.FC<MachineControlProps> = ({
                 })()
             )}
 
-            {/* Overlay Fixed para Bloqueio de Operador */}
+            {/* Overlay Fixed para Bloqueio de Operador ou Check-in de Turno Auto-Iniciado */}
             {!hasActiveShift && isAnyActiveShift && activeOrder && !isGestor && (
-                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center z-[100] transition-all duration-500 p-4">
+                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-md flex items-center justify-center z-[100] transition-all duration-500 p-4">
                     <div className="text-center p-8 bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md mx-auto animate-fade-in-up border-4 border-amber-400/50 overflow-hidden relative">
                         <div className="absolute top-0 inset-x-0 h-2 bg-gradient-to-r from-amber-400 via-amber-200 to-amber-400"></div>
                         
-                        <div className="bg-amber-50 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-white shadow-xl">
-                            <CogIcon className="h-12 w-12 text-amber-500 animate-spin-slow" />
-                        </div>
-                        
-                        <h3 className="text-3xl font-black text-slate-900 mb-2 tracking-tight uppercase">Máquina Ocupada</h3>
-                        
-                        <div className="bg-slate-50 rounded-2xl p-4 mb-6 border border-slate-100">
-                            <p className="text-slate-500 text-sm leading-relaxed font-bold">
-                                O operador <span className="text-amber-600 font-black uppercase text-base">{currentOperatorLog?.operator}</span> ainda possui um turno ativo nesta máquina.
-                            </p>
-                        </div>
-
-                        <p className="text-slate-400 mb-8 text-xs font-black uppercase tracking-widest leading-relaxed">
-                            Se você é <span className="text-indigo-600 font-black">{currentUser?.username}</span> e vai iniciar seu turno agora,<br/>clique no botão abaixo:
-                        </p>
-
-                        <div className="flex flex-col gap-4">
-                            <button
-                                onClick={() => startOperatorShift && startOperatorShift(activeOrder.id)}
-                                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-5 px-8 rounded-2xl uppercase text-sm flex items-center justify-center gap-3 tracking-[0.1em] transition-all shadow-xl shadow-indigo-100 active:scale-[0.97]"
-                            >
-                                <PlayIcon className="h-6 w-6" />
-                                Assumir Turno de {currentUser?.username || 'Hoje'}
-                            </button>
-                            
-                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
-                                Ao clicar, o turno de {currentOperatorLog?.operator} será encerrado automaticamente.
-                            </p>
-                        </div>
+                        {currentOperatorLog?.pendingOperatorCheckin ? (
+                            <>
+                                <div className="bg-amber-50 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-white shadow-xl">
+                                    <ClockIcon className="h-12 w-12 text-amber-500 animate-pulse" />
+                                </div>
+                                <span className="text-[10px] font-black uppercase tracking-widest bg-amber-500 text-slate-950 px-3 py-1 rounded-full mb-3 inline-block">
+                                    Turno Aberto pelo Sistema
+                                </span>
+                                <h3 className="text-2xl font-black text-slate-900 mb-2 tracking-tight uppercase">
+                                    {shiftStatus.shiftName}
+                                </h3>
+                                <div className="bg-slate-50 rounded-2xl p-4 mb-6 border border-slate-100 text-left space-y-1 text-xs">
+                                    <p className="text-slate-600 font-bold">
+                                        Horário agendado: <strong className="text-slate-900">{shiftStatus.shiftLabel}</strong>
+                                    </p>
+                                    <p className="text-slate-500">
+                                        O sistema abriu este turno pontualmente às {new Date(currentOperatorLog.startTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.
+                                    </p>
+                                </div>
+                                <p className="text-slate-500 mb-6 text-xs font-bold leading-relaxed">
+                                    Faça seu check-in para conectar seu usuário <span className="text-indigo-600 font-black">{currentUser?.username}</span> ao posto de trabalho e iniciar a produção.
+                                </p>
+                                <button
+                                    onClick={() => handleStartShift()}
+                                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-5 px-8 rounded-2xl uppercase text-sm flex items-center justify-center gap-3 tracking-[0.1em] transition-all shadow-xl shadow-emerald-100 active:scale-[0.97]"
+                                >
+                                    <CheckCircleIcon className="h-6 w-6" />
+                                    Fazer Check-in e Assumir Posto
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <div className="bg-amber-50 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-white shadow-xl">
+                                    <CogIcon className="h-12 w-12 text-amber-500 animate-spin-slow" />
+                                </div>
+                                <h3 className="text-3xl font-black text-slate-900 mb-2 tracking-tight uppercase">Máquina Ocupada</h3>
+                                <div className="bg-slate-50 rounded-2xl p-4 mb-6 border border-slate-100">
+                                    <p className="text-slate-500 text-sm leading-relaxed font-bold">
+                                        O operador <span className="text-amber-600 font-black uppercase text-base">{currentOperatorLog?.operator}</span> ainda possui um turno ativo nesta máquina.
+                                    </p>
+                                </div>
+                                <p className="text-slate-400 mb-8 text-xs font-black uppercase tracking-widest leading-relaxed">
+                                    Se você é <span className="text-indigo-600 font-black">{currentUser?.username}</span> e vai iniciar seu turno agora,<br/>clique no botão abaixo:
+                                </p>
+                                <div className="flex flex-col gap-4">
+                                    <button
+                                        onClick={() => handleStartShift()}
+                                        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-5 px-8 rounded-2xl uppercase text-sm flex items-center justify-center gap-3 tracking-[0.1em] transition-all shadow-xl shadow-indigo-100 active:scale-[0.97]"
+                                    >
+                                        <PlayIcon className="h-6 w-6" />
+                                        Assumir Turno de {currentUser?.username || 'Hoje'}
+                                    </button>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
+                                        Ao clicar, o turno de {currentOperatorLog?.operator} será encerrado automaticamente.
+                                    </p>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
             )}
@@ -2583,13 +2599,118 @@ const MachineControl: React.FC<MachineControlProps> = ({
             {showManagerAuthForShiftEnd && (
                 <ManagerActionAuthorizationModal
                     users={users}
-                    actionDescription="O encerramento do turno está fora do horário permitido (14:07 às 14:27 ou 23:24 às 23:44). É necessária autorização de um gestor."
+                    actionDescription={`O encerramento do turno está sendo solicitado fora do horário de término previsto para a máquina ${activeMachine} (${shiftStatus.shiftName}: término às ${shiftStatus.workEnd}). É necessária autorização de um gestor para confirmar.`}
                     onSuccess={handleManagerAuthSuccess}
                     onCancel={() => {
                         setShowManagerAuthForShiftEnd(false);
                         setPendingShiftEnd(null);
                     }}
                 />
+            )}
+            {showManagerAuthForOvertimeStart && (
+                <ManagerActionAuthorizationModal
+                    users={users}
+                    actionDescription={`Acesso e início de turno fora do horário regular programado para a máquina ${activeMachine} (${shiftStatus.shiftName}: ${shiftStatus.shiftLabel}). É necessária a senha do gestor para autorizar a operação em hora extra.`}
+                    onSuccess={() => {
+                        setShowManagerAuthForOvertimeStart(false);
+                        handleStartShift(true);
+                    }}
+                    onCancel={() => setShowManagerAuthForOvertimeStart(false)}
+                />
+            )}
+            {showManagerAuthForOvertimeExtend && (
+                <ManagerActionAuthorizationModal
+                    users={users}
+                    actionDescription={`Autorização para estender o turno e continuar a operação em HORA EXTRA na máquina ${activeMachine} após o horário de término (${shiftStatus.workEnd}).`}
+                    onSuccess={() => {
+                        setShowManagerAuthForOvertimeExtend(false);
+                        setAuthorizedOvertimeForCurrentShift(true);
+                        setShowAutoEndCountdownModal(false);
+                    }}
+                    onCancel={() => setShowManagerAuthForOvertimeExtend(false)}
+                />
+            )}
+            {showAutoEndCountdownModal && activeOrder && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[120] p-4 animate-fade-in">
+                    <div className="bg-[#0B1A24] border-2 border-amber-500/60 p-6 sm:p-8 rounded-3xl shadow-2xl w-full max-w-xl text-white relative overflow-hidden">
+                        <div className="absolute top-0 inset-x-0 h-2 bg-gradient-to-r from-amber-500 via-rose-500 to-amber-500 animate-pulse"></div>
+
+                        <div className="flex items-start gap-4 mb-6">
+                            <div className="w-14 h-14 rounded-2xl bg-amber-500/20 border border-amber-400 flex items-center justify-center text-amber-400 font-bold text-3xl shrink-0">
+                                ⏰
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-[10px] font-black uppercase tracking-widest bg-amber-500 text-slate-950 px-2.5 py-0.5 rounded-full">
+                                        Fim de Turno Atingido
+                                    </span>
+                                    <span className="text-xs text-amber-300 font-mono font-bold">
+                                        {shiftStatus.shiftName} ({shiftStatus.shiftLabel})
+                                    </span>
+                                </div>
+                                <h3 className="text-xl sm:text-2xl font-black text-white">
+                                    Encerramento Automático de Turno
+                                </h3>
+                            </div>
+                        </div>
+
+                        <div className="bg-white/5 border border-white/10 rounded-2xl p-5 mb-6 text-center">
+                            <p className="text-xs text-slate-400 uppercase tracking-wider font-bold mb-2">
+                                O sistema encerrará seu turno automaticamente em:
+                            </p>
+                            <div className="font-mono text-4xl sm:text-5xl font-black text-amber-400 tracking-wider">
+                                {Math.floor(shiftStatus.remainingCountdownSeconds / 60).toString().padStart(2, '0')}:
+                                {(shiftStatus.remainingCountdownSeconds % 60).toString().padStart(2, '0')}
+                            </div>
+                            <p className="text-xs text-slate-400 mt-2">
+                                Horário oficial de término: <strong className="text-white">{shiftStatus.workEnd}</strong>
+                            </p>
+                        </div>
+
+                        <div className="bg-slate-900/60 border border-slate-700/50 rounded-xl p-4 mb-6 text-xs text-slate-300 space-y-2">
+                            <div className="flex justify-between">
+                                <span className="text-slate-400">Máquina:</span>
+                                <span className="font-bold text-white">{activeMachine}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-slate-400">Ordem Ativa:</span>
+                                <span className="font-bold text-white">#{activeOrder.orderNumber}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-slate-400">Produção Atual Acumulada:</span>
+                                <span className="font-bold text-emerald-400">
+                                    {activeMachine.startsWith('Treliça') || activeMachine.startsWith('Malha')
+                                        ? `${activeOrder.actualProducedQuantity || 0} peças`
+                                        : `${(activeOrder.processedLots || []).filter(l => l.endTime).length} lotes concluídos`}
+                                </span>
+                            </div>
+                            <p className="text-[11px] text-amber-300/80 pt-2 border-t border-white/10 italic">
+                                Ao encerrar automaticamente, o sistema registrará a produção salva acima e colocará a máquina em parada "Final de Turno".
+                            </p>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    handleShiftEndRequest(activeOrder.id);
+                                }}
+                                className="flex-1 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black py-3.5 px-4 rounded-xl text-xs uppercase tracking-wider transition shadow-lg shadow-emerald-950/40 flex items-center justify-center gap-2"
+                            >
+                                <span>✓</span>
+                                <span>Encerrar Turno Agora</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setShowManagerAuthForOvertimeExtend(true)}
+                                className="flex-1 bg-amber-600/30 hover:bg-amber-600/50 active:scale-95 border border-amber-500/50 text-amber-300 hover:text-white font-black py-3.5 px-4 rounded-xl text-xs uppercase tracking-wider transition flex items-center justify-center gap-2"
+                            >
+                                <span>⏱️</span>
+                                <span>Continuar em Hora Extra (Requer Gestor)</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
             {showLotSelectionModal && (
                 <LotSelectionModal
@@ -2792,7 +2913,29 @@ const MachineControl: React.FC<MachineControlProps> = ({
                 <div className="space-y-6">
                     {activeOrder && !hasActiveShift && (
                         <div className="bg-white p-6 rounded-xl shadow-sm text-center border-2 border-slate-100">
-                            {isAnyActiveShift ? (
+                            {currentOperatorLog?.pendingOperatorCheckin ? (
+                                <div className="bg-gradient-to-r from-amber-500/15 via-amber-400/10 to-amber-500/15 p-6 rounded-2xl border-2 border-amber-500/40 text-center">
+                                    <div className="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-amber-500 text-3xl font-black mx-auto mb-3 animate-pulse">
+                                        ⚡
+                                    </div>
+                                    <span className="text-[10px] font-black uppercase tracking-widest bg-amber-500 text-slate-950 px-3 py-1 rounded-full inline-block mb-2">
+                                        Turno Aberto pelo Sistema • Aguardando Check-in
+                                    </span>
+                                    <h3 className="text-xl font-black text-slate-800 mb-1">
+                                        {shiftStatus.shiftName} ({shiftStatus.shiftLabel})
+                                    </h3>
+                                    <p className="text-slate-600 text-sm mb-4 max-w-md mx-auto">
+                                        Abertura oficial realizada às <strong className="text-slate-900">{new Date(currentOperatorLog.startTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</strong>. Faça o check-in para assumir o posto de trabalho.
+                                    </p>
+                                    <button
+                                        onClick={() => handleStartShift()}
+                                        className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black py-3.5 px-8 rounded-xl transition text-sm uppercase tracking-wider shadow-lg shadow-emerald-600/20 flex items-center gap-2 mx-auto"
+                                    >
+                                        <span>👤</span>
+                                        <span>Fazer Check-in e Assumir Posto</span>
+                                    </button>
+                                </div>
+                            ) : isAnyActiveShift ? (
                                 <>
                                     <h3 className="text-xl font-semibold text-slate-800 mb-2">A ordem <span className="font-bold text-slate-600">{activeOrder.orderNumber}</span> está sendo operada por <span className="text-indigo-600 font-bold uppercase">{currentOperatorLog?.operator}</span>.</h3>
                                     <p className="text-slate-500 mb-4 text-sm">
@@ -2805,7 +2948,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                             Acompanhar Painel
                                         </button>
                                         {isGestor && (
-                                            <button onClick={() => startOperatorShift && startOperatorShift(activeOrder.id)} className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold py-2 px-6 rounded-lg border border-emerald-100 transition">
+                                            <button onClick={() => handleStartShift()} className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold py-2 px-6 rounded-lg border border-emerald-100 transition">
                                                 Iniciar Meu Turno (Gestor)
                                             </button>
                                         )}
@@ -2814,7 +2957,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                             ) : (
                                 <>
                                     <h3 className="text-xl font-semibold text-slate-800 mb-4">A ordem <span className="font-bold text-slate-600">{activeOrder.orderNumber}</span> está aguardando operador.</h3>
-                                    <button onClick={() => startOperatorShift && startOperatorShift(activeOrder.id)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-lg transition text-lg shadow-lg shadow-emerald-100">
+                                    <button onClick={() => handleStartShift()} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-lg transition text-lg shadow-lg shadow-emerald-100">
                                         Iniciar Meu Turno
                                     </button>
                                 </>
@@ -3003,6 +3146,37 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                     ) : (
                                         // ORIGINAL CONTENT FOR TRELIÇA OR DESKTOP
                                         <div className={`space-y-6 ${mobileTab !== 'monitor' ? 'hidden lg:block' : 'animate-fade-in'}`}>
+                                            {currentOperatorLog?.pendingOperatorCheckin && (
+                                                <div className="bg-amber-500/20 border-2 border-amber-500/60 rounded-2xl p-4 shadow-lg flex items-center justify-between gap-4 animate-pulse">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="bg-amber-500/30 p-2.5 rounded-xl text-amber-400 font-bold shrink-0 text-xl">
+                                                            ⚡
+                                                        </div>
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-[10px] font-black uppercase tracking-wider bg-amber-500 text-slate-950 px-2 py-0.5 rounded-full">
+                                                                    Turno Aberto (Sistema)
+                                                                </span>
+                                                                <span className="text-xs text-amber-300 font-mono font-bold">
+                                                                    {shiftStatus.shiftName} ({shiftStatus.shiftLabel})
+                                                                </span>
+                                                            </div>
+                                                            <h4 className="text-slate-800 font-black text-base mt-0.5">
+                                                                Aguardando Check-in do Operador
+                                                            </h4>
+                                                            <p className="text-slate-600 text-xs">
+                                                                Faça o check-in para registrar sua atuação neste posto.
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => handleStartShift()}
+                                                        className="bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-black text-xs uppercase px-4 py-2.5 rounded-xl shadow-md transition shrink-0"
+                                                    >
+                                                        👤 Fazer Check-in
+                                                    </button>
+                                                </div>
+                                            )}
                                             {isShiftOverdue && (
                                                 <div className="bg-red-50 border-2 border-red-500 rounded-2xl p-4 shadow-sm flex items-start gap-4 animate-pulse">
                                                     <div className="bg-red-100 p-2 rounded-xl text-red-600 shrink-0">

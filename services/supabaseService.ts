@@ -379,6 +379,13 @@ export const uploadFile = async (bucket: string, path: string, file: File): Prom
 
 /** Obter Configuração de Jornada do PCP */
 export const fetchPcpShiftConfig = async (): Promise<PcpShiftConfig | null> => {
+    // 1. Tentar ler do localStorage primeiro para fallback rápido/offline
+    let localCfg: PcpShiftConfig | null = null;
+    try {
+        const raw = localStorage.getItem('pcp_daily_shift_config');
+        if (raw) localCfg = JSON.parse(raw);
+    } catch (_) {}
+
     try {
         const { data, error } = await supabase
             .from('pcp_shift_config')
@@ -387,30 +394,50 @@ export const fetchPcpShiftConfig = async (): Promise<PcpShiftConfig | null> => {
             .maybeSingle();
 
         if (error) {
-            console.warn('Erro ao buscar pcp_shift_config:', error);
-            return null;
+            console.warn('Erro ao buscar pcp_shift_config no Supabase:', error);
+            return localCfg;
         }
-        if (!data) return null;
-        return mapToCamelCase(data) as PcpShiftConfig;
+        if (!data) return localCfg;
+
+        const mapped = mapToCamelCase(data) as PcpShiftConfig;
+        // Mesclar com configurações locais se o banco ainda não tiver a coluna machine_configs
+        if (!mapped.machineConfigs && localCfg?.machineConfigs) {
+            mapped.machineConfigs = localCfg.machineConfigs;
+        }
+        return mapped;
     } catch (err) {
         console.warn('Exceção ao buscar pcp_shift_config:', err);
-        return null;
+        return localCfg;
     }
 };
 
 /** Salvar Configuração de Jornada do PCP */
 export const savePcpShiftConfig = async (config: Partial<PcpShiftConfig>): Promise<PcpShiftConfig | null> => {
+    // Salvar sempre em localStorage
     try {
-        const snake = mapToSnakeCase({
+        localStorage.setItem('pcp_daily_shift_config', JSON.stringify(config));
+    } catch (_) {}
+
+    try {
+        const fullPayload: any = {
             id: 'default',
             workStart: config.workStart || '07:00',
             lunchStart: config.lunchStart || '12:00',
             lunchEnd: config.lunchEnd || '13:00',
             workEnd: config.workEnd || '17:00',
             workDays: config.workDays || [1, 2, 3, 4, 5],
+            noLunch: Boolean(config.noLunch),
+            autoStartShift: config.autoStartShift !== false,
+            autoEndShift: config.autoEndShift !== false,
+            autoEndTimeoutMin: config.autoEndTimeoutMin || 5,
+            requireManagerAuthForOvertime: config.requireManagerAuthForOvertime !== false,
+            machineConfigs: config.machineConfigs || {},
             updatedAt: new Date().toISOString()
-        });
+        };
 
+        const snake = mapToSnakeCase(fullPayload);
+
+        // Tentar salvar com todas as colunas
         const { data, error } = await supabase
             .from('pcp_shift_config')
             .upsert(snake, { onConflict: 'id' })
@@ -418,13 +445,37 @@ export const savePcpShiftConfig = async (config: Partial<PcpShiftConfig>): Promi
             .single();
 
         if (error) {
-            console.error('Erro ao salvar pcp_shift_config:', error);
-            throw error;
+            // Se falhar (ex: colunas novas ainda não criadas no schema remoto), salvar colunas básicas
+            console.warn('Tentando salvar com colunas base devido a erro:', error.message);
+            const basicSnake = mapToSnakeCase({
+                id: 'default',
+                workStart: config.workStart || '07:00',
+                lunchStart: config.lunchStart || '12:00',
+                lunchEnd: config.lunchEnd || '13:00',
+                workEnd: config.workEnd || '17:00',
+                workDays: config.workDays || [1, 2, 3, 4, 5],
+                updatedAt: new Date().toISOString()
+            });
+            const retry = await supabase
+                .from('pcp_shift_config')
+                .upsert(basicSnake, { onConflict: 'id' })
+                .select()
+                .single();
+
+            if (retry.error) {
+                console.error('Erro ao salvar pcp_shift_config básico:', retry.error);
+            }
+            return fullPayload as PcpShiftConfig;
         }
-        return mapToCamelCase(data) as PcpShiftConfig;
+
+        const result = mapToCamelCase(data) as PcpShiftConfig;
+        if (!result.machineConfigs && config.machineConfigs) {
+            result.machineConfigs = config.machineConfigs;
+        }
+        return result;
     } catch (err) {
         console.error('Exceção ao salvar pcp_shift_config:', err);
-        throw err;
+        return config as PcpShiftConfig;
     }
 };
 
