@@ -1318,13 +1318,6 @@ const AddConferencePage: React.FC<{
                                     </p>
                                 </div>
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => setBatchTrelicaModal(true)}
-                                className="bg-blue-600 hover:bg-blue-700 text-white font-black text-xs py-2 px-4 rounded-xl shadow transition flex items-center gap-2 self-end sm:self-center active:scale-95"
-                            >
-                                ⚡ Gerador Rápido de Barras (ex: 100 un)
-                            </button>
                         </div>
                     )}
 
@@ -3370,7 +3363,7 @@ const StockControl: React.FC<{
                                 <th className="p-3 text-center">Tipo Aço</th>
                                 <th className="p-3 text-center">Mat.</th>
                                 <th className="p-3 text-center min-w-[200px]">{materialFilter === 'Eletrodos Treliças' ? 'Modelo / Código' : materialFilter === 'Sabão' ? 'Embalagem / Produto' : materialFilter === 'Treliça' ? 'Modelo / Ficha Técnica' : 'Bitola'}</th>
-                                <th className="p-3 text-center">{materialFilter === 'Eletrodos Treliças' ? 'Qtd (un)' : materialFilter === 'Sabão' ? 'Peso (kg / saco)' : materialFilter === 'Treliça' ? 'Qtd / Peso (kg)' : 'Peso (kg)'}</th>
+                                <th className={`p-3 text-center ${materialFilter === 'Treliça' ? 'min-w-[170px]' : ''}`}>{materialFilter === 'Eletrodos Treliças' ? 'Qtd (un)' : materialFilter === 'Sabão' ? 'Peso (kg / saco)' : materialFilter === 'Treliça' ? 'Qtd / Peso (kg)' : 'Peso (kg)'}</th>
                                 <th className="p-3 text-center">Status</th>
                                 <th className="p-3 text-center no-print">Ações</th>
                             </tr>
@@ -3494,50 +3487,41 @@ const StockControl: React.FC<{
                                                     })()}
                                                 </>
                                             ) : item.materialType === 'Treliça' ? (
-                                                <>
-                                                    <div className="flex items-center gap-1.5 justify-center flex-wrap">
-                                                        <span className="font-black text-slate-900 text-sm tracking-tight">
-                                                            {item.description || matchingGauge?.description || `Treliça ${item.bitola}`}
-                                                        </span>
-                                                        {(matchingGauge?.tamanho || (item as any).tamanho) && (
-                                                            <span className="text-xs font-black text-white bg-blue-600 px-2 py-0.5 rounded shadow-2xs">
-                                                                {matchingGauge?.tamanho || (item as any).tamanho}m
+                                                (() => {
+                                                    const code = item.productCode || matchingGauge?.productCode;
+                                                    const sup = matchingGauge?.superior || (item as any).superior;
+                                                    const inf = matchingGauge?.inferior || (item as any).inferior;
+                                                    const sen = matchingGauge?.senozoide || (item as any).senozoide;
+                                                    const peso = matchingGauge?.peso_final;
+                                                    const techInfo = [
+                                                        sup ? `Sup: ${sup}mm` : '',
+                                                        inf ? `Inf: ${inf}mm` : '',
+                                                        sen ? `Sen: ${sen}mm` : '',
+                                                        peso ? `Peso: ${peso} kg/m` : ''
+                                                    ].filter(Boolean).join(' • ');
+
+                                                    return (
+                                                        <div 
+                                                            className="flex items-center gap-2 justify-center flex-wrap"
+                                                            title={techInfo ? `Ficha Técnica: ${techInfo}` : undefined}
+                                                        >
+                                                            {code && (
+                                                                <span className="text-[11px] font-mono font-black text-blue-900 bg-blue-100 px-2 py-0.5 rounded border border-blue-300 uppercase shadow-2xs whitespace-nowrap">
+                                                                    Cód. {code}
+                                                                </span>
+                                                            )}
+                                                            <span className="font-black text-slate-900 text-sm tracking-tight">
+                                                                {item.description || matchingGauge?.description || `Treliça ${item.bitola}`}
                                                             </span>
-                                                        )}
-                                                    </div>
-                                                    {(() => {
-                                                        const code = item.productCode || matchingGauge?.productCode;
-                                                        const sup = matchingGauge?.superior || (item as any).superior;
-                                                        const inf = matchingGauge?.inferior || (item as any).inferior;
-                                                        const sen = matchingGauge?.senozoide || (item as any).senozoide;
-                                                        const peso = matchingGauge?.peso_final;
-                                                        return (
-                                                            <div className="flex flex-col items-center mt-1 space-y-1">
-                                                                {code && (
-                                                                    <span className="text-[10px] font-mono font-black text-blue-900 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 uppercase">
-                                                                        Cód. {code}
-                                                                    </span>
-                                                                )}
-                                                                {(sup || inf || sen) && (
-                                                                    <div className="flex items-center gap-2 text-xs font-bold text-slate-700 bg-blue-50/70 border border-blue-200/80 px-2.5 py-1 rounded-lg shadow-2xs">
-                                                                        {sup && <span title="Fio Superior">Sup: <strong className="text-blue-900 font-extrabold">{sup}</strong> mm</span>}
-                                                                        {sup && (inf || sen) && <span className="text-slate-300">•</span>}
-                                                                        {inf && <span title="Fio Inferior">Inf: <strong className="text-blue-900 font-extrabold">{inf}</strong> mm</span>}
-                                                                        {inf && sen && <span className="text-slate-300">•</span>}
-                                                                        {sen && <span title="Senozoide">Sen: <strong className="text-blue-900 font-extrabold">{sen}</strong> mm</span>}
-                                                                        {peso && (
-                                                                            <>
-                                                                                <span className="text-slate-300">•</span>
-                                                                                <span className="text-slate-500 font-semibold" title="Peso Estimado">{peso} kg/m</span>
-                                                                            </>
-                                                                        )}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        );
-                                                    })()}
-                                                </>
-                                            ) : (
+                                                            {(matchingGauge?.tamanho || (item as any).tamanho) && (
+                                                                <span className="text-xs font-black text-white bg-blue-600 px-2 py-0.5 rounded shadow-2xs">
+                                                                    {matchingGauge?.tamanho || (item as any).tamanho}m
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })()
+                                             ) : (
                                                 <>
                                                     <span className="font-black text-blue-600">{item.bitola.replace('.', ',')} mm</span>
                                                     {(() => {
@@ -3573,7 +3557,7 @@ const StockControl: React.FC<{
 
                                                      return (
                                                          <>
-                                                             <div className="flex items-center gap-1.5 justify-center flex-wrap">
+                                                             <div className="flex items-center gap-5 justify-center flex-wrap">
                                                                  {bars ? (
                                                                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-black bg-blue-100 text-blue-900 border border-blue-300 shadow-2xs" title="Quantidade de barras no pacote">
                                                                          {bars} <span className="text-[10px] font-semibold text-blue-700 ml-1">barras</span>
