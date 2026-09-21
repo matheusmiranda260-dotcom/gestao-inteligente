@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import type { StockItem, StockGauge } from '../types';
 import { MaterialOptions, FioMaquinaBitolaOptions, CA60BitolaOptions, DefaultTrelicaGauges, DefaultElectrodeGauges, DefaultSabaoGauges } from '../types';
 import { PrinterIcon, XIcon } from './icons';
@@ -394,9 +395,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                     peso_final: opt.peso_final
                 });
             } else {
-                // Algoritmo de Balanceamento Inteligente:
-                // Se ultrapassar maxItemsPerColumn (30), divide igualmente entre as colunas necessárias
-                // Ex: 57 lotes -> 2 partes de 29 e 28 (em vez de 30 e 27 com sobra em 3 colunas)
+                // Algoritmo de Balanceamento Inteligente: divide igualmente
                 const numParts = Math.max(1, Math.ceil(matchingLots.length / maxItemsPerColumn));
                 const itemsPerPart = Math.ceil(matchingLots.length / numParts);
 
@@ -467,42 +466,62 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
 
     if (!isOpen) return null;
 
-    return (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-xs z-[130] flex items-center justify-center p-2 sm:p-4 md:p-6 animate-in fade-in duration-150">
-            {/* CSS FÍSICO INFALÍVEL DE IMPRESSÃO A4 RETRATO (3 COLUNAS RÍGIDAS DE LARGURA FIXA) */}
+    // RENDERIZADO VIA PORTAL DIRETAMENTE EM document.body PARA ISOLAR COMPLETAMENTE DO RESTANTE DO APP
+    return createPortal(
+        <div className="stock-print-portal-root fixed inset-0 bg-slate-950/80 backdrop-blur-xs z-[130] flex items-center justify-center p-2 sm:p-4 md:p-6 animate-in fade-in duration-150">
+            {/* CSS FÍSICO INFALÍVEL DE IMPRESSÃO: OCULTA COMPLETAMENTE O APP DE TRÁS E IMPRIME APENAS O PORTAL */}
             <style>{`
                 @media print {
                     @page {
                         size: A4 portrait !important;
                         margin: 6mm 6mm 6mm 6mm !important;
                     }
+                    /* ELIMINA 100% DO APP PRINCIPAL (TABELA DE ESTOQUE DE TRÁS, MENUS, HEADERS) */
+                    #root {
+                        display: none !important;
+                    }
                     html, body {
                         width: 100% !important;
+                        height: auto !important;
                         margin: 0 !important;
                         padding: 0 !important;
                         background: #ffffff !important;
                         -webkit-print-color-adjust: exact !important;
                         print-color-adjust: exact !important;
                     }
-                    body * {
-                        visibility: hidden !important;
+                    .no-print {
+                        display: none !important;
                     }
-                    .stock-printable-area, .stock-printable-area * {
-                        visibility: visible !important;
+                    .stock-print-portal-root {
+                        position: static !important;
+                        display: block !important;
+                        background: transparent !important;
+                        padding: 0 !important;
+                        margin: 0 !important;
+                        width: 100% !important;
+                        z-index: auto !important;
+                    }
+                    .stock-print-modal-box {
+                        border: none !important;
+                        box-shadow: none !important;
+                        padding: 0 !important;
+                        margin: 0 !important;
+                        max-width: 100% !important;
+                        max-height: none !important;
+                        overflow: visible !important;
+                        display: block !important;
                     }
                     .stock-printable-area {
-                        position: absolute !important;
-                        left: 0 !important;
-                        top: 0 !important;
+                        position: static !important;
+                        display: block !important;
                         width: 100% !important;
                         max-width: 100% !important;
                         margin: 0 !important;
                         padding: 0 !important;
                         background: white !important;
                         color: #0f172a !important;
-                    }
-                    .no-print {
-                        display: none !important;
+                        box-shadow: none !important;
+                        border: none !important;
                     }
                     .print-sheet {
                         width: 100% !important;
@@ -513,9 +532,12 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                         break-inside: avoid !important;
                         min-height: 280mm !important;
                         padding: 2mm 0 !important;
+                        margin-bottom: 0 !important;
                         display: flex !important;
                         flex-direction: column !important;
                         justify-content: space-between !important;
+                        box-shadow: none !important;
+                        border: none !important;
                     }
                     .print-sheet:last-of-type {
                         page-break-after: auto !important;
@@ -538,7 +560,6 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                         min-width: 32% !important;
                         box-sizing: border-box !important;
                     }
-                    /* Garante legibilidade nítida da tabela de impressão */
                     .print-table {
                         width: 100% !important;
                         table-layout: fixed !important;
@@ -551,8 +572,8 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                 }
             `}</style>
 
-            <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-7xl max-h-[96vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
-                {/* Header do Modal */}
+            <div className="stock-print-modal-box bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-7xl max-h-[96vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
+                {/* Header do Modal (no-print) */}
                 <div className="no-print p-4 md:px-6 md:py-3.5 bg-gradient-to-r from-slate-900 via-[#0F3F5C] to-slate-900 text-white flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-2xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-xl">
@@ -562,10 +583,10 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                             <div className="flex items-center gap-2">
                                 <h3 className="text-lg font-black tracking-tight">Impressão Padronizada de Estoque</h3>
                                 <span className="text-[11px] font-black bg-emerald-500/30 text-emerald-200 px-2.5 py-0.5 rounded-full border border-emerald-400/30">
-                                    3 Colunas A4 • Escala Padrão
+                                    A4 Retrato • 3 Colunas Lado a Lado
                                 </span>
                             </div>
-                            <p className="text-xs text-blue-200/80">3 colunas rígidas lado a lado com largura confortável. Sem cortes de texto.</p>
+                            <p className="text-xs text-blue-200/80">Impressão isolada e limpa: apenas as folhas necessárias, sem duplicar com a tela de trás.</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -1007,6 +1028,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                     </div>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

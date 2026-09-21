@@ -2513,7 +2513,7 @@ const StockControl: React.FC<{
     if (isAdding) return <AddConferencePage onClose={() => setIsAdding(false)} onSubmit={addConference} stock={stock} onShowReport={setReportView} conferences={conferences} onEditConference={editConference} onDeleteConference={deleteConference} gauges={gauges} isGestor={isGestor} setPage={setPage} initialMaterialType={materialFilter === 'Eletrodos Treliças' ? 'Eletrodos Treliças' : materialFilter === 'Sabão' ? 'Sabão' : materialFilter === 'Treliça' ? 'Treliça' : undefined} />;
 
     return (
-        <div className="p-4 md:p-8 space-y-6">
+        <div className={`p-4 md:p-8 space-y-6 ${isPrintModalOpen ? 'print:hidden' : ''}`}>
             {consumingItem && (
                 <ConsumeLotModal
                     item={consumingItem}
