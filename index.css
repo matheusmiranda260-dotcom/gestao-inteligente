@@ -765,7 +765,7 @@ tr:hover td {
 }
 
 /* --- RESPONSIVIDADE (MOBILE) --- */
-@media (max-width: 768px) {
+@media screen and (max-width: 768px) {
   .app-container {
     flex-direction: column;
     height: auto;
@@ -938,7 +938,7 @@ tr:hover td {
   }
 }
 
-@media (min-width: 769px) {
+@media screen and (min-width: 769px) {
   .mobile-menu-btn {
     display: none !important;
   }

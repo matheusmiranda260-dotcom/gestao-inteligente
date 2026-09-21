@@ -52,6 +52,13 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
     const safeGauges = useMemo(() => Array.isArray(gauges) ? gauges : [], [gauges]);
     const safeStock = useMemo(() => Array.isArray(stock) ? stock : [], [stock]);
 
+    // Extrator infalível de peso de qualquer item de estoque
+    const getLotWeight = (item: any): number => {
+        if (!item) return 0;
+        const val = item.remainingQuantity ?? item.remaining_quantity ?? item.weight ?? item.label_weight ?? item.labelWeight ?? 0;
+        return Number(val) || 0;
+    };
+
     // =========================================================================
     // 1. MAPEAMENTO DE PRODUTOS / BITOLAS / TRELIÇAS (COM CÓD. E DESCRIÇÃO)
     // =========================================================================
@@ -218,9 +225,11 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                 });
             }
 
+            const itemQty = getLotWeight(item);
+
             if (matchedOption) {
                 matchedOption.count += 1;
-                matchedOption.weight += item.remainingQuantity;
+                matchedOption.weight += itemQty;
             } else {
                 const key = `${item.materialType}::${item.bitola}::${item.productCode || ''}::${item.description || ''}`;
                 const codeText = item.productCode ? ` (Cód. ${item.productCode})` : '';
@@ -233,7 +242,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                     description: item.description || '',
                     label: `${item.bitola.replace('.', ',')} mm${descText}${codeText}`,
                     count: 1,
-                    weight: item.remainingQuantity
+                    weight: itemQty
                 };
                 optionsMap.set(key, dynamicOpt);
             }
@@ -370,7 +379,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                 return a.internalLot.localeCompare(b.internalLot);
             });
 
-            const totalGaugeWeight = matchingLots.reduce((sum, i) => sum + (Number(i.remainingQuantity ?? i.weight ?? i.labelWeight ?? 0) || 0), 0);
+            const totalGaugeWeight = matchingLots.reduce((sum, i) => sum + getLotWeight(i), 0);
             const totalGaugeLots = matchingLots.length;
 
             if (matchingLots.length === 0) {
@@ -407,7 +416,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                 }
 
                 chunks.forEach((chunkLots, idx) => {
-                    const partWeight = chunkLots.reduce((sum, i) => sum + (Number(i.remainingQuantity ?? i.weight ?? i.labelWeight ?? 0) || 0), 0);
+                    const partWeight = chunkLots.reduce((sum, i) => sum + getLotWeight(i), 0);
                     cols.push({
                         id: `${opt.key}-part-${idx + 1}`,
                         optionKey: opt.key,
@@ -479,6 +488,9 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
     };
 
     if (!isOpen) return null;
+
+    // Largura padronizada de coluna (padrão oficial 3 colunas = 32.5%), sempre mantendo o padrão do visualizador
+    const colWidth = '32.5%';
 
     // Função que renderiza uma folha A4 com suas 3 colunas
     const renderPageContent = (pageColumns: PrintColumn[], pageIdx: number, isPreview = false) => {
@@ -565,14 +577,15 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                     </div>
                 )}
 
-                {/* GRID DE COLUNAS LADO A LADO DA FOLHA COM FLEXBOX RÍGIDO DE 3 COLUNAS */}
+                {/* GRID DE COLUNAS LADO A LADO DA FOLHA - PADRONIZADO E SEMPRE CENTRALIZADO */}
                 <div 
-                    className="print-row-3cols w-full"
+                    className="print-row-3cols"
+                    data-cols={pageColumns.length}
                     style={{
                         display: 'flex',
                         flexDirection: 'row',
                         flexWrap: 'nowrap',
-                        justifyContent: 'space-between',
+                        justifyContent: 'center',
                         alignItems: 'flex-start',
                         width: '100%',
                         gap: '8px',
@@ -582,13 +595,15 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                     {pageColumns.map(col => (
                         <div
                             key={col.id}
-                            className="print-col-fixed border-2 border-slate-700 rounded-md bg-white shadow-2xs flex flex-col"
+                            className="print-col border-2 border-slate-700 rounded-md bg-white shadow-2xs flex flex-col"
                             style={{
-                                flex: '0 0 32.5%',
-                                width: '32.5%',
-                                maxWidth: '32.8%',
-                                minWidth: '32%',
-                                boxSizing: 'border-box'
+                                flex: `0 0 ${colWidth}`,
+                                width: colWidth,
+                                minWidth: colWidth,
+                                maxWidth: colWidth,
+                                boxSizing: 'border-box',
+                                overflow: 'hidden',
+                                margin: pageColumns.length === 1 ? '0 auto' : undefined
                             }}
                         >
                             {/* CABEÇALHO DA COLUNA: Cor Clara, CÓDIGO DO PRODUTO DESTACADO NO CANTO SUPERIOR */}
@@ -625,26 +640,35 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                 )}
                             </div>
 
-                            {/* TABELA COM LARGURAS FIXAS INFALÍVEIS (50% LOTE | 50% PESO) */}
-                            <table 
-                                className="print-table w-full text-left"
+                            {/* TABELA: LOTE | CORRIDA | PESO — table-layout:fixed + colgroup para garantir larguras na impressão */}
+                            <table
+                                className="print-table"
                                 style={{
                                     width: '100%',
+                                    minWidth: 0,
+                                    maxWidth: '100%',
                                     tableLayout: 'fixed',
-                                    borderCollapse: 'collapse'
+                                    borderCollapse: 'collapse',
+                                    fontSize: '10px',
+                                    margin: 0
                                 }}
                             >
+                                <colgroup>
+                                    <col style={{ width: showCorrida ? '42%' : '50%' }} />
+                                    {showCorrida && <col style={{ width: '20%' }} />}
+                                    <col style={{ width: showCorrida ? '38%' : '50%' }} />
+                                </colgroup>
                                 <thead>
                                     <tr style={{ backgroundColor: '#e2e8f0', borderBottom: '2px solid #64748b' }}>
-                                        <th style={{ width: showCorrida ? '42%' : '50%', padding: '4px 4px', textAlign: 'center', fontSize: '10px', fontWeight: 900, color: '#0f172a', borderRight: '1px solid #cbd5e1' }}>
+                                        <th style={{ width: showCorrida ? '42%' : '50%', padding: '3px 4px', textAlign: 'center', fontSize: '9px', fontWeight: 900, color: '#0f172a', borderRight: '1px solid #cbd5e1', overflow: 'hidden', boxSizing: 'border-box' }}>
                                             LOTE
                                         </th>
                                         {showCorrida && (
-                                            <th style={{ width: '26%', padding: '4px 2px', textAlign: 'center', fontSize: '9px', fontWeight: 900, color: '#0f172a', borderRight: '1px solid #cbd5e1' }}>
+                                            <th style={{ width: '20%', padding: '3px 2px', textAlign: 'center', fontSize: '9px', fontWeight: 900, color: '#0f172a', borderRight: '1px solid #cbd5e1', overflow: 'hidden', boxSizing: 'border-box' }}>
                                                 CORR.
                                             </th>
                                         )}
-                                        <th style={{ width: showCorrida ? '32%' : '50%', padding: '4px 6px', textAlign: 'right', fontSize: '10px', fontWeight: 900, color: '#0f172a' }}>
+                                        <th style={{ width: showCorrida ? '38%' : '50%', padding: '3px 4px', textAlign: 'center', fontSize: '9px', fontWeight: 900, color: '#0f172a', overflow: 'hidden', boxSizing: 'border-box' }}>
                                             PESO (KG)
                                         </th>
                                     </tr>
@@ -652,24 +676,24 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                 <tbody>
                                     {col.lots.length === 0 ? (
                                         <tr>
-                                            <td colSpan={showCorrida ? 3 : 2} style={{ padding: '16px 4px', textAlign: 'center', color: '#64748b', fontStyle: 'italic', fontSize: '11px' }}>
+                                            <td colSpan={showCorrida ? 3 : 2} style={{ padding: '12px 4px', textAlign: 'center', color: '#64748b', fontStyle: 'italic', fontSize: '10px' }}>
                                                 Sem lotes em estoque
                                             </td>
                                         </tr>
                                     ) : (
                                         col.lots.map((lot, lIdx) => {
-                                            const itemWeight = Number(lot.remainingQuantity ?? lot.weight ?? lot.labelWeight ?? 0);
+                                            const itemWeight = getLotWeight(lot);
                                             return (
                                                 <tr key={lot.id} style={{ backgroundColor: lIdx % 2 === 1 ? '#f8fafc' : '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
-                                                    <td style={{ width: showCorrida ? '42%' : '50%', padding: '3px 4px', textAlign: 'center', fontSize: '11px', fontWeight: 900, fontFamily: 'monospace', color: '#0f172a', borderRight: '1px solid #e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    <td style={{ width: showCorrida ? '42%' : '50%', padding: '2px 4px', textAlign: 'center', fontSize: '10px', fontWeight: 700, fontFamily: 'monospace', color: '#0f172a', borderRight: '1px solid #e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', boxSizing: 'border-box' }}>
                                                         {lot.internalLot}
                                                     </td>
                                                     {showCorrida && (
-                                                        <td style={{ width: '26%', padding: '2px 2px', textAlign: 'center', fontSize: '9px', fontWeight: 700, color: '#78350f', borderRight: '1px solid #e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                        <td style={{ width: '20%', padding: '2px 2px', textAlign: 'center', fontSize: '9px', fontWeight: 700, color: '#78350f', borderRight: '1px solid #e2e8f0', overflow: 'hidden', whiteSpace: 'nowrap', boxSizing: 'border-box' }}>
                                                             {lot.runNumber || '-'}
                                                         </td>
                                                     )}
-                                                    <td style={{ width: showCorrida ? '32%' : '50%', padding: '3px 6px', textAlign: 'right', fontSize: '11px', fontWeight: 900, fontFamily: 'monospace', color: '#0f172a', whiteSpace: 'nowrap' }}>
+                                                    <td style={{ width: showCorrida ? '38%' : '50%', padding: '2px 4px', textAlign: 'center', fontSize: '10px', fontWeight: 900, fontFamily: 'monospace', color: '#0f172a', overflow: 'hidden', whiteSpace: 'nowrap', boxSizing: 'border-box' }}>
                                                         {itemWeight.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} kg
                                                     </td>
                                                 </tr>
@@ -678,19 +702,19 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                     )}
                                 </tbody>
                                 <tfoot>
-                                    <tr style={{ backgroundColor: '#f1f5f9', borderTop: '2px solid #334155', fontWeight: 900, color: '#0f172a' }}>
-                                        <td colSpan={showCorrida ? 2 : 1} style={{ width: showCorrida ? '68%' : '50%', padding: '4px 6px', textAlign: 'center', fontSize: '10px', borderRight: '1px solid #cbd5e1' }}>
+                                    <tr style={{ backgroundColor: '#e2e8f0', borderTop: '2px solid #334155' }}>
+                                        <td colSpan={showCorrida ? 2 : 1} style={{ width: showCorrida ? '62%' : '50%', padding: '3px 4px', textAlign: 'center', fontSize: '9px', fontWeight: 700, color: '#334155', borderRight: '1px solid #cbd5e1', boxSizing: 'border-box' }}>
                                             {col.totalParts > 1 ? (
                                                 <span>{col.lots.length} lotes ({col.partIndex}/{col.totalParts})</span>
                                             ) : (
                                                 <span>{col.totalGaugeLots} {col.totalGaugeLots === 1 ? 'lote' : 'lotes'}</span>
                                             )}
                                         </td>
-                                        <td style={{ width: showCorrida ? '32%' : '50%', padding: '4px 6px', textAlign: 'right', fontSize: '11px', fontWeight: 900, color: '#0F3F5C' }}>
-                                            {col.isLastPart || col.totalParts === 1 ? (
-                                                <span>{col.totalGaugeWeight.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} kg</span>
+                                        <td style={{ width: showCorrida ? '38%' : '50%', padding: '3px 4px', textAlign: 'center', fontSize: '10px', fontWeight: 900, color: '#0f172a', whiteSpace: 'nowrap', boxSizing: 'border-box' }}>
+                                            {col.totalParts > 1 && !col.isLastPart ? (
+                                                <span>Sub: {col.partWeight.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg</span>
                                             ) : (
-                                                <span style={{ color: '#475569', fontSize: '9px' }}>Sub: {col.partWeight.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg</span>
+                                                <span>{col.totalGaugeWeight.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} kg</span>
                                             )}
                                         </td>
                                     </tr>
@@ -986,10 +1010,11 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                             }
                             .print-sheet {
                                 width: 100% !important;
+                                max-width: 100% !important;
                                 box-sizing: border-box !important;
                                 page-break-inside: avoid !important;
                                 break-inside: avoid !important;
-                                margin: 0 !important;
+                                margin: 0 auto !important;
                                 padding: 1mm 0 !important;
                                 background: white !important;
                             }
@@ -997,27 +1022,60 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                 display: flex !important;
                                 flex-direction: row !important;
                                 flex-wrap: nowrap !important;
-                                justify-content: space-between !important;
+                                justify-content: center !important;
                                 align-items: flex-start !important;
                                 width: 100% !important;
+                                max-width: 100% !important;
+                                margin: 0 auto !important;
                                 box-sizing: border-box !important;
                                 gap: 8px !important;
                             }
-                            .print-col-fixed {
+                            .print-col {
                                 flex: 0 0 32.5% !important;
                                 width: 32.5% !important;
-                                max-width: 32.8% !important;
-                                min-width: 32% !important;
+                                min-width: 32.5% !important;
+                                max-width: 32.5% !important;
                                 box-sizing: border-box !important;
+                                page-break-inside: avoid !important;
+                                break-inside: avoid !important;
+                                overflow: hidden !important;
                             }
+                            .print-row-3cols[data-cols="1"] .print-col {
+                                margin: 0 auto !important;
+                            }
+                            #stock-print-isolated-root table,
+                            #stock-print-isolated-root .print-table,
+                            .print-sheet table,
                             .print-table {
                                 width: 100% !important;
+                                min-width: 0 !important;
+                                max-width: 100% !important;
                                 table-layout: fixed !important;
                                 border-collapse: collapse !important;
+                                border-spacing: 0 !important;
+                                margin: 0 !important;
+                                box-sizing: border-box !important;
                             }
-                            .print-table th, .print-table td {
-                                border: 1px solid #cbd5e1 !important;
+                            #stock-print-isolated-root table th,
+                            #stock-print-isolated-root table td,
+                            .print-sheet th,
+                            .print-sheet td,
+                            .print-table th,
+                            .print-table td {
                                 color: #0f172a !important;
+                                overflow: hidden !important;
+                                text-overflow: ellipsis !important;
+                                white-space: nowrap !important;
+                                text-align: center !important;
+                                box-sizing: border-box !important;
+                                padding: 2px 4px !important;
+                                font-size: 10px !important;
+                                line-height: 1.2 !important;
+                            }
+                            #stock-print-isolated-root thead th,
+                            .print-table thead th {
+                                font-size: 9px !important;
+                                padding: 3px 4px !important;
                             }
                         }
                     `}</style>
