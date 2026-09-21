@@ -380,7 +380,7 @@ export const StockMovementsTable: React.FC<StockMovementsTableProps> = ({
     };
 
     return (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-8 transition-all animate-in fade-in duration-300">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden transition-all animate-in fade-in duration-300">
             {/* Header da Seção de Movimentações */}
             <div className="p-4 sm:p-6 bg-gradient-to-r from-slate-50 via-white to-slate-50 border-b border-slate-200">
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">

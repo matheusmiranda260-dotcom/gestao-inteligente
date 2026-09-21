@@ -1691,6 +1691,7 @@ const StockControl: React.FC<{
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState<number>(50);
     const [isLotDisplayModalOpen, setIsLotDisplayModalOpen] = useState(false);
+    const [isMovementsModalOpen, setIsMovementsModalOpen] = useState(false);
 
     // ==========================================
     // ESTADO E CONTROLE DE ESTOQUE DE ELETRODOS
@@ -2863,8 +2864,8 @@ const StockControl: React.FC<{
                     </select>
                 </div>
 
-                {/* Botão para abrir Sub-Janela de Configuração de Visualização do Lote */}
-                <div className="border-t md:border-t-0 md:border-l border-slate-200 pt-2.5 md:pt-0 md:pl-3 shrink-0 flex items-center">
+                {/* Botões para abrir Sub-Janelas de Configuração e Histórico */}
+                <div className="border-t md:border-t-0 md:border-l border-slate-200 pt-2.5 md:pt-0 md:pl-3 shrink-0 flex items-center gap-2">
                     <button
                         type="button"
                         onClick={() => setIsLotDisplayModalOpen(true)}
@@ -2879,6 +2880,16 @@ const StockControl: React.FC<{
                         <span className="text-[10px] text-slate-400 font-semibold hidden xl:inline">
                             ({lotDisplayOptions.displayMode === 'badge' ? 'Badges' : 'Colunas'})
                         </span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setIsMovementsModalOpen(true)}
+                        className="w-full md:w-auto flex items-center justify-center gap-2 px-3.5 py-1.5 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-900 text-xs font-black transition shadow-2xs group"
+                        title="Abrir Histórico de Movimentações e Baixas em sub-janela"
+                    >
+                        <span>📋</span>
+                        <span className="whitespace-nowrap">Histórico</span>
                     </button>
                 </div>
             </div>
@@ -3125,8 +3136,18 @@ const StockControl: React.FC<{
                             )}
                         </div>
 
-                        {/* Direita: Métricas do Estoque deste Modelo e Botão para Limpar */}
-                        <div className="flex items-center gap-4 border-t lg:border-t-0 lg:border-l border-white/15 pt-3 lg:pt-0 lg:pl-6 shrink-0">
+                        {/* Direita: Métricas do Estoque deste Modelo e Botões de Ação */}
+                        <div className="flex items-center gap-4 border-t lg:border-t-0 lg:border-l border-white/15 pt-3 lg:pt-0 lg:pl-6 shrink-0 flex-wrap">
+                            <button
+                                type="button"
+                                onClick={() => setIsMovementsModalOpen(true)}
+                                className="px-3.5 py-2 bg-white/15 hover:bg-white/25 text-white rounded-xl transition border border-white/20 flex items-center gap-2 text-xs font-black shadow-xs shrink-0"
+                                title="Ver histórico de movimentações deste modelo em sub-janela"
+                            >
+                                <span>📋</span>
+                                <span>Histórico</span>
+                            </button>
+
                             <div className="flex items-center gap-5">
                                 <div className="text-left lg:text-right">
                                     <span className="text-[10px] font-black uppercase tracking-wider text-blue-300 block">Lotes Encontrados</span>
@@ -3481,16 +3502,69 @@ const StockControl: React.FC<{
                 {renderPaginationBar('bottom')}
             </div>
 
-            {/* TABELA INFERIOR: HISTÓRICO DE MOVIMENTAÇÕES & BAIXAS (SINCRONIZADA EM TEMPO REAL) */}
-            <StockMovementsTable
-                stock={stock}
-                conferences={conferences}
-                materialFilter={materialFilter}
-                bitolaFilter={bitolaFilter}
-                steelTypeFilter={steelTypeFilter}
-                searchTerm={searchTerm}
-                onSelectLot={(lot) => setHistoryLot(lot)}
-            />
+            {/* ========================================================================= */}
+            {/* SUB-JANELA MODAL: HISTÓRICO DE MOVIMENTAÇÕES & BAIXAS                     */}
+            {/* ========================================================================= */}
+            {isMovementsModalOpen && (
+                <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-xs z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 animate-in fade-in duration-150">
+                    <div className="bg-white rounded-2xl md:rounded-3xl shadow-2xl border border-slate-200 w-full max-w-7xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
+                        {/* Header do Modal */}
+                        <div className="p-4 md:px-6 md:py-4 bg-gradient-to-r from-slate-900 via-[#0F3F5C] to-slate-900 text-white flex items-center justify-between shrink-0">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-xl">
+                                    📋
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <h3 className="text-base md:text-lg font-black tracking-tight">Histórico de Movimentações & Baixas</h3>
+                                        {materialFilter && (
+                                            <span className="text-[10px] font-bold bg-blue-500/30 text-blue-200 px-2 py-0.5 rounded-full border border-blue-400/30">
+                                                {materialFilter} {bitolaFilter ? `• ${selectedGaugeOption?.description || bitolaFilter}` : ''}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-blue-200/80">Entradas de compras, consumos em produção, transferências e baixas registradas.</p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsMovementsModalOpen(false)}
+                                className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition"
+                                title="Fechar histórico"
+                            >
+                                <XIcon className="h-6 w-6" />
+                            </button>
+                        </div>
+
+                        {/* Conteúdo com rolagem do Histórico */}
+                        <div className="p-3 sm:p-5 md:p-6 overflow-y-auto flex-1 space-y-4">
+                            <StockMovementsTable
+                                stock={stock}
+                                conferences={conferences}
+                                materialFilter={materialFilter}
+                                bitolaFilter={bitolaFilter}
+                                steelTypeFilter={steelTypeFilter}
+                                searchTerm={searchTerm}
+                                onSelectLot={(lot) => setHistoryLot(lot)}
+                            />
+                        </div>
+
+                        {/* Rodapé do Modal */}
+                        <div className="px-6 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
+                            <span className="text-xs text-slate-500 font-medium hidden sm:inline">
+                                Sincronizado em tempo real com o estoque e movimentações.
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setIsMovementsModalOpen(false)}
+                                className="px-6 py-2 bg-[#0F3F5C] hover:bg-[#0c3149] text-white font-black text-xs rounded-xl shadow transition ml-auto"
+                            >
+                                Fechar Histórico
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* ========================================================================= */}
             {/* MODAL 1: CADASTRAR NOVO LOTE DE ELETRODOS COM GERADOR SEQUENCIAL         */}
