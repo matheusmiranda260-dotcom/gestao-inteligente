@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { StockItem, StockGauge } from '../types';
-import { MaterialOptions, FioMaquinaBitolaOptions, CA60BitolaOptions, DefaultTrelicaGauges } from '../types';
+import { MaterialOptions, FioMaquinaBitolaOptions, CA60BitolaOptions, DefaultTrelicaGauges, DefaultElectrodeGauges, DefaultSabaoGauges } from '../types';
 import { PrinterIcon, XIcon } from './icons';
 
 interface StockPrintModalProps {
@@ -11,6 +11,22 @@ interface StockPrintModalProps {
     initialMaterial?: string;
     initialBitola?: string;
     initialSteelType?: string;
+}
+
+export interface ProductOption {
+    key: string;
+    materialType: string;
+    gauge: string;
+    productCode: string;
+    description: string;
+    label: string;
+    count: number;
+    weight: number;
+    tamanho?: string;
+    superior?: string;
+    inferior?: string;
+    senozoide?: string;
+    peso_final?: string;
 }
 
 export const StockPrintModal: React.FC<StockPrintModalProps> = ({
@@ -33,106 +49,273 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
     const [showCorrida, setShowCorrida] = useState(false);
     const [showData, setShowData] = useState(false);
 
-    // Todas as bitolas/modelos possíveis para o material selecionado
-    const availableBitolasForMaterial = useMemo(() => {
+    // =========================================================================
+    // 1. MAPEAMENTO INTELIGENTE DE PRODUTOS / BITOLAS / TRELIÇAS (COM CÓD. E DESCRIÇÃO)
+    // =========================================================================
+    const availableProductOptions = useMemo<ProductOption[]>(() => {
         if (!selectedMaterial) return [];
 
-        const bitolasSet = new Map<string, { label: string; count: number; weight: number }>();
+        const optionsMap = new Map<string, ProductOption>();
 
-        // 1. Bitolas do estoque ativo
-        stock.forEach(item => {
-            if (item.materialType === selectedMaterial && item.status !== 'Consumido') {
-                const key = item.bitola;
-                const existing = bitolasSet.get(key) || { label: key, count: 0, weight: 0 };
-                existing.count += 1;
-                existing.weight += item.remainingQuantity;
-                bitolasSet.set(key, existing);
+        // 1. Gauges cadastrados no banco para o material selecionado
+        const relevantGauges = gauges.filter(g => g.materialType === selectedMaterial);
+        
+        relevantGauges.forEach(g => {
+            const key = `${g.materialType}::${g.gauge}::${g.productCode || ''}::${g.description || ''}`;
+            const codeText = g.productCode ? ` (Cód. ${g.productCode})` : '';
+            
+            let label = '';
+            if (g.materialType === 'Treliça') {
+                const desc = g.description || `Treliça ${g.gauge}`;
+                const tam = g.tamanho ? ` ${g.tamanho}m` : (g.gauge.includes('m') ? ` ${g.gauge}` : '');
+                label = `📐 ${desc}${tam}${codeText}`;
+            } else if (g.materialType === 'Eletrodos Treliças') {
+                const desc = g.description || `Eletrodo ${g.productCode || g.gauge}`;
+                label = `⚡ ${desc}${codeText}`;
+            } else if (g.materialType === 'Sabão') {
+                label = `🧼 ${g.gauge} - ${g.description || 'Condat'}${codeText}`;
+            } else {
+                // CA-60 / Fio Máquina
+                const descText = g.description ? ` - ${g.description}` : '';
+                label = `${g.gauge.replace('.', ',')} mm${descText}${codeText}`;
             }
+
+            optionsMap.set(key, {
+                key,
+                materialType: g.materialType,
+                gauge: g.gauge,
+                productCode: g.productCode || '',
+                description: g.description || '',
+                label,
+                count: 0,
+                weight: 0,
+                tamanho: g.tamanho || (g.gauge.includes('m') ? g.gauge.replace('m', '') : undefined),
+                superior: g.superior,
+                inferior: g.inferior,
+                senozoide: g.senozoide,
+                peso_final: g.peso_final
+            });
         });
 
-        // 2. Bitolas cadastradas nos gauges
-        gauges.filter(g => g.materialType === selectedMaterial).forEach(g => {
-            if (!bitolasSet.has(g.gauge)) {
-                bitolasSet.set(g.gauge, { label: g.description ? `${g.gauge} - ${g.description}` : g.gauge, count: 0, weight: 0 });
-            }
-        });
+        // 2. Defaults de Treliça (garante que apareçam todas as opções caso faltem no banco)
+        if (selectedMaterial === 'Treliça') {
+            DefaultTrelicaGauges.forEach(tg => {
+                const key = `Treliça::${tg.gauge}::${tg.productCode}::${tg.description}`;
+                if (!optionsMap.has(key)) {
+                    const tam = tg.tamanho ? ` ${tg.tamanho}m` : '';
+                    const code = tg.productCode ? ` (Cód. ${tg.productCode})` : '';
+                    optionsMap.set(key, {
+                        key,
+                        materialType: 'Treliça',
+                        gauge: tg.gauge,
+                        productCode: tg.productCode || '',
+                        description: tg.description || '',
+                        label: `📐 ${tg.description}${tam}${code}`,
+                        count: 0,
+                        weight: 0,
+                        tamanho: tg.tamanho,
+                        superior: tg.superior,
+                        inferior: tg.inferior,
+                        senozoide: tg.senozoide,
+                        peso_final: tg.peso_final
+                    });
+                }
+            });
+        }
 
-        // 3. Padrões caso seja vazio
+        // 3. Defaults para CA-60 e Fio Máquina
         if (selectedMaterial === 'CA-60') {
             CA60BitolaOptions.forEach(b => {
-                if (!bitolasSet.has(b)) bitolasSet.set(b, { label: `${b.replace('.', ',')} mm`, count: 0, weight: 0 });
+                const hasExisting = Array.from(optionsMap.values()).some(o => o.gauge === b);
+                if (!hasExisting) {
+                    const key = `CA-60::${b}::::CA-60 ${b.replace('.', ',')}mm`;
+                    optionsMap.set(key, {
+                        key,
+                        materialType: 'CA-60',
+                        gauge: b,
+                        productCode: '',
+                        description: `CA-60 ${b.replace('.', ',')}mm`,
+                        label: `${b.replace('.', ',')} mm`,
+                        count: 0,
+                        weight: 0
+                    });
+                }
             });
         } else if (selectedMaterial === 'Fio Máquina') {
             FioMaquinaBitolaOptions.forEach(b => {
-                if (!bitolasSet.has(b)) bitolasSet.set(b, { label: `${b.replace('.', ',')} mm`, count: 0, weight: 0 });
+                const hasExisting = Array.from(optionsMap.values()).some(o => o.gauge === b);
+                if (!hasExisting) {
+                    const key = `Fio Máquina::${b}::::Fio Máquina ${b.replace('.', ',')}mm`;
+                    optionsMap.set(key, {
+                        key,
+                        materialType: 'Fio Máquina',
+                        gauge: b,
+                        productCode: '',
+                        description: `Fio Máquina ${b.replace('.', ',')}mm`,
+                        label: `${b.replace('.', ',')} mm`,
+                        count: 0,
+                        weight: 0
+                    });
+                }
             });
-        } else if (selectedMaterial === 'Treliça') {
-            DefaultTrelicaGauges.forEach(t => {
-                const key = t.gauge;
-                if (!bitolasSet.has(key)) bitolasSet.set(key, { label: `${t.description} ${t.tamanho}m`, count: 0, weight: 0 });
+        } else if (selectedMaterial === 'Eletrodos Treliças') {
+            DefaultElectrodeGauges.forEach(eg => {
+                const key = `Eletrodos Treliças::${eg.gauge}::${eg.productCode}::${eg.description}`;
+                if (!optionsMap.has(key)) {
+                    optionsMap.set(key, {
+                        key,
+                        materialType: 'Eletrodos Treliças',
+                        gauge: eg.gauge,
+                        productCode: eg.productCode,
+                        description: eg.description,
+                        label: `⚡ ${eg.description} (Cód. ${eg.productCode})`,
+                        count: 0,
+                        weight: 0
+                    });
+                }
+            });
+        } else if (selectedMaterial === 'Sabão') {
+            DefaultSabaoGauges.forEach(sg => {
+                const key = `Sabão::${sg.gauge}::${sg.productCode}::${sg.description}`;
+                if (!optionsMap.has(key)) {
+                    optionsMap.set(key, {
+                        key,
+                        materialType: 'Sabão',
+                        gauge: sg.gauge,
+                        productCode: sg.productCode,
+                        description: sg.description,
+                        label: `🧼 ${sg.gauge} - ${sg.description} (Cód. ${sg.productCode})`,
+                        count: 0,
+                        weight: 0
+                    });
+                }
             });
         }
 
-        // Ordenação
-        return Array.from(bitolasSet.entries()).map(([key, data]) => ({
-            key,
-            label: data.label,
-            count: data.count,
-            weight: data.weight
-        })).sort((a, b) => {
-            const numA = parseFloat(a.key.replace(',', '.'));
-            const numB = parseFloat(b.key.replace(',', '.'));
-            if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-            return a.key.localeCompare(b.key);
+        // 4. Mapear os itens reais de estoque ativo para as opções e somar contagem / peso
+        const activeItems = stock.filter(item => item.materialType === selectedMaterial && item.status !== 'Consumido');
+
+        activeItems.forEach(item => {
+            let matchedOption: ProductOption | undefined;
+
+            // Tentativa A: Match exato por productCode
+            if (item.productCode) {
+                matchedOption = Array.from(optionsMap.values()).find(o => o.productCode && o.productCode.trim() === item.productCode?.trim());
+            }
+
+            // Tentativa B: Match por descrição exata e bitola
+            if (!matchedOption && item.description) {
+                matchedOption = Array.from(optionsMap.values()).find(o => 
+                    o.description && o.description.trim().toLowerCase() === item.description?.trim().toLowerCase()
+                );
+            }
+
+            // Tentativa C: Match por bitola/gauge
+            if (!matchedOption && item.bitola) {
+                const cleanBitola = item.bitola.replace(',', '.').replace(' mm', '').trim();
+                matchedOption = Array.from(optionsMap.values()).find(o => {
+                    const cleanGauge = o.gauge.replace(',', '.').replace(' mm', '').trim();
+                    return cleanGauge === cleanBitola && !o.description?.includes('ROLO');
+                });
+            }
+
+            if (matchedOption) {
+                matchedOption.count += 1;
+                matchedOption.weight += item.remainingQuantity;
+            } else {
+                // Se não deu match em nenhuma opção cadastrada, cria opção dinâmica para o lote
+                const key = `${item.materialType}::${item.bitola}::${item.productCode || ''}::${item.description || ''}`;
+                const codeText = item.productCode ? ` (Cód. ${item.productCode})` : '';
+                const descText = item.description ? ` - ${item.description}` : '';
+                const dynamicOpt: ProductOption = {
+                    key,
+                    materialType: item.materialType,
+                    gauge: item.bitola,
+                    productCode: item.productCode || '',
+                    description: item.description || '',
+                    label: `${item.bitola.replace('.', ',')} mm${descText}${codeText}`,
+                    count: 1,
+                    weight: item.remainingQuantity
+                };
+                optionsMap.set(key, dynamicOpt);
+            }
+        });
+
+        // Ordenação inteligente das opções
+        return Array.from(optionsMap.values()).sort((a, b) => {
+            if (selectedMaterial === 'Treliça') {
+                return a.label.localeCompare(b.label);
+            }
+            const numA = parseFloat(a.gauge.replace(',', '.'));
+            const numB = parseFloat(b.gauge.replace(',', '.'));
+            if (!isNaN(numA) && !isNaN(numB)) {
+                if (numA !== numB) return numA - numB;
+                return (a.productCode || '').localeCompare(b.productCode || '');
+            }
+            return a.label.localeCompare(b.label);
         });
     }, [selectedMaterial, stock, gauges]);
 
-    // Bitolas marcadas pelo usuário
-    const [selectedBitolas, setSelectedBitolas] = useState<string[]>(() => {
-        if (initialBitola) {
-            const clean = initialBitola.includes('::') ? initialBitola.split('::')[1] : initialBitola;
-            return [clean];
-        }
-        return [];
+    // Opções marcadas pelo usuário (por chave completa)
+    const [selectedOptionKeys, setSelectedOptionKeys] = useState<string[]>(() => {
+        if (!initialBitola) return [];
+        // Se vier como chave completa ou bitola limpa
+        return [initialBitola];
     });
 
-    // Atualiza bitolas selecionadas ao trocar de material
+    // Se as chaves iniciais não baterem exatamente com as chaves geradas, faz o auto-match inicial
+    React.useEffect(() => {
+        if (availableProductOptions.length > 0 && selectedOptionKeys.length === 0) {
+            // Pré-seleciona as opções que têm estoque
+            const withStock = availableProductOptions.filter(o => o.count > 0).map(o => o.key);
+            if (withStock.length > 0) {
+                setSelectedOptionKeys(withStock);
+            } else {
+                setSelectedOptionKeys([availableProductOptions[0].key]);
+            }
+        }
+    }, [availableProductOptions]);
+
+    // Atualiza opções selecionadas ao trocar de material
     const handleMaterialChange = (newMat: string) => {
         setSelectedMaterial(newMat);
-        const withStock = stock
-            .filter(i => i.materialType === newMat && i.status !== 'Consumido')
-            .map(i => i.bitola);
-        const uniqueWithStock = Array.from(new Set(withStock));
-        setSelectedBitolas(uniqueWithStock.length > 0 ? uniqueWithStock : []);
+        // Ao trocar de material, limpa para o useEffect selecionar automaticamente as que têm estoque
+        setSelectedOptionKeys([]);
     };
 
-    const selectAllBitolas = () => {
-        setSelectedBitolas(availableBitolasForMaterial.map(b => b.key));
+    const selectAllOptions = () => {
+        setSelectedOptionKeys(availableProductOptions.map(o => o.key));
     };
 
     const selectOnlyWithStock = () => {
-        const withStock = availableBitolasForMaterial.filter(b => b.count > 0).map(b => b.key);
-        setSelectedBitolas(withStock);
+        const withStock = availableProductOptions.filter(o => o.count > 0).map(o => o.key);
+        setSelectedOptionKeys(withStock);
     };
 
-    const clearAllBitolas = () => {
-        setSelectedBitolas([]);
+    const clearAllOptions = () => {
+        setSelectedOptionKeys([]);
     };
 
-    const toggleBitola = (bitolaKey: string) => {
-        if (selectedBitolas.includes(bitolaKey)) {
-            setSelectedBitolas(selectedBitolas.filter(b => b !== bitolaKey));
+    const toggleOption = (key: string) => {
+        if (selectedOptionKeys.includes(key)) {
+            setSelectedOptionKeys(selectedOptionKeys.filter(k => k !== key));
         } else {
-            setSelectedBitolas([...selectedBitolas, bitolaKey]);
+            setSelectedOptionKeys([...selectedOptionKeys, key]);
         }
     };
 
-    // Estrutura de sub-coluna inteligente (que quebra e continua ao lado)
+    // =========================================================================
+    // 2. ESTRUTURA DE COLUNA INTELIGENTE COM CÓDIGO DO PRODUTO E FICHA TÉCNICA
+    // =========================================================================
     interface PrintColumn {
         id: string;
-        bitolaKey: string;
+        optionKey: string;
+        materialType: string;
+        gauge: string;
+        productCode: string;
+        description: string;
         displayName: string;
-        displaySize?: number;
+        displaySize?: string;
         partIndex: number;
         totalParts: number;
         lots: StockItem[];
@@ -141,40 +324,78 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
         totalGaugeLots: number;
         totalGaugeWeight: number;
         partWeight: number;
+        superior?: string;
+        inferior?: string;
+        senozoide?: string;
+        peso_final?: string;
     }
+
+    // Função de match de lotes estritamente por produto
+    const isLotForOption = (lot: StockItem, opt: ProductOption) => {
+        if (lot.status === 'Consumido') return false;
+        if (lot.materialType !== opt.materialType) return false;
+        if (selectedSteelType && lot.steelType !== selectedSteelType) return false;
+        if (selectedStatuses.length > 0 && !selectedStatuses.includes(lot.status)) return false;
+
+        // 1. Se ambos têm productCode, eles devem bater
+        if (lot.productCode && opt.productCode) {
+            return lot.productCode.trim() === opt.productCode.trim();
+        }
+
+        // 2. Se a opção tem productCode mas o lote não tem
+        if (opt.productCode && !lot.productCode) {
+            if (lot.description && opt.description) {
+                return lot.description.trim().toLowerCase() === opt.description.trim().toLowerCase();
+            }
+            // Se a opção é rolo de 200kg ou especial, não deve pegar lote genérico
+            if (opt.description?.includes('ROLO') || opt.label.includes('ROLO')) return false;
+        }
+
+        // 3. Se o lote tem descrição que bate com a opção
+        if (lot.description && opt.description && lot.description.trim().toLowerCase() === opt.description.trim().toLowerCase()) {
+            return true;
+        }
+
+        // 4. Bitola / Gauge
+        const cleanBitola = lot.bitola.replace(',', '.').replace(' mm', '').trim();
+        const cleanGauge = opt.gauge.replace(',', '.').replace(' mm', '').trim();
+        if (cleanBitola === cleanGauge) {
+            if (opt.description?.includes('ROLO') && !lot.description?.includes('ROLO')) return false;
+            return true;
+        }
+
+        return false;
+    };
 
     // DIVISÃO INTELIGENTE DOS LOTES EM COLUNAS LADO A LADO
     const generatedColumns = useMemo(() => {
         const cols: PrintColumn[] = [];
 
-        selectedBitolas.forEach(bitola => {
-            const lots = stock.filter(item => {
-                if (item.status === 'Consumido') return false;
-                if (selectedMaterial && item.materialType !== selectedMaterial) return false;
-                if (item.bitola !== bitola) return false;
-                if (selectedSteelType && item.steelType !== selectedSteelType) return false;
-                if (selectedStatuses.length > 0 && !selectedStatuses.includes(item.status)) return false;
-                return true;
-            }).sort((a, b) => {
+        selectedOptionKeys.forEach(optKey => {
+            const opt = availableProductOptions.find(o => o.key === optKey);
+            if (!opt) return;
+
+            // Filtra e ordena os lotes pertencentes estritamente a este produto
+            const matchingLots = stock.filter(item => isLotForOption(item, opt)).sort((a, b) => {
                 const numA = parseInt(a.internalLot) || 0;
                 const numB = parseInt(b.internalLot) || 0;
                 if (numA !== numB) return numA - numB;
                 return a.internalLot.localeCompare(b.internalLot);
             });
 
-            const gaugeInfo = gauges.find(g => g.materialType === selectedMaterial && g.gauge === bitola);
-            const defaultTrelica = selectedMaterial === 'Treliça' ? DefaultTrelicaGauges.find(t => t.gauge === bitola) : null;
-            const displayName = gaugeInfo?.description || defaultTrelica?.description || `${bitola} mm`;
-            const displaySize = gaugeInfo?.tamanho || defaultTrelica?.tamanho;
-            const totalGaugeWeight = lots.reduce((sum, i) => sum + i.remainingQuantity, 0);
-            const totalGaugeLots = lots.length;
+            const totalGaugeWeight = matchingLots.reduce((sum, i) => sum + i.remainingQuantity, 0);
+            const totalGaugeLots = matchingLots.length;
 
-            if (lots.length === 0) {
+            if (matchingLots.length === 0) {
                 cols.push({
-                    id: `${bitola}-empty`,
-                    bitolaKey: bitola,
-                    displayName,
-                    displaySize,
+                    id: `${opt.key}-empty`,
+                    optionKey: opt.key,
+                    materialType: opt.materialType,
+                    gauge: opt.gauge,
+                    productCode: opt.productCode,
+                    description: opt.description,
+                    displayName: opt.description || `${opt.gauge} mm`,
+                    displaySize: opt.tamanho,
                     partIndex: 1,
                     totalParts: 1,
                     lots: [],
@@ -182,22 +403,30 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                     isLastPart: true,
                     totalGaugeLots: 0,
                     totalGaugeWeight: 0,
-                    partWeight: 0
+                    partWeight: 0,
+                    superior: opt.superior,
+                    inferior: opt.inferior,
+                    senozoide: opt.senozoide,
+                    peso_final: opt.peso_final
                 });
             } else {
                 // Divide em partes conforme o limite da folha (itemsPerColumn)
                 const chunks: StockItem[][] = [];
-                for (let i = 0; i < lots.length; i += itemsPerColumn) {
-                    chunks.push(lots.slice(i, i + itemsPerColumn));
+                for (let i = 0; i < matchingLots.length; i += itemsPerColumn) {
+                    chunks.push(matchingLots.slice(i, i + itemsPerColumn));
                 }
 
                 chunks.forEach((chunkLots, idx) => {
                     const partWeight = chunkLots.reduce((sum, i) => sum + i.remainingQuantity, 0);
                     cols.push({
-                        id: `${bitola}-part-${idx + 1}`,
-                        bitolaKey: bitola,
-                        displayName,
-                        displaySize,
+                        id: `${opt.key}-part-${idx + 1}`,
+                        optionKey: opt.key,
+                        materialType: opt.materialType,
+                        gauge: opt.gauge,
+                        productCode: opt.productCode,
+                        description: opt.description,
+                        displayName: opt.description || `${opt.gauge} mm`,
+                        displaySize: opt.tamanho,
                         partIndex: idx + 1,
                         totalParts: chunks.length,
                         lots: chunkLots,
@@ -205,14 +434,18 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                         isLastPart: idx === chunks.length - 1,
                         totalGaugeLots,
                         totalGaugeWeight,
-                        partWeight
+                        partWeight,
+                        superior: opt.superior,
+                        inferior: opt.inferior,
+                        senozoide: opt.senozoide,
+                        peso_final: opt.peso_final
                     });
                 });
             }
         });
 
         return cols;
-    }, [selectedBitolas, stock, selectedMaterial, selectedSteelType, selectedStatuses, gauges, itemsPerColumn]);
+    }, [selectedOptionKeys, availableProductOptions, stock, selectedSteelType, selectedStatuses, itemsPerColumn]);
 
     // PAGINAÇÃO INTELIGENTE POR FOLHA A4 RETRATO
     const printPages = useMemo(() => {
@@ -227,18 +460,17 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
     const consolidatedTotals = useMemo(() => {
         let totalLots = 0;
         let totalWeight = 0;
-        
-        selectedBitolas.forEach(bitola => {
-            stock.forEach(item => {
-                if (item.status !== 'Consumido' && item.materialType === selectedMaterial && item.bitola === bitola) {
-                    totalLots += 1;
-                    totalWeight += item.remainingQuantity;
-                }
-            });
+
+        selectedOptionKeys.forEach(optKey => {
+            const opt = availableProductOptions.find(o => o.key === optKey);
+            if (opt) {
+                totalLots += opt.count;
+                totalWeight += opt.weight;
+            }
         });
 
         return { totalLots, totalWeight };
-    }, [selectedBitolas, stock, selectedMaterial]);
+    }, [selectedOptionKeys, availableProductOptions]);
 
     const handleExecutePrint = () => {
         window.print();
@@ -314,10 +546,10 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                             <div className="flex items-center gap-2">
                                 <h3 className="text-lg font-black tracking-tight">Impressão Inteligente de Estoque</h3>
                                 <span className="text-[11px] font-black bg-blue-500/30 text-blue-200 px-2.5 py-0.5 rounded-full border border-blue-400/30">
-                                    A4 Retrato • Fluxo Lado a Lado
+                                    A4 Retrato • Cód. Produto Integrado
                                 </span>
                             </div>
-                            <p className="text-xs text-blue-200/80">Lotes que ultrapassam a altura da folha continuam na coluna ao lado automaticamente.</p>
+                            <p className="text-xs text-blue-200/80">Produtos divididos por código, rolagem ao lado e dados técnicos completos.</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -342,7 +574,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                 {/* Corpo do Modal: Painel de Configurações + Pré-Visualização das Folhas */}
                 <div className="flex-1 overflow-y-auto flex flex-col">
                     {/* BARRA DE CONFIGURAÇÕES INTELIGENTES (NO-PRINT) */}
-                    <div className="no-print p-4 bg-slate-50 border-b border-slate-200 space-y-3.5 shrink-0">
+                    <div className="no-print p-4 bg-slate-50 border-b border-slate-200 space-y-3 shrink-0">
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
                             {/* 1. Seleção de Material */}
                             <div>
@@ -401,10 +633,10 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                     onChange={e => setItemsPerColumn(Number(e.target.value))}
                                     className="w-full bg-white border border-slate-300 text-slate-800 text-xs font-bold rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-[#0F3F5C] shadow-2xs cursor-pointer"
                                 >
-                                    <option value={26}>26 linhas (Mais folgado)</option>
-                                    <option value={30}>30 linhas (Padrão A4 Retrato)</option>
+                                    <option value={26}>26 linhas (Espaçamento maior)</option>
+                                    <option value={30}>30 linhas (Recomendado A4)</option>
                                     <option value={34}>34 linhas (Super Compacto)</option>
-                                    <option value={40}>40 linhas (Densidade Máxima)</option>
+                                    <option value={40}>40 linhas (Máxima densidade)</option>
                                 </select>
                             </div>
 
@@ -450,11 +682,11 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                             </div>
                         </div>
 
-                        {/* SELETOR DE BITOLAS COM CHIPS */}
+                        {/* SELETOR DE PRODUTOS / BITOLAS COM CHIPS DETALHADOS */}
                         <div>
                             <div className="flex items-center justify-between mb-1.5">
                                 <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
-                                    Bitolas selecionadas para o fluxo de impressão:
+                                    Modelos e Códigos de {selectedMaterial} ({availableProductOptions.length} disponíveis):
                                 </label>
                                 <div className="flex items-center gap-2">
                                     <button
@@ -462,20 +694,20 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                         onClick={selectOnlyWithStock}
                                         className="text-[11px] font-bold text-blue-700 hover:underline"
                                     >
-                                        Apenas com Estoque ({availableBitolasForMaterial.filter(b => b.count > 0).length})
+                                        Apenas com Estoque ({availableProductOptions.filter(b => b.count > 0).length})
                                     </button>
                                     <span className="text-slate-300">•</span>
                                     <button
                                         type="button"
-                                        onClick={selectAllBitolas}
+                                        onClick={selectAllOptions}
                                         className="text-[11px] font-bold text-slate-600 hover:underline"
                                     >
-                                        Marcar Todas
+                                        Marcar Todos
                                     </button>
                                     <span className="text-slate-300">•</span>
                                     <button
                                         type="button"
-                                        onClick={clearAllBitolas}
+                                        onClick={clearAllOptions}
                                         className="text-[11px] font-bold text-slate-500 hover:underline"
                                     >
                                         Limpar
@@ -483,17 +715,17 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                 </div>
                             </div>
 
-                            <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1.5 border border-slate-200 rounded-xl bg-white shadow-2xs">
-                                {availableBitolasForMaterial.length === 0 && (
-                                    <span className="text-xs text-slate-400 p-1">Nenhuma bitola encontrada para este material.</span>
+                            <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto p-1.5 border border-slate-200 rounded-xl bg-white shadow-2xs">
+                                {availableProductOptions.length === 0 && (
+                                    <span className="text-xs text-slate-400 p-1">Nenhum produto cadastrado para este material.</span>
                                 )}
-                                {availableBitolasForMaterial.map(b => {
-                                    const isSelected = selectedBitolas.includes(b.key);
+                                {availableProductOptions.map(opt => {
+                                    const isSelected = selectedOptionKeys.includes(opt.key);
                                     return (
                                         <button
-                                            key={b.key}
+                                            key={opt.key}
                                             type="button"
-                                            onClick={() => toggleBitola(b.key)}
+                                            onClick={() => toggleOption(opt.key)}
                                             className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 border ${
                                                 isSelected
                                                     ? 'bg-[#0F3F5C] text-white border-[#0F3F5C] shadow-2xs'
@@ -506,13 +738,13 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                                 readOnly
                                                 className="h-3 w-3 rounded accent-white pointer-events-none"
                                             />
-                                            <span>{b.label}</span>
+                                            <span>{opt.label}</span>
                                             <span className={`text-[10px] px-1 py-0 rounded-full font-black ${
                                                 isSelected
                                                     ? 'bg-white/20 text-white'
-                                                    : b.count > 0 ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-500'
+                                                    : opt.count > 0 ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-500'
                                             }`}>
-                                                {b.count}
+                                                {opt.count}
                                             </span>
                                         </button>
                                     );
@@ -524,9 +756,9 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                     {/* ÁREA DE PRÉ-VISUALIZAÇÃO / FOLHAS A4 DE IMPRESSÃO */}
                     <div className="p-3 md:p-6 bg-slate-300/70 overflow-y-auto flex-1 flex flex-col items-center gap-6">
                         <div className="stock-printable-area w-full max-w-4xl flex flex-col gap-6">
-                            {selectedBitolas.length === 0 ? (
+                            {selectedOptionKeys.length === 0 ? (
                                 <div className="p-12 text-center text-slate-500 font-bold border-2 border-dashed border-slate-400 bg-white rounded-2xl shadow-sm">
-                                    Nenhuma bitola selecionada. Marque as bitolas no painel acima para calcular as colunas.
+                                    Nenhum produto selecionado. Marque os produtos no painel acima para calcular as colunas.
                                 </div>
                             ) : (
                                 printPages.map((pageColumns, pageIdx) => {
@@ -571,8 +803,8 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                                                     <span className="font-black text-slate-900 text-xs">{selectedMaterial}</span>
                                                                 </div>
                                                                 <div>
-                                                                    <span className="text-[9px] font-bold text-slate-500 uppercase block">Bitolas Marcadas</span>
-                                                                    <span className="font-bold text-slate-800 text-xs">{selectedBitolas.length} selecionadas</span>
+                                                                    <span className="text-[9px] font-bold text-slate-500 uppercase block">Produtos Marcados</span>
+                                                                    <span className="font-bold text-slate-800 text-xs">{selectedOptionKeys.length} selecionados</span>
                                                                 </div>
                                                                 <div>
                                                                     <span className="text-[9px] font-bold text-slate-500 uppercase block">Organização</span>
@@ -618,21 +850,41 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                                             key={col.id}
                                                             className="print-col-box border border-slate-700 rounded-md overflow-hidden bg-white shadow-2xs flex flex-col"
                                                         >
-                                                            {/* CABEÇALHO DA COLUNA: Cor Clara, Nítida e Elegante (Economiza Toner e Alta Leitura) */}
-                                                            <div className="bg-slate-100 text-slate-900 px-2 py-1.5 border-b-2 border-slate-700 text-center">
-                                                                <div className="flex items-center justify-center gap-1.5">
-                                                                    <h3 className="text-xs font-black uppercase tracking-tight text-slate-900">
-                                                                        {col.displayName}
-                                                                    </h3>
-                                                                    {col.totalParts > 1 && (
-                                                                        <span className="text-[9px] font-black bg-blue-100 text-blue-900 px-1 py-0.2 rounded border border-blue-300">
-                                                                            {col.partIndex}/{col.totalParts} {col.partIndex > 1 ? '(Cont.)' : ''}
+                                                            {/* CABEÇALHO DA COLUNA: Cor Clara, CÓDIGO DO PRODUTO DESTACADO NO CANTO SUPERIOR */}
+                                                            <div className="bg-slate-100 text-slate-900 px-2 py-1.5 border-b-2 border-slate-700">
+                                                                <div className="flex items-center justify-between gap-1 mb-0.5">
+                                                                    <div className="flex items-center gap-1">
+                                                                        <span className="text-xs font-black uppercase tracking-tight text-slate-900">
+                                                                            {col.gauge ? `${col.gauge.replace('.', ',')}${!col.gauge.includes('mm') && !col.gauge.includes('m') ? ' mm' : ''}` : ''}
+                                                                        </span>
+                                                                        {col.totalParts > 1 && (
+                                                                            <span className="text-[9px] font-black bg-blue-100 text-blue-900 px-1 py-0.2 rounded border border-blue-300">
+                                                                                {col.partIndex}/{col.totalParts} {col.partIndex > 1 ? '(Cont.)' : ''}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    {/* CÓDIGO DO PRODUTO CONFORME PEDIDO E CIRCULADO PELO USUÁRIO */}
+                                                                    {col.productCode && (
+                                                                        <span className="text-[10px] font-black bg-slate-900 text-white px-1.5 py-0.2 rounded shadow-2xs">
+                                                                            CÓD. {col.productCode}
                                                                         </span>
                                                                     )}
                                                                 </div>
-                                                                <span className="text-[9px] font-bold text-slate-600 uppercase block">
-                                                                    {selectedMaterial} {col.displaySize ? `• ${col.displaySize}m` : ''}
-                                                                </span>
+
+                                                                {/* Descrição Completa do Produto */}
+                                                                {col.description && (
+                                                                    <div className="text-[10px] font-extrabold text-blue-950 truncate" title={col.description}>
+                                                                        {col.description}
+                                                                    </div>
+                                                                )}
+
+                                                                {/* Ficha Técnica para Treliças */}
+                                                                {col.materialType === 'Treliça' && (col.displaySize || col.superior) && (
+                                                                    <div className="text-[9px] text-slate-600 font-bold mt-0.5">
+                                                                        {col.displaySize ? `Tam: ${col.displaySize}m ` : ''}
+                                                                        {col.superior ? `• Sup: ${col.superior} | Inf: ${col.inferior} | Sen: ${col.senozoide}` : ''}
+                                                                    </div>
+                                                                )}
                                                             </div>
 
                                                             {/* Tabela Ultra-Compacta: Máximo de linhas por folha */}
