@@ -3292,53 +3292,7 @@ const StockControl: React.FC<{
                 </div>
             )}
 
-            {/* SELEÇÃO RÁPIDA DE MODELOS QUANDO TRELIÇA ESTÁ SELECIONADA E NENHUM MODELO ESPECÍFICO FOI FIXADO */}
-            {materialFilter === 'Treliça' && !bitolaFilter && (
-                <div className="no-print bg-white p-3.5 rounded-xl border border-blue-100 shadow-sm space-y-2">
-                    <div className="flex items-center justify-between">
-                        <span className="text-xs font-black uppercase tracking-wider text-[#0F3F5C] flex items-center gap-1.5">
-                            <span>📐</span> Seleção Rápida de Modelos de Treliça
-                        </span>
-                        <span className="text-[11px] text-slate-500 font-medium hidden sm:inline">
-                            Clique em um modelo para visualizar a ficha técnica e filtrar os lotes
-                        </span>
-                    </div>
-                    <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                        {availableBitolaOptions.filter(o => o.materialType === 'Treliça').map(opt => {
-                            const modelLotCount = stock.filter(item =>
-                                item.status !== 'Consumido' &&
-                                item.materialType === 'Treliça' &&
-                                (item.productCode ? item.productCode === opt.productCode : (item.description === opt.description || item.bitola === opt.gauge))
-                            ).length;
-                            return (
-                                <button
-                                    key={opt.key}
-                                    type="button"
-                                    onClick={() => setBitolaFilter(opt.key)}
-                                    className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 text-slate-800 text-xs font-bold whitespace-nowrap transition shadow-2xs group shrink-0"
-                                >
-                                    <span>📐</span>
-                                    <div className="text-left">
-                                        <div className="font-extrabold text-slate-900 group-hover:text-blue-900">
-                                            {opt.description || opt.gauge}
-                                        </div>
-                                        <div className="text-[10px] text-slate-500 font-medium">
-                                            {opt.tamanho ? `${opt.tamanho}m` : ''} {opt.productCode ? `• Cód. ${opt.productCode}` : ''}
-                                        </div>
-                                    </div>
-                                    <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
-                                        modelLotCount > 0
-                                            ? 'bg-blue-100 text-blue-800'
-                                            : 'bg-slate-200 text-slate-500'
-                                    }`}>
-                                        {modelLotCount} {modelLotCount === 1 ? 'lote' : 'lotes'}
-                                    </span>
-                                </button>
-                            );
-                        })}
-                    </div>
-                </div>
-            )}
+
 
             {renderPaginationBar('top')}
             <div className="bg-white rounded-xl shadow-lg border overflow-hidden">
