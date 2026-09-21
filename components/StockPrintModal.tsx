@@ -43,14 +43,14 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
     const [selectedSteelType] = useState<string>(initialSteelType || '');
     const [selectedStatuses] = useState<string[]>(['Disponível', 'Disponível - Suporte Treliça']);
     
-    // Configurações padronizadas para A4 Retrato (Escala 100% nativa sem precisar ajustar)
-    const [itemsPerColumn, setItemsPerColumn] = useState<number>(28); // 28 linhas por coluna cabe 100% na folha A4 com escala 100%
-    const [columnsPerPage, setColumnsPerPage] = useState<number>(3); // Padrão definitivo: 3 colunas por folha
+    // PADRÃO DEFINITIVO PARA A4 RETRATO (3 COLUNAS LADO A LADO - ESCALA 100% NATIVA)
+    const columnsPerPage = 3; // Fixo em 3 colunas: largura perfeita de ~62mm por coluna em A4
+    const maxItemsPerColumn = 30; // Capacidade ideal de linhas em A4 Retrato com escala 100%
     const [showCorrida, setShowCorrida] = useState(false);
     const [showData, setShowData] = useState(false);
 
     // =========================================================================
-    // 1. MAPEAMENTO INTELIGENTE DE PRODUTOS / BITOLAS / TRELIÇAS (COM CÓD. E DESCRIÇÃO)
+    // 1. MAPEAMENTO DE PRODUTOS / BITOLAS / TRELIÇAS (COM CÓD. E DESCRIÇÃO)
     // =========================================================================
     const availableProductOptions = useMemo<ProductOption[]>(() => {
         if (!selectedMaterial) return [];
@@ -75,7 +75,6 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
             } else if (g.materialType === 'Sabão') {
                 label = `🧼 ${g.gauge} - ${g.description || 'Condat'}${codeText}`;
             } else {
-                // CA-60 / Fio Máquina
                 const descText = g.description ? ` - ${g.description}` : '';
                 label = `${g.gauge.replace('.', ',')} mm${descText}${codeText}`;
             }
@@ -97,7 +96,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
             });
         });
 
-        // 2. Defaults de Treliça (garante que apareçam todas as opções caso faltem no banco)
+        // 2. Defaults de Treliça
         if (selectedMaterial === 'Treliça') {
             DefaultTrelicaGauges.forEach(tg => {
                 const key = `Treliça::${tg.gauge}::${tg.productCode}::${tg.description}`;
@@ -192,25 +191,22 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
             });
         }
 
-        // 4. Mapear os itens reais de estoque ativo para as opções e somar contagem / peso
+        // 4. Mapear itens reais de estoque ativo
         const activeItems = stock.filter(item => item.materialType === selectedMaterial && item.status !== 'Consumido');
 
         activeItems.forEach(item => {
             let matchedOption: ProductOption | undefined;
 
-            // Tentativa A: Match exato por productCode
             if (item.productCode) {
                 matchedOption = Array.from(optionsMap.values()).find(o => o.productCode && o.productCode.trim() === item.productCode?.trim());
             }
 
-            // Tentativa B: Match por descrição exata e bitola
             if (!matchedOption && item.description) {
                 matchedOption = Array.from(optionsMap.values()).find(o => 
                     o.description && o.description.trim().toLowerCase() === item.description?.trim().toLowerCase()
                 );
             }
 
-            // Tentativa C: Match por bitola/gauge
             if (!matchedOption && item.bitola) {
                 const cleanBitola = item.bitola.replace(',', '.').replace(' mm', '').trim();
                 matchedOption = Array.from(optionsMap.values()).find(o => {
@@ -223,7 +219,6 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                 matchedOption.count += 1;
                 matchedOption.weight += item.remainingQuantity;
             } else {
-                // Se não deu match em nenhuma opção cadastrada, cria opção dinâmica para o lote
                 const key = `${item.materialType}::${item.bitola}::${item.productCode || ''}::${item.description || ''}`;
                 const codeText = item.productCode ? ` (Cód. ${item.productCode})` : '';
                 const descText = item.description ? ` - ${item.description}` : '';
@@ -241,7 +236,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
             }
         });
 
-        // Ordenação inteligente das opções
+        // Ordenação
         return Array.from(optionsMap.values()).sort((a, b) => {
             if (selectedMaterial === 'Treliça') {
                 return a.label.localeCompare(b.label);
@@ -256,7 +251,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
         });
     }, [selectedMaterial, stock, gauges]);
 
-    // Opções marcadas pelo usuário (por chave completa)
+    // Opções marcadas pelo usuário
     const [selectedOptionKeys, setSelectedOptionKeys] = useState<string[]>(() => {
         if (!initialBitola) return [];
         return [initialBitola];
@@ -301,7 +296,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
     };
 
     // =========================================================================
-    // 2. ESTRUTURA DE COLUNA INTELIGENTE COM CÓDIGO DO PRODUTO E FICHA TÉCNICA
+    // 2. ESTRUTURA DE COLUNA COM DIVISÃO E BALANCEAMENTO INTELIGENTE
     // =========================================================================
     interface PrintColumn {
         id: string;
@@ -326,19 +321,16 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
         peso_final?: string;
     }
 
-    // Função de match de lotes estritamente por produto
     const isLotForOption = (lot: StockItem, opt: ProductOption) => {
         if (lot.status === 'Consumido') return false;
         if (lot.materialType !== opt.materialType) return false;
         if (selectedSteelType && lot.steelType !== selectedSteelType) return false;
         if (selectedStatuses.length > 0 && !selectedStatuses.includes(lot.status)) return false;
 
-        // 1. Se ambos têm productCode
         if (lot.productCode && opt.productCode) {
             return lot.productCode.trim() === opt.productCode.trim();
         }
 
-        // 2. Se a opção tem productCode mas o lote não tem
         if (opt.productCode && !lot.productCode) {
             if (lot.description && opt.description) {
                 return lot.description.trim().toLowerCase() === opt.description.trim().toLowerCase();
@@ -346,12 +338,10 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
             if (opt.description?.includes('ROLO') || opt.label.includes('ROLO')) return false;
         }
 
-        // 3. Se o lote tem descrição que bate com a opção
         if (lot.description && opt.description && lot.description.trim().toLowerCase() === opt.description.trim().toLowerCase()) {
             return true;
         }
 
-        // 4. Bitola / Gauge
         const cleanBitola = lot.bitola.replace(',', '.').replace(' mm', '').trim();
         const cleanGauge = opt.gauge.replace(',', '.').replace(' mm', '').trim();
         if (cleanBitola === cleanGauge) {
@@ -362,7 +352,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
         return false;
     };
 
-    // DIVISÃO INTELIGENTE DOS LOTES EM COLUNAS LADO A LADO
+    // DIVISÃO INTELIGENTE E BALANCEADA EM COLUNAS LADO A LADO
     const generatedColumns = useMemo(() => {
         const cols: PrintColumn[] = [];
 
@@ -404,10 +394,15 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                     peso_final: opt.peso_final
                 });
             } else {
-                // Divide em partes conforme o limite da folha (itemsPerColumn)
+                // Algoritmo de Balanceamento Inteligente:
+                // Se ultrapassar maxItemsPerColumn (30), divide igualmente entre as colunas necessárias
+                // Ex: 57 lotes -> 2 partes de 29 e 28 (em vez de 30 e 27 com sobra em 3 colunas)
+                const numParts = Math.max(1, Math.ceil(matchingLots.length / maxItemsPerColumn));
+                const itemsPerPart = Math.ceil(matchingLots.length / numParts);
+
                 const chunks: StockItem[][] = [];
-                for (let i = 0; i < matchingLots.length; i += itemsPerColumn) {
-                    chunks.push(matchingLots.slice(i, i + itemsPerColumn));
+                for (let i = 0; i < matchingLots.length; i += itemsPerPart) {
+                    chunks.push(matchingLots.slice(i, i + itemsPerPart));
                 }
 
                 chunks.forEach((chunkLots, idx) => {
@@ -439,9 +434,9 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
         });
 
         return cols;
-    }, [selectedOptionKeys, availableProductOptions, stock, selectedSteelType, selectedStatuses, itemsPerColumn]);
+    }, [selectedOptionKeys, availableProductOptions, stock, selectedSteelType, selectedStatuses]);
 
-    // PAGINAÇÃO INTELIGENTE POR FOLHA A4 RETRATO
+    // PAGINAÇÃO EM FOLHAS A4 COM 3 COLUNAS RÍGIDAS LADO A LADO
     const printPages = useMemo(() => {
         const pages: PrintColumn[][] = [];
         for (let i = 0; i < generatedColumns.length; i += columnsPerPage) {
@@ -474,7 +469,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
 
     return (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-xs z-[130] flex items-center justify-center p-2 sm:p-4 md:p-6 animate-in fade-in duration-150">
-            {/* CSS FÍSICO INFALÍVEL DE IMPRESSÃO A4 RETRATO (COM COLUNAS RÍGIDAS LADO A LADO) */}
+            {/* CSS FÍSICO INFALÍVEL DE IMPRESSÃO A4 RETRATO (3 COLUNAS RÍGIDAS DE LARGURA FIXA) */}
             <style>{`
                 @media print {
                     @page {
@@ -483,7 +478,6 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                     }
                     html, body {
                         width: 100% !important;
-                        height: auto !important;
                         margin: 0 !important;
                         padding: 0 !important;
                         background: #ffffff !important;
@@ -505,14 +499,13 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                         margin: 0 !important;
                         padding: 0 !important;
                         background: white !important;
-                        color: black !important;
+                        color: #0f172a !important;
                     }
                     .no-print {
                         display: none !important;
                     }
                     .print-sheet {
                         width: 100% !important;
-                        max-width: 100% !important;
                         box-sizing: border-box !important;
                         page-break-after: always !important;
                         break-after: page !important;
@@ -528,36 +521,38 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                         page-break-after: auto !important;
                         break-after: auto !important;
                     }
-                    /* FLEXBOX NATIVO QUE FORÇA O NAVEGADOR A COLOCAR COLUNAS LADO A LADO SEM EMPILHAR */
-                    .print-columns-flex-container {
+                    .print-row-3cols {
                         display: flex !important;
                         flex-direction: row !important;
                         flex-wrap: nowrap !important;
                         justify-content: space-between !important;
-                        align-items: stretch !important;
+                        align-items: flex-start !important;
                         width: 100% !important;
                         box-sizing: border-box !important;
-                        gap: 6px !important;
+                        gap: 8px !important;
                     }
-                    .print-col-item-3 {
+                    .print-col-fixed {
                         flex: 0 0 32.5% !important;
                         width: 32.5% !important;
                         max-width: 32.8% !important;
                         min-width: 32% !important;
                         box-sizing: border-box !important;
                     }
-                    .print-col-item-4 {
-                        flex: 0 0 24.2% !important;
-                        width: 24.2% !important;
-                        max-width: 24.5% !important;
-                        min-width: 23.5% !important;
-                        box-sizing: border-box !important;
+                    /* Garante legibilidade nítida da tabela de impressão */
+                    .print-table {
+                        width: 100% !important;
+                        table-layout: fixed !important;
+                        border-collapse: collapse !important;
+                    }
+                    .print-table th, .print-table td {
+                        border: 1px solid #cbd5e1 !important;
+                        color: #0f172a !important;
                     }
                 }
             `}</style>
 
             <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-7xl max-h-[96vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
-                {/* Header da Central de Impressão */}
+                {/* Header do Modal */}
                 <div className="no-print p-4 md:px-6 md:py-3.5 bg-gradient-to-r from-slate-900 via-[#0F3F5C] to-slate-900 text-white flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-2xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-xl">
@@ -567,10 +562,10 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                             <div className="flex items-center gap-2">
                                 <h3 className="text-lg font-black tracking-tight">Impressão Padronizada de Estoque</h3>
                                 <span className="text-[11px] font-black bg-emerald-500/30 text-emerald-200 px-2.5 py-0.5 rounded-full border border-emerald-400/30">
-                                    A4 Retrato • Escala 100% Padrão
+                                    3 Colunas A4 • Escala Padrão
                                 </span>
                             </div>
-                            <p className="text-xs text-blue-200/80">3 colunas rígidas lado a lado. Lotes excedentes fluem automaticamente para a coluna ao lado.</p>
+                            <p className="text-xs text-blue-200/80">3 colunas rígidas lado a lado com largura confortável. Sem cortes de texto.</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -592,11 +587,11 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                     </div>
                 </div>
 
-                {/* Corpo do Modal: Configurações Rápidas + Pré-Visualização das Folhas */}
+                {/* Painel de Controles + Pré-Visualização */}
                 <div className="flex-1 overflow-y-auto flex flex-col">
                     {/* BARRA DE CONFIGURAÇÕES (NO-PRINT) */}
                     <div className="no-print p-4 bg-slate-50 border-b border-slate-200 space-y-3 shrink-0">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-end">
                             {/* 1. Seleção de Material */}
                             <div>
                                 <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider block mb-1">
@@ -613,41 +608,10 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                 </select>
                             </div>
 
-                            {/* 2. Colunas por Folha A4 Retrato */}
+                            {/* 2. Colunas Opcionais */}
                             <div>
                                 <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider block mb-1">
-                                    2. Colunas por Folha (A4 Retrato)
-                                </label>
-                                <div className="grid grid-cols-2 gap-1 bg-white p-1 rounded-xl border border-slate-300 shadow-2xs">
-                                    <button
-                                        type="button"
-                                        onClick={() => setColumnsPerPage(3)}
-                                        className={`py-1 text-xs font-black rounded-lg transition cursor-pointer ${
-                                            columnsPerPage === 3
-                                                ? 'bg-[#0F3F5C] text-white shadow-xs'
-                                                : 'text-slate-600 hover:bg-slate-100'
-                                        }`}
-                                    >
-                                        3 Colunas (Padrão)
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setColumnsPerPage(4)}
-                                        className={`py-1 text-xs font-black rounded-lg transition cursor-pointer ${
-                                            columnsPerPage === 4
-                                                ? 'bg-[#0F3F5C] text-white shadow-xs'
-                                                : 'text-slate-600 hover:bg-slate-100'
-                                        }`}
-                                    >
-                                        4 Colunas (Máx)
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* 3. Colunas Opcionais */}
-                            <div>
-                                <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider block mb-1">
-                                    3. Campos Opcionais
+                                    2. Campos Extras
                                 </label>
                                 <div className="flex items-center gap-1.5">
                                     <label className="flex-1 flex items-center justify-center gap-1 text-xs font-bold text-slate-700 bg-white border border-slate-300 px-2 py-2 rounded-xl cursor-pointer hover:bg-slate-100 transition shadow-2xs">
@@ -671,7 +635,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                 </div>
                             </div>
 
-                            {/* 4. Resumo da Distribuição */}
+                            {/* 3. Resumo da Distribuição */}
                             <div className="bg-blue-50/90 border border-blue-200 rounded-xl p-2 flex items-center justify-between">
                                 <div>
                                     <span className="text-[9px] font-black text-blue-900 uppercase block">Total a Imprimir</span>
@@ -690,7 +654,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                         <div>
                             <div className="flex items-center justify-between mb-1.5">
                                 <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
-                                    Produtos e Códigos de {selectedMaterial} ({availableProductOptions.length} modelos):
+                                    Modelos e Códigos de {selectedMaterial} ({availableProductOptions.length} produtos):
                                 </label>
                                 <div className="flex items-center gap-2">
                                     <button
@@ -813,7 +777,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                                                 </div>
                                                                 <div>
                                                                     <span className="text-[9px] font-bold text-slate-500 uppercase block">Formato</span>
-                                                                    <span className="font-bold text-blue-900 text-xs">A4 Retrato ({columnsPerPage} Colunas)</span>
+                                                                    <span className="font-bold text-blue-900 text-xs">A4 Retrato (3 Colunas Lado a Lado)</span>
                                                                 </div>
                                                             </div>
 
@@ -844,9 +808,9 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                                     </div>
                                                 )}
 
-                                                {/* GRID DE COLUNAS LADO A LADO DA FOLHA COM FLEXBOX NATIVO INFALÍVEL */}
+                                                {/* GRID DE COLUNAS LADO A LADO DA FOLHA COM FLEXBOX RÍGIDO DE 3 COLUNAS */}
                                                 <div 
-                                                    className="print-columns-flex-container w-full"
+                                                    className="print-row-3cols w-full"
                                                     style={{
                                                         display: 'flex',
                                                         flexDirection: 'row',
@@ -861,14 +825,12 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                                     {pageColumns.map(col => (
                                                         <div
                                                             key={col.id}
-                                                            className={`border border-slate-700 rounded-md overflow-hidden bg-white shadow-2xs flex flex-col ${
-                                                                columnsPerPage === 4 ? 'print-col-item-4' : 'print-col-item-3'
-                                                            }`}
+                                                            className="print-col-fixed border-2 border-slate-700 rounded-md overflow-hidden bg-white shadow-2xs flex flex-col"
                                                             style={{
-                                                                flex: columnsPerPage === 4 ? '0 0 24.2%' : '0 0 32.5%',
-                                                                width: columnsPerPage === 4 ? '24.2%' : '32.5%',
-                                                                maxWidth: columnsPerPage === 4 ? '24.5%' : '32.8%',
-                                                                minWidth: columnsPerPage === 4 ? '23.5%' : '32%',
+                                                                flex: '0 0 32.5%',
+                                                                width: '32.5%',
+                                                                maxWidth: '32.8%',
+                                                                minWidth: '32%',
                                                                 boxSizing: 'border-box'
                                                             }}
                                                         >
@@ -885,7 +847,6 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                                                             </span>
                                                                         )}
                                                                     </div>
-                                                                    {/* CÓDIGO DO PRODUTO CONFORME PEDIDO E CIRCULADO PELO USUÁRIO */}
                                                                     {col.productCode && (
                                                                         <span className="text-[10px] font-black bg-slate-900 text-white px-1.5 py-0.2 rounded shadow-2xs">
                                                                             CÓD. {col.productCode}
@@ -909,61 +870,80 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                                                 )}
                                                             </div>
 
-                                                            {/* Tabela Ultra-Compacta: 28 linhas cabem 100% sem escala personalizada */}
-                                                            <table className="w-full text-left border-collapse">
+                                                            {/* TABELA COM LARGURAS FIXAS INFALÍVEIS (LOTE 52% | PESO 48%) */}
+                                                            <table 
+                                                                className="print-table w-full text-left"
+                                                                style={{
+                                                                    width: '100%',
+                                                                    tableLayout: 'fixed',
+                                                                    borderCollapse: 'collapse'
+                                                                }}
+                                                            >
                                                                 <thead>
-                                                                    <tr className="bg-slate-200/90 border-b border-slate-300 text-slate-800 font-black text-[9px] uppercase tracking-wider">
-                                                                        {showData && <th className="py-0.5 px-1 text-center border-r border-slate-300">Data</th>}
-                                                                        <th className="py-0.5 px-1.5 text-center border-r border-slate-300">Lote</th>
-                                                                        {showCorrida && <th className="py-0.5 px-1 text-center border-r border-slate-300">Corrida</th>}
-                                                                        <th className="py-0.5 px-1.5 text-right">Peso (kg)</th>
+                                                                    <tr style={{ backgroundColor: '#e2e8f0', borderBottom: '2px solid #64748b' }}>
+                                                                        {showData && (
+                                                                            <th style={{ width: '22%', padding: '4px 2px', textAlign: 'center', fontSize: '9px', fontWeight: 900, color: '#0f172a', borderRight: '1px solid #cbd5e1' }}>
+                                                                                DATA
+                                                                            </th>
+                                                                        )}
+                                                                        <th style={{ width: showData || showCorrida ? '48%' : '52%', padding: '4px 4px', textAlign: 'center', fontSize: '10px', fontWeight: 900, color: '#0f172a', borderRight: '1px solid #cbd5e1' }}>
+                                                                            LOTE
+                                                                        </th>
+                                                                        {showCorrida && (
+                                                                            <th style={{ width: '22%', padding: '4px 2px', textAlign: 'center', fontSize: '9px', fontWeight: 900, color: '#0f172a', borderRight: '1px solid #cbd5e1' }}>
+                                                                                CORR.
+                                                                            </th>
+                                                                        )}
+                                                                        <th style={{ width: showData || showCorrida ? '30%' : '48%', padding: '4px 6px', textAlign: 'right', fontSize: '10px', fontWeight: 900, color: '#0f172a' }}>
+                                                                            PESO (KG)
+                                                                        </th>
                                                                     </tr>
                                                                 </thead>
-                                                                <tbody className="divide-y divide-slate-200">
+                                                                <tbody>
                                                                     {col.lots.length === 0 ? (
                                                                         <tr>
-                                                                            <td colSpan={2 + (showData ? 1 : 0) + (showCorrida ? 1 : 0)} className="py-6 text-center text-slate-400 italic font-medium text-[10px]">
+                                                                            <td colSpan={2 + (showData ? 1 : 0) + (showCorrida ? 1 : 0)} style={{ padding: '16px 4px', textAlign: 'center', color: '#64748b', fontStyle: 'italic', fontSize: '11px' }}>
                                                                                 Sem lotes em estoque
                                                                             </td>
                                                                         </tr>
                                                                     ) : (
                                                                         col.lots.map((lot, lIdx) => (
-                                                                            <tr key={lot.id} className={lIdx % 2 === 1 ? 'bg-slate-50/70' : 'bg-white'}>
+                                                                            <tr key={lot.id} style={{ backgroundColor: lIdx % 2 === 1 ? '#f8fafc' : '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
                                                                                 {showData && (
-                                                                                    <td className="py-[1px] px-1 text-center font-medium text-slate-600 border-r border-slate-200 text-[9px]">
+                                                                                    <td style={{ width: '22%', padding: '2px 2px', textAlign: 'center', fontSize: '9px', color: '#475569', borderRight: '1px solid #e2e8f0' }}>
                                                                                         {new Date(lot.entryDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
                                                                                     </td>
                                                                                 )}
-                                                                                <td className="py-[1.5px] px-1.5 text-center font-black text-slate-900 border-r border-slate-200 text-[11px] font-mono leading-tight">
+                                                                                <td style={{ width: showData || showCorrida ? '48%' : '52%', padding: '3px 4px', textAlign: 'center', fontSize: '11px', fontWeight: 900, fontFamily: 'monospace', color: '#0f172a', borderRight: '1px solid #e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                                                                     {lot.internalLot}
                                                                                 </td>
                                                                                 {showCorrida && (
-                                                                                    <td className="py-[1px] px-1 text-center font-bold text-amber-900 border-r border-slate-200 text-[9px]">
+                                                                                    <td style={{ width: '22%', padding: '2px 2px', textAlign: 'center', fontSize: '9px', fontWeight: 700, color: '#78350f', borderRight: '1px solid #e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                                                                         {lot.runNumber || '-'}
                                                                                     </td>
                                                                                 )}
-                                                                                <td className="py-[1.5px] px-1.5 text-right font-black text-slate-800 text-[11px] font-mono leading-tight">
+                                                                                <td style={{ width: showData || showCorrida ? '30%' : '48%', padding: '3px 6px', textAlign: 'right', fontSize: '11px', fontWeight: 900, fontFamily: 'monospace', color: '#0f172a', whiteSpace: 'nowrap' }}>
                                                                                     {lot.remainingQuantity.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                                                                                 </td>
                                                                             </tr>
                                                                         ))
                                                                     )}
                                                                 </tbody>
-                                                                {/* Rodapé da Coluna */}
+                                                                {/* Rodapé da Coluna com Totais */}
                                                                 <tfoot>
-                                                                    <tr className="bg-slate-100 border-t-2 border-slate-700 font-black text-[10px] text-slate-900">
-                                                                        <td colSpan={1 + (showData ? 1 : 0) + (showCorrida ? 1 : 0)} className="py-1 px-1.5 text-center border-r border-slate-300 uppercase">
+                                                                    <tr style={{ backgroundColor: '#f1f5f9', borderTop: '2px solid #334155', fontWeight: 900, color: '#0f172a' }}>
+                                                                        <td colSpan={1 + (showData ? 1 : 0) + (showCorrida ? 1 : 0)} style={{ padding: '4px 6px', textAlign: 'center', fontSize: '10px', borderRight: '1px solid #cbd5e1' }}>
                                                                             {col.totalParts > 1 ? (
                                                                                 <span>{col.lots.length} lotes ({col.partIndex}/{col.totalParts})</span>
                                                                             ) : (
                                                                                 <span>{col.totalGaugeLots} {col.totalGaugeLots === 1 ? 'lote' : 'lotes'}</span>
                                                                             )}
                                                                         </td>
-                                                                        <td className="py-1 px-1.5 text-right font-black text-blue-900">
+                                                                        <td style={{ padding: '4px 6px', textAlign: 'right', fontSize: '11px', fontWeight: 900, color: '#0F3F5C' }}>
                                                                             {col.isLastPart || col.totalParts === 1 ? (
                                                                                 <span>{col.totalGaugeWeight.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} kg</span>
                                                                             ) : (
-                                                                                <span className="text-slate-600 font-medium">Sub: {col.partWeight.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
+                                                                                <span style={{ color: '#475569', fontSize: '9px' }}>Sub: {col.partWeight.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg</span>
                                                                             )}
                                                                         </td>
                                                                     </tr>
@@ -983,7 +963,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                                     </div>
                                                     <div className="text-right">
                                                         <p className="font-bold text-slate-700">MSM Gestão Inteligente • Relatório Oficial</p>
-                                                        <p className="font-mono">Página {pageNum} de {totalPages} • A4 Retrato</p>
+                                                        <p className="font-mono">Página {pageNum} de {totalPages} • A4 Retrato (3 Colunas)</p>
                                                     </div>
                                                 </div>
                                             ) : (
@@ -1005,7 +985,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                     <div className="flex items-center gap-2 text-xs text-slate-600 font-medium">
                         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                         <span>
-                            Configuração automática ativa: <strong>{printPages.length} {printPages.length === 1 ? 'folha' : 'folhas'}</strong> A4 Retrato prontas para imprimir com <strong>Escala Padrão (100%)</strong>.
+                            Layout padrão de 3 colunas A4 Retrato: <strong>{printPages.length} {printPages.length === 1 ? 'folha' : 'folhas'}</strong> calculadas. Pronto para imprimir sem ajustes manuais.
                         </span>
                     </div>
                     <div className="flex items-center gap-2">
