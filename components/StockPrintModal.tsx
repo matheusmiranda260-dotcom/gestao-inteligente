@@ -48,7 +48,6 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
     const columnsPerPage = 3; // Fixo em 3 colunas por folha
     const maxItemsPerColumn = 30; // 30 linhas por coluna cabem perfeitamente em A4
     const [showCorrida, setShowCorrida] = useState(false);
-    const [showData, setShowData] = useState(false);
 
     const safeGauges = useMemo(() => Array.isArray(gauges) ? gauges : [], [gauges]);
     const safeStock = useMemo(() => Array.isArray(stock) ? stock : [], [stock]);
@@ -371,7 +370,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                 return a.internalLot.localeCompare(b.internalLot);
             });
 
-            const totalGaugeWeight = matchingLots.reduce((sum, i) => sum + i.remainingQuantity, 0);
+            const totalGaugeWeight = matchingLots.reduce((sum, i) => sum + (Number(i.remainingQuantity ?? i.weight ?? i.labelWeight ?? 0) || 0), 0);
             const totalGaugeLots = matchingLots.length;
 
             if (matchingLots.length === 0) {
@@ -408,7 +407,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                 }
 
                 chunks.forEach((chunkLots, idx) => {
-                    const partWeight = chunkLots.reduce((sum, i) => sum + i.remainingQuantity, 0);
+                    const partWeight = chunkLots.reduce((sum, i) => sum + (Number(i.remainingQuantity ?? i.weight ?? i.labelWeight ?? 0) || 0), 0);
                     cols.push({
                         id: `${opt.key}-part-${idx + 1}`,
                         optionKey: opt.key,
@@ -528,7 +527,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
 
                         {/* Faixa Resumo Executivo */}
                         <div className="mt-2 bg-slate-100 rounded-lg px-2.5 py-1.5 border border-slate-300 flex flex-wrap items-center justify-between text-xs">
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-5">
                                 <div>
                                     <span className="text-[9px] font-bold text-slate-500 uppercase block">Material</span>
                                     <span className="font-black text-slate-900 text-xs">{selectedMaterial}</span>
@@ -537,13 +536,9 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                     <span className="text-[9px] font-bold text-slate-500 uppercase block">Produtos Marcados</span>
                                     <span className="font-bold text-slate-800 text-xs">{selectedOptionKeys.length} selecionados</span>
                                 </div>
-                                <div>
-                                    <span className="text-[9px] font-bold text-slate-500 uppercase block">Formato</span>
-                                    <span className="font-bold text-blue-900 text-xs">A4 Retrato (3 Colunas Lado a Lado)</span>
-                                </div>
                             </div>
 
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-5">
                                 <div className="text-right">
                                     <span className="text-[9px] font-bold text-slate-500 uppercase block">Total Lotes</span>
                                     <span className="font-black text-slate-900 text-sm">{consolidatedTotals.totalLots}</span>
@@ -587,7 +582,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                     {pageColumns.map(col => (
                         <div
                             key={col.id}
-                            className="print-col-fixed border-2 border-slate-700 rounded-md overflow-hidden bg-white shadow-2xs flex flex-col"
+                            className="print-col-fixed border-2 border-slate-700 rounded-md bg-white shadow-2xs flex flex-col"
                             style={{
                                 flex: '0 0 32.5%',
                                 width: '32.5%',
@@ -630,7 +625,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                 )}
                             </div>
 
-                            {/* TABELA COM LARGURAS FIXAS INFALÍVEIS (LOTE 52% | PESO 48%) */}
+                            {/* TABELA COM LARGURAS FIXAS INFALÍVEIS (50% LOTE | 50% PESO) */}
                             <table 
                                 className="print-table w-full text-left"
                                 style={{
@@ -641,20 +636,15 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                             >
                                 <thead>
                                     <tr style={{ backgroundColor: '#e2e8f0', borderBottom: '2px solid #64748b' }}>
-                                        {showData && (
-                                            <th style={{ width: '22%', padding: '4px 2px', textAlign: 'center', fontSize: '9px', fontWeight: 900, color: '#0f172a', borderRight: '1px solid #cbd5e1' }}>
-                                                DATA
-                                            </th>
-                                        )}
-                                        <th style={{ width: showData || showCorrida ? '48%' : '52%', padding: '4px 4px', textAlign: 'center', fontSize: '10px', fontWeight: 900, color: '#0f172a', borderRight: '1px solid #cbd5e1' }}>
+                                        <th style={{ width: showCorrida ? '42%' : '50%', padding: '4px 4px', textAlign: 'center', fontSize: '10px', fontWeight: 900, color: '#0f172a', borderRight: '1px solid #cbd5e1' }}>
                                             LOTE
                                         </th>
                                         {showCorrida && (
-                                            <th style={{ width: '22%', padding: '4px 2px', textAlign: 'center', fontSize: '9px', fontWeight: 900, color: '#0f172a', borderRight: '1px solid #cbd5e1' }}>
+                                            <th style={{ width: '26%', padding: '4px 2px', textAlign: 'center', fontSize: '9px', fontWeight: 900, color: '#0f172a', borderRight: '1px solid #cbd5e1' }}>
                                                 CORR.
                                             </th>
                                         )}
-                                        <th style={{ width: showData || showCorrida ? '30%' : '48%', padding: '4px 6px', textAlign: 'right', fontSize: '10px', fontWeight: 900, color: '#0f172a' }}>
+                                        <th style={{ width: showCorrida ? '32%' : '50%', padding: '4px 6px', textAlign: 'right', fontSize: '10px', fontWeight: 900, color: '#0f172a' }}>
                                             PESO (KG)
                                         </th>
                                     </tr>
@@ -662,43 +652,41 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                 <tbody>
                                     {col.lots.length === 0 ? (
                                         <tr>
-                                            <td colSpan={2 + (showData ? 1 : 0) + (showCorrida ? 1 : 0)} style={{ padding: '16px 4px', textAlign: 'center', color: '#64748b', fontStyle: 'italic', fontSize: '11px' }}>
+                                            <td colSpan={showCorrida ? 3 : 2} style={{ padding: '16px 4px', textAlign: 'center', color: '#64748b', fontStyle: 'italic', fontSize: '11px' }}>
                                                 Sem lotes em estoque
                                             </td>
                                         </tr>
                                     ) : (
-                                        col.lots.map((lot, lIdx) => (
-                                            <tr key={lot.id} style={{ backgroundColor: lIdx % 2 === 1 ? '#f8fafc' : '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
-                                                {showData && (
-                                                    <td style={{ width: '22%', padding: '2px 2px', textAlign: 'center', fontSize: '9px', color: '#475569', borderRight: '1px solid #e2e8f0' }}>
-                                                        {new Date(lot.entryDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                                        col.lots.map((lot, lIdx) => {
+                                            const itemWeight = Number(lot.remainingQuantity ?? lot.weight ?? lot.labelWeight ?? 0);
+                                            return (
+                                                <tr key={lot.id} style={{ backgroundColor: lIdx % 2 === 1 ? '#f8fafc' : '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
+                                                    <td style={{ width: showCorrida ? '42%' : '50%', padding: '3px 4px', textAlign: 'center', fontSize: '11px', fontWeight: 900, fontFamily: 'monospace', color: '#0f172a', borderRight: '1px solid #e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                        {lot.internalLot}
                                                     </td>
-                                                )}
-                                                <td style={{ width: showData || showCorrida ? '48%' : '52%', padding: '3px 4px', textAlign: 'center', fontSize: '11px', fontWeight: 900, fontFamily: 'monospace', color: '#0f172a', borderRight: '1px solid #e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                    {lot.internalLot}
-                                                </td>
-                                                {showCorrida && (
-                                                    <td style={{ width: '22%', padding: '2px 2px', textAlign: 'center', fontSize: '9px', fontWeight: 700, color: '#78350f', borderRight: '1px solid #e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                        {lot.runNumber || '-'}
+                                                    {showCorrida && (
+                                                        <td style={{ width: '26%', padding: '2px 2px', textAlign: 'center', fontSize: '9px', fontWeight: 700, color: '#78350f', borderRight: '1px solid #e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                            {lot.runNumber || '-'}
+                                                        </td>
+                                                    )}
+                                                    <td style={{ width: showCorrida ? '32%' : '50%', padding: '3px 6px', textAlign: 'right', fontSize: '11px', fontWeight: 900, fontFamily: 'monospace', color: '#0f172a', whiteSpace: 'nowrap' }}>
+                                                        {itemWeight.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} kg
                                                     </td>
-                                                )}
-                                                <td style={{ width: showData || showCorrida ? '30%' : '48%', padding: '3px 6px', textAlign: 'right', fontSize: '11px', fontWeight: 900, fontFamily: 'monospace', color: '#0f172a', whiteSpace: 'nowrap' }}>
-                                                    {lot.remainingQuantity.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                                                </td>
-                                            </tr>
-                                        ))
+                                                </tr>
+                                            );
+                                        })
                                     )}
                                 </tbody>
                                 <tfoot>
                                     <tr style={{ backgroundColor: '#f1f5f9', borderTop: '2px solid #334155', fontWeight: 900, color: '#0f172a' }}>
-                                        <td colSpan={1 + (showData ? 1 : 0) + (showCorrida ? 1 : 0)} style={{ padding: '4px 6px', textAlign: 'center', fontSize: '10px', borderRight: '1px solid #cbd5e1' }}>
+                                        <td colSpan={showCorrida ? 2 : 1} style={{ width: showCorrida ? '68%' : '50%', padding: '4px 6px', textAlign: 'center', fontSize: '10px', borderRight: '1px solid #cbd5e1' }}>
                                             {col.totalParts > 1 ? (
                                                 <span>{col.lots.length} lotes ({col.partIndex}/{col.totalParts})</span>
                                             ) : (
                                                 <span>{col.totalGaugeLots} {col.totalGaugeLots === 1 ? 'lote' : 'lotes'}</span>
                                             )}
                                         </td>
-                                        <td style={{ padding: '4px 6px', textAlign: 'right', fontSize: '11px', fontWeight: 900, color: '#0F3F5C' }}>
+                                        <td style={{ width: showCorrida ? '32%' : '50%', padding: '4px 6px', textAlign: 'right', fontSize: '11px', fontWeight: 900, color: '#0F3F5C' }}>
                                             {col.isLastPart || col.totalParts === 1 ? (
                                                 <span>{col.totalGaugeWeight.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} kg</span>
                                             ) : (
@@ -797,26 +785,15 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                     <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider block mb-1">
                                         2. Campos Extras
                                     </label>
-                                    <div className="flex items-center gap-1.5">
-                                        <label className="flex-1 flex items-center justify-center gap-1 text-xs font-bold text-slate-700 bg-white border border-slate-300 px-2 py-2 rounded-xl cursor-pointer hover:bg-slate-100 transition shadow-2xs">
-                                            <input
-                                                type="checkbox"
-                                                checked={showCorrida}
-                                                onChange={e => setShowCorrida(e.target.checked)}
-                                                className="h-3.5 w-3.5 rounded accent-[#0F3F5C]"
-                                            />
-                                            <span>Corrida</span>
-                                        </label>
-                                        <label className="flex-1 flex items-center justify-center gap-1 text-xs font-bold text-slate-700 bg-white border border-slate-300 px-2 py-2 rounded-xl cursor-pointer hover:bg-slate-100 transition shadow-2xs">
-                                            <input
-                                                type="checkbox"
-                                                checked={showData}
-                                                onChange={e => setShowData(e.target.checked)}
-                                                className="h-3.5 w-3.5 rounded accent-[#0F3F5C]"
-                                            />
-                                            <span>Data</span>
-                                        </label>
-                                    </div>
+                                    <label className="w-full flex items-center justify-center gap-2 text-xs font-bold text-slate-700 bg-white border border-slate-300 px-3 py-2 rounded-xl cursor-pointer hover:bg-slate-100 transition shadow-2xs">
+                                        <input
+                                            type="checkbox"
+                                            checked={showCorrida}
+                                            onChange={e => setShowCorrida(e.target.checked)}
+                                            className="h-4 w-4 rounded accent-[#0F3F5C]"
+                                        />
+                                        <span>Exibir Nº Corrida</span>
+                                    </label>
                                 </div>
 
                                 <div className="bg-blue-50/90 border border-blue-200 rounded-xl p-2 flex items-center justify-between">
