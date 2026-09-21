@@ -2567,11 +2567,26 @@ const StockControl: React.FC<{
     };
 
     const stats = useMemo(() => {
-        return filtered.reduce((acc, item) => ({
-            count: acc.count + 1,
-            weight: acc.weight + item.remainingQuantity
-        }), { count: 0, weight: 0 });
-    }, [filtered]);
+        return filtered.reduce((acc, item) => {
+            let pieces = 0;
+            if (materialFilter === 'Treliça') {
+                const matchingGauge = (gauges || []).find(g => 
+                    g.materialType === 'Treliça' && (
+                    (item.productCode && g.productCode === item.productCode) || 
+                    (item.description && g.description === item.description) || 
+                    (g.gauge === item.bitola)
+                ));
+                const unitW = parseFloat((matchingGauge?.peso_final || '').replace(',', '.') || '0');
+                const bars = item.quantity || (item.history?.find((h: any) => h.details?.quantity)?.details?.quantity) || (unitW > 0 && item.remainingQuantity ? Math.round(item.remainingQuantity / unitW) : 0);
+                pieces = Number(bars) || 0;
+            }
+            return {
+                count: acc.count + 1,
+                weight: acc.weight + item.remainingQuantity,
+                pieces: acc.pieces + pieces
+            };
+        }, { count: 0, weight: 0, pieces: 0 });
+    }, [filtered, materialFilter, gauges]);
 
     const handleRevertToAvailable = (item: StockItem) => {
         if (confirm(`Deseja voltar o lote ${item.internalLot} para status "Disponível"?`)) {
@@ -2776,9 +2791,15 @@ const StockControl: React.FC<{
                                 <span className="text-[10px] font-bold text-slate-400 border-b border-transparent">Lotes</span>
                                 <span className="text-xl font-black text-slate-800">{stats.count}</span>
                             </div>
-                            <div className="flex flex-col">
+                            {materialFilter === 'Treliça' && (
+                                <div className="flex flex-col border-l pl-4 ml-0">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Peças (Barras)</span>
+                                    <span className="text-xl font-black text-[#0F3F5C]">{stats.pieces.toLocaleString('pt-BR')}</span>
+                                </div>
+                            )}
+                            <div className="flex flex-col border-l pl-4 ml-0">
                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                    {materialFilter === 'Eletrodos Treliças' ? 'Peças Disponíveis' : materialFilter === 'Treliça' ? 'Barras / Kg Disponível' : 'Kg Disponível'}
+                                    {materialFilter === 'Eletrodos Treliças' ? 'Peças Disponíveis' : 'Kg Disponível'}
                                 </span>
                                 <span className="text-xl font-black text-blue-600">
                                     {materialFilter === 'Eletrodos Treliças' 
