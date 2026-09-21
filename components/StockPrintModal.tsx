@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type { StockItem, StockGauge } from '../types';
 import { MaterialOptions, FioMaquinaBitolaOptions, CA60BitolaOptions, DefaultTrelicaGauges, DefaultElectrodeGauges, DefaultSabaoGauges } from '../types';
@@ -33,8 +33,8 @@ export interface ProductOption {
 export const StockPrintModal: React.FC<StockPrintModalProps> = ({
     isOpen,
     onClose,
-    stock,
-    gauges,
+    stock = [],
+    gauges = [],
     initialMaterial = '',
     initialBitola = '',
     initialSteelType = ''
@@ -50,6 +50,9 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
     const [showCorrida, setShowCorrida] = useState(false);
     const [showData, setShowData] = useState(false);
 
+    const safeGauges = useMemo(() => Array.isArray(gauges) ? gauges : [], [gauges]);
+    const safeStock = useMemo(() => Array.isArray(stock) ? stock : [], [stock]);
+
     // =========================================================================
     // 1. MAPEAMENTO DE PRODUTOS / BITOLAS / TRELIÇAS (COM CÓD. E DESCRIÇÃO)
     // =========================================================================
@@ -59,7 +62,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
         const optionsMap = new Map<string, ProductOption>();
 
         // 1. Gauges cadastrados no banco para o material selecionado
-        const relevantGauges = gauges.filter(g => g.materialType === selectedMaterial);
+        const relevantGauges = safeGauges.filter(g => g.materialType === selectedMaterial);
         
         relevantGauges.forEach(g => {
             const key = `${g.materialType}::${g.gauge}::${g.productCode || ''}::${g.description || ''}`;
@@ -193,7 +196,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
         }
 
         // 4. Mapear itens reais de estoque ativo
-        const activeItems = stock.filter(item => item.materialType === selectedMaterial && item.status !== 'Consumido');
+        const activeItems = safeStock.filter(item => item.materialType === selectedMaterial && item.status !== 'Consumido');
 
         activeItems.forEach(item => {
             let matchedOption: ProductOption | undefined;
@@ -250,7 +253,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
             }
             return a.label.localeCompare(b.label);
         });
-    }, [selectedMaterial, stock, gauges]);
+    }, [selectedMaterial, safeStock, safeGauges]);
 
     // Opções marcadas pelo usuário
     const [selectedOptionKeys, setSelectedOptionKeys] = useState<string[]>(() => {
@@ -361,7 +364,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
             const opt = availableProductOptions.find(o => o.key === optKey);
             if (!opt) return;
 
-            const matchingLots = stock.filter(item => isLotForOption(item, opt)).sort((a, b) => {
+            const matchingLots = safeStock.filter(item => isLotForOption(item, opt)).sort((a, b) => {
                 const numA = parseInt(a.internalLot) || 0;
                 const numB = parseInt(b.internalLot) || 0;
                 if (numA !== numB) return numA - numB;
