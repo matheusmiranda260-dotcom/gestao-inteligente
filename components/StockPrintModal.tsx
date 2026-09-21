@@ -43,9 +43,9 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
     const [selectedSteelType] = useState<string>(initialSteelType || '');
     const [selectedStatuses] = useState<string[]>(['Disponível', 'Disponível - Suporte Treliça']);
     
-    // Configurações inteligentes de impressão A4 Retrato
-    const [itemsPerColumn, setItemsPerColumn] = useState<number>(30); // Limite de linhas por coluna
-    const [columnsPerPage, setColumnsPerPage] = useState<number>(3); // 3 ou 4 colunas por folha A4 retrato
+    // Configurações padronizadas para A4 Retrato (Escala 100% nativa sem precisar ajustar)
+    const [itemsPerColumn, setItemsPerColumn] = useState<number>(28); // 28 linhas por coluna cabe 100% na folha A4 com escala 100%
+    const [columnsPerPage, setColumnsPerPage] = useState<number>(3); // Padrão definitivo: 3 colunas por folha
     const [showCorrida, setShowCorrida] = useState(false);
     const [showData, setShowData] = useState(false);
 
@@ -259,14 +259,12 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
     // Opções marcadas pelo usuário (por chave completa)
     const [selectedOptionKeys, setSelectedOptionKeys] = useState<string[]>(() => {
         if (!initialBitola) return [];
-        // Se vier como chave completa ou bitola limpa
         return [initialBitola];
     });
 
-    // Se as chaves iniciais não baterem exatamente com as chaves geradas, faz o auto-match inicial
+    // Pré-seleção automática inicial de produtos com estoque
     React.useEffect(() => {
         if (availableProductOptions.length > 0 && selectedOptionKeys.length === 0) {
-            // Pré-seleciona as opções que têm estoque
             const withStock = availableProductOptions.filter(o => o.count > 0).map(o => o.key);
             if (withStock.length > 0) {
                 setSelectedOptionKeys(withStock);
@@ -276,10 +274,8 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
         }
     }, [availableProductOptions]);
 
-    // Atualiza opções selecionadas ao trocar de material
     const handleMaterialChange = (newMat: string) => {
         setSelectedMaterial(newMat);
-        // Ao trocar de material, limpa para o useEffect selecionar automaticamente as que têm estoque
         setSelectedOptionKeys([]);
     };
 
@@ -337,7 +333,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
         if (selectedSteelType && lot.steelType !== selectedSteelType) return false;
         if (selectedStatuses.length > 0 && !selectedStatuses.includes(lot.status)) return false;
 
-        // 1. Se ambos têm productCode, eles devem bater
+        // 1. Se ambos têm productCode
         if (lot.productCode && opt.productCode) {
             return lot.productCode.trim() === opt.productCode.trim();
         }
@@ -347,7 +343,6 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
             if (lot.description && opt.description) {
                 return lot.description.trim().toLowerCase() === opt.description.trim().toLowerCase();
             }
-            // Se a opção é rolo de 200kg ou especial, não deve pegar lote genérico
             if (opt.description?.includes('ROLO') || opt.label.includes('ROLO')) return false;
         }
 
@@ -375,7 +370,6 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
             const opt = availableProductOptions.find(o => o.key === optKey);
             if (!opt) return;
 
-            // Filtra e ordena os lotes pertencentes estritamente a este produto
             const matchingLots = stock.filter(item => isLotForOption(item, opt)).sort((a, b) => {
                 const numA = parseInt(a.internalLot) || 0;
                 const numB = parseInt(b.internalLot) || 0;
@@ -480,12 +474,12 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
 
     return (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-xs z-[130] flex items-center justify-center p-2 sm:p-4 md:p-6 animate-in fade-in duration-150">
-            {/* CSS específico de impressão para folhas A4 Retrato Inteligente */}
+            {/* CSS FÍSICO INFALÍVEL DE IMPRESSÃO A4 RETRATO (COM COLUNAS RÍGIDAS LADO A LADO) */}
             <style>{`
                 @media print {
                     @page {
-                        size: A4 portrait;
-                        margin: 5mm 5mm 6mm 5mm;
+                        size: A4 portrait !important;
+                        margin: 6mm 6mm 6mm 6mm !important;
                     }
                     html, body {
                         width: 100% !important;
@@ -497,16 +491,17 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                         print-color-adjust: exact !important;
                     }
                     body * {
-                        visibility: hidden;
+                        visibility: hidden !important;
                     }
                     .stock-printable-area, .stock-printable-area * {
-                        visibility: visible;
+                        visibility: visible !important;
                     }
                     .stock-printable-area {
-                        position: absolute;
-                        left: 0;
-                        top: 0;
+                        position: absolute !important;
+                        left: 0 !important;
+                        top: 0 !important;
                         width: 100% !important;
+                        max-width: 100% !important;
                         margin: 0 !important;
                         padding: 0 !important;
                         background: white !important;
@@ -516,21 +511,47 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                         display: none !important;
                     }
                     .print-sheet {
+                        width: 100% !important;
+                        max-width: 100% !important;
+                        box-sizing: border-box !important;
                         page-break-after: always !important;
                         break-after: page !important;
                         page-break-inside: avoid !important;
                         break-inside: avoid !important;
-                        min-height: 275mm;
-                        padding: 2mm 0;
-                        box-sizing: border-box;
+                        min-height: 280mm !important;
+                        padding: 2mm 0 !important;
+                        display: flex !important;
+                        flex-direction: column !important;
+                        justify-content: space-between !important;
                     }
                     .print-sheet:last-of-type {
                         page-break-after: auto !important;
                         break-after: auto !important;
                     }
-                    .print-col-box {
-                        page-break-inside: avoid !important;
-                        break-inside: avoid !important;
+                    /* FLEXBOX NATIVO QUE FORÇA O NAVEGADOR A COLOCAR COLUNAS LADO A LADO SEM EMPILHAR */
+                    .print-columns-flex-container {
+                        display: flex !important;
+                        flex-direction: row !important;
+                        flex-wrap: nowrap !important;
+                        justify-content: space-between !important;
+                        align-items: stretch !important;
+                        width: 100% !important;
+                        box-sizing: border-box !important;
+                        gap: 6px !important;
+                    }
+                    .print-col-item-3 {
+                        flex: 0 0 32.5% !important;
+                        width: 32.5% !important;
+                        max-width: 32.8% !important;
+                        min-width: 32% !important;
+                        box-sizing: border-box !important;
+                    }
+                    .print-col-item-4 {
+                        flex: 0 0 24.2% !important;
+                        width: 24.2% !important;
+                        max-width: 24.5% !important;
+                        min-width: 23.5% !important;
+                        box-sizing: border-box !important;
                     }
                 }
             `}</style>
@@ -544,19 +565,19 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                         </div>
                         <div>
                             <div className="flex items-center gap-2">
-                                <h3 className="text-lg font-black tracking-tight">Impressão Inteligente de Estoque</h3>
-                                <span className="text-[11px] font-black bg-blue-500/30 text-blue-200 px-2.5 py-0.5 rounded-full border border-blue-400/30">
-                                    A4 Retrato • Cód. Produto Integrado
+                                <h3 className="text-lg font-black tracking-tight">Impressão Padronizada de Estoque</h3>
+                                <span className="text-[11px] font-black bg-emerald-500/30 text-emerald-200 px-2.5 py-0.5 rounded-full border border-emerald-400/30">
+                                    A4 Retrato • Escala 100% Padrão
                                 </span>
                             </div>
-                            <p className="text-xs text-blue-200/80">Produtos divididos por código, rolagem ao lado e dados técnicos completos.</p>
+                            <p className="text-xs text-blue-200/80">3 colunas rígidas lado a lado. Lotes excedentes fluem automaticamente para a coluna ao lado.</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
                         <button
                             type="button"
                             onClick={handleExecutePrint}
-                            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-lg transition flex items-center gap-2"
+                            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-lg transition flex items-center gap-2 cursor-pointer"
                         >
                             <PrinterIcon className="h-4 w-4" />
                             <span>Imprimir Agora</span>
@@ -564,18 +585,18 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                         <button
                             type="button"
                             onClick={onClose}
-                            className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition"
+                            className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition cursor-pointer"
                         >
                             <XIcon className="h-6 w-6" />
                         </button>
                     </div>
                 </div>
 
-                {/* Corpo do Modal: Painel de Configurações + Pré-Visualização das Folhas */}
+                {/* Corpo do Modal: Configurações Rápidas + Pré-Visualização das Folhas */}
                 <div className="flex-1 overflow-y-auto flex flex-col">
-                    {/* BARRA DE CONFIGURAÇÕES INTELIGENTES (NO-PRINT) */}
+                    {/* BARRA DE CONFIGURAÇÕES (NO-PRINT) */}
                     <div className="no-print p-4 bg-slate-50 border-b border-slate-200 space-y-3 shrink-0">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
                             {/* 1. Seleção de Material */}
                             <div>
                                 <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider block mb-1">
@@ -601,18 +622,18 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                     <button
                                         type="button"
                                         onClick={() => setColumnsPerPage(3)}
-                                        className={`py-1 text-xs font-black rounded-lg transition ${
+                                        className={`py-1 text-xs font-black rounded-lg transition cursor-pointer ${
                                             columnsPerPage === 3
                                                 ? 'bg-[#0F3F5C] text-white shadow-xs'
                                                 : 'text-slate-600 hover:bg-slate-100'
                                         }`}
                                     >
-                                        3 Colunas (Ideal)
+                                        3 Colunas (Padrão)
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => setColumnsPerPage(4)}
-                                        className={`py-1 text-xs font-black rounded-lg transition ${
+                                        className={`py-1 text-xs font-black rounded-lg transition cursor-pointer ${
                                             columnsPerPage === 4
                                                 ? 'bg-[#0F3F5C] text-white shadow-xs'
                                                 : 'text-slate-600 hover:bg-slate-100'
@@ -623,27 +644,10 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                 </div>
                             </div>
 
-                            {/* 3. Limite de Linhas por Coluna */}
+                            {/* 3. Colunas Opcionais */}
                             <div>
                                 <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider block mb-1">
-                                    3. Linhas por Coluna (Cálculo Folha)
-                                </label>
-                                <select
-                                    value={itemsPerColumn}
-                                    onChange={e => setItemsPerColumn(Number(e.target.value))}
-                                    className="w-full bg-white border border-slate-300 text-slate-800 text-xs font-bold rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-[#0F3F5C] shadow-2xs cursor-pointer"
-                                >
-                                    <option value={26}>26 linhas (Espaçamento maior)</option>
-                                    <option value={30}>30 linhas (Recomendado A4)</option>
-                                    <option value={34}>34 linhas (Super Compacto)</option>
-                                    <option value={40}>40 linhas (Máxima densidade)</option>
-                                </select>
-                            </div>
-
-                            {/* 4. Colunas Opcionais */}
-                            <div>
-                                <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider block mb-1">
-                                    4. Campos Opcionais
+                                    3. Campos Opcionais
                                 </label>
                                 <div className="flex items-center gap-1.5">
                                     <label className="flex-1 flex items-center justify-center gap-1 text-xs font-bold text-slate-700 bg-white border border-slate-300 px-2 py-2 rounded-xl cursor-pointer hover:bg-slate-100 transition shadow-2xs">
@@ -667,7 +671,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                 </div>
                             </div>
 
-                            {/* 5. Resumo da Distribuição */}
+                            {/* 4. Resumo da Distribuição */}
                             <div className="bg-blue-50/90 border border-blue-200 rounded-xl p-2 flex items-center justify-between">
                                 <div>
                                     <span className="text-[9px] font-black text-blue-900 uppercase block">Total a Imprimir</span>
@@ -682,17 +686,17 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                             </div>
                         </div>
 
-                        {/* SELETOR DE PRODUTOS / BITOLAS COM CHIPS DETALHADOS */}
+                        {/* SELETOR DE PRODUTOS COM CHIPS */}
                         <div>
                             <div className="flex items-center justify-between mb-1.5">
                                 <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
-                                    Modelos e Códigos de {selectedMaterial} ({availableProductOptions.length} disponíveis):
+                                    Produtos e Códigos de {selectedMaterial} ({availableProductOptions.length} modelos):
                                 </label>
                                 <div className="flex items-center gap-2">
                                     <button
                                         type="button"
                                         onClick={selectOnlyWithStock}
-                                        className="text-[11px] font-bold text-blue-700 hover:underline"
+                                        className="text-[11px] font-bold text-blue-700 hover:underline cursor-pointer"
                                     >
                                         Apenas com Estoque ({availableProductOptions.filter(b => b.count > 0).length})
                                     </button>
@@ -700,7 +704,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                     <button
                                         type="button"
                                         onClick={selectAllOptions}
-                                        className="text-[11px] font-bold text-slate-600 hover:underline"
+                                        className="text-[11px] font-bold text-slate-600 hover:underline cursor-pointer"
                                     >
                                         Marcar Todos
                                     </button>
@@ -708,7 +712,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                     <button
                                         type="button"
                                         onClick={clearAllOptions}
-                                        className="text-[11px] font-bold text-slate-500 hover:underline"
+                                        className="text-[11px] font-bold text-slate-500 hover:underline cursor-pointer"
                                     >
                                         Limpar
                                     </button>
@@ -726,7 +730,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                             key={opt.key}
                                             type="button"
                                             onClick={() => toggleOption(opt.key)}
-                                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 border ${
+                                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 border cursor-pointer ${
                                                 isSelected
                                                     ? 'bg-[#0F3F5C] text-white border-[#0F3F5C] shadow-2xs'
                                                     : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
@@ -771,11 +775,12 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                         <div
                                             key={`sheet-${pageNum}`}
                                             className="print-sheet bg-white text-slate-900 w-full shadow-xl rounded-xl p-5 md:p-6 border border-slate-300 flex flex-col justify-between"
+                                            style={{ minHeight: '280mm', boxSizing: 'border-box' }}
                                         >
                                             <div>
-                                                {/* CABEÇALHO DO DOCUMENTO: Detalhado na Folha 1, Compacto nas demais folhas */}
+                                                {/* CABEÇALHO DO DOCUMENTO */}
                                                 {isFirstPage ? (
-                                                    <div className="border-b-2 border-slate-800 pb-3 mb-4">
+                                                    <div className="border-b-2 border-slate-800 pb-2 mb-3">
                                                         <div className="flex justify-between items-start">
                                                             <div>
                                                                 <h1 className="text-xl font-black text-slate-900 uppercase tracking-tight italic">
@@ -796,7 +801,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                                         </div>
 
                                                         {/* Faixa Resumo Executivo */}
-                                                        <div className="mt-2.5 bg-slate-100 rounded-lg p-2 border border-slate-300 flex flex-wrap items-center justify-between text-xs">
+                                                        <div className="mt-2 bg-slate-100 rounded-lg px-2.5 py-1.5 border border-slate-300 flex flex-wrap items-center justify-between text-xs">
                                                             <div className="flex items-center gap-4">
                                                                 <div>
                                                                     <span className="text-[9px] font-bold text-slate-500 uppercase block">Material</span>
@@ -807,14 +812,14 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                                                     <span className="font-bold text-slate-800 text-xs">{selectedOptionKeys.length} selecionados</span>
                                                                 </div>
                                                                 <div>
-                                                                    <span className="text-[9px] font-bold text-slate-500 uppercase block">Organização</span>
-                                                                    <span className="font-bold text-blue-900 text-xs">Lado a Lado ({itemsPerColumn} linhas/coluna)</span>
+                                                                    <span className="text-[9px] font-bold text-slate-500 uppercase block">Formato</span>
+                                                                    <span className="font-bold text-blue-900 text-xs">A4 Retrato ({columnsPerPage} Colunas)</span>
                                                                 </div>
                                                             </div>
 
                                                             <div className="flex items-center gap-4">
                                                                 <div className="text-right">
-                                                                    <span className="text-[9px] font-bold text-slate-500 uppercase block">Total Geral Lotes</span>
+                                                                    <span className="text-[9px] font-bold text-slate-500 uppercase block">Total Lotes</span>
                                                                     <span className="font-black text-slate-900 text-sm">{consolidatedTotals.totalLots}</span>
                                                                 </div>
                                                                 <div className="text-right">
@@ -827,7 +832,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                                         </div>
                                                     </div>
                                                 ) : (
-                                                    <div className="border-b-2 border-slate-800 pb-2 mb-4 flex justify-between items-center text-xs">
+                                                    <div className="border-b-2 border-slate-800 pb-1.5 mb-3 flex justify-between items-center text-xs">
                                                         <div className="flex items-center gap-2">
                                                             <span className="font-black text-slate-900 uppercase">MSM Gestão Inteligente</span>
                                                             <span className="text-slate-400">•</span>
@@ -839,16 +844,33 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                                     </div>
                                                 )}
 
-                                                {/* GRID DE COLUNAS LADO A LADO DA FOLHA */}
+                                                {/* GRID DE COLUNAS LADO A LADO DA FOLHA COM FLEXBOX NATIVO INFALÍVEL */}
                                                 <div 
-                                                    className={`grid gap-2.5 items-start ${
-                                                        columnsPerPage === 4 ? 'grid-cols-4' : 'grid-cols-3'
-                                                    }`}
+                                                    className="print-columns-flex-container w-full"
+                                                    style={{
+                                                        display: 'flex',
+                                                        flexDirection: 'row',
+                                                        flexWrap: 'nowrap',
+                                                        justifyContent: 'space-between',
+                                                        alignItems: 'flex-start',
+                                                        width: '100%',
+                                                        gap: '8px',
+                                                        boxSizing: 'border-box'
+                                                    }}
                                                 >
                                                     {pageColumns.map(col => (
                                                         <div
                                                             key={col.id}
-                                                            className="print-col-box border border-slate-700 rounded-md overflow-hidden bg-white shadow-2xs flex flex-col"
+                                                            className={`border border-slate-700 rounded-md overflow-hidden bg-white shadow-2xs flex flex-col ${
+                                                                columnsPerPage === 4 ? 'print-col-item-4' : 'print-col-item-3'
+                                                            }`}
+                                                            style={{
+                                                                flex: columnsPerPage === 4 ? '0 0 24.2%' : '0 0 32.5%',
+                                                                width: columnsPerPage === 4 ? '24.2%' : '32.5%',
+                                                                maxWidth: columnsPerPage === 4 ? '24.5%' : '32.8%',
+                                                                minWidth: columnsPerPage === 4 ? '23.5%' : '32%',
+                                                                boxSizing: 'border-box'
+                                                            }}
                                                         >
                                                             {/* CABEÇALHO DA COLUNA: Cor Clara, CÓDIGO DO PRODUTO DESTACADO NO CANTO SUPERIOR */}
                                                             <div className="bg-slate-100 text-slate-900 px-2 py-1.5 border-b-2 border-slate-700">
@@ -887,14 +909,14 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                                                 )}
                                                             </div>
 
-                                                            {/* Tabela Ultra-Compacta: Máximo de linhas por folha */}
+                                                            {/* Tabela Ultra-Compacta: 28 linhas cabem 100% sem escala personalizada */}
                                                             <table className="w-full text-left border-collapse">
                                                                 <thead>
                                                                     <tr className="bg-slate-200/90 border-b border-slate-300 text-slate-800 font-black text-[9px] uppercase tracking-wider">
-                                                                        {showData && <th className="py-1 px-1 text-center border-r border-slate-300">Data</th>}
-                                                                        <th className="py-1 px-1.5 text-center border-r border-slate-300">Lote</th>
-                                                                        {showCorrida && <th className="py-1 px-1 text-center border-r border-slate-300">Corrida</th>}
-                                                                        <th className="py-1 px-1.5 text-right">Peso (kg)</th>
+                                                                        {showData && <th className="py-0.5 px-1 text-center border-r border-slate-300">Data</th>}
+                                                                        <th className="py-0.5 px-1.5 text-center border-r border-slate-300">Lote</th>
+                                                                        {showCorrida && <th className="py-0.5 px-1 text-center border-r border-slate-300">Corrida</th>}
+                                                                        <th className="py-0.5 px-1.5 text-right">Peso (kg)</th>
                                                                     </tr>
                                                                 </thead>
                                                                 <tbody className="divide-y divide-slate-200">
@@ -908,19 +930,19 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                                                         col.lots.map((lot, lIdx) => (
                                                                             <tr key={lot.id} className={lIdx % 2 === 1 ? 'bg-slate-50/70' : 'bg-white'}>
                                                                                 {showData && (
-                                                                                    <td className="py-0.5 px-1 text-center font-medium text-slate-600 border-r border-slate-200 text-[9px]">
+                                                                                    <td className="py-[1px] px-1 text-center font-medium text-slate-600 border-r border-slate-200 text-[9px]">
                                                                                         {new Date(lot.entryDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
                                                                                     </td>
                                                                                 )}
-                                                                                <td className="py-0.5 px-1.5 text-center font-black text-slate-900 border-r border-slate-200 text-[11px] font-mono">
+                                                                                <td className="py-[1.5px] px-1.5 text-center font-black text-slate-900 border-r border-slate-200 text-[11px] font-mono leading-tight">
                                                                                     {lot.internalLot}
                                                                                 </td>
                                                                                 {showCorrida && (
-                                                                                    <td className="py-0.5 px-1 text-center font-bold text-amber-900 border-r border-slate-200 text-[9px]">
+                                                                                    <td className="py-[1px] px-1 text-center font-bold text-amber-900 border-r border-slate-200 text-[9px]">
                                                                                         {lot.runNumber || '-'}
                                                                                     </td>
                                                                                 )}
-                                                                                <td className="py-0.5 px-1.5 text-right font-black text-slate-800 text-[11px] font-mono">
+                                                                                <td className="py-[1.5px] px-1.5 text-right font-black text-slate-800 text-[11px] font-mono leading-tight">
                                                                                     {lot.remainingQuantity.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                                                                                 </td>
                                                                             </tr>
@@ -954,7 +976,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
 
                                             {/* RODAPÉ DA FOLHA / ASSINATURA */}
                                             {isLastPage ? (
-                                                <div className="mt-5 pt-3 border-t border-dashed border-slate-400 flex justify-between items-end text-[9px] text-slate-500">
+                                                <div className="mt-4 pt-2 border-t border-dashed border-slate-400 flex justify-between items-end text-[9px] text-slate-500">
                                                     <div>
                                                         <p className="font-bold uppercase text-slate-700">Conferente / Responsável pelo Estoque:</p>
                                                         <div className="w-52 border-b border-slate-600 mt-5" />
@@ -965,7 +987,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <div className="mt-3 pt-2 border-t border-slate-200 flex justify-between items-center text-[9px] text-slate-400">
+                                                <div className="mt-2 pt-1.5 border-t border-slate-200 flex justify-between items-center text-[9px] text-slate-400">
                                                     <span>Continua na próxima folha...</span>
                                                     <span>Folha {pageNum} de {totalPages}</span>
                                                 </div>
@@ -983,21 +1005,21 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                     <div className="flex items-center gap-2 text-xs text-slate-600 font-medium">
                         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                         <span>
-                            Cálculo inteligente ativo: <strong>{printPages.length} {printPages.length === 1 ? 'folha' : 'folhas'}</strong> geradas em formato A4 Retrato.
+                            Configuração automática ativa: <strong>{printPages.length} {printPages.length === 1 ? 'folha' : 'folhas'}</strong> A4 Retrato prontas para imprimir com <strong>Escala Padrão (100%)</strong>.
                         </span>
                     </div>
                     <div className="flex items-center gap-2">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-4 py-2 border border-slate-300 text-slate-700 font-bold text-xs rounded-xl hover:bg-slate-50 transition"
+                            className="px-4 py-2 border border-slate-300 text-slate-700 font-bold text-xs rounded-xl hover:bg-slate-50 transition cursor-pointer"
                         >
                             Fechar
                         </button>
                         <button
                             type="button"
                             onClick={handleExecutePrint}
-                            className="px-6 py-2 bg-[#0F3F5C] hover:bg-[#0A2A3D] text-white font-black text-xs rounded-xl shadow-lg transition flex items-center gap-2"
+                            className="px-6 py-2 bg-[#0F3F5C] hover:bg-[#0A2A3D] text-white font-black text-xs rounded-xl shadow-lg transition flex items-center gap-2 cursor-pointer"
                         >
                             <PrinterIcon className="h-4 w-4" />
                             <span>Imprimir / Gerar PDF</span>
