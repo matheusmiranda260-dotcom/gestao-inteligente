@@ -16,6 +16,7 @@ import ConferenceReport from './ConferenceReport';
 import FinishedConferencesModal from './FinishedConferencesModal';
 import LotHistoryModal from './LotHistoryModal';
 import StockMovementsTable from './StockMovementsTable';
+import { StockPrintModal } from './StockPrintModal';
 import {
     getLocalElectrodeStock, saveLocalElectrodeStock, generateNextElectrodeLot, DEFAULT_BENCHMARK_METERS, getElectrodeTypePrefix
 } from './ElectrodeStockManager';
@@ -1692,6 +1693,7 @@ const StockControl: React.FC<{
     const [pageSize, setPageSize] = useState<number>(50);
     const [isLotDisplayModalOpen, setIsLotDisplayModalOpen] = useState(false);
     const [isMovementsModalOpen, setIsMovementsModalOpen] = useState(false);
+    const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
 
     // ==========================================
     // ESTADO E CONTROLE DE ESTOQUE DE ELETRODOS
@@ -2705,7 +2707,15 @@ const StockControl: React.FC<{
                         </div>
                     </div>
                 </div>
-                <div className="flex items-center gap-4 no-print">
+                <div className="flex items-center gap-3 no-print">
+                    <button 
+                        onClick={() => setIsPrintModalOpen(true)} 
+                        className="bg-white text-slate-700 font-bold py-2 px-4 rounded-xl shadow border border-slate-200 flex items-center gap-2 hover:bg-slate-50 transition whitespace-nowrap"
+                        title="Central de Impressão de Estoque"
+                    >
+                        <PrinterIcon className="h-5 w-5 text-[#0F3F5C]" />
+                        <span>Imprimir</span>
+                    </button>
                     {isGestor ? (
                         <>
                             <button onClick={() => setPage('gaugesManager')} className="bg-white text-slate-600 font-bold py-2 px-6 rounded-lg shadow border flex items-center gap-2 hover:bg-slate-50 transition whitespace-nowrap"><AdjustmentsIcon className="h-5 w-5" /> Gerenciar Bitolas</button>
@@ -2890,6 +2900,16 @@ const StockControl: React.FC<{
                     >
                         <span>📋</span>
                         <span className="whitespace-nowrap">Histórico</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setIsPrintModalOpen(true)}
+                        className="w-full md:w-auto flex items-center justify-center gap-2 px-3.5 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition shadow-2xs group"
+                        title="Central de Impressão de Estoque (Individual ou Resumido em Colunas)"
+                    >
+                        <PrinterIcon className="h-4 w-4 text-[#0F3F5C]" />
+                        <span className="whitespace-nowrap">Imprimir</span>
                     </button>
                 </div>
             </div>
@@ -3146,6 +3166,16 @@ const StockControl: React.FC<{
                             >
                                 <span>📋</span>
                                 <span>Histórico</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setIsPrintModalOpen(true)}
+                                className="px-3.5 py-2 bg-white/15 hover:bg-white/25 text-white rounded-xl transition border border-white/20 flex items-center gap-2 text-xs font-black shadow-xs shrink-0"
+                                title="Imprimir este modelo ou selecionar bitolas lado a lado"
+                            >
+                                <PrinterIcon className="h-4 w-4" />
+                                <span>Imprimir</span>
                             </button>
 
                             <div className="flex items-center gap-5">
@@ -3565,6 +3595,17 @@ const StockControl: React.FC<{
                     </div>
                 </div>
             )}
+
+            {/* SUB-JANELA MODAL: CENTRAL DE IMPRESSÃO DE ESTOQUE */}
+            <StockPrintModal
+                isOpen={isPrintModalOpen}
+                onClose={() => setIsPrintModalOpen(false)}
+                stock={stock}
+                gauges={gauges}
+                initialMaterial={materialFilter || (selectedGaugeOption?.materialType || 'CA-60')}
+                initialBitola={bitolaFilter}
+                initialSteelType={steelTypeFilter}
+            />
 
             {/* ========================================================================= */}
             {/* MODAL 1: CADASTRAR NOVO LOTE DE ELETRODOS COM GERADOR SEQUENCIAL         */}
