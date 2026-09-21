@@ -258,16 +258,48 @@ export const insertItem = async <T extends { id?: string }>(
     console.log(`Inserting into ${table}:`, payload);
     let { data, error } = await supabase.from(table).insert(payload).select().single();
     
-    // Resilience fallback: if a column does not exist yet in the DB schema, strip it and retry
-    if (error && (error.code === 'PGRST204' || error.code === '42703')) {
-        console.warn(`Column missing in ${table}, retrying without potential new columns...`, error.message);
-        const fallbackPayload = { ...payload };
-        delete fallbackPayload.description;
-        delete fallbackPayload.product_code;
-        const retry = await supabase.from(table).insert(fallbackPayload).select().single();
-        if (!retry.error) {
+    // Resilience fallback: if any column does not exist yet in the DB schema, strip it and retry
+    let fallbackPayload = { ...payload };
+    while (error && (error.code === 'PGRST204' || error.code === '42703')) {
+        const match = error.message?.match(/['"]([a-zA-Z0-9_]+)['"] column/) || 
+                      error.message?.match(/column ['"]([a-zA-Z0-9_]+)['"]/);
+        if (match && match[1] && fallbackPayload[match[1]] !== undefined) {
+            console.warn(`Column '${match[1]}' missing in ${table}, retrying insert without it...`);
+            delete fallbackPayload[match[1]];
+            const retry = await supabase.from(table).insert(fallbackPayload).select().single();
             data = retry.data;
-            error = null;
+            error = retry.error;
+        } else {
+            // General column strip if regex didn't catch the exact column
+            if (fallbackPayload.tamanho !== undefined || fallbackPayload.superior !== undefined) {
+                delete fallbackPayload.tamanho;
+                delete fallbackPayload.superior;
+                delete fallbackPayload.inferior;
+                delete fallbackPayload.senozoide;
+                delete fallbackPayload.peso_final;
+                delete fallbackPayload.peso_superior;
+                delete fallbackPayload.peso_inferior;
+                delete fallbackPayload.peso_senozoide;
+                const retry = await supabase.from(table).insert(fallbackPayload).select().single();
+                data = retry.data;
+                error = retry.error;
+                continue;
+            }
+            if (fallbackPayload.product_code !== undefined) {
+                delete fallbackPayload.product_code;
+                const retry = await supabase.from(table).insert(fallbackPayload).select().single();
+                data = retry.data;
+                error = retry.error;
+                continue;
+            }
+            if (fallbackPayload.description !== undefined) {
+                delete fallbackPayload.description;
+                const retry = await supabase.from(table).insert(fallbackPayload).select().single();
+                data = retry.data;
+                error = retry.error;
+                continue;
+            }
+            break;
         }
     }
 
@@ -292,16 +324,47 @@ export const updateItem = async <T>(table: string, id: string, updates: Partial<
     let { payload } = sanitizeForTable(table, snakeUpdates);
     let { data, error } = await supabase.from(table).update(payload).eq('id', id).select().single();
 
-    // Resilience fallback: if a column does not exist yet in the DB schema, strip it and retry
-    if (error && (error.code === 'PGRST204' || error.code === '42703')) {
-        console.warn(`Column missing in ${table}, retrying update without potential new columns...`, error.message);
-        const fallbackPayload = { ...payload };
-        delete fallbackPayload.description;
-        delete fallbackPayload.product_code;
-        const retry = await supabase.from(table).update(fallbackPayload).eq('id', id).select().single();
-        if (!retry.error) {
+    // Resilience fallback: if any column does not exist yet in the DB schema, strip it and retry
+    let fallbackPayload = { ...payload };
+    while (error && (error.code === 'PGRST204' || error.code === '42703')) {
+        const match = error.message?.match(/['"]([a-zA-Z0-9_]+)['"] column/) || 
+                      error.message?.match(/column ['"]([a-zA-Z0-9_]+)['"]/);
+        if (match && match[1] && fallbackPayload[match[1]] !== undefined) {
+            console.warn(`Column '${match[1]}' missing in ${table}, retrying update without it...`);
+            delete fallbackPayload[match[1]];
+            const retry = await supabase.from(table).update(fallbackPayload).eq('id', id).select().single();
             data = retry.data;
-            error = null;
+            error = retry.error;
+        } else {
+            if (fallbackPayload.tamanho !== undefined || fallbackPayload.superior !== undefined) {
+                delete fallbackPayload.tamanho;
+                delete fallbackPayload.superior;
+                delete fallbackPayload.inferior;
+                delete fallbackPayload.senozoide;
+                delete fallbackPayload.peso_final;
+                delete fallbackPayload.peso_superior;
+                delete fallbackPayload.peso_inferior;
+                delete fallbackPayload.peso_senozoide;
+                const retry = await supabase.from(table).update(fallbackPayload).eq('id', id).select().single();
+                data = retry.data;
+                error = retry.error;
+                continue;
+            }
+            if (fallbackPayload.product_code !== undefined) {
+                delete fallbackPayload.product_code;
+                const retry = await supabase.from(table).update(fallbackPayload).eq('id', id).select().single();
+                data = retry.data;
+                error = retry.error;
+                continue;
+            }
+            if (fallbackPayload.description !== undefined) {
+                delete fallbackPayload.description;
+                const retry = await supabase.from(table).update(fallbackPayload).eq('id', id).select().single();
+                data = retry.data;
+                error = retry.error;
+                continue;
+            }
+            break;
         }
     }
 

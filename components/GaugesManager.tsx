@@ -104,38 +104,69 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
     // Ensure default electrode, sabao & trelica gauges are visible if not yet added
     const effectiveGauges = useMemo(() => {
         let result = [...gauges];
-        const hasElectrodes = result.some(g => g.materialType === 'Eletrodos Treliças');
-        if (!hasElectrodes) {
-            const defaultsAsStockGauges = DefaultElectrodeGauges.map(d => ({
-                id: `default_el_${d.productCode}`,
-                materialType: d.materialType,
-                gauge: d.gauge,
-                productCode: d.productCode,
-                description: d.description
-            })) as StockGauge[];
-            result = [...result, ...defaultsAsStockGauges];
-        }
+        
+        let deletedDefaults: string[] = [];
+        let overriddenDefaults: string[] = [];
+        try {
+            deletedDefaults = JSON.parse(localStorage.getItem('deleted_default_gauges') || '[]');
+            overriddenDefaults = JSON.parse(localStorage.getItem('overridden_default_gauges') || '[]');
+        } catch (e) {}
 
-        const hasSabao = result.some(g => g.materialType === 'Sabão');
-        if (!hasSabao) {
-            const defaultsSabao = DefaultSabaoGauges.map(d => ({
-                id: `default_sb_${d.productCode}`,
-                materialType: d.materialType,
-                gauge: d.gauge,
-                productCode: d.productCode,
-                description: d.description
-            })) as StockGauge[];
-            result = [...result, ...defaultsSabao];
-        }
+        // 1. Eletrodos: inclui os padrões que ainda não estejam salvos no banco ou substituídos
+        DefaultElectrodeGauges.forEach(d => {
+            const defId = `default_el_${d.productCode}`;
+            if (deletedDefaults.includes(defId) || overriddenDefaults.includes(defId)) return;
+            const exists = result.some(g => 
+                g.materialType === 'Eletrodos Treliças' && 
+                ((d.productCode && g.productCode === d.productCode) || g.id === defId)
+            );
+            if (!exists) {
+                result.push({
+                    id: defId,
+                    materialType: d.materialType,
+                    gauge: d.gauge,
+                    productCode: d.productCode,
+                    description: d.description
+                });
+            }
+        });
 
-        const hasTrelica = result.some(g => g.materialType === 'Treliça');
-        if (!hasTrelica) {
-            const defaultsTrelica = DefaultTrelicaGauges.map(d => ({
-                id: d.id || `default_tr_${d.productCode}`,
-                ...d
-            })) as StockGauge[];
-            result = [...result, ...defaultsTrelica];
-        }
+        // 2. Sabão: inclui os padrões que ainda não estejam salvos no banco ou substituídos
+        DefaultSabaoGauges.forEach(d => {
+            const defId = `default_sb_${d.productCode}`;
+            if (deletedDefaults.includes(defId) || overriddenDefaults.includes(defId)) return;
+            const exists = result.some(g => 
+                g.materialType === 'Sabão' && 
+                ((d.productCode && g.productCode === d.productCode) || g.id === defId)
+            );
+            if (!exists) {
+                result.push({
+                    id: defId,
+                    materialType: d.materialType,
+                    gauge: d.gauge,
+                    productCode: d.productCode,
+                    description: d.description
+                });
+            }
+        });
+
+        // 3. Treliças: inclui os modelos padrão que ainda não estejam no banco ou substituídos
+        DefaultTrelicaGauges.forEach(d => {
+            const defId = d.id || `default_tr_${d.productCode}`;
+            if (deletedDefaults.includes(defId) || overriddenDefaults.includes(defId)) return;
+            const exists = result.some(g => 
+                g.materialType === 'Treliça' && 
+                ((d.productCode && g.productCode === d.productCode) || 
+                 (g.description === d.description && (g.tamanho === d.tamanho || g.gauge === d.gauge)) ||
+                 g.id === defId)
+            );
+            if (!exists) {
+                result.push({
+                    id: defId,
+                    ...d
+                });
+            }
+        });
 
         return result;
     }, [gauges]);
@@ -317,10 +348,11 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
             const finalPeso = editingTrPesoFinal || calculated?.pesoFinal || item.peso_final || '0';
 
             onUpdate(id, { 
+                materialType: 'Treliça',
                 gauge: `${editingTrTamanho || item.tamanho || '12'}m`,
-                description: editingDescription.trim() || undefined,
-                productCode: editingCode.trim() || undefined,
-                tamanho: editingTrTamanho || item.tamanho,
+                description: editingDescription.trim() || item.description || 'Treliça',
+                productCode: editingCode.trim() || item.productCode || '',
+                tamanho: editingTrTamanho || item.tamanho || '12',
                 superior: editingTrSuperior || item.superior,
                 inferior: editingTrInferior || item.inferior,
                 senozoide: editingTrSenozoide || item.senozoide,
@@ -345,19 +377,21 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
             });
         } else if (item?.materialType === 'Eletrodos Treliças' || item?.materialType === 'Sabão') {
             onUpdate(id, { 
-                gauge: editingGauge.trim() || undefined,
-                description: editingDescription.trim() || undefined,
-                productCode: editingCode.trim() || undefined 
+                materialType: item.materialType,
+                gauge: editingGauge.trim() || item.gauge,
+                description: editingDescription.trim() || item.description,
+                productCode: editingCode.trim() || item.productCode 
             });
         } else {
             const normalized = editingGauge.trim().replace(',', '.');
             const numberVal = parseFloat(normalized);
-            const finalGauge = !isNaN(numberVal) && numberVal > 0 ? numberVal.toFixed(2) : undefined;
+            const finalGauge = !isNaN(numberVal) && numberVal > 0 ? numberVal.toFixed(2) : (item?.gauge || editingGauge.trim());
 
             onUpdate(id, { 
+                materialType: item?.materialType,
                 gauge: finalGauge,
-                description: editingDescription.trim() || undefined,
-                productCode: editingCode.trim() || undefined 
+                description: editingDescription.trim() || item?.description,
+                productCode: editingCode.trim() || item?.productCode 
             });
         }
         setEditingId(null);
@@ -807,12 +841,13 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                                                                 </div>
                                                                 <div className="space-y-2">
                                                                     <div>
-                                                                        <label className="text-[9px] font-bold text-slate-500 uppercase block">Modelo</label>
+                                                                        <label className="text-[9px] font-bold text-slate-500 uppercase block">Modelo / Descrição</label>
                                                                         <input
                                                                             type="text"
                                                                             value={editingDescription}
                                                                             onChange={e => setEditingDescription(e.target.value)}
                                                                             className="w-full p-1.5 text-xs border rounded-lg bg-slate-50 font-bold"
+                                                                            placeholder="Ex: H-10 LEVE"
                                                                         />
                                                                     </div>
                                                                     <div className="grid grid-cols-2 gap-1.5">
@@ -830,12 +865,13 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                                                                             </select>
                                                                         </div>
                                                                         <div>
-                                                                            <label className="text-[9px] font-bold text-slate-500 uppercase block">Cód</label>
+                                                                            <label className="text-[9px] font-bold text-slate-500 uppercase block">Cód. Produto</label>
                                                                             <input
                                                                                 type="text"
                                                                                 value={editingCode}
                                                                                 onChange={e => setEditingCode(e.target.value.toUpperCase())}
                                                                                 className="w-full p-1.5 text-xs border rounded-lg bg-slate-50 font-mono font-bold"
+                                                                                placeholder="Ex: H10L6"
                                                                             />
                                                                         </div>
                                                                     </div>

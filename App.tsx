@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import type { Page, User, Employee, StockItem, ConferenceData, ProductionOrderData, TransferRecord, Bitola, MaterialType, MachineType, PartsRequest, ShiftReport, ProductionRecord, TransferredLotInfo, ProcessedLot, DowntimeEvent, OperatorLog, TrelicaSelectedLots, WeighedPackage, FinishedProductItem, Ponta, PontaItem, FinishedGoodsTransferRecord, TransferredFinishedGoodInfo, KaizenProblem, Meeting, MeetingItem, MeetingCategory, StockMovement, DowntimeConfig, UserAccessLog, ProductionSchedule, PcpShiftConfig } from './types';
-import { FioMaquinaBitolaOptions, TrefilaBitolaOptions, DefaultElectrodeGauges } from './types';
+import { FioMaquinaBitolaOptions, TrefilaBitolaOptions, CA60BitolaOptions, DefaultElectrodeGauges, DefaultSabaoGauges, DefaultTrelicaGauges } from './types';
 import Login from './components/Login';
 import MainMenu from './components/MainMenu';
 import StockControl from './components/StockControl';
@@ -567,21 +567,33 @@ const App: React.FC = () => {
         try {
             const saved = await insertItem<StockGauge>('stock_gauges', data as StockGauge);
             setGauges(prev => [...prev, saved]);
-            showNotification('Bitola cadastrada com sucesso!', 'success');
+            showNotification('Produto cadastrado e salvo no banco de dados com sucesso!', 'success');
         } catch (error) {
             console.error(error);
-            showNotification('Erro ao cadastrar bitola. Verifique se a tabela stock_gauges existe.', 'error');
+            showNotification('Erro ao cadastrar produto. Verifique se a tabela stock_gauges existe.', 'error');
         }
     };
 
     const deleteGauge = async (id: string) => {
         try {
-            if (!id.startsWith('default_el_')) {
+            if (id.startsWith('default_')) {
+                try {
+                    const delStr = localStorage.getItem('deleted_default_gauges') || '[]';
+                    const delList = JSON.parse(delStr);
+                    if (!delList.includes(id)) {
+                        delList.push(id);
+                        localStorage.setItem('deleted_default_gauges', JSON.stringify(delList));
+                    }
+                } catch (e) {
+                    console.warn(e);
+                }
+            } else {
                 await deleteItem('stock_gauges', id);
             }
             setGauges(prev => prev.filter(g => g.id !== id));
             showNotification('Item removido com sucesso!', 'success');
         } catch (error) {
+            console.error(error);
             setGauges(prev => prev.filter(g => g.id !== id));
             showNotification('Item removido com sucesso!', 'success');
         }
@@ -589,33 +601,138 @@ const App: React.FC = () => {
 
     const updateGauge = async (id: string, data: Partial<StockGauge>) => {
         try {
-            if (!id.startsWith('default_el_')) {
-                await updateItem<StockGauge>('stock_gauges', id, data);
+            let savedOrUpdated: StockGauge | null = null;
+            const isSyntheticId = id.startsWith('default_');
+
+            if (isSyntheticId) {
+                // Find existing item from current gauges or default lists
+                const existing = gauges.find(g => g.id === id) ||
+                    DefaultTrelicaGauges.find(t => (t.id || `default_tr_${t.productCode}`) === id) ||
+                    DefaultElectrodeGauges.find(e => `default_el_${e.productCode}` === id) ||
+                    DefaultSabaoGauges.find(s => `default_sb_${s.productCode}` === id);
+
+                const itemToInsert: Omit<StockGauge, 'id'> = {
+                    materialType: data.materialType || existing?.materialType || 'Treliça',
+                    gauge: data.gauge || existing?.gauge || '',
+                    description: data.description !== undefined ? data.description : existing?.description,
+                    productCode: data.productCode !== undefined ? data.productCode : existing?.productCode,
+                    tamanho: data.tamanho || existing?.tamanho,
+                    superior: data.superior || existing?.superior,
+                    inferior: data.inferior || existing?.inferior,
+                    senozoide: data.senozoide || existing?.senozoide,
+                    peso_final: data.peso_final || existing?.peso_final,
+                    peso_superior: data.peso_superior || existing?.peso_superior,
+                    peso_inferior: data.peso_inferior || existing?.peso_inferior,
+                    peso_senozoide: data.peso_senozoide || existing?.peso_senozoide
+                };
+
+                savedOrUpdated = await insertItem<StockGauge>('stock_gauges', itemToInsert as StockGauge);
+                
+                // Track this synthetic ID as overridden so it doesn't duplicate
+                try {
+                    const replacedStr = localStorage.getItem('overridden_default_gauges') || '[]';
+                    const replacedList = JSON.parse(replacedStr);
+                    if (!replacedList.includes(id)) {
+                        replacedList.push(id);
+                        localStorage.setItem('overridden_default_gauges', JSON.stringify(replacedList));
+                    }
+                } catch (e) {
+                    console.warn(e);
+                }
+
+                // Replace the synthetic item in state with the real DB-saved item
+                setGauges(prev => {
+                    const filtered = prev.filter(g => g.id !== id);
+                    return [...filtered, savedOrUpdated!];
+                });
+            } else {
+                savedOrUpdated = await updateItem<StockGauge>('stock_gauges', id, data);
+                setGauges(prev => prev.map(g => g.id === id ? { ...g, ...savedOrUpdated } : g));
             }
-            setGauges(prev => prev.map(g => g.id === id ? { ...g, ...data } : g));
-            showNotification('Produto atualizado com sucesso!', 'success');
-        } catch (error) {
-            console.error(error);
-            setGauges(prev => prev.map(g => g.id === id ? { ...g, ...data } : g));
+
+            // If it's a Treliça, also sync to trelica_models table (if exists) and localStorage
+            if ((savedOrUpdated?.materialType || data.materialType) === 'Treliça') {
+                const trData = {
+                    cod: data.productCode || savedOrUpdated?.productCode || '',
+                    modelo: data.description || savedOrUpdated?.description || '',
+                    tamanho: data.tamanho || savedOrUpdated?.tamanho || (savedOrUpdated?.gauge || '').replace(/\D/g, '') || '12',
+                    superior: data.superior || savedOrUpdated?.superior || '',
+                    inferior: data.inferior || savedOrUpdated?.inferior || '',
+                    senozoide: data.senozoide || savedOrUpdated?.senozoide || '',
+                    peso_final: data.peso_final || savedOrUpdated?.peso_final || '',
+                    peso_superior: data.peso_superior || savedOrUpdated?.peso_superior || '',
+                    peso_inferior: data.peso_inferior || savedOrUpdated?.peso_inferior || '',
+                    peso_senozoide: data.peso_senozoide || savedOrUpdated?.peso_senozoide || ''
+                };
+                try {
+                    await supabase.from('trelica_models').upsert([trData], { onConflict: 'cod' });
+                } catch (e) {}
+                try {
+                    const cachedStr = localStorage.getItem('cached_trelica_models');
+                    let list = cachedStr ? JSON.parse(cachedStr) : [];
+                    const idx = list.findIndex((m: any) => (trData.cod && m.cod === trData.cod) || (m.modelo === trData.modelo && m.tamanho === trData.tamanho));
+                    if (idx >= 0) {
+                        list[idx] = { ...list[idx], ...trData, pesoFinal: trData.peso_final };
+                    } else {
+                        list.push({ id: String(Date.now()), ...trData, pesoFinal: trData.peso_final });
+                    }
+                    localStorage.setItem('cached_trelica_models', JSON.stringify(list));
+                } catch (e) {}
+            }
+
+            showNotification('Produto atualizado e salvo no banco de dados com sucesso!', 'success');
+        } catch (error: any) {
+            console.error('Erro ao atualizar produto:', error);
+            setGauges(prev => {
+                const exists = prev.some(g => g.id === id);
+                if (exists) {
+                    return prev.map(g => g.id === id ? { ...g, ...data } : g);
+                }
+                return [...prev, { id, ...data } as StockGauge];
+            });
             showNotification('Produto atualizado localmente!', 'info');
         }
     };
 
     const restoreDefaultGauges = async () => {
-        if (!confirm('Deseja restaurar as bitolas e modelos de eletrodos padrão do sistema?')) return;
+        if (!confirm('Deseja restaurar todas as bitolas, insumos, eletrodos e modelos de treliça padrão no banco de dados?')) return;
 
         try {
-            const defaults: Array<{ materialType: MaterialType; gauge: string; description: string; productCode?: string }> = [
-                ...FioMaquinaBitolaOptions.map(g => ({ materialType: 'Fio Máquina' as MaterialType, gauge: g, description: `Fio Máquina ${g}mm`, productCode: undefined })),
-                ...TrefilaBitolaOptions.map(g => ({ materialType: 'CA-60' as MaterialType, gauge: g, description: `CA-60 ${g}mm`, productCode: undefined })),
-                ...DefaultElectrodeGauges.map(e => ({ materialType: e.materialType, gauge: e.gauge, productCode: e.productCode, description: e.description }))
+            localStorage.removeItem('deleted_default_gauges');
+            localStorage.removeItem('overridden_default_gauges');
+
+            const defaults: Array<Omit<StockGauge, 'id'>> = [
+                ...FioMaquinaBitolaOptions.map(g => ({ materialType: 'Fio Máquina' as MaterialType, gauge: g, description: `Fio Máquina ${g.replace('.', ',')}mm` })),
+                ...CA60BitolaOptions.map(g => ({ materialType: 'CA-60' as MaterialType, gauge: g, description: `CA-60 ${g.replace('.', ',')}mm` })),
+                ...DefaultElectrodeGauges.map(e => ({ materialType: e.materialType, gauge: e.gauge, productCode: e.productCode, description: e.description })),
+                ...DefaultSabaoGauges.map(s => ({ materialType: s.materialType, gauge: s.gauge, productCode: s.productCode, description: s.description })),
+                ...DefaultTrelicaGauges.map(t => ({
+                    materialType: 'Treliça' as MaterialType,
+                    gauge: t.gauge,
+                    productCode: t.productCode,
+                    description: t.description,
+                    tamanho: t.tamanho,
+                    superior: t.superior,
+                    inferior: t.inferior,
+                    senozoide: t.senozoide,
+                    peso_final: t.peso_final,
+                    peso_superior: t.peso_superior,
+                    peso_inferior: t.peso_inferior,
+                    peso_senozoide: t.peso_senozoide
+                }))
             ];
 
             let addedCount = 0;
-            // Iterate sequentially to avoid race conditions or heavy load
             for (const item of defaults) {
-                // Check if exists in local state
-                if (gauges.some(g => g.materialType === item.materialType && (g.gauge === item.gauge || (g.productCode && item.productCode && g.productCode === item.productCode)))) continue;
+                // Check if exists in current gauges state
+                const alreadyExists = gauges.some(g =>
+                    g.materialType === item.materialType &&
+                    ((item.productCode && g.productCode === item.productCode) ||
+                     (item.materialType === 'Treliça' && g.description === item.description && (g.tamanho === item.tamanho || g.gauge === item.gauge)) ||
+                     (item.materialType !== 'Treliça' && g.gauge === item.gauge && (g.description === item.description || !item.productCode)))
+                );
+
+                if (alreadyExists) continue;
 
                 try {
                     const saved = await insertItem<StockGauge>('stock_gauges', item as StockGauge);
@@ -627,13 +744,13 @@ const App: React.FC = () => {
             }
 
             if (addedCount > 0) {
-                showNotification(`${addedCount} produtos/eletrodos padrão restaurados com sucesso!`, 'success');
+                showNotification(`${addedCount} novos produtos padrão salvos no banco de dados com sucesso!`, 'success');
             } else {
-                showNotification('Todos os produtos e eletrodos padrão já estavam cadastrados.', 'info');
+                showNotification('Todos os produtos padrão já estão cadastrados no banco de dados.', 'info');
             }
         } catch (error) {
             console.error(error);
-            showNotification('Erro ao restaurar padrões. Verifique se a tabela foi criada.', 'error');
+            showNotification('Erro ao restaurar padrões.', 'error');
         }
     };
 
