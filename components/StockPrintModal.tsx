@@ -640,86 +640,111 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                 )}
                             </div>
 
-                            {/* TABELA: LOTE | CORRIDA | PESO — table-layout:fixed + colgroup para garantir larguras na impressão */}
-                            <table
-                                className="print-table"
-                                style={{
-                                    width: '100%',
-                                    minWidth: 0,
-                                    maxWidth: '100%',
-                                    tableLayout: 'fixed',
-                                    borderCollapse: 'collapse',
-                                    fontSize: '10px',
-                                    margin: 0
-                                }}
-                            >
-                                <colgroup>
-                                    <col style={{ width: showCorrida ? '42%' : '50%' }} />
-                                    {showCorrida && <col style={{ width: '20%' }} />}
-                                    <col style={{ width: showCorrida ? '38%' : '50%' }} />
-                                </colgroup>
-                                <thead>
-                                    <tr style={{ backgroundColor: '#e2e8f0', borderBottom: '2px solid #64748b' }}>
-                                        <th style={{ width: showCorrida ? '42%' : '50%', padding: '3px 4px', textAlign: 'center', fontSize: '9px', fontWeight: 900, color: '#0f172a', borderRight: '1px solid #cbd5e1', overflow: 'hidden', boxSizing: 'border-box' }}>
-                                            LOTE
-                                        </th>
-                                        {showCorrida && (
-                                            <th style={{ width: '20%', padding: '3px 2px', textAlign: 'center', fontSize: '9px', fontWeight: 900, color: '#0f172a', borderRight: '1px solid #cbd5e1', overflow: 'hidden', boxSizing: 'border-box' }}>
-                                                CORR.
-                                            </th>
-                                        )}
-                                        <th style={{ width: showCorrida ? '38%' : '50%', padding: '3px 4px', textAlign: 'center', fontSize: '9px', fontWeight: 900, color: '#0f172a', overflow: 'hidden', boxSizing: 'border-box' }}>
-                                            PESO (KG)
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {col.lots.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={showCorrida ? 3 : 2} style={{ padding: '12px 4px', textAlign: 'center', color: '#64748b', fontStyle: 'italic', fontSize: '10px' }}>
-                                                Sem lotes em estoque
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        col.lots.map((lot, lIdx) => {
-                                            const itemWeight = getLotWeight(lot);
-                                            return (
-                                                <tr key={lot.id} style={{ backgroundColor: lIdx % 2 === 1 ? '#f8fafc' : '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
-                                                    <td style={{ width: showCorrida ? '42%' : '50%', padding: '2px 4px', textAlign: 'center', fontSize: '10px', fontWeight: 700, fontFamily: 'monospace', color: '#0f172a', borderRight: '1px solid #e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', boxSizing: 'border-box' }}>
-                                                        {lot.internalLot}
-                                                    </td>
-                                                    {showCorrida && (
-                                                        <td style={{ width: '20%', padding: '2px 2px', textAlign: 'center', fontSize: '9px', fontWeight: 700, color: '#78350f', borderRight: '1px solid #e2e8f0', overflow: 'hidden', whiteSpace: 'nowrap', boxSizing: 'border-box' }}>
-                                                            {lot.runNumber || '-'}
-                                                        </td>
-                                                    )}
-                                                    <td style={{ width: showCorrida ? '38%' : '50%', padding: '2px 4px', textAlign: 'center', fontSize: '10px', fontWeight: 900, fontFamily: 'monospace', color: '#0f172a', overflow: 'hidden', whiteSpace: 'nowrap', boxSizing: 'border-box' }}>
-                                                        {itemWeight.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} kg
+                            {/* TABELA: LOTE | CORRIDA | PESO (E QTD SE TRELIÇA) */}
+                            {(() => {
+                                const hasQtd = col.materialType === 'Treliça';
+                                return (
+                                    <table
+                                        className="print-table"
+                                        style={{
+                                            width: '100%',
+                                            minWidth: 0,
+                                            maxWidth: '100%',
+                                            tableLayout: 'fixed',
+                                            borderCollapse: 'collapse',
+                                            fontSize: '10px',
+                                            margin: 0
+                                        }}
+                                    >
+                                        <colgroup>
+                                            <col style={{ width: showCorrida ? (hasQtd ? '32%' : '42%') : (hasQtd ? '40%' : '50%') }} />
+                                            {showCorrida && <col style={{ width: hasQtd ? '18%' : '20%' }} />}
+                                            {hasQtd && <col style={{ width: showCorrida ? '25%' : '30%' }} />}
+                                            <col style={{ width: showCorrida ? (hasQtd ? '25%' : '38%') : (hasQtd ? '30%' : '50%') }} />
+                                        </colgroup>
+                                        <thead>
+                                            <tr style={{ backgroundColor: '#e2e8f0', borderBottom: '2px solid #64748b' }}>
+                                                <th style={{ width: showCorrida ? (hasQtd ? '32%' : '42%') : (hasQtd ? '40%' : '50%'), padding: '3px 4px', textAlign: 'center', fontSize: '9px', fontWeight: 900, color: '#0f172a', borderRight: '1px solid #cbd5e1', overflow: 'hidden', boxSizing: 'border-box' }}>
+                                                    LOTE
+                                                </th>
+                                                {showCorrida && (
+                                                    <th style={{ width: hasQtd ? '18%' : '20%', padding: '3px 2px', textAlign: 'center', fontSize: '9px', fontWeight: 900, color: '#0f172a', borderRight: '1px solid #cbd5e1', overflow: 'hidden', boxSizing: 'border-box' }}>
+                                                        CORR.
+                                                    </th>
+                                                )}
+                                                {hasQtd && (
+                                                    <th style={{ width: showCorrida ? '25%' : '30%', padding: '3px 2px', textAlign: 'center', fontSize: '9px', fontWeight: 900, color: '#0f172a', borderRight: '1px solid #cbd5e1', overflow: 'hidden', boxSizing: 'border-box' }}>
+                                                        QTD
+                                                    </th>
+                                                )}
+                                                <th style={{ width: showCorrida ? (hasQtd ? '25%' : '38%') : (hasQtd ? '30%' : '50%'), padding: '3px 4px', textAlign: 'center', fontSize: '9px', fontWeight: 900, color: '#0f172a', overflow: 'hidden', boxSizing: 'border-box' }}>
+                                                    PESO (KG)
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {col.lots.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={showCorrida ? (hasQtd ? 4 : 3) : (hasQtd ? 3 : 2)} style={{ padding: '12px 4px', textAlign: 'center', color: '#64748b', fontStyle: 'italic', fontSize: '10px' }}>
+                                                        Sem lotes em estoque
                                                     </td>
                                                 </tr>
-                                            );
-                                        })
-                                    )}
-                                </tbody>
-                                <tfoot>
-                                    <tr style={{ backgroundColor: '#e2e8f0', borderTop: '2px solid #334155' }}>
-                                        <td colSpan={showCorrida ? 2 : 1} style={{ width: showCorrida ? '62%' : '50%', padding: '3px 4px', textAlign: 'center', fontSize: '9px', fontWeight: 700, color: '#334155', borderRight: '1px solid #cbd5e1', boxSizing: 'border-box' }}>
-                                            {col.totalParts > 1 ? (
-                                                <span>{col.lots.length} lotes ({col.partIndex}/{col.totalParts})</span>
                                             ) : (
-                                                <span>{col.totalGaugeLots} {col.totalGaugeLots === 1 ? 'lote' : 'lotes'}</span>
+                                                col.lots.map((lot: any, lIdx: number) => {
+                                                    const itemWeight = getLotWeight(lot);
+                                                    
+                                                    // Calculo de barras se for treliça
+                                                    let barsDisplay = '-';
+                                                    if (hasQtd) {
+                                                        const unitW = parseFloat((col.peso_final || '').replace(',', '.') || '0');
+                                                        const bars = lot.quantity || lot.details?.quantity || (lot.history?.find((h: any) => h.details?.quantity)?.details?.quantity) || (unitW > 0 && itemWeight ? Math.round(itemWeight / unitW) : null);
+                                                        if (bars) barsDisplay = `${bars}`;
+                                                    }
+
+                                                    return (
+                                                        <tr key={lot.id} style={{ backgroundColor: lIdx % 2 === 1 ? '#f8fafc' : '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
+                                                            <td style={{ padding: '2px 4px', textAlign: 'center', fontSize: '10px', fontWeight: 700, fontFamily: 'monospace', color: '#0f172a', borderRight: '1px solid #e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', boxSizing: 'border-box' }}>
+                                                                {lot.internalLot}
+                                                            </td>
+                                                            {showCorrida && (
+                                                                <td style={{ padding: '2px 2px', textAlign: 'center', fontSize: '9px', fontWeight: 700, color: '#78350f', borderRight: '1px solid #e2e8f0', overflow: 'hidden', whiteSpace: 'nowrap', boxSizing: 'border-box' }}>
+                                                                    {lot.runNumber || '-'}
+                                                                </td>
+                                                            )}
+                                                            {hasQtd && (
+                                                                <td style={{ padding: '2px 2px', textAlign: 'center', fontSize: '10px', fontWeight: 900, color: '#0369a1', borderRight: '1px solid #e2e8f0', overflow: 'hidden', whiteSpace: 'nowrap', boxSizing: 'border-box' }}>
+                                                                    {barsDisplay}
+                                                                </td>
+                                                            )}
+                                                            <td style={{ padding: '2px 4px', textAlign: 'center', fontSize: '10px', fontWeight: 900, fontFamily: 'monospace', color: '#0f172a', overflow: 'hidden', whiteSpace: 'nowrap', boxSizing: 'border-box' }}>
+                                                                {itemWeight.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} kg
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })
                                             )}
-                                        </td>
-                                        <td style={{ width: showCorrida ? '38%' : '50%', padding: '3px 4px', textAlign: 'center', fontSize: '10px', fontWeight: 900, color: '#0f172a', whiteSpace: 'nowrap', boxSizing: 'border-box' }}>
-                                            {col.totalParts > 1 && !col.isLastPart ? (
-                                                <span>Sub: {col.partWeight.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg</span>
-                                            ) : (
-                                                <span>{col.totalGaugeWeight.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} kg</span>
-                                            )}
-                                        </td>
-                                    </tr>
-                                </tfoot>
-                            </table>
+                                        </tbody>
+                                        <tfoot>
+                                            <tr style={{ backgroundColor: '#e2e8f0', borderTop: '2px solid #334155' }}>
+                                                <td colSpan={showCorrida ? (hasQtd ? 3 : 2) : (hasQtd ? 2 : 1)} style={{ padding: '3px 4px', textAlign: 'center', fontSize: '9px', fontWeight: 700, color: '#334155', borderRight: '1px solid #cbd5e1', boxSizing: 'border-box' }}>
+                                                    {col.totalParts > 1 ? (
+                                                        <span>{col.lots.length} lotes ({col.partIndex}/{col.totalParts})</span>
+                                                    ) : (
+                                                        <span>{col.totalGaugeLots} {col.totalGaugeLots === 1 ? 'lote' : 'lotes'}</span>
+                                                    )}
+                                                </td>
+                                                <td style={{ padding: '3px 4px', textAlign: 'center', fontSize: '10px', fontWeight: 900, color: '#0f172a', whiteSpace: 'nowrap', boxSizing: 'border-box' }}>
+                                                    {col.totalParts > 1 && !col.isLastPart ? (
+                                                        <span>Sub: {col.partWeight.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg</span>
+                                                    ) : (
+                                                        <span>{col.totalGaugeWeight.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} kg</span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                );
+                            })()}
                         </div>
                     ))}
                 </div>
