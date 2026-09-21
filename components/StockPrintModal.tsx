@@ -459,17 +459,32 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
     const consolidatedTotals = useMemo(() => {
         let totalLots = 0;
         let totalWeight = 0;
+        let totalPieces = 0;
 
         selectedOptionKeys.forEach(optKey => {
             const opt = availableProductOptions.find(o => o.key === optKey);
             if (opt) {
                 totalLots += opt.count;
                 totalWeight += opt.weight;
+                
+                if (opt.materialType === 'Treliça') {
+                    const unitW = parseFloat((opt.peso_final || '').replace(',', '.') || '0');
+                    const activeLots = safeStock.filter(item => 
+                        item.status !== 'Consumido' && 
+                        item.materialType === 'Treliça' && 
+                        (item.productCode ? item.productCode === opt.productCode : (item.description === opt.description || item.bitola === opt.gauge))
+                    );
+                    activeLots.forEach(lot => {
+                        const itemWeight = getLotWeight(lot);
+                        const bars = lot.quantity || lot.details?.quantity || (lot.history?.find((h: any) => h.details?.quantity)?.details?.quantity) || (unitW > 0 && itemWeight ? Math.round(itemWeight / unitW) : 0);
+                        if (bars) totalPieces += Number(bars);
+                    });
+                }
             }
         });
 
-        return { totalLots, totalWeight };
-    }, [selectedOptionKeys, availableProductOptions]);
+        return { totalLots, totalWeight, totalPieces };
+    }, [selectedOptionKeys, availableProductOptions, safeStock]);
 
     useEffect(() => {
         if (isOpen) {
@@ -551,6 +566,12 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                             </div>
 
                             <div className="flex items-center gap-5">
+                                {selectedMaterial === 'Treliça' && (
+                                    <div className="text-right border-r border-slate-300 pr-5">
+                                        <span className="text-[9px] font-bold text-slate-500 uppercase block">Total Peças</span>
+                                        <span className="font-black text-[#0F3F5C] text-sm">{consolidatedTotals.totalPieces.toLocaleString('pt-BR')}</span>
+                                    </div>
+                                )}
                                 <div className="text-right">
                                     <span className="text-[9px] font-bold text-slate-500 uppercase block">Total Lotes</span>
                                     <span className="font-black text-slate-900 text-sm">{consolidatedTotals.totalLots}</span>
@@ -850,7 +871,13 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                         <span className="text-[9px] font-black text-blue-900 uppercase block">Total a Imprimir</span>
                                         <span className="text-xs font-black text-blue-900">{consolidatedTotals.totalLots} lotes • {printPages.length} {printPages.length === 1 ? 'Folha' : 'Folhas'}</span>
                                     </div>
-                                    <div className="text-right">
+                                    {selectedMaterial === 'Treliça' && (
+                                        <div className="text-center px-4 border-l border-r border-blue-200/60 mx-2">
+                                            <span className="text-[9px] font-black text-blue-900 uppercase block">Total Peças</span>
+                                            <span className="text-xs font-black text-[#0F3F5C]">{consolidatedTotals.totalPieces.toLocaleString('pt-BR')}</span>
+                                        </div>
+                                    )}
+                                    <div className="text-right flex-1">
                                         <span className="text-[9px] font-black text-emerald-800 uppercase block">Peso Consolidado</span>
                                         <span className="text-xs font-black text-emerald-700">
                                             {consolidatedTotals.totalWeight.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg
