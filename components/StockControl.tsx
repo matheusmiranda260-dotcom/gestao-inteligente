@@ -1690,6 +1690,7 @@ const StockControl: React.FC<{
     const [isPrinting, setIsPrinting] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState<number>(50);
+    const [isLotDisplayModalOpen, setIsLotDisplayModalOpen] = useState(false);
 
     // ==========================================
     // ESTADO E CONTROLE DE ESTOQUE DE ELETRODOS
@@ -1940,6 +1941,11 @@ const StockControl: React.FC<{
             productCode?: string;
             description?: string;
             label: string;
+            tamanho?: string;
+            superior?: string;
+            inferior?: string;
+            senozoide?: string;
+            peso_final?: string;
         }> = [];
 
         // 1. Custom registered gauges from Cadastro
@@ -1976,18 +1982,20 @@ const StockControl: React.FC<{
                     });
                 } else if (g.materialType === 'Treliça') {
                     const desc = g.description || `Treliça ${g.gauge}`;
-                    const code = g.productCode ? ` (Cód. ${g.productCode})` : '';
-                    const tech = (g.superior && g.inferior && g.senozoide)
-                        ? ` [Sup: ${g.superior} | Inf: ${g.inferior} | Sen: ${g.senozoide} mm]`
-                        : '';
-                    const peso = g.peso_final ? ` - ${g.peso_final} kg/un` : '';
+                    const code = g.productCode ? ` (${g.productCode})` : '';
+                    const tam = g.tamanho ? ` ${g.tamanho}m` : '';
                     options.push({
                         key,
                         gauge: g.gauge,
                         materialType: g.materialType,
                         productCode: g.productCode,
                         description: g.description,
-                        label: `${matPrefix}📐 ${desc} ${g.tamanho ? `${g.tamanho}m` : ''}${code}${tech}${peso}`
+                        tamanho: g.tamanho,
+                        superior: g.superior,
+                        inferior: g.inferior,
+                        senozoide: g.senozoide,
+                        peso_final: g.peso_final,
+                        label: `${matPrefix}📐 ${desc}${tam}${code}`
                     });
                 } else {
                     const descText = g.description ? ` - ${g.description}` : '';
@@ -2043,6 +2051,8 @@ const StockControl: React.FC<{
                     DefaultTrelicaGauges.forEach(tg => {
                         const key = `Treliça::${tg.gauge}::${tg.productCode}::${tg.description}`;
                         const matPrefix = !materialFilter ? `[Treliça] ` : '';
+                        const tam = tg.tamanho ? ` ${tg.tamanho}m` : '';
+                        const code = tg.productCode ? ` (${tg.productCode})` : '';
                         if (!options.some(o => o.key === key)) {
                             options.push({
                                 key,
@@ -2050,7 +2060,12 @@ const StockControl: React.FC<{
                                 materialType: 'Treliça',
                                 productCode: tg.productCode,
                                 description: tg.description,
-                                label: `${matPrefix}📐 ${tg.description} ${tg.tamanho}m (${tg.productCode}) [Sup: ${tg.superior} | Inf: ${tg.inferior} | Sen: ${tg.senozoide} mm] - ${tg.peso_final} kg/un`
+                                tamanho: tg.tamanho,
+                                superior: tg.superior,
+                                inferior: tg.inferior,
+                                senozoide: tg.senozoide,
+                                peso_final: tg.peso_final,
+                                label: `${matPrefix}📐 ${tg.description}${tam}${code}`
                             });
                         }
                     });
@@ -2124,6 +2139,10 @@ const StockControl: React.FC<{
                         materialType: i.materialType,
                         productCode: code,
                         description: desc,
+                        tamanho: (i as any).tamanho,
+                        superior: (i as any).superior,
+                        inferior: (i as any).inferior,
+                        senozoide: (i as any).senozoide,
                         label: `${matPrefix}📐 ${desc}${codeText}`
                     });
                 } else {
@@ -2180,6 +2199,23 @@ const StockControl: React.FC<{
         }
         return map;
     }, [gauges]);
+
+    const selectedGaugeOption = useMemo(() => {
+        if (!bitolaFilter) return null;
+        const opt = availableBitolaOptions.find(o => o.key === bitolaFilter);
+        if (!opt) return null;
+        const matchingG = (opt.productCode && gaugeLookupMap.get(`${opt.materialType}::${opt.gauge}::${opt.productCode}`)) ||
+                          (opt.description && gaugeLookupMap.get(`${opt.materialType}::${opt.gauge}::${opt.description}`)) ||
+                          gaugeLookupMap.get(`${opt.materialType}::${opt.gauge}`);
+        return {
+            ...opt,
+            tamanho: opt.tamanho || matchingG?.tamanho,
+            superior: opt.superior || matchingG?.superior,
+            inferior: opt.inferior || matchingG?.inferior,
+            senozoide: opt.senozoide || matchingG?.senozoide,
+            peso_final: opt.peso_final || matchingG?.peso_final
+        };
+    }, [bitolaFilter, availableBitolaOptions, gaugeLookupMap]);
 
     const confByLotMap = useMemo(() => {
         const map = new Map<string, { conferenceNumber: string; nfe: string; supplier: string; runNumber?: string }>();
@@ -2568,7 +2604,12 @@ const StockControl: React.FC<{
                             <label className="text-[10px] font-bold text-slate-500 uppercase">
                                 {materialFilter === 'Eletrodos Treliças' ? 'Modelo' : materialFilter === 'Sabão' ? 'Apresentação' : materialFilter === 'Treliça' ? 'Modelo' : 'Bitola'}
                             </label>
-                            <select value={bitolaFilter} onChange={e => setBitolaFilter(e.target.value)} className="bg-transparent outline-none font-bold text-sm min-w-[120px] max-w-[280px]">
+                            <select 
+                                value={bitolaFilter} 
+                                onChange={e => setBitolaFilter(e.target.value)} 
+                                className="bg-transparent outline-none font-bold text-sm min-w-[140px] max-w-[340px] md:max-w-[420px] cursor-pointer"
+                                title={selectedGaugeOption?.label || "Selecione o modelo ou bitola"}
+                            >
                                 <option value="">{materialFilter === 'Eletrodos Treliças' ? 'Todos os Modelos' : materialFilter === 'Sabão' ? 'Todas' : materialFilter === 'Treliça' ? 'Todos os Modelos' : 'Todas'}</option>
                                 {!materialFilter ? (
                                     <>
@@ -2695,7 +2736,7 @@ const StockControl: React.FC<{
                     <label className="text-[10px] font-bold text-slate-500">
                         {materialFilter === 'Eletrodos Treliças' ? 'Mod:' : materialFilter === 'Sabão' ? 'Emb:' : materialFilter === 'Treliça' ? 'Mod:' : 'Ø:'}
                     </label>
-                    <select value={bitolaFilter} onChange={e => setBitolaFilter(e.target.value)} className="bg-transparent outline-none font-bold text-xs max-w-[150px]">
+                    <select value={bitolaFilter} onChange={e => setBitolaFilter(e.target.value)} className="bg-transparent outline-none font-bold text-xs max-w-[200px]">
                         <option value="">{materialFilter === 'Eletrodos Treliças' ? 'Todos' : materialFilter === 'Treliça' ? 'Todos' : 'Todas'}</option>
                         {!materialFilter ? (
                             <>
@@ -2821,128 +2862,350 @@ const StockControl: React.FC<{
                         <option value="lote">📦 Lote Interno</option>
                     </select>
                 </div>
-            </div>
 
-            {/* Barra de Configuração de Exibição sobre o Lote */}
-            <div className="no-print bg-gradient-to-r from-slate-50 to-blue-50/40 border border-slate-200/90 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-sm">
-                <div className="flex items-center gap-2 flex-wrap">
-                    <div className="flex items-center gap-1.5 text-xs font-black text-slate-700 mr-1 uppercase tracking-wide">
-                        <AdjustmentsIcon className="h-4 w-4 text-[#0F3F5C]" />
-                        <span>Exibir sobre o Lote:</span>
-                    </div>
-
-                    {/* Botão Corrida */}
+                {/* Botão para abrir Sub-Janela de Configuração de Visualização do Lote */}
+                <div className="border-t md:border-t-0 md:border-l border-slate-200 pt-2.5 md:pt-0 md:pl-3 shrink-0 flex items-center">
                     <button
                         type="button"
-                        onClick={() => updateLotDisplayOptions({ showCorrida: !lotDisplayOptions.showCorrida })}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border shadow-sm ${
-                            lotDisplayOptions.showCorrida
-                                ? 'bg-[#0F3F5C] text-white border-[#0F3F5C] ring-2 ring-[#0F3F5C]/20'
-                                : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
-                        }`}
-                        title="Ativar/Desativar exibição da Corrida do lote"
+                        onClick={() => setIsLotDisplayModalOpen(true)}
+                        className="w-full md:w-auto flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg border border-slate-300 bg-slate-50 hover:bg-blue-50/60 hover:border-blue-300 text-slate-700 text-xs font-bold transition shadow-2xs group"
+                        title="Configurações de visualização dos lotes e formato da tabela"
                     >
-                        <input
-                            type="checkbox"
-                            checked={lotDisplayOptions.showCorrida}
-                            readOnly
-                            className="pointer-events-none h-3.5 w-3.5 rounded accent-[#0F3F5C]"
-                        />
-                        <span>🏷️ Corrida</span>
-                    </button>
-
-                    {/* Botão NF-e */}
-                    <button
-                        type="button"
-                        onClick={() => updateLotDisplayOptions({ showNfe: !lotDisplayOptions.showNfe })}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border shadow-sm ${
-                            lotDisplayOptions.showNfe
-                                ? 'bg-[#0F3F5C] text-white border-[#0F3F5C] ring-2 ring-[#0F3F5C]/20'
-                                : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
-                        }`}
-                        title="Ativar/Desativar exibição da Nota Fiscal (NF-e)"
-                    >
-                        <input
-                            type="checkbox"
-                            checked={lotDisplayOptions.showNfe}
-                            readOnly
-                            className="pointer-events-none h-3.5 w-3.5 rounded accent-[#0F3F5C]"
-                        />
-                        <span>📄 NF-e</span>
-                    </button>
-
-                    {/* Botão Nº Conferência */}
-                    <button
-                        type="button"
-                        onClick={() => updateLotDisplayOptions({ showConferencia: !lotDisplayOptions.showConferencia })}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border shadow-sm ${
-                            lotDisplayOptions.showConferencia
-                                ? 'bg-[#0F3F5C] text-white border-[#0F3F5C] ring-2 ring-[#0F3F5C]/20'
-                                : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
-                        }`}
-                        title="Ativar/Desativar exibição do Número de Conferência"
-                    >
-                        <input
-                            type="checkbox"
-                            checked={lotDisplayOptions.showConferencia}
-                            readOnly
-                            className="pointer-events-none h-3.5 w-3.5 rounded accent-[#0F3F5C]"
-                        />
-                        <span>📋 Nº Conferência</span>
-                    </button>
-
-                    {/* Botão Fornecedor */}
-                    <button
-                        type="button"
-                        onClick={() => updateLotDisplayOptions({ showFornecedor: !lotDisplayOptions.showFornecedor })}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border shadow-sm ${
-                            lotDisplayOptions.showFornecedor
-                                ? 'bg-[#0F3F5C] text-white border-[#0F3F5C] ring-2 ring-[#0F3F5C]/20'
-                                : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
-                        }`}
-                        title="Ativar/Desativar exibição do Fornecedor"
-                    >
-                        <input
-                            type="checkbox"
-                            checked={lotDisplayOptions.showFornecedor}
-                            readOnly
-                            className="pointer-events-none h-3.5 w-3.5 rounded accent-[#0F3F5C]"
-                        />
-                        <span>🏭 Fornecedor</span>
+                        <AdjustmentsIcon className="h-4 w-4 text-[#0F3F5C] group-hover:rotate-45 transition-transform" />
+                        <span className="whitespace-nowrap">Exibição do Lote</span>
+                        <span className="bg-[#0F3F5C] text-white text-[10px] font-black px-1.5 py-0.2 rounded-full">
+                            {Number(lotDisplayOptions.showCorrida) + Number(lotDisplayOptions.showNfe) + Number(lotDisplayOptions.showConferencia) + Number(lotDisplayOptions.showFornecedor)}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-semibold hidden xl:inline">
+                            ({lotDisplayOptions.displayMode === 'badge' ? 'Badges' : 'Colunas'})
+                        </span>
                     </button>
                 </div>
+            </div>
 
-                {/* Alternador de Layout (Badges no Lote vs Colunas Separadas) */}
-                <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Layout:</span>
-                    <div className="inline-flex bg-white rounded-lg p-0.5 border border-slate-300 shadow-sm">
-                        <button
-                            type="button"
-                            onClick={() => updateLotDisplayOptions({ displayMode: 'badge' })}
-                            className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all ${
-                                lotDisplayOptions.displayMode === 'badge'
-                                    ? 'bg-[#0F3F5C] text-white shadow-xs'
-                                    : 'text-slate-600 hover:text-slate-900'
-                            }`}
-                            title="Exibir os dados selecionados em badges compactos junto ao Lote Interno"
-                        >
-                            🏷️ No Lote
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => updateLotDisplayOptions({ displayMode: 'column' })}
-                            className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all ${
-                                lotDisplayOptions.displayMode === 'column'
-                                    ? 'bg-[#0F3F5C] text-white shadow-xs'
-                                    : 'text-slate-600 hover:text-slate-900'
-                            }`}
-                            title="Exibir os dados selecionados em colunas dedicadas na tabela"
-                        >
-                            📊 Em Colunas
-                        </button>
+            {/* Sub-Janela Modal: Configurações de Exibição dos Lotes */}
+            {isLotDisplayModalOpen && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-150">
+                        <div className="p-4 bg-gradient-to-r from-[#0F3F5C] to-slate-800 text-white flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                                <div className="p-2 bg-white/10 rounded-xl">
+                                    <AdjustmentsIcon className="h-5 w-5 text-blue-300" />
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-black">Visualização dos Lotes</h3>
+                                    <p className="text-[11px] text-blue-100">Personalize dados exibidos e formato da tabela</p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsLotDisplayModalOpen(false)}
+                                className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition"
+                            >
+                                <XIcon className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        <div className="p-5 space-y-5">
+                            {/* Seção 1: Dados sobre o lote */}
+                            <div>
+                                <label className="text-xs font-black uppercase text-slate-500 tracking-wider block mb-2.5">
+                                    Campos Exibidos nos Lotes
+                                </label>
+                                <div className="grid grid-cols-2 gap-2.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => updateLotDisplayOptions({ showCorrida: !lotDisplayOptions.showCorrida })}
+                                        className={`p-3 rounded-xl border text-left flex items-center justify-between transition-all ${
+                                            lotDisplayOptions.showCorrida
+                                                ? 'bg-amber-50/90 border-amber-300 text-amber-900 shadow-xs'
+                                                : 'bg-slate-50/70 border-slate-200 text-slate-500 hover:bg-slate-100'
+                                        }`}
+                                    >
+                                        <span className="text-xs font-bold flex items-center gap-1.5">
+                                            🏷️ Corrida
+                                        </span>
+                                        <input
+                                            type="checkbox"
+                                            checked={lotDisplayOptions.showCorrida}
+                                            readOnly
+                                            className="h-4 w-4 rounded accent-amber-600 pointer-events-none"
+                                        />
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => updateLotDisplayOptions({ showNfe: !lotDisplayOptions.showNfe })}
+                                        className={`p-3 rounded-xl border text-left flex items-center justify-between transition-all ${
+                                            lotDisplayOptions.showNfe
+                                                ? 'bg-blue-50/90 border-blue-300 text-blue-900 shadow-xs'
+                                                : 'bg-slate-50/70 border-slate-200 text-slate-500 hover:bg-slate-100'
+                                        }`}
+                                    >
+                                        <span className="text-xs font-bold flex items-center gap-1.5">
+                                            📄 NF-e
+                                        </span>
+                                        <input
+                                            type="checkbox"
+                                            checked={lotDisplayOptions.showNfe}
+                                            readOnly
+                                            className="h-4 w-4 rounded accent-blue-600 pointer-events-none"
+                                        />
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => updateLotDisplayOptions({ showConferencia: !lotDisplayOptions.showConferencia })}
+                                        className={`p-3 rounded-xl border text-left flex items-center justify-between transition-all ${
+                                            lotDisplayOptions.showConferencia
+                                                ? 'bg-purple-50/90 border-purple-300 text-purple-900 shadow-xs'
+                                                : 'bg-slate-50/70 border-slate-200 text-slate-500 hover:bg-slate-100'
+                                        }`}
+                                    >
+                                        <span className="text-xs font-bold flex items-center gap-1.5">
+                                            📋 Conferência
+                                        </span>
+                                        <input
+                                            type="checkbox"
+                                            checked={lotDisplayOptions.showConferencia}
+                                            readOnly
+                                            className="h-4 w-4 rounded accent-purple-600 pointer-events-none"
+                                        />
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => updateLotDisplayOptions({ showFornecedor: !lotDisplayOptions.showFornecedor })}
+                                        className={`p-3 rounded-xl border text-left flex items-center justify-between transition-all ${
+                                            lotDisplayOptions.showFornecedor
+                                                ? 'bg-emerald-50/90 border-emerald-300 text-emerald-900 shadow-xs'
+                                                : 'bg-slate-50/70 border-slate-200 text-slate-500 hover:bg-slate-100'
+                                        }`}
+                                    >
+                                        <span className="text-xs font-bold flex items-center gap-1.5">
+                                            🏭 Fornecedor
+                                        </span>
+                                        <input
+                                            type="checkbox"
+                                            checked={lotDisplayOptions.showFornecedor}
+                                            readOnly
+                                            className="h-4 w-4 rounded accent-emerald-600 pointer-events-none"
+                                        />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Seção 2: Modo de Layout da Tabela */}
+                            <div>
+                                <label className="text-xs font-black uppercase text-slate-500 tracking-wider block mb-2.5">
+                                    Formato de Exibição na Tabela
+                                </label>
+                                <div className="grid grid-cols-2 gap-2.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => updateLotDisplayOptions({ displayMode: 'badge' })}
+                                        className={`p-3 rounded-xl border text-left transition-all ${
+                                            lotDisplayOptions.displayMode === 'badge'
+                                                ? 'bg-[#0F3F5C] text-white border-[#0F3F5C] shadow-md'
+                                                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                                        }`}
+                                    >
+                                        <div className="font-extrabold text-xs flex items-center gap-1.5">
+                                            🏷️ Badges no Lote
+                                        </div>
+                                        <p className={`text-[11px] mt-1 ${lotDisplayOptions.displayMode === 'badge' ? 'text-blue-100' : 'text-slate-500'}`}>
+                                            Compacto: dados exibidos agrupados junto ao lote interno.
+                                        </p>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => updateLotDisplayOptions({ displayMode: 'column' })}
+                                        className={`p-3 rounded-xl border text-left transition-all ${
+                                            lotDisplayOptions.displayMode === 'column'
+                                                ? 'bg-[#0F3F5C] text-white border-[#0F3F5C] shadow-md'
+                                                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                                        }`}
+                                    >
+                                        <div className="font-extrabold text-xs flex items-center gap-1.5">
+                                            📊 Em Colunas
+                                        </div>
+                                        <p className={`text-[11px] mt-1 ${lotDisplayOptions.displayMode === 'column' ? 'text-blue-100' : 'text-slate-500'}`}>
+                                            Dedicado: cria colunas exclusivas para cada campo ativo.
+                                        </p>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Ações rápidas */}
+                            <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                                <button
+                                    type="button"
+                                    onClick={() => updateLotDisplayOptions(DEFAULT_LOT_DISPLAY_OPTIONS)}
+                                    className="text-xs font-bold text-slate-500 hover:text-slate-800 underline transition"
+                                >
+                                    Restaurar Padrão
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsLotDisplayModalOpen(false)}
+                                    className="px-5 py-2 bg-[#0F3F5C] hover:bg-[#0c3149] text-white font-black text-xs rounded-xl shadow transition"
+                                >
+                                    Concluído
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
+
+            {/* PAINEL DE DESTAQUE E VISUALIZAÇÃO AMPLIADA DO MODELO SELECIONADO */}
+            {selectedGaugeOption && (
+                <div className="no-print bg-gradient-to-r from-blue-900 via-[#0F3F5C] to-slate-900 text-white rounded-2xl p-4 md:p-5 shadow-xl border border-blue-800/50 relative overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 relative z-10">
+                        {/* Esquerda: Identificação do Modelo / Peça */}
+                        <div className="space-y-2">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <span className="bg-blue-500/20 text-blue-200 border border-blue-400/30 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full">
+                                    {selectedGaugeOption.materialType === 'Treliça' ? '📐 Modelo de Treliça' :
+                                     selectedGaugeOption.materialType === 'Eletrodos Treliças' ? '⚡ Eletrodo Treliça' :
+                                     selectedGaugeOption.materialType === 'Sabão' ? '🧼 Sabão de Trefila' :
+                                     `⚙️ ${selectedGaugeOption.materialType}`}
+                                </span>
+                                {selectedGaugeOption.tamanho && (
+                                    <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-[11px] font-black px-2 py-0.5 rounded-md">
+                                        📏 {selectedGaugeOption.tamanho} Metros
+                                    </span>
+                                )}
+                                {selectedGaugeOption.productCode && (
+                                    <span className="bg-amber-500/20 text-amber-200 border border-amber-400/30 text-[10px] font-mono font-black px-2 py-0.5 rounded-md uppercase">
+                                        Cód. {selectedGaugeOption.productCode}
+                                    </span>
+                                )}
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                <h2 className="text-xl md:text-2xl font-black text-white tracking-tight">
+                                    {selectedGaugeOption.description || selectedGaugeOption.gauge}
+                                </h2>
+                            </div>
+
+                            {/* Especificações Técnicas (Fios, Bitolas, Peso) */}
+                            {(selectedGaugeOption.superior || selectedGaugeOption.inferior || selectedGaugeOption.senozoide || selectedGaugeOption.peso_final) ? (
+                                <div className="flex flex-wrap items-center gap-2 pt-1">
+                                    {selectedGaugeOption.superior && (
+                                        <div className="bg-white/10 backdrop-blur-md px-3 py-1 rounded-lg border border-white/10 text-xs">
+                                            <span className="text-blue-300 text-[10px] font-bold uppercase block">Fio Superior</span>
+                                            <span className="font-black text-white text-sm">Ø {selectedGaugeOption.superior} mm</span>
+                                        </div>
+                                    )}
+                                    {selectedGaugeOption.inferior && (
+                                        <div className="bg-white/10 backdrop-blur-md px-3 py-1 rounded-lg border border-white/10 text-xs">
+                                            <span className="text-blue-300 text-[10px] font-bold uppercase block">Fio Inferior</span>
+                                            <span className="font-black text-white text-sm">Ø {selectedGaugeOption.inferior} mm</span>
+                                        </div>
+                                    )}
+                                    {selectedGaugeOption.senozoide && (
+                                        <div className="bg-white/10 backdrop-blur-md px-3 py-1 rounded-lg border border-white/10 text-xs">
+                                            <span className="text-blue-300 text-[10px] font-bold uppercase block">Senozoide</span>
+                                            <span className="font-black text-white text-sm">Ø {selectedGaugeOption.senozoide} mm</span>
+                                        </div>
+                                    )}
+                                    {selectedGaugeOption.peso_final && (
+                                        <div className="bg-white/10 backdrop-blur-md px-3 py-1 rounded-lg border border-white/10 text-xs">
+                                            <span className="text-emerald-300 text-[10px] font-bold uppercase block">Peso Estimado</span>
+                                            <span className="font-black text-emerald-200 text-sm">{selectedGaugeOption.peso_final} kg/un</span>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <p className="text-xs text-blue-200/80">
+                                    Visualizando lotes associados a este modelo em estoque.
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Direita: Métricas do Estoque deste Modelo e Botão para Limpar */}
+                        <div className="flex items-center gap-4 border-t lg:border-t-0 lg:border-l border-white/15 pt-3 lg:pt-0 lg:pl-6 shrink-0">
+                            <div className="flex items-center gap-5">
+                                <div className="text-left lg:text-right">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-blue-300 block">Lotes Encontrados</span>
+                                    <span className="text-2xl font-black text-white">{stats.count}</span>
+                                </div>
+                                <div className="text-left lg:text-right">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-blue-300 block">
+                                        {selectedGaugeOption.materialType === 'Eletrodos Treliças' ? 'Peças Disponíveis' :
+                                         selectedGaugeOption.materialType === 'Treliça' ? 'Barras / Volume' : 'Disponível'}
+                                    </span>
+                                    <span className="text-2xl font-black text-emerald-400">
+                                        {selectedGaugeOption.materialType === 'Eletrodos Treliças'
+                                            ? `${stats.weight.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} un`
+                                            : `${stats.weight.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} kg`}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => setBitolaFilter('')}
+                                className="px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl transition border border-white/20 flex items-center gap-1.5 text-xs font-bold shrink-0"
+                                title="Remover filtro deste modelo e ver todas as peças"
+                            >
+                                <XIcon className="h-4 w-4" />
+                                <span>Ver Todos</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* SELEÇÃO RÁPIDA DE MODELOS QUANDO TRELIÇA ESTÁ SELECIONADA E NENHUM MODELO ESPECÍFICO FOI FIXADO */}
+            {materialFilter === 'Treliça' && !bitolaFilter && (
+                <div className="no-print bg-white p-3.5 rounded-xl border border-blue-100 shadow-sm space-y-2">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-black uppercase tracking-wider text-[#0F3F5C] flex items-center gap-1.5">
+                            <span>📐</span> Seleção Rápida de Modelos de Treliça
+                        </span>
+                        <span className="text-[11px] text-slate-500 font-medium hidden sm:inline">
+                            Clique em um modelo para visualizar a ficha técnica e filtrar os lotes
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                        {availableBitolaOptions.filter(o => o.materialType === 'Treliça').map(opt => {
+                            const modelLotCount = stock.filter(item =>
+                                item.status !== 'Consumido' &&
+                                item.materialType === 'Treliça' &&
+                                (item.productCode ? item.productCode === opt.productCode : (item.description === opt.description || item.bitola === opt.gauge))
+                            ).length;
+                            return (
+                                <button
+                                    key={opt.key}
+                                    type="button"
+                                    onClick={() => setBitolaFilter(opt.key)}
+                                    className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 text-slate-800 text-xs font-bold whitespace-nowrap transition shadow-2xs group shrink-0"
+                                >
+                                    <span>📐</span>
+                                    <div className="text-left">
+                                        <div className="font-extrabold text-slate-900 group-hover:text-blue-900">
+                                            {opt.description || opt.gauge}
+                                        </div>
+                                        <div className="text-[10px] text-slate-500 font-medium">
+                                            {opt.tamanho ? `${opt.tamanho}m` : ''} {opt.productCode ? `• Cód. ${opt.productCode}` : ''}
+                                        </div>
+                                    </div>
+                                    <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+                                        modelLotCount > 0
+                                            ? 'bg-blue-100 text-blue-800'
+                                            : 'bg-slate-200 text-slate-500'
+                                    }`}>
+                                        {modelLotCount} {modelLotCount === 1 ? 'lote' : 'lotes'}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
             {renderPaginationBar('top')}
             <div className="bg-white rounded-xl shadow-lg border overflow-hidden">
@@ -2966,7 +3229,7 @@ const StockControl: React.FC<{
                                 )}
                                 <th className="p-3 text-center">Tipo Aço</th>
                                 <th className="p-3 text-center">Mat.</th>
-                                <th className="p-3 text-center">{materialFilter === 'Eletrodos Treliças' ? 'Modelo / Código' : materialFilter === 'Sabão' ? 'Embalagem / Produto' : materialFilter === 'Treliça' ? 'Modelo / Ficha Técnica' : 'Bitola'}</th>
+                                <th className="p-3 text-center min-w-[200px]">{materialFilter === 'Eletrodos Treliças' ? 'Modelo / Código' : materialFilter === 'Sabão' ? 'Embalagem / Produto' : materialFilter === 'Treliça' ? 'Modelo / Ficha Técnica' : 'Bitola'}</th>
                                 <th className="p-3 text-center">{materialFilter === 'Eletrodos Treliças' ? 'Qtd (un)' : materialFilter === 'Sabão' ? 'Peso (kg / saco)' : materialFilter === 'Treliça' ? 'Qtd / Peso (kg)' : 'Peso (kg)'}</th>
                                 <th className="p-3 text-center">Status</th>
                                 <th className="p-3 text-center no-print">Ações</th>
@@ -3092,35 +3355,42 @@ const StockControl: React.FC<{
                                                 </>
                                             ) : item.materialType === 'Treliça' ? (
                                                 <>
-                                                    <div className="flex items-center gap-1.5 justify-center">
-                                                        <span className="font-black text-blue-900 text-xs">
+                                                    <div className="flex items-center gap-1.5 justify-center flex-wrap">
+                                                        <span className="font-black text-slate-900 text-sm tracking-tight">
                                                             {item.description || matchingGauge?.description || `Treliça ${item.bitola}`}
                                                         </span>
-                                                        {matchingGauge?.tamanho && (
-                                                            <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">
-                                                                {matchingGauge.tamanho}m
+                                                        {(matchingGauge?.tamanho || (item as any).tamanho) && (
+                                                            <span className="text-xs font-black text-white bg-blue-600 px-2 py-0.5 rounded shadow-2xs">
+                                                                {matchingGauge?.tamanho || (item as any).tamanho}m
                                                             </span>
                                                         )}
                                                     </div>
                                                     {(() => {
                                                         const code = item.productCode || matchingGauge?.productCode;
-                                                        const sup = matchingGauge?.superior;
-                                                        const inf = matchingGauge?.inferior;
-                                                        const sen = matchingGauge?.senozoide;
+                                                        const sup = matchingGauge?.superior || (item as any).superior;
+                                                        const inf = matchingGauge?.inferior || (item as any).inferior;
+                                                        const sen = matchingGauge?.senozoide || (item as any).senozoide;
+                                                        const peso = matchingGauge?.peso_final;
                                                         return (
-                                                            <div className="flex flex-col items-center mt-0.5 space-y-0.5">
+                                                            <div className="flex flex-col items-center mt-1 space-y-1">
                                                                 {code && (
-                                                                    <span className="text-[9px] font-mono font-black text-blue-800 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200 uppercase">
+                                                                    <span className="text-[10px] font-mono font-black text-blue-900 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 uppercase">
                                                                         Cód. {code}
                                                                     </span>
                                                                 )}
-                                                                {(sup && inf && sen) && (
-                                                                    <div className="flex items-center gap-1 text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded mt-0.5">
-                                                                        <span>Sup: <strong className="text-slate-800">{sup}</strong></span>
-                                                                        <span>•</span>
-                                                                        <span>Inf: <strong className="text-slate-800">{inf}</strong></span>
-                                                                        <span>•</span>
-                                                                        <span>Sen: <strong className="text-slate-800">{sen}</strong></span>
+                                                                {(sup || inf || sen) && (
+                                                                    <div className="flex items-center gap-2 text-xs font-bold text-slate-700 bg-blue-50/70 border border-blue-200/80 px-2.5 py-1 rounded-lg shadow-2xs">
+                                                                        {sup && <span title="Fio Superior">Sup: <strong className="text-blue-900 font-extrabold">{sup}</strong> mm</span>}
+                                                                        {sup && (inf || sen) && <span className="text-slate-300">•</span>}
+                                                                        {inf && <span title="Fio Inferior">Inf: <strong className="text-blue-900 font-extrabold">{inf}</strong> mm</span>}
+                                                                        {inf && sen && <span className="text-slate-300">•</span>}
+                                                                        {sen && <span title="Senozoide">Sen: <strong className="text-blue-900 font-extrabold">{sen}</strong> mm</span>}
+                                                                        {peso && (
+                                                                            <>
+                                                                                <span className="text-slate-300">•</span>
+                                                                                <span className="text-slate-500 font-semibold" title="Peso Estimado">{peso} kg/m</span>
+                                                                            </>
+                                                                        )}
                                                                     </div>
                                                                 )}
                                                             </div>
