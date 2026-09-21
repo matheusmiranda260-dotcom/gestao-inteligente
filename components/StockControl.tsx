@@ -601,6 +601,7 @@ const AddConferencePage: React.FC<{
             materialType: mat, 
             productCode: first?.code || (isInitialSabao ? '00010' : isInitialTrelica ? 'H8L12' : ''),
             description: first?.description || (isInitialSabao ? 'Condat' : isInitialTrelica ? 'H-8 LEVE' : ''),
+            quantity: isInitialTrelica ? 100 : undefined,
             labelWeight: defaultWeight
         }];
     });
@@ -774,6 +775,7 @@ const AddConferencePage: React.FC<{
             materialType: 'Treliça',
             productCode: selectedOpt.code || 'H8L12',
             description: selectedOpt.description || 'H-8 LEVE',
+            quantity: barsQty,
             labelWeight: totalKg
         };
 
@@ -820,7 +822,7 @@ const AddConferencePage: React.FC<{
             const fallback = defaultOpts[0];
             const matchingGauge = gauges.find(g => g.materialType === 'Treliça' && (g.productCode === lastLot.productCode || g.description === lastLot.description));
             const unitW = parseFloat(matchingGauge?.peso_final || fallback?.peso_final || '6.01');
-            const defaultBars = 100;
+            const defaultBars = lastLot.quantity || 100;
             setLots(prev => [
                 ...prev,
                 {
@@ -831,6 +833,7 @@ const AddConferencePage: React.FC<{
                     materialType: 'Treliça',
                     productCode: lastLot.productCode || fallback?.code || 'H8L12',
                     description: lastLot.description || fallback?.description || 'H-8 LEVE',
+                    quantity: defaultBars,
                     labelWeight: Math.round(unitW * defaultBars)
                 }
             ]);
@@ -906,8 +909,9 @@ const AddConferencePage: React.FC<{
                 }
                 newLots[index].runNumber = newLots[index].runNumber || '-';
                 newLots[index].steelType = '';
+                newLots[index].quantity = newLots[index].quantity || 100;
                 const unitW = parseFloat(opts[0]?.peso_final || '6.01');
-                newLots[index].labelWeight = Math.round(unitW * 100);
+                newLots[index].labelWeight = Math.round(unitW * (newLots[index].quantity || 100));
                 const cNum = conferenceData.conferenceNumber.trim();
                 if (!cNum || !cNum.toUpperCase().includes('TR')) {
                     const nextConf = getNextTrelicaConferenceNumber(conferences, stock);
@@ -933,10 +937,10 @@ const AddConferencePage: React.FC<{
             const oldUnitW = parseFloat(currentLot?.materialType === 'Treliça' ? (opts.find(o => o.code === currentLot.productCode)?.peso_final || '6.01') : '1');
             const newUnitW = parseFloat(selected.peso_final || '6.01');
 
+            const currentQty = newLots[index].quantity || (oldUnitW > 0 && currentLot?.labelWeight ? Math.max(1, Math.round(currentLot.labelWeight / oldUnitW)) : 100);
             let newLabelWeight = newLots[index].labelWeight;
-            if (currentLot?.materialType === 'Treliça' && oldUnitW > 0 && currentLot.labelWeight) {
-                const barsCount = Math.max(1, Math.round(currentLot.labelWeight / oldUnitW));
-                newLabelWeight = Math.round(barsCount * newUnitW);
+            if (currentLot?.materialType === 'Treliça' && newUnitW > 0) {
+                newLabelWeight = Math.round(currentQty * newUnitW);
             }
 
             newLots[index] = {
@@ -944,6 +948,7 @@ const AddConferencePage: React.FC<{
                 bitola: selected.gauge,
                 productCode: selected.code || '',
                 description: selected.description || '',
+                quantity: currentLot?.materialType === 'Treliça' ? currentQty : newLots[index].quantity,
                 labelWeight: newLabelWeight
             };
             setLots(newLots);
@@ -1010,11 +1015,13 @@ const AddConferencePage: React.FC<{
             if (l.materialType === 'Treliça') {
                 const lotVal = l.internalLot?.trim() || '';
                 const autoLot = lotVal || getNextTrelicaInternalLot(stock, lots.slice(0, i), conferences);
+                const qty = l.quantity && l.quantity > 0 ? Number(l.quantity) : 100;
                 return {
                     ...l,
                     steelType: '',
                     internalLot: autoLot,
                     runNumber: l.runNumber?.trim() || '-',
+                    quantity: qty,
                     labelWeight: l.labelWeight && l.labelWeight > 0 ? l.labelWeight : 600
                 };
             }
@@ -1445,8 +1452,13 @@ const AddConferencePage: React.FC<{
                                     <th className="p-3 text-center font-bold text-slate-600 uppercase text-[10px]">
                                         {isAnyElectrode ? 'Modelo / Código' : isAnySabao ? 'Embalagem / Produto' : isAnyTrelica ? 'Modelo / Ficha Técnica' : 'Bitola'}
                                     </th>
+                                    {isAnyTrelica && (
+                                        <th className="p-3 text-center font-bold text-blue-900 uppercase text-[10px] w-36 bg-blue-50/60">
+                                            Quantidade (Barras)
+                                        </th>
+                                    )}
                                     <th className="p-3 text-center font-bold text-slate-600 uppercase text-[10px]">
-                                        {isAnyElectrode ? 'Qtd (un)' : isAnySabao ? 'Peso (kg) / Saco' : isAnyTrelica ? 'Peso Total (kg) [Barras]' : 'Peso Etiqueta'}
+                                        {isAnyElectrode ? 'Qtd (un)' : isAnySabao ? 'Peso (kg) / Saco' : isAnyTrelica ? 'Peso do Pct (kg)' : 'Peso Etiqueta'}
                                     </th>
                                     <th className="p-3 text-center font-bold text-slate-600 uppercase text-[10px]"></th>
                                 </tr>
@@ -1575,32 +1587,78 @@ const AddConferencePage: React.FC<{
                                                 );
                                             })()}
                                         </td>
+                                        {isAnyTrelica && (
+                                            <td className="p-2 w-36">
+                                                {lot.materialType === 'Treliça' ? (
+                                                    <div>
+                                                        <div className="relative">
+                                                            <input
+                                                                type="number"
+                                                                min="1"
+                                                                value={lot.quantity ?? 100}
+                                                                onChange={e => {
+                                                                    const newQty = parseInt(e.target.value, 10) || 0;
+                                                                    const opts = getGaugeOptionsForMaterial('Treliça', gauges);
+                                                                    const curOpt = opts.find(o => o.code === lot.productCode || o.gauge === lot.bitola) || opts[0];
+                                                                    const unitW = parseFloat(curOpt?.peso_final || '6.01');
+                                                                    const newLots = [...lots];
+                                                                    newLots[index] = {
+                                                                        ...newLots[index],
+                                                                        quantity: newQty,
+                                                                        labelWeight: newQty > 0 && unitW > 0 ? Math.round(newQty * unitW) : newLots[index].labelWeight
+                                                                    };
+                                                                    setLots(newLots);
+                                                                }}
+                                                                className="w-full p-2 border-2 border-blue-300 bg-blue-50/50 rounded-lg font-black text-center text-blue-900 focus:bg-white focus:ring-2 focus:ring-blue-500 transition shadow-inner"
+                                                                placeholder="100"
+                                                                required
+                                                            />
+                                                            <span className="absolute right-2 top-2.5 text-[10px] font-bold text-blue-600 pointer-events-none">
+                                                                un
+                                                            </span>
+                                                        </div>
+                                                        <span className="text-[10px] text-blue-700 font-bold block text-center mt-0.5">
+                                                            barras / pct
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-xs text-slate-400 font-bold block text-center">-</span>
+                                                )}
+                                            </td>
+                                        )}
                                         <td className="p-2">
-                                            <input
-                                                type="text"
-                                                inputMode="numeric"
-                                                value={lot.labelWeight || ''}
-                                                onChange={e => {
-                                                    const val = e.target.value.replace(/\D/g, '');
-                                                    handleLotChange(index, 'labelWeight', val ? parseInt(val) : 0);
-                                                }}
-                                                className="w-full p-2 border rounded font-bold text-center no-spinner"
-                                                placeholder={lot.materialType === 'Eletrodos Treliças' ? '1' : lot.materialType === 'Sabão' ? '25' : lot.materialType === 'Treliça' ? '600' : '0'}
-                                                required
-                                            />
+                                            <div className="relative">
+                                                <input
+                                                    type="text"
+                                                    inputMode="numeric"
+                                                    value={lot.labelWeight || ''}
+                                                    onChange={e => {
+                                                        const val = e.target.value.replace(/\D/g, '');
+                                                        handleLotChange(index, 'labelWeight', val ? parseInt(val) : 0);
+                                                    }}
+                                                    className={`w-full p-2 border rounded font-bold text-center no-spinner ${
+                                                        lot.materialType === 'Treliça' ? 'border-blue-200 bg-blue-50/20' : ''
+                                                    }`}
+                                                    placeholder={lot.materialType === 'Eletrodos Treliças' ? '1' : lot.materialType === 'Sabão' ? '25' : lot.materialType === 'Treliça' ? '600' : '0'}
+                                                    required
+                                                />
+                                                {lot.materialType === 'Treliça' && (
+                                                    <span className="absolute right-2 top-2.5 text-[10px] font-bold text-slate-500 pointer-events-none">
+                                                        kg
+                                                    </span>
+                                                )}
+                                            </div>
                                             {lot.materialType === 'Treliça' && (() => {
                                                 const opts = getGaugeOptionsForMaterial('Treliça', gauges);
                                                 const curOpt = opts.find(o => o.code === lot.productCode || o.gauge === lot.bitola) || opts[0];
                                                 const unitW = parseFloat(curOpt?.peso_final || '6.01');
-                                                if (unitW > 0 && lot.labelWeight) {
-                                                    const bars = Math.round(lot.labelWeight / unitW);
-                                                    return (
-                                                        <span className="text-[10px] text-blue-700 font-bold block text-center mt-0.5">
-                                                            ~{bars} barras ({unitW} kg/un)
-                                                        </span>
-                                                    );
-                                                }
-                                                return null;
+                                                const bars = lot.quantity || (unitW > 0 && lot.labelWeight ? Math.round(lot.labelWeight / unitW) : 100);
+                                                const avgUnitW = bars > 0 && lot.labelWeight ? (lot.labelWeight / bars).toFixed(2) : unitW.toFixed(2);
+                                                return (
+                                                    <span className="text-[10px] text-slate-600 font-semibold block text-center mt-0.5">
+                                                        {bars} barras • ~{avgUnitW} kg/barra {unitW > 0 && unitW.toFixed(2) !== avgUnitW ? `(padrão: ${unitW} kg)` : ''}
+                                                    </span>
+                                                );
                                             })()}
                                         </td>
                                         <td className="p-2"><button type="button" onClick={() => setLots(lots.filter((_, i) => i !== index))} className="p-2 text-red-500"><TrashIcon className="h-5 w-5" /></button></td>
@@ -2189,16 +2247,45 @@ const StockControl: React.FC<{
 
     const gaugeLookupMap = useMemo(() => {
         const map = new Map<string, StockGauge>();
+
+        // Index default treliças
+        DefaultTrelicaGauges.forEach(tg => {
+            const fakeG: StockGauge = {
+                id: tg.id || `default_tr_${tg.productCode}`,
+                materialType: 'Treliça',
+                gauge: tg.gauge,
+                productCode: tg.productCode,
+                description: tg.description,
+                tamanho: tg.tamanho,
+                superior: tg.superior,
+                inferior: tg.inferior,
+                senozoide: tg.senozoide,
+                peso_final: tg.peso_final
+            };
+            if (tg.productCode) {
+                map.set(`Treliça::${tg.gauge}::${tg.productCode}`, fakeG);
+                map.set(`Treliça::${tg.productCode}`, fakeG);
+            }
+            if (tg.description) {
+                map.set(`Treliça::${tg.gauge}::${tg.description}`, fakeG);
+                map.set(`Treliça::${tg.description}`, fakeG);
+            }
+            if (!map.has(`Treliça::${tg.gauge}`)) {
+                map.set(`Treliça::${tg.gauge}`, fakeG);
+            }
+        });
+
+        // Index DB gauges
         for (const g of gauges) {
             if (g.productCode) {
                 map.set(`${g.materialType}::${g.gauge}::${g.productCode}`, g);
+                map.set(`${g.materialType}::${g.productCode}`, g);
             }
             if (g.description) {
                 map.set(`${g.materialType}::${g.gauge}::${g.description}`, g);
+                map.set(`${g.materialType}::${g.description}`, g);
             }
-            if (!map.has(`${g.materialType}::${g.gauge}`)) {
-                map.set(`${g.materialType}::${g.gauge}`, g);
-            }
+            map.set(`${g.materialType}::${g.gauge}`, g);
         }
         return map;
     }, [gauges]);
@@ -2207,8 +2294,8 @@ const StockControl: React.FC<{
         if (!bitolaFilter) return null;
         const opt = availableBitolaOptions.find(o => o.key === bitolaFilter);
         if (!opt) return null;
-        const matchingG = (opt.productCode && gaugeLookupMap.get(`${opt.materialType}::${opt.gauge}::${opt.productCode}`)) ||
-                          (opt.description && gaugeLookupMap.get(`${opt.materialType}::${opt.gauge}::${opt.description}`)) ||
+        const matchingG = (opt.productCode && (gaugeLookupMap.get(`${opt.materialType}::${opt.gauge}::${opt.productCode}`) || gaugeLookupMap.get(`${opt.materialType}::${opt.productCode}`))) ||
+                          (opt.description && (gaugeLookupMap.get(`${opt.materialType}::${opt.gauge}::${opt.description}`) || gaugeLookupMap.get(`${opt.materialType}::${opt.description}`))) ||
                           gaugeLookupMap.get(`${opt.materialType}::${opt.gauge}`);
         return {
             ...opt,
@@ -2221,7 +2308,7 @@ const StockControl: React.FC<{
     }, [bitolaFilter, availableBitolaOptions, gaugeLookupMap]);
 
     const confByLotMap = useMemo(() => {
-        const map = new Map<string, { conferenceNumber: string; nfe: string; supplier: string; runNumber?: string }>();
+        const map = new Map<string, { conferenceNumber: string; nfe: string; supplier: string; runNumber?: string; quantity?: number }>();
         if (!conferences || !Array.isArray(conferences)) return map;
         for (const conf of conferences) {
             if (conf.lots && Array.isArray(conf.lots)) {
@@ -2231,7 +2318,8 @@ const StockControl: React.FC<{
                             conferenceNumber: conf.conferenceNumber || '',
                             nfe: conf.nfe || '',
                             supplier: lot.supplier || conf.supplier || '',
-                            runNumber: lot.runNumber || ''
+                            runNumber: lot.runNumber || '',
+                            quantity: lot.quantity
                         });
                     }
                 }
@@ -2246,7 +2334,8 @@ const StockControl: React.FC<{
         const nfe = (item.nfe || confInfo?.nfe || '').trim();
         const confNum = (item.conferenceNumber || confInfo?.conferenceNumber || '').trim();
         const supplier = (item.supplier || confInfo?.supplier || '').trim();
-        return { runNumber, nfe, confNum, supplier };
+        const quantity = item.quantity || confInfo?.quantity;
+        return { runNumber, nfe, confNum, supplier, quantity };
     };
 
     useEffect(() => {
@@ -3476,21 +3565,33 @@ const StockControl: React.FC<{
                                         ) : item.materialType === 'Sabão' ? (
                                             <span>{item.remainingQuantity.toFixed(2)} <span className="text-[10px] text-teal-700 font-bold">kg</span></span>
                                         ) : item.materialType === 'Treliça' ? (
-                                            <div>
-                                                <span className="font-black text-slate-900">{item.remainingQuantity.toFixed(0)} <span className="text-[10px] text-blue-700 font-bold">kg</span></span>
-                                                {(() => {
-                                                    const unitW = parseFloat(matchingGauge?.peso_final || '0');
-                                                    if (unitW > 0) {
-                                                        const estimatedBars = Math.round(item.remainingQuantity / unitW);
-                                                        return (
-                                                            <span className="text-[10px] text-slate-500 font-bold block" title={`Base de cálculo: ${unitW} kg por barra`}>
-                                                                ({estimatedBars} barras)
-                                                            </span>
-                                                        );
-                                                    }
-                                                    return null;
-                                                })()}
-                                            </div>
+                                             <div className="flex flex-col items-center justify-center">
+                                                 {(() => {
+                                                     const unitW = parseFloat((matchingGauge?.peso_final || '').replace(',', '.') || '0');
+                                                     const bars = item.quantity || details.quantity || (item.history?.find((h: any) => h.details?.quantity)?.details?.quantity) || (unitW > 0 && item.remainingQuantity ? Math.round(item.remainingQuantity / unitW) : null);
+                                                     const avgKgPerBar = bars && bars > 0 && item.remainingQuantity ? (item.remainingQuantity / bars).toFixed(2) : (unitW > 0 ? unitW.toFixed(2) : null);
+
+                                                     return (
+                                                         <>
+                                                             <div className="flex items-center gap-1.5 justify-center flex-wrap">
+                                                                 {bars ? (
+                                                                     <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-black bg-blue-100 text-blue-900 border border-blue-300 shadow-2xs" title="Quantidade de barras no pacote">
+                                                                         {bars} <span className="text-[10px] font-semibold text-blue-700 ml-1">barras</span>
+                                                                     </span>
+                                                                 ) : null}
+                                                                 <span className="font-black text-slate-900 text-sm whitespace-nowrap">
+                                                                     {item.remainingQuantity.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} <span className="text-[10px] text-blue-700 font-bold">kg</span>
+                                                                 </span>
+                                                             </div>
+                                                             {avgKgPerBar && (
+                                                                 <span className="text-[10px] text-slate-500 font-semibold block mt-0.5 whitespace-nowrap" title={unitW > 0 ? `Referência técnica: ${unitW} kg/barra` : undefined}>
+                                                                     ~{avgKgPerBar} kg/barra
+                                                                 </span>
+                                                             )}
+                                                         </>
+                                                     );
+                                                 })()}
+                                             </div>
                                         ) : (
                                             item.remainingQuantity.toFixed(2)
                                         )}
@@ -4113,9 +4214,41 @@ const EditStockItemModal: React.FC<{ item: StockItem; onClose: () => void; onSav
                         </div>
                     </div>
 
+                    {formData.materialType === 'Treliça' && (
+                        <div className="bg-blue-50/70 p-3 rounded-xl border border-blue-200">
+                            <label className="text-xs font-bold text-blue-900 uppercase block mb-1">Quantidade de Barras (no pacote)</label>
+                            <div className="relative">
+                                <input
+                                    type="number"
+                                    min="1"
+                                    value={formData.quantity || ''}
+                                    placeholder="Ex: 100"
+                                    onChange={e => {
+                                        const q = parseInt(e.target.value) || 0;
+                                        setFormData(p => {
+                                            const opts = getGaugeOptionsForMaterial('Treliça', gauges);
+                                            const curOpt = opts.find(o => o.code === p.productCode || o.gauge === p.bitola) || opts[0];
+                                            const unitW = parseFloat((curOpt?.peso_final || '').replace(',', '.') || '0');
+                                            return {
+                                                ...p,
+                                                quantity: q,
+                                                remainingQuantity: q > 0 && unitW > 0 ? Math.round(q * unitW) : p.remainingQuantity
+                                            };
+                                        });
+                                    }}
+                                    className="w-full px-3 py-2 bg-white border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold text-blue-900"
+                                />
+                                <span className="absolute right-3 top-2 text-xs font-bold text-blue-600">barras</span>
+                            </div>
+                            <span className="text-[10px] text-blue-700 block mt-1">
+                                Ao alterar a quantidade de barras, o peso do pacote é recalculado automaticamente.
+                            </span>
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-slate-500 uppercase">Peso Atual (kg)</label>
+                            <label className="text-xs font-bold text-slate-500 uppercase">{formData.materialType === 'Treliça' ? 'Peso do Pacote (kg)' : 'Peso Atual (kg)'}</label>
                             <input
                                 type="text"
                                 inputMode="numeric"

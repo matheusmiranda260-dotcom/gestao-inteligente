@@ -785,6 +785,7 @@ const App: React.FC = () => {
                 labelWeight: lot.labelWeight,
                 initialQuantity: lot.labelWeight,
                 remainingQuantity: lot.labelWeight,
+                quantity: lot.quantity,
                 status: 'Disponível',
                 history: [{
                     type: 'Entrada',
@@ -792,6 +793,7 @@ const App: React.FC = () => {
                     details: {
                         action: 'Conferência de Recebimento',
                         weight: lot.labelWeight,
+                        quantity: lot.quantity,
                     }
                 }]
             }));
@@ -859,6 +861,7 @@ const App: React.FC = () => {
                     labelWeight: lot.labelWeight,
                     initialQuantity: lot.labelWeight,
                     remainingQuantity: existingItem?.remainingQuantity ?? lot.labelWeight,
+                    quantity: lot.quantity ?? existingItem?.quantity,
                     status: existingItem?.status ?? 'Disponível',
                     history: [...(existingItem?.history || []), {
                         type: 'Entrada (Editada)',
@@ -866,6 +869,7 @@ const App: React.FC = () => {
                         details: {
                             action: 'Conferência Editada',
                             weight: lot.labelWeight,
+                            quantity: lot.quantity ?? existingItem?.quantity,
                         }
                     }],
                     productionOrderIds: existingItem?.productionOrderIds,

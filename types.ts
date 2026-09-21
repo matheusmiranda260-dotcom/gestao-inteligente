@@ -139,6 +139,7 @@ export interface ConferenceLotData {
     materialType: string | MaterialType;
     bitola: Bitola;
     labelWeight: number;
+    quantity?: number;
     supplier?: string;
     productCode?: string;
     description?: string;
