@@ -460,7 +460,19 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
         return { totalLots, totalWeight };
     }, [selectedOptionKeys, availableProductOptions]);
 
+    useEffect(() => {
+        if (isOpen) {
+            document.body.classList.add('stock-print-active');
+        } else {
+            document.body.classList.remove('stock-print-active');
+        }
+        return () => {
+            document.body.classList.remove('stock-print-active');
+        };
+    }, [isOpen]);
+
     const handleExecutePrint = () => {
+        document.body.classList.add('stock-print-active');
         window.print();
     };
 
@@ -482,7 +494,11 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                     boxSizing: 'border-box',
                     padding: isPreview ? '20px' : '0px',
                     margin: '0',
-                    backgroundColor: '#ffffff'
+                    backgroundColor: '#ffffff',
+                    pageBreakAfter: isLastPage ? 'avoid' : 'always',
+                    breakAfter: isLastPage ? 'avoid' : 'page',
+                    pageBreakInside: 'avoid',
+                    breakInside: 'avoid'
                 }}
             >
                 {/* CABEÇALHO DO DOCUMENTO */}
@@ -946,12 +962,40 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                 size: A4 portrait !important;
                                 margin: 6mm 6mm 6mm 6mm !important;
                             }
-                            /* OCULTA RIGOROSAMENTE TUDO NO BODY */
-                            body > * {
+                            /* ESCONDE #root E TODOS OS ELEMENTOS DA APLICAÇÃO (.app-container, sidebar, etc) COM MÁXIMA ESPECIFICIDADE */
+                            body.stock-print-active #root,
+                            body.stock-print-active > #root,
+                            html body #root,
+                            #root,
+                            .app-container,
+                            .main-content,
+                            .sidebar {
+                                display: none !important;
+                                height: 0 !important;
+                                min-height: 0 !important;
+                                max-height: 0 !important;
+                                overflow: hidden !important;
+                                margin: 0 !important;
+                                padding: 0 !important;
+                            }
+                            /* ESCONDE QUALQUER OUTRO ELEMENTO FILHO DO BODY */
+                            body.stock-print-active > *:not(#stock-print-isolated-root),
+                            body > *:not(#stock-print-isolated-root) {
                                 display: none !important;
                             }
+                            html, body {
+                                width: 100% !important;
+                                height: auto !important;
+                                min-height: 0 !important;
+                                margin: 0 !important;
+                                padding: 0 !important;
+                                background: #ffffff !important;
+                                -webkit-print-color-adjust: exact !important;
+                                print-color-adjust: exact !important;
+                            }
                             /* EXIBE APENAS O DOCUMENTO DE IMPRESSÃO ISOLADO */
-                            body > #stock-print-isolated-root {
+                            body.stock-print-active #stock-print-isolated-root,
+                            #stock-print-isolated-root {
                                 display: block !important;
                                 position: static !important;
                                 width: 100% !important;
@@ -960,29 +1004,14 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                 background: #ffffff !important;
                                 color: #0f172a !important;
                             }
-                            html, body {
-                                width: 100% !important;
-                                height: auto !important;
-                                margin: 0 !important;
-                                padding: 0 !important;
-                                background: #ffffff !important;
-                                -webkit-print-color-adjust: exact !important;
-                                print-color-adjust: exact !important;
-                            }
                             .print-sheet {
                                 width: 100% !important;
                                 box-sizing: border-box !important;
-                                page-break-after: always !important;
-                                break-after: page !important;
                                 page-break-inside: avoid !important;
                                 break-inside: avoid !important;
                                 margin: 0 !important;
                                 padding: 1mm 0 !important;
                                 background: white !important;
-                            }
-                            .print-sheet:last-child {
-                                page-break-after: avoid !important;
-                                break-after: avoid !important;
                             }
                             .print-row-3cols {
                                 display: flex !important;
@@ -1014,9 +1043,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                     `}</style>
 
                     {printPages.map((pageColumns, pageIdx) => (
-                        <div key={`isolated-sheet-${pageIdx}`}>
-                            {renderPageContent(pageColumns, pageIdx, false)}
-                        </div>
+                        renderPageContent(pageColumns, pageIdx, false)
                     ))}
                 </div>,
                 document.body
