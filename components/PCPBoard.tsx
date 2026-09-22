@@ -9,7 +9,8 @@ import {
     fetchPcpHolidays, 
     addPcpHoliday, 
     deletePcpHoliday,
-    fetchTrelicaSpoolStands
+    fetchTrelicaSpoolStands,
+    updateItem
 } from '../services/supabaseService';
 import { 
     resolveMachineShiftConfig, 
@@ -488,81 +489,140 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     // Estado do Drawer Lateral (Raio-X da OP)
     const [drawerOP, setDrawerOP] = useState<ProductionOrderData | null>(null);
 
+    // Interface de contexto para ajuste de quantidade (Turno vs Total)
+    interface AdjustQuantityContext {
+        order: ProductionOrderData;
+        initialMode?: 'shift' | 'total';
+        dayStats?: any;
+        targetDay?: Date;
+        dayColName?: string;
+        operatorName?: string;
+        shiftProduced?: number;
+    }
+
     // Estado do Modal de Ajuste de Quantidade Produzida pelo Gestor
-    const [adjustQuantityOP, setAdjustQuantityOP] = useState<ProductionOrderData | null>(null);
+    const [adjustQuantityConfig, setAdjustQuantityConfig] = useState<AdjustQuantityContext | null>(null);
     const [showManagerAuthForAdjust, setShowManagerAuthForAdjust] = useState(false);
-    const [pendingAdjustOP, setPendingAdjustOP] = useState<ProductionOrderData | null>(null);
+    const [pendingAdjustConfig, setPendingAdjustConfig] = useState<AdjustQuantityContext | null>(null);
 
     const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor' || currentUser?.username?.toLowerCase() === 'admin' || currentUser?.username?.toLowerCase() === 'gestor' || currentUser?.username?.toLowerCase().includes('matheusmiranda');
 
-    const handleOpenAdjustQuantity = (op: ProductionOrderData) => {
+    const handleOpenAdjustQuantity = (
+        op: ProductionOrderData,
+        options?: {
+            mode?: 'shift' | 'total';
+            dayStats?: any;
+            targetDay?: Date;
+            dayColName?: string;
+            operatorName?: string;
+            shiftProduced?: number;
+        }
+    ) => {
+        const config: AdjustQuantityContext = {
+            order: op,
+            initialMode: options?.mode || 'shift',
+            dayStats: options?.dayStats,
+            targetDay: options?.targetDay,
+            dayColName: options?.dayColName,
+            operatorName: options?.operatorName,
+            shiftProduced: options?.shiftProduced
+        };
+
         if (isGestor) {
-            setAdjustQuantityOP(op);
+            setAdjustQuantityConfig(config);
         } else {
-            setPendingAdjustOP(op);
+            setPendingAdjustConfig(config);
             setShowManagerAuthForAdjust(true);
         }
     };
 
     const handleManagerAuthSuccessForAdjust = () => {
         setShowManagerAuthForAdjust(false);
-        if (pendingAdjustOP) {
-            setAdjustQuantityOP(pendingAdjustOP);
-            setPendingAdjustOP(null);
+        if (pendingAdjustConfig) {
+            setAdjustQuantityConfig(pendingAdjustConfig);
+            setPendingAdjustConfig(null);
         }
     };
 
-    const handleSaveAdjustQuantity = async (orderId: string, newQty: number, reason: string) => {
+    const handleSaveAdjustQuantity = async (
+        orderId: string, 
+        newTotalQty: number, 
+        reason: string,
+        details?: {
+            mode: 'shift' | 'total';
+            shiftQty?: number;
+            operatorName?: string;
+            dayStats?: any;
+            updatedLogs?: any[];
+        }
+    ) => {
         const targetOrder = productionOrders.find(o => o.id === orderId);
         if (!targetOrder) return;
 
         const isTrefila = typeof targetOrder.machine === 'string' && targetOrder.machine.startsWith('Trefila') || (typeof targetOrder.scheduledMachine === 'string' && targetOrder.scheduledMachine.startsWith('Trefila'));
         const now = new Date().toISOString();
+        const unit = isTrefila ? 'kg' : 'pçs';
 
         try {
+            const updates: Partial<ProductionOrderData> = {
+                lastQuantityUpdate: now
+            };
+
             if (isTrefila) {
-                await updateProductionOrder(orderId, {
-                    actualProducedWeight: newQty,
-                    totalProducedWeight: newQty,
-                    lastQuantityUpdate: now
-                });
+                updates.actualProducedWeight = newTotalQty;
+                updates.totalProducedWeight = newTotalQty;
             } else {
-                if (updateProducedQuantity) {
-                    await updateProducedQuantity(orderId, newQty);
-                } else {
-                    await updateProductionOrder(orderId, {
-                        actualProducedQuantity: newQty,
-                        lastQuantityUpdate: now
-                    });
-                }
+                updates.actualProducedQuantity = newTotalQty;
             }
 
-            // Se houver turno ativo do operador (sem endTime), manter coerência do startQuantity caso a quantidade total seja reduzida
-            if (targetOrder.operatorLogs && targetOrder.operatorLogs.length > 0) {
-                const activeLogIndex = targetOrder.operatorLogs.findIndex((l: any) => !l.endTime);
-                if (activeLogIndex !== -1) {
-                    const activeLog = targetOrder.operatorLogs[activeLogIndex];
-                    const startQty = Number(activeLog.startQuantity) || 0;
-                    if (newQty < startQty) {
-                        const updatedLogs = [...targetOrder.operatorLogs];
-                        updatedLogs[activeLogIndex] = {
-                            ...activeLog,
-                            startQuantity: Math.max(0, newQty)
-                        };
-                        await updateProductionOrder(orderId, {
-                            operatorLogs: updatedLogs
-                        });
+            if (details?.updatedLogs && details.updatedLogs.length > 0) {
+                updates.operatorLogs = details.updatedLogs;
+            }
+
+            if (isTrefila) {
+                await updateProductionOrder(orderId, updates);
+            } else {
+                if (updateProducedQuantity) {
+                    await updateProducedQuantity(orderId, newTotalQty);
+                }
+                await updateProductionOrder(orderId, updates);
+            }
+
+            // Se for ajuste de turno e houver relatório de turno correspondente (fechado)
+            if (details?.mode === 'shift' && details.dayStats?.dateStr && details.shiftQty !== undefined) {
+                const targetDateStr = details.dayStats.dateStr;
+                const matchingRep = (shiftReports || []).find(r => {
+                    const isThisOp = r.productionOrderId === targetOrder.id || r.orderNumber === targetOrder.orderNumber;
+                    if (!isThisOp) return false;
+                    const repDate = r.date || getIsoDateStr(r.shiftStartTime || r.shiftEndTime);
+                    return repDate === targetDateStr;
+                });
+                if (matchingRep) {
+                    try {
+                        const repUpdates: any = isTrefila 
+                            ? { totalProducedWeight: details.shiftQty } 
+                            : { totalProducedQuantity: details.shiftQty };
+                        await updateItem('shift_reports', matchingRep.id, repUpdates);
+                    } catch (e) {
+                        console.warn('Erro ao atualizar shift_reports:', e);
                     }
                 }
             }
 
             if (showNotification) {
-                showNotification(
-                    `Quantidade da OP #${targetOrder.orderNumber} atualizada para ${newQty.toLocaleString('pt-BR')} ${isTrefila ? 'kg' : 'pçs'}! Painel do operador sincronizado com sucesso.`,
-                    'success'
-                );
+                if (details?.mode === 'shift' && details.shiftQty !== undefined) {
+                    showNotification(
+                        `Turno de ${details.operatorName || 'Operador'} ajustado para ${details.shiftQty.toLocaleString('pt-BR')} ${unit}! Total da OP atualizado para ${newTotalQty.toLocaleString('pt-BR')} ${unit}.`,
+                        'success'
+                    );
+                } else {
+                    showNotification(
+                        `Quantidade da OP #${targetOrder.orderNumber} atualizada para ${newTotalQty.toLocaleString('pt-BR')} ${unit}! Painel do operador sincronizado com sucesso.`,
+                        'success'
+                    );
+                }
             }
-            setAdjustQuantityOP(null);
+            setAdjustQuantityConfig(null);
         } catch (err) {
             console.error('Erro ao ajustar quantidade produzida:', err);
             if (showNotification) {
@@ -3713,10 +3773,17 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                 <div 
                                                                                     onClick={(e) => {
                                                                                         e.stopPropagation();
-                                                                                        handleOpenAdjustQuantity(op);
+                                                                                        handleOpenAdjustQuantity(op, {
+                                                                                            mode: 'shift',
+                                                                                            dayStats: dayStats,
+                                                                                            targetDay: currentDay,
+                                                                                            dayColName: dayColName,
+                                                                                            operatorName: dayStats.operatorName,
+                                                                                            shiftProduced: dayStats.produced
+                                                                                        });
                                                                                     }}
                                                                                     className="flex items-baseline gap-1 cursor-pointer group/qty hover:bg-white/10 px-1 py-0.5 -mx-1 rounded transition-all select-none"
-                                                                                    title="Clique para ajustar quantidade produzida (Gestor)"
+                                                                                    title="Clique para ajustar quantidade produzida no turno (Gestor)"
                                                                                 >
                                                                                     <span className={`text-xs sm:text-sm md:text-base font-black font-mono tracking-tight group-hover/qty:text-[#00E5FF] transition-colors ${
                                                                                         dayStats.isToday 
@@ -3814,10 +3881,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                             <div 
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    handleOpenAdjustQuantity(op);
+                                                                    handleOpenAdjustQuantity(op, { mode: 'total' });
                                                                 }}
                                                                 className="flex items-center gap-2 flex-1 max-w-[280px] min-w-0 cursor-pointer group/footprog hover:bg-white/10 px-2 py-0.5 rounded-lg transition-all select-none"
-                                                                title="Clique para ajustar quantidade produzida (Gestor)"
+                                                                title="Clique para ajustar quantidade total produzida da OP (Gestor)"
                                                             >
                                                                 <div className="flex-1 min-w-0">
                                                                     <div className="flex items-center justify-between text-[10.5px] font-mono font-bold text-slate-200 leading-none">
@@ -6173,7 +6240,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                                     <button
                                         type="button"
-                                        onClick={() => handleOpenAdjustQuantity(drawerOP)}
+                                        onClick={() => handleOpenAdjustQuantity(drawerOP, { mode: 'total' })}
                                         className="mt-2 w-full py-2 px-3 rounded-xl bg-[#00E5FF]/15 hover:bg-[#00E5FF]/25 border border-[#00E5FF]/40 hover:border-[#00E5FF]/70 text-[#00E5FF] font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(0,229,255,0.15)] cursor-pointer active:scale-98"
                                         title="Ajustar quantidade produzida desta OP no PCP e sincronizar com o operador"
                                     >
@@ -7275,10 +7342,18 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             )}
 
             {/* Modal de Ajuste de Quantidade Produzida pelo Gestor */}
-            {adjustQuantityOP && (
+            {adjustQuantityConfig && (
                 <AdjustQuantityModal
-                    order={adjustQuantityOP}
-                    onClose={() => setAdjustQuantityOP(null)}
+                    order={adjustQuantityConfig.order}
+                    initialMode={adjustQuantityConfig.initialMode || 'shift'}
+                    context={{
+                        dayStats: adjustQuantityConfig.dayStats,
+                        targetDay: adjustQuantityConfig.targetDay,
+                        dayColName: adjustQuantityConfig.dayColName,
+                        operatorName: adjustQuantityConfig.operatorName,
+                        shiftProduced: adjustQuantityConfig.shiftProduced
+                    }}
+                    onClose={() => setAdjustQuantityConfig(null)}
                     onSave={handleSaveAdjustQuantity}
                 />
             )}
@@ -7289,7 +7364,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     onSuccess={handleManagerAuthSuccessForAdjust}
                     onCancel={() => {
                         setShowManagerAuthForAdjust(false);
-                        setPendingAdjustOP(null);
+                        setPendingAdjustConfig(null);
                     }}
                     users={users}
                 />
@@ -7779,9 +7854,28 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
 // ============================================================================
 const AdjustQuantityModal: React.FC<{
     order: ProductionOrderData;
+    initialMode?: 'shift' | 'total';
+    context?: {
+        dayStats?: any;
+        targetDay?: Date;
+        dayColName?: string;
+        operatorName?: string;
+        shiftProduced?: number;
+    };
     onClose: () => void;
-    onSave: (orderId: string, newQty: number, reason: string) => Promise<void>;
-}> = ({ order, onClose, onSave }) => {
+    onSave: (
+        orderId: string, 
+        newTotalQty: number, 
+        reason: string,
+        details?: {
+            mode: 'shift' | 'total';
+            shiftQty?: number;
+            operatorName?: string;
+            dayStats?: any;
+            updatedLogs?: any[];
+        }
+    ) => Promise<void>;
+}> = ({ order, initialMode = 'shift', context, onClose, onSave }) => {
     const isTrefila = typeof order.machine === 'string' && order.machine.startsWith('Trefila') || (typeof order.scheduledMachine === 'string' && order.scheduledMachine.startsWith('Trefila'));
     const isTrelica = typeof order.machine === 'string' && order.machine.startsWith('Treliça') || (typeof order.scheduledMachine === 'string' && order.scheduledMachine.startsWith('Treliça'));
     const unit = isTrefila ? 'kg' : 'pçs';
@@ -7794,17 +7888,63 @@ const AdjustQuantityModal: React.FC<{
         ? (order.totalWeight || order.quantityToProduce || 18000) 
         : (order.quantityToProduce || (isTrelica ? 3500 : 5000));
 
-    const [qty, setQty] = useState<number>(currentTotal);
-    const [reason, setReason] = useState<string>('Ajuste manual de contagem (Gestor)');
+    // Turno ativo do operador (se houver)
+    const activeLogIndex = (order.operatorLogs || []).findIndex((l: any) => !l.endTime);
+    const activeLog = activeLogIndex !== -1 ? order.operatorLogs![activeLogIndex] : null;
+
+    // Nome do operador
+    const formatName = (name?: string) => {
+        if (!name) return '';
+        const parts = name.trim().split(/\s+/).filter(Boolean);
+        if (parts.length <= 1) return parts[0] || '';
+        const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+        return `${cap(parts[0])} ${cap(parts[parts.length - 1])}`;
+    };
+
+    const operatorName = formatName(context?.operatorName) 
+        || (activeLog?.operator ? formatName(activeLog.operator) : '') 
+        || (context?.dayStats?.operatorName ? formatName(context.dayStats.operatorName) : '')
+        || 'Operador';
+
+    // Determinar a quantidade de produção base deste turno
+    const logStartQty = Number(activeLog?.startQuantity) || 0;
+    const computedActiveShiftQty = Math.max(0, currentTotal - logStartQty);
+    const shiftBaseQty = context?.shiftProduced !== undefined 
+        ? context.shiftProduced 
+        : computedActiveShiftQty;
+
+    const [mode, setMode] = useState<'shift' | 'total'>(initialMode);
+    const [qty, setQty] = useState<number>(initialMode === 'shift' ? shiftBaseQty : currentTotal);
+    const [reason, setReason] = useState<string>(
+        initialMode === 'shift' 
+            ? 'Ajuste manual de contagem do turno (Gestor)' 
+            : 'Ajuste manual de contagem geral da OP (Gestor)'
+    );
     const [isSaving, setIsSaving] = useState(false);
 
-    const delta = qty - currentTotal;
+    // Trocar modo (Turno vs Total da OP)
+    const handleSwitchMode = (newMode: 'shift' | 'total') => {
+        if (newMode === mode) return;
+        setMode(newMode);
+        if (newMode === 'shift') {
+            setQty(shiftBaseQty);
+            setReason('Ajuste manual de contagem do turno (Gestor)');
+        } else {
+            setQty(currentTotal);
+            setReason('Ajuste manual de contagem geral da OP (Gestor)');
+        }
+    };
 
-    // Turno ativo do operador (se houver)
-    const activeLog = (order.operatorLogs || []).find((l: any) => !l.endTime);
-    const startQty = Number(activeLog?.startQuantity) || 0;
-    const currentShiftQty = Math.max(0, currentTotal - startQty);
-    const newShiftQty = Math.max(0, qty - startQty);
+    const isShiftMode = mode === 'shift';
+
+    // Cálculos dinâmicos
+    const shiftDelta = isShiftMode ? (qty - shiftBaseQty) : (qty - currentTotal);
+    const calculatedNewTotal = isShiftMode 
+        ? Math.max(0, currentTotal + (qty - shiftBaseQty))
+        : qty;
+    const calculatedNewShift = isShiftMode
+        ? qty
+        : Math.max(0, shiftBaseQty + (qty - currentTotal));
 
     const quickSteps = isTrefila 
         ? [-1000, -500, -100, -50, 50, 100, 500, 1000]
@@ -7814,7 +7954,65 @@ const AdjustQuantityModal: React.FC<{
         e.preventDefault();
         setIsSaving(true);
         try {
-            await onSave(order.id, Math.max(0, qty), reason);
+            let updatedLogs = order.operatorLogs ? [...order.operatorLogs] : [];
+
+            if (isShiftMode) {
+                // Modo Turno
+                if (activeLogIndex !== -1) {
+                    const activeL = updatedLogs[activeLogIndex];
+                    const startVal = Number(activeL.startQuantity) !== undefined && !isNaN(Number(activeL.startQuantity))
+                        ? Number(activeL.startQuantity)
+                        : Math.max(0, currentTotal - shiftBaseQty);
+                    updatedLogs[activeLogIndex] = {
+                        ...activeL,
+                        startQuantity: startVal
+                    };
+                } else if (context?.dayStats?.dateStr) {
+                    // Turno fechado / data específica
+                    const targetDateStr = context.dayStats.dateStr;
+                    const pastLogIndex = updatedLogs.findIndex((l: any) => {
+                        const s = (l.startTime || '').split('T')[0];
+                        const e = (l.endTime || '').split('T')[0];
+                        return s === targetDateStr || e === targetDateStr;
+                    });
+                    if (pastLogIndex !== -1) {
+                        const pastL = updatedLogs[pastLogIndex];
+                        const sQty = Number(pastL.startQuantity) || 0;
+                        updatedLogs[pastLogIndex] = {
+                            ...pastL,
+                            endQuantity: sQty + qty
+                        };
+                    }
+                }
+
+                await onSave(order.id, calculatedNewTotal, reason, {
+                    mode: 'shift',
+                    shiftQty: qty,
+                    operatorName,
+                    dayStats: context?.dayStats,
+                    updatedLogs: updatedLogs.length > 0 ? updatedLogs : undefined
+                });
+            } else {
+                // Modo Total Geral da OP
+                if (activeLogIndex !== -1) {
+                    const activeL = updatedLogs[activeLogIndex];
+                    const sQty = Number(activeL.startQuantity) || 0;
+                    if (qty < sQty) {
+                        updatedLogs[activeLogIndex] = {
+                            ...activeL,
+                            startQuantity: Math.max(0, qty)
+                        };
+                    }
+                }
+
+                await onSave(order.id, Math.max(0, qty), reason, {
+                    mode: 'total',
+                    shiftQty: calculatedNewShift,
+                    operatorName,
+                    dayStats: context?.dayStats,
+                    updatedLogs: updatedLogs.length > 0 ? updatedLogs : undefined
+                });
+            }
         } finally {
             setIsSaving(false);
         }
@@ -7832,14 +8030,14 @@ const AdjustQuantityModal: React.FC<{
                         <div>
                             <div className="flex items-center gap-2">
                                 <h3 className="text-base font-black uppercase tracking-wider text-white">
-                                    Ajustar Quantidade Produzida
+                                    {isShiftMode ? 'Ajustar Quantidade do Turno' : 'Ajustar Quantidade Total da OP'}
                                 </h3>
                                 <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-[#00E5FF]/20 text-[#00E5FF] border border-[#00E5FF]/40 font-mono">
                                     GESTOR
                                 </span>
                             </div>
                             <p className="text-xs text-slate-400 font-mono">
-                                OP #{order.orderNumber} • {order.scheduledMachine || (order.machine as string)} {order.trelicaModel ? `• ${order.trelicaModel}` : order.targetBitola ? `• Bitola ${order.targetBitola}mm` : ''}
+                                OP #{order.orderNumber} • {order.scheduledMachine || (order.machine as string)} {order.trelicaModel ? `• ${order.trelicaModel}` : order.targetBitola ? `• Bitola ${order.targetBitola}mm` : ''} {context?.dayColName ? `• ${context.dayColName}` : ''}
                             </p>
                         </div>
                     </div>
@@ -7852,35 +8050,79 @@ const AdjustQuantityModal: React.FC<{
                     </button>
                 </div>
 
+                {/* Seletor de Modo: Turno vs Total da OP */}
+                <div className="flex items-center gap-1.5 p-1 bg-black/40 rounded-xl border border-white/10">
+                    <button
+                        type="button"
+                        onClick={() => handleSwitchMode('shift')}
+                        className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                            isShiftMode
+                                ? 'bg-[#00E5FF] text-slate-950 shadow-[0_0_15px_rgba(0,229,255,0.4)] font-black'
+                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                        }`}
+                    >
+                        <span>👤</span>
+                        <span className="truncate">Turno de {operatorName} ({shiftBaseQty.toLocaleString('pt-BR')} {unit})</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleSwitchMode('total')}
+                        className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                            !isShiftMode
+                                ? 'bg-[#00E5FF] text-slate-950 shadow-[0_0_15px_rgba(0,229,255,0.4)] font-black'
+                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                        }`}
+                    >
+                        <span>📊</span>
+                        <span className="truncate">Total da OP ({currentTotal.toLocaleString('pt-BR')} {unit})</span>
+                    </button>
+                </div>
+
                 <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                     {/* Resumo Atual */}
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                        <div className="bg-[#08131B] p-3 rounded-xl border border-white/5 flex flex-col">
-                            <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Produção Atual</span>
-                            <span className="text-xl font-black text-white font-mono mt-0.5">
-                                {currentTotal.toLocaleString('pt-BR')} <span className="text-xs font-bold text-slate-400">{unit}</span>
-                            </span>
-                        </div>
-                        <div className="bg-[#08131B] p-3 rounded-xl border border-white/5 flex flex-col">
-                            <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Meta Total</span>
-                            <span className="text-xl font-black text-slate-300 font-mono mt-0.5">
-                                {target.toLocaleString('pt-BR')} <span className="text-xs font-bold text-slate-400">{unit}</span>
-                            </span>
-                        </div>
-                        {activeLog ? (
-                            <div className="bg-[#08131B] p-3 rounded-xl border border-[#00E5FF]/20 flex flex-col col-span-2 sm:col-span-1">
-                                <span className="text-[10px] font-bold uppercase text-[#00E5FF] tracking-wider truncate">Turno de {activeLog.operator || 'Operador'}</span>
-                                <span className="text-xl font-black text-[#00E5FF] font-mono mt-0.5">
-                                    {currentShiftQty.toLocaleString('pt-BR')} <span className="text-xs font-bold text-[#00E5FF]/70">{unit}</span>
-                                </span>
-                            </div>
+                        {isShiftMode ? (
+                            <>
+                                <div className="bg-[#08131B] p-3 rounded-xl border border-[#00E5FF]/40 shadow-[0_0_12px_rgba(0,229,255,0.15)] flex flex-col">
+                                    <span className="text-[10px] font-bold uppercase text-[#00E5FF] tracking-wider truncate">Turno de {operatorName}</span>
+                                    <span className="text-xl font-black text-[#00E5FF] font-mono mt-0.5">
+                                        {shiftBaseQty.toLocaleString('pt-BR')} <span className="text-xs font-bold text-[#00E5FF]/70">{unit}</span>
+                                    </span>
+                                </div>
+                                <div className="bg-[#08131B] p-3 rounded-xl border border-white/5 flex flex-col">
+                                    <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Total Acumulado OP</span>
+                                    <span className="text-xl font-black text-white font-mono mt-0.5">
+                                        {currentTotal.toLocaleString('pt-BR')} <span className="text-xs font-bold text-slate-400">{unit}</span>
+                                    </span>
+                                </div>
+                                <div className="bg-[#08131B] p-3 rounded-xl border border-white/5 flex flex-col col-span-2 sm:col-span-1">
+                                    <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Meta Total</span>
+                                    <span className="text-xl font-black text-slate-300 font-mono mt-0.5">
+                                        {target.toLocaleString('pt-BR')} <span className="text-xs font-bold text-slate-400">{unit}</span>
+                                    </span>
+                                </div>
+                            </>
                         ) : (
-                            <div className="bg-[#08131B] p-3 rounded-xl border border-white/5 flex flex-col col-span-2 sm:col-span-1">
-                                <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Status da OP</span>
-                                <span className="text-sm font-bold text-slate-300 mt-1 truncate">
-                                    {order.status === 'in_progress' || order.status === 'Em Produção' ? '⚡ Ao Vivo' : order.status === 'completed' ? '✓ Concluída' : '⏳ Agendada'}
-                                </span>
-                            </div>
+                            <>
+                                <div className="bg-[#08131B] p-3 rounded-xl border border-[#00E5FF]/40 shadow-[0_0_12px_rgba(0,229,255,0.15)] flex flex-col">
+                                    <span className="text-[10px] font-bold uppercase text-[#00E5FF] tracking-wider">Produção Total Atual</span>
+                                    <span className="text-xl font-black text-white font-mono mt-0.5">
+                                        {currentTotal.toLocaleString('pt-BR')} <span className="text-xs font-bold text-slate-400">{unit}</span>
+                                    </span>
+                                </div>
+                                <div className="bg-[#08131B] p-3 rounded-xl border border-white/5 flex flex-col">
+                                    <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Meta Total</span>
+                                    <span className="text-xl font-black text-slate-300 font-mono mt-0.5">
+                                        {target.toLocaleString('pt-BR')} <span className="text-xs font-bold text-slate-400">{unit}</span>
+                                    </span>
+                                </div>
+                                <div className="bg-[#08131B] p-3 rounded-xl border border-white/5 flex flex-col col-span-2 sm:col-span-1">
+                                    <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider truncate">Turno de {operatorName}</span>
+                                    <span className="text-xl font-black text-slate-300 font-mono mt-0.5">
+                                        {shiftBaseQty.toLocaleString('pt-BR')} <span className="text-xs font-bold text-slate-500">{unit}</span>
+                                    </span>
+                                </div>
+                            </>
                         )}
                     </div>
 
@@ -7888,14 +8130,16 @@ const AdjustQuantityModal: React.FC<{
                     <div className="bg-[#0B1D2A]/90 p-4 rounded-2xl border border-white/10 flex flex-col gap-3">
                         <div className="flex items-center justify-between">
                             <label className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                                Definir Nova Quantidade Produzida:
+                                {isShiftMode 
+                                    ? `Definir Quantidade Produzida no Turno (${operatorName}):` 
+                                    : 'Definir Nova Quantidade Total da OP:'}
                             </label>
                             <button
                                 type="button"
-                                onClick={() => setQty(currentTotal)}
+                                onClick={() => setQty(isShiftMode ? shiftBaseQty : currentTotal)}
                                 className="text-[10px] font-bold text-slate-400 hover:text-white underline cursor-pointer"
                             >
-                                Restaurar Inicial
+                                Restaurar Inicial ({isShiftMode ? shiftBaseQty.toLocaleString('pt-BR') : currentTotal.toLocaleString('pt-BR')} {unit})
                             </button>
                         </div>
 
@@ -7958,34 +8202,32 @@ const AdjustQuantityModal: React.FC<{
 
                         {/* Indicador em Tempo Real da Diferença e Efeito no Painel */}
                         <div className={`p-3 rounded-xl border flex items-center justify-between text-xs transition-all ${
-                            delta > 0 
+                            shiftDelta > 0 
                                 ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200' 
-                                : delta < 0 
+                                : shiftDelta < 0 
                                     ? 'bg-amber-950/40 border-amber-500/40 text-amber-200' 
                                     : 'bg-black/30 border-white/5 text-slate-400'
                         }`}>
                             <div className="flex items-center gap-2 min-w-0">
-                                <span className="text-base shrink-0">{delta > 0 ? '📈' : delta < 0 ? '📉' : '⚖️'}</span>
+                                <span className="text-base shrink-0">{shiftDelta > 0 ? '📈' : shiftDelta < 0 ? '📉' : '⚖️'}</span>
                                 <div className="flex flex-col min-w-0">
                                     <span className="font-bold">
-                                        {delta > 0 
-                                            ? `Acréscimo de +${delta.toLocaleString('pt-BR')} ${unit}` 
-                                            : delta < 0 
-                                                ? `Redução de ${delta.toLocaleString('pt-BR')} ${unit}` 
-                                                : 'Nenhuma alteração na quantidade'}
+                                        {shiftDelta > 0 
+                                            ? `Acréscimo de +${shiftDelta.toLocaleString('pt-BR')} ${unit} ${isShiftMode ? `no turno de ${operatorName}` : 'no total da OP'}` 
+                                            : shiftDelta < 0 
+                                                ? `Redução de ${shiftDelta.toLocaleString('pt-BR')} ${unit} ${isShiftMode ? `no turno de ${operatorName}` : 'no total da OP'}` 
+                                                : `Nenhuma alteração na quantidade ${isShiftMode ? 'do turno' : 'da OP'}`}
                                     </span>
-                                    <span className="text-[11px] opacity-80 truncate">
-                                        No Painel do Operador passará a exibir: <strong className="font-black text-[#00E5FF] underline">{qty.toLocaleString('pt-BR')} {unit}</strong>
+                                    <span className="text-[11px] opacity-90 truncate mt-0.5">
+                                        No Painel do Operador passará a exibir: <strong className="font-black text-[#00E5FF] underline">{calculatedNewShift.toLocaleString('pt-BR')} {unit}</strong> no turno
                                     </span>
-                                    {activeLog && (
-                                        <span className="text-[10px] text-[#00E5FF]/80 mt-0.5">
-                                            Peças no turno de {activeLog.operator}: {newShiftQty.toLocaleString('pt-BR')} {unit}
-                                        </span>
-                                    )}
+                                    <span className="text-[10px] text-slate-300/80 mt-0.5">
+                                        Total acumulado da OP passará de {currentTotal.toLocaleString('pt-BR')} para <strong className="text-white font-bold">{calculatedNewTotal.toLocaleString('pt-BR')} {unit}</strong>
+                                    </span>
                                 </div>
                             </div>
                             <span className="text-xs font-mono font-black px-2 py-0.5 rounded bg-black/40 border border-white/10 shrink-0 ml-2">
-                                {Math.min(100, Math.round((qty / (target || 1)) * 100))}%
+                                {Math.min(100, Math.round((calculatedNewTotal / (target || 1)) * 100))}% da Meta
                             </span>
                         </div>
                     </div>
@@ -8000,7 +8242,8 @@ const AdjustQuantityModal: React.FC<{
                             onChange={(e) => setReason(e.target.value)}
                             className="bg-[#08131B] border border-white/15 focus:border-[#00E5FF] rounded-xl px-3 py-2 text-xs text-slate-200 outline-none cursor-pointer"
                         >
-                            <option value="Ajuste manual de contagem (Gestor)">Ajuste manual de contagem (Gestor)</option>
+                            <option value="Ajuste manual de contagem do turno (Gestor)">Ajuste manual de contagem do turno (Gestor)</option>
+                            <option value="Ajuste manual de contagem geral da OP (Gestor)">Ajuste manual de contagem geral da OP (Gestor)</option>
                             <option value="Correção de refugo ou pontas de solda">Correção de refugo ou pontas de solda</option>
                             <option value="Contagem física do lote / amarrado">Contagem física do lote / amarrado</option>
                             <option value="Ajuste por parada de setup">Ajuste por parada de setup</option>
@@ -8028,7 +8271,7 @@ const AdjustQuantityModal: React.FC<{
                             ) : (
                                 <>
                                     <span>✓</span>
-                                    <span>Salvar e Atualizar Painel do Operador</span>
+                                    <span>{isShiftMode ? `Salvar e Atualizar Turno (${operatorName})` : 'Salvar e Atualizar Total da OP'}</span>
                                 </>
                             )}
                         </button>
