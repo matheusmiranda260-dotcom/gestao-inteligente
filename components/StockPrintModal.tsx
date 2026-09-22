@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type { StockItem, StockGauge } from '../types';
-import { MaterialOptions, FioMaquinaBitolaOptions, CA60BitolaOptions, DefaultTrelicaGauges, DefaultElectrodeGauges, DefaultSabaoGauges } from '../types';
+import { MaterialOptions, FioMaquinaBitolaOptions, CA60BitolaOptions, DefaultTrelicaGauges, DefaultElectrodeGauges, DefaultSabaoGauges, DefaultMalhaGauges } from '../types';
 import { PrinterIcon, XIcon } from './icons';
 
 interface StockPrintModalProps {
@@ -28,6 +28,12 @@ export interface ProductOption {
     inferior?: string;
     senozoide?: string;
     peso_final?: string;
+    peso_peca?: number;
+    longitudinal?: string;
+    transversal?: string;
+    linearMeters?: number;
+    meshSpacing?: string;
+    panelDimensions?: string;
 }
 
 export const StockPrintModal: React.FC<StockPrintModalProps> = ({
@@ -79,6 +85,10 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                 const desc = g.description || `Treliça ${g.gauge}`;
                 const tam = g.tamanho ? ` ${g.tamanho}m` : (g.gauge.includes('m') ? ` ${g.gauge}` : '');
                 label = `📐 ${desc}${tam}${codeText}`;
+            } else if (g.materialType === 'Malha') {
+                const desc = g.description || `Malha ${g.gauge}`;
+                const weightText = g.peso_peca ? ` [${g.peso_peca} kg/pc]` : '';
+                label = `🕸️ ${desc}${codeText}${weightText}`;
             } else if (g.materialType === 'Eletrodos Treliças') {
                 const desc = g.description || `Eletrodo ${g.productCode || g.gauge}`;
                 label = `⚡ ${desc}${codeText}`;
@@ -102,7 +112,13 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                 superior: g.superior,
                 inferior: g.inferior,
                 senozoide: g.senozoide,
-                peso_final: g.peso_final
+                peso_final: g.peso_final,
+                peso_peca: g.peso_peca,
+                longitudinal: g.longitudinal,
+                transversal: g.transversal,
+                linearMeters: g.linearMeters,
+                meshSpacing: g.meshSpacing,
+                panelDimensions: g.panelDimensions
             });
         });
 
@@ -199,6 +215,30 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                     });
                 }
             });
+        } else if (selectedMaterial === 'Malha') {
+            DefaultMalhaGauges.forEach(mg => {
+                const key = `Malha::${mg.gauge}::${mg.productCode}::${mg.description}`;
+                if (!optionsMap.has(key)) {
+                    const code = mg.productCode ? ` (Cód. ${mg.productCode})` : '';
+                    const weightText = mg.peso_peca ? ` [${mg.peso_peca} kg/pc]` : '';
+                    optionsMap.set(key, {
+                        key,
+                        materialType: 'Malha',
+                        gauge: mg.gauge,
+                        productCode: mg.productCode || '',
+                        description: mg.description || '',
+                        label: `🕸️ ${mg.description}${code}${weightText}`,
+                        count: 0,
+                        weight: 0,
+                        peso_peca: mg.peso_peca,
+                        longitudinal: mg.longitudinal,
+                        transversal: mg.transversal,
+                        linearMeters: mg.linearMeters,
+                        meshSpacing: mg.meshSpacing,
+                        panelDimensions: mg.panelDimensions
+                    });
+                }
+            });
         }
 
         // 4. Mapear itens reais de estoque ativo
@@ -250,7 +290,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
 
         // Ordenação
         return Array.from(optionsMap.values()).sort((a, b) => {
-            if (selectedMaterial === 'Treliça') {
+            if (selectedMaterial === 'Treliça' || selectedMaterial === 'Malha') {
                 return a.label.localeCompare(b.label);
             }
             const numA = parseFloat(a.gauge.replace(',', '.'));
@@ -331,6 +371,11 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
         inferior?: string;
         senozoide?: string;
         peso_final?: string;
+        peso_peca?: number;
+        meshSpacing?: string;
+        panelDimensions?: string;
+        longitudinal?: string;
+        transversal?: string;
     }
 
     const isLotForOption = (lot: StockItem, opt: ProductOption) => {
@@ -403,7 +448,12 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                     superior: opt.superior,
                     inferior: opt.inferior,
                     senozoide: opt.senozoide,
-                    peso_final: opt.peso_final
+                    peso_final: opt.peso_final,
+                    peso_peca: opt.peso_peca,
+                    meshSpacing: opt.meshSpacing,
+                    panelDimensions: opt.panelDimensions,
+                    longitudinal: opt.longitudinal,
+                    transversal: opt.transversal
                 });
             } else {
                 // Divide igualmente entre as colunas necessárias
@@ -437,7 +487,12 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                         superior: opt.superior,
                         inferior: opt.inferior,
                         senozoide: opt.senozoide,
-                        peso_final: opt.peso_final
+                        peso_final: opt.peso_final,
+                        peso_peca: opt.peso_peca,
+                        meshSpacing: opt.meshSpacing,
+                        panelDimensions: opt.panelDimensions,
+                        longitudinal: opt.longitudinal,
+                        transversal: opt.transversal
                     });
                 });
             }
@@ -478,6 +533,18 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                         const itemWeight = getLotWeight(lot);
                         const bars = lot.quantity || lot.details?.quantity || (lot.history?.find((h: any) => h.details?.quantity)?.details?.quantity) || (unitW > 0 && itemWeight ? Math.round(itemWeight / unitW) : 0);
                         if (bars) totalPieces += Number(bars);
+                    });
+                } else if (opt.materialType === 'Malha') {
+                    const unitW = Number(opt.peso_peca || 0);
+                    const activeLots = safeStock.filter(item => 
+                        item.status !== 'Consumido' && 
+                        item.materialType === 'Malha' && 
+                        (item.productCode ? item.productCode === opt.productCode : (item.description === opt.description || item.bitola === opt.gauge))
+                    );
+                    activeLots.forEach(lot => {
+                        const itemWeight = getLotWeight(lot);
+                        const panels = lot.quantity || lot.details?.quantity || (lot.history?.find((h: any) => h.details?.quantity)?.details?.quantity) || (unitW > 0 && itemWeight ? Math.round(itemWeight / unitW) : 0);
+                        if (panels) totalPieces += Number(panels);
                     });
                 }
             }
@@ -572,6 +639,12 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                         <span className="font-black text-[#0F3F5C] text-sm">{consolidatedTotals.totalPieces.toLocaleString('pt-BR')}</span>
                                     </div>
                                 )}
+                                {selectedMaterial === 'Malha' && (
+                                    <div className="text-right border-r border-slate-300 pr-5">
+                                        <span className="text-[9px] font-bold text-purple-700 uppercase block">Total Painéis</span>
+                                        <span className="font-black text-purple-900 text-sm">{consolidatedTotals.totalPieces.toLocaleString('pt-BR')}</span>
+                                    </div>
+                                )}
                                 <div className="text-right">
                                     <span className="text-[9px] font-bold text-slate-500 uppercase block">Total Lotes</span>
                                     <span className="font-black text-slate-900 text-sm">{consolidatedTotals.totalLots}</span>
@@ -659,11 +732,18 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                         {col.superior ? `• Sup: ${col.superior} | Inf: ${col.inferior} | Sen: ${col.senozoide}` : ''}
                                     </div>
                                 )}
+                                {col.materialType === 'Malha' && (col.meshSpacing || col.panelDimensions || col.peso_peca) && (
+                                    <div className="text-[9px] text-purple-800 font-bold mt-0.5">
+                                        {col.meshSpacing ? `Malha: ${col.meshSpacing} ` : ''}
+                                        {col.panelDimensions ? `• Painel: ${col.panelDimensions} ` : ''}
+                                        {col.peso_peca ? `• ~${col.peso_peca} kg/pc` : ''}
+                                    </div>
+                                )}
                             </div>
 
-                            {/* TABELA: LOTE | CORRIDA | PESO (E QTD SE TRELIÇA) */}
+                            {/* TABELA: LOTE | CORRIDA | PESO (E QTD SE TRELIÇA OU MALHA) */}
                             {(() => {
-                                const hasQtd = col.materialType === 'Treliça';
+                                const hasQtd = col.materialType === 'Treliça' || col.materialType === 'Malha';
                                 return (
                                     <table
                                         className="print-table"
@@ -695,7 +775,7 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                                 )}
                                                 {hasQtd && (
                                                     <th style={{ width: showCorrida ? '25%' : '30%', padding: '3px 2px', textAlign: 'center', fontSize: '9px', fontWeight: 900, color: '#0f172a', borderRight: '1px solid #cbd5e1', overflow: 'hidden', boxSizing: 'border-box' }}>
-                                                        QTD
+                                                        {col.materialType === 'Malha' ? 'PAIN.' : 'QTD'}
                                                     </th>
                                                 )}
                                                 <th style={{ width: showCorrida ? (hasQtd ? '25%' : '38%') : (hasQtd ? '30%' : '50%'), padding: '3px 4px', textAlign: 'center', fontSize: '9px', fontWeight: 900, color: '#0f172a', overflow: 'hidden', boxSizing: 'border-box' }}>
@@ -714,12 +794,16 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                                 col.lots.map((lot: any, lIdx: number) => {
                                                     const itemWeight = getLotWeight(lot);
                                                     
-                                                    // Calculo de barras se for treliça
+                                                    // Calculo de barras se for treliça ou painéis se for malha
                                                     let barsDisplay = '-';
-                                                    if (hasQtd) {
+                                                    if (col.materialType === 'Treliça') {
                                                         const unitW = parseFloat((col.peso_final || '').replace(',', '.') || '0');
                                                         const bars = lot.quantity || lot.details?.quantity || (lot.history?.find((h: any) => h.details?.quantity)?.details?.quantity) || (unitW > 0 && itemWeight ? Math.round(itemWeight / unitW) : null);
                                                         if (bars) barsDisplay = `${bars}`;
+                                                    } else if (col.materialType === 'Malha') {
+                                                        const unitW = Number(col.peso_peca || (lot as any).peso_peca || 0);
+                                                        const panels = lot.quantity || lot.details?.quantity || (lot.history?.find((h: any) => h.details?.quantity)?.details?.quantity) || (unitW > 0 && itemWeight ? Math.round(itemWeight / unitW) : null);
+                                                        if (panels) barsDisplay = `${panels}`;
                                                     }
 
                                                     return (
@@ -875,6 +959,12 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                                         <div className="text-center px-4 border-l border-r border-blue-200/60 mx-2">
                                             <span className="text-[9px] font-black text-blue-900 uppercase block">Total Peças</span>
                                             <span className="text-xs font-black text-[#0F3F5C]">{consolidatedTotals.totalPieces.toLocaleString('pt-BR')}</span>
+                                        </div>
+                                    )}
+                                    {selectedMaterial === 'Malha' && (
+                                        <div className="text-center px-4 border-l border-r border-purple-200/60 mx-2">
+                                            <span className="text-[9px] font-black text-purple-900 uppercase block">Total Painéis</span>
+                                            <span className="text-xs font-black text-purple-700">{consolidatedTotals.totalPieces.toLocaleString('pt-BR')}</span>
                                         </div>
                                     )}
                                     <div className="text-right flex-1">

@@ -42,7 +42,7 @@ export interface EmployeeDocument {
 
 export type MachineType = 'Trefila 1' | 'Trefila 2' | 'Treliça 1' | 'Treliça 2' | 'Malha' | 'Malha 1' | 'Malha 2' | 'Corte-01' | 'Corte-02' | 'Trefila' | 'Treliça' | 'Geral' | 'Empilhadeira' | 'Desbobinadeira 1';
 
-export type MaterialType = 'Arame' | 'Treliça' | 'Ponta' | 'Fio Máquina' | 'Sucata' | 'CA-60' | 'CA-50' | 'Eletrodos Treliças' | 'Sabão';
+export type MaterialType = 'Arame' | 'Treliça' | 'Ponta' | 'Fio Máquina' | 'Sucata' | 'CA-60' | 'CA-50' | 'Eletrodos Treliças' | 'Sabão' | 'Malha';
 
 export type Bitola = string; // e.g., '3.40', '4,20', '8.00'
 
@@ -482,6 +482,13 @@ export interface StockGauge {
     peso_superior?: string;
     peso_inferior?: string;
     peso_senozoide?: string;
+    // Parâmetros técnicos para Malha Soldada Industrial
+    longitudinal?: string;
+    transversal?: string;
+    linearMeters?: number;
+    meshSpacing?: string;
+    panelDimensions?: string;
+    peso_peca?: number | string;
 }
 
 export interface LabAnalysisEntry {
@@ -715,7 +722,7 @@ export interface UserAccessLog {
 }
 
 export const trelicaLabels = ['H08 (8m)', 'H12 (12m)', 'H6 (6m)', 'H10 (10m)'];
-export const MaterialOptions = ['Fio Máquina', 'CA-60', 'Eletrodos Treliças', 'Sabão', 'Treliça'];
+export const MaterialOptions = ['Fio Máquina', 'CA-60', 'Eletrodos Treliças', 'Sabão', 'Treliça', 'Malha'];
 
 export const DefaultSabaoGauges: Array<{ materialType: MaterialType; gauge: string; productCode: string; description: string }> = [
     { materialType: 'Sabão', gauge: 'Saco 25kg', productCode: '00010', description: 'Condat' },
@@ -756,6 +763,126 @@ export const DefaultElectrodeGauges: Array<{ materialType: MaterialType; gauge: 
     { materialType: 'Eletrodos Treliças', gauge: '1009', productCode: '1009', description: 'Base Central Geral' },
     { materialType: 'Eletrodos Treliças', gauge: '1010', productCode: '1010', description: 'Eletrodo da Lateral da Base (D)' },
     { materialType: 'Eletrodos Treliças', gauge: '1011', productCode: '1011', description: 'Eletrodo da Lateral da Base (E)' },
+];
+
+export const DefaultMalhaGauges: Array<Omit<StockGauge, 'id'> & { id?: string }> = [
+    {
+        materialType: 'Malha',
+        productCode: '4088',
+        description: 'MALHA SOLDADA/IND. LEVE Q 45 - 20X20 3,40MM SOB MEDIDA',
+        gauge: '3,40mm',
+        longitudinal: '10 peças c/ 3mts',
+        transversal: '15 peças c/ 2mts',
+        linearMeters: 60,
+        meshSpacing: '20X20',
+        panelDimensions: '3,00X2,00',
+        peso_peca: '4,274',
+        peso_final: '4,274'
+    },
+    {
+        materialType: 'Malha',
+        productCode: '4089',
+        description: 'MALHA SOLDADA/IND. MEDIA Q61 - 15X15 3,40MM SOB MEDIDA',
+        gauge: '3,40mm',
+        longitudinal: '14 peças c/ 3mts',
+        transversal: '20 peças c/ 2mts',
+        linearMeters: 79,
+        meshSpacing: '15X15',
+        panelDimensions: '3,00X2,00',
+        peso_peca: '5,627',
+        peso_final: '5,627'
+    },
+    {
+        materialType: 'Malha',
+        productCode: '3968',
+        description: 'MALHA SOLDADA/IND. PAINEL Q113 -2,45 10X10 3,80MM- SOB MEDIDA',
+        gauge: '3,80mm',
+        longitudinal: '25 peças c/ 6mts',
+        transversal: '60 peças c/ 2,45mts',
+        linearMeters: 297,
+        meshSpacing: '10X10',
+        panelDimensions: '6,00X2,45',
+        peso_peca: '26,448',
+        peso_final: '26,448'
+    },
+    {
+        materialType: 'Malha',
+        productCode: '6626',
+        description: 'MALHA SOLDADA/IND. PAINEL 6,00X2,45 10X10 4,20MM- SOB MEDIDA',
+        gauge: '4,20mm',
+        longitudinal: '25 peças c/ 6mts',
+        transversal: '60 peças c/ 2,45mts',
+        linearMeters: 297,
+        meshSpacing: '10X10',
+        panelDimensions: '6,00X2,45',
+        peso_peca: '32,283',
+        peso_final: '32,283'
+    },
+    {
+        materialType: 'Malha',
+        productCode: '6621',
+        description: 'MALHA SOLDADA/IND. PAINEL 6,00X2,45 10X10 4,60MM- SOB MEDIDA',
+        gauge: '4,60mm',
+        longitudinal: '25 peças c/ 6mts',
+        transversal: '60 peças c/ 2,45mts',
+        linearMeters: 297,
+        meshSpacing: '10X10',
+        panelDimensions: '6,00X2,45',
+        peso_peca: '38,725',
+        peso_final: '38,725'
+    },
+    {
+        materialType: 'Malha',
+        productCode: '3885',
+        description: 'MALHA SOLDADA/IND. PAINEL Q116X2,45 10X10 5,00MM- SOB MEDIDA',
+        gauge: '5,00mm',
+        longitudinal: '25 peças c/ 6mts',
+        transversal: '60 peças c/ 2,45mts',
+        linearMeters: 297,
+        meshSpacing: '10X10',
+        panelDimensions: '6,00X2,45',
+        peso_peca: '45,753',
+        peso_final: '45,753'
+    },
+    {
+        materialType: 'Malha',
+        productCode: '6625',
+        description: 'MALHA SOLDADA/IND. PAINEL Q238.2,45 10X10 5,50MM- SOB MEDIDA',
+        gauge: '5,50mm',
+        longitudinal: '25 peças c/ 6mts',
+        transversal: '60 peças c/ 2,45mts',
+        linearMeters: 297,
+        meshSpacing: '10X10',
+        panelDimensions: '6,00X2,45',
+        peso_peca: '55,361',
+        peso_final: '55,361'
+    },
+    {
+        materialType: 'Malha',
+        productCode: '4129',
+        description: 'MALHA SOLDADA/IND. PAINEL 6,00X2,45 10X10 6,00MM- SOB MEDIDA',
+        gauge: '6,00mm',
+        longitudinal: '25 peças c/ 6mts',
+        transversal: '60 peças c/ 2,45mts',
+        linearMeters: 297,
+        meshSpacing: '10X10',
+        panelDimensions: '6,00X2,45',
+        peso_peca: '65,884',
+        peso_final: '65,884'
+    },
+    {
+        materialType: 'Malha',
+        productCode: '6622',
+        description: 'MALHA SOLDADA/IND. PAINEL 6,00X2,45 15X15 3,40MM - SOB MEDIDA',
+        gauge: '3,40mm',
+        longitudinal: '16 peças c/ 6mts',
+        transversal: '40 peças c/ 2,45mts',
+        linearMeters: 194,
+        meshSpacing: '15X15',
+        panelDimensions: '6,00X2,45',
+        peso_peca: '13,819',
+        peso_final: '13,819'
+    }
 ];
 
 export const FioMaquinaBitolaOptions = ['8.00', '6.50', '6.35', '5.50'];

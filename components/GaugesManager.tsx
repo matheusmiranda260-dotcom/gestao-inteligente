@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { StockGauge, MaterialType } from '../types';
-import { MaterialOptions, DefaultElectrodeGauges, DefaultSabaoGauges, DefaultTrelicaGauges } from '../types';
+import { MaterialOptions, DefaultElectrodeGauges, DefaultSabaoGauges, DefaultTrelicaGauges, DefaultMalhaGauges } from '../types';
 import { TrashIcon, PlusIcon, CheckCircleIcon, ScaleIcon, ArrowPathIcon, PencilIcon, XIcon, SearchIcon } from './icons';
 
 interface GaugesManagerProps {
@@ -40,6 +40,12 @@ const calculateTrelicaWeights = (tamanhoStr: string, superior: string, inferior:
         pesoSenozoide: wSen.toFixed(3).replace('.', ','),
         pesoFinal: (wSup + wInf + wSen).toFixed(3).replace('.', ',')
     };
+};
+
+const calculateMalhaWeight = (bitolaStr: string, linearMetersNum: number) => {
+    const bitola = parseFloat((bitolaStr || '').replace(',', '.'));
+    if (isNaN(bitola) || bitola <= 0 || !linearMetersNum || linearMetersNum <= 0) return 0;
+    return parseFloat((bitola * bitola * 0.0061654 * linearMetersNum).toFixed(3));
 };
 
 const syncTrelicaModelToCache = (modelData: any) => {
@@ -88,6 +94,17 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
     const [trSenozoide, setTrSenozoide] = useState('3,2');
     const [trPesoFinal, setTrPesoFinal] = useState('');
     const [trCode, setTrCode] = useState('');
+
+    // Malha specific form states
+    const [mlCodigo, setMlCodigo] = useState('');
+    const [mlDescricao, setMlDescricao] = useState('');
+    const [mlBitola, setMlBitola] = useState('3,40');
+    const [mlLongitudinal, setMlLongitudinal] = useState('25 peças c/ 6mts');
+    const [mlTransversal, setMlTransversal] = useState('60 peças c/ 2,45mts');
+    const [mlMetros, setMlMetros] = useState<number | string>(297);
+    const [mlEspacamento, setMlEspacamento] = useState('10x10');
+    const [mlDimensoes, setMlDimensoes] = useState('6,00x2,45');
+    const [mlPesoPeca, setMlPesoPeca] = useState<string>('32,283');
     
     // Editing states
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -99,6 +116,12 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
     const [editingTrSenozoide, setEditingTrSenozoide] = useState('');
     const [editingTrPesoFinal, setEditingTrPesoFinal] = useState('');
     const [editingTrTamanho, setEditingTrTamanho] = useState('12');
+    const [editingMlLongitudinal, setEditingMlLongitudinal] = useState('');
+    const [editingMlTransversal, setEditingMlTransversal] = useState('');
+    const [editingMlMetros, setEditingMlMetros] = useState<number | string>('');
+    const [editingMlPesoPeca, setEditingMlPesoPeca] = useState('');
+    const [editingMlEspacamento, setEditingMlEspacamento] = useState('');
+    const [editingMlDimensoes, setEditingMlDimensoes] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
 
     // Ensure default electrode, sabao & trelica gauges are visible if not yet added
@@ -158,6 +181,24 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                 g.materialType === 'Treliça' && 
                 ((d.productCode && g.productCode === d.productCode) || 
                  (g.description === d.description && (g.tamanho === d.tamanho || g.gauge === d.gauge)) ||
+                 g.id === defId)
+            );
+            if (!exists) {
+                result.push({
+                    id: defId,
+                    ...d
+                });
+            }
+        });
+
+        // 4. Malhas: inclui os modelos padrão do catálogo que ainda não estejam no banco ou substituídos
+        DefaultMalhaGauges.forEach(d => {
+            const defId = d.id || `default_ml_${d.productCode}`;
+            if (deletedDefaults.includes(defId) || overriddenDefaults.includes(defId)) return;
+            const exists = result.some(g => 
+                g.materialType === 'Malha' && 
+                ((d.productCode && g.productCode === d.productCode) || 
+                 (g.description === d.description && g.gauge === d.gauge) ||
                  g.id === defId)
             );
             if (!exists) {
@@ -300,6 +341,62 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
             return;
         }
 
+        if (materialType === 'Malha') {
+            const code = mlCodigo.trim();
+            const desc = mlDescricao.trim();
+            const bitola = mlBitola.trim() || '3,40';
+            const long = mlLongitudinal.trim() || '25 peças c/ 6mts';
+            const trans = mlTransversal.trim() || '60 peças c/ 2,45mts';
+            const metros = Number(mlMetros) || 297;
+            const espac = mlEspacamento.trim() || '10x10';
+            const dim = mlDimensoes.trim() || '6,00x2,45';
+            const autoCalc = calculateMalhaWeight(bitola, metros);
+            const peso = mlPesoPeca.trim() || (autoCalc > 0 ? autoCalc.toFixed(3).replace('.', ',') : '32,283');
+
+            if (!desc) {
+                alert('Por favor, informe a descrição completa da malha.');
+                return;
+            }
+
+            const isDuplicate = effectiveGauges.some(g =>
+                g.materialType === 'Malha' &&
+                ((code && g.productCode === code) ||
+                 (g.description || '').toLowerCase() === desc.toLowerCase())
+            );
+
+            if (isDuplicate) {
+                alert(`Já existe uma malha cadastrada com o código ${code} ou descrição.`);
+                return;
+            }
+
+            const newMalha: Omit<StockGauge, 'id'> = {
+                materialType: 'Malha',
+                gauge: bitola.includes('mm') ? bitola : `${bitola}mm`,
+                description: desc,
+                productCode: code || undefined,
+                longitudinal: long,
+                transversal: trans,
+                linearMeters: metros,
+                meshSpacing: espac,
+                panelDimensions: dim,
+                peso_peca: peso,
+                peso_final: peso
+            };
+
+            onAdd(newMalha);
+
+            setMlCodigo('');
+            setMlDescricao('');
+            setMlBitola('3,40');
+            setMlLongitudinal('25 peças c/ 6mts');
+            setMlTransversal('60 peças c/ 2,45mts');
+            setMlMetros(297);
+            setMlEspacamento('10x10');
+            setMlDimensoes('6,00x2,45');
+            setMlPesoPeca('32,283');
+            return;
+        }
+
         if (!newGauge.trim()) {
             alert('Por favor, insira o diâmetro da bitola em mm.');
             return;
@@ -375,6 +472,20 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                 pesoInferior: calculated?.pesoInferior || item.peso_inferior || '',
                 pesoSenozoide: calculated?.pesoSenozoide || item.peso_senozoide || ''
             });
+        } else if (item?.materialType === 'Malha') {
+            onUpdate(id, {
+                materialType: 'Malha',
+                gauge: editingGauge.trim() || item.gauge,
+                description: editingDescription.trim() || item.description,
+                productCode: editingCode.trim() || item.productCode,
+                longitudinal: editingMlLongitudinal || item.longitudinal,
+                transversal: editingMlTransversal || item.transversal,
+                linearMeters: Number(editingMlMetros) || item.linearMeters,
+                meshSpacing: editingMlEspacamento || item.meshSpacing,
+                panelDimensions: editingMlDimensoes || item.panelDimensions,
+                peso_peca: editingMlPesoPeca || item.peso_peca,
+                peso_final: editingMlPesoPeca || item.peso_final
+            });
         } else if (item?.materialType === 'Eletrodos Treliças' || item?.materialType === 'Sabão') {
             onUpdate(id, { 
                 materialType: item.materialType,
@@ -416,6 +527,13 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
             setEditingTrInferior(g.inferior || '3,2');
             setEditingTrSenozoide(g.senozoide || '3,2');
             setEditingTrPesoFinal(g.peso_final || '');
+        } else if (g.materialType === 'Malha') {
+            setEditingMlLongitudinal(g.longitudinal || '');
+            setEditingMlTransversal(g.transversal || '');
+            setEditingMlMetros(g.linearMeters || '');
+            setEditingMlPesoPeca(String(g.peso_peca || g.peso_final || ''));
+            setEditingMlEspacamento(g.meshSpacing || '');
+            setEditingMlDimensoes(g.panelDimensions || '');
         }
     };
 
@@ -429,6 +547,12 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
         setEditingTrSenozoide('');
         setEditingTrPesoFinal('');
         setEditingTrTamanho('12');
+        setEditingMlLongitudinal('');
+        setEditingMlTransversal('');
+        setEditingMlMetros('');
+        setEditingMlPesoPeca('');
+        setEditingMlEspacamento('');
+        setEditingMlDimensoes('');
     };
 
     const gaugesByMaterial = MaterialOptions.reduce((acc, material) => {
@@ -498,7 +622,7 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                             <span className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-sm">
                                 <PlusIcon className="h-5 w-5" />
                             </span>
-                            {materialType === 'Treliça' ? 'Cadastrar Modelo de Treliça (Ficha Técnica)' : 'Cadastrar Novo Produto / Bitola'}
+                            {materialType === 'Treliça' ? 'Cadastrar Modelo de Treliça (Ficha Técnica)' : materialType === 'Malha' ? 'Cadastrar Malha Soldada Industrial (Ficha Técnica)' : 'Cadastrar Novo Produto / Bitola'}
                         </h2>
 
                         {/* Seletor de Material */}
@@ -509,7 +633,7 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                             <div className="flex flex-wrap gap-2">
                                 {MaterialOptions.map(m => {
                                     const isSelected = materialType === m;
-                                    const icon = m === 'Treliça' ? '📐' : m === 'Sabão' ? '🧼' : m === 'Eletrodos Treliças' ? '⚡' : '⚙️';
+                                    const icon = m === 'Treliça' ? '📐' : m === 'Sabão' ? '🧼' : m === 'Eletrodos Treliças' ? '⚡' : m === 'Malha' ? '🕸️' : '⚙️';
                                     return (
                                         <button
                                             key={m}
@@ -522,7 +646,7 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                                             }`}
                                         >
                                             <span>{icon}</span>
-                                            <span>{m === 'Treliça' ? 'Treliças' : m}</span>
+                                            <span>{m === 'Treliça' ? 'Treliças' : m === 'Malha' ? 'Malhas' : m}</span>
                                         </button>
                                     );
                                 })}
@@ -695,6 +819,146 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                                     </button>
                                 </div>
                             </div>
+                        ) : materialType === 'Malha' ? (
+                            /* FORMULÁRIO EXCLUSIVO DE MALHA SOLDADA INDUSTRIAL */
+                            <div className="bg-purple-50/60 p-4 rounded-xl border border-purple-200 space-y-3">
+                                <div className="flex items-center justify-between pb-1 border-b border-purple-200/70">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-base">🕸️</span>
+                                        <span className="text-xs font-black text-purple-950 uppercase tracking-wide">
+                                            Ficha Técnica da Malha Soldada Industrial
+                                        </span>
+                                    </div>
+                                    <span className="text-[10px] font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full border border-purple-200">
+                                        Cálculo automático de peso por peça
+                                    </span>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+                                    {/* Código */}
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                                            Cód. Produto <span className="text-purple-600 font-bold">(ex: 6626)</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={mlCodigo}
+                                            onChange={e => setMlCodigo(e.target.value)}
+                                            placeholder="Ex: 6626"
+                                            className="w-full p-2 text-sm bg-white border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none font-mono font-bold text-purple-950"
+                                        />
+                                    </div>
+
+                                    {/* Descrição Completa */}
+                                    <div className="lg:col-span-3">
+                                        <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                                            Descrição Completa da Malha <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={mlDescricao}
+                                            onChange={e => setMlDescricao(e.target.value)}
+                                            placeholder="Ex: MALHA SOLDADA/IND. PAINEL 6,00X2,45 10X10 4,20MM- SOB MEDIDA"
+                                            className="w-full p-2 text-sm bg-white border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none font-bold text-slate-800"
+                                            required
+                                        />
+                                    </div>
+
+                                    {/* Bitola */}
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                                            Bitola (mm) <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={mlBitola}
+                                            onChange={e => {
+                                                const val = e.target.value;
+                                                setMlBitola(val);
+                                                const autoW = calculateMalhaWeight(val, Number(mlMetros) || 0);
+                                                if (autoW > 0) setMlPesoPeca(autoW.toFixed(3).replace('.', ','));
+                                            }}
+                                            placeholder="Ex: 4,20"
+                                            className="w-full p-2 text-sm bg-white border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none font-mono font-bold text-center"
+                                            required
+                                        />
+                                    </div>
+
+                                    {/* Metros Lineares */}
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                                            Metros Lineares <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={mlMetros}
+                                            onChange={e => {
+                                                const val = Number(e.target.value) || 0;
+                                                setMlMetros(val);
+                                                const autoW = calculateMalhaWeight(mlBitola, val);
+                                                if (autoW > 0) setMlPesoPeca(autoW.toFixed(3).replace('.', ','));
+                                            }}
+                                            placeholder="Ex: 297"
+                                            className="w-full p-2 text-sm bg-white border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none font-mono font-bold text-center"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-1">
+                                    {/* Longitudinal */}
+                                    <div className="lg:col-span-2">
+                                        <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                                            Longitudinal <span className="text-slate-400 font-normal">(peças c/ metros)</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={mlLongitudinal}
+                                            onChange={e => setMlLongitudinal(e.target.value)}
+                                            placeholder="Ex: 25 peças c/ 6mts"
+                                            className="w-full p-2 text-sm bg-white border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none"
+                                        />
+                                    </div>
+
+                                    {/* Transversal */}
+                                    <div className="lg:col-span-2">
+                                        <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                                            Transversal <span className="text-slate-400 font-normal">(peças c/ metros)</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={mlTransversal}
+                                            onChange={e => setMlTransversal(e.target.value)}
+                                            placeholder="Ex: 60 peças c/ 2,45mts"
+                                            className="w-full p-2 text-sm bg-white border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none"
+                                        />
+                                    </div>
+
+                                    {/* Peso por Peça */}
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-purple-900 uppercase tracking-wider mb-1">
+                                            Peso por Peça (kg)
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={mlPesoPeca}
+                                            onChange={e => setMlPesoPeca(e.target.value)}
+                                            placeholder="Ex: 32,283"
+                                            className="w-full p-2 text-sm bg-purple-100/70 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none font-mono font-black text-purple-950 text-center"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-end pt-1">
+                                    <button
+                                        type="button"
+                                        onClick={handleAdd}
+                                        className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 hover:to-indigo-800 text-white font-black text-xs uppercase tracking-wider rounded-lg shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer"
+                                    >
+                                        <PlusIcon className="h-4 w-4" /> Cadastrar Malha Soldada
+                                    </button>
+                                </div>
+                            </div>
                         ) : (
                             /* FORMULÁRIO PADRÃO PARA DEMAIS MATERIAIS */
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -788,12 +1052,13 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
 
                     {/* LISTAGEM POR MATERIAL */}
                     <div className="p-6 bg-slate-50/30">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
                             {MaterialOptions.map(material => {
                                 const isFioMaquina = material === 'Fio Máquina';
                                 const isCA60 = material === 'CA-60';
                                 const isSabao = material === 'Sabão';
                                 const isTrelica = material === 'Treliça';
+                                const isMalha = material === 'Malha';
                                 const badgeColor = isFioMaquina 
                                     ? 'bg-amber-100 text-amber-800 border-amber-300' 
                                     : isCA60 
@@ -802,7 +1067,9 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                                             ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
                                             : isTrelica
                                                 ? 'bg-cyan-100 text-cyan-900 border-cyan-300'
-                                                : 'bg-orange-100 text-orange-900 border-orange-300';
+                                                : isMalha
+                                                    ? 'bg-purple-100 text-purple-900 border-purple-300'
+                                                    : 'bg-orange-100 text-orange-900 border-orange-300';
                                 const items = gaugesByMaterial[material] || [];
 
                                 return (
@@ -815,10 +1082,12 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                                                     <span className="text-sm">⚡</span>
                                                 ) : isSabao ? (
                                                     <span className="text-sm">🧼</span>
+                                                ) : isMalha ? (
+                                                    <span className="text-sm">🕸️</span>
                                                 ) : (
                                                     <ScaleIcon className="h-4 w-4 text-slate-500" />
                                                 )}
-                                                <span>{isTrelica ? 'Treliças' : material}</span>
+                                                <span>{isTrelica ? 'Treliças' : isMalha ? 'Malhas' : material}</span>
                                             </h3>
                                             <span className={`text-[10px] px-2 py-0.5 rounded-full font-black border ${badgeColor} shrink-0`}>
                                                 {items.length} {items.length === 1 ? 'item' : 'itens'}
@@ -830,6 +1099,95 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                                                 const isEditing = editingId === g.id;
 
                                                 if (isEditing) {
+                                                    if (g.materialType === 'Malha') {
+                                                        return (
+                                                            <div key={g.id} className="p-3 bg-white rounded-xl border-2 border-purple-500 shadow-md space-y-2.5 animate-fadeIn">
+                                                                <div className="flex items-center justify-between border-b pb-1 text-xs font-black text-purple-900 uppercase">
+                                                                    <span>Editando Malha</span>
+                                                                    <button onClick={cancelEditing} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                                                                        <XIcon className="h-4 w-4" />
+                                                                    </button>
+                                                                </div>
+                                                                <div className="space-y-2">
+                                                                    <div>
+                                                                        <label className="text-[9px] font-bold text-slate-500 uppercase block">Descrição</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={editingDescription}
+                                                                            onChange={e => setEditingDescription(e.target.value)}
+                                                                            className="w-full p-1.5 text-xs border rounded-lg bg-slate-50 font-bold"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="grid grid-cols-2 gap-1.5">
+                                                                        <div>
+                                                                            <label className="text-[9px] font-bold text-slate-500 uppercase block">Cód. Produto</label>
+                                                                            <input
+                                                                                type="text"
+                                                                                value={editingCode}
+                                                                                onChange={e => setEditingCode(e.target.value)}
+                                                                                className="w-full p-1.5 text-xs border rounded-lg bg-slate-50 font-mono font-bold"
+                                                                            />
+                                                                        </div>
+                                                                        <div>
+                                                                            <label className="text-[9px] font-bold text-slate-500 uppercase block">Bitola (mm)</label>
+                                                                            <input
+                                                                                type="text"
+                                                                                value={editingGauge}
+                                                                                onChange={e => setEditingGauge(e.target.value)}
+                                                                                className="w-full p-1.5 text-xs border rounded-lg bg-slate-50 font-mono font-bold"
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="grid grid-cols-2 gap-1.5">
+                                                                        <div>
+                                                                            <label className="text-[8px] font-bold text-slate-500 uppercase block">Metros Lineares</label>
+                                                                            <input
+                                                                                type="number"
+                                                                                value={editingMlMetros}
+                                                                                onChange={e => setEditingMlMetros(e.target.value)}
+                                                                                className="w-full p-1 text-xs border rounded bg-slate-50 font-bold"
+                                                                            />
+                                                                        </div>
+                                                                        <div>
+                                                                            <label className="text-[8px] font-bold text-purple-900 uppercase block">Peso Pç (kg)</label>
+                                                                            <input
+                                                                                type="text"
+                                                                                value={editingMlPesoPeca}
+                                                                                onChange={e => setEditingMlPesoPeca(e.target.value)}
+                                                                                className="w-full p-1 text-xs border border-purple-300 rounded bg-purple-50 font-black text-purple-950 font-mono text-center"
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="text-[8px] font-bold text-slate-500 uppercase block">Longitudinal</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={editingMlLongitudinal}
+                                                                            onChange={e => setEditingMlLongitudinal(e.target.value)}
+                                                                            className="w-full p-1 text-xs border rounded bg-slate-50"
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="text-[8px] font-bold text-slate-500 uppercase block">Transversal</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={editingMlTransversal}
+                                                                            onChange={e => setEditingMlTransversal(e.target.value)}
+                                                                            className="w-full p-1 text-xs border rounded bg-slate-50"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                                <div className="flex justify-end gap-2 pt-1 border-t">
+                                                                    <button onClick={cancelEditing} className="px-2.5 py-1 text-xs text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 cursor-pointer">
+                                                                        Cancelar
+                                                                    </button>
+                                                                    <button onClick={() => handleUpdate(g.id)} className="px-3 py-1 text-xs font-bold text-white bg-purple-600 rounded-lg hover:bg-purple-700 shadow-sm cursor-pointer">
+                                                                        Salvar
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    }
                                                     if (g.materialType === 'Treliça') {
                                                         return (
                                                             <div key={g.id} className="p-3 bg-white rounded-xl border-2 border-cyan-500 shadow-md space-y-2.5 animate-fadeIn">
@@ -998,6 +1356,7 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                                                 const isElectrode = g.materialType === 'Eletrodos Treliças';
                                                 const isItemSabao = g.materialType === 'Sabão';
                                                 const isItemTrelica = g.materialType === 'Treliça';
+                                                const isItemMalha = g.materialType === 'Malha';
 
                                                 return (
                                                     <div 
@@ -1005,7 +1364,9 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                                                         className={`group flex items-start justify-between p-3 bg-white rounded-xl border transition-all ${
                                                             isItemTrelica 
                                                                 ? 'border-slate-200 hover:border-cyan-400 hover:shadow-md' 
-                                                                : 'border-slate-200 hover:border-blue-300 hover:shadow-sm'
+                                                                : isItemMalha
+                                                                    ? 'border-slate-200 hover:border-purple-400 hover:shadow-md'
+                                                                    : 'border-slate-200 hover:border-blue-300 hover:shadow-sm'
                                                         }`}
                                                     >
                                                         <div className="flex flex-col min-w-0 flex-grow pr-2">
@@ -1042,6 +1403,41 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                                                                     <div className="flex items-center justify-between text-[10px] font-bold text-slate-600 bg-cyan-50/50 px-2 py-0.5 rounded border border-cyan-100 mt-0.5">
                                                                         <span className="text-[9px] text-slate-400 uppercase">Peso Barra:</span>
                                                                         <span className="text-cyan-800 font-black">{g.peso_final || '-'} kg</span>
+                                                                    </div>
+                                                                </>
+                                                            ) : isItemMalha ? (
+                                                                <>
+                                                                    <div className="flex items-center justify-between gap-1 mb-1">
+                                                                        <span className="text-[10px] font-mono font-black px-1.5 py-0.5 rounded bg-purple-100 text-purple-900 border border-purple-300">
+                                                                            {g.productCode ? `Cód. ${g.productCode}` : 'MALHA'}
+                                                                        </span>
+                                                                        <span className="text-[10px] font-extrabold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200 font-mono">
+                                                                            {g.gauge || '3,40mm'}
+                                                                        </span>
+                                                                    </div>
+
+                                                                    <span className="font-black text-slate-800 text-xs tracking-tight block mb-1 leading-snug" title={g.description || 'Malha Soldada'}>
+                                                                        {g.description || 'Malha Soldada'}
+                                                                    </span>
+
+                                                                    <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-100 space-y-1 my-1 text-[10px]">
+                                                                        <div className="flex items-center justify-between text-slate-600">
+                                                                            <span className="text-slate-400 font-bold">Longit.:</span>
+                                                                            <span className="font-bold text-slate-800 truncate max-w-[110px]" title={g.longitudinal}>{g.longitudinal || '-'}</span>
+                                                                        </div>
+                                                                        <div className="flex items-center justify-between text-slate-600">
+                                                                            <span className="text-slate-400 font-bold">Transv.:</span>
+                                                                            <span className="font-bold text-slate-800 truncate max-w-[110px]" title={g.transversal}>{g.transversal || '-'}</span>
+                                                                        </div>
+                                                                        <div className="flex items-center justify-between text-slate-600">
+                                                                            <span className="text-slate-400 font-bold">Metros:</span>
+                                                                            <span className="font-black text-slate-700">{g.linearMeters ? `${g.linearMeters} m` : '-'}</span>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div className="flex items-center justify-between text-[10px] font-bold text-slate-600 bg-purple-50 px-2 py-0.5 rounded border border-purple-200 mt-0.5">
+                                                                        <span className="text-[9px] text-purple-600 uppercase font-bold">Peso por Pç:</span>
+                                                                        <span className="text-purple-900 font-black">{g.peso_peca || g.peso_final || '-'} kg</span>
                                                                     </div>
                                                                 </>
                                                             ) : isElectrode ? (

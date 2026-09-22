@@ -9,7 +9,7 @@ import type {
     TrelicaElectrodeStock, TrelicaElectrodeType
 } from '../types';
 import {
-    FioMaquinaBitolaOptions, TrefilaBitolaOptions, MaterialOptions, CA60BitolaOptions, SteelTypeOptions, DefaultElectrodeGauges, DefaultSabaoGauges, DefaultTrelicaGauges
+    FioMaquinaBitolaOptions, TrefilaBitolaOptions, MaterialOptions, CA60BitolaOptions, SteelTypeOptions, DefaultElectrodeGauges, DefaultSabaoGauges, DefaultTrelicaGauges, DefaultMalhaGauges
 } from '../types';
 import { extractLotDataFromImage } from '../services/geminiService';
 import ConferenceReport from './ConferenceReport';
@@ -96,6 +96,12 @@ interface GaugeOption {
     inferior?: string;
     senozoide?: string;
     peso_final?: string;
+    longitudinal?: string;
+    transversal?: string;
+    linearMeters?: string;
+    meshSpacing?: string;
+    panelDimensions?: string;
+    peso_peca?: string;
 }
 
 const getGaugeOptionsForMaterial = (material: string, gauges: StockGauge[]): GaugeOption[] => {
@@ -124,6 +130,21 @@ const getGaugeOptionsForMaterial = (material: string, gauges: StockGauge[]): Gau
             peso_superior: t.peso_superior,
             peso_inferior: t.peso_inferior,
             peso_senozoide: t.peso_senozoide
+        })) as StockGauge[];
+    } else if (material === 'Malha' && customGauges.length === 0) {
+        customGauges = DefaultMalhaGauges.map(m => ({
+            id: `default_ml_${m.productCode}`,
+            materialType: 'Malha',
+            gauge: m.gauge,
+            productCode: m.productCode,
+            description: m.description,
+            longitudinal: m.longitudinal,
+            transversal: m.transversal,
+            linearMeters: m.linearMeters,
+            meshSpacing: m.meshSpacing,
+            panelDimensions: m.panelDimensions,
+            peso_peca: m.peso_peca,
+            peso_final: m.peso_peca
         })) as StockGauge[];
     }
 
@@ -169,6 +190,26 @@ const getGaugeOptionsForMaterial = (material: string, gauges: StockGauge[]): Gau
                 key: `${g.gauge}::${g.productCode || ''}::${g.description || ''}`,
                 label: `📐 ${desc} ${g.tamanho ? `${g.tamanho}m` : ''}${code}${tech}${peso}`
             });
+        } else if (material === 'Malha') {
+            const desc = g.description || `Malha ${g.gauge}`;
+            const code = g.productCode ? ` (${g.productCode})` : '';
+            const dim = g.panelDimensions ? ` ${g.panelDimensions}` : '';
+            const mesh = g.meshSpacing ? ` [Malha: ${g.meshSpacing}]` : '';
+            const peso = (g.peso_peca || g.peso_final) ? ` - ${g.peso_peca || g.peso_final} kg/pç` : '';
+            options.push({
+                gauge: g.gauge,
+                code: g.productCode,
+                description: g.description,
+                longitudinal: g.longitudinal,
+                transversal: g.transversal,
+                linearMeters: g.linearMeters,
+                meshSpacing: g.meshSpacing,
+                panelDimensions: g.panelDimensions,
+                peso_peca: g.peso_peca,
+                peso_final: g.peso_peca || g.peso_final,
+                key: `${g.gauge}::${g.productCode || ''}::${g.description || ''}`,
+                label: `🕸️ ${desc}${dim}${code}${mesh}${peso}`
+            });
         } else {
             const desc = g.description ? ` - ${g.description}` : '';
             const code = g.productCode ? ` (${g.productCode})` : '';
@@ -205,6 +246,23 @@ const getGaugeOptionsForMaterial = (material: string, gauges: StockGauge[]): Gau
                     peso_final: tg.peso_final,
                     key: `${tg.gauge}::${tg.productCode}::${tg.description}`,
                     label: `📐 ${tg.description} ${tg.tamanho}m (${tg.productCode}) [Sup: ${tg.superior} | Inf: ${tg.inferior} | Sen: ${tg.senozoide} mm] - ${tg.peso_final} kg/un`
+                });
+            });
+        } else if (material === 'Malha') {
+            DefaultMalhaGauges.forEach(mg => {
+                options.push({
+                    gauge: mg.gauge,
+                    code: mg.productCode,
+                    description: mg.description,
+                    longitudinal: mg.longitudinal,
+                    transversal: mg.transversal,
+                    linearMeters: mg.linearMeters,
+                    meshSpacing: mg.meshSpacing,
+                    panelDimensions: mg.panelDimensions,
+                    peso_peca: mg.peso_peca,
+                    peso_final: mg.peso_peca,
+                    key: `${mg.gauge}::${mg.productCode}::${mg.description}`,
+                    label: `🕸️ ${mg.description} ${mg.panelDimensions || ''} (${mg.productCode}) [Malha: ${mg.meshSpacing || ''}] - ${mg.peso_peca} kg/pç`
                 });
             });
         } else {
@@ -499,6 +557,88 @@ export const getNextTrelicaInternalLot = (
     return `TR-${String(nextNum).padStart(4, '0')}`;
 };
 
+export const getNextMalhaConferenceNumber = (conferences: ConferenceData[] = [], stock: StockItem[] = []): string => {
+    const nums: number[] = [];
+
+    const checkStr = (str?: string) => {
+        if (!str) return;
+        const cleaned = str.trim();
+        const match = cleaned.match(/(?:CONF[-_]ML[-_]|ML[-_])(\d+)/i);
+        if (match) {
+            nums.push(parseInt(match[1], 10));
+        } else if (/^\d+$/.test(cleaned)) {
+            const val = parseInt(cleaned, 10);
+            if (val >= 40000 && val <= 49999) {
+                nums.push(val - 40000);
+            }
+        }
+    };
+
+    for (const c of conferences) {
+        const isMalhaConf = Array.isArray(c.lots) && c.lots.some(l => l.materialType === 'Malha');
+        if (isMalhaConf || (c.conferenceNumber && c.conferenceNumber.toUpperCase().includes('ML'))) {
+            checkStr(c.conferenceNumber);
+        }
+    }
+
+    for (const s of stock) {
+        if (s.materialType === 'Malha' || (s.conferenceNumber && s.conferenceNumber.toUpperCase().includes('ML'))) {
+            checkStr(s.conferenceNumber);
+        }
+    }
+
+    if (nums.length === 0) {
+        return 'CONF-ML-001';
+    }
+    const nextNum = Math.max(...nums) + 1;
+    return `CONF-ML-${String(nextNum).padStart(3, '0')}`;
+};
+
+export const getNextMalhaInternalLot = (
+    stock: StockItem[] = [], 
+    currentLots: Partial<ConferenceLotData>[] = [], 
+    conferences: ConferenceData[] = []
+): string => {
+    const nums: number[] = [];
+
+    const checkStr = (str?: string) => {
+        if (!str) return;
+        const cleaned = str.trim();
+        const match = cleaned.match(/ML[-_]?(\d+)/i);
+        if (match) {
+            nums.push(parseInt(match[1], 10));
+        }
+    };
+
+    for (const s of stock) {
+        if (s.materialType === 'Malha' && s.internalLot) {
+            checkStr(s.internalLot);
+        }
+    }
+
+    for (const c of conferences) {
+        if (Array.isArray(c.lots)) {
+            for (const l of c.lots) {
+                if (l.materialType === 'Malha' && l.internalLot) {
+                    checkStr(l.internalLot);
+                }
+            }
+        }
+    }
+
+    for (const l of currentLots) {
+        if (l.materialType === 'Malha' && l.internalLot) {
+            checkStr(l.internalLot);
+        }
+    }
+
+    if (nums.length === 0) {
+        return 'ML-0001';
+    }
+    const nextNum = Math.max(...nums) + 1;
+    return `ML-${String(nextNum).padStart(4, '0')}`;
+};
+
 export const getVacantElectrodeLots = (
     stock: StockItem[] = [],
     currentLots: Partial<ConferenceLotData>[] = [],
@@ -563,23 +703,26 @@ const AddConferencePage: React.FC<{
     const isInitialElectrode = initialMaterialType === 'Eletrodos Treliças';
     const isInitialSabao = initialMaterialType === 'Sabão';
     const isInitialTrelica = initialMaterialType === 'Treliça';
+    const isInitialMalha = initialMaterialType === 'Malha';
 
     const [conferenceData, setConferenceData] = useState<Omit<ConferenceData, 'lots'>>(() => ({
         entryDate: new Date().toISOString().split('T')[0],
-        supplier: isInitialElectrode ? 'Cobretec' : isInitialSabao ? 'Condat' : isInitialTrelica ? 'Produção Própria - MSM' : '', 
-        nfe: isInitialElectrode ? 'Sem Nota' : isInitialTrelica ? 'Produção Interna' : '', 
+        supplier: isInitialElectrode ? 'Cobretec' : isInitialSabao ? 'Condat' : (isInitialTrelica || isInitialMalha) ? 'Produção Própria - MSM' : '', 
+        nfe: isInitialElectrode ? 'Sem Nota' : (isInitialTrelica || isInitialMalha) ? 'Produção Interna' : '', 
         conferenceNumber: isInitialElectrode 
             ? getNextElectrodeConferenceNumber(conferences, stock) 
             : isInitialSabao 
                 ? getNextSabaoConferenceNumber(conferences, stock) 
                 : isInitialTrelica
                     ? getNextTrelicaConferenceNumber(conferences, stock)
-                    : '',
+                    : isInitialMalha
+                        ? getNextMalhaConferenceNumber(conferences, stock)
+                        : '',
     }));
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
     const [lots, setLots] = useState<Partial<ConferenceLotData>[]>(() => {
-        const mat = isInitialElectrode ? 'Eletrodos Treliças' : isInitialSabao ? 'Sabão' : isInitialTrelica ? 'Treliça' : 'Fio Máquina';
+        const mat = isInitialElectrode ? 'Eletrodos Treliças' : isInitialSabao ? 'Sabão' : isInitialTrelica ? 'Treliça' : isInitialMalha ? 'Malha' : 'Fio Máquina';
         const defaultOpts = getGaugeOptionsForMaterial(mat, gauges);
         const first = defaultOpts[0];
         const autoLot = isInitialElectrode 
@@ -588,20 +731,23 @@ const AddConferencePage: React.FC<{
                 ? getNextSabaoInternalLot(stock, [], conferences) 
                 : isInitialTrelica
                     ? getNextTrelicaInternalLot(stock, [], conferences)
-                    : '';
+                    : isInitialMalha
+                        ? getNextMalhaInternalLot(stock, [], conferences)
+                        : '';
 
         const trUnitW = parseFloat(first?.peso_final || '6.01');
-        const defaultWeight = isInitialElectrode ? 1 : isInitialSabao ? 25 : isInitialTrelica ? Math.round(trUnitW * 100) : 0;
+        const mlUnitW = parseFloat(first?.peso_peca || first?.peso_final || '4.274');
+        const defaultWeight = isInitialElectrode ? 1 : isInitialSabao ? 25 : isInitialTrelica ? Math.round(trUnitW * 100) : isInitialMalha ? Math.round(mlUnitW * 50 * 10) / 10 : 0;
 
         return [{
             internalLot: autoLot, 
-            runNumber: (isInitialElectrode || isInitialSabao || isInitialTrelica) ? '-' : '', 
-            steelType: (isInitialElectrode || isInitialSabao || isInitialTrelica) ? '' : '1006', 
-            bitola: first ? first.gauge : (isInitialElectrode ? '1000' : isInitialSabao ? 'Saco 25kg' : isInitialTrelica ? '12m' : '8.00'), 
+            runNumber: (isInitialElectrode || isInitialSabao || isInitialTrelica || isInitialMalha) ? '-' : '', 
+            steelType: (isInitialElectrode || isInitialSabao || isInitialTrelica || isInitialMalha) ? '' : '1006', 
+            bitola: first ? first.gauge : (isInitialElectrode ? '1000' : isInitialSabao ? 'Saco 25kg' : isInitialTrelica ? '12m' : isInitialMalha ? '3.40' : '8.00'), 
             materialType: mat, 
-            productCode: first?.code || (isInitialSabao ? '00010' : isInitialTrelica ? 'H8L12' : ''),
-            description: first?.description || (isInitialSabao ? 'Condat' : isInitialTrelica ? 'H-8 LEVE' : ''),
-            quantity: isInitialTrelica ? 100 : undefined,
+            productCode: first?.code || (isInitialSabao ? '00010' : isInitialTrelica ? 'H8L12' : isInitialMalha ? '4088' : ''),
+            description: first?.description || (isInitialSabao ? 'Condat' : isInitialTrelica ? 'H-8 LEVE' : isInitialMalha ? 'Q45 - 20X20 3,40MM' : ''),
+            quantity: isInitialTrelica ? 100 : isInitialMalha ? 50 : undefined,
             labelWeight: defaultWeight
         }];
     });
@@ -614,10 +760,13 @@ const AddConferencePage: React.FC<{
     const [batchBagsQty, setBatchBagsQty] = useState(10);
     const [batchTrelicaModal, setBatchTrelicaModal] = useState(false);
     const [batchTrelicaBars, setBatchTrelicaBars] = useState(100);
+    const [batchMalhaModal, setBatchMalhaModal] = useState(false);
+    const [batchMalhaQty, setBatchMalhaQty] = useState(50);
 
     const isAnyElectrode = useMemo(() => lots.some(l => l.materialType === 'Eletrodos Treliças'), [lots]);
     const isAnySabao = useMemo(() => lots.some(l => l.materialType === 'Sabão'), [lots]);
     const isAnyTrelica = useMemo(() => lots.some(l => l.materialType === 'Treliça'), [lots]);
+    const isAnyMalha = useMemo(() => lots.some(l => l.materialType === 'Malha'), [lots]);
     const isAnyRawMaterial = useMemo(() => lots.some(l => l.materialType === 'Fio Máquina' || l.materialType === 'CA-60'), [lots]);
 
     const vacantLots = useMemo(() => {
@@ -650,13 +799,24 @@ const AddConferencePage: React.FC<{
                 const nextConf = getNextTrelicaConferenceNumber(conferences, stock);
                 setConferenceData(prev => ({ 
                     ...prev, 
-                    conferenceNumber: nextConf,
+                    conferenceNumber: nextConf, 
+                    supplier: prev.supplier || 'Produção Própria - MSM',
+                    nfe: prev.nfe || 'Produção Interna'
+                }));
+            }
+        } else if (isAnyMalha) {
+            const currentConf = conferenceData.conferenceNumber?.trim() || '';
+            if (!currentConf || !currentConf.toUpperCase().includes('ML')) {
+                const nextConf = getNextMalhaConferenceNumber(conferences, stock);
+                setConferenceData(prev => ({ 
+                    ...prev, 
+                    conferenceNumber: nextConf, 
                     supplier: prev.supplier || 'Produção Própria - MSM',
                     nfe: prev.nfe || 'Produção Interna'
                 }));
             }
         }
-    }, [isAnyElectrode, isAnySabao, isAnyTrelica, conferences, stock]);
+    }, [isAnyElectrode, isAnySabao, isAnyTrelica, isAnyMalha, conferences, stock]);
 
     useEffect(() => {
         if (!conferenceData.conferenceNumber) {
@@ -788,6 +948,41 @@ const AddConferencePage: React.FC<{
         setBatchTrelicaModal(false);
     };
 
+    const handleGenerateMalhaBatch = (panelsQty: number) => {
+        if (panelsQty <= 0) return;
+        const defaultOpts = getGaugeOptionsForMaterial('Malha', gauges);
+        const lastLot = lots[lots.length - 1];
+        const selectedOpt = defaultOpts.find(o => o.code === lastLot?.productCode || o.gauge === lastLot?.bitola) || defaultOpts[0] || { 
+            gauge: '3.40', code: '4088', description: 'Q45 - 20X20 3,40MM', peso_peca: '4.274' 
+        };
+
+        const unitW = parseFloat(selectedOpt.peso_peca || selectedOpt.peso_final || '4.274');
+        const totalKg = Math.round(unitW * panelsQty * 10) / 10;
+
+        const existingValidLots = lots.filter(l => Boolean(l.internalLot));
+        const nextLot = getNextMalhaInternalLot(stock, existingValidLots, conferences);
+
+        const newLot: Partial<ConferenceLotData> = {
+            internalLot: nextLot,
+            runNumber: '-',
+            steelType: '',
+            bitola: selectedOpt.gauge,
+            materialType: 'Malha',
+            productCode: selectedOpt.code || '4088',
+            description: selectedOpt.description || 'Q45 - 20X20 3,40MM',
+            quantity: panelsQty,
+            labelWeight: totalKg
+        };
+
+        if (lots.length === 1 && (!lots[0].internalLot || (lots[0].materialType === 'Malha' && !lots[0].internalLot))) {
+            setLots([newLot]);
+        } else {
+            setLots(prev => [...prev, newLot]);
+        }
+
+        setBatchMalhaModal(false);
+    };
+
     const handleAddLot = () => {
         const lastLot = lots[lots.length - 1];
         if (lastLot && lastLot.materialType === 'Eletrodos Treliças') {
@@ -835,6 +1030,27 @@ const AddConferencePage: React.FC<{
                     description: lastLot.description || fallback?.description || 'H-8 LEVE',
                     quantity: defaultBars,
                     labelWeight: Math.round(unitW * defaultBars)
+                }
+            ]);
+        } else if (lastLot && lastLot.materialType === 'Malha') {
+            const nextLot = getNextMalhaInternalLot(stock, lots, conferences);
+            const defaultOpts = getGaugeOptionsForMaterial('Malha', gauges);
+            const fallback = defaultOpts[0];
+            const matchingGauge = gauges.find(g => g.materialType === 'Malha' && (g.productCode === lastLot.productCode || g.description === lastLot.description));
+            const unitW = parseFloat(matchingGauge?.peso_peca || matchingGauge?.peso_final || fallback?.peso_peca || fallback?.peso_final || '4.274');
+            const defaultPcs = lastLot.quantity || 50;
+            setLots(prev => [
+                ...prev,
+                {
+                    internalLot: nextLot,
+                    runNumber: '-',
+                    steelType: '',
+                    bitola: lastLot.bitola || fallback?.gauge || '3.40',
+                    materialType: 'Malha',
+                    productCode: lastLot.productCode || fallback?.code || '4088',
+                    description: lastLot.description || fallback?.description || 'Q45 - 20X20 3,40MM',
+                    quantity: defaultPcs,
+                    labelWeight: Math.round(unitW * defaultPcs * 10) / 10
                 }
             ]);
         } else {
@@ -922,6 +1138,29 @@ const AddConferencePage: React.FC<{
                         nfe: prev.nfe || 'Produção Interna'
                     }));
                 }
+            } else if (value === 'Malha') {
+                const currentLotVal = newLots[index].internalLot?.trim() || '';
+                const isMlFormat = /^ML[-_]?\d+/i.test(currentLotVal);
+                if (!currentLotVal || !isMlFormat) {
+                    const otherLots = newLots.filter((_, i) => i !== index);
+                    const nextLot = getNextMalhaInternalLot(stock, otherLots, conferences);
+                    newLots[index].internalLot = nextLot;
+                }
+                newLots[index].runNumber = newLots[index].runNumber || '-';
+                newLots[index].steelType = '';
+                newLots[index].quantity = newLots[index].quantity || 50;
+                const unitW = parseFloat(opts[0]?.peso_peca || opts[0]?.peso_final || '4.274');
+                newLots[index].labelWeight = Math.round(unitW * (newLots[index].quantity || 50) * 10) / 10;
+                const cNum = conferenceData.conferenceNumber.trim();
+                if (!cNum || !cNum.toUpperCase().includes('ML')) {
+                    const nextConf = getNextMalhaConferenceNumber(conferences, stock);
+                    setConferenceData(prev => ({ 
+                        ...prev, 
+                        conferenceNumber: nextConf, 
+                        supplier: prev.supplier || 'Produção Própria - MSM',
+                        nfe: prev.nfe || 'Produção Interna'
+                    }));
+                }
             }
         }
 
@@ -934,13 +1173,18 @@ const AddConferencePage: React.FC<{
         const selected = opts.find(o => o.key === key);
         if (selected) {
             const newLots = [...lots];
-            const oldUnitW = parseFloat(currentLot?.materialType === 'Treliça' ? (opts.find(o => o.code === currentLot.productCode)?.peso_final || '6.01') : '1');
-            const newUnitW = parseFloat(selected.peso_final || '6.01');
+            const oldUnitW = parseFloat(
+                currentLot?.materialType === 'Treliça' ? (opts.find(o => o.code === currentLot.productCode)?.peso_final || '6.01') :
+                currentLot?.materialType === 'Malha' ? (opts.find(o => o.code === currentLot.productCode)?.peso_peca || opts.find(o => o.code === currentLot.productCode)?.peso_final || '4.274') : '1'
+            );
+            const newUnitW = parseFloat(selected.peso_peca || selected.peso_final || '1');
 
-            const currentQty = newLots[index].quantity || (oldUnitW > 0 && currentLot?.labelWeight ? Math.max(1, Math.round(currentLot.labelWeight / oldUnitW)) : 100);
+            const currentQty = newLots[index].quantity || (oldUnitW > 0 && currentLot?.labelWeight ? Math.max(1, Math.round(currentLot.labelWeight / oldUnitW)) : (currentLot?.materialType === 'Malha' ? 50 : 100));
             let newLabelWeight = newLots[index].labelWeight;
             if (currentLot?.materialType === 'Treliça' && newUnitW > 0) {
                 newLabelWeight = Math.round(currentQty * newUnitW);
+            } else if (currentLot?.materialType === 'Malha' && newUnitW > 0) {
+                newLabelWeight = Math.round(currentQty * newUnitW * 10) / 10;
             }
 
             newLots[index] = {
@@ -948,7 +1192,7 @@ const AddConferencePage: React.FC<{
                 bitola: selected.gauge,
                 productCode: selected.code || '',
                 description: selected.description || '',
-                quantity: currentLot?.materialType === 'Treliça' ? currentQty : newLots[index].quantity,
+                quantity: (currentLot?.materialType === 'Treliça' || currentLot?.materialType === 'Malha') ? currentQty : newLots[index].quantity,
                 labelWeight: newLabelWeight
             };
             setLots(newLots);
@@ -1199,6 +1443,10 @@ const AddConferencePage: React.FC<{
                                     <span className="text-blue-800 bg-blue-100 text-[9px] font-extrabold px-1.5 py-0.5 rounded border border-blue-300">
                                         📐 Auto (CONF-TR-001+)
                                     </span>
+                                ) : isAnyMalha ? (
+                                    <span className="text-purple-800 bg-purple-100 text-[9px] font-extrabold px-1.5 py-0.5 rounded border border-purple-300">
+                                        🕸️ Auto (CONF-ML-001+)
+                                    </span>
                                 ) : null}
                             </div>
                             <div className="relative">
@@ -1206,11 +1454,12 @@ const AddConferencePage: React.FC<{
                                     type="text" 
                                     value={conferenceData.conferenceNumber} 
                                     onChange={e => setConferenceData({ ...conferenceData, conferenceNumber: e.target.value })} 
-                                    placeholder={isAnyElectrode ? "Ex: 10000" : isAnySabao ? "Ex: CONF-SB-001" : isAnyTrelica ? "Ex: CONF-TR-001" : ""}
+                                    placeholder={isAnyElectrode ? "Ex: 10000" : isAnySabao ? "Ex: CONF-SB-001" : isAnyTrelica ? "Ex: CONF-TR-001" : isAnyMalha ? "Ex: CONF-ML-001" : ""}
                                     className={`w-full p-2 border rounded text-center font-bold ${
                                         isAnyElectrode ? 'bg-amber-50/60 border-amber-300 text-slate-900' :
                                         isAnySabao ? 'bg-emerald-50/60 border-emerald-300 text-emerald-950' :
-                                        isAnyTrelica ? 'bg-blue-50/60 border-blue-300 text-blue-950' : ''
+                                        isAnyTrelica ? 'bg-blue-50/60 border-blue-300 text-blue-950' :
+                                        isAnyMalha ? 'bg-purple-50/60 border-purple-300 text-purple-950' : ''
                                     } ${conferenceNumberError ? 'border-red-500 bg-red-50' : ''}`} 
                                     required 
                                 />
@@ -1249,6 +1498,19 @@ const AddConferencePage: React.FC<{
                                         }}
                                         title="Recalcular conferência de treliça"
                                         className="absolute right-1 top-1 bottom-1 px-2 text-[10px] font-bold bg-blue-200 text-blue-900 rounded hover:bg-blue-300"
+                                    >
+                                        Auto
+                                    </button>
+                                )}
+                                {isAnyMalha && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const nextConf = getNextMalhaConferenceNumber(conferences, stock);
+                                            setConferenceData(prev => ({ ...prev, conferenceNumber: nextConf }));
+                                        }}
+                                        title="Recalcular conferência de malha"
+                                        className="absolute right-1 top-1 bottom-1 px-2 text-[10px] font-bold bg-purple-200 text-purple-900 rounded hover:bg-purple-300"
                                     >
                                         Auto
                                     </button>
@@ -1379,6 +1641,87 @@ const AddConferencePage: React.FC<{
                         </div>
                     )}
 
+                    {isAnyMalha && (
+                        <div className="bg-purple-50 border-2 border-purple-400 rounded-xl p-3.5 mx-6 mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm animate-fadeIn">
+                            <div className="flex items-center gap-2.5">
+                                <span className="text-2xl">🕸️</span>
+                                <div>
+                                    <p className="text-xs font-black text-purple-900 uppercase tracking-wide">
+                                        Entrada / Recebimento de Malhas Soldadas no Estoque
+                                    </p>
+                                    <p className="text-xs font-medium text-purple-800">
+                                        Lotes sequenciais exclusivos (<strong className="text-purple-950 font-bold">ML-0001+</strong>), conferência (<strong className="text-purple-950 font-bold">CONF-ML-001+</strong>) e peso automático por painel.
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setBatchMalhaModal(true)}
+                                className="bg-purple-600 hover:bg-purple-700 text-white font-black text-xs py-2 px-4 rounded-xl shadow transition flex items-center gap-2 self-end sm:self-center active:scale-95"
+                            >
+                                🕸️ Adicionar Painéis em Lote
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Modal para Adicionar Lote Rápido de Malha por Painéis */}
+                    {batchMalhaModal && (
+                        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-[130] flex items-center justify-center p-4">
+                            <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-slate-200 space-y-4 animate-scaleUp">
+                                <div className="flex items-center justify-between border-b pb-3">
+                                    <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                                        <span>🕸️</span> Gerar Lote de Malhas Soldadas
+                                    </h3>
+                                    <button onClick={() => setBatchMalhaModal(false)} className="text-slate-400 hover:text-slate-600">
+                                        <XIcon className="h-4 w-4" />
+                                    </button>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-600 mb-1">
+                                        Quantos painéis de malha chegaram?
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="5000"
+                                        value={batchMalhaQty}
+                                        onChange={e => setBatchMalhaQty(Math.max(1, parseInt(e.target.value) || 1))}
+                                        className="w-full p-2.5 border-2 border-purple-400 rounded-xl font-black text-center text-lg text-purple-900 bg-purple-50/40 outline-none"
+                                        autoFocus
+                                    />
+                                    {(() => {
+                                        const lastLot = lots[lots.length - 1];
+                                        const defaultOpts = getGaugeOptionsForMaterial('Malha', gauges);
+                                        const curOpt = defaultOpts.find(o => o.code === lastLot?.productCode || o.gauge === lastLot?.bitola) || defaultOpts[0];
+                                        const unitW = parseFloat(curOpt?.peso_peca || curOpt?.peso_final || '4.274');
+                                        return (
+                                            <p className="text-xs text-slate-500 mt-2 text-center">
+                                                Modelo: <strong className="text-purple-700">{curOpt?.description} ({curOpt?.code})</strong><br />
+                                                Total calculado: <strong className="text-purple-800 font-black">{Math.round(unitW * batchMalhaQty * 10) / 10} kg</strong> ({batchMalhaQty} painéis × {unitW} kg/pç)
+                                            </p>
+                                        );
+                                    })()}
+                                </div>
+                                <div className="flex gap-2 pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setBatchMalhaModal(false)}
+                                        className="w-1/2 py-2.5 rounded-xl border font-bold text-xs text-slate-600 hover:bg-slate-100"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleGenerateMalhaBatch(batchMalhaQty)}
+                                        className="w-1/2 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs shadow-md transition"
+                                    >
+                                        ✓ Adicionar Lote
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Modal para Adicionar Múltiplos Sacos de Sabão */}
                     {batchBagsModal && (
                         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-[130] flex items-center justify-center p-4">
@@ -1437,21 +1780,21 @@ const AddConferencePage: React.FC<{
                             <thead className="bg-slate-50 border-y">
                                 <tr>
                                     <th className="p-3 text-center font-bold text-slate-600 uppercase text-[10px]">
-                                        Lote Interno {isAnyElectrode ? <span className="text-amber-600 font-bold block text-[9px]">⚡ Auto (10001+)</span> : isAnySabao ? <span className="text-emerald-600 font-bold block text-[9px]">🧼 Auto (SB-0001+)</span> : isAnyTrelica ? <span className="text-blue-600 font-bold block text-[9px]">📐 Auto (TR-0001+)</span> : ''}
+                                        Lote Interno {isAnyElectrode ? <span className="text-amber-600 font-bold block text-[9px]">⚡ Auto (10001+)</span> : isAnySabao ? <span className="text-emerald-600 font-bold block text-[9px]">🧼 Auto (SB-0001+)</span> : isAnyTrelica ? <span className="text-blue-600 font-bold block text-[9px]">📐 Auto (TR-0001+)</span> : isAnyMalha ? <span className="text-purple-600 font-bold block text-[9px]">🕸️ Auto (ML-0001+)</span> : ''}
                                     </th>
                                     <th className="p-3 text-center font-bold text-slate-600 uppercase text-[10px]">Tipo de Aço</th>
                                     <th className="p-3 text-center font-bold text-slate-600 uppercase text-[10px]">Corrida</th>
                                     <th className="p-3 text-center font-bold text-slate-600 uppercase text-[10px]">Material</th>
                                     <th className="p-3 text-center font-bold text-slate-600 uppercase text-[10px]">
-                                        {isAnyElectrode ? 'Modelo / Código' : isAnySabao ? 'Embalagem / Produto' : isAnyTrelica ? 'Modelo / Ficha Técnica' : 'Bitola'}
+                                        {isAnyElectrode ? 'Modelo / Código' : isAnySabao ? 'Embalagem / Produto' : isAnyTrelica ? 'Modelo / Ficha Técnica' : isAnyMalha ? 'Modelo / Painel / Ficha Técnica' : 'Bitola'}
                                     </th>
-                                    {isAnyTrelica && (
-                                        <th className="p-3 text-center font-bold text-blue-900 uppercase text-[10px] w-36 bg-blue-50/60">
-                                            Quantidade (Barras)
+                                    {(isAnyTrelica || isAnyMalha) && (
+                                        <th className={`p-3 text-center font-bold uppercase text-[10px] w-36 ${isAnyMalha ? 'text-purple-900 bg-purple-50/60' : 'text-blue-900 bg-blue-50/60'}`}>
+                                            {isAnyMalha ? 'Quantidade (Painéis)' : 'Quantidade (Barras)'}
                                         </th>
                                     )}
                                     <th className="p-3 text-center font-bold text-slate-600 uppercase text-[10px]">
-                                        {isAnyElectrode ? 'Qtd (un)' : isAnySabao ? 'Peso (kg) / Saco' : isAnyTrelica ? 'Peso do Pct (kg)' : 'Peso Etiqueta'}
+                                        {isAnyElectrode ? 'Qtd (un)' : isAnySabao ? 'Peso (kg) / Saco' : isAnyTrelica ? 'Peso do Pct (kg)' : isAnyMalha ? 'Peso Total (kg)' : 'Peso Etiqueta'}
                                     </th>
                                     <th className="p-3 text-center font-bold text-slate-600 uppercase text-[10px]"></th>
                                 </tr>
@@ -1465,11 +1808,12 @@ const AddConferencePage: React.FC<{
                                                     type="text" 
                                                     value={lot.internalLot || ''} 
                                                     onChange={e => handleLotChange(index, 'internalLot', e.target.value)} 
-                                                    placeholder={lot.materialType === 'Eletrodos Treliças' ? 'Ex: 10001' : lot.materialType === 'Sabão' ? 'Ex: SB-0001' : lot.materialType === 'Treliça' ? 'Ex: TR-0001' : ''}
+                                                    placeholder={lot.materialType === 'Eletrodos Treliças' ? 'Ex: 10001' : lot.materialType === 'Sabão' ? 'Ex: SB-0001' : lot.materialType === 'Treliça' ? 'Ex: TR-0001' : lot.materialType === 'Malha' ? 'Ex: ML-0001' : ''}
                                                     className={`w-full p-2 border rounded text-center font-bold ${
                                                         lot.materialType === 'Eletrodos Treliças' ? 'bg-amber-50/60 border-amber-300 text-amber-900' : 
                                                         lot.materialType === 'Sabão' ? 'bg-emerald-50/60 border-emerald-300 text-emerald-900' : 
-                                                        lot.materialType === 'Treliça' ? 'bg-blue-50/60 border-blue-300 text-blue-900' : ''
+                                                        lot.materialType === 'Treliça' ? 'bg-blue-50/60 border-blue-300 text-blue-900' : 
+                                                        lot.materialType === 'Malha' ? 'bg-purple-50/60 border-purple-300 text-purple-900' : ''
                                                     }`} 
                                                     required 
                                                 />
@@ -1509,11 +1853,23 @@ const AddConferencePage: React.FC<{
                                                         Auto
                                                     </button>
                                                 )}
+                                                {lot.materialType === 'Malha' && !lot.internalLot && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const nextLot = getNextMalhaInternalLot(stock, lots.filter((_, i) => i !== index), conferences);
+                                                            handleLotChange(index, 'internalLot', nextLot);
+                                                        }}
+                                                        className="absolute right-1 top-1 bottom-1 px-1.5 text-[9px] font-bold bg-purple-200 text-purple-900 rounded hover:bg-purple-300"
+                                                    >
+                                                        Auto
+                                                    </button>
+                                                )}
                                             </div>
                                             {duplicateErrors[index] && <p className="text-red-500 text-[9px] font-bold text-center mt-0.5">{duplicateErrors[index]}</p>}
                                         </td>
                                         <td className="p-2">
-                                            {lot.materialType === 'Eletrodos Treliças' || lot.materialType === 'Sabão' || lot.materialType === 'Treliça' ? (
+                                            {lot.materialType === 'Eletrodos Treliças' || lot.materialType === 'Sabão' || lot.materialType === 'Treliça' || lot.materialType === 'Malha' ? (
                                                 <span className="text-xs text-slate-400 font-bold block text-center">-</span>
                                             ) : (
                                                 <select value={lot.steelType || ''} onChange={e => handleLotChange(index, 'steelType', e.target.value)} className="w-full p-2 border rounded text-center" required>
@@ -1526,9 +1882,9 @@ const AddConferencePage: React.FC<{
                                                 type="text" 
                                                 value={lot.runNumber || ''} 
                                                 onChange={e => handleLotChange(index, 'runNumber', e.target.value)} 
-                                                placeholder={lot.materialType === 'Eletrodos Treliças' || lot.materialType === 'Sabão' || lot.materialType === 'Treliça' ? '-' : ''}
+                                                placeholder={lot.materialType === 'Eletrodos Treliças' || lot.materialType === 'Sabão' || lot.materialType === 'Treliça' || lot.materialType === 'Malha' ? '-' : ''}
                                                 className="w-full p-2 border rounded text-center" 
-                                                required={lot.materialType !== 'Eletrodos Treliças' && lot.materialType !== 'Sabão' && lot.materialType !== 'Treliça'} 
+                                                required={lot.materialType !== 'Eletrodos Treliças' && lot.materialType !== 'Sabão' && lot.materialType !== 'Treliça' && lot.materialType !== 'Malha'} 
                                             />
                                         </td>
                                         <td className="p-2">
@@ -1580,7 +1936,7 @@ const AddConferencePage: React.FC<{
                                                 );
                                             })()}
                                         </td>
-                                        {isAnyTrelica && (
+                                        {(isAnyTrelica || isAnyMalha) && (
                                             <td className="p-2 w-36">
                                                 {lot.materialType === 'Treliça' ? (
                                                     <div>
@@ -1614,6 +1970,38 @@ const AddConferencePage: React.FC<{
                                                             barras / pct
                                                         </span>
                                                     </div>
+                                                ) : lot.materialType === 'Malha' ? (
+                                                    <div>
+                                                        <div className="relative">
+                                                            <input
+                                                                type="number"
+                                                                min="1"
+                                                                value={lot.quantity ?? 50}
+                                                                onChange={e => {
+                                                                    const newQty = parseInt(e.target.value, 10) || 0;
+                                                                    const opts = getGaugeOptionsForMaterial('Malha', gauges);
+                                                                    const curOpt = opts.find(o => o.code === lot.productCode || o.gauge === lot.bitola) || opts[0];
+                                                                    const unitW = parseFloat(curOpt?.peso_peca || curOpt?.peso_final || '4.274');
+                                                                    const newLots = [...lots];
+                                                                    newLots[index] = {
+                                                                        ...newLots[index],
+                                                                        quantity: newQty,
+                                                                        labelWeight: newQty > 0 && unitW > 0 ? Math.round(newQty * unitW * 10) / 10 : newLots[index].labelWeight
+                                                                    };
+                                                                    setLots(newLots);
+                                                                }}
+                                                                className="w-full p-2 border-2 border-purple-300 bg-purple-50/50 rounded-lg font-black text-center text-purple-900 focus:bg-white focus:ring-2 focus:ring-purple-500 transition shadow-inner"
+                                                                placeholder="50"
+                                                                required
+                                                            />
+                                                            <span className="absolute right-2 top-2.5 text-[10px] font-bold text-purple-600 pointer-events-none">
+                                                                pç
+                                                            </span>
+                                                        </div>
+                                                        <span className="text-[10px] text-purple-700 font-bold block text-center mt-0.5">
+                                                            painéis
+                                                        </span>
+                                                    </div>
                                                 ) : (
                                                     <span className="text-xs text-slate-400 font-bold block text-center">-</span>
                                                 )}
@@ -1623,19 +2011,19 @@ const AddConferencePage: React.FC<{
                                             <div className="relative">
                                                 <input
                                                     type="text"
-                                                    inputMode="numeric"
                                                     value={lot.labelWeight || ''}
                                                     onChange={e => {
-                                                        const val = e.target.value.replace(/\D/g, '');
-                                                        handleLotChange(index, 'labelWeight', val ? parseInt(val) : 0);
+                                                        const val = e.target.value.replace(/[^\d.,]/g, '').replace(',', '.');
+                                                        handleLotChange(index, 'labelWeight', val ? parseFloat(val) : 0);
                                                     }}
                                                     className={`w-full p-2 border rounded font-bold text-center no-spinner ${
-                                                        lot.materialType === 'Treliça' ? 'border-blue-200 bg-blue-50/20' : ''
+                                                        lot.materialType === 'Treliça' ? 'border-blue-200 bg-blue-50/20' : 
+                                                        lot.materialType === 'Malha' ? 'border-purple-200 bg-purple-50/20' : ''
                                                     }`}
-                                                    placeholder={lot.materialType === 'Eletrodos Treliças' ? '1' : lot.materialType === 'Sabão' ? '25' : lot.materialType === 'Treliça' ? '600' : '0'}
+                                                    placeholder={lot.materialType === 'Eletrodos Treliças' ? '1' : lot.materialType === 'Sabão' ? '25' : lot.materialType === 'Treliça' ? '600' : lot.materialType === 'Malha' ? '213.7' : '0'}
                                                     required
                                                 />
-                                                {lot.materialType === 'Treliça' && (
+                                                {(lot.materialType === 'Treliça' || lot.materialType === 'Malha') && (
                                                     <span className="absolute right-2 top-2.5 text-[10px] font-bold text-slate-500 pointer-events-none">
                                                         kg
                                                     </span>
@@ -1650,6 +2038,18 @@ const AddConferencePage: React.FC<{
                                                 return (
                                                     <span className="text-[10px] text-slate-600 font-semibold block text-center mt-0.5">
                                                         {bars} barras • ~{avgUnitW} kg/barra {unitW > 0 && unitW.toFixed(2) !== avgUnitW ? `(padrão: ${unitW} kg)` : ''}
+                                                    </span>
+                                                );
+                                            })()}
+                                            {lot.materialType === 'Malha' && (() => {
+                                                const opts = getGaugeOptionsForMaterial('Malha', gauges);
+                                                const curOpt = opts.find(o => o.code === lot.productCode || o.gauge === lot.bitola) || opts[0];
+                                                const unitW = parseFloat(curOpt?.peso_peca || curOpt?.peso_final || '4.274');
+                                                const pcs = lot.quantity || (unitW > 0 && lot.labelWeight ? Math.round(lot.labelWeight / unitW) : 50);
+                                                const avgUnitW = pcs > 0 && lot.labelWeight ? (lot.labelWeight / pcs).toFixed(3) : unitW.toFixed(3);
+                                                return (
+                                                    <span className="text-[10px] text-slate-600 font-semibold block text-center mt-0.5">
+                                                        {pcs} painéis • ~{avgUnitW} kg/pç {unitW > 0 && unitW.toFixed(3) !== avgUnitW ? `(catálogo: ${unitW} kg)` : ''}
                                                     </span>
                                                 );
                                             })()}
@@ -2000,6 +2400,12 @@ const StockControl: React.FC<{
             inferior?: string;
             senozoide?: string;
             peso_final?: string;
+            peso_peca?: number;
+            longitudinal?: string;
+            transversal?: string;
+            linearMeters?: number;
+            meshSpacing?: string;
+            panelDimensions?: string;
         }> = [];
 
         // 1. Custom registered gauges from Cadastro
@@ -2051,6 +2457,24 @@ const StockControl: React.FC<{
                         peso_final: g.peso_final,
                         label: `${matPrefix}📐 ${desc}${tam}${code}`
                     });
+                } else if (g.materialType === 'Malha') {
+                    const desc = g.description || `Malha ${g.gauge}`;
+                    const code = g.productCode ? ` (${g.productCode})` : '';
+                    const weightText = g.peso_peca ? ` [${g.peso_peca} kg/pc]` : '';
+                    options.push({
+                        key,
+                        gauge: g.gauge,
+                        materialType: g.materialType,
+                        productCode: g.productCode,
+                        description: g.description,
+                        peso_peca: g.peso_peca,
+                        longitudinal: g.longitudinal,
+                        transversal: g.transversal,
+                        linearMeters: g.linearMeters,
+                        meshSpacing: g.meshSpacing,
+                        panelDimensions: g.panelDimensions,
+                        label: `${matPrefix}🕸️ ${desc}${code}${weightText}`
+                    });
                 } else {
                     const descText = g.description ? ` - ${g.description}` : '';
                     const codeText = g.productCode ? ` (${g.productCode})` : '';
@@ -2067,7 +2491,7 @@ const StockControl: React.FC<{
         });
 
         // 2. Default base gauges ONLY if a material has ZERO registered gauges in DB
-        const materialsToInclude = materialFilter ? [materialFilter] : ['Fio Máquina', 'CA-60', 'Eletrodos Treliças', 'Sabão', 'Treliça'];
+        const materialsToInclude = materialFilter ? [materialFilter] : ['Fio Máquina', 'CA-60', 'Eletrodos Treliças', 'Sabão', 'Treliça', 'Malha'];
         materialsToInclude.forEach(mat => {
             const registeredCount = gauges.filter(g => g.materialType === mat).length;
             if (registeredCount === 0) {
@@ -2120,6 +2544,29 @@ const StockControl: React.FC<{
                                 senozoide: tg.senozoide,
                                 peso_final: tg.peso_final,
                                 label: `${matPrefix}📐 ${tg.description}${tam}${code}`
+                            });
+                        }
+                    });
+                } else if (mat === 'Malha') {
+                    DefaultMalhaGauges.forEach(mg => {
+                        const key = `Malha::${mg.gauge}::${mg.productCode}::${mg.description}`;
+                        const matPrefix = !materialFilter ? `[Malha] ` : '';
+                        const code = mg.productCode ? ` (${mg.productCode})` : '';
+                        const weightText = mg.peso_peca ? ` [${mg.peso_peca} kg/pc]` : '';
+                        if (!options.some(o => o.key === key)) {
+                            options.push({
+                                key,
+                                gauge: mg.gauge,
+                                materialType: 'Malha',
+                                productCode: mg.productCode,
+                                description: mg.description,
+                                peso_peca: mg.peso_peca,
+                                longitudinal: mg.longitudinal,
+                                transversal: mg.transversal,
+                                linearMeters: mg.linearMeters,
+                                meshSpacing: mg.meshSpacing,
+                                panelDimensions: mg.panelDimensions,
+                                label: `${matPrefix}🕸️ ${mg.description}${code}${weightText}`
                             });
                         }
                     });
@@ -2199,6 +2646,18 @@ const StockControl: React.FC<{
                         senozoide: (i as any).senozoide,
                         label: `${matPrefix}📐 ${desc}${codeText}`
                     });
+                } else if (i.materialType === 'Malha') {
+                    const desc = i.description || `Malha ${i.bitola}`;
+                    const codeText = code ? ` (${code})` : '';
+                    options.push({
+                        key,
+                        gauge: i.bitola,
+                        materialType: i.materialType,
+                        productCode: code,
+                        description: desc,
+                        peso_peca: (i as any).peso_peca,
+                        label: `${matPrefix}🕸️ ${desc}${codeText}`
+                    });
                 } else {
                     const desc = i.description || `${i.materialType} ${i.bitola.replace('.', ',')} mm`;
                     const codeText = code ? ` (${code})` : '';
@@ -2219,6 +2678,11 @@ const StockControl: React.FC<{
                 return a.materialType.localeCompare(b.materialType);
             }
             if (a.materialType === 'Treliça') {
+                const descComp = (a.description || '').localeCompare(b.description || '');
+                if (descComp !== 0) return descComp;
+                return (a.productCode || a.gauge).localeCompare(b.productCode || b.gauge);
+            }
+            if (a.materialType === 'Malha') {
                 const descComp = (a.description || '').localeCompare(b.description || '');
                 if (descComp !== 0) return descComp;
                 return (a.productCode || a.gauge).localeCompare(b.productCode || b.gauge);
@@ -2268,6 +2732,34 @@ const StockControl: React.FC<{
             }
         });
 
+        // Index default malhas
+        DefaultMalhaGauges.forEach(mg => {
+            const fakeG: StockGauge = {
+                id: mg.id || `default_ml_${mg.productCode}`,
+                materialType: 'Malha',
+                gauge: mg.gauge,
+                productCode: mg.productCode,
+                description: mg.description,
+                longitudinal: mg.longitudinal,
+                transversal: mg.transversal,
+                linearMeters: mg.linearMeters,
+                meshSpacing: mg.meshSpacing,
+                panelDimensions: mg.panelDimensions,
+                peso_peca: mg.peso_peca
+            };
+            if (mg.productCode) {
+                map.set(`Malha::${mg.gauge}::${mg.productCode}`, fakeG);
+                map.set(`Malha::${mg.productCode}`, fakeG);
+            }
+            if (mg.description) {
+                map.set(`Malha::${mg.gauge}::${mg.description}`, fakeG);
+                map.set(`Malha::${mg.description}`, fakeG);
+            }
+            if (!map.has(`Malha::${mg.gauge}`)) {
+                map.set(`Malha::${mg.gauge}`, fakeG);
+            }
+        });
+
         // Index DB gauges
         for (const g of gauges) {
             if (g.productCode) {
@@ -2296,7 +2788,13 @@ const StockControl: React.FC<{
             superior: opt.superior || matchingG?.superior,
             inferior: opt.inferior || matchingG?.inferior,
             senozoide: opt.senozoide || matchingG?.senozoide,
-            peso_final: opt.peso_final || matchingG?.peso_final
+            peso_final: opt.peso_final || matchingG?.peso_final,
+            peso_peca: opt.peso_peca || matchingG?.peso_peca,
+            longitudinal: opt.longitudinal || matchingG?.longitudinal,
+            transversal: opt.transversal || matchingG?.transversal,
+            linearMeters: opt.linearMeters || matchingG?.linearMeters,
+            meshSpacing: opt.meshSpacing || matchingG?.meshSpacing,
+            panelDimensions: opt.panelDimensions || matchingG?.panelDimensions
         };
     }, [bitolaFilter, availableBitolaOptions, gaugeLookupMap]);
 
@@ -2579,6 +3077,20 @@ const StockControl: React.FC<{
                 const unitW = parseFloat((matchingGauge?.peso_final || '').replace(',', '.') || '0');
                 const bars = item.quantity || (item.history?.find((h: any) => h.details?.quantity)?.details?.quantity) || (unitW > 0 && item.remainingQuantity ? Math.round(item.remainingQuantity / unitW) : 0);
                 pieces = Number(bars) || 0;
+            } else if (materialFilter === 'Malha') {
+                const matchingGauge = (gauges || []).find(g =>
+                    g.materialType === 'Malha' && (
+                    (item.productCode && g.productCode === item.productCode) ||
+                    (item.description && g.description === item.description) ||
+                    (g.gauge === item.bitola)
+                )) || DefaultMalhaGauges.find(g =>
+                    (item.productCode && g.productCode === item.productCode) ||
+                    (item.description && g.description === item.description) ||
+                    (g.gauge === item.bitola)
+                );
+                const unitW = Number((item as any).peso_peca || matchingGauge?.peso_peca || 0);
+                const panels = item.quantity || (item.history?.find((h: any) => h.details?.quantity)?.details?.quantity) || (unitW > 0 && item.remainingQuantity ? Math.round(item.remainingQuantity / unitW) : 0);
+                pieces = Number(panels) || 0;
             }
             return {
                 count: acc.count + 1,
@@ -2607,7 +3119,7 @@ const StockControl: React.FC<{
         }
     };
 
-    if (isAdding) return <AddConferencePage onClose={() => setIsAdding(false)} onSubmit={addConference} stock={stock} onShowReport={setReportView} conferences={conferences} onEditConference={editConference} onDeleteConference={deleteConference} gauges={gauges} isGestor={isGestor} setPage={setPage} initialMaterialType={materialFilter === 'Eletrodos Treliças' ? 'Eletrodos Treliças' : materialFilter === 'Sabão' ? 'Sabão' : materialFilter === 'Treliça' ? 'Treliça' : undefined} />;
+    if (isAdding) return <AddConferencePage onClose={() => setIsAdding(false)} onSubmit={addConference} stock={stock} onShowReport={setReportView} conferences={conferences} onEditConference={editConference} onDeleteConference={deleteConference} gauges={gauges} isGestor={isGestor} setPage={setPage} initialMaterialType={materialFilter === 'Eletrodos Treliças' ? 'Eletrodos Treliças' : materialFilter === 'Sabão' ? 'Sabão' : materialFilter === 'Treliça' ? 'Treliça' : materialFilter === 'Malha' ? 'Malha' : undefined} />;
 
     return (
         <div className={`p-4 md:p-8 space-y-6 ${isPrintModalOpen ? 'print:hidden' : ''}`}>
@@ -2702,7 +3214,7 @@ const StockControl: React.FC<{
                         </div>
                         <div className="bg-white p-2 rounded-xl shadow border flex items-center gap-2 px-4 shrink-0">
                             <label className="text-[10px] font-bold text-slate-500 uppercase">
-                                {materialFilter === 'Eletrodos Treliças' ? 'Modelo' : materialFilter === 'Sabão' ? 'Apresentação' : materialFilter === 'Treliça' ? 'Modelo' : 'Bitola'}
+                                {materialFilter === 'Eletrodos Treliças' ? 'Modelo' : materialFilter === 'Sabão' ? 'Apresentação' : (materialFilter === 'Treliça' || materialFilter === 'Malha') ? 'Modelo' : 'Bitola'}
                             </label>
                             <select 
                                 value={bitolaFilter} 
@@ -2710,7 +3222,7 @@ const StockControl: React.FC<{
                                 className="bg-transparent outline-none font-bold text-sm min-w-[140px] max-w-[340px] md:max-w-[420px] cursor-pointer"
                                 title={selectedGaugeOption?.label || "Selecione o modelo ou bitola"}
                             >
-                                <option value="">{materialFilter === 'Eletrodos Treliças' ? 'Todos os Modelos' : materialFilter === 'Sabão' ? 'Todas' : materialFilter === 'Treliça' ? 'Todos os Modelos' : 'Todas'}</option>
+                                <option value="">{materialFilter === 'Eletrodos Treliças' ? 'Todos os Modelos' : materialFilter === 'Sabão' ? 'Todas' : (materialFilter === 'Treliça' || materialFilter === 'Malha') ? 'Todos os Modelos' : 'Todas'}</option>
                                 {!materialFilter ? (
                                     <>
                                         <optgroup label="Fio Máquina">
@@ -2735,6 +3247,11 @@ const StockControl: React.FC<{
                                         </optgroup>
                                         <optgroup label="Treliças">
                                             {availableBitolaOptions.filter(o => o.materialType === 'Treliça').map(o => (
+                                                <option key={o.key} value={o.key}>{o.label}</option>
+                                            ))}
+                                        </optgroup>
+                                        <optgroup label="Malhas">
+                                            {availableBitolaOptions.filter(o => o.materialType === 'Malha').map(o => (
                                                 <option key={o.key} value={o.key}>{o.label}</option>
                                             ))}
                                         </optgroup>
@@ -2797,6 +3314,12 @@ const StockControl: React.FC<{
                                     <span className="text-xl font-black text-[#0F3F5C]">{stats.pieces.toLocaleString('pt-BR')}</span>
                                 </div>
                             )}
+                            {materialFilter === 'Malha' && (
+                                <div className="flex flex-col border-l pl-4 ml-0">
+                                    <span className="text-[10px] font-bold text-purple-600 uppercase tracking-wider">Peças (Painéis)</span>
+                                    <span className="text-xl font-black text-purple-700">{stats.pieces.toLocaleString('pt-BR')}</span>
+                                </div>
+                            )}
                             <div className="flex flex-col border-l pl-4 ml-0">
                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                                     {materialFilter === 'Eletrodos Treliças' ? 'Peças Disponíveis' : 'Kg Disponível'}
@@ -2848,10 +3371,10 @@ const StockControl: React.FC<{
                 </div>
                 <div className="bg-white p-2 rounded-lg shadow border flex items-center gap-2 px-4 shadow-sm">
                     <label className="text-[10px] font-bold text-slate-500">
-                        {materialFilter === 'Eletrodos Treliças' ? 'Mod:' : materialFilter === 'Sabão' ? 'Emb:' : materialFilter === 'Treliça' ? 'Mod:' : 'Ø:'}
+                        {materialFilter === 'Eletrodos Treliças' ? 'Mod:' : materialFilter === 'Sabão' ? 'Emb:' : (materialFilter === 'Treliça' || materialFilter === 'Malha') ? 'Mod:' : 'Ø:'}
                     </label>
                     <select value={bitolaFilter} onChange={e => setBitolaFilter(e.target.value)} className="bg-transparent outline-none font-bold text-xs max-w-[200px]">
-                        <option value="">{materialFilter === 'Eletrodos Treliças' ? 'Todos' : materialFilter === 'Treliça' ? 'Todos' : 'Todas'}</option>
+                        <option value="">{materialFilter === 'Eletrodos Treliças' ? 'Todos' : (materialFilter === 'Treliça' || materialFilter === 'Malha') ? 'Todos' : 'Todas'}</option>
                         {!materialFilter ? (
                             <>
                                 <optgroup label="Fio Máquina">
@@ -2876,6 +3399,11 @@ const StockControl: React.FC<{
                                 </optgroup>
                                 <optgroup label="Treliças">
                                     {availableBitolaOptions.filter(o => o.materialType === 'Treliça').map(o => (
+                                        <option key={o.key} value={o.key}>{o.label}</option>
+                                    ))}
+                                </optgroup>
+                                <optgroup label="Malhas">
+                                    {availableBitolaOptions.filter(o => o.materialType === 'Malha').map(o => (
                                         <option key={o.key} value={o.key}>{o.label}</option>
                                     ))}
                                 </optgroup>
@@ -3202,6 +3730,7 @@ const StockControl: React.FC<{
                             <div className="flex items-center gap-2 flex-wrap">
                                 <span className="bg-blue-500/20 text-blue-200 border border-blue-400/30 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full">
                                     {selectedGaugeOption.materialType === 'Treliça' ? '📐 Modelo de Treliça' :
+                                     selectedGaugeOption.materialType === 'Malha' ? '🕸️ Malha Soldada' :
                                      selectedGaugeOption.materialType === 'Eletrodos Treliças' ? '⚡ Eletrodo Treliça' :
                                      selectedGaugeOption.materialType === 'Sabão' ? '🧼 Sabão de Trefila' :
                                      `⚙️ ${selectedGaugeOption.materialType}`}
@@ -3225,7 +3754,40 @@ const StockControl: React.FC<{
                             </div>
 
                             {/* Especificações Técnicas (Fios, Bitolas, Peso) */}
-                            {(selectedGaugeOption.superior || selectedGaugeOption.inferior || selectedGaugeOption.senozoide || selectedGaugeOption.peso_final) ? (
+                            {selectedGaugeOption.materialType === 'Malha' ? (
+                                <div className="flex flex-wrap items-center gap-2 pt-1">
+                                    {selectedGaugeOption.meshSpacing && (
+                                        <div className="bg-white/10 backdrop-blur-md px-3 py-1 rounded-lg border border-white/10 text-xs">
+                                            <span className="text-purple-300 text-[10px] font-bold uppercase block">Malha</span>
+                                            <span className="font-black text-white text-sm">{selectedGaugeOption.meshSpacing}</span>
+                                        </div>
+                                    )}
+                                    {selectedGaugeOption.longitudinal && (
+                                        <div className="bg-white/10 backdrop-blur-md px-3 py-1 rounded-lg border border-white/10 text-xs">
+                                            <span className="text-purple-300 text-[10px] font-bold uppercase block">Fio Long.</span>
+                                            <span className="font-black text-white text-sm">Ø {selectedGaugeOption.longitudinal} mm</span>
+                                        </div>
+                                    )}
+                                    {selectedGaugeOption.transversal && (
+                                        <div className="bg-white/10 backdrop-blur-md px-3 py-1 rounded-lg border border-white/10 text-xs">
+                                            <span className="text-purple-300 text-[10px] font-bold uppercase block">Fio Trans.</span>
+                                            <span className="font-black text-white text-sm">Ø {selectedGaugeOption.transversal} mm</span>
+                                        </div>
+                                    )}
+                                    {selectedGaugeOption.panelDimensions && (
+                                        <div className="bg-white/10 backdrop-blur-md px-3 py-1 rounded-lg border border-white/10 text-xs">
+                                            <span className="text-purple-300 text-[10px] font-bold uppercase block">Painel</span>
+                                            <span className="font-black text-white text-sm">{selectedGaugeOption.panelDimensions}</span>
+                                        </div>
+                                    )}
+                                    {selectedGaugeOption.peso_peca && (
+                                        <div className="bg-white/10 backdrop-blur-md px-3 py-1 rounded-lg border border-white/10 text-xs">
+                                            <span className="text-emerald-300 text-[10px] font-bold uppercase block">Peso Estimado</span>
+                                            <span className="font-black text-emerald-200 text-sm">{selectedGaugeOption.peso_peca} kg/pc</span>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (selectedGaugeOption.superior || selectedGaugeOption.inferior || selectedGaugeOption.senozoide || selectedGaugeOption.peso_final) ? (
                                 <div className="flex flex-wrap items-center gap-2 pt-1">
                                     {selectedGaugeOption.superior && (
                                         <div className="bg-white/10 backdrop-blur-md px-3 py-1 rounded-lg border border-white/10 text-xs">
@@ -3289,7 +3851,8 @@ const StockControl: React.FC<{
                                 <div className="text-left lg:text-right">
                                     <span className="text-[10px] font-black uppercase tracking-wider text-blue-300 block">
                                         {selectedGaugeOption.materialType === 'Eletrodos Treliças' ? 'Peças Disponíveis' :
-                                         selectedGaugeOption.materialType === 'Treliça' ? 'Barras / Volume' : 'Disponível'}
+                                         selectedGaugeOption.materialType === 'Treliça' ? 'Barras / Volume' :
+                                         selectedGaugeOption.materialType === 'Malha' ? 'Painéis / Peso' : 'Disponível'}
                                     </span>
                                     <span className="text-2xl font-black text-emerald-400">
                                         {selectedGaugeOption.materialType === 'Eletrodos Treliças'
@@ -3337,8 +3900,8 @@ const StockControl: React.FC<{
                                 )}
                                 <th className="p-3 text-center">Tipo Aço</th>
                                 <th className="p-3 text-center">Mat.</th>
-                                <th className="p-3 text-center min-w-[200px]">{materialFilter === 'Eletrodos Treliças' ? 'Modelo / Código' : materialFilter === 'Sabão' ? 'Embalagem / Produto' : materialFilter === 'Treliça' ? 'Modelo / Ficha Técnica' : 'Bitola'}</th>
-                                <th className={`p-3 text-center ${materialFilter === 'Treliça' ? 'min-w-[170px]' : ''}`}>{materialFilter === 'Eletrodos Treliças' ? 'Qtd (un)' : materialFilter === 'Sabão' ? 'Peso (kg / saco)' : materialFilter === 'Treliça' ? 'Qtd / Peso (kg)' : 'Peso (kg)'}</th>
+                                <th className="p-3 text-center min-w-[200px]">{materialFilter === 'Eletrodos Treliças' ? 'Modelo / Código' : materialFilter === 'Sabão' ? 'Embalagem / Produto' : (materialFilter === 'Treliça' || materialFilter === 'Malha') ? 'Modelo / Ficha Técnica' : 'Bitola'}</th>
+                                <th className={`p-3 text-center ${(materialFilter === 'Treliça' || materialFilter === 'Malha') ? 'min-w-[170px]' : ''}`}>{materialFilter === 'Eletrodos Treliças' ? 'Qtd (un)' : materialFilter === 'Sabão' ? 'Peso (kg / saco)' : materialFilter === 'Treliça' ? 'Qtd / Peso (kg)' : materialFilter === 'Malha' ? 'Painéis / Peso (kg)' : 'Peso (kg)'}</th>
                                 <th className="p-3 text-center">Status</th>
                                 <th className="p-3 text-center no-print">Ações</th>
                             </tr>
@@ -3412,7 +3975,7 @@ const StockControl: React.FC<{
                                             {details.supplier || '-'}
                                         </td>
                                     )}
-                                    <td className="p-3 text-center font-bold text-slate-600">{(item.materialType === 'Eletrodos Treliças' || item.materialType === 'Sabão' || item.materialType === 'Treliça') ? '-' : (item.steelType || '-')}</td>
+                                    <td className="p-3 text-center font-bold text-slate-600">{(item.materialType === 'Eletrodos Treliças' || item.materialType === 'Sabão' || item.materialType === 'Treliça' || item.materialType === 'Malha') ? '-' : (item.steelType || '-')}</td>
                                     <td className="p-3 text-center text-slate-500 font-semibold">
                                         {item.materialType === 'Sabão' ? (
                                             <span className="inline-flex items-center gap-1 font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
@@ -3421,6 +3984,10 @@ const StockControl: React.FC<{
                                         ) : item.materialType === 'Treliça' ? (
                                             <span className="inline-flex items-center gap-1 font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
                                                 📐 Treliça
+                                            </span>
+                                        ) : item.materialType === 'Malha' ? (
+                                            <span className="inline-flex items-center gap-1 font-bold text-purple-800 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+                                                🕸️ Malha
                                             </span>
                                         ) : item.materialType}
                                     </td>
@@ -3486,12 +4053,52 @@ const StockControl: React.FC<{
                                                                 </span>
                                                             )}
                                                             <span className="font-black text-slate-900 text-sm tracking-tight">
-                                                                {item.description || matchingGauge?.description || `Treliça ${item.bitola}`}
-                                                            </span>
+                                                                    {item.description || matchingGauge?.description || `Treliça ${item.bitola}`}
+                                                                </span>
                                                             {(matchingGauge?.tamanho || (item as any).tamanho) && (
                                                                 <span className="text-xs font-black text-white bg-blue-600 px-2 py-0.5 rounded shadow-2xs">
                                                                     {matchingGauge?.tamanho || (item as any).tamanho}m
                                                                 </span>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })()
+                                             ) : item.materialType === 'Malha' ? (
+                                                (() => {
+                                                    const code = item.productCode || matchingGauge?.productCode;
+                                                    const long = matchingGauge?.longitudinal || (item as any).longitudinal;
+                                                    const trans = matchingGauge?.transversal || (item as any).transversal;
+                                                    const mesh = matchingGauge?.meshSpacing || (item as any).meshSpacing;
+                                                    const panel = matchingGauge?.panelDimensions || (item as any).panelDimensions;
+                                                    const peso = matchingGauge?.peso_peca || (item as any).peso_peca;
+                                                    const techInfo = [
+                                                        panel ? `Painel: ${panel}` : '',
+                                                        mesh ? `Malha: ${mesh}` : '',
+                                                        long ? `Long: ${long}mm` : '',
+                                                        trans ? `Trans: ${trans}mm` : '',
+                                                        peso ? `Peso: ${peso} kg/pc` : ''
+                                                    ].filter(Boolean).join(' • ');
+
+                                                    return (
+                                                        <div 
+                                                            className="flex flex-col items-center justify-center gap-1"
+                                                            title={techInfo ? `Ficha Técnica: ${techInfo}` : undefined}
+                                                        >
+                                                            <div className="flex items-center gap-1.5 justify-center flex-wrap">
+                                                                {code && (
+                                                                    <span className="text-[11px] font-mono font-black text-purple-900 bg-purple-100 px-2 py-0.5 rounded border border-purple-300 uppercase shadow-2xs whitespace-nowrap">
+                                                                        Cód. {code}
+                                                                    </span>
+                                                                )}
+                                                                <span className="font-black text-slate-900 text-sm tracking-tight">
+                                                                    {item.description || matchingGauge?.description || `Malha ${item.bitola}`}
+                                                                </span>
+                                                            </div>
+                                                            {(mesh || panel) && (
+                                                                <div className="flex items-center gap-1 text-[11px] text-purple-700 font-bold bg-purple-50/70 px-2 py-0.5 rounded border border-purple-100">
+                                                                    {mesh && <span>📐 {mesh}</span>}
+                                                                    {panel && <span>({panel})</span>}
+                                                                </div>
                                                             )}
                                                         </div>
                                                     );
@@ -3551,9 +4158,37 @@ const StockControl: React.FC<{
                                                      );
                                                  })()}
                                              </div>
-                                        ) : (
-                                            item.remainingQuantity.toFixed(2)
-                                        )}
+                                         ) : item.materialType === 'Malha' ? (
+                                             <div className="flex flex-col items-center justify-center">
+                                                 {(() => {
+                                                     const unitW = Number(matchingGauge?.peso_peca || (item as any).peso_peca || 0);
+                                                     const panels = item.quantity || details.quantity || (item.history?.find((h: any) => h.details?.quantity)?.details?.quantity) || (unitW > 0 && item.remainingQuantity ? Math.round(item.remainingQuantity / unitW) : null);
+                                                     const avgKgPerPanel = panels && panels > 0 && item.remainingQuantity ? (item.remainingQuantity / panels).toFixed(2) : (unitW > 0 ? unitW.toFixed(2) : null);
+
+                                                     return (
+                                                         <>
+                                                             <div className="flex items-center gap-2 justify-center flex-wrap">
+                                                                 {panels ? (
+                                                                     <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-black bg-purple-100 text-purple-900 border border-purple-300 shadow-2xs" title="Quantidade de painéis de malha">
+                                                                         {panels} <span className="text-[10px] font-semibold text-purple-700 ml-1">painéis</span>
+                                                                     </span>
+                                                                 ) : null}
+                                                                 <span className="font-black text-slate-900 text-sm whitespace-nowrap">
+                                                                     {item.remainingQuantity.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} <span className="text-[10px] text-purple-700 font-bold">kg</span>
+                                                                 </span>
+                                                             </div>
+                                                             {avgKgPerPanel && (
+                                                                 <span className="text-[10px] text-slate-500 font-semibold block mt-0.5 whitespace-nowrap" title={unitW > 0 ? `Referência técnica: ${unitW} kg/painel` : undefined}>
+                                                                     ~{avgKgPerPanel} kg/painel
+                                                                 </span>
+                                                             )}
+                                                         </>
+                                                     );
+                                                 })()}
+                                             </div>
+                                         ) : (
+                                             item.remainingQuantity.toFixed(2)
+                                         )}
                                     </td>
                                     <td className="p-3 text-center">{getStatusBadge(item.status)}</td>
                                     <td className="p-3 flex justify-center gap-2 no-print">
@@ -4137,7 +4772,7 @@ const EditStockItemModal: React.FC<{ item: StockItem; onClose: () => void; onSav
                             </select>
                         </div>
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-slate-500 uppercase">{formData.materialType === 'Sabão' ? 'Embalagem & Produto' : formData.materialType === 'Eletrodos Treliças' ? 'Modelo & Código' : formData.materialType === 'Treliça' ? 'Modelo & Ficha Técnica' : 'Bitola & Descrição'}</label>
+                            <label className="text-xs font-bold text-slate-500 uppercase">{formData.materialType === 'Sabão' ? 'Embalagem & Produto' : formData.materialType === 'Eletrodos Treliças' ? 'Modelo & Código' : (formData.materialType === 'Treliça' || formData.materialType === 'Malha') ? 'Modelo & Ficha Técnica' : 'Bitola & Descrição'}</label>
                             {(() => {
                                 const opts = getGaugeOptionsForMaterial(formData.materialType, gauges);
                                 const currentKey = opts.find(o => 
@@ -4205,9 +4840,41 @@ const EditStockItemModal: React.FC<{ item: StockItem; onClose: () => void; onSav
                         </div>
                     )}
 
+                    {formData.materialType === 'Malha' && (
+                        <div className="bg-purple-50/70 p-3 rounded-xl border border-purple-200">
+                            <label className="text-xs font-bold text-purple-900 uppercase block mb-1">Quantidade de Painéis (no lote)</label>
+                            <div className="relative">
+                                <input
+                                    type="number"
+                                    min="1"
+                                    value={formData.quantity || ''}
+                                    placeholder="Ex: 50"
+                                    onChange={e => {
+                                        const q = parseInt(e.target.value) || 0;
+                                        setFormData(p => {
+                                            const opts = getGaugeOptionsForMaterial('Malha', gauges);
+                                            const curOpt = opts.find(o => o.code === p.productCode || o.gauge === p.bitola) || opts[0];
+                                            const unitW = Number(curOpt?.peso_peca || 0);
+                                            return {
+                                                ...p,
+                                                quantity: q,
+                                                remainingQuantity: q > 0 && unitW > 0 ? Math.round(q * unitW) : p.remainingQuantity
+                                            };
+                                        });
+                                    }}
+                                    className="w-full px-3 py-2 bg-white border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none font-bold text-purple-900"
+                                />
+                                <span className="absolute right-3 top-2 text-xs font-bold text-purple-600">painéis</span>
+                            </div>
+                            <span className="text-[10px] text-purple-700 block mt-1">
+                                Ao alterar a quantidade de painéis, o peso total é recalculado automaticamente com base no peso por peça.
+                            </span>
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-slate-500 uppercase">{formData.materialType === 'Treliça' ? 'Peso do Pacote (kg)' : 'Peso Atual (kg)'}</label>
+                            <label className="text-xs font-bold text-slate-500 uppercase">{formData.materialType === 'Treliça' ? 'Peso do Pacote (kg)' : formData.materialType === 'Malha' ? 'Peso Total (kg)' : 'Peso Atual (kg)'}</label>
                             <input
                                 type="text"
                                 inputMode="numeric"

@@ -94,13 +94,15 @@ export const StockMovementsTable: React.FC<StockMovementsTableProps> = ({
                     steelType: item.steelType,
                     type: 'Entrada Compra',
                     locationFrom: item.supplier || conf?.supplier || 'Fornecedor',
-                    locationTo: item.materialType === 'Treliça' 
-                        ? 'Estoque Treliças' 
-                        : item.materialType === 'Eletrodos Treliças' 
-                            ? 'Estoque Eletrodos' 
-                            : item.materialType === 'Sabão'
-                                ? 'Almoxarifado Sabão'
-                                : 'Estoque Matéria-Prima',
+                    locationTo: item.materialType === 'Malha'
+                        ? 'Estoque Malhas'
+                        : item.materialType === 'Treliça' 
+                            ? 'Estoque Treliças' 
+                            : item.materialType === 'Eletrodos Treliças' 
+                                ? 'Estoque Eletrodos' 
+                                : item.materialType === 'Sabão'
+                                    ? 'Almoxarifado Sabão'
+                                    : 'Estoque Matéria-Prima',
                     quantity: initialQty,
                     unit: itemUnit,
                     responsible: conf?.operator || 'Recepção / Almoxarifado',
@@ -141,7 +143,11 @@ export const StockMovementsTable: React.FC<StockMovementsTableProps> = ({
                             bitola: item.bitola,
                             steelType: item.steelType,
                             type: 'Saída Produção',
-                            locationFrom: 'Estoque Matéria-Prima',
+                            locationFrom: item.materialType === 'Malha'
+                                ? 'Estoque Malhas'
+                                : item.materialType === 'Treliça'
+                                    ? 'Estoque Treliças'
+                                    : 'Estoque Matéria-Prima',
                             locationTo: h.details?.['Motivo'] || 'Linha de Produção',
                             quantity: deductedQty,
                             unit: itemUnit,
@@ -222,7 +228,11 @@ export const StockMovementsTable: React.FC<StockMovementsTableProps> = ({
                     bitola: item.bitola,
                     steelType: item.steelType,
                     type: 'Saída Produção',
-                    locationFrom: 'Estoque Matéria-Prima',
+                    locationFrom: item.materialType === 'Malha'
+                        ? 'Estoque Malhas'
+                        : item.materialType === 'Treliça'
+                            ? 'Estoque Treliças'
+                            : 'Estoque Matéria-Prima',
                     locationTo: item.status === 'Consumido' ? 'Consumo Total' : 'Produção',
                     quantity: diff,
                     unit: itemUnit,
@@ -257,6 +267,8 @@ export const StockMovementsTable: React.FC<StockMovementsTableProps> = ({
                     if (!movMat.includes('sabão') && !movMat.includes('sabao')) return false;
                 } else if (filterMat === 'treliça') {
                     if (!movMat.includes('treliça') && !movMat.includes('trelica')) return false;
+                } else if (filterMat === 'malha') {
+                    if (!movMat.includes('malha')) return false;
                 } else if (movMat !== filterMat) {
                     return false;
                 }
@@ -577,7 +589,7 @@ export const StockMovementsTable: React.FC<StockMovementsTableProps> = ({
                                         <td className="p-3.5 whitespace-nowrap">
                                             <div className="flex flex-col">
                                                 <span className="font-bold text-slate-800 text-xs">
-                                                    {mov.materialType === 'Treliça' ? `📐 ${mov.bitola}` : mov.bitola}
+                                                    {mov.materialType === 'Treliça' ? `📐 ${mov.bitola}` : mov.materialType === 'Malha' ? `🕸️ ${mov.bitola}` : mov.bitola}
                                                 </span>
                                                 <span className="text-[10px] text-slate-400">
                                                     {mov.materialType} {mov.steelType ? `• ${mov.steelType}` : ''}
