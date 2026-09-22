@@ -26,7 +26,8 @@ import {
     CalendarIcon, PlusIcon, ChevronRightIcon, XIcon, ArrowLeftIcon, 
     TrashIcon, PlayIcon, CheckCircleIcon, ClockIcon, ChartBarIcon, 
     CogIcon, WrenchScrewdriverIcon, PrinterIcon, ClipboardListIcon,
-    AdjustmentsIcon, ChevronDownIcon, ChevronUpIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon
+    AdjustmentsIcon, ChevronDownIcon, ChevronUpIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon,
+    PencilIcon, LockClosedIcon
 } from './icons';
 import { 
     ENTRY_RINGS_LIST, 
@@ -118,6 +119,17 @@ export const formatDateString = (date: Date): string => {
 
 export const formatFriendlyDate = (date: Date): string => {
     return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+};
+
+export const getIsoDateStrGlobal = (iso?: string | null): string => {
+    if (!iso) return '';
+    try {
+        const d = new Date(iso);
+        if (isNaN(d.getTime())) return String(iso).split('T')[0];
+        return formatDateString(d);
+    } catch {
+        return String(iso).split('T')[0];
+    }
 };
 
 export const PCPBoard: React.FC<PCPBoardProps> = ({
@@ -490,6 +502,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     // Estado do Drawer Lateral (Raio-X da OP)
     const [drawerOP, setDrawerOP] = useState<ProductionOrderData | null>(null);
 
+    // Estado do Modal de Edição da OP em Produção (Nome, Meta, Turnos)
+    const [editingInProgressOP, setEditingInProgressOP] = useState<ProductionOrderData | null>(null);
+
     // Interface de contexto para ajuste de quantidade (Turno vs Total)
     interface AdjustQuantityContext {
         order: ProductionOrderData;
@@ -734,6 +749,173 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             console.error('Erro ao ajustar quantidade produzida:', err);
             if (showNotification) {
                 showNotification('Erro ao salvar ajuste de quantidade.', 'error');
+            }
+        }
+    };
+
+    // Salvar edição de OP em andamento (Nome, Meta, Turnos Finalizados)
+    const handleSaveActiveOPEdit = async (
+        orderId: string,
+        data: {
+            newOrderNumber: string;
+            newQuantityToProduce: number;
+            updatedFinalizedShifts: {
+                logIndex: number;
+                reportId?: string;
+                operator: string;
+                pieces: number;
+                startTime?: string;
+                endTime?: string;
+            }[];
+            activeShiftPieces?: number;
+        }
+    ) => {
+        const targetOrder = productionOrders.find(o => o.id === orderId) || editingInProgressOP;
+        if (!targetOrder) return;
+
+        const isTrefila = typeof targetOrder.machine === 'string' && targetOrder.machine.startsWith('Trefila') || (typeof targetOrder.scheduledMachine === 'string' && targetOrder.scheduledMachine.startsWith('Trefila'));
+        const unit = isTrefila ? 'kg' : 'pçs';
+        const now = new Date().toISOString();
+        const oldOrderNumber = targetOrder.orderNumber;
+        const cleanNewOrderNumber = data.newOrderNumber.trim() || oldOrderNumber;
+
+        try {
+            const updates: Partial<ProductionOrderData> = {
+                lastQuantityUpdate: now
+            };
+
+            // 1. Atualizar Número / Nome da Ordem se alterado
+            if (cleanNewOrderNumber && cleanNewOrderNumber !== oldOrderNumber) {
+                updates.orderNumber = cleanNewOrderNumber;
+            }
+
+            // 2. Atualizar Quantidade a Produzir (Meta)
+            if (isTrefila) {
+                updates.quantityToProduce = data.newQuantityToProduce;
+                updates.totalWeight = data.newQuantityToProduce;
+            } else {
+                updates.quantityToProduce = data.newQuantityToProduce;
+            }
+
+            // 3. Atualizar Logs e Turnos
+            let currentLogs = targetOrder.operatorLogs ? [...targetOrder.operatorLogs] : [];
+            let runningAccumulator = 0;
+
+            if (currentLogs.length > 0) {
+                const newLogs = currentLogs.map((log: any, idx: number) => {
+                    if (log.endTime) {
+                        const editedShift = data.updatedFinalizedShifts.find(s => s.logIndex === idx);
+                        const shiftQty = editedShift !== undefined
+                            ? Math.max(0, editedShift.pieces)
+                            : Math.max(0, (Number(log.endQuantity) || 0) - (Number(log.startQuantity) || 0));
+                        
+                        const startQ = runningAccumulator;
+                        runningAccumulator += shiftQty;
+                        return {
+                            ...log,
+                            startQuantity: startQ,
+                            endQuantity: runningAccumulator
+                        };
+                    } else {
+                        // Turno aberto em andamento
+                        const liveQty = data.activeShiftPieces !== undefined 
+                            ? Math.max(0, data.activeShiftPieces)
+                            : Math.max(0, (isTrefila ? Number(targetOrder.actualProducedWeight) : Number(targetOrder.actualProducedQuantity) || 0) - (Number(log.startQuantity) || 0));
+                        
+                        const startQ = runningAccumulator;
+                        runningAccumulator += liveQty;
+                        return {
+                            ...log,
+                            startQuantity: startQ
+                        };
+                    }
+                });
+                updates.operatorLogs = newLogs;
+            } else if (data.updatedFinalizedShifts.length > 0) {
+                const newLogs = data.updatedFinalizedShifts.map((s) => {
+                    const shiftQty = Math.max(0, s.pieces);
+                    const startQ = runningAccumulator;
+                    runningAccumulator += shiftQty;
+                    return {
+                        operator: s.operator || 'Operador',
+                        startTime: s.startTime || now,
+                        endTime: s.endTime || now,
+                        startQuantity: startQ,
+                        endQuantity: runningAccumulator
+                    };
+                });
+                updates.operatorLogs = newLogs;
+            } else {
+                runningAccumulator = isTrefila
+                    ? (Number(targetOrder.actualProducedWeight) || Number(targetOrder.totalProducedWeight) || 0)
+                    : (Number(targetOrder.actualProducedQuantity) || 0);
+            }
+
+            // 4. Quantidade Total Realizada Recalculada
+            if (isTrefila) {
+                updates.actualProducedWeight = runningAccumulator;
+                updates.totalProducedWeight = runningAccumulator;
+            } else {
+                updates.actualProducedQuantity = runningAccumulator;
+            }
+
+            // 5. Salvar em production_orders
+            await updateProductionOrder(orderId, updates);
+
+            // 6. Atualizar shift_reports correspondentes
+            for (const s of data.updatedFinalizedShifts) {
+                if (s.reportId) {
+                    try {
+                        const repUpdates: any = isTrefila 
+                            ? { totalProducedWeight: s.pieces, order_number: cleanNewOrderNumber }
+                            : { totalProducedQuantity: s.pieces, order_number: cleanNewOrderNumber };
+                        await updateItem('shift_reports', s.reportId, repUpdates);
+                    } catch (e) {
+                        console.warn('Erro ao atualizar shift_report:', e);
+                    }
+                }
+            }
+
+            // 7. Se o número da OP mudou, atualizar todos os shift_reports da OP
+            if (cleanNewOrderNumber && cleanNewOrderNumber !== oldOrderNumber) {
+                try {
+                    await supabase
+                        .from('shift_reports')
+                        .update({ order_number: cleanNewOrderNumber })
+                        .eq('production_order_id', orderId);
+                } catch (e) {
+                    console.warn('Erro ao sincronizar order_number em shift_reports:', e);
+                }
+            }
+
+            // 8. Abate de porta-rolos para Treliça se houve aumento de peças
+            const prevQty = Number(targetOrder.actualProducedQuantity) || 0;
+            const deltaPieces = Math.max(0, runningAccumulator - prevQty);
+            const mach = targetOrder.machine || targetOrder.scheduledMachine || '';
+            if (mach.startsWith('Treliça') && deltaPieces > 0) {
+                const model = targetOrder.trelicaModel || (targetOrder as any)?.trelica_model || '';
+                const tamanho = targetOrder.tamanho;
+                deductTrelicaSpoolStandConsumption(mach, model, tamanho, deltaPieces).catch(e => {
+                    console.warn('Erro ao abater nível das bobinas:', e);
+                });
+            }
+
+            if (drawerOP && drawerOP.id === orderId) {
+                setDrawerOP(prev => prev ? { ...prev, ...updates } : null);
+            }
+
+            if (showNotification) {
+                showNotification(
+                    `OP #${cleanNewOrderNumber} atualizada! Meta: ${data.newQuantityToProduce.toLocaleString('pt-BR')} ${unit} | Realizado: ${runningAccumulator.toLocaleString('pt-BR')} ${unit}.`,
+                    'success'
+                );
+            }
+
+            setEditingInProgressOP(null);
+        } catch (err) {
+            console.error('Erro ao salvar edição da OP em produção:', err);
+            if (showNotification) {
+                showNotification('Erro ao salvar alterações da ordem de produção.', 'error');
             }
         }
     };
@@ -3702,7 +3884,16 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                         <div className="flex items-start justify-between gap-1.5 shrink-0">
                                                             <div className="truncate flex-1">
                                                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                                                    <span className="text-sm sm:text-base font-black text-white tracking-wide drop-shadow">#{title}</span>
+                                                                    <span 
+                                                                        className="text-sm sm:text-base font-black text-white tracking-wide drop-shadow hover:text-purple-300 cursor-pointer transition-colors"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setEditingInProgressOP(op);
+                                                                        }}
+                                                                        title="Clique para editar OP em produção (Nome, Meta, Turnos Finalizados)"
+                                                                    >
+                                                                        #{title}
+                                                                    </span>
                                                                     
                                                                     {prog.isPending && (
                                                                         <span className="flex items-center gap-1 text-[9px] sm:text-[10px] font-black uppercase bg-amber-500/25 text-amber-200 px-2 py-0.5 rounded border border-amber-500/50 shadow-sm">
@@ -3743,6 +3934,13 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                             </div>
 
                                                             <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                                                <button 
+                                                                    onClick={() => setEditingInProgressOP(op)}
+                                                                    className="text-purple-400 hover:text-purple-300 p-1 rounded-lg transition-all hover:bg-white/10 bg-white/5 border border-white/5"
+                                                                    title="Editar OP em Produção (Nome, Meta, Turnos Finalizados)"
+                                                                >
+                                                                    <PencilIcon className="w-3.5 h-3.5 text-purple-400" />
+                                                                </button>
                                                                 <button 
                                                                     onClick={() => setDiagnosticOP(op)}
                                                                     className="text-amber-400 hover:text-amber-300 p-1 rounded-lg transition-all hover:bg-white/10 bg-white/5 border border-white/5"
@@ -6389,6 +6587,16 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                                     <button
                                         type="button"
+                                        onClick={() => setEditingInProgressOP(drawerOP)}
+                                        className="mt-2 w-full py-2 px-3 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/40 hover:border-purple-500/70 text-purple-300 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(168,85,247,0.15)] cursor-pointer active:scale-98"
+                                        title="Editar OP em Produção (Nome, Meta, Turnos Finalizados)"
+                                    >
+                                        <PencilIcon className="w-4 h-4 text-purple-400" />
+                                        <span>Editar OP em Produção (Nome, Meta, Turnos)</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
                                         onClick={() => {
                                             const today = new Date();
                                             setSelectedDailyReport({
@@ -7497,6 +7705,16 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 />
             )}
 
+            {/* Modal de Edição da OP em Produção (Nome, Meta, Turnos Finalizados) */}
+            {editingInProgressOP && (
+                <EditActiveOPModal
+                    order={editingInProgressOP}
+                    shiftReports={shiftReports}
+                    onClose={() => setEditingInProgressOP(null)}
+                    onSave={handleSaveActiveOPEdit}
+                />
+            )}
+
             {/* Modal de Autorização do Gestor para Ajuste de Quantidade */}
             {showManagerAuthForAdjust && (
                 <ManagerAuthModalForAdjust
@@ -8443,6 +8661,499 @@ const ManagerAuthModalForAdjust: React.FC<{
                     </button>
                 </div>
             </form>
+        </div>
+    );
+};
+
+// ============================================================================
+// COMPONENTE: Modal de Edição da OP em Produção (Nome, Meta, Turnos Finalizados)
+// Modelo técnico bloqueado para preservar a rastreabilidade dos lotes.
+// ============================================================================
+interface EditActiveOPModalProps {
+    order: ProductionOrderData;
+    shiftReports?: ShiftReport[];
+    onClose: () => void;
+    onSave: (
+        orderId: string,
+        data: {
+            newOrderNumber: string;
+            newQuantityToProduce: number;
+            updatedFinalizedShifts: {
+                logIndex: number;
+                reportId?: string;
+                operator: string;
+                pieces: number;
+                startTime?: string;
+                endTime?: string;
+            }[];
+            activeShiftPieces?: number;
+        }
+    ) => Promise<void>;
+}
+
+interface FinalizedShiftItem {
+    id: string;
+    logIndex: number;
+    reportId?: string;
+    operator: string;
+    startTime?: string;
+    endTime?: string;
+    dateFormatted: string;
+    timeRange: string;
+    pieces: number;
+}
+
+const EditActiveOPModal: React.FC<EditActiveOPModalProps> = ({
+    order,
+    shiftReports = [],
+    onClose,
+    onSave
+}) => {
+    const isTrefila = typeof order.machine === 'string' && order.machine.startsWith('Trefila') || (typeof order.scheduledMachine === 'string' && order.scheduledMachine.startsWith('Trefila'));
+    const isTrelica = typeof order.machine === 'string' && order.machine.startsWith('Treliça') || (typeof order.scheduledMachine === 'string' && order.scheduledMachine.startsWith('Treliça'));
+    const unit = isTrefila ? 'kg' : 'pçs';
+
+    // 1. Nome / Número da Ordem
+    const [orderNumber, setOrderNumber] = useState<string>(order.orderNumber || '');
+
+    // 2. Meta (Quantidade a Produzir)
+    const initialMeta = useMemo(() => {
+        if (isTrefila) {
+            return Number(order.quantityToProduce) || Number(order.totalWeight) || 18000;
+        }
+        return Number(order.quantityToProduce) || (isTrelica ? 3500 : 5000);
+    }, [order, isTrefila, isTrelica]);
+
+    const [quantityToProduce, setQuantityToProduce] = useState<number>(initialMeta);
+
+    // 3. Modelo Técnico (BLOQUEADO)
+    const modelDisplay = useMemo(() => {
+        if (isTrelica) {
+            return `${order.trelicaModel || 'Treliça'}${order.tamanho ? ` • ${order.tamanho}` : ''}`;
+        }
+        if (isTrefila) {
+            return `Bitola ${order.targetBitola || 'N/A'}mm${order.inputBitola ? ` (Entrada: ${order.inputBitola}mm)` : ''}`;
+        }
+        return order.malhaModel || 'Malha Padrão';
+    }, [order, isTrelica, isTrefila]);
+
+    // 4. Turnos Finalizados (Peças Produzidas)
+    const initialShifts = useMemo(() => {
+        const list: FinalizedShiftItem[] = [];
+        const logs = (order.operatorLogs || []) as any[];
+        const matchingReports = (shiftReports || []).filter(r => 
+            (r.productionOrderId && r.productionOrderId === order.id) || 
+            (r.orderNumber && r.orderNumber === order.orderNumber)
+        );
+
+        logs.forEach((log, index) => {
+            if (!log.startTime) return;
+            if (log.endTime) {
+                const shiftPieces = Math.max(0, (Number(log.endQuantity) || 0) - (Number(log.startQuantity) || 0));
+                const sDate = log.startTime ? getIsoDateStrGlobal(log.startTime) : '';
+                const matchingReport = matchingReports.find(r => {
+                    const rDate = r.date || (r.shiftStartTime ? getIsoDateStrGlobal(r.shiftStartTime) : '');
+                    return rDate === sDate || (r.operator && log.operator && r.operator.toLowerCase() === log.operator.toLowerCase());
+                });
+
+                const startDt = new Date(log.startTime);
+                const endDt = new Date(log.endTime);
+                const dateFormatted = !isNaN(startDt.getTime()) ? startDt.toLocaleDateString('pt-BR') : 'Data não informada';
+                const timeRange = !isNaN(startDt.getTime()) && !isNaN(endDt.getTime())
+                    ? `${startDt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} às ${endDt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+                    : 'Turno Encerrado';
+
+                list.push({
+                    id: `log-${index}`,
+                    logIndex: index,
+                    reportId: matchingReport?.id,
+                    operator: log.operator || 'Operador',
+                    startTime: log.startTime,
+                    endTime: log.endTime,
+                    dateFormatted,
+                    timeRange,
+                    pieces: shiftPieces
+                });
+            }
+        });
+
+        // Se não havia logs fechados em operatorLogs, verificar shiftReports
+        if (list.length === 0 && matchingReports.length > 0) {
+            matchingReports.forEach((rep, rIdx) => {
+                const qty = isTrefila 
+                    ? (Number(rep.totalProducedWeight) || 0)
+                    : (Number(rep.totalProducedQuantity) || 0);
+                const dt = rep.date ? new Date(rep.date) : (rep.shiftStartTime ? new Date(rep.shiftStartTime) : new Date());
+                const dateFormatted = !isNaN(dt.getTime()) ? dt.toLocaleDateString('pt-BR') : 'Data não informada';
+                list.push({
+                    id: `rep-${rep.id || rIdx}`,
+                    logIndex: -1,
+                    reportId: rep.id,
+                    operator: rep.operator || 'Operador',
+                    startTime: rep.shiftStartTime,
+                    endTime: rep.shiftEndTime,
+                    dateFormatted,
+                    timeRange: 'Turno Registrado',
+                    pieces: qty
+                });
+            });
+        }
+
+        return list;
+    }, [order, shiftReports, isTrefila]);
+
+    const [finalizedShifts, setFinalizedShifts] = useState<FinalizedShiftItem[]>(initialShifts);
+
+    // 5. Turno Ativo (Ao Vivo) se existir
+    const activeLogIndex = (order.operatorLogs || []).findIndex((l: any) => !l.endTime);
+    const activeLog = activeLogIndex !== -1 ? order.operatorLogs![activeLogIndex] : null;
+    const hasActiveShift = activeLog !== null;
+
+    const initialActivePieces = useMemo(() => {
+        if (!hasActiveShift) return 0;
+        const currentTotal = isTrefila 
+            ? (Number(order.actualProducedWeight) || Number(order.totalProducedWeight) || 0)
+            : (Number(order.actualProducedQuantity) || 0);
+        const startQty = Number(activeLog?.startQuantity) || 0;
+        return Math.max(0, currentTotal - startQty);
+    }, [hasActiveShift, activeLog, order, isTrefila]);
+
+    const [activeShiftPieces, setActiveShiftPieces] = useState<number>(initialActivePieces);
+    const [isSaving, setIsSaving] = useState(false);
+
+    // Handlers para atualizar peças do turno finalizado
+    const handleShiftPiecesChange = (index: number, delta: number) => {
+        setFinalizedShifts(prev => prev.map((s, idx) => {
+            if (idx === index) {
+                return { ...s, pieces: Math.max(0, (Number(s.pieces) || 0) + delta) };
+            }
+            return s;
+        }));
+    };
+
+    const handleSetShiftPieces = (index: number, value: number) => {
+        setFinalizedShifts(prev => prev.map((s, idx) => {
+            if (idx === index) {
+                return { ...s, pieces: Math.max(0, value) };
+            }
+            return s;
+        }));
+    };
+
+    // Cálculos em tempo real
+    const sumFinalized = finalizedShifts.reduce((acc, s) => acc + (Number(s.pieces) || 0), 0);
+    const recalculatedTotal = sumFinalized + (hasActiveShift ? (Number(activeShiftPieces) || 0) : 0);
+    const target = Number(quantityToProduce) || 1;
+    const progressPercent = Math.min(100, Math.round((recalculatedTotal / target) * 100));
+
+    const quickMetaDeltas = isTrefila 
+        ? [-1000, -500, -100, 100, 500, 1000]
+        : [-500, -100, -50, 50, 100, 500];
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSaving(true);
+        try {
+            await onSave(order.id, {
+                newOrderNumber: orderNumber,
+                newQuantityToProduce: quantityToProduce,
+                updatedFinalizedShifts: finalizedShifts.map(s => ({
+                    logIndex: s.logIndex,
+                    reportId: s.reportId,
+                    operator: s.operator,
+                    pieces: s.pieces,
+                    startTime: s.startTime,
+                    endTime: s.endTime
+                })),
+                activeShiftPieces: hasActiveShift ? activeShiftPieces : undefined
+            });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/85 backdrop-blur-md animate-fade p-3 sm:p-4 overflow-y-auto">
+            <div className="w-full max-w-xl pcp-glass-card rounded-2xl border border-white/10 p-5 sm:p-6 flex flex-col gap-4 text-slate-100 shadow-2xl my-auto">
+                {/* Cabeçalho do Modal */}
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.3)]">
+                            <PencilIcon className="w-5 h-5 text-purple-300" />
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h3 className="text-base font-black uppercase tracking-wider text-white">
+                                    Editar OP em Produção
+                                </h3>
+                                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 font-mono">
+                                    PCP / GESTOR
+                                </span>
+                            </div>
+                            <p className="text-xs text-slate-400 font-mono">
+                                {order.scheduledMachine || order.machine} • ID: {order.id.slice(0, 8)}...
+                            </p>
+                        </div>
+                    </div>
+                    <button 
+                        type="button" 
+                        onClick={onClose} 
+                        className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-all cursor-pointer"
+                    >
+                        <XIcon className="w-5 h-5" />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                    {/* 1. Nome / Número da Ordem */}
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center justify-between">
+                            <span>Nome / Número da Ordem</span>
+                            <span className="text-[10px] text-slate-400 font-normal">Identificador da OP nos terminais e painel</span>
+                        </label>
+                        <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-400 font-mono text-sm font-bold">#</span>
+                            <input
+                                type="text"
+                                value={orderNumber}
+                                onChange={(e) => setOrderNumber(e.target.value)}
+                                className="w-full bg-slate-900/90 border border-white/15 focus:border-purple-400 focus:ring-1 focus:ring-purple-400 rounded-xl pl-8 pr-3 py-2.5 text-white font-mono font-bold text-sm tracking-wide transition-all outline-none"
+                                placeholder="Ex: teste 3888888 ou TR-9222"
+                                required
+                            />
+                        </div>
+                    </div>
+
+                    {/* 2. Modelo Técnico Bloqueado */}
+                    <div className="bg-slate-900/70 border border-amber-500/30 rounded-xl p-3.5 flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                                <LockClosedIcon className="w-3.5 h-3.5 text-amber-400" />
+                                <span>Modelo Técnico do Produto</span>
+                            </span>
+                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1 font-mono">
+                                <span>🔒</span> BLOQUEADO
+                            </span>
+                        </div>
+                        <div className="flex items-center justify-between bg-black/40 border border-white/10 rounded-lg px-3 py-2">
+                            <span className="font-mono text-sm font-bold text-slate-200">
+                                {modelDisplay}
+                            </span>
+                            <span className="text-[11px] font-mono text-slate-400">
+                                {order.scheduledMachine || order.machine}
+                            </span>
+                        </div>
+                        <p className="text-[11px] text-amber-300/80 leading-snug">
+                            ⚠️ O modelo técnico não pode ser trocado com a OP em andamento para não corromper a rastreabilidade dos lotes de matéria-prima e bobinas já consumidas.
+                        </p>
+                    </div>
+
+                    {/* 3. Quantidade a Produzir (Meta) */}
+                    <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between">
+                            <label className="text-xs font-black uppercase tracking-wider text-slate-300">
+                                Quantidade a Produzir (Meta da OP)
+                            </label>
+                            <span className="text-xs font-mono text-[#00E5FF] font-bold">
+                                Unidade: {unit}
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="number"
+                                min={1}
+                                value={quantityToProduce}
+                                onChange={(e) => setQuantityToProduce(Math.max(1, Number(e.target.value) || 0))}
+                                className="flex-1 bg-slate-900/90 border border-white/15 focus:border-[#00E5FF] focus:ring-1 focus:ring-[#00E5FF] rounded-xl px-3 py-2 text-white font-mono font-bold text-base transition-all outline-none"
+                                required
+                            />
+                            <span className="text-sm font-bold text-slate-400 font-mono px-2">
+                                {unit}
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                            {quickMetaDeltas.map(d => (
+                                <button
+                                    key={d}
+                                    type="button"
+                                    onClick={() => setQuantityToProduce(prev => Math.max(1, prev + d))}
+                                    className="px-2.5 py-1 bg-white/5 hover:bg-white/15 border border-white/10 rounded-lg text-xs font-mono text-slate-300 hover:text-white transition-all cursor-pointer"
+                                >
+                                    {d > 0 ? `+${d.toLocaleString('pt-BR')}` : d.toLocaleString('pt-BR')}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* 4. Turnos Finalizados */}
+                    <div className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                            <label className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                                <span>Peças Produzidas nos Turnos Finalizados</span>
+                                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                    {finalizedShifts.length} {finalizedShifts.length === 1 ? 'Turno' : 'Turnos'}
+                                </span>
+                            </label>
+                        </div>
+
+                        {finalizedShifts.length === 0 ? (
+                            <div className="bg-slate-900/50 border border-white/10 rounded-xl p-3 text-center text-xs text-slate-400">
+                                Nenhum turno finalizado registrado para esta OP até o momento.
+                            </div>
+                        ) : (
+                            <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                                {finalizedShifts.map((shift, idx) => (
+                                    <div key={shift.id || idx} className="bg-slate-900/80 border border-white/10 rounded-xl p-3 flex flex-col gap-2">
+                                        <div className="flex items-center justify-between text-xs">
+                                            <div className="flex items-center gap-2">
+                                                <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-mono font-bold text-[10px]">
+                                                    {idx + 1}
+                                                </span>
+                                                <span className="font-bold text-slate-200">
+                                                    {shift.operator || 'Operador'}
+                                                </span>
+                                                <span className="text-[11px] text-slate-400 font-mono">
+                                                    {shift.dateFormatted}
+                                                </span>
+                                            </div>
+                                            <span className="text-[10px] uppercase font-bold text-slate-400 bg-white/5 px-2 py-0.5 rounded">
+                                                {shift.timeRange}
+                                            </span>
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleShiftPiecesChange(idx, isTrefila ? -100 : -10)}
+                                                    className="w-8 h-8 bg-white/5 hover:bg-white/15 border border-white/10 rounded-lg text-xs font-bold text-slate-300 hover:text-white transition-all flex items-center justify-center cursor-pointer"
+                                                >
+                                                    {isTrefila ? '-100' : '-10'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleShiftPiecesChange(idx, isTrefila ? -10 : -1)}
+                                                    className="w-7 h-8 bg-white/5 hover:bg-white/15 border border-white/10 rounded-lg text-xs font-bold text-slate-300 hover:text-white transition-all flex items-center justify-center cursor-pointer"
+                                                >
+                                                    {isTrefila ? '-10' : '-1'}
+                                                </button>
+                                            </div>
+
+                                            <input
+                                                type="number"
+                                                min={0}
+                                                value={shift.pieces}
+                                                onChange={(e) => handleSetShiftPieces(idx, Number(e.target.value) || 0)}
+                                                className="flex-1 bg-black/50 border border-white/15 focus:border-emerald-400 rounded-lg px-3 py-1.5 text-center font-mono font-bold text-emerald-300 text-sm outline-none"
+                                            />
+                                            <span className="text-xs font-mono font-bold text-slate-400 w-8">
+                                                {unit}
+                                            </span>
+
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleShiftPiecesChange(idx, isTrefila ? 10 : 1)}
+                                                    className="w-7 h-8 bg-white/5 hover:bg-white/15 border border-white/10 rounded-lg text-xs font-bold text-slate-300 hover:text-white transition-all flex items-center justify-center cursor-pointer"
+                                                >
+                                                    {isTrefila ? '+10' : '+1'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleShiftPiecesChange(idx, isTrefila ? 100 : 10)}
+                                                    className="w-8 h-8 bg-white/5 hover:bg-white/15 border border-white/10 rounded-lg text-xs font-bold text-slate-300 hover:text-white transition-all flex items-center justify-center cursor-pointer"
+                                                >
+                                                    {isTrefila ? '+100' : '+10'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 5. Turno Atual em Andamento (se houver) */}
+                    {hasActiveShift && (
+                        <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-3 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <span className="w-2.5 h-2.5 rounded-full bg-[#00E5FF] animate-pulse" />
+                                <div className="flex flex-col">
+                                    <span className="text-xs font-bold text-[#00E5FF] flex items-center gap-1.5">
+                                        <span>Turno Atual em Execução (Ao Vivo)</span>
+                                    </span>
+                                    <span className="text-[11px] text-slate-300 font-mono">
+                                        {activeLog?.operator || 'Operador'}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <span className="text-sm font-mono font-black text-white">
+                                    {activeShiftPieces.toLocaleString('pt-BR')} {unit}
+                                </span>
+                                <span className="block text-[10px] text-slate-400">em andamento</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 6. Barra de Progresso e Resumo Recalculado */}
+                    <div className="bg-black/50 border border-white/10 rounded-xl p-3.5 flex flex-col gap-2">
+                        <div className="flex items-center justify-between text-xs">
+                            <span className="text-slate-400">Progresso Recalculado da OP</span>
+                            <span className="font-mono font-bold text-[#00E5FF]">{progressPercent}%</span>
+                        </div>
+                        <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
+                            <div 
+                                className="h-full bg-gradient-to-r from-purple-500 via-[#00E5FF] to-emerald-400 transition-all duration-300"
+                                style={{ width: `${progressPercent}%` }}
+                            />
+                        </div>
+                        <div className="flex items-center justify-between text-xs font-mono pt-1">
+                            <div>
+                                <span className="text-slate-400 block text-[10px]">TOTAL REALIZADO:</span>
+                                <span className="font-black text-emerald-400 text-sm">
+                                    {recalculatedTotal.toLocaleString('pt-BR')} {unit}
+                                </span>
+                            </div>
+                            <div className="text-right">
+                                <span className="text-slate-400 block text-[10px]">META DA OP:</span>
+                                <span className="font-black text-white text-sm">
+                                    {quantityToProduce.toLocaleString('pt-BR')} {unit}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Botões de Ação */}
+                    <div className="flex items-center justify-end gap-3 pt-2 border-t border-white/10">
+                        <button 
+                            type="button" 
+                            onClick={onClose} 
+                            disabled={isSaving}
+                            className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-bold text-xs transition cursor-pointer"
+                        >
+                            Cancelar
+                        </button>
+                        <button 
+                            type="submit" 
+                            disabled={isSaving}
+                            className="px-5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs uppercase tracking-wider transition shadow-lg shadow-purple-500/25 flex items-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
+                        >
+                            {isSaving ? (
+                                <>
+                                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    <span>Salvando...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <PencilIcon className="w-3.5 h-3.5" />
+                                    <span>Salvar Alterações da OP</span>
+                                </>
+                            )}
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     );
 };
