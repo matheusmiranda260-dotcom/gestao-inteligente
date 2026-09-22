@@ -10,7 +10,8 @@ import {
     addPcpHoliday, 
     deletePcpHoliday,
     fetchTrelicaSpoolStands,
-    updateItem
+    updateItem,
+    deductTrelicaSpoolStandConsumption
 } from '../services/supabaseService';
 import { 
     resolveMachineShiftConfig, 
@@ -544,6 +545,33 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         }
     };
 
+    // Ajuste rápido de contagem do turno (+/- 1 pç direto pelo dashboard)
+    const handleQuickAdjustShift = async (
+        e: React.MouseEvent,
+        op: ProductionOrderData,
+        dayStats: any,
+        currentDay: Date,
+        delta: number
+    ) => {
+        e.stopPropagation();
+        const currentShift = Number(dayStats?.produced) || 0;
+        const newShift = Math.max(0, currentShift + delta);
+        if (newShift === currentShift && delta < 0) return;
+
+        const isTrefila = typeof op.machine === 'string' && op.machine.startsWith('Trefila') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Trefila'));
+        const currentTotal = isTrefila 
+            ? (Number(op.actualProducedWeight) || Number(op.totalProducedWeight) || 0) 
+            : (Number(op.actualProducedQuantity) || 0);
+        const newTotal = Math.max(0, currentTotal + delta);
+
+        await handleSaveAdjustQuantity(op.id, newTotal, 'Ajuste rápido de contagem do turno (Gestor +/-)', {
+            mode: 'shift',
+            shiftQty: newShift,
+            operatorName: dayStats?.operatorName,
+            dayStats: dayStats
+        });
+    };
+
     const handleSaveAdjustQuantity = async (
         orderId: string, 
         newTotalQty: number, 
@@ -575,17 +603,96 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 updates.actualProducedQuantity = newTotalQty;
             }
 
-            if (details?.updatedLogs && details.updatedLogs.length > 0) {
+            let currentLogs = targetOrder.operatorLogs ? [...targetOrder.operatorLogs] : [];
+
+            if (details?.mode === 'shift' && details.shiftQty !== undefined) {
+                const shiftQty = Math.max(0, details.shiftQty);
+                const targetDateStr = details.dayStats?.dateStr || formatDateString(new Date());
+                const isTodayTarget = details.dayStats?.isToday ?? (targetDateStr === formatDateString(new Date()));
+
+                const openLogIdx = currentLogs.findIndex((l: any) => !l.endTime);
+
+                if (isTodayTarget && openLogIdx !== -1) {
+                    // Turno aberto de hoje: ajustar startQuantity para que total - startQuantity === shiftQty
+                    const activeL = currentLogs[openLogIdx];
+                    currentLogs[openLogIdx] = {
+                        ...activeL,
+                        operator: details.operatorName || activeL.operator || 'Operador',
+                        startQuantity: Math.max(0, newTotalQty - shiftQty)
+                    };
+                } else if (openLogIdx !== -1 && !isTodayTarget) {
+                    // Log aberto existe hoje, mas gestor alterou um dia passado
+                    const pastIdx = currentLogs.findIndex((l: any) => {
+                        const s = getIsoDateStr(l.startTime);
+                        const e = getIsoDateStr(l.endTime);
+                        return s === targetDateStr || e === targetDateStr;
+                    });
+                    if (pastIdx !== -1) {
+                        const pLog = currentLogs[pastIdx];
+                        const sQty = Number(pLog.startQuantity) || 0;
+                        currentLogs[pastIdx] = {
+                            ...pLog,
+                            endQuantity: sQty + shiftQty
+                        };
+                    } else {
+                        currentLogs.push({
+                            operator: details.operatorName || 'Operador',
+                            startTime: `${targetDateStr}T08:00:00.000Z`,
+                            endTime: `${targetDateStr}T17:00:00.000Z`,
+                            startQuantity: 0,
+                            endQuantity: shiftQty
+                        });
+                    }
+                } else if (openLogIdx === -1 && isTodayTarget) {
+                    // Hoje sem log aberto: criar log aberto com startQuantity sincronizado
+                    currentLogs.push({
+                        operator: details.operatorName || 'Operador',
+                        startTime: now,
+                        endTime: null,
+                        startQuantity: Math.max(0, newTotalQty - shiftQty)
+                    });
+                } else {
+                    // Dia passado sem log aberto
+                    const pastIdx = currentLogs.findIndex((l: any) => {
+                        const s = getIsoDateStr(l.startTime);
+                        const e = getIsoDateStr(l.endTime);
+                        return s === targetDateStr || e === targetDateStr;
+                    });
+                    if (pastIdx !== -1) {
+                        const pLog = currentLogs[pastIdx];
+                        const sQty = Number(pLog.startQuantity) || 0;
+                        currentLogs[pastIdx] = {
+                            ...pLog,
+                            endQuantity: sQty + shiftQty
+                        };
+                    } else {
+                        currentLogs.push({
+                            operator: details.operatorName || 'Operador',
+                            startTime: `${targetDateStr}T08:00:00.000Z`,
+                            endTime: `${targetDateStr}T17:00:00.000Z`,
+                            startQuantity: 0,
+                            endQuantity: shiftQty
+                        });
+                    }
+                }
+                updates.operatorLogs = currentLogs;
+            } else if (details?.updatedLogs && details.updatedLogs.length > 0) {
                 updates.operatorLogs = details.updatedLogs;
             }
 
-            if (isTrefila) {
-                await updateProductionOrder(orderId, updates);
-            } else {
-                if (updateProducedQuantity) {
-                    await updateProducedQuantity(orderId, newTotalQty);
-                }
-                await updateProductionOrder(orderId, updates);
+            // Atualização única atômica em production_orders
+            await updateProductionOrder(orderId, updates);
+
+            // Abate de porta-rolos para Treliça se houve aumento de peças
+            const prevQty = Number(targetOrder.actualProducedQuantity) || 0;
+            const deltaPieces = Math.max(0, newTotalQty - prevQty);
+            const mach = targetOrder.machine || targetOrder.scheduledMachine || '';
+            if (mach.startsWith('Treliça') && deltaPieces > 0) {
+                const model = targetOrder.trelicaModel || (targetOrder as any)?.trelica_model || '';
+                const tamanho = targetOrder.tamanho;
+                deductTrelicaSpoolStandConsumption(mach, model, tamanho, deltaPieces).catch(e => {
+                    console.warn('Erro ao abater nível das bobinas:', e);
+                });
             }
 
             // Se for ajuste de turno e houver relatório de turno correspondente (fechado)
@@ -612,12 +719,12 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             if (showNotification) {
                 if (details?.mode === 'shift' && details.shiftQty !== undefined) {
                     showNotification(
-                        `Turno de ${details.operatorName || 'Operador'} ajustado para ${details.shiftQty.toLocaleString('pt-BR')} ${unit}! Total da OP atualizado para ${newTotalQty.toLocaleString('pt-BR')} ${unit}.`,
+                        `Turno de ${details.operatorName || 'Operador'} atualizado para ${details.shiftQty.toLocaleString('pt-BR')} ${unit}! Total da OP: ${newTotalQty.toLocaleString('pt-BR')} ${unit}.`,
                         'success'
                     );
                 } else {
                     showNotification(
-                        `Quantidade da OP #${targetOrder.orderNumber} atualizada para ${newTotalQty.toLocaleString('pt-BR')} ${unit}! Painel do operador sincronizado com sucesso.`,
+                        `Quantidade da OP #${targetOrder.orderNumber} atualizada para ${newTotalQty.toLocaleString('pt-BR')} ${unit}!`,
                         'success'
                     );
                 }
@@ -2470,6 +2577,19 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             ? (Number(op.actualProducedWeight) || Number(op.totalProducedWeight) || 0) 
             : (Number(op.actualProducedQuantity) || 0);
 
+        // Produção isolada dos logs desta data específica
+        const dayLogsPcs = dayLogs.reduce((acc: number, l: any) => {
+            if (!l.endTime) {
+                if (l.startQuantity !== undefined) {
+                    return acc + Math.max(0, totalOverall - Number(l.startQuantity));
+                }
+                return acc;
+            } else if (l.endQuantity !== undefined && l.startQuantity !== undefined) {
+                return acc + Math.max(0, Number(l.endQuantity) - Number(l.startQuantity));
+            }
+            return acc;
+        }, 0);
+
         // Produção isolada de HOJE
         let todayProduced = 0;
         if (isTrefila) {
@@ -2480,7 +2600,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             if (openLog && openLog.startQuantity !== undefined) {
                 liveShiftPcs = Math.max(0, totalOverall - Number(openLog.startQuantity));
             }
-            todayProduced = Math.max(dayPackagesQty + reportsDayQty, liveShiftPcs);
+            todayProduced = Math.max(dayPackagesQty + reportsDayQty, dayLogsPcs, liveShiftPcs);
         }
 
         // Produção realizada nos dias anteriores a hoje
@@ -2493,16 +2613,17 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         if (isToday) {
             const isLive = op.status === 'in_progress' || op.status === 'Em Produção';
             const liveOperator = getMachineOperator(machName);
+            const openLog = (op.operatorLogs || []).find((l: any) => !l.endTime);
 
             if (isLive) {
                 status = 'live';
-                operatorName = liveOperator?.displayName || (liveOperator?.name ? formatShortName(liveOperator.name) : '') || 'Operando';
+                operatorName = liveOperator?.displayName || (liveOperator?.name ? formatShortName(liveOperator.name) : '') || (openLog?.operator ? formatShortName(openLog.operator) : '') || 'Operando';
                 produced = todayProduced;
             } else if (reportsDayQty > 0 || dayLotsWeight > 0 || dayPackagesQty > 0 || todayProduced > 0) {
                 // Houve produção hoje, mas turno atual não está em andamento agora
                 status = 'closed';
                 produced = todayProduced > 0 ? todayProduced : (isTrefila ? (dayLotsWeight > 0 ? dayLotsWeight : reportsDayQty) : (reportsDayQty > 0 ? reportsDayQty : dayPackagesQty));
-                operatorName = reportOperators || logOperators || 'Turno Encerrado';
+                operatorName = reportOperators || logOperators || (openLog?.operator ? formatShortName(openLog.operator) : '') || 'Turno Encerrado';
             } else {
                 status = 'idle';
                 produced = 0;
@@ -2523,18 +2644,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 status = 'closed';
                 produced = dayPackagesQty;
                 operatorName = reportOperators || logOperators || 'Encerrado';
-            } else if (dayLogs.length > 0) {
-                const logsQty = dayLogs.reduce((acc: number, l: any) => {
-                    if (l.endQuantity !== undefined && l.startQuantity !== undefined) {
-                        return acc + Math.max(0, (Number(l.endQuantity) || 0) - (Number(l.startQuantity) || 0));
-                    }
-                    return acc;
-                }, 0);
-                if (logsQty > 0) {
-                    status = 'closed';
-                    produced = logsQty;
-                    operatorName = logOperators || 'Encerrado';
-                }
+            } else if (dayLogsPcs > 0) {
+                status = 'closed';
+                produced = dayLogsPcs;
+                operatorName = logOperators || 'Encerrado';
             }
             if (produced === 0 && isHoliday) {
                 operatorName = holidayName;
@@ -3770,34 +3883,60 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                     Folga / Feriado
                                                                                 </span>
                                                                             ) : (
-                                                                                <div 
-                                                                                    onClick={(e) => {
-                                                                                        e.stopPropagation();
-                                                                                        handleOpenAdjustQuantity(op, {
-                                                                                            mode: 'shift',
-                                                                                            dayStats: dayStats,
-                                                                                            targetDay: currentDay,
-                                                                                            dayColName: dayColName,
-                                                                                            operatorName: dayStats.operatorName,
-                                                                                            shiftProduced: dayStats.produced
-                                                                                        });
-                                                                                    }}
-                                                                                    className="flex items-baseline gap-1 cursor-pointer group/qty hover:bg-white/10 px-1 py-0.5 -mx-1 rounded transition-all select-none"
-                                                                                    title="Clique para ajustar quantidade produzida no turno (Gestor)"
-                                                                                >
-                                                                                    <span className={`text-xs sm:text-sm md:text-base font-black font-mono tracking-tight group-hover/qty:text-[#00E5FF] transition-colors ${
-                                                                                        dayStats.isToday 
-                                                                                            ? 'text-white drop-shadow' 
-                                                                                            : hasRealPastProd
-                                                                                                ? 'text-emerald-300' 
-                                                                                                : isIdlePast
-                                                                                                    ? 'text-slate-500'
-                                                                                                    : 'text-slate-300'
-                                                                                    }`}>
-                                                                                        {dayStats.isFuture ? `~${dayStats.produced.toLocaleString('pt-BR')}` : dayStats.produced.toLocaleString('pt-BR')}
-                                                                                    </span>
-                                                                                    <span className="text-[9px] font-bold text-slate-400 font-mono group-hover/qty:text-[#00E5FF] transition-colors">{dayStats.unit}</span>
-                                                                                    <span className="opacity-0 group-hover/qty:opacity-100 text-[9px] text-[#00E5FF] transition-opacity ml-0.5" title="Ajustar Quantidade">✏️</span>
+                                                                                <div className="flex items-center gap-1">
+                                                                                    {/* Botão Menos Rápido para Gestor */}
+                                                                                    {isGestor && !dayStats.isFuture && (
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={(e) => handleQuickAdjustShift(e, op, dayStats, currentDay, isTrefila ? -50 : -1)}
+                                                                                            className="w-5 h-5 rounded bg-white/5 hover:bg-rose-500/25 text-slate-400 hover:text-rose-300 border border-white/10 hover:border-rose-500/50 text-xs font-black flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 active:scale-90 cursor-pointer select-none"
+                                                                                            title={`Subtrair 1 ${dayStats.unit} deste turno`}
+                                                                                        >
+                                                                                            -
+                                                                                        </button>
+                                                                                    )}
+
+                                                                                    <div 
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            handleOpenAdjustQuantity(op, {
+                                                                                                mode: 'shift',
+                                                                                                dayStats: dayStats,
+                                                                                                targetDay: currentDay,
+                                                                                                dayColName: dayColName,
+                                                                                                operatorName: dayStats.operatorName,
+                                                                                                shiftProduced: dayStats.produced
+                                                                                            });
+                                                                                        }}
+                                                                                        className="flex items-baseline gap-1 cursor-pointer group/qty hover:bg-white/10 px-1 py-0.5 rounded transition-all select-none"
+                                                                                        title="Clique para abrir ajuste de contagem (Gestor)"
+                                                                                    >
+                                                                                        <span className={`text-xs sm:text-sm md:text-base font-black font-mono tracking-tight group-hover/qty:text-[#00E5FF] transition-colors ${
+                                                                                            dayStats.isToday 
+                                                                                                ? 'text-white drop-shadow' 
+                                                                                                : hasRealPastProd
+                                                                                                    ? 'text-emerald-300' 
+                                                                                                    : isIdlePast
+                                                                                                        ? 'text-slate-500'
+                                                                                                        : 'text-slate-300'
+                                                                                        }`}>
+                                                                                            {dayStats.isFuture ? `~${dayStats.produced.toLocaleString('pt-BR')}` : dayStats.produced.toLocaleString('pt-BR')}
+                                                                                        </span>
+                                                                                        <span className="text-[9px] font-bold text-slate-400 font-mono group-hover/qty:text-[#00E5FF] transition-colors">{dayStats.unit}</span>
+                                                                                        <span className="opacity-0 group-hover/qty:opacity-100 text-[9px] text-[#00E5FF] transition-opacity ml-0.5" title="Ajustar Quantidade">✏️</span>
+                                                                                    </div>
+
+                                                                                    {/* Botão Mais Rápido para Gestor */}
+                                                                                    {isGestor && !dayStats.isFuture && (
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={(e) => handleQuickAdjustShift(e, op, dayStats, currentDay, isTrefila ? 50 : 1)}
+                                                                                            className="w-5 h-5 rounded bg-white/5 hover:bg-emerald-500/25 text-slate-400 hover:text-emerald-300 border border-white/10 hover:border-emerald-500/50 text-xs font-black flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 active:scale-90 cursor-pointer select-none"
+                                                                                            title={`Adicionar 1 ${dayStats.unit} a este turno`}
+                                                                                        >
+                                                                                            +
+                                                                                        </button>
+                                                                                    )}
                                                                                 </div>
                                                                             )}
                                                                         </div>
@@ -7954,65 +8093,12 @@ const AdjustQuantityModal: React.FC<{
         e.preventDefault();
         setIsSaving(true);
         try {
-            let updatedLogs = order.operatorLogs ? [...order.operatorLogs] : [];
-
-            if (isShiftMode) {
-                // Modo Turno
-                if (activeLogIndex !== -1) {
-                    const activeL = updatedLogs[activeLogIndex];
-                    const startVal = Number(activeL.startQuantity) !== undefined && !isNaN(Number(activeL.startQuantity))
-                        ? Number(activeL.startQuantity)
-                        : Math.max(0, currentTotal - shiftBaseQty);
-                    updatedLogs[activeLogIndex] = {
-                        ...activeL,
-                        startQuantity: startVal
-                    };
-                } else if (context?.dayStats?.dateStr) {
-                    // Turno fechado / data específica
-                    const targetDateStr = context.dayStats.dateStr;
-                    const pastLogIndex = updatedLogs.findIndex((l: any) => {
-                        const s = (l.startTime || '').split('T')[0];
-                        const e = (l.endTime || '').split('T')[0];
-                        return s === targetDateStr || e === targetDateStr;
-                    });
-                    if (pastLogIndex !== -1) {
-                        const pastL = updatedLogs[pastLogIndex];
-                        const sQty = Number(pastL.startQuantity) || 0;
-                        updatedLogs[pastLogIndex] = {
-                            ...pastL,
-                            endQuantity: sQty + qty
-                        };
-                    }
-                }
-
-                await onSave(order.id, calculatedNewTotal, reason, {
-                    mode: 'shift',
-                    shiftQty: qty,
-                    operatorName,
-                    dayStats: context?.dayStats,
-                    updatedLogs: updatedLogs.length > 0 ? updatedLogs : undefined
-                });
-            } else {
-                // Modo Total Geral da OP
-                if (activeLogIndex !== -1) {
-                    const activeL = updatedLogs[activeLogIndex];
-                    const sQty = Number(activeL.startQuantity) || 0;
-                    if (qty < sQty) {
-                        updatedLogs[activeLogIndex] = {
-                            ...activeL,
-                            startQuantity: Math.max(0, qty)
-                        };
-                    }
-                }
-
-                await onSave(order.id, Math.max(0, qty), reason, {
-                    mode: 'total',
-                    shiftQty: calculatedNewShift,
-                    operatorName,
-                    dayStats: context?.dayStats,
-                    updatedLogs: updatedLogs.length > 0 ? updatedLogs : undefined
-                });
-            }
+            await onSave(order.id, calculatedNewTotal, reason, {
+                mode,
+                shiftQty: isShiftMode ? qty : calculatedNewShift,
+                operatorName,
+                dayStats: context?.dayStats
+            });
         } finally {
             setIsSaving(false);
         }
@@ -8271,7 +8357,7 @@ const AdjustQuantityModal: React.FC<{
                             ) : (
                                 <>
                                     <span>✓</span>
-                                    <span>{isShiftMode ? `Salvar e Atualizar Turno (${operatorName})` : 'Salvar e Atualizar Total da OP'}</span>
+                                    <span>{isShiftMode ? `Salvar e Atualizar Dashboard (${operatorName})` : 'Salvar e Atualizar Total da OP'}</span>
                                 </>
                             )}
                         </button>
