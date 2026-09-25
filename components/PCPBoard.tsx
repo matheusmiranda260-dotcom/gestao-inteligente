@@ -20,7 +20,7 @@ import {
     DEFAULT_GLOBAL_SHIFT_CONFIG 
 } from '../services/shiftConfigService';
 import TrelicaSpoolStands from './TrelicaSpoolStands';
-import TrelicaWeldingHead from './TrelicaWeldingHead';
+import TrelicaWeldingHead, { getLocalMachineElectrodes, getLocalElectrodeHistory } from './TrelicaWeldingHead';
 import DailyProductionReportSheetModal from './DailyProductionReportSheetModal';
 import { 
     CalendarIcon, PlusIcon, ChevronRightIcon, XIcon, ArrowLeftIcon, 
@@ -117,8 +117,11 @@ export const formatDateString = (date: Date): string => {
     return `${y}-${m}-${d}`;
 };
 
-export const formatFriendlyDate = (date: Date): string => {
-    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+export const formatFriendlyDate = (date: Date | string): string => {
+    if (!date) return '';
+    const d = typeof date === 'string' ? new Date(date.includes('T') ? date : date + 'T12:00:00') : date;
+    if (isNaN(d.getTime())) return String(date);
+    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 };
 
 export const getIsoDateStrGlobal = (iso?: string | null): string => {
@@ -1354,6 +1357,21 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             }
         }
         return formatDateString(cur);
+    };
+
+    // Conta quantos dias úteis existem entre duas datas (inclusive)
+    const countWorkingDaysBetween = (startStr: string, endStr: string): number => {
+        if (!startStr || !endStr || startStr > endStr) return 1;
+        const cur = new Date(startStr + 'T00:00:00');
+        const end = new Date(endStr + 'T00:00:00');
+        let count = 0;
+        while (cur <= end) {
+            if (isWorkingDay(cur)) {
+                count++;
+            }
+            cur.setDate(cur.getDate() + 1);
+        }
+        return Math.max(1, count);
     };
 
     // Gera o intervalo de Segunda a Sexta da semana selecionada
@@ -2626,10 +2644,36 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         }
     };
 
-    // Deslocar OP (+/- dias úteis)
+    // Determina se uma OP já foi iniciada na fábrica ou possui produção apontada no passado
+    const hasProductionStarted = (op: ProductionOrderData): boolean => {
+        const st = (op.status || '').toLowerCase();
+        if (st === 'in_progress' || st.includes('produção') || st.includes('producao') || st === 'completed' || st.includes('conclu')) {
+            return true;
+        }
+        if (Number(op.actualProducedQuantity || 0) > 0 || Number(op.actualProducedWeight || 0) > 0 || Number(op.totalProducedWeight || 0) > 0) {
+            return true;
+        }
+        if (op.operatorLogs && op.operatorLogs.length > 0) {
+            const hasRealLog = op.operatorLogs.some(l => 
+                l.operator && l.operator !== 'GHOST_ORDER_FLAG' && (l.endQuantity || l.startQuantity || l.endTime)
+            );
+            if (hasRealLog) return true;
+        }
+        if (op.plannedStartDate && op.plannedStartDate < todayStr) {
+            return true;
+        }
+        return false;
+    };
+
+    // Deslocar OP (+/- dias úteis) - APENAS permitido para OPs ainda não iniciadas!
     const handleShiftOP = async (op: ProductionOrderData, daysToShift: number) => {
         if (!op.plannedStartDate) return;
         
+        if (hasProductionStarted(op)) {
+            showNotification?.('Esta OP já começou a produzir ou possui apontamentos passados. A data inicial não pode ser movida para preservar o histórico. Use o botão ESTENDER para estender o prazo de término.', 'warning');
+            return;
+        }
+
         const newStartStr = shiftWorkingDay(op.plannedStartDate, daysToShift);
         const duration = op.estimatedDurationDays || 1;
         const newEndStr = calculateEndDateByWorkDays(newStartStr, duration);
@@ -2641,16 +2685,26 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
         try {
             await updateProductionOrder(op.id, updates);
+            showNotification?.(`OP #${op.orderNumber} movida para ${formatFriendlyDate(newStartStr)}.`, 'success');
         } catch (error) {
             console.error('Erro ao deslocar agendamento:', error);
         }
     };
 
-    // Ajusta a duração da OP (+1 ou -1 dia útil)
+    // Ajusta a duração da OP (+1 ou -1 dia útil) - ESTENDER / REDUZIR PRAZO
     const handleAdjustDuration = async (op: ProductionOrderData, durationDelta: number) => {
         if (!op.plannedStartDate) return;
         
         const currentDuration = op.estimatedDurationDays || 1;
+
+        if (durationDelta < 0 && hasProductionStarted(op)) {
+            const elapsedDays = countWorkingDaysBetween(op.plannedStartDate, todayStr);
+            if (currentDuration <= elapsedDays) {
+                showNotification?.(`A OP já possui produção iniciada até a data atual. Não é possível encurtar para menos de ${elapsedDays} dia(s) úteis.`, 'warning');
+                return;
+            }
+        }
+
         const newDuration = Math.max(1, currentDuration + durationDelta);
         const newEndStr = calculateEndDateByWorkDays(op.plannedStartDate, newDuration);
         
@@ -2661,6 +2715,11 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
         try {
             await updateProductionOrder(op.id, updates);
+            if (durationDelta > 0) {
+                showNotification?.(`OP #${op.orderNumber} estendida em +${durationDelta} dia (novo término: ${formatFriendlyDate(newEndStr)}).`, 'success');
+            } else {
+                showNotification?.(`Duração da OP #${op.orderNumber} reduzida (término: ${formatFriendlyDate(newEndStr)}).`, 'info');
+            }
         } catch (error) {
             console.error('Erro ao ajustar duração:', error);
         }
@@ -4243,31 +4302,47 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                                                         {/* Rodapé Integrado: Controles de Dias + Barra de Progresso Real (1 linha) */}
                                                         <div className="flex items-center justify-between gap-2 bg-black/60 px-2 py-1 rounded-lg border border-white/10 select-none shrink-0" onClick={(e) => e.stopPropagation()}>
-                                                            {/* Controles Rápidos: MOVER e DURAÇÃO */}
+                                                            {/* Controles Rápidos: MOVER ou ESTENDER + DURAÇÃO */}
                                                             <div className="flex items-center gap-1.5 shrink-0">
-                                                                <div className="flex items-center gap-1 bg-white/5 px-1.5 py-0.5 rounded border border-white/5">
-                                                                    <button 
-                                                                        onClick={() => handleShiftOP(op, -1)}
-                                                                        className="text-slate-300 hover:text-[#00E5FF] font-black text-xs transition-colors active:scale-90 p-0.5" 
-                                                                        title="Mover 1 dia antes"
-                                                                    >
-                                                                        ◀
-                                                                    </button>
-                                                                    <span className="text-[9px] uppercase font-black text-slate-300 tracking-wider">MOVER</span>
-                                                                    <button 
-                                                                        onClick={() => handleShiftOP(op, 1)}
-                                                                        className="text-slate-300 hover:text-[#00E5FF] font-black text-xs transition-colors active:scale-90 p-0.5"
-                                                                        title="Mover 1 dia depois"
-                                                                    >
-                                                                        ▶
-                                                                    </button>
-                                                                </div>
+                                                                {hasProductionStarted(op) ? (
+                                                                    <div className="flex items-center gap-1 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/30" title={`OP com produção iniciada em ${formatFriendlyDate(op.plannedStartDate)}. Início fixado para preservar histórico. Use + para ESTENDER o término.`}>
+                                                                        <span className="text-[9px] uppercase font-black text-amber-400 tracking-wider flex items-center gap-1">
+                                                                            <span>⏱️</span>
+                                                                            <span>ESTENDER</span>
+                                                                        </span>
+                                                                        <button 
+                                                                            onClick={() => handleAdjustDuration(op, 1)}
+                                                                            className="text-white hover:text-emerald-300 font-black text-[10px] transition-colors active:scale-90 px-1 py-0.2 bg-emerald-500/25 hover:bg-emerald-500/40 rounded border border-emerald-500/40 ml-0.5"
+                                                                            title="Estender produção em +1 dia útil"
+                                                                        >
+                                                                            +1d
+                                                                        </button>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="flex items-center gap-1 bg-white/5 px-1.5 py-0.5 rounded border border-white/5">
+                                                                        <button 
+                                                                            onClick={() => handleShiftOP(op, -1)}
+                                                                            className="text-slate-300 hover:text-[#00E5FF] font-black text-xs transition-colors active:scale-90 p-0.5" 
+                                                                            title="Mover 1 dia antes"
+                                                                        >
+                                                                            ◀
+                                                                        </button>
+                                                                        <span className="text-[9px] uppercase font-black text-slate-300 tracking-wider">MOVER</span>
+                                                                        <button 
+                                                                            onClick={() => handleShiftOP(op, 1)}
+                                                                            className="text-slate-300 hover:text-[#00E5FF] font-black text-xs transition-colors active:scale-90 p-0.5"
+                                                                            title="Mover 1 dia depois"
+                                                                        >
+                                                                            ▶
+                                                                        </button>
+                                                                    </div>
+                                                                )}
 
-                                                                <div className="flex items-center gap-1 bg-white/5 px-1.5 py-0.5 rounded border border-white/5">
+                                                                <div className="flex items-center gap-1 bg-white/5 px-1.5 py-0.5 rounded border border-white/5" title="Duração estimada em dias úteis">
                                                                     <button 
                                                                         onClick={() => handleAdjustDuration(op, -1)}
                                                                         className="text-slate-300 hover:text-red-400 font-black text-xs transition-colors active:scale-90 px-0.5"
-                                                                        title="Diminuir duração"
+                                                                        title={hasProductionStarted(op) ? "Reduzir extensão (não reduz abaixo dos dias já decorridos)" : "Diminuir duração"}
                                                                     >
                                                                         -
                                                                     </button>
@@ -4275,7 +4350,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                     <button 
                                                                         onClick={() => handleAdjustDuration(op, 1)}
                                                                         className="text-slate-300 hover:text-emerald-400 font-black text-xs transition-colors active:scale-90 px-0.5"
-                                                                        title="Aumentar duração"
+                                                                        title="Aumentar duração / Estender OP"
                                                                     >
                                                                         +
                                                                     </button>
@@ -6411,19 +6486,33 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 </div>
             )}
 
-            {/* MODAL 2: REAGENDAMENTO RÁPIDO DE OP EXISTENTE */}
-            {selectedOP && (
+            {/* MODAL 2: REAGENDAMENTO RÁPIDO DE OP EXISTENTE / ESTENDER PRAZO */}
+            {selectedOP && (() => {
+                const isAlreadyStarted = hasProductionStarted(selectedOP);
+                return (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md animate-fade p-4">
                     <div className="w-full max-w-[420px] pcp-glass-card rounded-2xl border border-white/10 p-6 flex flex-col gap-4 text-slate-100">
                         <div className="flex items-center justify-between border-b border-white/10 pb-3">
                             <h3 className="text-sm font-black uppercase tracking-wider text-[#00E5FF] flex items-center gap-2">
                                 <CalendarIcon className="w-5 h-5" />
-                                Reprogramar OP #{selectedOP.orderNumber}
+                                {isAlreadyStarted ? `Estender Prazo • OP #${selectedOP.orderNumber}` : `Reprogramar OP #${selectedOP.orderNumber}`}
                             </h3>
                             <button onClick={() => setSelectedOP(null)} className="text-slate-400 hover:text-white transition-colors">
                                 <XIcon className="w-5 h-5" />
                             </button>
                         </div>
+
+                        {isAlreadyStarted && (
+                            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-200 flex flex-col gap-1">
+                                <span className="font-bold flex items-center gap-1.5 text-amber-400 uppercase text-[10px] tracking-wider">
+                                    <span>⚠️</span>
+                                    <span>OP com produção em andamento</span>
+                                </span>
+                                <p className="text-[11px] leading-relaxed text-slate-300">
+                                    Esta OP iniciou em <strong className="text-white">{formatFriendlyDate(selectedOP.plannedStartDate)}</strong>. A data de início permanece travada para preservar os apontamentos já realizados. Ajuste a duração abaixo para <strong>estender o prazo</strong> de entrega.
+                                </p>
+                            </div>
+                        )}
 
                         <div className="space-y-4">
                             <div className="flex flex-col gap-1.5">
@@ -6431,7 +6520,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                 <select
                                     value={scheduleMachine}
                                     onChange={(e) => setScheduleMachine(e.target.value)}
-                                    className="w-full bg-[#0A1D2A] border border-white/10 rounded-xl py-2 px-3 text-xs focus:outline-none focus:border-[#00E5FF]/50 text-white font-bold"
+                                    disabled={isAlreadyStarted}
+                                    className={`w-full bg-[#0A1D2A] border border-white/10 rounded-xl py-2 px-3 text-xs focus:outline-none focus:border-[#00E5FF]/50 text-white font-bold ${
+                                        isAlreadyStarted ? 'opacity-60 cursor-not-allowed' : ''
+                                    }`}
                                 >
                                     {MACHINES.map(m => (
                                         <option key={m.name} value={m.name}>{m.name} ({m.type})</option>
@@ -6440,29 +6532,46 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                             </div>
 
                             <div className="flex flex-col gap-1.5">
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Data de Início</label>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                                    <span>Data de Início</span>
+                                    {isAlreadyStarted && (
+                                        <span className="text-[9px] font-bold text-amber-400 uppercase">🔒 Início Travado</span>
+                                    )}
+                                </label>
                                 <input
                                     type="date"
                                     value={scheduleStartDate}
                                     onChange={(e) => setScheduleStartDate(e.target.value)}
-                                    className="w-full bg-[#0A1D2A] border border-white/10 rounded-xl py-2 px-3 text-xs focus:outline-none focus:border-[#00E5FF]/50 text-white font-bold"
+                                    disabled={isAlreadyStarted}
+                                    className={`w-full bg-[#0A1D2A] border border-white/10 rounded-xl py-2 px-3 text-xs focus:outline-none focus:border-[#00E5FF]/50 text-white font-bold ${
+                                        isAlreadyStarted ? 'opacity-60 cursor-not-allowed bg-black/40' : ''
+                                    }`}
                                 />
                             </div>
 
                             <div className="flex flex-col gap-1.5">
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex justify-between">
-                                    <span>Duração Estimada</span>
+                                    <span>{isAlreadyStarted ? 'Duração Total (Dias Úteis)' : 'Duração Estimada'}</span>
                                     <span className="text-[#00E5FF] font-black">{scheduleDuration} {scheduleDuration === 1 ? 'dia' : 'dias'}</span>
                                 </label>
                                 <div className="flex items-center gap-3 bg-[#0A1D2A] border border-white/10 rounded-xl p-1 justify-between">
                                     <button
                                         type="button"
-                                        onClick={() => setScheduleDuration(prev => Math.max(1, prev - 1))}
+                                        onClick={() => {
+                                            if (isAlreadyStarted) {
+                                                const elapsed = countWorkingDaysBetween(selectedOP.plannedStartDate || scheduleStartDate, todayStr);
+                                                if (scheduleDuration <= elapsed) {
+                                                    showNotification?.(`Não é possível reduzir para menos de ${elapsed} dia(s), pois a produção já decorreu até hoje.`, 'warning');
+                                                    return;
+                                                }
+                                            }
+                                            setScheduleDuration(prev => Math.max(1, prev - 1));
+                                        }}
                                         className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 font-black text-sm flex items-center justify-center text-slate-300 hover:text-white transition-colors"
                                     >
                                         -
                                     </button>
-                                    <span className="text-xs font-bold text-white">{scheduleDuration}</span>
+                                    <span className="text-xs font-bold text-white">{scheduleDuration}d</span>
                                     <button
                                         type="button"
                                         onClick={() => setScheduleDuration(prev => prev + 1)}
@@ -6471,6 +6580,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                         +
                                     </button>
                                 </div>
+                                <span className="text-[10px] text-slate-400 font-mono">
+                                    Término previsto: <strong className="text-white">{formatFriendlyDate(calculateEndDateByWorkDays(scheduleStartDate, scheduleDuration))}</strong>
+                                </span>
                             </div>
                         </div>
 
@@ -6487,12 +6599,13 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                 onClick={handleSaveSchedule}
                                 className="flex-1 bg-[#00E5FF] hover:bg-[#00B4D8] text-slate-900 rounded-xl py-2.5 text-xs font-black transition-all shadow-md text-center active:scale-95 uppercase tracking-wider"
                             >
-                                Salvar
+                                {isAlreadyStarted ? 'Salvar Extensão' : 'Salvar'}
                             </button>
                         </div>
                     </div>
                 </div>
-            )}
+                );
+            })()}
 
             {/* DRAWER LATERAL: RAIO-X DA OP */}
             {drawerOP && (
@@ -7896,7 +8009,20 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                 dur = Math.max(0, Math.round((endMs - sDate.getTime()) / 60000));
             }
 
+            const reasonNorm = (e.reason || '').toLowerCase().trim();
+            // Desconsiderar paradas fantasmas de 'Final de Turno' com 0 minutos ou stopTime igual a resumeTime
+            if ((reasonNorm.includes('final de turno') || reasonNorm.includes('fim de turno') || reasonNorm.includes('aguardando início')) && dur === 0) {
+                return;
+            }
+
             const dStr = parseDateOnly(stopTime) || data.dateStr;
+
+            // Desduplicar 'Final de Turno' ocorridos no mesmo horário
+            if (reasonNorm.includes('final de turno')) {
+                const isDupeFT = stopsList.some(s => s.dateStr === dStr && (s.reason || '').toLowerCase().includes('final de turno') && Math.abs(new Date(s.stopTime).getTime() - sDate.getTime()) < 180000);
+                if (isDupeFT) return;
+            }
+
             const timeFormatted = isValidStop
                 ? `${sDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${rDate && !isNaN(rDate.getTime()) ? ` às ${rDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ' (Em andamento)'}`
                 : 'Horário não informado';
@@ -7932,6 +8058,11 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                 } else if (isValidStop) {
                     const endMs = rDate && !isNaN(rDate.getTime()) ? rDate.getTime() : Date.now();
                     dur = Math.max(0, Math.round((endMs - sDate.getTime()) / 60000));
+                }
+
+                const rNorm = (e.reason || '').toLowerCase().trim();
+                if ((rNorm.includes('final de turno') || rNorm.includes('fim de turno') || rNorm.includes('aguardando início')) && dur === 0) {
+                    return;
                 }
 
                 const dStr = parseDateOnly(stopTime) || reportDate;
@@ -8155,91 +8286,304 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                     </div>
                 </div>
 
-                {/* Lista de Paradas */}
+                {/* Lista e Linha do Tempo de Paradas e Jornada */}
                 <div className="p-4 overflow-y-auto flex-1 space-y-2.5 custom-scrollbar">
-                    {filteredStops.length === 0 ? (
-                        <div className="p-8 text-center flex flex-col items-center justify-center gap-3 bg-white/5 rounded-2xl border border-white/5">
-                            <span className="text-3xl">✅</span>
-                            <div className="flex flex-col gap-1">
-                                <p className="text-sm font-bold text-slate-300">
-                                    Nenhuma parada registrada em {activeLabel}.
-                                </p>
-                                <p className="text-xs text-slate-500">
-                                    A máquina operou sem interrupções registradas nesta data.
-                                </p>
-                            </div>
-                            {allStops.length > 0 && selectedDateStr !== 'ALL' && (
-                                <button
-                                    type="button"
-                                    onClick={() => setSelectedDateStr('ALL')}
-                                    className="mt-2 px-3.5 py-1.5 rounded-xl bg-[#00E5FF]/15 hover:bg-[#00E5FF]/25 border border-[#00E5FF]/40 text-[#00E5FF] font-black text-xs uppercase tracking-wider transition cursor-pointer"
-                                >
-                                    Ver todas as {allStops.length} paradas desta OP
-                                </button>
-                            )}
-                        </div>
-                    ) : (
-                        filteredStops.map((stop) => {
-                            const isLong = stop.durationMin >= 30;
-                            const isMedium = stop.durationMin >= 10;
-                            
-                            return (
-                                <div 
-                                    key={stop.id} 
-                                    className="p-3 bg-black/40 rounded-xl border border-white/5 hover:border-white/15 flex items-center justify-between gap-3 transition-all"
-                                >
-                                    <div className="flex items-start gap-3 min-w-0">
-                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold shrink-0 mt-0.5 ${
-                                            stop.isOngoing 
-                                                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 animate-pulse'
-                                                : isLong 
-                                                    ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' 
-                                                    : isMedium 
-                                                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' 
-                                                        : 'bg-white/5 text-slate-400 border border-white/10'
-                                        }`}>
-                                            🛑
+                    {(() => {
+                        const targetDStr = selectedDateStr === 'ALL' ? data.dateStr : selectedDateStr;
+                        const machName = activeOp.scheduledMachine || activeOp.machine || 'Trefila 1';
+                        const machCfg = resolveMachineShiftConfig(machName);
+                        
+                        const dayLogs = (activeOp.operatorLogs || []).filter(l => {
+                            if (!l.startTime) return false;
+                            const s = parseDateOnly(l.startTime);
+                            const e = parseDateOnly(l.endTime);
+                            return s === targetDStr || e === targetDStr;
+                        }).sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+
+                        const matchingShiftReport = shiftReports.find(r => 
+                            (r.productionOrderId === activeOp.id || r.orderNumber === activeOp.orderNumber) &&
+                            (r.date === targetDStr || parseDateOnly(r.shiftStartTime) === targetDStr)
+                        );
+
+                        const firstLog = dayLogs[0];
+                        const lastLog = dayLogs[dayLogs.length - 1];
+
+                        const fmtHM = (iso?: string) => {
+                            if (!iso) return '';
+                            try {
+                                const dt = new Date(iso);
+                                if (isNaN(dt.getTime())) {
+                                    if (/^\d{2}:\d{2}/.test(iso)) return iso.slice(0, 5);
+                                    return '';
+                                }
+                                return dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                            } catch {
+                                return '';
+                            }
+                        };
+
+                        const scheduledStart = machCfg.workStart || '07:45';
+                        const actualStart = fmtHM(firstLog?.startTime) || fmtHM(matchingShiftReport?.shiftStartTime) || (dayLogs.length > 0 ? scheduledStart : (filteredStops.length > 0 ? 'Iniciado' : '--:--'));
+                        const scheduledEnd = machCfg.workEnd || '17:33';
+                        const isOpen = lastLog && !lastLog.endTime;
+                        const actualEnd = isOpen 
+                            ? 'Em andamento' 
+                            : (fmtHM(lastLog?.endTime) || fmtHM(matchingShiftReport?.shiftEndTime) || (dayLogs.length > 0 ? scheduledEnd : (filteredStops.length > 0 ? 'Em andamento' : '--:--')));
+                        const operatorName = firstLog?.operator || lastLog?.operator || matchingShiftReport?.operator || activeOp.operatorName;
+
+                        return (
+                            <>
+                                {/* 1 & 2. TOPO DA LINHA DO TEMPO: TÉRMINO DO TURNO (SISTEMA E APP) */}
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2 py-0.5 px-1">
+                                        <div className="h-px bg-indigo-500/30 flex-1" />
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
+                                            <span>🏁</span>
+                                            <span>Término / Encerramento do Turno</span>
+                                        </span>
+                                        <div className="h-px bg-indigo-500/30 flex-1" />
+                                    </div>
+
+                                    {/* Término do Turno (Horário programado no sistema) */}
+                                    <div className="p-3 bg-indigo-950/30 rounded-xl border border-indigo-500/25 flex items-center justify-between gap-3 transition-all hover:border-indigo-500/40">
+                                        <div className="flex items-start gap-3 min-w-0">
+                                            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold shrink-0 mt-0.5 bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
+                                                🏁
+                                            </div>
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <h5 className="text-sm font-bold text-indigo-200">
+                                                        Término do Turno (Horário Programado no Sistema)
+                                                    </h5>
+                                                    <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                                                        Sistema
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-slate-400 font-mono mt-0.5">
+                                                    Horário previsto de término do expediente • {machName}
+                                                </p>
+                                            </div>
                                         </div>
-                                        <div className="min-w-0">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <h5 className="text-sm font-bold text-rose-300 truncate">
-                                                    {stop.reason}
-                                                </h5>
-                                                {stop.isOngoing && (
-                                                    <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-rose-500/30 text-rose-300 border border-rose-500/50 animate-pulse">
-                                                        Em andamento
-                                                    </span>
-                                                )}
-                                                {selectedDateStr === 'ALL' && stop.dateStr && (
-                                                    <span className="text-[9px] font-bold font-mono px-1.5 py-0.2 rounded bg-white/5 text-slate-400 border border-white/10">
-                                                        {stop.dateStr}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="text-xs text-slate-400 font-mono mt-0.5 flex items-center gap-2">
-                                                <span>🕒 {stop.timeFormatted}</span>
-                                                {stop.operator && (
-                                                    <span className="text-slate-500">
-                                                        • Op: <strong className="text-slate-300">{stop.operator}</strong>
-                                                    </span>
-                                                )}
-                                            </div>
+                                        <div className="px-3 py-1 rounded-xl text-xs font-black font-mono shrink-0 border bg-indigo-500/20 text-indigo-200 border-indigo-500/40">
+                                            {scheduledEnd}
                                         </div>
                                     </div>
 
-                                    <div className={`px-2.5 py-1 rounded-xl text-xs font-black font-mono shrink-0 border ${
-                                        isLong 
-                                            ? 'bg-rose-500/20 text-rose-300 border-rose-500/40' 
-                                            : isMedium 
-                                                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
-                                                : 'bg-white/5 text-slate-300 border-white/10'
-                                    }`}>
-                                        {stop.durationMin} min
+                                    {/* Término no App (Apontado pelo Operador) */}
+                                    <div className="p-3 bg-blue-950/30 rounded-xl border border-blue-500/25 flex items-center justify-between gap-3 transition-all hover:border-blue-500/40">
+                                        <div className="flex items-start gap-3 min-w-0">
+                                            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold shrink-0 mt-0.5 bg-blue-500/20 text-blue-300 border border-blue-500/40">
+                                                📱
+                                            </div>
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <h5 className="text-sm font-bold text-blue-200">
+                                                        Término no App (Apontado pelo Operador)
+                                                    </h5>
+                                                    {actualEnd === 'Em andamento' ? (
+                                                        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 animate-pulse">
+                                                            Em andamento
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                                                            Apontado no App
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-xs text-slate-400 font-mono mt-0.5">
+                                                    {actualEnd === 'Em andamento' ? 'Máquina operando no chão de fábrica' : 'Horário registrado no encerramento do turno'}
+                                                    {operatorName ? ` • Operador: ${operatorName}` : ''}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className={`px-3 py-1 rounded-xl text-xs font-black font-mono shrink-0 border ${
+                                            actualEnd === 'Em andamento' 
+                                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 animate-pulse'
+                                                : 'bg-blue-500/20 text-blue-200 border-blue-500/40'
+                                        }`}>
+                                            {actualEnd}
+                                        </div>
                                     </div>
                                 </div>
-                            );
-                        })
-                    )}
+
+                                {/* DIVISOR DE PARADAS REGISTRADAS */}
+                                <div className="flex items-center gap-2 py-1 px-1">
+                                    <div className="h-px bg-white/10 flex-1" />
+                                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider flex items-center gap-1.5">
+                                        <span>🛑</span>
+                                        <span>Paradas e Interrupções ({filteredStops.length})</span>
+                                    </span>
+                                    <div className="h-px bg-white/10 flex-1" />
+                                </div>
+
+                                {/* LISTA DE PARADAS */}
+                                {filteredStops.length === 0 ? (
+                                    <div className="p-6 text-center flex flex-col items-center justify-center gap-2 bg-white/5 rounded-2xl border border-white/5">
+                                        <span className="text-2xl">✅</span>
+                                        <div className="flex flex-col gap-0.5">
+                                            <p className="text-xs font-bold text-slate-300">
+                                                Nenhuma parada registrada em {activeLabel}.
+                                            </p>
+                                            <p className="text-[11px] text-slate-500">
+                                                A máquina operou sem interrupções registradas nesta data.
+                                            </p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    filteredStops.map((stop) => {
+                                        const isLong = stop.durationMin >= 30;
+                                        const isMedium = stop.durationMin >= 10;
+                                        
+                                        return (
+                                            <div 
+                                                key={stop.id} 
+                                                className="p-3 bg-black/40 rounded-xl border border-white/5 hover:border-white/15 flex items-center justify-between gap-3 transition-all"
+                                            >
+                                                <div className="flex items-start gap-3 min-w-0">
+                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold shrink-0 mt-0.5 ${
+                                                        stop.isOngoing 
+                                                            ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 animate-pulse'
+                                                            : isLong 
+                                                                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' 
+                                                                : isMedium 
+                                                                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' 
+                                                                    : 'bg-white/5 text-slate-400 border border-white/10'
+                                                    }`}>
+                                                        🛑
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <h5 className="text-sm font-bold text-rose-300 truncate">
+                                                                {stop.reason.includes(' [') ? stop.reason.split(' [')[0] : stop.reason}
+                                                            </h5>
+                                                            {stop.isOngoing && (
+                                                                <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-rose-500/30 text-rose-300 border border-rose-500/50 animate-pulse">
+                                                                    Em andamento
+                                                                </span>
+                                                            )}
+                                                            {selectedDateStr === 'ALL' && stop.dateStr && (
+                                                                <span className="text-[9px] font-bold font-mono px-1.5 py-0.2 rounded bg-white/5 text-slate-400 border border-white/10">
+                                                                    {stop.dateStr}
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Badge de Controladoria de Eletrodos */}
+                                                        {(() => {
+                                                            const hasBracket = stop.reason.includes('[') && stop.reason.includes(']');
+                                                            const isElectrodeStop = stop.reason.toLowerCase().includes('eletrodo') || stop.reason.toLowerCase().includes('solda');
+                                                            
+                                                            let lotDetail = '';
+                                                            if (hasBracket && isElectrodeStop) {
+                                                                lotDetail = stop.reason.substring(stop.reason.indexOf('[') + 1, stop.reason.lastIndexOf(']'));
+                                                            } else if (isElectrodeStop) {
+                                                                // Histórico / Retroativo da Treliça: busca nos eletrodos configurados da máquina
+                                                                const machName = activeOp.scheduledMachine || activeOp.machine || 'Treliça 1';
+                                                                const machEls = getLocalMachineElectrodes(machName);
+                                                                const activeLots = machEls.map(e => `${e.shortLabel || e.position_label}: ${e.lot_number}`).slice(0, 3).join(' • ');
+                                                                lotDetail = activeLots ? `Lotes da Máquina: ${activeLots}...` : 'Lotes da Máquina Vinculados';
+                                                            }
+
+                                                            if (!lotDetail) return null;
+
+                                                            return (
+                                                                <div className="mt-1 px-2.5 py-1 rounded-lg bg-cyan-950/60 border border-cyan-500/40 text-cyan-200 text-xs font-mono flex items-center gap-1.5 flex-wrap">
+                                                                    <span className="text-amber-400 font-bold">⚡ Controladoria:</span>
+                                                                    <span className="text-slate-200 font-medium">{lotDetail}</span>
+                                                                </div>
+                                                            );
+                                                        })()}
+
+                                                        <div className="text-xs text-slate-400 font-mono mt-0.5 flex items-center gap-2">
+                                                            <span>🕒 {stop.timeFormatted}</span>
+                                                            {stop.operator && (
+                                                                <span className="text-slate-500">
+                                                                    • Op: <strong className="text-slate-300">{stop.operator}</strong>
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className={`px-2.5 py-1 rounded-xl text-xs font-black font-mono shrink-0 border ${
+                                                    isLong 
+                                                        ? 'bg-rose-500/20 text-rose-300 border-rose-500/40' 
+                                                        : isMedium 
+                                                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
+                                                            : 'bg-white/5 text-slate-300 border-white/10'
+                                                }`}>
+                                                    {stop.durationMin} min
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+
+                                {/* 3 & 4. BASE DA LINHA DO TEMPO: INÍCIO DO TURNO (APP E SISTEMA) */}
+                                <div className="space-y-2 pt-1">
+                                    <div className="flex items-center gap-2 py-0.5 px-1">
+                                        <div className="h-px bg-emerald-500/30 flex-1" />
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                                            <span>⏰</span>
+                                            <span>Início / Abertura do Turno</span>
+                                        </span>
+                                        <div className="h-px bg-emerald-500/30 flex-1" />
+                                    </div>
+
+                                    {/* Início da Máquina no App */}
+                                    <div className="p-3 bg-emerald-950/30 rounded-xl border border-emerald-500/25 flex items-center justify-between gap-3 transition-all hover:border-emerald-500/40">
+                                        <div className="flex items-start gap-3 min-w-0">
+                                            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold shrink-0 mt-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                                                📱
+                                            </div>
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <h5 className="text-sm font-bold text-emerald-200">
+                                                        Início da Máquina no App
+                                                    </h5>
+                                                    <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                                        Início no App
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-slate-400 font-mono mt-0.5">
+                                                    Horário que o operador iniciou o turno no app
+                                                    {operatorName ? ` • Operador: ${operatorName}` : ''}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="px-3 py-1 rounded-xl text-xs font-black font-mono shrink-0 border bg-emerald-500/20 text-emerald-200 border-emerald-500/40">
+                                            {actualStart}
+                                        </div>
+                                    </div>
+
+                                    {/* Início do Turno (Horário programado no sistema) */}
+                                    <div className="p-3 bg-[#00E5FF]/10 rounded-xl border border-[#00E5FF]/25 flex items-center justify-between gap-3 transition-all hover:border-[#00E5FF]/40">
+                                        <div className="flex items-start gap-3 min-w-0">
+                                            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold shrink-0 mt-0.5 bg-[#00E5FF]/20 text-[#00E5FF] border border-[#00E5FF]/40">
+                                                ⏰
+                                            </div>
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <h5 className="text-sm font-bold text-cyan-200">
+                                                        Início do Turno (Horário Programado no Sistema)
+                                                    </h5>
+                                                    <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-[#00E5FF]/20 text-[#00E5FF] border border-[#00E5FF]/30">
+                                                        Sistema
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-slate-400 font-mono mt-0.5">
+                                                    Horário programado de início de turno • {machName}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="px-3 py-1 rounded-xl text-xs font-black font-mono shrink-0 border bg-[#00E5FF]/20 text-[#00E5FF] border-[#00E5FF]/40">
+                                            {scheduledStart}
+                                        </div>
+                                    </div>
+                                </div>
+                            </>
+                        );
+                    })()}
                 </div>
 
                 {/* Rodapé */}

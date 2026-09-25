@@ -10,7 +10,14 @@ import { checkMachineShiftStatus, resolveMachineShiftConfig } from '../services/
 import { trelicaModels } from './ProductionOrderTrelica';
 import TrefilaCalculation from './TrefilaCalculation';
 import TrelicaSpoolStands from './TrelicaSpoolStands';
-import TrelicaWeldingHead, { getLocalMachineElectrodes, saveLocalMachineElectrodes } from './TrelicaWeldingHead';
+import TrelicaWeldingHead, { 
+    getLocalMachineElectrodes, 
+    saveLocalMachineElectrodes,
+    validateTrelicaElectrodesConfigured,
+    TrelicaElectrodesValidation,
+    ELECTRODE_POSITIONS_CONFIG,
+    getLocalElectrodeHistory
+} from './TrelicaWeldingHead';
 
 
 const IdleActivityLogger: React.FC<{
@@ -70,6 +77,46 @@ const DowntimeModal: React.FC<{
     const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
     const [otherReason, setOtherReason] = useState('');
     const [isOtherActive, setIsOtherActive] = useState(false);
+
+    // Controladoria de Eletrodos para Treliça
+    const isTrelica = (machineType || '').startsWith('Treliça');
+    const machineElectrodes = useMemo(() => {
+        if (!isTrelica) return [];
+        return getLocalMachineElectrodes(machineType || 'Treliça 1');
+    }, [isTrelica, machineType]);
+
+    const isElectrodeReasonSelected = useMemo(() => {
+        if (!isTrelica) return false;
+        return selectedReasons.some(r => {
+            const low = r.toLowerCase();
+            return low.includes('eletrodo') || low.includes('solda');
+        });
+    }, [isTrelica, selectedReasons]);
+
+    const isTrocaSelected = useMemo(() => {
+        return selectedReasons.some(r => r.toLowerCase().includes('troca de eletrodo'));
+    }, [selectedReasons]);
+
+    const [isAllElectrodes, setIsAllElectrodes] = useState(false);
+    const [selectedPositions, setSelectedPositions] = useState<string[]>([]);
+    const [replacementLots, setReplacementLots] = useState<Record<string, string>>({});
+
+    const toggleElectrodePosition = (pos: string) => {
+        setIsAllElectrodes(false);
+        setSelectedPositions(prev => 
+            prev.includes(pos) ? prev.filter(p => p !== pos) : [...prev, pos]
+        );
+    };
+
+    const toggleAllElectrodes = () => {
+        if (isAllElectrodes) {
+            setIsAllElectrodes(false);
+            setSelectedPositions([]);
+        } else {
+            setIsAllElectrodes(true);
+            setSelectedPositions(machineElectrodes.map(e => e.position));
+        }
+    };
     
     const dynamicDowntimeReasons = useMemo(() => {
         // 100% banco de dados - sem fallback hardcoded
@@ -105,10 +152,58 @@ const DowntimeModal: React.FC<{
             reasons.push(otherReason.trim());
         }
 
-        const finalReason = reasons.join(' + ');
+        let finalReason = reasons.join(' + ');
         if (!finalReason) {
             alert('Por favor, selecione pelo menos um motivo.');
             return;
+        }
+
+        // Se motivo envolver eletrodo na Treliça, exigir a seleção dos eletrodos/lotes
+        if (isElectrodeReasonSelected) {
+            if (!isAllElectrodes && selectedPositions.length === 0) {
+                alert('⚠️ ATENÇÃO OPERADOR:\n\nPara a controladoria da Treliça, é obrigatório selecionar qual(is) eletrodo(s) foram atendidos (ou clicar em "Limpeza Geral de Todos os Eletrodos").');
+                return;
+            }
+
+            let electrodeNote = '';
+            if (isAllElectrodes) {
+                electrodeNote = 'Limpeza Geral - Todos os 12 Eletrodos';
+            } else {
+                const parts = selectedPositions.map(pos => {
+                    const el = machineElectrodes.find(e => e.position === pos);
+                    const label = el?.position_label || pos;
+                    const currentLot = el?.lot_number || 'Sem Lote';
+                    if (isTrocaSelected) {
+                        const newLot = replacementLots[pos]?.trim() || `EL-NOVO-${Date.now().toString().slice(-4)}`;
+                        return `Troca ${label}: Lote ${currentLot} ➔ Novo Lote ${newLot}`;
+                    }
+                    return `${label} (Lote: ${currentLot})`;
+                });
+                electrodeNote = parts.join(', ');
+            }
+
+            // Atualiza os lotes locais se houve troca
+            if (isTrocaSelected && !isAllElectrodes) {
+                const updatedEls = machineElectrodes.map(el => {
+                    if (selectedPositions.includes(el.position)) {
+                        const newLot = replacementLots[el.position]?.trim();
+                        if (newLot) {
+                            return {
+                                ...el,
+                                lot_number: newLot,
+                                installed_at: new Date().toISOString(),
+                                meters_produced: 0,
+                                pieces_produced: 0,
+                                status: 'active' as const
+                            };
+                        }
+                    }
+                    return el;
+                });
+                saveLocalMachineElectrodes(machineType || 'Treliça 1', updatedEls);
+            }
+
+            finalReason = `${finalReason} [${electrodeNote}]`;
         }
 
         // Check for repeat reasons (excluding ADMINISTRATIVE reasons like Shift End)
@@ -216,15 +311,82 @@ const DowntimeModal: React.FC<{
                         </button>
                     </div>
 
-                    {isOtherActive && (
-                        <div className="animate-fade-in-up mb-8">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Digite o motivo</label>
-                            <input
-                                value={otherReason}
-                                onChange={(e) => setOtherReason(e.target.value)}
-                                className="w-full p-4 border-2 border-slate-100 rounded-2xl focus:border-amber-500 focus:ring-0 transition-all font-bold text-slate-700 bg-slate-50"
-                                placeholder="..."
-                            />
+                    {/* PAINEL DE CONTROLADORIA DE ELETRODOS */}
+                    {isElectrodeReasonSelected && (
+                        <div className="mb-6 p-4 sm:p-5 rounded-3xl bg-slate-900 border-2 border-cyan-500/50 shadow-xl space-y-3 animate-fade-in text-white">
+                            <div className="flex items-center justify-between border-b border-white/10 pb-2 flex-wrap gap-2">
+                                <div className="flex items-center gap-2">
+                                    <span className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-400 text-lg">⚡</span>
+                                    <div>
+                                        <h4 className="text-xs font-black uppercase tracking-wider text-cyan-300">
+                                            Controladoria de Eletrodos • {machineType}
+                                        </h4>
+                                        <p className="text-[10px] text-slate-400">
+                                            {isTrocaSelected 
+                                                ? 'Selecione o eletrodo substituído e informe o novo lote:' 
+                                                : 'Selecione qual(is) eletrodo(s) foram limpos ou ajustados:'}
+                                        </p>
+                                    </div>
+                                </div>
+                                {!isTrocaSelected && (
+                                    <button
+                                        type="button"
+                                        onClick={toggleAllElectrodes}
+                                        className={`px-3 py-1.5 rounded-xl font-black text-[10px] uppercase tracking-wider transition active:scale-95 border cursor-pointer ${
+                                            isAllElectrodes 
+                                                ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-[0_0_10px_rgba(0,229,255,0.4)]' 
+                                                : 'bg-white/10 text-slate-300 border-white/15 hover:bg-white/15'
+                                        }`}
+                                    >
+                                        ⚡ Limpeza Geral (Todos os 12)
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto custom-scrollbar p-1">
+                                {machineElectrodes.map(el => {
+                                    const isSelected = isAllElectrodes || selectedPositions.includes(el.position);
+                                    return (
+                                        <div
+                                            key={el.position}
+                                            onClick={() => toggleElectrodePosition(el.position)}
+                                            className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all active:scale-95 ${
+                                                isSelected
+                                                    ? 'bg-cyan-500/20 border-cyan-400 text-white shadow-md'
+                                                    : 'bg-slate-800/80 border-white/5 text-slate-300 hover:border-white/20'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[11px] font-black truncate">{el.position_label}</span>
+                                                <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-bold ${
+                                                    isSelected ? 'bg-cyan-400 text-slate-950' : 'bg-white/10 text-transparent'
+                                                }`}>
+                                                    ✓
+                                                </span>
+                                            </div>
+                                            <span className="text-[9px] font-mono text-cyan-300/80 block mt-0.5 truncate">
+                                                Lote: <strong className="text-white">{el.lot_number || 'Sem Lote'}</strong>
+                                            </span>
+
+                                            {isTrocaSelected && isSelected && (
+                                                <div className="mt-2 pt-1.5 border-t border-white/10" onClick={e => e.stopPropagation()}>
+                                                    <label className="text-[8px] font-black uppercase text-amber-300 block">Novo Lote:</label>
+                                                    <input
+                                                        type="text"
+                                                        value={replacementLots[el.position] || ''}
+                                                        onChange={(e) => {
+                                                            const val = e.target.value;
+                                                            setReplacementLots(prev => ({ ...prev, [el.position]: val }));
+                                                        }}
+                                                        placeholder="Ex: EL-1008-02"
+                                                        className="w-full mt-0.5 px-2 py-1 rounded bg-black/50 border border-amber-400/50 text-[10px] font-mono text-amber-200 outline-none focus:border-amber-400"
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
                     )}
 
@@ -1136,6 +1298,9 @@ const MachineControl: React.FC<MachineControlProps> = ({
     const [showAutoEndCountdownModal, setShowAutoEndCountdownModal] = useState(false);
     const [pendingStartIsOvertime, setPendingStartIsOvertime] = useState(false);
     const [pendingStartManager, setPendingStartManager] = useState<string | undefined>(undefined);
+    const [trelicaValidationBlock, setTrelicaValidationBlock] = useState<TrelicaElectrodesValidation | null>(null);
+    const [showTrelicaBlockModal, setShowTrelicaBlockModal] = useState<boolean>(false);
+    const autoEndShiftTriggeredRef = useRef<string | null>(null);
 
     const shiftEvaluation = useMemo(() => {
         return checkMachineShiftStatus(activeMachine, pcpShiftConfig, now);
@@ -1162,6 +1327,16 @@ const MachineControl: React.FC<MachineControlProps> = ({
     const handleStartShift = (forceOvertime = false, managerAuthUser?: string) => {
         if (!activeOrder || !startOperatorShift) return;
 
+        // Validação Obrigatória de Controladoria: Eletrodos com lotes cadastrados na Treliça
+        if (activeMachine.startsWith('Treliça')) {
+            const val = validateTrelicaElectrodesConfigured(activeMachine);
+            if (!val.isValid) {
+                setTrelicaValidationBlock(val);
+                setShowTrelicaBlockModal(true);
+                return;
+            }
+        }
+
         // Se fora do horário programado e não for gestor nem já autorizado, exigir senha de gestor
         if (!shiftEvaluation.inShiftWindow && !isGestor && shiftEvaluation.requireManagerAuthForOvertime && !forceOvertime) {
             setShowManagerAuthForOvertimeStart(true);
@@ -1183,6 +1358,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
             setShowResumePreviousStopModal(true);
         } else {
             // Normal start — all events are administrative, just begin
+            autoEndShiftTriggeredRef.current = null;
             startOperatorShift(activeOrder.id, { isOvertime: isOt, managerAuthorized: mgrAuth });
         }
     };
@@ -1717,6 +1893,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
     useEffect(() => {
         setAuthorizedOvertimeForCurrentShift(false);
         setShowAutoEndCountdownModal(false);
+        autoEndShiftTriggeredRef.current = null;
     }, [activeOrder?.id, currentOperatorLog?.startTime]);
 
     // Monitoramento de Fim de Turno e Contagem Regressiva de Auto-Encerramento
@@ -1745,7 +1922,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
             } else {
                 // Tempo de tolerância esgotou (ex: 5 min) -> Executar auto-encerramento pelo sistema!
                 setShowAutoEndCountdownModal(false);
-                if (endOperatorShift && activeOrder) {
+                if (endOperatorShift && activeOrder && autoEndShiftTriggeredRef.current !== activeOrder.id) {
+                    autoEndShiftTriggeredRef.current = activeOrder.id;
                     const finalQty = activeOrder.actualProducedQuantity || 0;
                     endOperatorShift(activeOrder.id, finalQty, {
                         autoClosed: true,
@@ -1951,6 +2129,16 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
     const confirmStartLot = (speed: number) => {
         if (activeOrder && startLotProcessing && selectedLotForSpeed) {
+            // Validação de Controladoria: Eletrodos com lotes cadastrados na Treliça
+            if (activeMachine.startsWith('Treliça')) {
+                const val = validateTrelicaElectrodesConfigured(activeMachine);
+                if (!val.isValid) {
+                    setTrelicaValidationBlock(val);
+                    setShowTrelicaBlockModal(true);
+                    return;
+                }
+            }
+
             startLotProcessing(activeOrder.id, selectedLotForSpeed, speed);
             setShowSpeedModal(false);
             setSelectedLotForSpeed(null);
@@ -2010,6 +2198,16 @@ const MachineControl: React.FC<MachineControlProps> = ({
     };
 
     const handleUpdateQuantity = (shiftQuantity: number) => {
+        // Validação de Controladoria: Eletrodos com lotes cadastrados na Treliça antes de contabilizar
+        if (activeMachine.startsWith('Treliça')) {
+            const val = validateTrelicaElectrodesConfigured(activeMachine);
+            if (!val.isValid) {
+                setTrelicaValidationBlock(val);
+                setShowTrelicaBlockModal(true);
+                return;
+            }
+        }
+
         const targetOrder = pendingShiftEnd ? (productionOrders.find(o => o.id === pendingShiftEnd)) : activeOrder;
 
         if (targetOrder && updateProducedQuantity) {
@@ -2548,6 +2746,71 @@ const MachineControl: React.FC<MachineControlProps> = ({
                     order={promptOrder}
                 />
             )}
+
+            {/* Modal de Bloqueio por Falta de Lotes de Eletrodos na Treliça */}
+            {showTrelicaBlockModal && trelicaValidationBlock && (
+                <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-[130] p-4 animate-fade-in" onClick={() => setShowTrelicaBlockModal(false)}>
+                    <div className="bg-[#0B1A24] border-2 border-rose-500/50 rounded-3xl p-6 sm:p-8 max-w-lg w-full text-white shadow-2xl space-y-4" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-2xl bg-rose-500/20 border border-rose-500/50 flex items-center justify-center text-rose-400 text-2xl font-black">
+                                ⚠️
+                            </div>
+                            <div>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-rose-400 font-mono">
+                                    Controladoria • Rastreabilidade Obrigatória
+                                </span>
+                                <h3 className="text-xl font-black text-white">
+                                    Eletrodos sem Lote Cadastrado
+                                </h3>
+                            </div>
+                        </div>
+
+                        <p className="text-sm text-slate-300">
+                            A máquina <strong className="text-cyan-400">{activeMachine}</strong> possui <strong className="text-rose-400">{trelicaValidationBlock.missingCount}</strong> posição(ões) de eletrodo/base sem lote cadastrado no sistema.
+                        </p>
+
+                        <p className="text-xs text-slate-400">
+                            Para manter a controladoria de estoque e rastreabilidade 100% confiáveis, é obrigatório cadastrar e vincular os lotes de todos os eletrodos antes de iniciar o turno ou contabilizar produção.
+                        </p>
+
+                        <div className="bg-slate-900/80 p-3 rounded-2xl border border-white/10 max-h-44 overflow-y-auto custom-scrollbar space-y-1.5">
+                            <span className="text-[10px] font-black uppercase text-slate-400 block mb-1">
+                                Posições Pendentes de Lote ({trelicaValidationBlock.missingCount}):
+                            </span>
+                            {trelicaValidationBlock.missingPositions.map(pos => (
+                                <div key={pos.position} className="flex items-center justify-between text-xs px-2.5 py-1.5 rounded-lg bg-rose-950/40 border border-rose-500/30 text-rose-300 font-mono">
+                                    <span>{pos.label}</span>
+                                    <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-rose-500/30 text-rose-200 font-black">
+                                        Sem Lote
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowTrelicaBlockModal(false);
+                                    setShowElectrodesModal(true);
+                                }}
+                                className="flex-1 px-5 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-xs uppercase tracking-wider transition active:scale-95 shadow-lg shadow-cyan-500/30 flex items-center justify-center gap-2 cursor-pointer"
+                            >
+                                <span>⚡</span>
+                                <span>Abrir Cabeça de Solda e Cadastrar Lotes</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setShowTrelicaBlockModal(false)}
+                                className="px-4 py-3 rounded-xl bg-white/10 hover:bg-white/15 text-slate-300 font-bold text-xs transition cursor-pointer"
+                            >
+                                Fechar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {showPartsRequestModal && activeOrder && (
                 <PartsRequestModal
                     order={activeOrder}

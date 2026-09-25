@@ -1859,22 +1859,36 @@ const App: React.FC = () => {
             updates.lastQuantityUpdate = now;
         }
 
-        // Automatically stop machine and mark as Shift End
-        const newDowntimeEvents = [...(order.downtimeEvents || [])];
+        // Automatically stop machine and mark as Shift End (deduplicating 0-min ghost events)
+        let newDowntimeEvents = [...(order.downtimeEvents || [])];
+
+        // Purge old 0-min loop artifacts of 'Final de Turno'
+        newDowntimeEvents = newDowntimeEvents.filter(evt => {
+            if (evt.reason === 'Final de Turno' && evt.resumeTime && evt.stopTime === evt.resumeTime) {
+                return false;
+            }
+            return true;
+        });
+
         const lastDowntime = newDowntimeEvents.length > 0 ? newDowntimeEvents[newDowntimeEvents.length - 1] : null;
 
-        // Close any existing open event first
-        if (lastDowntime && !lastDowntime.resumeTime) {
-            lastDowntime.resumeTime = now;
-        }
+        // If the machine is ALREADY in an open 'Final de Turno', don't create duplicates!
+        if (lastDowntime && lastDowntime.reason === 'Final de Turno' && !lastDowntime.resumeTime) {
+            // Already off and in Final de Turno, keep existing open event
+        } else {
+            // Close any existing open non-shift-end event first
+            if (lastDowntime && !lastDowntime.resumeTime) {
+                lastDowntime.resumeTime = now;
+            }
 
-        // Always add Final de Turno to signify machine is off between shifts
-        newDowntimeEvents.push({
-            stopTime: now,
-            resumeTime: null,
-            reason: 'Final de Turno',
-            justification: options?.autoClosed ? 'Encerramento Automático pelo Sistema' : undefined
-        });
+            // Add Final de Turno to signify machine is off between shifts
+            newDowntimeEvents.push({
+                stopTime: now,
+                resumeTime: null,
+                reason: 'Final de Turno',
+                justification: options?.autoClosed ? 'Encerramento Automático pelo Sistema' : undefined
+            });
+        }
         updates.downtimeEvents = newDowntimeEvents;
 
         try {

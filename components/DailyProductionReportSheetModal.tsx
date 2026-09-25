@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { ProductionOrderData, ShiftReport } from '../types';
 import { supabase } from '../supabaseClient';
 import html2canvas from 'html2canvas';
+import { resolveMachineShiftConfig } from '../services/shiftConfigService';
 
 export interface DailyProductionReportSheetModalProps {
     isOpen: boolean;
@@ -26,6 +27,10 @@ interface ShiftStats {
     horasTrabalhadas: string;
     pecasProduzidas: number;
     tamanhoPeca: number;
+    horarioTurnoPrevisto?: string;
+    horarioInicioApp?: string;
+    horarioFimPrevisto?: string;
+    horarioFimApp?: string;
 }
 
 interface ProductionUpdateRow {
@@ -134,15 +139,18 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
     const [stopsShiftB, setStopsShiftB] = useState<StopRow[]>([]);
 
     // Estatísticas
+    const isInitialTrelica = initialMachine ? (initialMachine.toLowerCase().includes('treli') || initialMachine.toLowerCase().includes('trelica')) : true;
     const [statsShiftA, setStatsShiftA] = useState<ShiftStats>({
-        horasTrabalhadas: '09:00:00',
+        horasTrabalhadas: isInitialTrelica ? '08:48:00' : '09:48:00',
         pecasProduzidas: 0,
-        tamanhoPeca: 12
+        tamanhoPeca: 12,
+        horarioTurnoPrevisto: isInitialTrelica ? '05:00 às 14:48' : '07:45 às 17:33'
     });
     const [statsShiftB, setStatsShiftB] = useState<ShiftStats>({
-        horasTrabalhadas: '09:00:00',
+        horasTrabalhadas: '00:00:00',
         pecasProduzidas: 0,
-        tamanhoPeca: 6
+        tamanhoPeca: 6,
+        horarioTurnoPrevisto: ''
     });
 
     // Atualização de Produção (Pesagens)
@@ -227,6 +235,20 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         if (lower.includes('12') || lower.includes('12m') || lower.includes('12mts') || lower.includes('12 metros')) return 12;
         if (lower.includes('6') || lower.includes('6m') || lower.includes('6mts') || lower.includes('6 metros')) return 6;
         return 6;
+    };
+
+    const getLocalDateString = (val: any): string => {
+        if (!val) return '';
+        try {
+            const dt = new Date(val);
+            if (isNaN(dt.getTime())) return String(val).split('T')[0] || '';
+            const y = dt.getFullYear();
+            const m = String(dt.getMonth() + 1).padStart(2, '0');
+            const d = String(dt.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        } catch {
+            return String(val).split('T')[0] || '';
+        }
     };
 
     // Auto-preenchimento automático inteligente dos dados com base no chão de fábrica
@@ -395,6 +417,22 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
 
         const hasRealTurnoB = hasTurnoBReport || piecesB > 0 || stopsListB.length > 0 || Boolean(opB);
 
+        // Obter configuração da jornada da máquina
+        const shiftCfg = resolveMachineShiftConfig(machine);
+        const isTrelica = machine.toLowerCase().includes('treli') || machine.toLowerCase().includes('trelica');
+
+        const schedStartA = shiftCfg.workStart || (isTrelica ? '05:00' : '07:45');
+        const schedEndA = shiftCfg.workEnd || (isTrelica ? '14:48' : '17:33');
+        const shiftScheduleStrA = `${schedStartA} às ${schedEndA}`;
+
+        const schedStartB = shiftCfg.shift2Start || (isTrelica ? '14:48' : '14:00');
+        const schedEndB = shiftCfg.shift2End || (isTrelica ? '23:36' : '23:59');
+        const shiftScheduleStrB = `${schedStartB} às ${schedEndB}`;
+
+        // Carga horária programada do turno (ex: Treliça = 8h48 -> 08:48:00)
+        const shiftHoursA = isTrelica ? '08:48:00' : '09:48:00';
+        const shiftHoursB = hasRealTurnoB ? (isTrelica ? '08:48:00' : '09:00:00') : '00:00:00';
+
         return {
             productionOrder: prodOrder,
             productDescription: prodDesc,
@@ -404,14 +442,16 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             stopsShiftA: stopsListA,
             stopsShiftB: stopsListB,
             statsShiftA: {
-                horasTrabalhadas: '09:00:00',
+                horasTrabalhadas: shiftHoursA,
                 pecasProduzidas: piecesA,
-                tamanhoPeca: defaultSize
+                tamanhoPeca: defaultSize,
+                horarioTurnoPrevisto: shiftScheduleStrA,
             },
             statsShiftB: {
-                horasTrabalhadas: hasRealTurnoB ? '09:00:00' : '00:00:00',
+                horasTrabalhadas: shiftHoursB,
                 pecasProduzidas: piecesB,
-                tamanhoPeca: hasRealTurnoB ? (defaultSize === 12 ? 6 : defaultSize) : 0
+                tamanhoPeca: hasRealTurnoB ? (defaultSize === 12 ? 6 : defaultSize) : 0,
+                horarioTurnoPrevisto: hasRealTurnoB ? shiftScheduleStrB : '',
             },
             productionUpdates: []
         };
@@ -445,8 +485,42 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 setPiecesToProduce(Number(dbReport.pieces_to_produce ?? (op.quantityToProduce || 4500)));
                 setStopsShiftA(dbReport.stops_shift_a || []);
                 setStopsShiftB(dbReport.stops_shift_b || []);
-                setStatsShiftA(dbReport.stats_shift_a || { horasTrabalhadas: '09:00:00', pecasProduzidas: 0, tamanhoPeca: 12 });
-                setStatsShiftB(dbReport.stats_shift_b || { horasTrabalhadas: '00:00:00', pecasProduzidas: 0, tamanhoPeca: 0 });
+                const isTrelica = machine.toLowerCase().includes('treli') || machine.toLowerCase().includes('trelica');
+                const defaultShiftA = isTrelica ? '08:48:00' : '09:48:00';
+                const defaultSchedA = isTrelica ? '05:00 às 14:48' : '07:45 às 17:33';
+
+                const rawStatsA = dbReport.stats_shift_a || {};
+                const horasTrabalhadasA = (isTrelica && (rawStatsA.horasTrabalhadas === '09:49:05' || rawStatsA.horasTrabalhadas === '09:00:00'))
+                    ? defaultShiftA
+                    : (rawStatsA.horasTrabalhadas || defaultShiftA);
+
+                const horarioTurnoA = (rawStatsA.horarioTurnoPrevisto && rawStatsA.horarioTurnoPrevisto.includes('às'))
+                    ? rawStatsA.horarioTurnoPrevisto
+                    : defaultSchedA;
+
+                setStatsShiftA({
+                    ...rawStatsA,
+                    horasTrabalhadas: horasTrabalhadasA,
+                    pecasProduzidas: Number(rawStatsA.pecasProduzidas || 0),
+                    tamanhoPeca: Number(rawStatsA.tamanhoPeca || (isTrelica ? 12 : 6)),
+                    horarioTurnoPrevisto: horarioTurnoA
+                });
+
+                const rawStatsB = dbReport.stats_shift_b || {};
+                const defaultSchedB = isTrelica ? '14:48 às 23:36' : '14:00 às 23:59';
+                const defaultShiftB = isTrelica ? '08:48:00' : '09:00:00';
+                const hasHoursB = rawStatsB.horasTrabalhadas && rawStatsB.horasTrabalhadas !== '00:00:00';
+                const horarioTurnoB = (rawStatsB.horarioTurnoPrevisto && rawStatsB.horarioTurnoPrevisto.includes('às'))
+                    ? rawStatsB.horarioTurnoPrevisto
+                    : (hasHoursB ? defaultSchedB : '');
+
+                setStatsShiftB({
+                    ...rawStatsB,
+                    horasTrabalhadas: hasHoursB ? (isTrelica && rawStatsB.horasTrabalhadas === '09:00:00' ? defaultShiftB : rawStatsB.horasTrabalhadas) : '00:00:00',
+                    pecasProduzidas: Number(rawStatsB.pecasProduzidas || 0),
+                    tamanhoPeca: Number(rawStatsB.tamanhoPeca || 0),
+                    horarioTurnoPrevisto: horarioTurnoB
+                });
                 setProductionUpdates(dbReport.production_updates || []);
                 setSaveStatus('saved');
                 showToast(`Relatório do dia ${targetDate.split('-').reverse().join('/')} carregado do banco.`, 'info');
@@ -1353,6 +1427,27 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                     <span>ESTATÍSTICA DO DIA – TURNO A</span>
                                 </div>
                                 <div className="p-3 divide-y divide-slate-100 flex flex-col justify-between h-full">
+                                    {/* Horário Programado do Turno A */}
+                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 mb-1.5 text-xs flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <ClockIcon className="h-4 w-4 text-[#002060]" />
+                                            <span className="text-[10px] font-black uppercase text-[#002060] tracking-wider">Horário do Turno:</span>
+                                            <input 
+                                                type="text" 
+                                                value={statsShiftA.horarioTurnoPrevisto || (machine.toLowerCase().includes('treli') ? '05:00 às 14:48' : '07:45 às 17:33')} 
+                                                onChange={e => setStatsShiftA({ ...statsShiftA, horarioTurnoPrevisto: e.target.value })}
+                                                className="modern-editable-input font-black text-xs text-slate-800 w-36 text-center border-b border-slate-300"
+                                                placeholder="05:00 às 14:48"
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-[9.5px] font-bold text-slate-500 uppercase">Carga Horária:</span>
+                                            <span className="text-[10px] font-black text-[#002060] bg-white px-2 py-0.5 rounded border border-slate-200">
+                                                {machine.toLowerCase().includes('treli') ? '8h 48m' : '9h 48m'}
+                                            </span>
+                                        </div>
+                                    </div>
+
                                     {/* Horas Trabalhadas */}
                                     <div className="flex items-center justify-between py-2.5">
                                         <div className="flex items-center gap-2">
@@ -1461,6 +1556,35 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                     </button>
                                 </div>
                                 <div className="p-3 divide-y divide-slate-100 flex flex-col justify-between h-full">
+                                    {/* Horário Programado do Turno B */}
+                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 mb-1.5 text-xs flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <ClockIcon className="h-4 w-4 text-[#002060]" />
+                                            <span className="text-[10px] font-black uppercase text-[#002060] tracking-wider">Horário do Turno:</span>
+                                            <input 
+                                                type="text" 
+                                                value={statsShiftB.horarioTurnoPrevisto || (statsShiftB.horasTrabalhadas !== '00:00:00' ? (machine.toLowerCase().includes('treli') ? '14:48 às 23:36' : '14:00 às 23:59') : '')} 
+                                                onChange={e => setStatsShiftB({ ...statsShiftB, horarioTurnoPrevisto: e.target.value })}
+                                                className="modern-editable-input font-black text-xs text-slate-800 w-36 text-center border-b border-slate-300"
+                                                placeholder="14:48 às 23:36"
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                            {statsShiftB.horasTrabalhadas !== '00:00:00' ? (
+                                                <>
+                                                    <span className="text-[9.5px] font-bold text-slate-500 uppercase">Carga Horária:</span>
+                                                    <span className="text-[10px] font-black text-[#002060] bg-white px-2 py-0.5 rounded border border-slate-200">
+                                                        {machine.toLowerCase().includes('treli') ? '8h 48m' : '9h 00m'}
+                                                    </span>
+                                                </>
+                                            ) : (
+                                                <span className="text-[10px] font-bold text-slate-400">
+                                                    Sem 2º Turno
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+
                                     {/* Horas Trabalhadas */}
                                     <div className="flex items-center justify-between py-2.5">
                                         <div className="flex items-center gap-2">

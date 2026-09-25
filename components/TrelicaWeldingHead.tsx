@@ -163,6 +163,34 @@ export const saveLocalMachineElectrodes = (machineName: string, electrodes: Trel
     }
 };
 
+export interface TrelicaElectrodesValidation {
+    isValid: boolean;
+    missingCount: number;
+    missingPositions: { position: TrelicaElectrodePosition; label: string; shortLabel: string }[];
+    configuredElectrodes: TrelicaMachineElectrode[];
+}
+
+export const validateTrelicaElectrodesConfigured = (machineName: string): TrelicaElectrodesValidation => {
+    const electrodes = getLocalMachineElectrodes(machineName);
+    const missingPositions: { position: TrelicaElectrodePosition; label: string; shortLabel: string }[] = [];
+
+    ELECTRODE_POSITIONS_CONFIG.forEach(cfg => {
+        const found = electrodes.find(e => e.position === cfg.position);
+        const lot = found?.lot_number ? String(found.lot_number).trim() : '';
+        const isInvalid = !found || !lot || lot === 'Sem Lote' || lot === 'S/L' || lot === 'PENDENTE' || lot.toLowerCase().includes('sem lote') || found.status === 'inactive';
+        if (isInvalid) {
+            missingPositions.push({ position: cfg.position, label: cfg.label, shortLabel: cfg.shortLabel });
+        }
+    });
+
+    return {
+        isValid: missingPositions.length === 0,
+        missingCount: missingPositions.length,
+        missingPositions,
+        configuredElectrodes: electrodes
+    };
+};
+
 export type ElectrodeOffsetsMap = Record<TrelicaElectrodePosition, { dx: number; dy: number }>;
 
 const LAYOUT_OFFSETS_STORAGE_KEY = 'trelica_electrode_offsets_v1';
