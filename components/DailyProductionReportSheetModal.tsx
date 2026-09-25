@@ -197,6 +197,18 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         return diff;
     };
 
+    // Sanitização ativa: se horasTrabalhadas vier com valor desproporcional (> 11h, ex: 21:19:32 de operador que não encerrou no app)
+    useEffect(() => {
+        const isTrelica = machine.toLowerCase().includes('treli') || machine.toLowerCase().includes('trelica');
+        const defaultShiftA = isTrelica ? '08:48:00' : '09:48:00';
+        if (timeToSeconds(statsShiftA.horasTrabalhadas) > 11 * 3600) {
+            setStatsShiftA(prev => ({ ...prev, horasTrabalhadas: defaultShiftA }));
+        }
+        if (timeToSeconds(statsShiftB.horasTrabalhadas) > 11 * 3600) {
+            setStatsShiftB(prev => ({ ...prev, horasTrabalhadas: isTrelica ? '08:48:00' : '09:00:00' }));
+        }
+    }, [machine, statsShiftA.horasTrabalhadas, statsShiftB.horasTrabalhadas]);
+
     // Formatação da Data
     const safeDateObj = useMemo(() => {
         if (!selectedDate) return new Date();
@@ -490,7 +502,9 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 const defaultSchedA = isTrelica ? '05:00 às 14:48' : '07:45 às 17:33';
 
                 const rawStatsA = dbReport.stats_shift_a || {};
-                const horasTrabalhadasA = (isTrelica && (rawStatsA.horasTrabalhadas === '09:49:05' || rawStatsA.horasTrabalhadas === '09:00:00'))
+                const workedSecA = timeToSeconds(rawStatsA.horasTrabalhadas || '');
+                // Sanitizar valores legados inválidos (> 11h como 21:19:32 de app esquecido aberto, 09:49:05 ou zero)
+                const horasTrabalhadasA = (workedSecA > 11 * 3600 || workedSecA === 0 || rawStatsA.horasTrabalhadas === '09:49:05' || (isTrelica && rawStatsA.horasTrabalhadas === '09:00:00'))
                     ? defaultShiftA
                     : (rawStatsA.horasTrabalhadas || defaultShiftA);
 
@@ -509,14 +523,15 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 const rawStatsB = dbReport.stats_shift_b || {};
                 const defaultSchedB = isTrelica ? '14:48 às 23:36' : '14:00 às 23:59';
                 const defaultShiftB = isTrelica ? '08:48:00' : '09:00:00';
-                const hasHoursB = rawStatsB.horasTrabalhadas && rawStatsB.horasTrabalhadas !== '00:00:00';
+                const workedSecB = timeToSeconds(rawStatsB.horasTrabalhadas || '');
+                const hasHoursB = workedSecB > 0 && workedSecB < 12 * 3600;
                 const horarioTurnoB = (rawStatsB.horarioTurnoPrevisto && rawStatsB.horarioTurnoPrevisto.includes('às'))
                     ? rawStatsB.horarioTurnoPrevisto
                     : (hasHoursB ? defaultSchedB : '');
 
                 setStatsShiftB({
                     ...rawStatsB,
-                    horasTrabalhadas: hasHoursB ? (isTrelica && rawStatsB.horasTrabalhadas === '09:00:00' ? defaultShiftB : rawStatsB.horasTrabalhadas) : '00:00:00',
+                    horasTrabalhadas: workedSecB > 11 * 3600 ? defaultShiftB : (hasHoursB ? (isTrelica && rawStatsB.horasTrabalhadas === '09:00:00' ? defaultShiftB : rawStatsB.horasTrabalhadas) : '00:00:00'),
                     pecasProduzidas: Number(rawStatsB.pecasProduzidas || 0),
                     tamanhoPeca: Number(rawStatsB.tamanhoPeca || 0),
                     horarioTurnoPrevisto: horarioTurnoB
