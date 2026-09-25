@@ -1308,8 +1308,10 @@ const App: React.FC = () => {
             const updatedOrder = await updateItem<ProductionOrderData>('production_orders', orderId, updates);
             setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
             showNotification('Ordem de produção atualizada com sucesso!', 'success');
-        } catch (error) {
-            showNotification('Erro ao atualizar ordem de produção.', 'error');
+        } catch (error: any) {
+            console.error('Erro ao atualizar ordem de produção:', error);
+            showNotification(`Erro ao atualizar ordem de produção: ${error?.message || error}`, 'error');
+            throw error;
         }
     };
 
@@ -1708,7 +1710,7 @@ const App: React.FC = () => {
         }
     };
 
-    const generateShiftReport = async (order: ProductionOrderData, operatorLog: OperatorLog) => {
+    const generateShiftReport = async (order: ProductionOrderData, operatorLog: OperatorLog, customObservation?: string) => {
         if (!operatorLog.endTime) return;
         const shiftStart = new Date(operatorLog.startTime);
         const shiftEnd = new Date(operatorLog.endTime);
@@ -1807,7 +1809,7 @@ const App: React.FC = () => {
             isOvertime: operatorLog.isOvertime,
             managerAuthorized: operatorLog.managerAuthorized,
             autoClosed: operatorLog.autoClosed,
-            observation: observation || (operatorLog.autoClosed ? 'Encerramento Automático pelo Sistema (Operador ausente)' : undefined)
+            observation: customObservation || (operatorLog as any).observation || (operatorLog.autoClosed ? 'Encerramento Automático pelo Sistema (Operador ausente)' : undefined)
         };
 
         try {

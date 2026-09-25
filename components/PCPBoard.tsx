@@ -625,61 +625,29 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 const targetDateStr = details.dayStats?.dateStr || formatDateString(new Date());
                 const isTodayTarget = details.dayStats?.isToday ?? (targetDateStr === formatDateString(new Date()));
 
-                const openLogIdx = currentLogs.findIndex((l: any) => !l.endTime);
-
-                if (isTodayTarget && openLogIdx !== -1) {
-                    // Turno aberto de hoje: ajustar startQuantity para que total - startQuantity === shiftQty
-                    const activeL = currentLogs[openLogIdx];
-                    currentLogs[openLogIdx] = {
-                        ...activeL,
-                        operator: details.operatorName || activeL.operator || 'Operador',
-                        startQuantity: Math.max(0, newTotalQty - shiftQty)
-                    };
-                } else if (openLogIdx !== -1 && !isTodayTarget) {
-                    // Log aberto existe hoje, mas gestor alterou um dia passado
-                    const pastIdx = currentLogs.findIndex((l: any) => {
-                        const s = getIsoDateStr(l.startTime);
-                        const e = getIsoDateStr(l.endTime);
-                        return s === targetDateStr || e === targetDateStr;
-                    });
-                    if (pastIdx !== -1) {
-                        const pLog = currentLogs[pastIdx];
-                        const sQty = Number(pLog.startQuantity) || 0;
-                        currentLogs[pastIdx] = {
-                            ...pLog,
-                            endQuantity: sQty + shiftQty
-                        };
-                    } else {
-                        currentLogs.push({
-                            operator: details.operatorName || 'Operador',
-                            startTime: `${targetDateStr}T08:00:00.000Z`,
-                            endTime: `${targetDateStr}T17:00:00.000Z`,
-                            startQuantity: 0,
-                            endQuantity: shiftQty
-                        });
+                // 1. Identificar logs vinculados à data selecionada (início ou fim na data)
+                const matchingIndices: number[] = [];
+                currentLogs.forEach((l: any, idx: number) => {
+                    const s = getIsoDateStr(l.startTime);
+                    const e = getIsoDateStr(l.endTime);
+                    if (s === targetDateStr || e === targetDateStr) {
+                        matchingIndices.push(idx);
                     }
-                } else if (openLogIdx === -1 && isTodayTarget) {
-                    // Hoje sem log aberto: criar log aberto com startQuantity sincronizado
-                    currentLogs.push({
-                        operator: details.operatorName || 'Operador',
-                        startTime: now,
-                        endTime: null,
-                        startQuantity: Math.max(0, newTotalQty - shiftQty)
-                    });
-                } else {
-                    // Dia passado sem log aberto
-                    const pastIdx = currentLogs.findIndex((l: any) => {
-                        const s = getIsoDateStr(l.startTime);
-                        const e = getIsoDateStr(l.endTime);
-                        return s === targetDateStr || e === targetDateStr;
-                    });
-                    if (pastIdx !== -1) {
-                        const pLog = currentLogs[pastIdx];
-                        const sQty = Number(pLog.startQuantity) || 0;
-                        currentLogs[pastIdx] = {
-                            ...pLog,
-                            endQuantity: sQty + shiftQty
-                        };
+                });
+
+                // Se não há nenhum log nessa data, cria um novo
+                if (matchingIndices.length === 0) {
+                    const openIdx = currentLogs.findIndex((l: any) => !l.endTime);
+                    if (isTodayTarget && openIdx !== -1) {
+                        matchingIndices.push(openIdx);
+                    } else if (isTodayTarget) {
+                        currentLogs.push({
+                            operator: details.operatorName || 'Operador',
+                            startTime: now,
+                            endTime: null,
+                            startQuantity: 0
+                        });
+                        matchingIndices.push(currentLogs.length - 1);
                     } else {
                         currentLogs.push({
                             operator: details.operatorName || 'Operador',
@@ -688,11 +656,115 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                             startQuantity: 0,
                             endQuantity: shiftQty
                         });
+                        matchingIndices.push(currentLogs.length - 1);
                     }
                 }
-                updates.operatorLogs = currentLogs;
+
+                // 2. Distribuir a nova meta de peças da data
+                const closedIndicesOnDay = matchingIndices.filter(i => currentLogs[i].endTime);
+                const openIdxOnDay = matchingIndices.find(i => !currentLogs[i].endTime);
+
+                let targetOpenPieces = 0;
+                if (openIdxOnDay !== undefined) {
+                    const sumClosedOther = closedIndicesOnDay.reduce((acc, i) => {
+                        return acc + Math.max(0, (Number(currentLogs[i].endQuantity) || 0) - (Number(currentLogs[i].startQuantity) || 0));
+                    }, 0);
+                    targetOpenPieces = Math.max(0, shiftQty - sumClosedOther);
+                } else if (closedIndicesOnDay.length > 0) {
+                    const lastClosedIdx = closedIndicesOnDay[closedIndicesOnDay.length - 1];
+                    const sumClosedOther = closedIndicesOnDay.slice(0, -1).reduce((acc, i) => {
+                        return acc + Math.max(0, (Number(currentLogs[i].endQuantity) || 0) - (Number(currentLogs[i].startQuantity) || 0));
+                    }, 0);
+                    currentLogs[lastClosedIdx] = {
+                        ...currentLogs[lastClosedIdx],
+                        _targetDelta: Math.max(0, shiftQty - sumClosedOther)
+                    };
+                }
+
+                // 3. Re-encadear todos os logs sequencialmente para manter total e deltas 100% íntegros
+                let runningAccumulator = 0;
+                const newLogs = currentLogs.map((log: any, idx: number) => {
+                    let pieces = 0;
+                    if (log._targetDelta !== undefined) {
+                        pieces = log._targetDelta;
+                        delete log._targetDelta;
+                    } else if (log.endTime) {
+                        pieces = Math.max(0, (Number(log.endQuantity) || 0) - (Number(log.startQuantity) || 0));
+                    } else {
+                        // Log aberto
+                        if (idx === openIdxOnDay) {
+                            pieces = targetOpenPieces;
+                        } else {
+                            const prevTot = isTrefila 
+                                ? (Number(targetOrder.actualProducedWeight) || Number(targetOrder.totalProducedWeight) || 0)
+                                : (Number(targetOrder.actualProducedQuantity) || 0);
+                            pieces = Math.max(0, prevTot - (Number(log.startQuantity) || 0));
+                        }
+                    }
+
+                    const startQ = runningAccumulator;
+                    runningAccumulator += pieces;
+
+                    if (log.endTime) {
+                        return {
+                            ...log,
+                            startQuantity: startQ,
+                            endQuantity: runningAccumulator
+                        };
+                    } else {
+                        return {
+                            ...log,
+                            startQuantity: startQ
+                        };
+                    }
+                });
+
+                updates.operatorLogs = newLogs;
+                newTotalQty = runningAccumulator;
+                if (isTrefila) {
+                    updates.actualProducedWeight = runningAccumulator;
+                    updates.totalProducedWeight = runningAccumulator;
+                } else {
+                    updates.actualProducedQuantity = runningAccumulator;
+                }
+            } else if (details?.mode === 'total') {
+                if (isTrefila) {
+                    updates.actualProducedWeight = newTotalQty;
+                    updates.totalProducedWeight = newTotalQty;
+                } else {
+                    updates.actualProducedQuantity = newTotalQty;
+                }
+
+                const openLogIdx = currentLogs.findIndex((l: any) => !l.endTime);
+                if (openLogIdx !== -1) {
+                    let runningAccumulator = 0;
+                    const newLogs = currentLogs.map((log: any, idx: number) => {
+                        if (idx === openLogIdx) {
+                            return {
+                                ...log,
+                                startQuantity: runningAccumulator
+                            };
+                        } else {
+                            const p = Math.max(0, (Number(log.endQuantity) || 0) - (Number(log.startQuantity) || 0));
+                            const sQ = runningAccumulator;
+                            runningAccumulator += p;
+                            return {
+                                ...log,
+                                startQuantity: sQ,
+                                endQuantity: runningAccumulator
+                            };
+                        }
+                    });
+                    updates.operatorLogs = newLogs;
+                }
             } else if (details?.updatedLogs && details.updatedLogs.length > 0) {
                 updates.operatorLogs = details.updatedLogs;
+                if (isTrefila) {
+                    updates.actualProducedWeight = newTotalQty;
+                    updates.totalProducedWeight = newTotalQty;
+                } else {
+                    updates.actualProducedQuantity = newTotalQty;
+                }
             }
 
             // Atualização única atômica em production_orders
@@ -8294,10 +8366,23 @@ const AdjustQuantityModal: React.FC<{
 
     const isShiftMode = mode === 'shift';
 
+    // Soma de todas as peças registradas nos turnos da OP para garantir consistência
+    const sumLogsTotal = useMemo(() => {
+        let sum = 0;
+        (order.operatorLogs || []).forEach((l: any) => {
+            if (l.endTime) {
+                sum += Math.max(0, (Number(l.endQuantity) || 0) - (Number(l.startQuantity) || 0));
+            } else {
+                sum += Math.max(0, currentTotal - (Number(l.startQuantity) || 0));
+            }
+        });
+        return sum > 0 ? sum : currentTotal;
+    }, [order, currentTotal]);
+
     // Cálculos dinâmicos
     const shiftDelta = isShiftMode ? (qty - shiftBaseQty) : (qty - currentTotal);
     const calculatedNewTotal = isShiftMode 
-        ? Math.max(0, currentTotal + (qty - shiftBaseQty))
+        ? Math.max(0, sumLogsTotal + (qty - shiftBaseQty))
         : qty;
     const calculatedNewShift = isShiftMode
         ? qty
