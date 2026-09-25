@@ -315,13 +315,18 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 if (l.endQuantity !== undefined && l.startQuantity !== undefined) {
                     const diff = Math.max(0, (Number(l.endQuantity) || 0) - (Number(l.startQuantity) || 0));
                     piecesA += diff;
+                } else if (!l.endTime && l.startQuantity !== undefined) {
+                    // Turno ativo em andamento hoje!
+                    const currentTotal = Number(op.actualProducedQuantity) || 0;
+                    const diff = Math.max(0, currentTotal - Number(l.startQuantity));
+                    piecesA += diff;
                 }
             });
         }
 
-        // 3. Se ainda assim estiver zerado, mas tivermos a quantidade calculada pelo PCP no card do dia
-        if (piecesA === 0 && piecesB === 0) {
-            if (initialProduced !== undefined && initialProduced > 0) {
+        // 3. Sincronizar com initialProduced calculado pelo PCP (garante paridade exata)
+        if (initialProduced !== undefined && initialProduced > 0) {
+            if (piecesA === 0 || piecesA < initialProduced) {
                 piecesA = initialProduced;
             }
         }
@@ -512,10 +517,30 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     ? rawStatsA.horarioTurnoPrevisto
                     : defaultSchedA;
 
+                // Sincronização inteligente com a produção real do chão de fábrica:
+                // Se a data for hoje ou se o turno ainda estiver em andamento,
+                // ou se initialProduced for maior que o valor estático que foi salvo no banco:
+                let piecesAFromDb = Number(rawStatsA.pecasProduzidas || 0);
+                const todayStr = getLocalDateString(new Date());
+                const isCurrentActiveDay = targetDate === todayStr || rawStatsA.horarioFimApp === 'Em andamento' || op.status === 'in_progress' || op.status === 'Em Produção';
+
+                const liveTotal = Number(op.actualProducedQuantity) || 0;
+                const openLog = (op.operatorLogs || []).find((l: any) => !l.endTime);
+                let liveProducedPcs = 0;
+                if (openLog && openLog.startQuantity !== undefined) {
+                    liveProducedPcs = Math.max(0, liveTotal - Number(openLog.startQuantity));
+                }
+
+                if (initialProduced !== undefined && initialProduced > 0 && isCurrentActiveDay) {
+                    piecesAFromDb = Math.max(piecesAFromDb, initialProduced);
+                } else if (liveProducedPcs > 0 && isCurrentActiveDay) {
+                    piecesAFromDb = Math.max(piecesAFromDb, liveProducedPcs);
+                }
+
                 setStatsShiftA({
                     ...rawStatsA,
                     horasTrabalhadas: horasTrabalhadasA,
-                    pecasProduzidas: Number(rawStatsA.pecasProduzidas || 0),
+                    pecasProduzidas: piecesAFromDb,
                     tamanhoPeca: Number(rawStatsA.tamanhoPeca || (isTrelica ? 12 : 6)),
                     horarioTurnoPrevisto: horarioTurnoA
                 });

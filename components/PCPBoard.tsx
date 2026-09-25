@@ -159,7 +159,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     });
 
     const [selectedDailyReport, setSelectedDailyReport] = useState<{ op: ProductionOrderData, date: Date, dateStr: string, dayName: string, produced: number, unit: string } | null>(null);
-    const [officialReportModalData, setOfficialReportModalData] = useState<{ op: ProductionOrderData; dateStr: string; machine: string } | null>(null);
+    const [officialReportModalData, setOfficialReportModalData] = useState<{ op: ProductionOrderData; dateStr: string; machine: string; initialProduced?: number; initialOperator?: string } | null>(null);
 
     type TrelicaModel = typeof DEFAULT_TRELICA_MODELS[number];
     const [trelicaModels, setTrelicaModels] = useState<TrelicaModel[]>(() => {
@@ -6799,10 +6799,14 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                         onClick={() => {
                                             const today = new Date();
                                             const dateStr = formatDateString(today);
+                                            const machine = drawerOP.scheduledMachine || (drawerOP.machine as string) || 'Treliça 1';
+                                            const todayStats = getOpDayStats(drawerOP, today, machine);
                                             setOfficialReportModalData({
                                                 op: drawerOP,
                                                 dateStr,
-                                                machine: drawerOP.scheduledMachine || (drawerOP.machine as string) || 'Treliça 1'
+                                                machine,
+                                                initialProduced: todayStats.produced,
+                                                initialOperator: todayStats.operatorName
                                             });
                                         }}
                                         className="mt-2 w-full py-2 px-3 rounded-xl bg-gradient-to-r from-blue-600/25 to-indigo-600/25 hover:from-blue-600/35 hover:to-indigo-600/35 border border-blue-500/40 hover:border-blue-400 text-blue-200 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(59,130,246,0.2)] cursor-pointer active:scale-98"
@@ -7927,6 +7931,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     op={officialReportModalData.op}
                     shiftReports={shiftReports}
                     productionOrders={productionOrders}
+                    initialProduced={officialReportModalData.initialProduced}
+                    initialOperator={officialReportModalData.initialOperator}
                 />
             )}
         </div>
