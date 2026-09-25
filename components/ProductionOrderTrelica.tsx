@@ -528,9 +528,14 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
         // Previous code passed `trelicaLots as any`.
         // I should stick to that, assuming App.tsx handles it or custom logic there extracts IDs.
 
+        const unitPieceWeight = parseFloat(selectedModel.pesoFinal.replace(',', '.')) || 0;
+
         addProductionOrder({
             orderNumber: orderNumber,
             machine: selectedMachine,
+            productCode: selectedModel.cod,
+            productDescription: selectedModel.modelo,
+            pieceWeight: unitPieceWeight,
             targetBitola: normalizeBitola(selectedModel.superior) as Bitola,
             trelicaModel: selectedModel.modelo,
             tamanho: selectedModel.tamanho,

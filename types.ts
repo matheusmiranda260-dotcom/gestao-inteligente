@@ -209,6 +209,9 @@ export interface ProductionOrderData {
     shiftConfig?: { workStart: string; lunchStart: string; lunchEnd: string; workEnd: string };
     k7Count?: number;
     k7Setup?: any[];
+    productCode?: string;
+    productDescription?: string;
+    pieceWeight?: number;
 }
 
 export interface TransferRecord {

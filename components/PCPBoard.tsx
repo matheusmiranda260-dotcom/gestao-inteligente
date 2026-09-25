@@ -1244,23 +1244,28 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
             let loadedCount = 0;
             stands.forEach(s => {
-                if (s.current_lot_id) {
-                    if (s.role_type === 'superior') {
-                        setTrelicaSuperiorLots(prev => [s.current_lot_id, ...prev.filter(id => id !== s.current_lot_id)]);
-                        loadedCount++;
-                    } else if (s.role_type === 'senozoide_left') {
-                        setTrelicaSenozoideLeftLots(prev => [s.current_lot_id, ...prev.filter(id => id !== s.current_lot_id)]);
-                        loadedCount++;
-                    } else if (s.role_type === 'senozoide_right') {
-                        setTrelicaSenozoideRightLots(prev => [s.current_lot_id, ...prev.filter(id => id !== s.current_lot_id)]);
-                        loadedCount++;
-                    } else if (s.role_type === 'inferior_left') {
-                        setTrelicaInferiorLeftLots(prev => [s.current_lot_id, ...prev.filter(id => id !== s.current_lot_id)]);
-                        loadedCount++;
-                    } else if (s.role_type === 'inferior_right') {
-                        setTrelicaInferiorRightLots(prev => [s.current_lot_id, ...prev.filter(id => id !== s.current_lot_id)]);
-                        loadedCount++;
-                    }
+                const rawLot = s.current_lot_id || s.current_lot_number;
+                if (!rawLot) return;
+
+                // Tenta mapear o lote bruto para o item no estoque para obter o ID canônico
+                const matched = stock.find(st => st.id === rawLot || st.internalLot === rawLot || (st.lotNumber && st.lotNumber === rawLot));
+                const resolvedId = matched ? matched.id : rawLot;
+
+                if (s.role_type === 'superior') {
+                    setTrelicaSuperiorLots(prev => [resolvedId, ...prev.filter(id => id !== resolvedId && id !== rawLot)]);
+                    loadedCount++;
+                } else if (s.role_type === 'senozoide_left') {
+                    setTrelicaSenozoideLeftLots(prev => [resolvedId, ...prev.filter(id => id !== resolvedId && id !== rawLot)]);
+                    loadedCount++;
+                } else if (s.role_type === 'senozoide_right') {
+                    setTrelicaSenozoideRightLots(prev => [resolvedId, ...prev.filter(id => id !== resolvedId && id !== rawLot)]);
+                    loadedCount++;
+                } else if (s.role_type === 'inferior_left') {
+                    setTrelicaInferiorLeftLots(prev => [resolvedId, ...prev.filter(id => id !== resolvedId && id !== rawLot)]);
+                    loadedCount++;
+                } else if (s.role_type === 'inferior_right') {
+                    setTrelicaInferiorRightLots(prev => [resolvedId, ...prev.filter(id => id !== resolvedId && id !== rawLot)]);
+                    loadedCount++;
                 }
             });
 
@@ -2021,8 +2026,14 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         lotId: string,
         isChecked: boolean
     ) => {
-        const updateList = (prev: string[]) => 
-            isChecked ? [...prev, lotId] : prev.filter(id => id !== lotId);
+        const item = stock.find(s => s.id === lotId || s.internalLot === lotId);
+        const canonicalId = item ? item.id : lotId;
+        const altId = item?.internalLot;
+
+        const updateList = (prev: string[]) => {
+            const filtered = prev.filter(id => id !== canonicalId && id !== lotId && (!altId || id !== altId));
+            return isChecked ? [...filtered, canonicalId] : filtered;
+        };
 
         if (position === 'sup') setTrelicaSuperiorLots(updateList);
         else if (position === 'inf1') setTrelicaInferiorLeftLots(updateList);
@@ -2052,13 +2063,17 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
         // Localizar ID da bobina que já está montada com bitola compatível
         const getMountedLotId = (roleType: string, bitolaNorm: string): string | undefined => {
-            const match = machineMountedStands.find(s => 
-                s.role_type === roleType && 
-                s.current_lot_id && 
-                normalizeBitola(s.current_gauge || '') === bitolaNorm &&
-                !usedIds.has(s.current_lot_id)
-            );
-            return match?.current_lot_id;
+            const match = machineMountedStands.find(s => {
+                const raw = s.current_lot_id || s.current_lot_number;
+                return s.role_type === roleType && 
+                    raw && 
+                    normalizeBitola(s.current_gauge || '') === bitolaNorm;
+            });
+            if (!match) return undefined;
+            const raw = match.current_lot_id || match.current_lot_number;
+            const stockMatch = availableCa60Stock.find(l => l.id === raw || l.internalLot === raw);
+            const foundId = stockMatch ? stockMatch.id : raw;
+            return foundId && !usedIds.has(foundId) ? foundId : undefined;
         };
 
         const allocateLots = (bitolaNorm: string, targetWeight: number, preferredFirstLotId?: string): string[] => {
@@ -2067,7 +2082,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
             // Prioridade 1: Bobina que já está montada no suporte da máquina!
             if (preferredFirstLotId) {
-                const mountedItem = availableCa60Stock.find(l => l.id === preferredFirstLotId);
+                const mountedItem = availableCa60Stock.find(l => l.id === preferredFirstLotId || l.internalLot === preferredFirstLotId);
                 if (mountedItem && !usedIds.has(mountedItem.id)) {
                     selected.push(mountedItem.id);
                     usedIds.add(mountedItem.id);
@@ -2484,11 +2499,16 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 allSenozoideRight: trelicaSenozoideRightLots,
             };
 
+            const unitPieceWeight = parseFloat(selectedTrelicaModel.pesoFinal.replace(',', '.')) || 0;
+
+            orderData.productCode = selectedTrelicaModel.cod;
+            orderData.productDescription = selectedTrelicaModel.modelo;
+            orderData.pieceWeight = unitPieceWeight;
             orderData.trelicaModel = selectedTrelicaModel.modelo;
             orderData.tamanho = selectedTrelicaModel.tamanho;
             orderData.quantityToProduce = trelicaQuantity;
             orderData.targetBitola = selectedTrelicaModel.superior as Bitola;
-            orderData.totalWeight = parseFloat(selectedTrelicaModel.pesoFinal.replace(',', '.')) * trelicaQuantity;
+            orderData.totalWeight = unitPieceWeight * trelicaQuantity;
             orderData.isGhostOrder = isTrelicaGhostOrder;
             orderData.selectedLotIds = trelicaLots;
             orderData.trelicaSuperior = selectedTrelicaModel.superior;
@@ -5029,53 +5049,58 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                             const infBitolaNorm = normalizeBitola(selectedTrelicaModel?.inferior);
                             const senBitolaNorm = normalizeBitola(selectedTrelicaModel?.senozoide);
 
+                            // Helper para checar se um lote está selecionado na lista (por ID ou lote interno)
+                            const isLotSelectedIn = (list: string[], item: any) => {
+                                return list.some(id => id === item.id || id === item.internalLot || (item.lotNumber && id === item.lotNumber));
+                            };
+
                             // Lotes compatíveis e filtrados por arame excluindo seleções cruzadas
                             const supCandidates = availableCa60Stock.filter(s => {
                                 const matchGauge = trelicaShowAllGauges || normalizeBitola(s.bitola) === supBitolaNorm;
-                                const notInOthers = !trelicaInferiorLeftLots.includes(s.id) &&
-                                                    !trelicaInferiorRightLots.includes(s.id) &&
-                                                    !trelicaSenozoideLeftLots.includes(s.id) &&
-                                                    !trelicaSenozoideRightLots.includes(s.id);
+                                const notInOthers = !isLotSelectedIn(trelicaInferiorLeftLots, s) &&
+                                                    !isLotSelectedIn(trelicaInferiorRightLots, s) &&
+                                                    !isLotSelectedIn(trelicaSenozoideLeftLots, s) &&
+                                                    !isLotSelectedIn(trelicaSenozoideRightLots, s);
                                 const matchSearch = !trelicaLotSearch || (s.internalLot || '').toLowerCase().includes(trelicaLotSearch.toLowerCase());
                                 return matchGauge && notInOthers && matchSearch;
                             });
 
                             const inf1Candidates = availableCa60Stock.filter(s => {
                                 const matchGauge = trelicaShowAllGauges || normalizeBitola(s.bitola) === infBitolaNorm;
-                                const notInOthers = !trelicaSuperiorLots.includes(s.id) &&
-                                                    !trelicaInferiorRightLots.includes(s.id) &&
-                                                    !trelicaSenozoideLeftLots.includes(s.id) &&
-                                                    !trelicaSenozoideRightLots.includes(s.id);
+                                const notInOthers = !isLotSelectedIn(trelicaSuperiorLots, s) &&
+                                                    !isLotSelectedIn(trelicaInferiorRightLots, s) &&
+                                                    !isLotSelectedIn(trelicaSenozoideLeftLots, s) &&
+                                                    !isLotSelectedIn(trelicaSenozoideRightLots, s);
                                 const matchSearch = !trelicaLotSearch || (s.internalLot || '').toLowerCase().includes(trelicaLotSearch.toLowerCase());
                                 return matchGauge && notInOthers && matchSearch;
                             });
 
                             const inf2Candidates = availableCa60Stock.filter(s => {
                                 const matchGauge = trelicaShowAllGauges || normalizeBitola(s.bitola) === infBitolaNorm;
-                                const notInOthers = !trelicaSuperiorLots.includes(s.id) &&
-                                                    !trelicaInferiorLeftLots.includes(s.id) &&
-                                                    !trelicaSenozoideLeftLots.includes(s.id) &&
-                                                    !trelicaSenozoideRightLots.includes(s.id);
+                                const notInOthers = !isLotSelectedIn(trelicaSuperiorLots, s) &&
+                                                    !isLotSelectedIn(trelicaInferiorLeftLots, s) &&
+                                                    !isLotSelectedIn(trelicaSenozoideLeftLots, s) &&
+                                                    !isLotSelectedIn(trelicaSenozoideRightLots, s);
                                 const matchSearch = !trelicaLotSearch || (s.internalLot || '').toLowerCase().includes(trelicaLotSearch.toLowerCase());
                                 return matchGauge && notInOthers && matchSearch;
                             });
 
                             const sen1Candidates = availableCa60Stock.filter(s => {
                                 const matchGauge = trelicaShowAllGauges || normalizeBitola(s.bitola) === senBitolaNorm;
-                                const notInOthers = !trelicaSuperiorLots.includes(s.id) &&
-                                                    !trelicaInferiorLeftLots.includes(s.id) &&
-                                                    !trelicaInferiorRightLots.includes(s.id) &&
-                                                    !trelicaSenozoideRightLots.includes(s.id);
+                                const notInOthers = !isLotSelectedIn(trelicaSuperiorLots, s) &&
+                                                    !isLotSelectedIn(trelicaInferiorLeftLots, s) &&
+                                                    !isLotSelectedIn(trelicaInferiorRightLots, s) &&
+                                                    !isLotSelectedIn(trelicaSenozoideRightLots, s);
                                 const matchSearch = !trelicaLotSearch || (s.internalLot || '').toLowerCase().includes(trelicaLotSearch.toLowerCase());
                                 return matchGauge && notInOthers && matchSearch;
                             });
 
                             const sen2Candidates = availableCa60Stock.filter(s => {
                                 const matchGauge = trelicaShowAllGauges || normalizeBitola(s.bitola) === senBitolaNorm;
-                                const notInOthers = !trelicaSuperiorLots.includes(s.id) &&
-                                                    !trelicaInferiorLeftLots.includes(s.id) &&
-                                                    !trelicaInferiorRightLots.includes(s.id) &&
-                                                    !trelicaSenozoideLeftLots.includes(s.id);
+                                const notInOthers = !isLotSelectedIn(trelicaSuperiorLots, s) &&
+                                                    !isLotSelectedIn(trelicaInferiorLeftLots, s) &&
+                                                    !isLotSelectedIn(trelicaInferiorRightLots, s) &&
+                                                    !isLotSelectedIn(trelicaSenozoideLeftLots, s);
                                 const matchSearch = !trelicaLotSearch || (s.internalLot || '').toLowerCase().includes(trelicaLotSearch.toLowerCase());
                                 return matchGauge && notInOthers && matchSearch;
                             });
@@ -5152,7 +5177,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                 </thead>
                                                 <tbody className="divide-y divide-white/5 font-mono text-[11px]">
                                                     {candidates.map(lot => {
-                                                        const isSelected = selIds.includes(lot.id);
+                                                        const isSelected = isLotSelectedIn(selIds, lot);
                                                         return (
                                                             <tr
                                                                 key={lot.id}

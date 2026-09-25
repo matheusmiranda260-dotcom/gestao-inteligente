@@ -453,6 +453,81 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
         };
     }, [machineType, activeOrder, activeLotInfo, now]);
 
+    // Detalhes completos do produto e da OP formatados conforme padrão solicitado:
+    // #NUMERO DA ORDEM# COD. PRODUTO+ DESCRIÇÃO E TAMANHO E PESO DA PEÇA
+    const productInfo = useMemo(() => {
+        if (!activeOrder) return null;
+
+        if (machineType.startsWith('Treliça')) {
+            let cachedList: any[] = trelicaModels;
+            try {
+                const saved = localStorage.getItem('cached_trelica_models');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (Array.isArray(parsed) && parsed.length > 0) cachedList = parsed;
+                }
+            } catch (e) {}
+
+            const normalize = (s: string) => s?.toUpperCase().replace(/[-\s]/g, '').trim() || '';
+            const orderModelNorm = normalize(activeOrder.trelicaModel || '');
+
+            const matched = cachedList.find(m => {
+                const mNorm = normalize(m.modelo || '');
+                const mCodNorm = normalize(m.cod || '');
+                const matchesModel = orderModelNorm && (mNorm.includes(orderModelNorm) || orderModelNorm.includes(mNorm) || mCodNorm === orderModelNorm);
+                const matchesSize = activeOrder.tamanho ? String(activeOrder.tamanho).trim() === String(m.tamanho).trim() : true;
+                return matchesModel && matchesSize;
+            }) || cachedList.find(m => {
+                const mNorm = normalize(m.modelo || '');
+                return orderModelNorm && (mNorm.includes(orderModelNorm) || orderModelNorm.includes(mNorm));
+            });
+
+            const code = activeOrder.productCode || matched?.cod || 'TL';
+            const description = activeOrder.productDescription || activeOrder.trelicaModel || matched?.modelo || 'Treliça';
+            const rawSize = activeOrder.tamanho || matched?.tamanho || '';
+            const sizeStr = rawSize ? `${rawSize} METROS` : '';
+            const rawWeight = (activeOrder.pieceWeight !== undefined && activeOrder.pieceWeight !== null && activeOrder.pieceWeight > 0)
+                ? activeOrder.pieceWeight
+                : (matched?.pesoFinal || matched?.peso_final ? parseFloat(String(matched.pesoFinal || matched.peso_final).replace(',', '.')) : null);
+            const weightStr = rawWeight !== null && !isNaN(rawWeight) ? `${rawWeight.toFixed(3).replace('.', ',')} kg/pç` : '';
+
+            return {
+                orderNumber: activeOrder.orderNumber,
+                code,
+                description,
+                size: sizeStr,
+                weight: weightStr,
+                formattedHeader: `#${activeOrder.orderNumber}# ${code} + ${description}${sizeStr ? ` • ${sizeStr}` : ''}${weightStr ? ` • ${weightStr}` : ''}`
+            };
+        }
+
+        if (machineType.startsWith('Trefila')) {
+            const bitola = activeOrder.targetBitola ? `ø${activeOrder.targetBitola}mm` : 'CA-60';
+            const weightStr = activeOrder.totalWeight ? `${activeOrder.totalWeight.toLocaleString('pt-BR')} kg` : '';
+            return {
+                orderNumber: activeOrder.orderNumber,
+                code: activeOrder.productCode || 'CA-60',
+                description: activeOrder.productDescription || `Aramo Trefilado CA-60`,
+                size: bitola,
+                weight: weightStr,
+                formattedHeader: `#${activeOrder.orderNumber}# CA-60 + Aramo Trefilado ${bitola}${weightStr ? ` • ${weightStr}` : ''}`
+            };
+        }
+
+        // Malha
+        const desc = activeOrder.productDescription || activeOrder.malhaModel || 'Malha Soldada';
+        const sizeStr = activeOrder.malhaPieces ? `${activeOrder.malhaPieces} peças` : '';
+        const weightStr = activeOrder.totalWeight ? `${activeOrder.totalWeight.toLocaleString('pt-BR')} kg` : '';
+        return {
+            orderNumber: activeOrder.orderNumber,
+            code: activeOrder.productCode || 'MALHA',
+            description: desc,
+            size: sizeStr,
+            weight: weightStr,
+            formattedHeader: `#${activeOrder.orderNumber}# ${activeOrder.productCode || 'MALHA'} + ${desc}${sizeStr ? ` • ${sizeStr}` : ''}${weightStr ? ` • ${weightStr}` : ''}`
+        };
+    }, [activeOrder, machineType]);
+
     // Busca detalhes técnicos do modelo de treliça caso não existam na ordem
     const trelicaDetails = useMemo(() => {
         if (!machineType.startsWith('Treliça') || !activeOrder?.trelicaModel) return null;
@@ -495,21 +570,33 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                                 <span className="bg-red-500/20 text-red-500 text-[8px] font-black px-1.5 py-0.5 rounded border border-red-500/30 font-mono">ID: {activeOrder.machine}</span>
                              )}
                         </div>
-                        <div className="flex items-center gap-2 mt-1.5">
+                        <div className="flex flex-wrap items-center gap-2 mt-2">
                             <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-black/40 border border-white/10 ${currentStyle.color}`}>
                                 {currentOperator}
                             </span>
-                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none">
-                                • {machineType.startsWith('Trefila') 
-                                    ? (activeOrder?.targetBitola || '---') 
-                                    : (machineType.startsWith('Treliça') ? (activeOrder?.trelicaModel ? `${activeOrder.trelicaModel} ${activeOrder.tamanho ? `(${activeOrder.tamanho}m)` : ''}` : '---') : (activeOrder?.malhaModel || '---'))
-                                }
-                            </span>
+                            {productInfo ? (
+                                <div className="flex flex-wrap items-center gap-1.5 bg-black/60 border border-emerald-500/30 px-2.5 py-1 rounded-lg font-mono text-[11px] shadow-sm">
+                                    <span className="font-black text-emerald-400">#{productInfo.orderNumber}#</span>
+                                    <span className="font-black text-cyan-300">{productInfo.code}</span>
+                                    <span className="text-slate-400 font-bold">+</span>
+                                    <span className="font-bold text-white uppercase">{productInfo.description}</span>
+                                    {productInfo.size && (
+                                        <span className="text-amber-300 font-semibold">• {productInfo.size}</span>
+                                    )}
+                                    {productInfo.weight && (
+                                        <span className="text-emerald-300 font-semibold">• {productInfo.weight}</span>
+                                    )}
+                                </div>
+                            ) : (
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none">
+                                    • SEM OP ATIVA
+                                </span>
+                            )}
                             {trelicaDetails && (
-                                <div className="flex gap-2 ml-1">
-                                    <span className="text-[8px] font-black text-slate-600 bg-white/5 px-1.5 py-0.5 rounded uppercase">S: {trelicaDetails.superior}</span>
-                                    <span className="text-[8px] font-black text-slate-600 bg-white/5 px-1.5 py-0.5 rounded uppercase">I: {trelicaDetails.sinusoide}</span>
-                                    <span className="text-[8px] font-black text-slate-600 bg-white/5 px-1.5 py-0.5 rounded uppercase">Z: {trelicaDetails.inferior}</span>
+                                <div className="flex gap-1.5 ml-1">
+                                    <span className="text-[8px] font-black text-slate-400 bg-white/5 border border-white/10 px-1.5 py-0.5 rounded uppercase">S: {trelicaDetails.superior}</span>
+                                    <span className="text-[8px] font-black text-slate-400 bg-white/5 border border-white/10 px-1.5 py-0.5 rounded uppercase">I: {trelicaDetails.sinusoide}</span>
+                                    <span className="text-[8px] font-black text-slate-400 bg-white/5 border border-white/10 px-1.5 py-0.5 rounded uppercase">Z: {trelicaDetails.inferior}</span>
                                 </div>
                             )}
                         </div>
@@ -538,11 +625,21 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                             <span className={`text-sm font-black uppercase tracking-[0.8em] mb-6 ${trefilaEstimation.isDelayed ? 'text-rose-400 neon-text-red animate-pulse' : 'text-emerald-400 neon-text-green'}`}>
                                 {trefilaEstimation.isDelayed ? '⚠ LOTE ATRASADO' : (machineType.startsWith('Trefila') ? 'LOTE EM PROCESSO' : 'MÁQUINA EM OPERAÇÃO')}
                             </span>
-                            <div className="flex flex-col items-center gap-2">
-                                <h3 className="text-4xl md:text-7xl font-black text-white text-center uppercase tracking-tighter drop-shadow-[0_10px_30px_rgba(0,0,0,0.5)] leading-tight px-4 break-words max-w-full italic">
+                            <div className="flex flex-col items-center gap-3">
+                                {productInfo && (
+                                    <div className="inline-flex flex-wrap items-center justify-center gap-2 px-5 py-2 rounded-2xl bg-black/70 border border-emerald-400/40 text-emerald-300 font-mono text-sm md:text-base font-black tracking-wide shadow-[0_0_30px_rgba(16,185,129,0.3)]">
+                                        <span className="text-emerald-400 bg-emerald-500/20 px-2.5 py-0.5 rounded border border-emerald-500/40">#{productInfo.orderNumber}#</span>
+                                        <span className="text-cyan-300">{productInfo.code}</span>
+                                        <span className="text-slate-400 font-bold">+</span>
+                                        <span className="text-white uppercase">{productInfo.description}</span>
+                                        {productInfo.size && <span className="text-amber-300">• {productInfo.size}</span>}
+                                        {productInfo.weight && <span className="text-emerald-300">• {productInfo.weight}</span>}
+                                    </div>
+                                )}
+                                <h3 className="text-3xl md:text-6xl font-black text-white text-center uppercase tracking-tighter drop-shadow-[0_10px_30px_rgba(0,0,0,0.5)] leading-tight px-4 break-words max-w-full italic">
                                     {machineType.startsWith('Trefila') 
                                         ? `${activeLotInfo?.internalLot || '---'} ${activeLotInfo?.initialQuantity ? `• ${activeLotInfo.initialQuantity} KG` : ''}` 
-                                        : (machineType.startsWith('Treliça') ? `${activeOrder?.trelicaModel || '---'} ${activeOrder?.tamanho ? `(${activeOrder.tamanho}M)` : ''}` : `${activeOrder?.malhaModel || '---'}`)}
+                                        : (productInfo?.description || activeOrder?.trelicaModel || '---')}
                                 </h3>
                                 {trelicaDetails && (
                                     <div className="flex gap-6 mt-2 px-8 py-2 bg-black/40 border border-white/5 rounded-full backdrop-blur-md">
@@ -631,7 +728,17 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                 {isStopped && !isHistoryExpanded && (
                     <div className="absolute inset-0 z-40 flex flex-col items-center justify-center p-8 pointer-events-none select-none">
                         <div className="w-full bg-rose-950/45 backdrop-blur-xl border-y-4 border-rose-500 py-12 animate-stop-pulse flex flex-col items-center justify-center shadow-[0_0_100px_rgba(244,63,94,0.4)]">
-                            <span className="text-sm font-black text-rose-400 uppercase tracking-[0.8em] mb-6 neon-text-red">ALERTA MÁQUINA PARADA</span>
+                            <span className="text-sm font-black text-rose-400 uppercase tracking-[0.8em] mb-4 neon-text-red">ALERTA MÁQUINA PARADA</span>
+                            {productInfo && (
+                                <div className="mb-4 inline-flex flex-wrap items-center justify-center gap-2 px-4 py-1.5 rounded-xl bg-black/60 border border-rose-500/40 text-rose-300 font-mono text-xs md:text-sm font-bold shadow-md">
+                                    <span className="text-white bg-rose-900/60 px-2 py-0.5 rounded border border-rose-500/30">#{productInfo.orderNumber}#</span>
+                                    <span className="text-cyan-300">{productInfo.code}</span>
+                                    <span className="text-slate-400 font-bold">+</span>
+                                    <span className="text-white uppercase">{productInfo.description}</span>
+                                    {productInfo.size && <span className="text-amber-300">• {productInfo.size}</span>}
+                                    {productInfo.weight && <span className="text-emerald-300">• {productInfo.weight}</span>}
+                                </div>
+                            )}
                             <h3 className="text-4xl md:text-6xl font-black text-white text-center uppercase tracking-tighter drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)] leading-tight px-4 break-words max-w-full italic">
                                 {machineStatus.reason}
                             </h3>
@@ -822,8 +929,22 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
                         {/* Progress Card */}
                         <div className="p-6 bg-black/30 rounded-3xl border border-white/5 h-full flex flex-col justify-between">
                             <div>
-                                <div className="flex justify-between items-center mb-6">
-                                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Progresso da OP #{activeOrder?.orderNumber || '---'}</h3>
+                                <div className="flex justify-between items-start mb-4">
+                                    <div>
+                                        <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">
+                                            Progresso da OP #{activeOrder?.orderNumber || '---'}
+                                        </h3>
+                                        {productInfo && (
+                                            <div className="mt-1 flex flex-wrap items-center gap-1.5 font-mono text-[10px]">
+                                                <span className="font-black text-emerald-400">#{productInfo.orderNumber}#</span>
+                                                <span className="font-black text-cyan-300">{productInfo.code}</span>
+                                                <span className="text-slate-400 font-bold">+</span>
+                                                <span className="font-bold text-white uppercase">{productInfo.description}</span>
+                                                {productInfo.size && <span className="text-amber-300">• {productInfo.size}</span>}
+                                                {productInfo.weight && <span className="text-emerald-300">• {productInfo.weight}</span>}
+                                            </div>
+                                        )}
+                                    </div>
                                     {isGestor && onResetShift && (
                                         <button onClick={onResetShift} className="text-[9px] font-black bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 px-3 py-1.5 rounded-lg border border-white/10 uppercase transition-all">Reset Shift</button>
                                     )}
