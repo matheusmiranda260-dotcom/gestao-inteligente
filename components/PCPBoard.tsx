@@ -4005,9 +4005,6 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                     if (isTrelica) {
                                                         barBg = 'bg-[#0E4231]/95 border-l-[#10B981] border-[#10B981]/30 hover:bg-[#12533E]';
                                                         barProgressColor = 'bg-emerald-400';
-                                                    } else if (isMalha) {
-                                                        barBg = 'bg-[#2E1854]/95 border-l-[#A78BFA] border-[#A78BFA]/30 hover:bg-[#3B1F6C]';
-                                                        barProgressColor = 'bg-purple-400';
                                                     } else {
                                                         barBg = 'bg-[#0B2533]/95 border-l-[#00E5FF] border-[#00E5FF]/30 hover:bg-[#103447]';
                                                         barProgressColor = 'bg-cyan-400';
@@ -4032,7 +4029,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                             <div className="truncate flex-1">
                                                                 <div className="flex items-center gap-1.5 flex-wrap">
                                                                     <span 
-                                                                        className="text-sm sm:text-base font-black text-white tracking-wide drop-shadow hover:text-purple-300 cursor-pointer transition-colors"
+                                                                        className="text-sm sm:text-base font-black text-white tracking-wide drop-shadow hover:text-[#00E5FF] cursor-pointer transition-colors"
                                                                         onClick={(e) => {
                                                                             e.stopPropagation();
                                                                             setEditingInProgressOP(op);
@@ -4063,12 +4060,6 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                     {prog.isLive && prog.isOffline && (
                                                                         <span className="flex items-center gap-1 text-[9px] sm:text-[10px] font-black uppercase bg-slate-500/25 text-slate-200 px-2 py-0.5 rounded border border-slate-500/50">
                                                                             DESLIGADA: TURNO
-                                                                        </span>
-                                                                    )}
-                                                                    {prog.isLive && !prog.isStopped && !prog.isPrep && !prog.isOffline && (
-                                                                        <span className="flex items-center gap-1 text-[9px] sm:text-[10px] font-black uppercase bg-cyan-500/30 text-[#00E5FF] px-2 py-0.5 rounded border border-[#00E5FF]/50 ring-1 ring-[#00E5FF]/50 animate-pulse">
-                                                                            <span className="w-1.5 h-1.5 rounded-full bg-[#00E5FF] pulse-live" />
-                                                                            AO VIVO
                                                                         </span>
                                                                     )}
                                                                     {prog.isCompleted && (
@@ -4195,9 +4186,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                 {dayColName} {formatFriendlyDate(currentDay)}
                                                                             </span>
                                                                             {dayStats.isToday && (
-                                                                                <span className="flex items-center gap-0.5 text-[8px] font-black uppercase px-1 py-0.5 rounded bg-[#00E5FF]/20 text-[#00E5FF] border border-[#00E5FF]/40">
+                                                                                <span className="flex items-center gap-0.5 text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-[#00E5FF]/20 text-[#00E5FF] border border-[#00E5FF]/40 tracking-wider">
                                                                                     <span className="w-1.5 h-1.5 rounded-full bg-[#00E5FF] pulse-live" />
-                                                                                    Ao Vivo
+                                                                                    EM PRODUÇÃO
                                                                                 </span>
                                                                             )}
                                                                             {dayStats.isHoliday && !dayStats.isToday && (
