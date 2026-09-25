@@ -3,6 +3,7 @@ import type { ProductionOrderData, ShiftReport } from '../types';
 import { supabase } from '../supabaseClient';
 import html2canvas from 'html2canvas';
 import { resolveMachineShiftConfig } from '../services/shiftConfigService';
+import { DEFAULT_TRELICA_MODELS } from '../utils/trelicaModelsData';
 
 export interface DailyProductionReportSheetModalProps {
     isOpen: boolean;
@@ -263,6 +264,115 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         }
     };
 
+    // Helper para formatar data ISO YYYY-MM-DD para DD/MM/YYYY
+    const formatDateBr = (isoStr: string): string => {
+        if (!isoStr) return '';
+        const parts = isoStr.split('-');
+        if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        return isoStr;
+    };
+
+    // Helper para obter o peso teórico por peça (em kg) a partir do catálogo oficial
+    const getTheoreticalWeightPerPiece = (modelStr: string, sizeMts: number): number => {
+        const cleanModel = (modelStr || '').toUpperCase().trim();
+        const match = DEFAULT_TRELICA_MODELS.find(m => {
+            const mModel = m.modelo.toUpperCase().trim();
+            const mTam = parseInt(m.tamanho, 10);
+            return cleanModel.includes(mModel) && mTam === sizeMts;
+        }) || DEFAULT_TRELICA_MODELS.find(m => {
+            const mModel = m.modelo.toUpperCase().trim();
+            return cleanModel.includes(mModel);
+        });
+
+        if (match) {
+            const raw = parseFloat((match.pesoFinal || match.peso_final || '0').replace(',', '.'));
+            if (raw > 0) {
+                const mTam = parseInt(match.tamanho, 10) || 12;
+                if (mTam === 12 && sizeMts === 6) return raw / 2;
+                if (mTam === 6 && sizeMts === 12) return raw * 2;
+                return raw;
+            }
+        }
+
+        // Fallbacks industriais por bitola/modelo
+        if (cleanModel.includes('SUPER PESADO') || cleanModel.includes('SP')) {
+            return sizeMts === 12 ? 8.647 : 4.324;
+        }
+        if (cleanModel.includes('H-10') || cleanModel.includes('H10')) {
+            return sizeMts === 12 ? 7.686 : 3.843;
+        }
+        if (cleanModel.includes('H-8') || cleanModel.includes('H8')) {
+            return sizeMts === 12 ? 5.797 : 2.898;
+        }
+        return sizeMts === 12 ? 7.044 : 3.522;
+    };
+
+    // Helper para gerar o histórico diário da OP desde o início da ordem até o momento com peso teórico
+    const generateProductionUpdatesHistory = (
+        targetOp: ProductionOrderData,
+        reports: ShiftReport[],
+        unitWeight: number,
+        upToDateStr?: string
+    ): ProductionUpdateRow[] => {
+        const dayMap = new Map<string, number>();
+
+        // 1. Dos Shift Reports
+        (reports || []).forEach(r => {
+            const isThisOp = r.productionOrderId === targetOp.id || r.orderNumber === targetOp.orderNumber;
+            if (!isThisOp) return;
+            const d = getLocalDateString(r.date || r.shiftStartTime || r.shiftEndTime);
+            const q = Number(r.totalProducedQuantity || 0);
+            if (d && q > 0) {
+                dayMap.set(d, (dayMap.get(d) || 0) + q);
+            }
+        });
+
+        // 2. Dos Operator Logs
+        (targetOp.operatorLogs || []).forEach((l: any) => {
+            const s = getLocalDateString(l.startTime);
+            const e = getLocalDateString(l.endTime);
+            const d = s || e;
+            if (!d) return;
+
+            let diff = 0;
+            if (l.endQuantity !== undefined && l.startQuantity !== undefined) {
+                diff = Math.max(0, Number(l.endQuantity) - Number(l.startQuantity));
+            } else if (!l.endTime && l.startQuantity !== undefined) {
+                diff = Math.max(0, (Number(targetOp.actualProducedQuantity) || 0) - Number(l.startQuantity));
+            }
+
+            if (diff > 0) {
+                const current = dayMap.get(d) || 0;
+                if (current === 0 || diff > current) {
+                    dayMap.set(d, diff);
+                }
+            }
+        });
+
+        // 3. De pacotes pesados
+        (targetOp.weighedPackages || []).forEach((p: any) => {
+            if (!p.timestamp) return;
+            const d = getLocalDateString(p.timestamp);
+            const q = Number(p.quantity) || 200;
+            if (d && q > 0 && !dayMap.has(d)) {
+                dayMap.set(d, q);
+            }
+        });
+
+        const sortedDates = [...dayMap.keys()].filter(d => !upToDateStr || d <= upToDateStr).sort();
+
+        return sortedDates.map((dStr, idx) => {
+            const qnt = dayMap.get(dStr) || 0;
+            const peso = Math.round(qnt * unitWeight * 100) / 100;
+            return {
+                id: `auto-prod-${dStr}-${idx}`,
+                qnt,
+                peso,
+                data: formatDateBr(dStr)
+            };
+        });
+    };
+
     // Auto-preenchimento automático inteligente dos dados com base no chão de fábrica
     const generateAutoDataFromShopFloor = () => {
         const prodOrder = op.orderNumber || '';
@@ -470,7 +580,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 tamanhoPeca: hasRealTurnoB ? (defaultSize === 12 ? 6 : defaultSize) : 0,
                 horarioTurnoPrevisto: hasRealTurnoB ? shiftScheduleStrB : '',
             },
-            productionUpdates: []
+            productionUpdates: generateProductionUpdatesHistory(op, shiftReports, getTheoreticalWeightPerPiece(prodDesc, defaultSize), selectedDate)
         };
     };
 
@@ -561,7 +671,16 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     tamanhoPeca: Number(rawStatsB.tamanhoPeca || 0),
                     horarioTurnoPrevisto: horarioTurnoB
                 });
-                setProductionUpdates(dbReport.production_updates || []);
+                const currentDesc = dbReport.product_description || op.trelicaModel || 'TRELIÇA';
+                const currentSize = Number(rawStatsA.tamanhoPeca || (isTrelica ? 12 : 6));
+                const theoreticalUnitWeight = getTheoreticalWeightPerPiece(currentDesc, currentSize);
+                const autoHistory = generateProductionUpdatesHistory(op, shiftReports, theoreticalUnitWeight, targetDate);
+
+                const finalUpdates = (dbReport.production_updates && dbReport.production_updates.length > 0)
+                    ? dbReport.production_updates
+                    : autoHistory;
+
+                setProductionUpdates(finalUpdates);
                 setSaveStatus('saved');
                 showToast(`Relatório do dia ${targetDate.split('-').reverse().join('/')} carregado do banco.`, 'info');
             } else {
@@ -757,7 +876,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             id: `pesagem-${Date.now()}`,
             qnt: 0,
             peso: 0,
-            data: formattedDateNumbers.slice(0, 5)
+            data: formattedDateNumbers
         };
         setProductionUpdates(prev => [...prev, newRow]);
     };
@@ -767,7 +886,16 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
     };
 
     const updateProductionUpdateField = (id: string, field: keyof ProductionUpdateRow, value: any) => {
-        setProductionUpdates(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r));
+        setProductionUpdates(prev => prev.map(r => {
+            if (r.id !== id) return r;
+            const updated = { ...r, [field]: value };
+            if (field === 'qnt' && (!r.peso || r.peso === 0)) {
+                const size = statsShiftA.tamanhoPeca || 12;
+                const unitWeight = getTheoreticalWeightPerPiece(productDescription, size);
+                updated.peso = Math.round((Number(value) || 0) * unitWeight * 100) / 100;
+            }
+            return updated;
+        }));
     };
 
     // Cálculos em Tempo Real
