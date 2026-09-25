@@ -661,24 +661,24 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 }
 
                 // 2. Distribuir a nova meta de peças da data
-                const closedIndicesOnDay = matchingIndices.filter(i => currentLogs[i].endTime);
-                const openIdxOnDay = matchingIndices.find(i => !currentLogs[i].endTime);
+                let remainingToDistribute = shiftQty;
+                matchingIndices.forEach(i => {
+                    const log = currentLogs[i];
+                    if (log.endTime) {
+                        const originalDiff = Math.max(0, (Number(log.endQuantity) || 0) - (Number(log.startQuantity) || 0));
+                        const allocated = Math.min(remainingToDistribute, originalDiff);
+                        currentLogs[i] = { ...log, _targetDelta: allocated };
+                        remainingToDistribute -= allocated;
+                    }
+                });
 
-                let targetOpenPieces = 0;
+                const openIdxOnDay = matchingIndices.find(i => !currentLogs[i].endTime);
                 if (openIdxOnDay !== undefined) {
-                    const sumClosedOther = closedIndicesOnDay.reduce((acc, i) => {
-                        return acc + Math.max(0, (Number(currentLogs[i].endQuantity) || 0) - (Number(currentLogs[i].startQuantity) || 0));
-                    }, 0);
-                    targetOpenPieces = Math.max(0, shiftQty - sumClosedOther);
-                } else if (closedIndicesOnDay.length > 0) {
-                    const lastClosedIdx = closedIndicesOnDay[closedIndicesOnDay.length - 1];
-                    const sumClosedOther = closedIndicesOnDay.slice(0, -1).reduce((acc, i) => {
-                        return acc + Math.max(0, (Number(currentLogs[i].endQuantity) || 0) - (Number(currentLogs[i].startQuantity) || 0));
-                    }, 0);
-                    currentLogs[lastClosedIdx] = {
-                        ...currentLogs[lastClosedIdx],
-                        _targetDelta: Math.max(0, shiftQty - sumClosedOther)
-                    };
+                    currentLogs[openIdxOnDay] = { ...currentLogs[openIdxOnDay], _targetDelta: remainingToDistribute };
+                    remainingToDistribute = 0;
+                } else if (remainingToDistribute > 0 && matchingIndices.length > 0) {
+                    const lastClosedIdx = matchingIndices[matchingIndices.length - 1];
+                    currentLogs[lastClosedIdx]._targetDelta = (currentLogs[lastClosedIdx]._targetDelta || 0) + remainingToDistribute;
                 }
 
                 // 3. Re-encadear todos os logs sequencialmente para manter total e deltas 100% íntegros
@@ -691,15 +691,11 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     } else if (log.endTime) {
                         pieces = Math.max(0, (Number(log.endQuantity) || 0) - (Number(log.startQuantity) || 0));
                     } else {
-                        // Log aberto
-                        if (idx === openIdxOnDay) {
-                            pieces = targetOpenPieces;
-                        } else {
-                            const prevTot = isTrefila 
-                                ? (Number(targetOrder.actualProducedWeight) || Number(targetOrder.totalProducedWeight) || 0)
-                                : (Number(targetOrder.actualProducedQuantity) || 0);
-                            pieces = Math.max(0, prevTot - (Number(log.startQuantity) || 0));
-                        }
+                        // Log aberto que não pertence à data (fallback)
+                        const prevTot = isTrefila 
+                            ? (Number(targetOrder.actualProducedWeight) || Number(targetOrder.totalProducedWeight) || 0)
+                            : (Number(targetOrder.actualProducedQuantity) || 0);
+                        pieces = Math.max(0, prevTot - (Number(log.startQuantity) || 0));
                     }
 
                     const startQ = runningAccumulator;
