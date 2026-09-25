@@ -3574,25 +3574,26 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                         
                                         {/* Coluna da Máquina */}
                                         <div className={`p-3.5 flex flex-col justify-between border-r border-white/5 border-l-4 ${mach.color} sticky left-0 z-20 shrink-0 shadow-lg`}>
-                                            <div>
-<div className="flex items-center justify-between">
-                                                    <span className="text-white text-base sm:text-lg font-black tracking-wider block">{mach.name}</span>
-                                                    <button
-                                                        onClick={() => handleOpenCreateModal(mach.name)}
-                                                        className="w-6 h-6 rounded-lg bg-white/10 hover:bg-[#00E5FF]/20 text-slate-300 hover:text-[#00E5FF] flex items-center justify-center transition-all"
-                                                        title={`Criar OP para ${mach.name}`}
-                                                    >
-                                                        <PlusIcon className="w-3.5 h-3.5" />
-                                                    </button>
-                                                </div>
+                                            {/* Topo: Nome da Máquina + Botão Nova OP */}
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-white text-base sm:text-lg font-black tracking-wider block">{mach.name}</span>
+                                                <button
+                                                    onClick={() => handleOpenCreateModal(mach.name)}
+                                                    className="w-6 h-6 rounded-lg bg-white/10 hover:bg-[#00E5FF]/20 text-slate-300 hover:text-[#00E5FF] flex items-center justify-center transition-all"
+                                                    title={`Criar OP para ${mach.name}`}
+                                                >
+                                                    <PlusIcon className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
 
-                                                {/* Card do Operador da Máquina */}
+                                            {/* Centro: Card do Operador da Máquina */}
+                                            <div className="my-auto py-1">
                                                 {(() => {
                                                     const operator = getMachineOperator(mach.name);
                                                     if (!operator) {
                                                         return (
                                                             <div 
-                                                                className="mt-2 p-1.5 rounded-xl border border-white/5 bg-[#06121B]/90 flex items-center justify-between gap-1.5 text-slate-400 hover:border-white/10 transition-all shadow-inner"
+                                                                className="p-1.5 rounded-xl border border-white/5 bg-[#06121B]/90 flex items-center justify-between gap-1.5 text-slate-400 hover:border-white/10 transition-all shadow-inner"
                                                                 title={`Nenhum operador com turno ativo na máquina ${mach.name}. Turno Encerrado.`}
                                                             >
                                                                 <div className="flex items-center gap-1.5 min-w-0">
@@ -3618,7 +3619,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                     if ((operator as any).isAutoStartedWaitingCheckin) {
                                                         return (
                                                             <div 
-                                                                className="mt-2 p-1.5 rounded-xl border border-amber-500/50 bg-gradient-to-r from-amber-950/40 via-[#081822] to-cyan-950/30 flex items-center justify-between gap-1.5 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.25)] transition-all animate-pulse"
+                                                                className="p-1.5 rounded-xl border border-amber-500/50 bg-gradient-to-r from-amber-950/40 via-[#081822] to-cyan-950/30 flex items-center justify-between gap-1.5 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.25)] transition-all animate-pulse"
                                                                 title={`Turno iniciado automaticamente pelo sistema para ${mach.name}. Aguardando check-in do operador no aplicativo.`}
                                                             >
                                                                 <div className="flex items-center gap-1.5 min-w-0">
@@ -3646,14 +3647,20 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                                                     return (
                                                         <div 
-                                                            className={`mt-2 p-1.5 rounded-xl border transition-all flex items-center gap-2 ${
+                                                            onClick={() => {
+                                                                localStorage.setItem('msm_active_machine', mach.name);
+                                                                if (mach.name.startsWith('Trefila')) setPage('trefilaInProgress');
+                                                                else if (mach.name.startsWith('Treliça')) setPage('trelicaInProgress');
+                                                                else if (mach.name.startsWith('Malha')) setPage('malhaInProgress');
+                                                            }}
+                                                            className={`p-1.5 rounded-xl border transition-all flex items-center gap-2 cursor-pointer hover:brightness-110 active:scale-[0.98] ${
                                                                 isOperating 
                                                                     ? 'bg-emerald-950/40 border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.15)]' 
                                                                     : isOnline 
                                                                         ? 'bg-cyan-950/30 border-[#00E5FF]/40 shadow-[0_0_10px_rgba(0,229,255,0.12)]'
                                                                         : 'bg-white/5 border-white/10'
                                                             }`}
-                                                            title={`${operator.name} (${operator.jobTitle}) - ${operator.statusLabel} ${isOnline ? '(Online no App)' : '(Offline no App)'}`}
+                                                            title={`${operator.name} (${operator.jobTitle}) - ${operator.statusLabel} ${isOnline ? '(Online no App)' : '(Offline no App)'}. Clique para abrir o painel da máquina.`}
                                                         >
                                                             {/* Avatar com Foto do Operador */}
                                                             <div className="relative shrink-0">
@@ -3711,7 +3718,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                 })()}
                                             </div>
 
-                                            {/* Status em Tempo Real da Máquina (Parada, Produzindo, etc) */}
+                                            {/* Status em Tempo Real da Máquina (Parada, Preparação, etc) */}
                                             {(() => {
                                                 const liveInfo = machineLiveStatus.find(m => m.machine === mach.name);
                                                 if (!liveInfo) return null;
@@ -3768,32 +3775,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                     );
                                                 }
 
-                                                if (liveInfo.state === 'producing') {
-                                                    return (
-                                                        <div 
-                                                            onClick={() => {
-                                                                localStorage.setItem('msm_active_machine', mach.name);
-                                                                if (mach.name.startsWith('Trefila')) setPage('trefilaInProgress');
-                                                                else if (mach.name.startsWith('Treliça')) setPage('trelicaInProgress');
-                                                                else if (mach.name.startsWith('Malha')) setPage('malhaInProgress');
-                                                            }}
-                                                            className="mt-1.5 p-1 rounded-md bg-cyan-500/15 border border-[#00E5FF]/30 text-cyan-200 cursor-pointer hover:bg-cyan-500/25 transition-all"
-                                                            title="Máquina em Operação. Clique para ir ao painel"
-                                                        >
-                                                            <div className="flex items-center gap-1 font-black text-[9px] sm:text-[10px] uppercase tracking-wide text-[#00E5FF]">
-                                                                <span className="w-1.5 h-1.5 rounded-full bg-[#00E5FF] pulse-live" />
-                                                                OPERANDO
-                                                            </div>
-                                                            <span className="text-[10px] sm:text-xs font-black text-white truncate block">OP #{liveInfo.op?.orderNumber}</span>
-                                                        </div>
-                                                    );
-                                                }
-
-                                                return (
-                                                    <div className="mt-2 text-[8px] text-slate-500 font-mono">
-                                                        {machOps.length} {machOps.length === 1 ? 'OP agendada' : 'OPs agendadas'}
-                                                    </div>
-                                                );
+                                                return null;
                                             })()}
 
                                             {/* Mini Widget dos 5 Porta-Rolos (Treliça) */}
