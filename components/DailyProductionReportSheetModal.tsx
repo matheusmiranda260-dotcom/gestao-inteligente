@@ -150,7 +150,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
     const [statsShiftB, setStatsShiftB] = useState<ShiftStats>({
         horasTrabalhadas: '00:00:00',
         pecasProduzidas: 0,
-        tamanhoPeca: 6,
+        tamanhoPeca: 12,
         horarioTurnoPrevisto: ''
     });
 
@@ -242,12 +242,49 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         return days[safeDateObj.getDay()];
     }, [safeDateObj]);
 
-    // Extrair tamanho da peça do nome do modelo (ex: "12METROS" -> 12, "6 MTS" -> 6)
-    const extractPieceSize = (description: string): number => {
-        const lower = description.toLowerCase();
-        if (lower.includes('12') || lower.includes('12m') || lower.includes('12mts') || lower.includes('12 metros')) return 12;
-        if (lower.includes('6') || lower.includes('6m') || lower.includes('6mts') || lower.includes('6 metros')) return 6;
-        return 6;
+    // Resolver com precisão o tamanho da peça (em metros) com base na OP, descrição e padrões da máquina
+    const resolvePieceSize = (targetOp?: ProductionOrderData, description?: string): number => {
+        const isTrelicaMach = machine.toLowerCase().includes('treli') || 
+            (targetOp?.machine && String(targetOp.machine).toLowerCase().includes('treli')) ||
+            (targetOp?.scheduledMachine && String(targetOp.scheduledMachine).toLowerCase().includes('treli'));
+
+        // 1. Prioridade máxima: campo 'tamanho' explícito da OP (ex: "12", "6", "12m", "6m")
+        if (targetOp?.tamanho) {
+            const raw = String(targetOp.tamanho).trim().toLowerCase();
+            const num = parseFloat(raw.replace(',', '.'));
+            if (!isNaN(num) && num > 0) return num;
+            if (raw.includes('12')) return 12;
+            if (raw.includes('6')) return 6;
+        }
+
+        // 2. Extração de padrões explícitos de comprimento no texto (evitando falsos positivos como 'H-12')
+        const fullText = `${description || ''} ${targetOp?.trelicaModel || ''} ${targetOp?.productDescription || ''} ${(targetOp as any)?.product || ''}`.toLowerCase();
+        
+        // Padrões de 12 metros explícitos
+        if (/\b(12\s*m|12\s*mts|12\s*metros|\(12\))\b/.test(fullText) || fullText.includes('(12)') || fullText.includes(' 12m') || fullText.includes('12 metros')) {
+            return 12;
+        }
+        // Padrões de 6 metros explícitos
+        if (/\b(6\s*m|6\s*mts|6\s*metros|\(6\))\b/.test(fullText) || fullText.includes('(6)') || fullText.includes(' 6m') || fullText.includes('6 metros')) {
+            return 6;
+        }
+
+        // 3. Catálogo oficial de modelos de treliça
+        const modelName = (targetOp?.trelicaModel || description || '').toUpperCase().trim();
+        if (modelName) {
+            const matchedModel = DEFAULT_TRELICA_MODELS.find(m => {
+                const code = m.cod.toUpperCase();
+                const mod = m.modelo.toUpperCase();
+                return modelName.includes(code) || modelName === mod || modelName.startsWith(mod);
+            });
+            if (matchedModel?.tamanho) {
+                const tNum = parseFloat(matchedModel.tamanho);
+                if (!isNaN(tNum) && tNum > 0) return tNum;
+            }
+        }
+
+        // 4. Padrão industrial: Treliça padrão é 12m; se não for treliça, default 6m
+        return isTrelicaMach ? 12 : 6;
     };
 
     const getLocalDateString = (val: any): string => {
@@ -378,7 +415,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         const prodOrder = op.orderNumber || '';
         const prodDesc = (op.trelicaModel || op.product || 'TRELIÇA H-12 LEVE 6 MTS').toUpperCase();
         const targetQ = op.quantityToProduce || op.targetQuantity || 4500;
-        const defaultSize = extractPieceSize(prodDesc);
+        const defaultSize = resolvePieceSize(op, prodDesc);
 
         // 1. Relatórios de Turno desta OP nesta data específica
         const dayShiftReports = shiftReports.filter(r => {
@@ -577,7 +614,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             statsShiftB: {
                 horasTrabalhadas: shiftHoursB,
                 pecasProduzidas: piecesB,
-                tamanhoPeca: hasRealTurnoB ? (defaultSize === 12 ? 6 : defaultSize) : 0,
+                tamanhoPeca: defaultSize,
                 horarioTurnoPrevisto: hasRealTurnoB ? shiftScheduleStrB : '',
             },
             productionUpdates: generateProductionUpdatesHistory(op, shiftReports, getTheoreticalWeightPerPiece(prodDesc, defaultSize), selectedDate)
@@ -647,11 +684,25 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     piecesAFromDb = Math.max(piecesAFromDb, liveProducedPcs);
                 }
 
+                const expectedPieceSize = resolvePieceSize(op, dbReport.product_description);
+
+                // Sincronização inteligente de tamanho de peça:
+                // Se a OP tem um tamanho definido (ex: op.tamanho = '12') ou se o banco tem valor incorreto anterior (6 em vez de 12 para treliça de 12m):
+                let resolvedTamanhoA = Number(rawStatsA.tamanhoPeca);
+                if (!resolvedTamanhoA || (op.tamanho && expectedPieceSize && resolvedTamanhoA !== expectedPieceSize)) {
+                    resolvedTamanhoA = expectedPieceSize;
+                }
+
+                let resolvedTamanhoB = Number(rawStatsB.tamanhoPeca);
+                if (!resolvedTamanhoB || (op.tamanho && expectedPieceSize && resolvedTamanhoB !== expectedPieceSize)) {
+                    resolvedTamanhoB = resolvedTamanhoA;
+                }
+
                 setStatsShiftA({
                     ...rawStatsA,
                     horasTrabalhadas: horasTrabalhadasA,
                     pecasProduzidas: piecesAFromDb,
-                    tamanhoPeca: Number(rawStatsA.tamanhoPeca || (isTrelica ? 12 : 6)),
+                    tamanhoPeca: resolvedTamanhoA,
                     horarioTurnoPrevisto: horarioTurnoA
                 });
 
@@ -668,11 +719,11 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     ...rawStatsB,
                     horasTrabalhadas: workedSecB > 11 * 3600 ? defaultShiftB : (hasHoursB ? (isTrelica && rawStatsB.horasTrabalhadas === '09:00:00' ? defaultShiftB : rawStatsB.horasTrabalhadas) : '00:00:00'),
                     pecasProduzidas: Number(rawStatsB.pecasProduzidas || 0),
-                    tamanhoPeca: Number(rawStatsB.tamanhoPeca || 0),
+                    tamanhoPeca: resolvedTamanhoB,
                     horarioTurnoPrevisto: horarioTurnoB
                 });
                 const currentDesc = dbReport.product_description || op.trelicaModel || 'TRELIÇA';
-                const currentSize = Number(rawStatsA.tamanhoPeca || (isTrelica ? 12 : 6));
+                const currentSize = resolvedTamanhoA;
                 const theoreticalUnitWeight = getTheoreticalWeightPerPiece(currentDesc, currentSize);
                 const autoHistory = generateProductionUpdatesHistory(op, shiftReports, theoreticalUnitWeight, targetDate);
 
