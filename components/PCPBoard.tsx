@@ -444,6 +444,14 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             return null;
         }
 
+        // Se o expediente já encerrou na configuração do PCP (com tolerância expirada) e não há autorização de hora extra por gestor
+        const shiftEval = checkMachineShiftStatus(machName, shiftConfig, liveNow);
+        if (shiftEval.autoEndShift && !shiftEval.inShiftWindow && shiftEval.isOvertime && !shiftEval.isAutoEndCountdown) {
+            if (!openLog.managerAuthorized) {
+                return null;
+            }
+        }
+
         const activeOpName = openLog.operator;
 
         // 4. Buscar dados do operador (foto, nome completo, cargo) independente de quem for
@@ -3083,8 +3091,19 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 statusColor = 'bg-rose-500/25 text-rose-300 border-rose-500/50';
             }
         } else if (isLive) {
-            statusLabel = 'Em Produção (Ao Vivo)';
-            statusColor = 'bg-cyan-500/20 text-[#00E5FF] border-[#00E5FF]/40';
+            const machName = op.scheduledMachine || (op.machine as string);
+            const shiftEval = machName ? checkMachineShiftStatus(machName, shiftConfig, liveNow) : null;
+            const openLogs = (op.operatorLogs || []).filter((l: any) => !l.endTime && l.operator && l.operator !== 'GHOST_ORDER_FLAG');
+            const hasManagerAuth = openLogs.some((l: any) => Boolean(l.managerAuthorized));
+
+            if (shiftEval && shiftEval.autoEndShift && !shiftEval.inShiftWindow && shiftEval.isOvertime && !shiftEval.isAutoEndCountdown && !hasManagerAuth) {
+                isOffline = true;
+                statusLabel = 'Desligada: Turno Encerrado';
+                statusColor = 'bg-slate-500/20 text-slate-300 border-slate-500/40';
+            } else {
+                statusLabel = 'Em Produção (Ao Vivo)';
+                statusColor = 'bg-cyan-500/20 text-[#00E5FF] border-[#00E5FF]/40';
+            }
         } else if (isCompleted) {
             statusLabel = 'Concluída';
             statusColor = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';

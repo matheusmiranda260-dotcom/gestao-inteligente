@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { Page, User, Employee, StockItem, ConferenceData, ProductionOrderData, TransferRecord, Bitola, MaterialType, MachineType, PartsRequest, ShiftReport, ProductionRecord, TransferredLotInfo, ProcessedLot, DowntimeEvent, OperatorLog, TrelicaSelectedLots, WeighedPackage, FinishedProductItem, Ponta, PontaItem, FinishedGoodsTransferRecord, TransferredFinishedGoodInfo, KaizenProblem, Meeting, MeetingItem, MeetingCategory, StockMovement, DowntimeConfig, UserAccessLog, ProductionSchedule, PcpShiftConfig } from './types';
 import { FioMaquinaBitolaOptions, TrefilaBitolaOptions, CA60BitolaOptions, DefaultElectrodeGauges, DefaultSabaoGauges, DefaultTrelicaGauges } from './types';
 import Login from './components/Login';
@@ -42,7 +42,7 @@ import { supabase } from './supabaseClient';
 import type { StockGauge, StickyNote } from './types';
 
 import { fetchTable, insertItem, updateItem, deleteItem, deleteItemByColumn, updateItemByColumn, mapToCamelCase, fetchByColumn, deductTrelicaSpoolStandConsumption, fetchPcpShiftConfig } from './services/supabaseService';
-import { DEFAULT_GLOBAL_SHIFT_CONFIG, DEFAULT_MACHINE_SHIFTS } from './services/shiftConfigService';
+import { DEFAULT_GLOBAL_SHIFT_CONFIG, DEFAULT_MACHINE_SHIFTS, checkMachineShiftStatus } from './services/shiftConfigService';
 import { useAllRealtimeSubscriptions } from './hooks/useSupabaseRealtime';
 
 const SESSION_VERSION = 1;
@@ -1830,6 +1830,13 @@ const App: React.FC = () => {
         const order = fetchedOrders[0];
         if (!order) return;
 
+        // Verificar se todos os logs já estão fechados e a máquina já está em Final de Turno
+        const hasOpenLogs = (order.operatorLogs || []).some(l => !l.endTime);
+        const lastDtCheck = (order.downtimeEvents || []).slice(-1)[0];
+        if (!hasOpenLogs && lastDtCheck && lastDtCheck.reason === 'Final de Turno' && !lastDtCheck.resumeTime) {
+            return;
+        }
+
         const now = new Date().toISOString();
 
         const logsToReport: OperatorLog[] = [];
@@ -1904,6 +1911,74 @@ const App: React.FC = () => {
             showNotification('Erro ao finalizar turno.', 'error');
         }
     };
+
+    // Watchdog Central de Auto-Encerramento de Turnos
+    // Monitora todas as máquinas e ordens em andamento da fábrica periodicamente.
+    // Se o expediente já encerrou (incluindo o tempo de tolerância),
+    // finaliza automaticamente o turno para não deixar a máquina como "Em Produção" com operador órfão.
+    const autoCloseInProgressRef = useRef<Set<string>>(new Set());
+
+    useEffect(() => {
+        const checkAutoEndShifts = async () => {
+            if (!productionOrders || productionOrders.length === 0) return;
+            const now = new Date();
+
+            const activeOrders = productionOrders.filter(o => 
+                (o.status === 'in_progress' || o.status === 'Em Produção')
+            );
+
+            for (const order of activeOrders) {
+                const machName = order.scheduledMachine || order.machine;
+                if (!machName) continue;
+
+                // Verificar se há operadores com log em aberto
+                const openLogs = (order.operatorLogs || []).filter(l => 
+                    !l.endTime && 
+                    l.operator && 
+                    l.operator !== 'GHOST_ORDER_FLAG' && 
+                    l.action !== 'Criada no PCP' &&
+                    l.operator.toLowerCase() !== 'gestor pcp' &&
+                    l.operator.toLowerCase() !== 'gestor' &&
+                    !l.pendingOperatorCheckin &&
+                    !l.operator.toUpperCase().includes('SISTEMA')
+                );
+
+                if (openLogs.length === 0) continue;
+
+                // Avaliar a jornada atual da máquina
+                const shiftEval = checkMachineShiftStatus(machName, pcpShiftConfig, now);
+
+                // Se a máquina possui autoEndShift ativo e o horário do turno encerrou + tolerância esgotada
+                if (shiftEval.autoEndShift && shiftEval.isOvertime && !shiftEval.inShiftWindow && !shiftEval.isAutoEndCountdown) {
+                    // Verificar se há autorização de hora extra concedida por gestor
+                    const hasManagerOvertime = openLogs.some(l => Boolean(l.managerAuthorized));
+                    if (hasManagerOvertime) continue;
+
+                    const lockKey = `${order.id}_${now.toLocaleDateString('sv-SE')}_${shiftEval.shiftName}`;
+                    if (autoCloseInProgressRef.current.has(lockKey)) continue;
+
+                    autoCloseInProgressRef.current.add(lockKey);
+
+                    console.log(`[Watchdog de Turno] Encerrando automaticamente ${machName} (OP #${order.orderNumber}). Horário limite: ${shiftEval.workEnd}`);
+
+                    const finalQty = order.actualProducedQuantity || 0;
+                    try {
+                        await endOperatorShift(order.id, finalQty, {
+                            autoClosed: true,
+                            observation: `Encerramento automático pelo sistema por fim do ${shiftEval.shiftName} (${shiftEval.shiftLabel}). Horário limite atingido (${shiftEval.workEnd} + ${shiftEval.autoEndTimeoutMin}m de tolerância). Quantidade registrada: ${finalQty}.`
+                        });
+                    } catch (err) {
+                        console.error(`Erro ao auto-encerrar turno da máquina ${machName}:`, err);
+                        autoCloseInProgressRef.current.delete(lockKey);
+                    }
+                }
+            }
+        };
+
+        checkAutoEndShifts();
+        const watchdogTimer = setInterval(checkAutoEndShifts, 10000);
+        return () => clearInterval(watchdogTimer);
+    }, [productionOrders, pcpShiftConfig]);
 
     const logDowntime = async (orderId: string, reason: string) => {
         const now = new Date().toISOString();
