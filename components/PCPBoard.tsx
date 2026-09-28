@@ -1557,15 +1557,16 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         return formatDateString(cur);
     };
 
-    // Desloca uma data em +/- dias úteis (para a função MOVER ◀ ▶)
+    // Desloca uma data em +/- dias úteis (para a função MOVER ◀ ▶ e ESTENDER)
     const shiftWorkingDay = (currentDateStr: string, direction: number): string => {
         const cur = new Date(currentDateStr + 'T00:00:00');
         const step = direction >= 0 ? 1 : -1;
-        let found = false;
-        while (!found) {
+        const totalSteps = Math.max(1, Math.abs(direction));
+        let counted = 0;
+        while (counted < totalSteps) {
             cur.setDate(cur.getDate() + step);
             if (isWorkingDay(cur)) {
-                found = true;
+                counted++;
             }
         }
         return formatDateString(cur);
@@ -2832,14 +2833,21 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         setSelectedOP(op);
         setScheduleMachine(op.scheduledMachine || (op.machine as string));
         setScheduleStartDate(op.plannedStartDate || mondayStr);
-        setScheduleDuration(op.estimatedDurationDays || 1);
+        const hasStarted = hasProductionStarted(op);
+        const elapsed = hasStarted ? countWorkingDaysBetween(op.plannedStartDate || mondayStr, todayStr) : 1;
+        const currentEffectiveEnd = (hasStarted && op.plannedEndDate && op.plannedEndDate < todayStr) ? todayStr : (op.plannedEndDate || op.plannedStartDate || todayStr);
+        const currentDays = countWorkingDaysBetween(op.plannedStartDate || mondayStr, currentEffectiveEnd);
+        setScheduleDuration(Math.max(elapsed, currentDays, op.estimatedDurationDays || 1));
     };
 
     // Salva o reagendamento
     const handleSaveSchedule = async () => {
         if (!selectedOP) return;
 
-        const endDateStr = calculateEndDateByWorkDays(scheduleStartDate, scheduleDuration);
+        let endDateStr = calculateEndDateByWorkDays(scheduleStartDate, scheduleDuration);
+        if (hasProductionStarted(selectedOP) && endDateStr < todayStr) {
+            endDateStr = todayStr;
+        }
 
         const updates: Partial<ProductionOrderData> = {
             scheduledMachine: scheduleMachine,
@@ -2947,18 +2955,31 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     const handleAdjustDuration = async (op: ProductionOrderData, durationDelta: number) => {
         if (!op.plannedStartDate) return;
         
-        const currentDuration = op.estimatedDurationDays || 1;
+        const hasStarted = hasProductionStarted(op);
 
-        if (durationDelta < 0 && hasProductionStarted(op)) {
-            const elapsedDays = countWorkingDaysBetween(op.plannedStartDate, todayStr);
-            if (currentDuration <= elapsedDays) {
-                showNotification?.(`A OP já possui produção iniciada até a data atual. Não é possível encurtar para menos de ${elapsedDays} dia(s) úteis.`, 'warning');
+        // Data de término efetiva atual (se a OP já está em produção e o término agendado anteriormente venceu no passado, a base mínima é hoje)
+        const currentEffectiveEnd = (hasStarted && op.plannedEndDate && op.plannedEndDate < todayStr)
+            ? todayStr
+            : (op.plannedEndDate || op.plannedStartDate || todayStr);
+
+        let newEndStr: string;
+
+        if (durationDelta > 0) {
+            // Estende +X dia(s) útil(eis) além do término efetivo atual
+            newEndStr = shiftWorkingDay(currentEffectiveEnd, durationDelta);
+        } else {
+            // Reduz prazo (-1 dia útil)
+            if (hasStarted && currentEffectiveEnd <= todayStr) {
+                showNotification?.(`A OP já possui produção iniciada até a data atual (${formatFriendlyDate(todayStr)}). Não é possível reduzir o prazo para antes de hoje.`, 'warning');
                 return;
+            }
+            newEndStr = shiftWorkingDay(currentEffectiveEnd, -1);
+            if (hasStarted && newEndStr < todayStr) {
+                newEndStr = todayStr;
             }
         }
 
-        const newDuration = Math.max(1, currentDuration + durationDelta);
-        const newEndStr = calculateEndDateByWorkDays(op.plannedStartDate, newDuration);
+        const newDuration = Math.max(1, countWorkingDaysBetween(op.plannedStartDate, newEndStr));
         
         const updates: Partial<ProductionOrderData> = {
             estimatedDurationDays: newDuration,
@@ -2967,13 +2988,17 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
         try {
             await updateProductionOrder(op.id, updates);
+            if (drawerOP?.id === op.id) {
+                setDrawerOP(prev => prev ? { ...prev, ...updates } : null);
+            }
             if (durationDelta > 0) {
-                showNotification?.(`OP #${op.orderNumber} estendida em +${durationDelta} dia (novo término: ${formatFriendlyDate(newEndStr)}).`, 'success');
+                showNotification?.(`OP #${op.orderNumber} estendida até ${formatFriendlyDate(newEndStr)} (+${durationDelta} dia útil).`, 'success');
             } else {
-                showNotification?.(`Duração da OP #${op.orderNumber} reduzida (término: ${formatFriendlyDate(newEndStr)}).`, 'info');
+                showNotification?.(`Prazo da OP #${op.orderNumber} reduzido para ${formatFriendlyDate(newEndStr)}.`, 'info');
             }
         } catch (error) {
             console.error('Erro ao ajustar duração:', error);
+            showNotification?.('Erro ao atualizar duração da OP.', 'error');
         }
     };
 
