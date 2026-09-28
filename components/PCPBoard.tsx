@@ -4219,14 +4219,15 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                             <div className="truncate flex-1">
                                                                 <div className="flex items-center gap-1.5 flex-wrap">
                                                                     <span 
-                                                                        className="text-sm sm:text-base font-black text-white tracking-wide drop-shadow hover:text-[#00E5FF] cursor-pointer transition-colors"
+                                                                        className="text-sm sm:text-base font-black text-white tracking-wide drop-shadow hover:text-[#00E5FF] cursor-pointer transition-colors flex items-center flex-wrap gap-1"
                                                                         onClick={(e) => {
                                                                             e.stopPropagation();
                                                                             setEditingInProgressOP(op);
                                                                         }}
                                                                         title="Clique para editar OP em produção (Nome, Meta, Turnos Finalizados)"
                                                                     >
-                                                                        #{title}
+                                                                        <span>#{title}</span>
+                                                                        {subtitle && <span className="text-xs sm:text-sm text-slate-300 font-bold ml-1 tracking-normal truncate max-w-[200px] sm:max-w-[300px]">{subtitle}</span>}
                                                                     </span>
                                                                     
                                                                     {prog.isPending && (
@@ -4258,7 +4259,6 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                         </span>
                                                                     )}
                                                                 </div>
-                                                                <span className="text-xs sm:text-sm text-slate-100 font-extrabold truncate block mt-0.5 leading-snug">{subtitle}</span>
                                                             </div>
                                                         </div>
 
@@ -6809,8 +6809,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="min-w-0">
                                                 <div className="flex items-center gap-2 flex-wrap">
-                                                    <span className="text-base font-black text-white">
-                                                        #{title}
+                                                    <span className="text-base font-black text-white flex items-center flex-wrap gap-1">
+                                                        <span>#{title}</span>
+                                                        {subtitle && <span className="text-xs text-slate-300 font-bold ml-1 tracking-normal truncate max-w-[200px]">{subtitle}</span>}
                                                     </span>
                                                     {isLive && (
                                                         <span className="flex items-center gap-1 text-[9px] font-black uppercase bg-emerald-500/25 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/40 animate-pulse">
@@ -6830,9 +6831,6 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                         </span>
                                                     )}
                                                 </div>
-                                                <span className="text-xs text-slate-300 font-bold block mt-1">
-                                                    {subtitle}
-                                                </span>
                                             </div>
 
                                             <div className="text-right shrink-0">
