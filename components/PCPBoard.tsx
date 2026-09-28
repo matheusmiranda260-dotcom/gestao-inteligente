@@ -4118,7 +4118,27 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             const isMalha = typeof op.machine === 'string' && op.machine.startsWith('Malha') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Malha'));
                                             const isTrefila = typeof op.machine === 'string' && op.machine.startsWith('Trefila') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Trefila'));
                                             const title = op.orderNumber;
-                                            const subtitle = isTrelica ? `${op.trelicaModel} (${op.tamanho || '6m'})` : isMalha ? op.malhaModel : `Bitola ${op.targetBitola}mm`;
+                                            
+                                            const subtitleParts = [];
+                                            if (op.productCode) subtitleParts.push(op.productCode);
+                                            
+                                            if (op.productDescription) {
+                                                subtitleParts.push(op.productDescription);
+                                            } else {
+                                                if (isTrelica) subtitleParts.push(op.trelicaModel);
+                                                else if (isMalha) subtitleParts.push(op.malhaModel);
+                                                else subtitleParts.push(`Bitola ${op.targetBitola}mm`);
+                                            }
+                                            
+                                            const tamanhoStr = op.tamanho;
+                                            if (tamanhoStr) {
+                                                const desc = (op.productDescription || op.trelicaModel || op.malhaModel || '').toUpperCase();
+                                                if (!desc.includes(tamanhoStr.toUpperCase())) {
+                                                    subtitleParts.push(tamanhoStr);
+                                                }
+                                            }
+                                            
+                                            const subtitle = subtitleParts.filter(Boolean).join(' - ');
                                             
                                             const prog = getOPProgress(op);
 
@@ -4247,8 +4267,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                         }}
                                                                         title="Clique para editar OP em produção (Nome, Meta, Turnos Finalizados)"
                                                                     >
-                                                                        <span>#{title}</span>
-                                                                        {subtitle && <span className="text-xs sm:text-sm text-slate-700 font-bold ml-1 tracking-normal truncate max-w-[200px] sm:max-w-[300px]">{subtitle}</span>}
+                                                                        <span>#{title}#</span>
+                                                                        {subtitle && <span className="text-xs sm:text-sm text-slate-700 font-bold ml-1 tracking-normal truncate flex-1 min-w-0">{subtitle}</span>}
                                                                     </span>
                                                                     
                                                                     {prog.isPending && (
@@ -6891,8 +6911,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             <div className="min-w-0">
                                                 <div className="flex items-center gap-2 flex-wrap">
                                                     <span className="text-base font-black text-white flex items-center flex-wrap gap-1">
-                                                        <span>#{title}</span>
-                                                        {subtitle && <span className="text-xs text-slate-300 font-bold ml-1 tracking-normal truncate max-w-[200px]">{subtitle}</span>}
+                                                        <span>#{title}#</span>
+                                                        {subtitle && <span className="text-xs text-slate-300 font-bold ml-1 tracking-normal truncate flex-1 min-w-0">{subtitle}</span>}
                                                     </span>
                                                     {isLive && (
                                                         <span className="flex items-center gap-1 text-[9px] font-black uppercase bg-emerald-500/25 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/40 animate-pulse">
