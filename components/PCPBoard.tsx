@@ -9322,7 +9322,7 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                     {(() => {
                         const targetDStr = selectedDateStr === 'ALL' ? data.dateStr : selectedDateStr;
                         const machName = activeOp.scheduledMachine || activeOp.machine || 'Trefila 1';
-                        const machCfg = resolveMachineShiftConfig(machName);
+                        const machCfg = resolveMachineShiftConfig(machName, shiftConfig);
                         
                         const dayLogs = (activeOp.operatorLogs || []).filter(l => {
                             if (!l.startTime) return false;
