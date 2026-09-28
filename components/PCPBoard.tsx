@@ -4392,7 +4392,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                         className="flex items-baseline gap-1 cursor-pointer group/qty hover:bg-white/10 px-1 py-0.5 rounded transition-all select-none"
                                                                                         title="Clique para abrir ajuste de contagem (Gestor)"
                                                                                     >
-                                                                                        <span className={`text-xs sm:text-sm md:text-base font-black font-mono tracking-tight group-hover/qty:text-[#00E5FF] transition-colors ${
+                                                                                        <span className={`text-lg sm:text-xl md:text-2xl font-black font-mono tracking-tighter group-hover/qty:text-[#00E5FF] transition-colors ${
                                                                                             dayStats.isToday 
                                                                                                 ? 'text-white drop-shadow' 
                                                                                                 : hasRealPastProd
