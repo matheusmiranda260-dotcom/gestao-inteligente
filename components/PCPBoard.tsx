@@ -1125,7 +1125,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         shift2End?: string;
     } | null>(null);
 
-    const [machineShiftModalTab, setMachineShiftModalTab] = useState<'shifts' | 'downtimes'>('shifts');
+    const [machineShiftModalTab, setMachineShiftModalTab] = useState<'op' | 'equipment' | 'shifts' | 'downtimes'>('op');
     const [newDowntimeReason, setNewDowntimeReason] = useState('');
     const [newDowntimeThreshold, setNewDowntimeThreshold] = useState(15);
     const [isSavingDowntime, setIsSavingDowntime] = useState(false);
@@ -1137,7 +1137,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         }
     }, [downtimeConfigs]);
 
-    const handleOpenMachineShiftModal = (machName: string) => {
+    const handleOpenMachineShiftModal = (machName: string, initialTab: 'op' | 'equipment' | 'shifts' | 'downtimes' = 'op') => {
         const mCfg = resolveMachineShiftConfig(machName, shiftConfig);
         setMachineShiftModalDraft({
             shiftCount: mCfg.shiftCount === 2 ? 2 : 1,
@@ -1149,7 +1149,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             shift2Start: mCfg.shift2Start || (machName.toLowerCase().includes('treli') ? '14:48' : '14:00'),
             shift2End: mCfg.shift2End || (machName.toLowerCase().includes('treli') ? '23:36' : '23:59'),
         });
-        setMachineShiftModalTab('shifts');
+        setMachineShiftModalTab(initialTab);
         setNewDowntimeReason('');
         setNewDowntimeThreshold(15);
         setMachineShiftModalTarget(machName);
@@ -4027,48 +4027,6 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                                                 return null;
                                             })()}
-
-                                            {/* Mini Widget dos 5 Porta-Rolos (Treliça) */}
-                                            {mach.name.startsWith('Treliça') && (
-                                                <div 
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setViewSpoolStandsMachine(mach.name);
-                                                    }}
-                                                    className="mt-2 cursor-pointer hover:scale-[1.02] transition-transform"
-                                                    title="Clique para abrir o Gêmeo Digital dos 5 Porta-Rolos"
-                                                >
-                                                    <TrelicaSpoolStands 
-                                                        machineName={mach.name} 
-                                                        isCompact={true} 
-                                                        stock={stock} 
-                                                        productionOrders={productionOrders}
-                                                    />
-                                                </div>
-                                            )}
-
-                                            {/* Mini Botão Compacto: Comando Solda (Treliça) */}
-                                            {mach.name.startsWith('Treliça') && (
-                                                <button 
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setViewWeldingHeadMachine(mach.name);
-                                                    }}
-                                                    className="mt-1.5 w-full py-1 px-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 hover:border-amber-400/60 transition-all flex items-center justify-between text-left group"
-                                                    title="Clique para abrir o Comando da Cabeça de Solda, Relatórios e Calibração"
-                                                >
-                                                    <div className="flex items-center gap-1.5 min-w-0">
-                                                        <span className="text-[11px] leading-none text-amber-400">⚡</span>
-                                                        <span className="text-[10px] font-bold text-amber-300 uppercase tracking-tight truncate">
-                                                            Comando Solda
-                                                        </span>
-                                                    </div>
-                                                    <span className="text-[10px] text-amber-400/70 group-hover:text-amber-300 group-hover:translate-x-0.5 transition-all">
-                                                        ➔
-                                                    </span>
-                                                </button>
-                                            )}
                                         </div>
 
                                         {/* Grade de fundo (5 Colunas de dias) */}
@@ -4305,46 +4263,12 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                                                             <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                                                                 <button 
-                                                                    onClick={() => setEditingInProgressOP(op)}
-                                                                    className="text-purple-400 hover:text-purple-300 p-1 rounded-lg transition-all hover:bg-white/10 bg-white/5 border border-white/5"
-                                                                    title="Editar OP em Produção (Nome, Meta, Turnos Finalizados)"
+                                                                    type="button"
+                                                                    onClick={() => handleOpenMachineShiftModal(op.scheduledMachine || (op.machine as string), 'op')}
+                                                                    className="p-1 rounded-lg text-slate-300 hover:text-[#00E5FF] bg-white/5 hover:bg-cyan-500/20 border border-white/10 hover:border-cyan-500/40 transition-all flex items-center justify-center cursor-pointer shadow-sm"
+                                                                    title={`Configuração da Máquina (${op.scheduledMachine || op.machine}) - Comandos, Turnos e Paradas`}
                                                                 >
-                                                                    <PencilIcon className="w-3.5 h-3.5 text-purple-400" />
-                                                                </button>
-                                                                <button 
-                                                                    onClick={() => setDiagnosticOP(op)}
-                                                                    className="text-amber-400 hover:text-amber-300 p-1 rounded-lg transition-all hover:bg-white/10 bg-white/5 border border-white/5"
-                                                                    title="Diagnóstico da Produção (Planejado vs Realizado)"
-                                                                >
-                                                                    <ClipboardListIcon className="w-3.5 h-3.5 text-amber-400" />
-                                                                </button>
-                                                                <button 
-                                                                    onClick={() => handleGoToProduction(op)}
-                                                                    className="text-emerald-400 hover:text-emerald-300 p-1 rounded-lg transition-all hover:bg-white/10 bg-white/5 border border-white/5"
-                                                                    title={`Enviar / Abrir no Painel da Máquina (${op.scheduledMachine || op.machine})`}
-                                                                >
-                                                                    <PlayIcon className="w-3.5 h-3.5 text-emerald-400" />
-                                                                </button>
-                                                                <button 
-                                                                    onClick={() => handlePrintOP(op)}
-                                                                    className="text-cyan-400 hover:text-cyan-300 p-1 rounded-lg transition-all hover:bg-white/10 bg-white/5 border border-white/5"
-                                                                    title="Imprimir Ficha de Produção (A4)"
-                                                                >
-                                                                    <PrinterIcon className="w-3.5 h-3.5" />
-                                                                </button>
-                                                                <button 
-                                                                    onClick={() => openScheduleModal(op)}
-                                                                    className="text-slate-300 hover:text-[#00E5FF] p-1 rounded-lg transition-all hover:bg-white/10 bg-white/5 border border-white/5"
-                                                                    title="Reagendar"
-                                                                >
-                                                                    <CalendarIcon className="w-3.5 h-3.5" />
-                                                                </button>
-                                                                <button 
-                                                                    onClick={() => handleRemoveSchedule(op.id)}
-                                                                    className="text-slate-400 hover:text-red-400 p-1 rounded-lg transition-all hover:bg-white/10 bg-white/5 border border-white/5"
-                                                                    title="Desagendar"
-                                                                >
-                                                                    <XIcon className="w-3.5 h-3.5" />
+                                                                    <CogIcon className="w-3.5 h-3.5 text-[#00E5FF]" />
                                                                 </button>
                                                             </div>
                                                         </div>
@@ -6739,12 +6663,12 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             {/* ========================================================================= */}
             {machineShiftModalTarget && machineShiftModalDraft && (
                 <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/80 backdrop-blur-md animate-fade p-3 sm:p-4">
-                    <div className="w-full max-w-xl pcp-glass-card rounded-2xl border border-cyan-500/40 p-5 sm:p-6 flex flex-col gap-4 text-slate-100 shadow-2xl max-h-[92vh] overflow-y-auto">
+                    <div className="w-full max-w-2xl sm:max-w-3xl pcp-glass-card rounded-2xl border border-cyan-500/40 p-5 sm:p-6 flex flex-col gap-4 text-slate-100 shadow-2xl max-h-[92vh] overflow-y-auto">
                         {/* Cabeçalho */}
                         <div className="flex items-center justify-between border-b border-white/10 pb-3 shrink-0">
                             <div className="flex items-center gap-2.5">
                                 <div className="w-10 h-10 rounded-xl bg-cyan-500/20 text-[#00E5FF] flex items-center justify-center border border-cyan-500/40 shrink-0">
-                                    <ClockIcon className="w-5 h-5" />
+                                    <CogIcon className="w-5 h-5" />
                                 </div>
                                 <div>
                                     <div className="flex items-center gap-2">
@@ -6756,7 +6680,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                         </span>
                                     </div>
                                     <p className="text-xs text-slate-300 font-medium">
-                                        Defina turnos de operação e programe as paradas vinculadas no banco
+                                        Comandos da OP ativa, ferramentas, turnos e paradas vinculadas no banco
                                     </p>
                                 </div>
                             </div>
@@ -6772,42 +6696,444 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                             </button>
                         </div>
 
-                        {/* Abas de Navegação do Modal: Turnos vs Paradas */}
-                        <div className="grid grid-cols-2 gap-2 p-1 bg-[#08131B] rounded-xl border border-white/10 shrink-0">
-                            <button
-                                type="button"
-                                onClick={() => setMachineShiftModalTab('shifts')}
-                                className={`py-2 px-3 rounded-lg text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-2 cursor-pointer ${
-                                    machineShiftModalTab === 'shifts'
-                                        ? 'bg-cyan-500/25 text-[#00E5FF] border border-cyan-500/40 shadow-sm'
-                                        : 'text-slate-400 hover:text-white'
-                                }`}
-                            >
-                                <span>☀️ Turnos & Horários</span>
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setMachineShiftModalTab('downtimes')}
-                                className={`py-2 px-3 rounded-lg text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-2 cursor-pointer ${
-                                    machineShiftModalTab === 'downtimes'
-                                        ? 'bg-rose-500/25 text-rose-300 border border-rose-500/40 shadow-sm'
-                                        : 'text-slate-400 hover:text-white'
-                                }`}
-                            >
-                                <span>🛑 Programar Paradas</span>
-                                {localDowntimeConfigs.filter(c => {
-                                    const mType = machineShiftModalTarget?.split(' ')[0] || '';
-                                    return c.isActive && (!c.machineType || c.machineType === 'Geral' || c.machineType === mType);
-                                }).length > 0 && (
-                                    <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-500/30 text-rose-200">
+                        {/* Abas de Navegação do Modal: OP vs Equipamento vs Turnos vs Paradas */}
+                        {(() => {
+                            const isTrelica = Boolean(machineShiftModalTarget && machineShiftModalTarget.toLowerCase().includes('treli'));
+                            return (
+                                <div className={`grid ${isTrelica ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'} gap-1.5 p-1 bg-[#08131B] rounded-xl border border-white/10 shrink-0`}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setMachineShiftModalTab('op')}
+                                        className={`py-2 px-2.5 rounded-lg text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                                            machineShiftModalTab === 'op'
+                                                ? 'bg-cyan-500/25 text-[#00E5FF] border border-cyan-500/40 shadow-sm'
+                                                : 'text-slate-400 hover:text-white'
+                                        }`}
+                                    >
+                                        <span>📋 OP & Ações</span>
+                                    </button>
+
+                                    {isTrelica && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setMachineShiftModalTab('equipment')}
+                                            className={`py-2 px-2.5 rounded-lg text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                                                machineShiftModalTab === 'equipment'
+                                                    ? 'bg-amber-500/25 text-amber-300 border border-amber-500/40 shadow-sm'
+                                                    : 'text-slate-400 hover:text-white'
+                                            }`}
+                                        >
+                                            <span>⚡ Rolos & Solda</span>
+                                        </button>
+                                    )}
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setMachineShiftModalTab('shifts')}
+                                        className={`py-2 px-2.5 rounded-lg text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                                            machineShiftModalTab === 'shifts'
+                                                ? 'bg-cyan-500/25 text-[#00E5FF] border border-cyan-500/40 shadow-sm'
+                                                : 'text-slate-400 hover:text-white'
+                                        }`}
+                                    >
+                                        <span>☀️ Turnos</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setMachineShiftModalTab('downtimes')}
+                                        className={`py-2 px-2.5 rounded-lg text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                                            machineShiftModalTab === 'downtimes'
+                                                ? 'bg-rose-500/25 text-rose-300 border border-rose-500/40 shadow-sm'
+                                                : 'text-slate-400 hover:text-white'
+                                        }`}
+                                    >
+                                        <span>🛑 Paradas</span>
                                         {localDowntimeConfigs.filter(c => {
                                             const mType = machineShiftModalTarget?.split(' ')[0] || '';
                                             return c.isActive && (!c.machineType || c.machineType === 'Geral' || c.machineType === mType);
-                                        }).length}
-                                    </span>
-                                )}
-                            </button>
-                        </div>
+                                        }).length > 0 && (
+                                            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-500/30 text-rose-200">
+                                                {localDowntimeConfigs.filter(c => {
+                                                    const mType = machineShiftModalTarget?.split(' ')[0] || '';
+                                                    return c.isActive && (!c.machineType || c.machineType === 'Geral' || c.machineType === mType);
+                                                }).length}
+                                            </span>
+                                        )}
+                                    </button>
+                                </div>
+                            );
+                        })()}
+
+                        {/* ABA: OP & COMANDOS DE PRODUÇÃO */}
+                        {machineShiftModalTab === 'op' && (() => {
+                            const machineOrders = productionOrders.filter(o => 
+                                (o.scheduledMachine === machineShiftModalTarget || o.machine === machineShiftModalTarget) &&
+                                o.status !== 'completed' && o.status !== 'cancelled'
+                            );
+                            const activeOP = machineOrders.find(o => o.status === 'in_progress' || (o.status as string) === 'em_producao') || machineOrders[0];
+
+                            if (!activeOP) {
+                                return (
+                                    <div className="py-8 px-4 rounded-2xl bg-[#08131B] border border-white/10 text-center flex flex-col items-center gap-3 animate-fade">
+                                        <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 text-2xl">
+                                            📋
+                                        </div>
+                                        <div className="space-y-1">
+                                            <h4 className="text-white font-black text-sm">
+                                                Nenhuma OP agendada ou em andamento em {machineShiftModalTarget}
+                                            </h4>
+                                            <p className="text-xs text-slate-400">
+                                                Programe uma nova ordem de produção na grade do PCP para habilitar os comandos de máquina.
+                                            </p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setMachineShiftModalTarget(null);
+                                                handleOpenCreateModal(machineShiftModalTarget);
+                                            }}
+                                            className="mt-2 px-4 py-2 rounded-xl bg-[#00E5FF] hover:bg-[#00cce6] text-black font-black text-xs uppercase tracking-wider transition flex items-center gap-2 cursor-pointer shadow-lg active:scale-95"
+                                        >
+                                            <PlusIcon className="w-4 h-4" />
+                                            <span>Programar Nova OP</span>
+                                        </button>
+                                    </div>
+                                );
+                            }
+
+                            const prog = getOPProgress(activeOP);
+                            const title = activeOP.orderNumber || activeOP.id.slice(0, 6);
+                            const subtitle = activeOP.productName || (
+                                activeOP.machine?.startsWith('Trefila') ? `Bitola ${activeOP.targetBitola || 'N/A'}mm` :
+                                activeOP.machine?.startsWith('Treliça') ? `${activeOP.trelicaModel || 'Treliça'} • ${activeOP.tamanho || ''}m` :
+                                activeOP.machine?.startsWith('Malha') ? `${activeOP.malhaModel || 'Malha'} (${activeOP.tamanho || ''})` :
+                                'Ordem de Produção'
+                            );
+                            const isLive = prog.isLive;
+                            const isPending = prog.isPending;
+
+                            return (
+                                <div className="space-y-3.5 animate-fade">
+                                    {/* Card Principal da OP */}
+                                    <div className="p-3.5 rounded-2xl bg-[#06121B] border border-white/10 relative overflow-hidden shadow-inner">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="text-base font-black text-white">
+                                                        #{title}
+                                                    </span>
+                                                    {isLive && (
+                                                        <span className="flex items-center gap-1 text-[9px] font-black uppercase bg-emerald-500/25 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/40 animate-pulse">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                                            EM PRODUÇÃO
+                                                        </span>
+                                                    )}
+                                                    {isPending && (
+                                                        <span className="flex items-center gap-1 text-[9px] font-black uppercase bg-amber-500/25 text-amber-200 px-2 py-0.5 rounded border border-amber-500/50">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                                                            AGENDADA
+                                                        </span>
+                                                    )}
+                                                    {activeOP.operator && (
+                                                        <span className="text-[10px] font-bold text-slate-300 bg-white/5 px-2 py-0.5 rounded border border-white/5">
+                                                            👷 {activeOP.operator}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <span className="text-xs text-slate-300 font-bold block mt-1">
+                                                    {subtitle}
+                                                </span>
+                                            </div>
+
+                                            <div className="text-right shrink-0">
+                                                <span className="text-xs font-mono font-black text-[#00E5FF] block">
+                                                    {prog.totalProducedFormatted} / {prog.targetFormatted} {prog.unit}
+                                                </span>
+                                                <span className="text-[10px] font-bold text-slate-400">
+                                                    Progresso: {prog.percent}%
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* Barra de Progresso */}
+                                        <div className="w-full bg-black/40 rounded-full h-2 mt-2.5 overflow-hidden border border-white/10">
+                                            <div 
+                                                className={`h-full transition-all duration-300 ${isLive ? 'bg-gradient-to-r from-cyan-500 to-emerald-400' : 'bg-amber-400'}`}
+                                                style={{ width: `${Math.min(100, prog.percent)}%` }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Grid dos 6 Botões de Comando */}
+                                    <div className="space-y-1.5">
+                                        <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider block">
+                                            Comandos de Produção da Máquina:
+                                        </span>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            {/* 1. Editar OP em Produção */}
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setMachineShiftModalTarget(null);
+                                                    setEditingInProgressOP(activeOP);
+                                                }}
+                                                className="p-3 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 hover:border-purple-400/60 text-left transition-all flex items-start gap-2.5 group cursor-pointer"
+                                            >
+                                                <div className="w-8 h-8 rounded-lg bg-purple-500/20 border border-purple-500/40 text-purple-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                    <PencilIcon className="w-4 h-4" />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <span className="text-xs font-black text-purple-200 block group-hover:text-purple-100">
+                                                        Editar OP em Produção
+                                                    </span>
+                                                    <span className="text-[10px] text-purple-300/70 font-medium block leading-tight mt-0.5">
+                                                        Nome, meta, lotes e turnos finalizados
+                                                    </span>
+                                                </div>
+                                            </button>
+
+                                            {/* 2. Diagnóstico de Produção */}
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setMachineShiftModalTarget(null);
+                                                    setDiagnosticOP(activeOP);
+                                                }}
+                                                className="p-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 hover:border-amber-400/60 text-left transition-all flex items-start gap-2.5 group cursor-pointer"
+                                            >
+                                                <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                    <ClipboardListIcon className="w-4 h-4" />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <span className="text-xs font-black text-amber-200 block group-hover:text-amber-100">
+                                                        Diagnóstico de Produção
+                                                    </span>
+                                                    <span className="text-[10px] text-amber-300/70 font-medium block leading-tight mt-0.5">
+                                                        Planejado vs Realizado, velocidade e ritmo
+                                                    </span>
+                                                </div>
+                                            </button>
+
+                                            {/* 3. Abrir Painel da Máquina */}
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setMachineShiftModalTarget(null);
+                                                    handleGoToProduction(activeOP);
+                                                }}
+                                                className="p-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 hover:border-emerald-400/60 text-left transition-all flex items-start gap-2.5 group cursor-pointer"
+                                            >
+                                                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                    <PlayIcon className="w-4 h-4" />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <span className="text-xs font-black text-emerald-200 block group-hover:text-emerald-100">
+                                                        Abrir Painel da Máquina
+                                                    </span>
+                                                    <span className="text-[10px] text-emerald-300/70 font-medium block leading-tight mt-0.5">
+                                                        Apontamento e painel ao vivo do operador
+                                                    </span>
+                                                </div>
+                                            </button>
+
+                                            {/* 4. Imprimir Ficha de Produção */}
+                                            <button
+                                                type="button"
+                                                onClick={() => handlePrintOP(activeOP)}
+                                                className="p-3 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 hover:border-cyan-400/60 text-left transition-all flex items-start gap-2.5 group cursor-pointer"
+                                            >
+                                                <div className="w-8 h-8 rounded-lg bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                    <PrinterIcon className="w-4 h-4" />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <span className="text-xs font-black text-cyan-200 block group-hover:text-cyan-100">
+                                                        Imprimir Ficha de Produção (A4)
+                                                    </span>
+                                                    <span className="text-[10px] text-cyan-300/70 font-medium block leading-tight mt-0.5">
+                                                        Ficha técnica com código de barras e especificações
+                                                    </span>
+                                                </div>
+                                            </button>
+
+                                            {/* 5. Reagendar */}
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setMachineShiftModalTarget(null);
+                                                    openScheduleModal(activeOP);
+                                                }}
+                                                className="p-3 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 hover:border-sky-400/60 text-left transition-all flex items-start gap-2.5 group cursor-pointer"
+                                            >
+                                                <div className="w-8 h-8 rounded-lg bg-sky-500/20 border border-sky-500/40 text-sky-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                    <CalendarIcon className="w-4 h-4" />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <span className="text-xs font-black text-sky-200 block group-hover:text-sky-100">
+                                                        Reagendar OP
+                                                    </span>
+                                                    <span className="text-[10px] text-sky-300/70 font-medium block leading-tight mt-0.5">
+                                                        Mudar data, máquina ou duração em dias
+                                                    </span>
+                                                </div>
+                                            </button>
+
+                                            {/* 6. Desagendar */}
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    handleRemoveSchedule(activeOP.id);
+                                                }}
+                                                className="p-3 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 hover:border-rose-400/60 text-left transition-all flex items-start gap-2.5 group cursor-pointer"
+                                            >
+                                                <div className="w-8 h-8 rounded-lg bg-rose-500/20 border border-rose-500/40 text-rose-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                    <XIcon className="w-4 h-4" />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <span className="text-xs font-black text-rose-200 block group-hover:text-rose-100">
+                                                        Desagendar OP
+                                                    </span>
+                                                    <span className="text-[10px] text-rose-300/70 font-medium block leading-tight mt-0.5">
+                                                        Retirar a OP do cronograma da grade do PCP
+                                                    </span>
+                                                </div>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Outras OPs na Fila se houver */}
+                                    {machineOrders.length > 1 && (
+                                        <div className="mt-2 space-y-1.5 border-t border-white/10 pt-2.5">
+                                            <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider block">
+                                                Outras OPs Agendadas nesta Máquina ({machineOrders.length - 1}):
+                                            </span>
+                                            <div className="space-y-1 max-h-36 overflow-y-auto pr-1">
+                                                {machineOrders.filter(o => o.id !== activeOP.id).map(queuedOp => (
+                                                    <div key={queuedOp.id} className="p-2 rounded-xl bg-[#08131B] border border-white/5 flex items-center justify-between gap-2 text-xs">
+                                                        <div className="min-w-0 truncate">
+                                                            <span className="font-bold text-white">#{queuedOp.orderNumber}</span>
+                                                            <span className="text-slate-400 text-[10px] ml-2 truncate">
+                                                                {queuedOp.productName || queuedOp.targetBitola || queuedOp.trelicaModel || queuedOp.malhaModel}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1 shrink-0">
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={() => { setMachineShiftModalTarget(null); setEditingInProgressOP(queuedOp); }}
+                                                                className="p-1 rounded bg-white/5 hover:bg-white/10 text-purple-300 cursor-pointer"
+                                                                title="Editar OP"
+                                                            >
+                                                                <PencilIcon className="w-3.5 h-3.5" />
+                                                            </button>
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={() => { setMachineShiftModalTarget(null); handleGoToProduction(queuedOp); }}
+                                                                className="p-1 rounded bg-white/5 hover:bg-white/10 text-emerald-300 cursor-pointer"
+                                                                title="Abrir no Painel"
+                                                            >
+                                                                <PlayIcon className="w-3.5 h-3.5" />
+                                                            </button>
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={() => handlePrintOP(queuedOp)}
+                                                                className="p-1 rounded bg-white/5 hover:bg-white/10 text-cyan-300 cursor-pointer"
+                                                                title="Imprimir Ficha"
+                                                            >
+                                                                <PrinterIcon className="w-3.5 h-3.5" />
+                                                            </button>
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={() => handleRemoveSchedule(queuedOp.id)}
+                                                                className="p-1 rounded bg-white/5 hover:bg-white/10 text-rose-400 cursor-pointer"
+                                                                title="Desagendar"
+                                                            >
+                                                                <XIcon className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })()}
+
+                        {/* ABA: ROLOS & SOLDA (EXCLUSIVO TRELIÇA) */}
+                        {machineShiftModalTab === 'equipment' && Boolean(machineShiftModalTarget && machineShiftModalTarget.toLowerCase().includes('treli')) && (
+                            <div className="space-y-4 animate-fade">
+                                <div className="p-3 rounded-xl bg-gradient-to-r from-blue-950/40 via-[#081822] to-amber-950/30 border border-cyan-500/30 flex items-center justify-between gap-3">
+                                    <div>
+                                        <h4 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                                            <span>⚡ Equipamento & Solda:</span>
+                                            <span className="text-cyan-300">{machineShiftModalTarget}</span>
+                                        </h4>
+                                        <p className="text-[11px] text-slate-300">
+                                            Gêmeo digital dos 5 desbobinadores e controle técnico da cabeça de solda
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setViewSpoolStandsMachine(machineShiftModalTarget)}
+                                        className="px-3 py-1.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/40 text-blue-300 font-bold text-xs flex items-center gap-1.5 transition shrink-0 cursor-pointer"
+                                        title="Expandir Porta-Rolos em Tela Cheia"
+                                    >
+                                        <span>⛶ Tela Cheia</span>
+                                    </button>
+                                </div>
+
+                                {/* 1. Gêmeo Digital dos 5 Porta-Rolos */}
+                                <div className="p-3 rounded-2xl bg-[#06121B] border border-white/10">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                                            <span>🧲 Porta-Rolos (5 Posições)</span>
+                                        </span>
+                                        <span className="text-[10px] text-cyan-400 font-mono">
+                                            1 Superior • 2 Senozóides • 2 Inferiores
+                                        </span>
+                                    </div>
+                                    <div 
+                                        onClick={() => setViewSpoolStandsMachine(machineShiftModalTarget)}
+                                        className="cursor-pointer hover:border-cyan-500/40 transition-all rounded-xl"
+                                        title="Clique para gerenciar bobinas e estoque"
+                                    >
+                                        <TrelicaSpoolStands 
+                                            machineName={machineShiftModalTarget} 
+                                            isCompact={true} 
+                                            stock={stock} 
+                                            productionOrders={productionOrders}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* 2. Botão/Card Comando Solda */}
+                                <div className="p-3.5 rounded-2xl bg-[#06121B] border border-amber-500/30 flex items-center justify-between gap-3 hover:border-amber-400/60 transition-all">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 text-lg shrink-0">
+                                            ⚡
+                                        </div>
+                                        <div className="min-w-0">
+                                            <h5 className="text-xs font-black text-amber-200 uppercase tracking-wider">
+                                                Comando da Cabeça de Solda
+                                            </h5>
+                                            <p className="text-[11px] text-slate-300 mt-0.5">
+                                                Calibração de eletrodos (Sup, Esq, Dir), desgaste, pressão pneumática e relatórios
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setViewWeldingHeadMachine(machineShiftModalTarget);
+                                        }}
+                                        className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 shrink-0 shadow-lg cursor-pointer"
+                                    >
+                                        <span>Abrir Painel Solda</span>
+                                        <span>➔</span>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
 
                         {/* ABA 1: TURNOS & HORÁRIOS */}
                         {machineShiftModalTab === 'shifts' && (
