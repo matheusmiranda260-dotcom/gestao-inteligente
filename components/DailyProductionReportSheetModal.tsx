@@ -15,6 +15,7 @@ export interface DailyProductionReportSheetModalProps {
     productionOrders?: ProductionOrderData[];
     initialProduced?: number;
     initialOperator?: string;
+    shiftConfig?: any;
 }
 
 interface StopRow {
@@ -105,6 +106,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
     shiftReports = [],
     initialProduced,
     initialOperator,
+    shiftConfig,
 }) => {
     // Normalização da máquina (ex: Treliça 1, Treliça 2)
     const machine = useMemo(() => {
@@ -113,6 +115,14 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         if (raw.toLowerCase().includes('treliça') || raw.toLowerCase().includes('trelica')) return 'Treliça 1';
         return raw;
     }, [initialMachine, op]);
+
+    // Resolução da configuração de turnos da máquina (1 ou 2 turnos)
+    const shiftCfg = useMemo(() => resolveMachineShiftConfig(machine, shiftConfig), [machine, shiftConfig]);
+    const [hasSecondShift, setHasSecondShift] = useState<boolean>(() => (shiftCfg.shiftCount === 2));
+
+    useEffect(() => {
+        setHasSecondShift(shiftCfg.shiftCount === 2);
+    }, [shiftCfg.shiftCount]);
 
     // Data selecionada (pode alternar de dia dentro da ficha)
     const [selectedDate, setSelectedDate] = useState<string>(initialDateStr);
@@ -579,18 +589,17 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             });
         });
 
-        const hasRealTurnoB = hasTurnoBReport || piecesB > 0 || stopsListB.length > 0 || Boolean(opB);
-
         // Obter configuração da jornada da máquina
-        const shiftCfg = resolveMachineShiftConfig(machine);
+        const resolvedCfg = resolveMachineShiftConfig(machine, shiftConfig);
+        const hasRealTurnoB = resolvedCfg.shiftCount === 2 && (hasTurnoBReport || piecesB > 0 || stopsListB.length > 0 || Boolean(opB));
         const isTrelica = machine.toLowerCase().includes('treli') || machine.toLowerCase().includes('trelica');
 
-        const schedStartA = shiftCfg.workStart || (isTrelica ? '05:00' : '07:45');
-        const schedEndA = shiftCfg.workEnd || (isTrelica ? '14:48' : '17:33');
+        const schedStartA = resolvedCfg.workStart || (isTrelica ? '05:00' : '07:45');
+        const schedEndA = resolvedCfg.workEnd || (isTrelica ? '14:48' : '17:33');
         const shiftScheduleStrA = `${schedStartA} às ${schedEndA}`;
 
-        const schedStartB = shiftCfg.shift2Start || (isTrelica ? '14:48' : '14:00');
-        const schedEndB = shiftCfg.shift2End || (isTrelica ? '23:36' : '23:59');
+        const schedStartB = resolvedCfg.shift2Start || (isTrelica ? '14:48' : '14:00');
+        const schedEndB = resolvedCfg.shift2End || (isTrelica ? '23:36' : '23:59');
         const shiftScheduleStrB = `${schedStartB} às ${schedEndB}`;
 
         // Carga horária programada do turno (ex: Treliça = 8h48 -> 08:48:00)
@@ -693,6 +702,8 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     resolvedTamanhoA = expectedPieceSize;
                 }
 
+                const rawStatsB = dbReport.stats_shift_b || {};
+
                 let resolvedTamanhoB = Number(rawStatsB.tamanhoPeca);
                 if (!resolvedTamanhoB || (op.tamanho && expectedPieceSize && resolvedTamanhoB !== expectedPieceSize)) {
                     resolvedTamanhoB = resolvedTamanhoA;
@@ -706,7 +717,6 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     horarioTurnoPrevisto: horarioTurnoA
                 });
 
-                const rawStatsB = dbReport.stats_shift_b || {};
                 const defaultSchedB = isTrelica ? '14:48 às 23:36' : '14:00 às 23:59';
                 const defaultShiftB = isTrelica ? '08:48:00' : '09:00:00';
                 const workedSecB = timeToSeconds(rawStatsB.horasTrabalhadas || '');
@@ -732,6 +742,13 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     : autoHistory;
 
                 setProductionUpdates(finalUpdates);
+                
+                const hasTurnoBFromDb = Boolean(dbReport.operator_shift_b) || 
+                    (dbReport.stops_shift_b && dbReport.stops_shift_b.length > 0) || 
+                    Number(rawStatsB.pecasProduzidas || 0) > 0 || 
+                    hasHoursB;
+                setHasSecondShift(hasTurnoBFromDb ? true : (shiftCfg.shiftCount === 2));
+
                 setSaveStatus('saved');
                 showToast(`Relatório do dia ${targetDate.split('-').reverse().join('/')} carregado do banco.`, 'info');
             } else {
@@ -749,6 +766,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 setStatsShiftA(auto.statsShiftA);
                 setStatsShiftB(auto.statsShiftB);
                 setProductionUpdates(auto.productionUpdates);
+                setHasSecondShift(shiftCfg.shiftCount === 2);
 
                 // Auto-salvar no banco para garantir que já fique registrado
                 saveReportData(targetDate, {
@@ -769,6 +787,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             setStatsShiftA(auto.statsShiftA);
             setStatsShiftB(auto.statsShiftB);
             setProductionUpdates(auto.productionUpdates);
+            setHasSecondShift(shiftCfg.shiftCount === 2);
             setSaveStatus('saved');
         } finally {
             setLoading(false);
@@ -974,7 +993,9 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         const velocidadeMinutoA = secondsEfetivoA > 0 ? (metrosProduzidosA / (secondsEfetivoA / 60)) : 0;
         const velocidadeMinutoB = secondsEfetivoB > 0 ? (metrosProduzidosB / (secondsEfetivoB / 60)) : 0;
 
-        const totalPecasProduzidas = statsShiftA.pecasProduzidas + statsShiftB.pecasProduzidas;
+        const totalPecasProduzidas = hasSecondShift
+            ? (statsShiftA.pecasProduzidas + statsShiftB.pecasProduzidas)
+            : statsShiftA.pecasProduzidas;
 
         const totalUpdateQnt = productionUpdates.reduce((sum, r) => sum + (Number(r.qnt) || 0), 0);
         const totalUpdateWeight = productionUpdates.reduce((sum, r) => sum + (Number(r.peso) || 0), 0);
@@ -1004,7 +1025,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 velocidadeStr: `${velocidadeMinutoB.toFixed(1).replace('.', ',')} metros/ minuto`
             }
         };
-    }, [stopsShiftA, stopsShiftB, statsShiftA, statsShiftB, productionUpdates]);
+    }, [stopsShiftA, stopsShiftB, statsShiftA, statsShiftB, productionUpdates, hasSecondShift]);
 
     // AÇÃO 1: IMPRESSÃO LIMPA EM FOLHA A4
     const handlePrint = () => {
@@ -1260,6 +1281,34 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                         />
                     </div>
 
+                    {/* Alternador de Regime de Turnos (1 Turno vs 2 Turnos) */}
+                    <div className="flex items-center bg-black/50 border border-white/15 rounded-xl p-0.5 no-print shadow-inner">
+                        <button
+                            type="button"
+                            onClick={() => setHasSecondShift(false)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                !hasSecondShift 
+                                    ? 'bg-[#00E5FF]/20 text-[#00E5FF] border border-[#00E5FF]/40 shadow-sm' 
+                                    : 'text-slate-400 hover:text-white'
+                            }`}
+                            title="Operação em 1 Turno (Oculta o 2º Turno no relatório e estende o Turno A)"
+                        >
+                            1º Turno (Único)
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setHasSecondShift(true)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                hasSecondShift 
+                                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm' 
+                                    : 'text-slate-400 hover:text-white'
+                            }`}
+                            title="Operação em 2 Turnos (Exibe Turno A e Turno B lado a lado)"
+                        >
+                            2 Turnos (A + B)
+                        </button>
+                    </div>
+
                     {/* Botão Sincronizar Dados do Chão de Fábrica */}
                     <button
                         type="button"
@@ -1392,8 +1441,8 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
 
                         {/* Metadados e Ordem de Produção */}
                         <div className="grid grid-cols-1 md:grid-cols-12 border-b border-slate-200 bg-[#fbfcfd]">
-                            {/* Coluna 1: Ordem de Produção e Operador Turno A */}
-                            <div className="col-span-1 md:col-span-4 p-4 flex flex-col justify-between gap-3.5 border-r border-slate-200">
+                            {/* Coluna 1: Ordem de Produção e Operador */}
+                            <div className={`${hasSecondShift ? 'col-span-1 md:col-span-4' : 'col-span-1 md:col-span-5'} p-4 flex flex-col justify-between gap-3.5 border-r border-slate-200`}>
                                 <div className="flex items-start gap-2.5">
                                     <ClipboardIcon className="h-5 w-5 text-[#002060] mt-0.5 shrink-0" />
                                     <div className="flex-grow">
@@ -1410,7 +1459,9 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                 <div className="flex items-start gap-2.5 pt-3 border-t border-slate-100">
                                     <UserIcon className="h-5 w-5 text-[#002060] mt-0.5 shrink-0" />
                                     <div className="flex-grow">
-                                        <div className="text-[9px] font-black text-slate-500 uppercase tracking-wider">OPERADOR / AUXILIAR - TURNO A</div>
+                                        <div className="text-[9px] font-black text-slate-500 uppercase tracking-wider">
+                                            {hasSecondShift ? 'OPERADOR / AUXILIAR - TURNO A' : 'OPERADOR / AUXILIAR'}
+                                        </div>
                                         <input
                                             type="text"
                                             value={operatorShiftA}
@@ -1422,8 +1473,8 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                 </div>
                             </div>
 
-                            {/* Coluna 2: Descrição do Produto e Operador Turno B */}
-                            <div className="col-span-1 md:col-span-5 p-4 flex flex-col justify-between gap-3.5 border-r border-slate-200">
+                            {/* Coluna 2: Descrição do Produto e Operador Turno B (se houver 2 turnos) */}
+                            <div className={`${hasSecondShift ? 'col-span-1 md:col-span-5' : 'col-span-1 md:col-span-4'} p-4 flex flex-col justify-between gap-3.5 border-r border-slate-200`}>
                                 <div className="flex items-start gap-2.5">
                                     <TagIcon className="h-5 w-5 text-[#002060] mt-0.5 shrink-0" />
                                     <div className="flex-grow">
@@ -1437,19 +1488,21 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                         />
                                     </div>
                                 </div>
-                                <div className="flex items-start gap-2.5 pt-3 border-t border-slate-100">
-                                    <UserIcon className="h-5 w-5 text-[#002060] mt-0.5 shrink-0" />
-                                    <div className="flex-grow">
-                                        <div className="text-[9px] font-black text-slate-500 uppercase tracking-wider">OPERADOR / AUXILIAR - TURNO B</div>
-                                        <input
-                                            type="text"
-                                            value={operatorShiftB}
-                                            onChange={e => setOperatorShiftB(e.target.value)}
-                                            className="w-full text-xs font-black text-slate-700 bg-transparent border-none p-0 focus:ring-0 focus:outline-none uppercase modern-editable-input"
-                                            placeholder="Nome do operador..."
-                                        />
+                                {hasSecondShift && (
+                                    <div className="flex items-start gap-2.5 pt-3 border-t border-slate-100">
+                                        <UserIcon className="h-5 w-5 text-[#002060] mt-0.5 shrink-0" />
+                                        <div className="flex-grow">
+                                            <div className="text-[9px] font-black text-slate-500 uppercase tracking-wider">OPERADOR / AUXILIAR - TURNO B</div>
+                                            <input
+                                                type="text"
+                                                value={operatorShiftB}
+                                                onChange={e => setOperatorShiftB(e.target.value)}
+                                                className="w-full text-xs font-black text-slate-700 bg-transparent border-none p-0 focus:ring-0 focus:outline-none uppercase modern-editable-input"
+                                                placeholder="Nome do operador..."
+                                            />
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                             </div>
 
                             {/* Coluna 3: Quantidade de Peças Produzidas */}
@@ -1464,12 +1517,12 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                             </div>
                         </div>
 
-                        {/* Paradas e Seus Motivos – Turno A e Turno B (Lado a Lado) */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-4 border-b border-slate-200">
+                        {/* Paradas e Seus Motivos – Turno A e Turno B (Lado a Lado ou Único) */}
+                        <div className={`grid ${hasSecondShift ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'} gap-4 p-4 border-b border-slate-200`}>
                             {/* Paradas Turno A */}
                             <div className="border border-[#002060] rounded-lg overflow-hidden bg-white shadow-sm flex flex-col">
                                 <div className="bg-[#002060] text-white py-2 px-3 flex items-center justify-between text-[11px] font-black tracking-wider">
-                                    <span className="uppercase">PARADAS E SEUS MOTIVOS – TURNO A</span>
+                                    <span className="uppercase">{hasSecondShift ? 'PARADAS E SEUS MOTIVOS – TURNO A' : 'PARADAS E SEUS MOTIVOS'}</span>
                                     <button
                                         type="button"
                                         onClick={() => addStopRow('A')}
@@ -1491,7 +1544,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                         {stopsShiftA.length === 0 ? (
                                             <tr>
                                                 <td colSpan={4} className="text-center py-6 text-slate-400 italic font-bold text-xs">
-                                                    Nenhuma parada registrada no Turno A.
+                                                    Nenhuma parada registrada {hasSecondShift ? 'no Turno A' : 'nesta data'}.
                                                 </td>
                                             </tr>
                                         ) : (
@@ -1545,105 +1598,107 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                 </table>
                             </div>
 
-                            {/* Paradas Turno B */}
-                            <div className="border border-[#002060] rounded-lg overflow-hidden bg-white shadow-sm flex flex-col">
-                                <div className="bg-[#002060] text-white py-2 px-3 flex items-center justify-between text-[11px] font-black tracking-wider">
-                                    <span className="uppercase">PARADAS E SEUS MOTIVOS – TURNO B</span>
-                                    <div className="flex items-center gap-1.5 no-print">
-                                        {stopsShiftB.length > 0 && (
+                            {/* Paradas Turno B (visível apenas com 2 turnos) */}
+                            {hasSecondShift && (
+                                <div className="border border-[#002060] rounded-lg overflow-hidden bg-white shadow-sm flex flex-col">
+                                    <div className="bg-[#002060] text-white py-2 px-3 flex items-center justify-between text-[11px] font-black tracking-wider">
+                                        <span className="uppercase">PARADAS E SEUS MOTIVOS – TURNO B</span>
+                                        <div className="flex items-center gap-1.5 no-print">
+                                            {stopsShiftB.length > 0 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setStopsShiftB([])}
+                                                    className="border border-white/50 hover:bg-rose-600/30 text-white text-[9px] font-bold px-1.5 py-0.5 rounded transition-all cursor-pointer uppercase"
+                                                    title="Limpar paradas do Turno B"
+                                                >
+                                                    Limpar
+                                                </button>
+                                            )}
                                             <button
                                                 type="button"
-                                                onClick={() => setStopsShiftB([])}
-                                                className="border border-white/50 hover:bg-rose-600/30 text-white text-[9px] font-bold px-1.5 py-0.5 rounded transition-all cursor-pointer uppercase"
-                                                title="Limpar paradas do Turno B"
+                                                onClick={() => addStopRow('B')}
+                                                className="border border-white hover:bg-white hover:text-[#002060] text-white text-[9px] font-bold px-2 py-0.5 rounded transition-all cursor-pointer uppercase"
                                             >
-                                                Limpar
+                                                + Linha
                                             </button>
-                                        )}
-                                        <button
-                                            type="button"
-                                            onClick={() => addStopRow('B')}
-                                            className="border border-white hover:bg-white hover:text-[#002060] text-white text-[9px] font-bold px-2 py-0.5 rounded transition-all cursor-pointer uppercase"
-                                        >
-                                            + Linha
-                                        </button>
+                                        </div>
                                     </div>
-                                </div>
-                                <table className="w-full border-collapse">
-                                    <thead>
-                                        <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-700 uppercase">
-                                            <th className="py-1.5 border-r border-slate-200 text-center" style={{ width: '75px' }}>Início</th>
-                                            <th className="py-1.5 border-r border-slate-200 text-center" style={{ width: '75px' }}>Fim</th>
-                                            <th className="py-1.5 border-r border-slate-200 text-center" style={{ width: '70px' }}>Duração</th>
-                                            <th className="py-1.5 text-left pl-3">Motivo</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {stopsShiftB.length === 0 ? (
-                                            <tr>
-                                                <td colSpan={4} className="text-center py-6 text-slate-400 italic font-bold text-xs">
-                                                    Nenhuma parada registrada no Turno B.
-                                                </td>
+                                    <table className="w-full border-collapse">
+                                        <thead>
+                                            <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-700 uppercase">
+                                                <th className="py-1.5 border-r border-slate-200 text-center" style={{ width: '75px' }}>Início</th>
+                                                <th className="py-1.5 border-r border-slate-200 text-center" style={{ width: '75px' }}>Fim</th>
+                                                <th className="py-1.5 border-r border-slate-200 text-center" style={{ width: '70px' }}>Duração</th>
+                                                <th className="py-1.5 text-left pl-3">Motivo</th>
                                             </tr>
-                                        ) : (
-                                            stopsShiftB.map(stop => {
-                                                const durationSecs = calculateStopDurationSeconds(stop.inicio, stop.fim);
-                                                return (
-                                                    <tr key={stop.id} className="border-b border-slate-200 hover:bg-slate-50/50 group text-xs">
-                                                        <td className="p-1 border-r border-slate-200 text-center">
-                                                            <input
-                                                                type="text"
-                                                                value={stop.inicio}
-                                                                onChange={e => updateStopField('B', stop.id, 'inicio', e.target.value)}
-                                                                className="modern-editable-input text-center text-rose-600 w-full font-black text-xs"
-                                                                placeholder="00:00:00"
-                                                            />
-                                                        </td>
-                                                        <td className="p-1 border-r border-slate-200 text-center">
-                                                            <input
-                                                                type="text"
-                                                                value={stop.fim}
-                                                                onChange={e => updateStopField('B', stop.id, 'fim', e.target.value)}
-                                                                className="modern-editable-input text-center text-emerald-600 w-full font-black text-xs"
-                                                                placeholder="00:00:00"
-                                                            />
-                                                        </td>
-                                                        <td className="p-1 border-r border-slate-200 text-center font-black text-rose-600 text-xs">
-                                                            {secondsToTime(durationSecs)}
-                                                        </td>
-                                                        <td className="p-1 text-left pl-3 relative pr-8">
-                                                            <input
-                                                                type="text"
-                                                                value={stop.motivo}
-                                                                onChange={e => updateStopField('B', stop.id, 'motivo', e.target.value)}
-                                                                className="modern-editable-input text-left text-slate-800 w-full font-bold text-xs"
-                                                                placeholder="Motivo..."
-                                                            />
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => removeStopRow('B', stop.id)}
-                                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-rose-600 hover:text-rose-800 font-black text-sm no-print opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                title="Remover parada"
-                                                            >
-                                                                ×
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
+                                        </thead>
+                                        <tbody>
+                                            {stopsShiftB.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={4} className="text-center py-6 text-slate-400 italic font-bold text-xs">
+                                                        Nenhuma parada registrada no Turno B.
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                stopsShiftB.map(stop => {
+                                                    const durationSecs = calculateStopDurationSeconds(stop.inicio, stop.fim);
+                                                    return (
+                                                        <tr key={stop.id} className="border-b border-slate-200 hover:bg-slate-50/50 group text-xs">
+                                                            <td className="p-1 border-r border-slate-200 text-center">
+                                                                <input
+                                                                    type="text"
+                                                                    value={stop.inicio}
+                                                                    onChange={e => updateStopField('B', stop.id, 'inicio', e.target.value)}
+                                                                    className="modern-editable-input text-center text-rose-600 w-full font-black text-xs"
+                                                                    placeholder="00:00:00"
+                                                                />
+                                                            </td>
+                                                            <td className="p-1 border-r border-slate-200 text-center">
+                                                                <input
+                                                                    type="text"
+                                                                    value={stop.fim}
+                                                                    onChange={e => updateStopField('B', stop.id, 'fim', e.target.value)}
+                                                                    className="modern-editable-input text-center text-emerald-600 w-full font-black text-xs"
+                                                                    placeholder="00:00:00"
+                                                                />
+                                                            </td>
+                                                            <td className="p-1 border-r border-slate-200 text-center font-black text-rose-600 text-xs">
+                                                                {secondsToTime(durationSecs)}
+                                                            </td>
+                                                            <td className="p-1 text-left pl-3 relative pr-8">
+                                                                <input
+                                                                    type="text"
+                                                                    value={stop.motivo}
+                                                                    onChange={e => updateStopField('B', stop.id, 'motivo', e.target.value)}
+                                                                    className="modern-editable-input text-left text-slate-800 w-full font-bold text-xs"
+                                                                    placeholder="Motivo..."
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => removeStopRow('B', stop.id)}
+                                                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-rose-600 hover:text-rose-800 font-black text-sm no-print opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                    title="Remover parada"
+                                                                >
+                                                                    ×
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
                         </div>
 
-                        {/* Estatística do Dia – Turno A e Turno B (Lado a Lado) */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-4 border-b border-slate-200 bg-[#fbfcfd]">
+                        {/* Estatística do Dia – Turno A e Turno B (Lado a Lado ou Único) */}
+                        <div className={`grid ${hasSecondShift ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'} gap-4 p-4 border-b border-slate-200 bg-[#fbfcfd]`}>
                             {/* Estatísticas Turno A */}
                             <div className="border border-[#002060] rounded-lg overflow-hidden bg-white shadow-sm flex flex-col">
                                 <div className="bg-[#002060] text-white py-2 px-3 flex items-center gap-1.5 text-[11px] font-black tracking-wider uppercase">
                                     <GaugeIcon className="h-4 w-4 text-white" />
-                                    <span>ESTATÍSTICA DO DIA – TURNO A</span>
+                                    <span>{hasSecondShift ? 'ESTATÍSTICA DO DIA – TURNO A' : 'ESTATÍSTICA DO DIA'}</span>
                                 </div>
                                 <div className="p-3 divide-y divide-slate-100 flex flex-col justify-between h-full">
                                     {/* Horário Programado do Turno A */}
@@ -1754,9 +1809,10 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                 </div>
                             </div>
 
-                            {/* Estatísticas Turno B */}
-                            <div className="border border-[#002060] rounded-lg overflow-hidden bg-white shadow-sm flex flex-col">
-                                <div className="bg-[#002060] text-white py-2 px-3 flex items-center justify-between text-[11px] font-black tracking-wider uppercase">
+                            {/* Estatísticas Turno B (visível apenas com 2 turnos) */}
+                            {hasSecondShift && (
+                                <div className="border border-[#002060] rounded-lg overflow-hidden bg-white shadow-sm flex flex-col">
+                                    <div className="bg-[#002060] text-white py-2 px-3 flex items-center justify-between text-[11px] font-black tracking-wider uppercase">
                                     <div className="flex items-center gap-1.5">
                                         <GaugeIcon className="h-4 w-4 text-white" />
                                         <span>ESTATÍSTICA DO DIA – TURNO B</span>
@@ -1890,7 +1946,8 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        )}
+                    </div>
 
                         {/* Atualização da Produção (Lotes de Pesagem) */}
                         <div className="p-4 bg-[#fbfcfd]">

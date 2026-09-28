@@ -452,29 +452,56 @@ export const fetchPcpShiftConfig = async (): Promise<PcpShiftConfig | null> => {
     try {
         const { data, error } = await supabase
             .from('pcp_shift_config')
-            .select('*')
-            .eq('id', 'default')
-            .maybeSingle();
+            .select('*');
 
         if (error) {
             console.warn('Erro ao buscar pcp_shift_config no Supabase:', error);
             return localCfg;
         }
-        if (!data) return localCfg;
+        if (!data || data.length === 0) return localCfg;
 
-        const mapped = mapToCamelCase(data) as PcpShiftConfig;
-        // Mesclar com configurações locais se o banco ainda não tiver a coluna machine_configs
-        if (!mapped.machineConfigs && localCfg?.machineConfigs) {
-            mapped.machineConfigs = localCfg.machineConfigs;
-        }
-        return mapped;
+        const defaultRow = data.find((r: any) => r.id === 'default') || data[0];
+        const baseConfig = mapToCamelCase(defaultRow) as PcpShiftConfig;
+
+        // Montar machineConfigs a partir das linhas do banco
+        const machineConfigs: Record<string, any> = {
+            ...(localCfg?.machineConfigs || {})
+        };
+
+        const shift2Rows = data.filter((r: any) => r.id && r.id.startsWith('mach_shift2_'));
+        const machRows = data.filter((r: any) => r.id && r.id.startsWith('mach_') && !r.id.startsWith('mach_shift2_'));
+
+        machRows.forEach((r: any) => {
+            const machName = r.id.replace('mach_', '');
+            const hasShift2 = shift2Rows.find((s: any) => s.id === `mach_shift2_${machName}`);
+            const isNoLunch = (r.lunch_start === '00:00' && r.lunch_end === '00:00') || !r.lunch_start;
+
+            machineConfigs[machName] = {
+                workStart: r.work_start || '07:00',
+                workEnd: r.work_end || '17:00',
+                lunchStart: isNoLunch ? '12:00' : (r.lunch_start || '12:00'),
+                lunchEnd: isNoLunch ? '13:00' : (r.lunch_end || '13:00'),
+                noLunch: isNoLunch,
+                workDays: r.work_days || [1, 2, 3, 4, 5],
+                shiftCount: hasShift2 ? 2 : 1,
+                shift2Start: hasShift2?.work_start || '14:48',
+                shift2End: hasShift2?.work_end || '23:36',
+                autoStartShift: false,
+                autoEndShift: true,
+                autoEndTimeoutMin: 5,
+                requireManagerAuthForOvertime: true
+            };
+        });
+
+        baseConfig.machineConfigs = machineConfigs;
+        return baseConfig;
     } catch (err) {
         console.warn('Exceção ao buscar pcp_shift_config:', err);
         return localCfg;
     }
 };
 
-/** Salvar Configuração de Jornada do PCP */
+/** Salvar Configuração de Jornada do PCP (Global e Individual de Máquinas) */
 export const savePcpShiftConfig = async (config: Partial<PcpShiftConfig>): Promise<PcpShiftConfig | null> => {
     // Salvar sempre em localStorage
     try {
@@ -482,60 +509,65 @@ export const savePcpShiftConfig = async (config: Partial<PcpShiftConfig>): Promi
     } catch (_) {}
 
     try {
-        const fullPayload: any = {
+        // 1. Salvar configuração global (default)
+        const defaultPayload = {
             id: 'default',
-            workStart: config.workStart || '07:00',
-            lunchStart: config.lunchStart || '12:00',
-            lunchEnd: config.lunchEnd || '13:00',
-            workEnd: config.workEnd || '17:00',
-            workDays: config.workDays || [1, 2, 3, 4, 5],
-            noLunch: Boolean(config.noLunch),
-            autoStartShift: config.autoStartShift !== false,
-            autoEndShift: config.autoEndShift !== false,
-            autoEndTimeoutMin: config.autoEndTimeoutMin || 5,
-            requireManagerAuthForOvertime: config.requireManagerAuthForOvertime !== false,
-            machineConfigs: config.machineConfigs || {},
-            updatedAt: new Date().toISOString()
+            work_start: config.workStart || '07:00',
+            lunch_start: config.lunchStart || '12:00',
+            lunch_end: config.lunchEnd || '13:00',
+            work_end: config.workEnd || '17:00',
+            work_days: config.workDays || [1, 2, 3, 4, 5],
+            updated_at: new Date().toISOString()
         };
 
-        const snake = mapToSnakeCase(fullPayload);
-
-        // Tentar salvar com todas as colunas
-        const { data, error } = await supabase
+        await supabase
             .from('pcp_shift_config')
-            .upsert(snake, { onConflict: 'id' })
-            .select()
-            .single();
+            .upsert(defaultPayload, { onConflict: 'id' });
 
-        if (error) {
-            // Se falhar (ex: colunas novas ainda não criadas no schema remoto), salvar colunas básicas
-            console.warn('Tentando salvar com colunas base devido a erro:', error.message);
-            const basicSnake = mapToSnakeCase({
-                id: 'default',
-                workStart: config.workStart || '07:00',
-                lunchStart: config.lunchStart || '12:00',
-                lunchEnd: config.lunchEnd || '13:00',
-                workEnd: config.workEnd || '17:00',
-                workDays: config.workDays || [1, 2, 3, 4, 5],
-                updatedAt: new Date().toISOString()
-            });
-            const retry = await supabase
-                .from('pcp_shift_config')
-                .upsert(basicSnake, { onConflict: 'id' })
-                .select()
-                .single();
+        // 2. Salvar cada máquina individualmente na tabela pcp_shift_config
+        if (config.machineConfigs) {
+            const machineEntries = Object.entries(config.machineConfigs);
+            for (const [machName, mCfg] of machineEntries) {
+                if (!mCfg) continue;
+                const isNoLunch = Boolean(mCfg.noLunch);
+                const machPayload = {
+                    id: `mach_${machName}`,
+                    work_start: mCfg.workStart || '07:00',
+                    lunch_start: isNoLunch ? '00:00' : (mCfg.lunchStart || '12:00'),
+                    lunch_end: isNoLunch ? '00:00' : (mCfg.lunchEnd || '13:00'),
+                    work_end: mCfg.workEnd || '17:00',
+                    work_days: mCfg.workDays || [1, 2, 3, 4, 5],
+                    updated_at: new Date().toISOString()
+                };
 
-            if (retry.error) {
-                console.error('Erro ao salvar pcp_shift_config básico:', retry.error);
+                await supabase
+                    .from('pcp_shift_config')
+                    .upsert(machPayload, { onConflict: 'id' });
+
+                if (mCfg.shiftCount === 2) {
+                    const shift2Payload = {
+                        id: `mach_shift2_${machName}`,
+                        work_start: mCfg.shift2Start || '14:48',
+                        lunch_start: '00:00',
+                        lunch_end: '00:00',
+                        work_end: mCfg.shift2End || '23:36',
+                        work_days: mCfg.workDays || [1, 2, 3, 4, 5],
+                        updated_at: new Date().toISOString()
+                    };
+                    await supabase
+                        .from('pcp_shift_config')
+                        .upsert(shift2Payload, { onConflict: 'id' });
+                } else {
+                    // Remover turno 2 se a máquina agora é turno único
+                    await supabase
+                        .from('pcp_shift_config')
+                        .delete()
+                        .eq('id', `mach_shift2_${machName}`);
+                }
             }
-            return fullPayload as PcpShiftConfig;
         }
 
-        const result = mapToCamelCase(data) as PcpShiftConfig;
-        if (!result.machineConfigs && config.machineConfigs) {
-            result.machineConfigs = config.machineConfigs;
-        }
-        return result;
+        return config as PcpShiftConfig;
     } catch (err) {
         console.error('Exceção ao salvar pcp_shift_config:', err);
         return config as PcpShiftConfig;

@@ -3006,6 +3006,8 @@ const App: React.FC = () => {
                 employees={employees}
                 users={users}
                 updateProducedQuantity={updateProducedQuantity}
+                shiftConfig={pcpShiftConfig}
+                onUpdateShiftConfig={setPcpShiftConfig}
             />;
         }
     };

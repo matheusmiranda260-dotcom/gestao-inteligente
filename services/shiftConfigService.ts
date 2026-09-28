@@ -8,7 +8,7 @@ export const DEFAULT_GLOBAL_SHIFT_CONFIG: PcpShiftConfig = {
     workEnd: '17:00',
     workDays: [1, 2, 3, 4, 5],
     noLunch: false,
-    autoStartShift: true,
+    autoStartShift: false, // Maquinas NUNCA devem ligar ou iniciar turno sozinhas
     autoEndShift: true,
     autoEndTimeoutMin: 5,
     requireManagerAuthForOvertime: true,
@@ -21,7 +21,7 @@ export const DEFAULT_MACHINE_SHIFTS: Record<string, MachineShiftConfig> = {
         noLunch: true,
         shiftCount: 1,
         workDays: [1, 2, 3, 4, 5],
-        autoStartShift: true,
+        autoStartShift: false,
         autoEndShift: true,
         autoEndTimeoutMin: 5,
         requireManagerAuthForOvertime: true
@@ -32,7 +32,7 @@ export const DEFAULT_MACHINE_SHIFTS: Record<string, MachineShiftConfig> = {
         noLunch: true,
         shiftCount: 1,
         workDays: [1, 2, 3, 4, 5],
-        autoStartShift: true,
+        autoStartShift: false,
         autoEndShift: true,
         autoEndTimeoutMin: 5,
         requireManagerAuthForOvertime: true
@@ -47,7 +47,7 @@ export const DEFAULT_MACHINE_SHIFTS: Record<string, MachineShiftConfig> = {
         shift2Start: '14:48',
         shift2End: '23:36',
         workDays: [1, 2, 3, 4, 5],
-        autoStartShift: true,
+        autoStartShift: false,
         autoEndShift: true,
         autoEndTimeoutMin: 5,
         requireManagerAuthForOvertime: true
@@ -62,7 +62,7 @@ export const DEFAULT_MACHINE_SHIFTS: Record<string, MachineShiftConfig> = {
         shift2Start: '14:48',
         shift2End: '23:36',
         workDays: [1, 2, 3, 4, 5],
-        autoStartShift: true,
+        autoStartShift: false,
         autoEndShift: true,
         autoEndTimeoutMin: 5,
         requireManagerAuthForOvertime: true
@@ -75,7 +75,7 @@ export const DEFAULT_MACHINE_SHIFTS: Record<string, MachineShiftConfig> = {
         lunchEnd: '13:00',
         shiftCount: 1,
         workDays: [1, 2, 3, 4, 5],
-        autoStartShift: true,
+        autoStartShift: false,
         autoEndShift: true,
         autoEndTimeoutMin: 5,
         requireManagerAuthForOvertime: true
@@ -93,20 +93,32 @@ export const resolveMachineShiftConfig = (
 ): MachineShiftConfig => {
     const rawMachName = (machineName || '').trim();
     const custom = globalConfig?.machineConfigs?.[rawMachName];
+    const defaultForMach = DEFAULT_MACHINE_SHIFTS[rawMachName];
+
     if (custom && custom.workStart && custom.workEnd) {
+        const resolvedShiftCount = custom.shiftCount !== undefined 
+            ? Number(custom.shiftCount) as (1 | 2) 
+            : (defaultForMach?.shiftCount || 1);
+
         return {
             workDays: custom.workDays || globalConfig?.workDays || [1, 2, 3, 4, 5],
-            autoStartShift: custom.autoStartShift !== undefined ? custom.autoStartShift : (globalConfig?.autoStartShift !== false),
+            autoStartShift: custom.autoStartShift === true, // Apenas se explicitamente true
             autoEndShift: custom.autoEndShift !== undefined ? custom.autoEndShift : (globalConfig?.autoEndShift !== false),
             autoEndTimeoutMin: custom.autoEndTimeoutMin || globalConfig?.autoEndTimeoutMin || 5,
             requireManagerAuthForOvertime: custom.requireManagerAuthForOvertime !== undefined ? custom.requireManagerAuthForOvertime : (globalConfig?.requireManagerAuthForOvertime !== false),
-            ...custom
+            ...custom,
+            shiftCount: resolvedShiftCount,
+            shift2Start: resolvedShiftCount === 2 ? (custom.shift2Start || defaultForMach?.shift2Start || '14:48') : undefined,
+            shift2End: resolvedShiftCount === 2 ? (custom.shift2End || defaultForMach?.shift2End || '23:36') : undefined,
         };
     }
 
     // Default específico por máquina
-    if (DEFAULT_MACHINE_SHIFTS[rawMachName]) {
-        return { ...DEFAULT_MACHINE_SHIFTS[rawMachName] };
+    if (defaultForMach) {
+        return { 
+            ...defaultForMach,
+            autoStartShift: false
+        };
     }
 
     // Fallback para o globalConfig ou default da fábrica
@@ -118,7 +130,7 @@ export const resolveMachineShiftConfig = (
         lunchEnd: globalConfig?.lunchEnd || '13:00',
         workDays: globalConfig?.workDays || [1, 2, 3, 4, 5],
         shiftCount: 1,
-        autoStartShift: globalConfig?.autoStartShift !== false,
+        autoStartShift: false,
         autoEndShift: globalConfig?.autoEndShift !== false,
         autoEndTimeoutMin: globalConfig?.autoEndTimeoutMin || 5,
         requireManagerAuthForOvertime: globalConfig?.requireManagerAuthForOvertime !== false
@@ -145,8 +157,8 @@ export interface MachineShiftEvaluation {
     isWorkDay: boolean;
 }
 
-const parseHourMin = (timeStr: string) => {
-    if (!timeStr || !timeStr.includes(':')) return { h: 7, m: 0 };
+const parseHourMin = (timeStr: any) => {
+    if (!timeStr || typeof timeStr !== 'string' || !timeStr.includes(':')) return { h: 7, m: 0 };
     const parts = timeStr.split(':');
     return { h: parseInt(parts[0], 10) || 0, m: parseInt(parts[1], 10) || 0 };
 };
@@ -266,7 +278,7 @@ export const checkMachineShiftStatus = (
         workEnd: sEndStr,
         shiftStartMs: startMs,
         shiftEndMs: endMs,
-        autoStartShift: config.autoStartShift !== false,
+        autoStartShift: Boolean(config.autoStartShift),
         autoEndShift: config.autoEndShift !== false,
         autoEndTimeoutMin: autoTimeoutMin,
         requireManagerAuthForOvertime: config.requireManagerAuthForOvertime !== false,

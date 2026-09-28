@@ -11,6 +11,8 @@ import {
     deletePcpHoliday,
     fetchTrelicaSpoolStands,
     updateItem,
+    insertItem,
+    deleteItem,
     deductTrelicaSpoolStandConsumption
 } from '../services/supabaseService';
 import { 
@@ -54,6 +56,8 @@ interface PCPBoardProps {
     employees?: Employee[];
     users?: User[];
     updateProducedQuantity?: (orderId: string, quantity: number) => Promise<void>;
+    shiftConfig?: PcpShiftConfig;
+    onUpdateShiftConfig?: (config: PcpShiftConfig) => void;
 }
 
 // Configurações de capacidade produtiva padrão por máquina para sugerir duração
@@ -151,7 +155,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     setIsPcpFullscreen,
     employees = [],
     users = [],
-    updateProducedQuantity
+    updateProducedQuantity,
+    shiftConfig: incomingShiftConfig,
+    onUpdateShiftConfig
 }) => {
     // Estado de cabeçalho minimizado/expandido (persistido)
     const [isHeaderCollapsed, setIsHeaderCollapsed] = useState<boolean>(() => {
@@ -414,37 +420,27 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             l.operator.toLowerCase() !== 'gestor'
         );
 
-        // Se há log aberto mas é auto-iniciado aguardando o operador conectar
-        if (openLog && (openLog.pendingOperatorCheckin || (openLog.operator && openLog.operator.toUpperCase().includes('SISTEMA')))) {
-            return {
-                id: 'auto-shift',
-                name: 'Turno Aberto (Auto)',
-                firstName: 'Aguardando',
-                jobTitle: 'Aguardando Operador',
-                photoUrl: null,
-                status: 'online' as const,
-                statusLabel: 'Aguardando Check-in',
-                isOnline: false,
-                isAutoStartedWaitingCheckin: true
-            };
+        // Se o log aberto for antigo (mais de 16 horas sem encerramento, ou seja, de outro dia)
+        const isLogStale = (log: any): boolean => {
+            if (!log?.startTime) return true;
+            try {
+                const start = new Date(log.startTime).getTime();
+                const nowMs = Date.now();
+                // Mais de 16 horas: operador não fechou o turno anterior, não pode constar como online/produzindo hoje sozinho
+                if (nowMs - start > 16 * 60 * 60 * 1000) return true;
+                return false;
+            } catch {
+                return true;
+            }
+        };
+
+        if (!openLog || isLogStale(openLog)) {
+            // Sem operador de fato hoje -> máquina NÃO inicia nem opera sozinha
+            return null;
         }
 
-        // Se ninguém assumiu o turno (ou todos os turnos anteriores já foram encerrados)
-        if (!openLog) {
-            const shiftEval = checkMachineShiftStatus(machName, shiftConfig);
-            if (shiftEval.autoStartShift && shiftEval.inShiftWindow) {
-                return {
-                    id: 'auto-shift',
-                    name: 'Turno Aberto (Auto)',
-                    firstName: 'Aguardando',
-                    jobTitle: 'Aguardando Operador',
-                    photoUrl: null,
-                    status: 'online' as const,
-                    statusLabel: 'Aguardando Check-in',
-                    isOnline: false,
-                    isAutoStartedWaitingCheckin: true
-                };
-            }
+        // Se há log aberto mas é apenas pendente de checkin ou gerado pelo sistema
+        if (openLog.pendingOperatorCheckin || (openLog.operator && openLog.operator.toUpperCase().includes('SISTEMA'))) {
             return null;
         }
 
@@ -468,10 +464,14 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         );
 
         // 5. Determinar estado e rótulo de produção vs online
-        const liveMachInfo = machineLiveStatus.find(m => m.machine === machName);
-        const isStopped = liveMachInfo?.state === 'stopped';
-        const isPrep = liveMachInfo?.state === 'prep';
-        const isProducing = !isStopped && !isPrep && liveMachInfo?.state !== 'offline';
+        let isStopped = false;
+        let isPrep = false;
+        if (openDowntime) {
+            const rNorm = (openDowntime.reason || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            isPrep = rNorm.includes('preparacao') || rNorm.includes('setup') || rNorm.includes('troca de rolo') || rNorm.includes('ajuste') || rNorm.includes('aguardando inicio');
+            isStopped = !isPrep;
+        }
+        const isProducing = !isStopped && !isPrep;
 
         let status: 'operating' | 'online' | 'offline';
         let statusLabel: string;
@@ -1091,6 +1091,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
     const [selectedMachineShiftTab, setSelectedMachineShiftTab] = useState<string>('GLOBAL');
     const [shiftConfig, setShiftConfig] = useState<PcpShiftConfig>(() => {
+        if (incomingShiftConfig) return incomingShiftConfig;
         try {
             const saved = localStorage.getItem('pcp_daily_shift_config');
             if (saved) return JSON.parse(saved);
@@ -1103,6 +1104,210 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         };
     });
     const [tempShiftConfig, setTempShiftConfig] = useState<PcpShiftConfig>(shiftConfig);
+
+    useEffect(() => {
+        if (incomingShiftConfig) {
+            setShiftConfig(incomingShiftConfig);
+            setTempShiftConfig(incomingShiftConfig);
+        }
+    }, [incomingShiftConfig]);
+
+    // Modal Exclusivo de Configuração de Turnos da Máquina (Aberto diretamente pelo botão na linha da máquina)
+    const [machineShiftModalTarget, setMachineShiftModalTarget] = useState<string | null>(null);
+    const [machineShiftModalDraft, setMachineShiftModalDraft] = useState<{
+        shiftCount: 1 | 2;
+        workStart: string;
+        workEnd: string;
+        noLunch: boolean;
+        lunchStart: string;
+        lunchEnd: string;
+        shift2Start?: string;
+        shift2End?: string;
+    } | null>(null);
+
+    const [machineShiftModalTab, setMachineShiftModalTab] = useState<'shifts' | 'downtimes'>('shifts');
+    const [newDowntimeReason, setNewDowntimeReason] = useState('');
+    const [newDowntimeThreshold, setNewDowntimeThreshold] = useState(15);
+    const [isSavingDowntime, setIsSavingDowntime] = useState(false);
+    const [localDowntimeConfigs, setLocalDowntimeConfigs] = useState<DowntimeConfig[]>(downtimeConfigs || []);
+
+    useEffect(() => {
+        if (downtimeConfigs) {
+            setLocalDowntimeConfigs(downtimeConfigs);
+        }
+    }, [downtimeConfigs]);
+
+    const handleOpenMachineShiftModal = (machName: string) => {
+        const mCfg = resolveMachineShiftConfig(machName, shiftConfig);
+        setMachineShiftModalDraft({
+            shiftCount: mCfg.shiftCount === 2 ? 2 : 1,
+            workStart: mCfg.workStart || '07:00',
+            workEnd: mCfg.workEnd || '17:00',
+            noLunch: Boolean(mCfg.noLunch),
+            lunchStart: mCfg.lunchStart || '12:00',
+            lunchEnd: mCfg.lunchEnd || '13:00',
+            shift2Start: mCfg.shift2Start || (machName.toLowerCase().includes('treli') ? '14:48' : '14:00'),
+            shift2End: mCfg.shift2End || (machName.toLowerCase().includes('treli') ? '23:36' : '23:59'),
+        });
+        setMachineShiftModalTab('shifts');
+        setNewDowntimeReason('');
+        setNewDowntimeThreshold(15);
+        setMachineShiftModalTarget(machName);
+    };
+
+    const handleAddMachineDowntime = async () => {
+        if (!machineShiftModalTarget || !newDowntimeReason.trim()) {
+            showNotification?.('Informe o nome do motivo de parada.', 'warning');
+            return;
+        }
+        const machType = machineShiftModalTarget.split(' ')[0]; // 'Trefila', 'Treliça', 'Malha'
+        const reason = newDowntimeReason.trim();
+        const threshold = Number(newDowntimeThreshold) || 15;
+
+        setIsSavingDowntime(true);
+        try {
+            const newItem = await insertItem<DowntimeConfig>('downtime_configs', {
+                reason,
+                thresholdMinutes: threshold,
+                machineType: machType,
+                isActive: true
+            } as any);
+
+            if (newItem) {
+                setLocalDowntimeConfigs(prev => [...prev, newItem]);
+            }
+            setNewDowntimeReason('');
+            setNewDowntimeThreshold(15);
+            showNotification?.(`Parada "${reason}" programada para ${machineShiftModalTarget} e salva no banco!`, 'success');
+        } catch (e: any) {
+            console.error('Erro ao salvar parada no banco:', e);
+            showNotification?.('Erro ao salvar motivo no banco de dados.', 'error');
+        } finally {
+            setIsSavingDowntime(false);
+        }
+    };
+
+    const handleToggleMachineDowntime = async (config: DowntimeConfig) => {
+        try {
+            const newActive = !config.isActive;
+            setLocalDowntimeConfigs(prev => prev.map(c => c.id === config.id ? { ...c, isActive: newActive } : c));
+            await updateItem('downtime_configs', config.id, { isActive: newActive });
+            showNotification?.(`Motivo "${config.reason}" ${newActive ? 'ativado' : 'desativado'} no banco!`, 'success');
+        } catch (e) {
+            console.error('Erro ao atualizar status da parada:', e);
+        }
+    };
+
+    const handleDeleteMachineDowntime = async (configId: string, reasonName: string) => {
+        if (!window.confirm(`Deseja remover a parada "${reasonName}" do banco de dados?`)) return;
+        try {
+            setLocalDowntimeConfigs(prev => prev.filter(c => c.id !== configId));
+            await deleteItem('downtime_configs', configId);
+            showNotification?.(`Parada "${reasonName}" excluída do banco de dados!`, 'info');
+        } catch (e) {
+            console.error('Erro ao excluir parada:', e);
+        }
+    };
+
+    const handleSeedDefaultMachineDowntimes = async () => {
+        if (!machineShiftModalTarget) return;
+        const machType = machineShiftModalTarget.split(' ')[0];
+        const defaultsMap: Record<string, string[]> = {
+            'Trefila': [
+                'Enrosco de fio', 'Quebra de fio', 'Troca de rolo / Setup', 
+                'Limpeza / Lubrificação', 'Manutenção Mecânica', 'Manutenção Elétrica', 
+                'Falta de Matéria-Prima', 'Ajuste de bitola', 'Falta de Energia', 'Refeição / Intervalo'
+            ],
+            'Treliça': [
+                'Troca de Eletrodo', 'Limpeza de Eletrodos', 'Regulagem de Altura / Ângulo', 
+                'Enrosco de Fio (Porta-Rolos)', 'Quebra de Fio', 'Falha de Solda', 
+                'Setup de Medida', 'Manutenção Mecânica', 'Manutenção Elétrica', 
+                'Falta de Matéria-Prima', 'Falta de Energia', 'Refeição / Intervalo'
+            ],
+            'Malha': [
+                'Troca de Rolo', 'Falha de Solda', 'Ajuste de Espaçamento', 
+                'Manutenção Mecânica', 'Manutenção Elétrica', 'Falta de Fio', 'Falta de Energia'
+            ],
+            'Desbobinadeira': [
+                'Troca de Rolo', 'Enrosco de Fio', 'Corte / Descarte', 'Manutenção Mecânica', 'Manutenção Elétrica'
+            ]
+        };
+
+        const list = defaultsMap[machType] || defaultsMap['Trefila'];
+        setIsSavingDowntime(true);
+        try {
+            for (const reason of list) {
+                const already = localDowntimeConfigs.some(c => 
+                    c.reason.toLowerCase().trim() === reason.toLowerCase().trim() && 
+                    (c.machineType === machType || c.machineType === 'Geral')
+                );
+                if (!already) {
+                    const newItem = await insertItem<DowntimeConfig>('downtime_configs', {
+                        reason,
+                        thresholdMinutes: 15,
+                        machineType: machType,
+                        isActive: true
+                    } as any);
+                    if (newItem) {
+                        setLocalDowntimeConfigs(prev => [...prev, newItem]);
+                    }
+                }
+            }
+            showNotification?.(`Paradas padrão para ${machineShiftModalTarget} sincronizadas no banco!`, 'success');
+        } catch (e) {
+            console.error('Erro ao semear paradas:', e);
+            showNotification?.('Erro ao sincronizar paradas padrão.', 'error');
+        } finally {
+            setIsSavingDowntime(false);
+        }
+    };
+
+    const handleSaveMachineShiftModal = async () => {
+        if (!machineShiftModalTarget || !machineShiftModalDraft) return;
+        const machName = machineShiftModalTarget;
+
+        const updatedMachCfg: any = {
+            workStart: machineShiftModalDraft.workStart || '07:00',
+            workEnd: machineShiftModalDraft.workEnd || '17:00',
+            noLunch: Boolean(machineShiftModalDraft.noLunch),
+            lunchStart: machineShiftModalDraft.lunchStart || '12:00',
+            lunchEnd: machineShiftModalDraft.lunchEnd || '13:00',
+            shiftCount: machineShiftModalDraft.shiftCount === 2 ? 2 : 1,
+            autoStartShift: false,
+            autoEndShift: true,
+            autoEndTimeoutMin: 5,
+            requireManagerAuthForOvertime: true
+        };
+
+        if (updatedMachCfg.shiftCount === 2) {
+            updatedMachCfg.shift2Start = machineShiftModalDraft.shift2Start || '14:48';
+            updatedMachCfg.shift2End = machineShiftModalDraft.shift2End || '23:36';
+        }
+
+        const updatedShiftConfig: PcpShiftConfig = {
+            ...shiftConfig,
+            machineConfigs: {
+                ...(shiftConfig.machineConfigs || {}),
+                [machName]: updatedMachCfg
+            }
+        };
+
+        setShiftConfig(updatedShiftConfig);
+        setTempShiftConfig(updatedShiftConfig);
+        localStorage.setItem('pcp_daily_shift_config', JSON.stringify(updatedShiftConfig));
+        onUpdateShiftConfig?.(updatedShiftConfig);
+
+        try {
+            await savePcpShiftConfig(updatedShiftConfig);
+            showNotification?.(`Turnos da máquina ${machName} salvos no banco de dados com sucesso! (${updatedMachCfg.shiftCount === 2 ? '2 Turnos: A + B' : '1 Turno Único'})`, 'success');
+        } catch (e) {
+            console.warn('Erro ao salvar no banco:', e);
+            showNotification?.(`Turnos da ${machName} atualizados!`, 'info');
+        }
+
+        setMachineShiftModalTarget(null);
+        setMachineShiftModalDraft(null);
+    };
 
     // Carregar configurações de jornada e feriados do Supabase e escutar em tempo real
     useEffect(() => {
@@ -1125,7 +1330,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                             workEnd: dbShift.workEnd || '17:00',
                             workDays: dbShift.workDays || [1, 2, 3, 4, 5],
                             noLunch: Boolean(dbShift.noLunch),
-                            autoStartShift: dbShift.autoStartShift !== false,
+                            autoStartShift: Boolean(dbShift.autoStartShift),
                             autoEndShift: dbShift.autoEndShift !== false,
                             autoEndTimeoutMin: dbShift.autoEndTimeoutMin || 5,
                             requireManagerAuthForOvertime: dbShift.requireManagerAuthForOvertime !== false,
@@ -1134,6 +1339,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                         setShiftConfig(fullShift);
                         setTempShiftConfig(fullShift);
                         localStorage.setItem('pcp_daily_shift_config', JSON.stringify(fullShift));
+                        onUpdateShiftConfig?.(fullShift);
                     }
                     if (dbHolidays && dbHolidays.length > 0) {
                         setHolidays(dbHolidays);
@@ -1159,7 +1365,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                         workEnd: updated.workEnd || '17:00',
                         workDays: updated.workDays || [1, 2, 3, 4, 5],
                         noLunch: Boolean(updated.noLunch),
-                        autoStartShift: updated.autoStartShift !== false,
+                        autoStartShift: Boolean(updated.autoStartShift),
                         autoEndShift: updated.autoEndShift !== false,
                         autoEndTimeoutMin: updated.autoEndTimeoutMin || 5,
                         requireManagerAuthForOvertime: updated.requireManagerAuthForOvertime !== false,
@@ -1168,6 +1374,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     setShiftConfig(fullShift);
                     setTempShiftConfig(fullShift);
                     localStorage.setItem('pcp_daily_shift_config', JSON.stringify(fullShift));
+                    onUpdateShiftConfig?.(fullShift);
                 }
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'pcp_holidays' }, async () => {
@@ -1425,10 +1632,17 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 completedCount++;
                 completedWeight += (op.actualProducedWeight || op.totalProducedWeight || w);
             } else if (isLive) {
-                liveCount++;
-                liveWeight += w;
-                if (op.scheduledMachine || op.machine) {
-                    liveMachines.add(op.scheduledMachine || (op.machine as string));
+                const machName = op.scheduledMachine || (op.machine as string);
+                const activeOperator = machName ? getMachineOperator(machName) : null;
+                if (activeOperator) {
+                    liveCount++;
+                    liveWeight += w;
+                    if (machName) {
+                        liveMachines.add(machName);
+                    }
+                } else {
+                    pendingCount++;
+                    pendingWeight += w;
                 }
             } else {
                 pendingCount++;
@@ -1446,7 +1660,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             liveMachinesCount: liveMachines.size,
             totalWeekOps: scheduledOrders.length
         };
-    }, [scheduledOrders]);
+    }, [scheduledOrders, productionOrders, liveNow, shiftConfig, users, currentUser, employees]);
 
     // Status e Paradas em tempo real de cada máquina da fábrica (atualiza com o relógio liveNow a cada 1s)
     const machineLiveStatus = useMemo(() => {
@@ -1473,6 +1687,22 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     dotColor: pendingCount > 0 ? 'bg-amber-400' : 'bg-slate-600',
                     op: null,
                     reason: pendingCount > 0 ? 'Aguardando Início na Máquina' : 'Disponível / Sem Ordem',
+                    durationMs: 0
+                };
+            }
+
+            // Verificar se há operador de fato com turno aberto hoje para esta máquina
+            const activeOpForMach = getMachineOperator(mach.name);
+            if (!activeOpForMach) {
+                return {
+                    machine: mach.name,
+                    type: mach.type,
+                    state: 'offline' as const,
+                    badgeText: 'TURNO ENCERRADO',
+                    badgeColor: 'bg-slate-500/20 text-slate-300 border-slate-500/40',
+                    dotColor: 'bg-slate-500',
+                    op: liveOp,
+                    reason: 'Aguardando operador iniciar o turno hoje',
                     durationMs: 0
                 };
             }
@@ -1699,7 +1929,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 lunchEnd: tempShiftConfig?.lunchEnd || '13:00',
                 workEnd: tempShiftConfig?.workEnd || '17:00',
                 noLunch: Boolean(tempShiftConfig?.noLunch),
-                autoStartShift: tempShiftConfig?.autoStartShift !== false,
+                autoStartShift: Boolean(tempShiftConfig?.autoStartShift),
                 autoEndShift: tempShiftConfig?.autoEndShift !== false,
                 autoEndTimeoutMin: tempShiftConfig?.autoEndTimeoutMin || 5,
                 requireManagerAuthForOvertime: tempShiftConfig?.requireManagerAuthForOvertime !== false,
@@ -1744,11 +1974,13 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         try {
             setShiftConfig(tempShiftConfig);
             localStorage.setItem('pcp_daily_shift_config', JSON.stringify(tempShiftConfig));
+            onUpdateShiftConfig?.(tempShiftConfig);
             await savePcpShiftConfig(tempShiftConfig);
             showNotification?.(`Jornada salva no banco de dados: ${tempShiftDetails.totalWorkHours.toFixed(1)}h de produção por dia!`, 'success');
             setIsWorkHoursModalOpen(false);
         } catch (e) {
             console.error('Erro ao salvar jornada no Supabase:', e);
+            onUpdateShiftConfig?.(tempShiftConfig);
             showNotification?.(`Jornada aplicada: ${tempShiftDetails.totalWorkHours.toFixed(1)}h/dia. Lembre-se de aplicar o SQL no Supabase.`, 'info');
             setIsWorkHoursModalOpen(false);
         } finally {
@@ -3326,21 +3558,6 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                             <span>Metas de Paradas</span>
                         </button>
 
-                        {/* Botão Jornada Diária de Produção */}
-                        <button
-                            onClick={() => {
-                                setTempShiftConfig(shiftConfig);
-                                setSelectedMachineShiftTab('GLOBAL');
-                                setActiveShiftTab('hours');
-                                setIsWorkHoursModalOpen(true);
-                            }}
-                            className="bg-[#0B1D2A] hover:bg-[#122b3d] border border-cyan-500/30 hover:border-[#00E5FF] text-cyan-300 font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all shadow-sm active:scale-95 whitespace-nowrap"
-                            title="Configurar Horários da Jornada de Trabalho"
-                        >
-                            <ClockIcon className="w-4 h-4 text-[#00E5FF]" />
-                            <span>Jornada</span>
-                        </button>
-
                         {/* Botão + Nova Ordem de Produção */}
                         <button
                             onClick={() => handleOpenCreateModal()}
@@ -3574,12 +3791,20 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                         
                                         {/* Coluna da Máquina */}
                                         <div className={`p-3.5 flex flex-col justify-between border-r border-white/5 border-l-4 ${mach.color} sticky left-0 z-20 shrink-0 shadow-lg`}>
-                                            {/* Topo: Nome da Máquina + Botão Nova OP */}
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-white text-base sm:text-lg font-black tracking-wider block">{mach.name}</span>
+                                            {/* Topo: Nome da Máquina (clicável para abrir turnos e paradas) + Botão Nova OP */}
+                                            <div className="flex items-center justify-between gap-2 pb-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleOpenMachineShiftModal(mach.name)}
+                                                    className="text-white text-base sm:text-lg font-black tracking-wider block shrink-0 hover:text-[#00E5FF] transition-all text-left flex items-center gap-1.5 group cursor-pointer"
+                                                    title={`Clique para configurar Turnos e Paradas de ${mach.name}`}
+                                                >
+                                                    <span className="group-hover:underline underline-offset-4 decoration-[#00E5FF]/60">{mach.name}</span>
+                                                    <span className="opacity-60 group-hover:opacity-100 text-[11px] text-cyan-400 font-mono transition-opacity">⚙️</span>
+                                                </button>
                                                 <button
                                                     onClick={() => handleOpenCreateModal(mach.name)}
-                                                    className="w-6 h-6 rounded-lg bg-white/10 hover:bg-[#00E5FF]/20 text-slate-300 hover:text-[#00E5FF] flex items-center justify-center transition-all"
+                                                    className="w-6 h-6 rounded-lg bg-white/10 hover:bg-[#00E5FF]/20 text-slate-300 hover:text-[#00E5FF] flex items-center justify-center transition-all shrink-0 cursor-pointer"
                                                     title={`Criar OP para ${mach.name}`}
                                                 >
                                                     <PlusIcon className="w-3.5 h-3.5" />
@@ -6484,6 +6709,464 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 </div>
             )}
 
+            {/* ========================================================================= */}
+            {/* MODAL EXCLUSIVO: CONFIGURAÇÃO DE TURNOS DA MÁQUINA SELECIONADA */}
+            {/* ========================================================================= */}
+            {machineShiftModalTarget && machineShiftModalDraft && (
+                <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/80 backdrop-blur-md animate-fade p-3 sm:p-4">
+                    <div className="w-full max-w-xl pcp-glass-card rounded-2xl border border-cyan-500/40 p-5 sm:p-6 flex flex-col gap-4 text-slate-100 shadow-2xl max-h-[92vh] overflow-y-auto">
+                        {/* Cabeçalho */}
+                        <div className="flex items-center justify-between border-b border-white/10 pb-3 shrink-0">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-10 h-10 rounded-xl bg-cyan-500/20 text-[#00E5FF] flex items-center justify-center border border-cyan-500/40 shrink-0">
+                                    <ClockIcon className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-base font-black uppercase tracking-wider text-white">
+                                            Configuração da Máquina
+                                        </h3>
+                                        <span className="px-2 py-0.5 rounded-md text-xs font-black uppercase tracking-wider bg-cyan-500/25 text-[#00E5FF] border border-cyan-500/40">
+                                            {machineShiftModalTarget}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-slate-300 font-medium">
+                                        Defina turnos de operação e programe as paradas vinculadas no banco
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setMachineShiftModalTarget(null);
+                                    setMachineShiftModalDraft(null);
+                                }}
+                                className="text-slate-400 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/10 cursor-pointer"
+                            >
+                                <XIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Abas de Navegação do Modal: Turnos vs Paradas */}
+                        <div className="grid grid-cols-2 gap-2 p-1 bg-[#08131B] rounded-xl border border-white/10 shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => setMachineShiftModalTab('shifts')}
+                                className={`py-2 px-3 rounded-lg text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-2 cursor-pointer ${
+                                    machineShiftModalTab === 'shifts'
+                                        ? 'bg-cyan-500/25 text-[#00E5FF] border border-cyan-500/40 shadow-sm'
+                                        : 'text-slate-400 hover:text-white'
+                                }`}
+                            >
+                                <span>☀️ Turnos & Horários</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setMachineShiftModalTab('downtimes')}
+                                className={`py-2 px-3 rounded-lg text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-2 cursor-pointer ${
+                                    machineShiftModalTab === 'downtimes'
+                                        ? 'bg-rose-500/25 text-rose-300 border border-rose-500/40 shadow-sm'
+                                        : 'text-slate-400 hover:text-white'
+                                }`}
+                            >
+                                <span>🛑 Programar Paradas</span>
+                                {localDowntimeConfigs.filter(c => {
+                                    const mType = machineShiftModalTarget?.split(' ')[0] || '';
+                                    return c.isActive && (!c.machineType || c.machineType === 'Geral' || c.machineType === mType);
+                                }).length > 0 && (
+                                    <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-500/30 text-rose-200">
+                                        {localDowntimeConfigs.filter(c => {
+                                            const mType = machineShiftModalTarget?.split(' ')[0] || '';
+                                            return c.isActive && (!c.machineType || c.machineType === 'Geral' || c.machineType === mType);
+                                        }).length}
+                                    </span>
+                                )}
+                            </button>
+                        </div>
+
+                        {/* ABA 1: TURNOS & HORÁRIOS */}
+                        {machineShiftModalTab === 'shifts' && (
+                            <div className="space-y-4 animate-fade">
+                                {/* Atalhos Rápidos por Tipo de Máquina */}
+                                {machineShiftModalTarget.toLowerCase().includes('trefila') && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setMachineShiftModalDraft(prev => prev ? ({
+                                                ...prev,
+                                                shiftCount: 1,
+                                                workStart: '07:45',
+                                                workEnd: '17:33',
+                                                noLunch: true
+                                            }) : null);
+                                        }}
+                                        className="w-full py-2 px-3 rounded-xl bg-cyan-500/15 text-cyan-300 hover:bg-cyan-500/25 border border-cyan-500/30 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                                    >
+                                        <span>⚡ Aplicar Padrão Trefila: 07:45 às 17:33 (1 Turno Contínuo)</span>
+                                    </button>
+                                )}
+                                {machineShiftModalTarget.toLowerCase().includes('treli') && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setMachineShiftModalDraft(prev => prev ? ({
+                                                ...prev,
+                                                shiftCount: 2,
+                                                workStart: '05:00',
+                                                workEnd: '14:44',
+                                                noLunch: false,
+                                                lunchStart: '11:30',
+                                                lunchEnd: '12:30',
+                                                shift2Start: '14:48',
+                                                shift2End: '23:36'
+                                            }) : null);
+                                        }}
+                                        className="w-full py-2 px-3 rounded-xl bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 border border-emerald-500/30 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                                    >
+                                        <span>⚡ Aplicar Padrão Treliça: 2 Turnos (A: 05:00-14:44 | B: 14:48-23:36)</span>
+                                    </button>
+                                )}
+
+                                {/* Seletor de Quantidade de Turnos */}
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
+                                        Quantidade de Turnos desta Máquina:
+                                    </label>
+                                    <div className="grid grid-cols-2 gap-2.5">
+                                        <button
+                                            type="button"
+                                            onClick={() => setMachineShiftModalDraft(prev => prev ? ({ ...prev, shiftCount: 1 }) : null)}
+                                            className={`p-3 rounded-xl border text-left transition-all flex flex-col gap-1 cursor-pointer ${
+                                                machineShiftModalDraft.shiftCount === 1
+                                                    ? 'bg-cyan-500/25 border-[#00E5FF] text-white shadow-[0_0_12px_rgba(0,229,255,0.25)]'
+                                                    : 'bg-[#08131B] border-white/10 text-slate-400 hover:border-white/20'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs font-black uppercase text-white flex items-center gap-1.5">
+                                                    ☀️ 1º Turno (Único)
+                                                </span>
+                                                {machineShiftModalDraft.shiftCount === 1 && (
+                                                    <span className="w-2.5 h-2.5 rounded-full bg-[#00E5FF] shadow-[0_0_8px_#00E5FF]" />
+                                                )}
+                                            </div>
+                                            <span className="text-[10px] text-slate-400 leading-tight">
+                                                Máquina opera em turno único (relatório oculta Turno B)
+                                            </span>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setMachineShiftModalDraft(prev => prev ? ({ ...prev, shiftCount: 2 }) : null)}
+                                            className={`p-3 rounded-xl border text-left transition-all flex flex-col gap-1 cursor-pointer ${
+                                                machineShiftModalDraft.shiftCount === 2
+                                                    ? 'bg-emerald-500/25 border-emerald-400 text-white shadow-[0_0_12px_rgba(16,185,129,0.25)]'
+                                                    : 'bg-[#08131B] border-white/10 text-slate-400 hover:border-white/20'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs font-black uppercase text-emerald-300 flex items-center gap-1.5">
+                                                    ⚡ 2 Turnos (A e B)
+                                                </span>
+                                                {machineShiftModalDraft.shiftCount === 2 && (
+                                                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#10B981]" />
+                                                )}
+                                            </div>
+                                            <span className="text-[10px] text-slate-400 leading-tight">
+                                                Máquina opera com revezamento de Turno A e Turno B
+                                            </span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Bloco: Horários do 1º Turno (Turno A) */}
+                                <div className="bg-[#08131B] p-3.5 rounded-xl border border-white/10 space-y-3">
+                                    <span className="text-xs font-black uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
+                                        ☀️ Horários do 1º Turno {machineShiftModalDraft.shiftCount === 2 ? '(Turno A)' : ''}
+                                    </span>
+                                    <div className="grid grid-cols-2 gap-2.5">
+                                        <div>
+                                            <label className="text-[10px] font-bold text-slate-400 block mb-1">Hora de Início</label>
+                                            <input
+                                                type="time"
+                                                value={machineShiftModalDraft.workStart || '07:00'}
+                                                onChange={(e) => setMachineShiftModalDraft(prev => prev ? ({ ...prev, workStart: e.target.value }) : null)}
+                                                style={{ colorScheme: 'dark' }}
+                                                className="w-full bg-[#0B1D2A] border border-cyan-500/30 rounded-lg px-2.5 py-1.5 text-xs font-bold font-mono focus:outline-none focus:border-[#00E5FF] text-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-slate-400 block mb-1">Hora de Término</label>
+                                            <input
+                                                type="time"
+                                                value={machineShiftModalDraft.workEnd || '17:00'}
+                                                onChange={(e) => setMachineShiftModalDraft(prev => prev ? ({ ...prev, workEnd: e.target.value }) : null)}
+                                                style={{ colorScheme: 'dark' }}
+                                                className="w-full bg-[#0B1D2A] border border-cyan-500/30 rounded-lg px-2.5 py-1.5 text-xs font-bold font-mono focus:outline-none focus:border-[#00E5FF] text-white"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Almoço */}
+                                    <label className="flex items-center gap-2 cursor-pointer select-none pt-1">
+                                        <input
+                                            type="checkbox"
+                                            checked={Boolean(machineShiftModalDraft.noLunch)}
+                                            onChange={(e) => setMachineShiftModalDraft(prev => prev ? ({ ...prev, noLunch: e.target.checked }) : null)}
+                                            className="w-4 h-4 rounded text-[#00E5FF] focus:ring-0 bg-[#0B1D2A] border-white/20 accent-[#00E5FF]"
+                                        />
+                                        <span className="text-xs font-bold text-slate-300">Sem intervalo de almoço (Turno Contínuo)</span>
+                                    </label>
+
+                                    {!machineShiftModalDraft.noLunch && (
+                                        <div className="grid grid-cols-2 gap-2.5 pt-1 border-t border-white/5 animate-fade">
+                                            <div>
+                                                <label className="text-[10px] font-bold text-amber-300 block mb-1">Início Almoço</label>
+                                                <input
+                                                    type="time"
+                                                    value={machineShiftModalDraft.lunchStart || '12:00'}
+                                                    onChange={(e) => setMachineShiftModalDraft(prev => prev ? ({ ...prev, lunchStart: e.target.value }) : null)}
+                                                    style={{ colorScheme: 'dark' }}
+                                                    className="w-full bg-[#0B1D2A] border border-amber-500/30 rounded-lg px-2 py-1 text-xs font-bold font-mono focus:outline-none focus:border-amber-400 text-white"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-bold text-amber-300 block mb-1">Retorno Almoço</label>
+                                                <input
+                                                    type="time"
+                                                    value={machineShiftModalDraft.lunchEnd || '13:00'}
+                                                    onChange={(e) => setMachineShiftModalDraft(prev => prev ? ({ ...prev, lunchEnd: e.target.value }) : null)}
+                                                    style={{ colorScheme: 'dark' }}
+                                                    className="w-full bg-[#0B1D2A] border border-amber-500/30 rounded-lg px-2 py-1 text-xs font-bold font-mono focus:outline-none focus:border-amber-400 text-white"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Bloco: Horários do 2º Turno (Turno B) */}
+                                {machineShiftModalDraft.shiftCount === 2 && (
+                                    <div className="bg-[#08131B] p-3.5 rounded-xl border border-emerald-500/30 space-y-3 animate-fade">
+                                        <span className="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                                            🌙 Horários do 2º Turno (Turno B)
+                                        </span>
+                                        <div className="grid grid-cols-2 gap-2.5">
+                                            <div>
+                                                <label className="text-[10px] font-bold text-slate-400 block mb-1">Início do Turno B</label>
+                                                <input
+                                                    type="time"
+                                                    value={machineShiftModalDraft.shift2Start || '14:48'}
+                                                    onChange={(e) => setMachineShiftModalDraft(prev => prev ? ({ ...prev, shift2Start: e.target.value }) : null)}
+                                                    style={{ colorScheme: 'dark' }}
+                                                    className="w-full bg-[#0B1D2A] border border-emerald-500/30 rounded-lg px-2.5 py-1.5 text-xs font-bold font-mono focus:outline-none focus:border-emerald-400 text-white"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-bold text-slate-400 block mb-1">Término do Turno B</label>
+                                                <input
+                                                    type="time"
+                                                    value={machineShiftModalDraft.shift2End || '23:36'}
+                                                    onChange={(e) => setMachineShiftModalDraft(prev => prev ? ({ ...prev, shift2End: e.target.value }) : null)}
+                                                    style={{ colorScheme: 'dark' }}
+                                                    className="w-full bg-[#0B1D2A] border border-emerald-500/30 rounded-lg px-2.5 py-1.5 text-xs font-bold font-mono focus:outline-none focus:border-emerald-400 text-white"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Rodapé com botões de ação */}
+                                <div className="flex items-center justify-between gap-2.5 pt-2 border-t border-white/10 shrink-0">
+                                    <div className="flex items-center gap-1.5 text-[10px] text-cyan-300 font-mono">
+                                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                                        <span>Banco Supabase Vinculado</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setMachineShiftModalTarget(null);
+                                                setMachineShiftModalDraft(null);
+                                            }}
+                                            className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-slate-300 font-bold text-xs transition cursor-pointer"
+                                        >
+                                            Cancelar
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleSaveMachineShiftModal}
+                                            className="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-xs uppercase tracking-wider transition shadow-lg shadow-cyan-500/20 active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                                        >
+                                            💾 Salvar Turnos da {machineShiftModalTarget}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ABA 2: PROGRAMAR PARADAS NA MÁQUINA */}
+                        {machineShiftModalTab === 'downtimes' && (() => {
+                            const machType = machineShiftModalTarget.split(' ')[0]; // 'Trefila', 'Treliça', 'Malha', 'Desbobinadeira'
+                            const machineReasons = localDowntimeConfigs.filter(c => {
+                                if (!c.machineType || c.machineType === 'Geral') return true;
+                                return c.machineType.toLowerCase().includes(machType.toLowerCase()) || machType.toLowerCase().includes(c.machineType.toLowerCase());
+                            });
+
+                            return (
+                                <div className="space-y-4 animate-fade">
+                                    <div className="p-3 bg-rose-500/10 border border-rose-500/25 rounded-xl flex items-start gap-2.5 text-xs text-rose-200">
+                                        <span className="text-base shrink-0">🛑</span>
+                                        <div className="flex flex-col gap-0.5">
+                                            <span className="font-bold text-rose-300 uppercase tracking-wide text-[11px]">
+                                                Paradas Programadas • {machineShiftModalTarget}
+                                            </span>
+                                            <p className="text-[11px] text-slate-300 leading-relaxed">
+                                                Os motivos cadastrados abaixo aparecem <strong>em tempo real no App do Operador</strong> desta máquina para apontamento e registro de paradas.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Formulário de Adicionar Nova Parada */}
+                                    <div className="bg-[#08131B] p-3.5 rounded-xl border border-white/10 space-y-2.5">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-300 block">
+                                            + Cadastrar Novo Motivo de Parada no Banco
+                                        </label>
+                                        <div className="flex flex-col sm:flex-row gap-2">
+                                            <input
+                                                type="text"
+                                                placeholder="Ex: Troca de Rolo, Falha Mecânica, Quebra de Fio..."
+                                                value={newDowntimeReason}
+                                                onChange={(e) => setNewDowntimeReason(e.target.value)}
+                                                onKeyDown={(e) => { if (e.key === 'Enter') handleAddMachineDowntime(); }}
+                                                className="flex-1 bg-[#0B1D2A] border border-white/15 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white placeholder:text-slate-500 focus:outline-none focus:border-rose-400"
+                                            />
+                                            <div className="flex items-center gap-1.5">
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    max="240"
+                                                    value={newDowntimeThreshold}
+                                                    onChange={(e) => setNewDowntimeThreshold(Number(e.target.value))}
+                                                    title="Tolerância em minutos"
+                                                    className="w-16 bg-[#0B1D2A] border border-white/15 rounded-lg px-2 py-1.5 text-xs font-bold font-mono text-center text-rose-300 focus:outline-none focus:border-rose-400"
+                                                />
+                                                <span className="text-[10px] text-slate-400 font-bold">min</span>
+                                                <button
+                                                    type="button"
+                                                    disabled={isSavingDowntime || !newDowntimeReason.trim()}
+                                                    onClick={handleAddMachineDowntime}
+                                                    className="px-3.5 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-400 disabled:opacity-50 text-slate-950 font-black text-xs uppercase tracking-wider transition active:scale-95 cursor-pointer shrink-0"
+                                                >
+                                                    {isSavingDowntime ? 'Salvando...' : '+ Salvar'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Botão de Atalho para Restaurar Padrões */}
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="text-[11px] font-bold text-slate-400">
+                                            Motivos Vinculados ({machineReasons.length})
+                                        </span>
+                                        <button
+                                            type="button"
+                                            disabled={isSavingDowntime}
+                                            onClick={handleSeedDefaultMachineDowntimes}
+                                            className="text-[10px] font-bold text-cyan-400 hover:text-cyan-300 hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                        >
+                                            <span>⚡ Sincronizar Motivos Padrão de {machType} no Banco</span>
+                                        </button>
+                                    </div>
+
+                                    {/* Lista de Motivos Cadastrados */}
+                                    <div className="space-y-1.5 max-h-[260px] overflow-y-auto pr-1">
+                                        {machineReasons.length === 0 ? (
+                                            <div className="text-center py-6 border border-dashed border-white/10 rounded-xl text-xs text-slate-400 font-medium flex flex-col items-center gap-2">
+                                                <span>Nenhum motivo específico cadastrado no banco para {machineShiftModalTarget}.</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleSeedDefaultMachineDowntimes}
+                                                    className="px-3 py-1.5 rounded-lg bg-cyan-500/20 text-[#00E5FF] hover:bg-cyan-500/30 border border-cyan-500/40 font-bold text-xs"
+                                                >
+                                                    ⚡ Inserir Motivos Padrão Agora
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            machineReasons.map(c => (
+                                                <div
+                                                    key={c.id}
+                                                    className={`flex items-center justify-between p-2.5 rounded-xl border transition-all text-xs ${
+                                                        c.isActive
+                                                            ? 'bg-[#08131B] border-white/10 hover:border-white/20'
+                                                            : 'bg-[#08131B]/40 border-white/5 opacity-60'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center gap-2.5 min-w-0">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleToggleMachineDowntime(c)}
+                                                            className={`w-4 h-4 rounded border flex items-center justify-center transition cursor-pointer ${
+                                                                c.isActive
+                                                                    ? 'bg-rose-500 border-rose-400 text-white'
+                                                                    : 'bg-white/5 border-white/20'
+                                                            }`}
+                                                            title={c.isActive ? 'Clique para desativar' : 'Clique para ativar'}
+                                                        >
+                                                            {c.isActive && <span className="text-[10px] leading-none">✓</span>}
+                                                        </button>
+                                                        <span className={`font-bold truncate ${c.isActive ? 'text-white' : 'text-slate-400 line-through'}`}>
+                                                            {c.reason}
+                                                        </span>
+                                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-rose-500/15 border border-rose-500/30 text-rose-300">
+                                                            {c.thresholdMinutes || 15} min
+                                                        </span>
+                                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-white/5 text-slate-400">
+                                                            {c.machineType || 'Geral'}
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2 shrink-0">
+                                                        <span className={`text-[10px] font-bold ${c.isActive ? 'text-emerald-400' : 'text-slate-500'}`}>
+                                                            {c.isActive ? 'Ativo no App' : 'Inativo'}
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleDeleteMachineDowntime(c.id, c.reason)}
+                                                            className="p-1 rounded text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
+                                                            title="Excluir do banco de dados"
+                                                        >
+                                                            <TrashIcon className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+
+                                    {/* Rodapé da aba de Paradas */}
+                                    <div className="flex items-center justify-between gap-2.5 pt-2 border-t border-white/10 shrink-0">
+                                        <div className="flex items-center gap-1.5 text-[10px] text-cyan-300 font-mono">
+                                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                                            <span>Sincronização em tempo real ativada</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setMachineShiftModalTarget(null);
+                                                setMachineShiftModalDraft(null);
+                                            }}
+                                            className="px-5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 font-bold text-xs transition cursor-pointer"
+                                        >
+                                            Concluir e Fechar
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                    </div>
+                </div>
+            )}
+
             {/* MODAL 2: REAGENDAMENTO RÁPIDO DE OP EXISTENTE / ESTENDER PRAZO */}
             {selectedOP && (() => {
                 const isAlreadyStarted = hasProductionStarted(selectedOP);
@@ -7918,6 +8601,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     weekDays={weekDays}
                     productionOrders={productionOrders}
                     shiftReports={shiftReports}
+                    shiftConfig={shiftConfig}
                 />
             )}
 
@@ -7933,6 +8617,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     productionOrders={productionOrders}
                     initialProduced={officialReportModalData.initialProduced}
                     initialOperator={officialReportModalData.initialOperator}
+                    shiftConfig={shiftConfig}
                 />
             )}
         </div>
@@ -7955,6 +8640,7 @@ interface DailyDowntimeReportModalProps {
     weekDays: Date[];
     productionOrders: ProductionOrderData[];
     shiftReports?: ShiftReport[];
+    shiftConfig?: PcpShiftConfig;
 }
 
 const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
@@ -7962,7 +8648,8 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
     onClose,
     weekDays,
     productionOrders,
-    shiftReports = []
+    shiftReports = [],
+    shiftConfig
 }) => {
     const activeOp = productionOrders.find(o => o.id === data.op.id) || data.op;
     const [selectedDateStr, setSelectedDateStr] = useState<string>(data.dateStr);
@@ -8616,6 +9303,7 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                     shiftReports={shiftReports}
                     productionOrders={productionOrders}
                     initialProduced={selectedDateStr === data.dateStr ? data.produced : undefined}
+                    shiftConfig={shiftConfig}
                 />
             )}
         </div>

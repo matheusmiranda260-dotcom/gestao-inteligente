@@ -119,21 +119,53 @@ const DowntimeModal: React.FC<{
     };
     
     const dynamicDowntimeReasons = useMemo(() => {
-        // 100% banco de dados - sem fallback hardcoded
-        // Se o banco estiver vazio, apenas 'Outros' aparece
-        const filtered = (downtimeConfigs || [])
+        const defaultTrefila = [
+            'Enrosco de fio', 'Quebra de fio', 'Troca de rolo / Setup', 
+            'Limpeza / Lubrificação', 'Manutenção Mecânica', 'Manutenção Elétrica', 
+            'Falta de Matéria-Prima', 'Ajuste de bitola', 'Falta de Energia', 'Refeição / Intervalo'
+        ];
+        const defaultTrelica = [
+            'Troca de Eletrodo', 'Limpeza de Eletrodos', 'Regulagem de Altura / Ângulo', 
+            'Enrosco de Fio (Porta-Rolos)', 'Quebra de Fio', 'Falha de Solda', 
+            'Setup de Medida', 'Manutenção Mecânica', 'Manutenção Elétrica', 
+            'Falta de Matéria-Prima', 'Falta de Energia', 'Refeição / Intervalo'
+        ];
+        const defaultMalha = [
+            'Troca de Rolo', 'Falha de Solda', 'Ajuste de Espaçamento', 
+            'Manutenção Mecânica', 'Manutenção Elétrica', 'Falta de Fio', 'Falta de Energia'
+        ];
+        const defaultDesbobinadeira = [
+            'Troca de Rolo', 'Enrosco de Fio', 'Corte / Descarte', 'Manutenção Mecânica', 'Manutenção Elétrica'
+        ];
+
+        const mTypeNorm = (machineType || '').toLowerCase();
+        let fallbackList = defaultTrefila;
+        if (mTypeNorm.includes('treli')) fallbackList = defaultTrelica;
+        else if (mTypeNorm.includes('malha')) fallbackList = defaultMalha;
+        else if (mTypeNorm.includes('desbobinad')) fallbackList = defaultDesbobinadeira;
+
+        // Motivos cadastrados no banco de dados para esta máquina ou gerais
+        const dbFiltered = (downtimeConfigs || [])
             .filter(c => {
                 if (!c.isActive) return false;
-                if (c.machineType === 'Geral') return true;
-                // machineType pode ser 'Trefila 1', 'Trefila 2', 'Treliça 1', 'Treliça 2'
-                // c.machineType é 'Trefila' ou 'Treliça'
-                if (!machineType || !c.machineType) return false;
-                return machineType.startsWith(c.machineType);
+                if (!c.machineType || c.machineType === 'Geral') return true;
+                const cNorm = c.machineType.toLowerCase();
+                return mTypeNorm.includes(cNorm) || cNorm.includes(mTypeNorm.split(' ')[0]);
             })
             .map(c => c.reason);
-        // 'Outros' sempre disponível como campo livre
-        if (!filtered.includes('Outros')) filtered.push('Outros');
-        return filtered;
+
+        // Combina motivos do banco de dados (prioridade) com lista padrão sem duplicações
+        const combined = [...dbFiltered];
+        fallbackList.forEach(item => {
+            const exists = combined.some(r => r.toLowerCase().trim() === item.toLowerCase().trim());
+            if (!exists) combined.push(item);
+        });
+
+        // Garantir que Preparação e Outros sempre estejam presentes
+        if (!combined.some(r => r.toLowerCase().includes('prepara'))) combined.push('Preparação');
+        if (!combined.some(r => r.toLowerCase() === 'outros')) combined.push('Outros');
+
+        return combined;
     }, [downtimeConfigs, machineType]);
 
     const toggleReason = (r: string) => {

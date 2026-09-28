@@ -1037,6 +1037,7 @@ export interface TrelicaMachineElectrode {
     machine_name: string; // 'Treliça 1' | 'Treliça 2'
     position: TrelicaElectrodePosition;
     position_label: string; // 'Superior Esquerdo', etc.
+    shortLabel?: string;
     lot_id?: string | null;
     lot_number?: string | null;
     electrode_type: TrelicaElectrodeType;
