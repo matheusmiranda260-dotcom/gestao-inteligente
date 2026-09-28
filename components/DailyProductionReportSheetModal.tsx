@@ -1722,19 +1722,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                         </div>
                                     </div>
 
-                                    {/* Horas Trabalhadas */}
-                                    <div className="flex items-center justify-between py-2.5">
-                                        <div className="flex items-center gap-2">
-                                            <ClockIcon className="h-4 w-4 text-slate-400" />
-                                            <span className="text-sm font-extrabold text-slate-700">Horas (Turno trabalhado)</span>
-                                        </div>
-                                        <input
-                                            type="text"
-                                            value={statsShiftA.horasTrabalhadas}
-                                            onChange={e => setStatsShiftA({ ...statsShiftA, horasTrabalhadas: e.target.value })}
-                                            className="modern-editable-input text-right w-24 text-slate-950 font-black text-sm"
-                                        />
-                                    </div>
+
                                     {/* Tempo Parada */}
                                     <div className="flex items-center justify-between py-2.5 bg-rose-50/30 px-1 rounded">
                                         <div className="flex items-center gap-2">
@@ -1860,19 +1848,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                         </div>
                                     </div>
 
-                                    {/* Horas Trabalhadas */}
-                                    <div className="flex items-center justify-between py-2.5">
-                                        <div className="flex items-center gap-2">
-                                            <ClockIcon className="h-4 w-4 text-slate-400" />
-                                            <span className="text-sm font-extrabold text-slate-700">Horas (Turno trabalhado)</span>
-                                        </div>
-                                        <input
-                                            type="text"
-                                            value={statsShiftB.horasTrabalhadas}
-                                            onChange={e => setStatsShiftB({ ...statsShiftB, horasTrabalhadas: e.target.value })}
-                                            className="modern-editable-input text-right w-24 text-slate-950 font-black text-sm"
-                                        />
-                                    </div>
+
                                     {/* Tempo Parada */}
                                     <div className="flex items-center justify-between py-2.5 bg-rose-50/30 px-1 rounded">
                                         <div className="flex items-center gap-2">
