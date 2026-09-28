@@ -3822,10 +3822,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                     type="button"
                                                     onClick={() => handleOpenMachineShiftModal(mach.name)}
                                                     className="text-white text-base sm:text-lg font-black tracking-wider block shrink-0 hover:text-[#00E5FF] transition-all text-left flex items-center gap-1.5 group cursor-pointer"
-                                                    title={`Clique para configurar Turnos e Paradas de ${mach.name}`}
+                                                    title={`Configuração da Máquina ${mach.name} (Comandos de OP, Ferramentas, Turnos e Paradas)`}
                                                 >
                                                     <span className="group-hover:underline underline-offset-4 decoration-[#00E5FF]/60">{mach.name}</span>
-                                                    <span className="opacity-60 group-hover:opacity-100 text-[11px] text-cyan-400 font-mono transition-opacity">⚙️</span>
+                                                    <span className="opacity-80 group-hover:opacity-100 group-hover:rotate-45 text-xs text-cyan-400 font-mono transition-all transform duration-300">⚙️</span>
                                                 </button>
                                                 <button
                                                     onClick={() => handleOpenCreateModal(mach.name)}
@@ -4259,17 +4259,6 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                     )}
                                                                 </div>
                                                                 <span className="text-xs sm:text-sm text-slate-100 font-extrabold truncate block mt-0.5 leading-snug">{subtitle}</span>
-                                                            </div>
-
-                                                            <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                                                                <button 
-                                                                    type="button"
-                                                                    onClick={() => handleOpenMachineShiftModal(op.scheduledMachine || (op.machine as string), 'op')}
-                                                                    className="p-1 rounded-lg text-slate-300 hover:text-[#00E5FF] bg-white/5 hover:bg-cyan-500/20 border border-white/10 hover:border-cyan-500/40 transition-all flex items-center justify-center cursor-pointer shadow-sm"
-                                                                    title={`Configuração da Máquina (${op.scheduledMachine || op.machine}) - Comandos, Turnos e Paradas`}
-                                                                >
-                                                                    <CogIcon className="w-3.5 h-3.5 text-[#00E5FF]" />
-                                                                </button>
                                                             </div>
                                                         </div>
 
