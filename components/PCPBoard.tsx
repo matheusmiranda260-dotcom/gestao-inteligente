@@ -9412,6 +9412,9 @@ const AdjustQuantityModal: React.FC<{
     }, [order, currentTotal]);
 
     // Cálculos dinâmicos
+    const minAllowedQty = isShiftMode ? shiftBaseQty : currentTotal;
+    const isBelowMinimum = qty < minAllowedQty;
+
     const shiftDelta = isShiftMode ? (qty - shiftBaseQty) : (qty - currentTotal);
     const calculatedNewTotal = isShiftMode 
         ? Math.max(0, sumLogsTotal + (qty - shiftBaseQty))
@@ -9420,12 +9423,9 @@ const AdjustQuantityModal: React.FC<{
         ? qty
         : Math.max(0, shiftBaseQty + (qty - currentTotal));
 
-    const quickSteps = isTrefila 
-        ? [-1000, -500, -100, -50, 50, 100, 500, 1000]
-        : [-100, -50, -20, -10, -5, -1, 1, 5, 10, 20, 50, 100];
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (qty < minAllowedQty) return;
         setIsSaving(true);
         try {
             await onSave(order.id, calculatedNewTotal, reason, {
@@ -9557,20 +9557,38 @@ const AdjustQuantityModal: React.FC<{
                             </label>
                             <button
                                 type="button"
-                                onClick={() => setQty(isShiftMode ? shiftBaseQty : currentTotal)}
+                                onClick={() => setQty(minAllowedQty)}
                                 className="text-[10px] font-bold text-slate-400 hover:text-white underline cursor-pointer"
                             >
-                                Restaurar Inicial ({isShiftMode ? shiftBaseQty.toLocaleString('pt-BR') : currentTotal.toLocaleString('pt-BR')} {unit})
+                                Restaurar Inicial ({minAllowedQty.toLocaleString('pt-BR')} {unit})
                             </button>
                         </div>
+
+                        {/* Alerta se tentar colocar menos que o já registrado */}
+                        {isBelowMinimum && (
+                            <div className="bg-rose-950/70 border border-rose-500/60 p-3 rounded-xl flex items-center gap-2.5 text-xs text-rose-200 animate-pulse">
+                                <span className="text-base shrink-0">⛔</span>
+                                <div>
+                                    <span className="font-black text-white">Quantidade Bloqueada!</span>
+                                    <p className="text-[11px] text-rose-300 mt-0.5">
+                                        Não é permitido marcar uma quantidade menor que <strong className="text-white font-mono">{minAllowedQty.toLocaleString('pt-BR')} {unit}</strong> (valor já registrado anteriormente).
+                                    </p>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Campo de Entrada com Steppers Grandes */}
                         <div className="flex items-center gap-2">
                             <button
                                 type="button"
-                                onClick={() => setQty(prev => Math.max(0, prev - (isTrefila ? 50 : 1)))}
-                                className="w-12 h-12 rounded-xl bg-white/5 hover:bg-rose-500/20 text-slate-200 hover:text-rose-300 border border-white/10 hover:border-rose-500/40 text-2xl font-black flex items-center justify-center transition-all active:scale-95 cursor-pointer select-none"
-                                title="Diminuir 1 unidade"
+                                disabled={qty <= minAllowedQty}
+                                onClick={() => setQty(prev => Math.max(minAllowedQty, prev - (isTrefila ? 50 : 1)))}
+                                className={`w-12 h-12 rounded-xl border text-2xl font-black flex items-center justify-center transition-all select-none ${
+                                    qty <= minAllowedQty
+                                        ? 'bg-white/5 text-slate-600 border-white/5 cursor-not-allowed opacity-40'
+                                        : 'bg-white/5 hover:bg-rose-500/20 text-slate-200 hover:text-rose-300 border-white/10 hover:border-rose-500/40 active:scale-95 cursor-pointer'
+                                }`}
+                                title={qty <= minAllowedQty ? `Mínimo permitido: ${minAllowedQty} ${unit}` : `Diminuir 1 ${unit}`}
                             >
                                 -
                             </button>
@@ -9578,12 +9596,20 @@ const AdjustQuantityModal: React.FC<{
                             <div className="relative flex-1">
                                 <input
                                     type="number"
-                                    min="0"
-                                    value={qty}
-                                    onChange={(e) => setQty(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                                    className="w-full h-12 bg-black/50 border border-white/15 focus:border-[#00E5FF] focus:ring-1 focus:ring-[#00E5FF] rounded-xl text-center text-2xl font-black font-mono text-white tracking-wider outline-none transition-all"
+                                    min={minAllowedQty}
+                                    value={qty === 0 && minAllowedQty === 0 ? '' : qty}
+                                    onChange={(e) => {
+                                        const val = parseInt(e.target.value, 10);
+                                        setQty(isNaN(val) ? 0 : val);
+                                    }}
+                                    className={`w-full h-12 bg-black/50 border rounded-xl text-center text-2xl font-black font-mono tracking-wider outline-none transition-all ${
+                                        isBelowMinimum
+                                            ? 'border-rose-500 text-rose-300 focus:border-rose-400 ring-2 ring-rose-500/20'
+                                            : 'border-white/15 text-white focus:border-[#00E5FF] focus:ring-1 focus:ring-[#00E5FF]'
+                                    }`}
                                     required
                                     autoFocus
+                                    onFocus={(e) => e.target.select()}
                                 />
                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-slate-400">
                                     {unit}
@@ -9594,31 +9620,10 @@ const AdjustQuantityModal: React.FC<{
                                 type="button"
                                 onClick={() => setQty(prev => prev + (isTrefila ? 50 : 1))}
                                 className="w-12 h-12 rounded-xl bg-white/5 hover:bg-emerald-500/20 text-slate-200 hover:text-emerald-300 border border-white/10 hover:border-emerald-500/40 text-2xl font-black flex items-center justify-center transition-all active:scale-95 cursor-pointer select-none"
-                                title="Aumentar 1 unidade"
+                                title={`Aumentar 1 ${unit}`}
                             >
                                 +
                             </button>
-                        </div>
-
-                        {/* Botões Rápidos de Ajuste (+ e -) */}
-                        <div className="flex flex-col gap-1.5 pt-1">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ajuste Rápido (Tanto pra mais ou pra menos):</span>
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                                {quickSteps.map(step => (
-                                    <button
-                                        key={step}
-                                        type="button"
-                                        onClick={() => setQty(prev => Math.max(0, prev + step))}
-                                        className={`px-2.5 py-1 rounded-lg text-xs font-mono font-black border transition-all active:scale-95 cursor-pointer ${
-                                            step < 0 
-                                                ? 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border-rose-500/30 hover:border-rose-500/50' 
-                                                : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-500/30 hover:border-emerald-500/50'
-                                        }`}
-                                    >
-                                        {step > 0 ? `+${step}` : step}
-                                    </button>
-                                ))}
-                            </div>
                         </div>
 
                         {/* Indicador em Tempo Real da Diferença e Efeito no Painel */}
@@ -9684,8 +9689,8 @@ const AdjustQuantityModal: React.FC<{
                         </button>
                         <button
                             type="submit"
-                            disabled={isSaving}
-                            className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#00E5FF] to-emerald-400 hover:from-[#00c8df] hover:to-emerald-500 text-slate-950 font-black text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-[0_0_20px_rgba(0,229,255,0.3)] disabled:opacity-50 cursor-pointer active:scale-98"
+                            disabled={isSaving || isBelowMinimum}
+                            className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#00E5FF] to-emerald-400 hover:from-[#00c8df] hover:to-emerald-500 text-slate-950 font-black text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-[0_0_20px_rgba(0,229,255,0.3)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer active:scale-98"
                         >
                             {isSaving ? (
                                 <span>Salvando...</span>

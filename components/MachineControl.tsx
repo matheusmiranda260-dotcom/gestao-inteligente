@@ -728,12 +728,6 @@ const QuantityPromptModal: React.FC<{
         : (isTrelica ? 6.4 : 0);
     const estimatedWireKg = pieceDelta * trelicaUnitWeight;
 
-    const handleQuickAdd = (addQty: number) => {
-        const base = Math.max(currentQuantity, quantity);
-        setQuantity(base + addQty);
-        setErrorMsg(null);
-    };
-
     const handleChange = (valStr: string) => {
         const val = parseInt(valStr, 10);
         if (isNaN(val)) {
@@ -836,40 +830,6 @@ const QuantityPromptModal: React.FC<{
                         <div className="absolute top-1/2 -translate-y-1/2 right-5 text-slate-500 font-black text-lg uppercase pointer-events-none font-mono">
                             pçs
                         </div>
-                    </div>
-                </div>
-
-                {/* Botões Rápidos de Acréscimo (+50, +100, +200 pçs) */}
-                <div className="flex flex-col gap-1.5">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
-                        Atalhos Rápidos de Acréscimo:
-                    </span>
-                    <div className="grid grid-cols-3 gap-2">
-                        <button
-                            type="button"
-                            onClick={() => handleQuickAdd(50)}
-                            className="bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 rounded-xl py-2 text-xs font-bold text-slate-200 transition flex items-center justify-center gap-1"
-                        >
-                            <span>+50</span>
-                            <span className="text-[10px] text-slate-400">pçs</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => handleQuickAdd(100)}
-                            className="bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 rounded-xl py-2 text-xs font-bold text-slate-200 transition flex items-center justify-center gap-1"
-                        >
-                            <span>+100</span>
-                            <span className="text-[10px] text-slate-400">pçs</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => handleQuickAdd(200)}
-                            className="bg-emerald-600/30 hover:bg-emerald-600/50 active:scale-95 border border-emerald-500/40 rounded-xl py-2 text-xs font-black text-emerald-300 transition flex items-center justify-center gap-1 shadow-sm"
-                            title="Pacote padrão de Treliça (200 peças)"
-                        >
-                            <span>+200</span>
-                            <span className="text-[10px] text-emerald-400 font-bold">(1 Pacote)</span>
-                        </button>
                     </div>
                 </div>
 
