@@ -224,14 +224,21 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
             const finalGauge = code || '1000';
             const finalDesc = desc || `Eletrodo Cód. ${finalGauge}`;
 
-            const isDuplicate = effectiveGauges.some(g =>
+            const existingElectrode = effectiveGauges.find(g =>
                 g.materialType === 'Eletrodos Treliças' &&
-                ((code && g.productCode === code) ||
-                 (g.description || '').toLowerCase() === finalDesc.toLowerCase())
+                ((code && g.productCode === code) || g.gauge === finalGauge)
             );
 
-            if (isDuplicate) {
-                alert('Já existe um eletrodo cadastrado com este mesmo código ou modelo.');
+            if (existingElectrode) {
+                onUpdate(existingElectrode.id, {
+                    materialType: 'Eletrodos Treliças',
+                    gauge: finalGauge,
+                    description: finalDesc,
+                    productCode: code || existingElectrode.productCode
+                });
+                setNewGauge('');
+                setNewDescription('');
+                setNewProductCode('');
                 return;
             }
 
@@ -253,14 +260,21 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
             const desc = newDescription.trim() || 'Condat';
             const code = newProductCode.trim() || '00010';
 
-            const isDuplicate = effectiveGauges.some(g =>
+            const existingSabao = effectiveGauges.find(g =>
                 g.materialType === 'Sabão' &&
-                ((code && g.productCode === code) ||
-                 (g.description || '').toLowerCase() === desc.toLowerCase())
+                ((code && g.productCode === code) || g.gauge === embalagem)
             );
 
-            if (isDuplicate) {
-                alert('Já existe um produto de Sabão cadastrado com este mesmo código ou descrição.');
+            if (existingSabao) {
+                onUpdate(existingSabao.id, {
+                    materialType: 'Sabão',
+                    gauge: embalagem,
+                    description: desc,
+                    productCode: code || existingSabao.productCode
+                });
+                setNewGauge('');
+                setNewDescription('');
+                setNewProductCode('');
                 return;
             }
 
@@ -287,17 +301,6 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
             const pesoFinal = trPesoFinal.trim() || calculated?.pesoFinal || '5,797';
             const code = trCode.trim() || newProductCode.trim() || (modelo.replace(/[^A-Za-z0-9]/g, '') + tamanho).toUpperCase();
 
-            const isDuplicate = effectiveGauges.some(g =>
-                g.materialType === 'Treliça' &&
-                ((code && g.productCode === code) ||
-                 ((g.description || '').toLowerCase() === modelo.toLowerCase() && (g.tamanho || g.gauge.replace(/\D/g, '')) === tamanho))
-            );
-
-            if (isDuplicate) {
-                alert(`Já existe um modelo de Treliça cadastrado com o código ${code} ou ${modelo} ${tamanho}m.`);
-                return;
-            }
-
             const newTrelica: Omit<StockGauge, 'id'> = {
                 materialType: 'Treliça',
                 gauge: `${tamanho}m`,
@@ -312,6 +315,39 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                 peso_inferior: calculated?.pesoInferior,
                 peso_senozoide: calculated?.pesoSenozoide
             };
+
+            const existingTrelica = effectiveGauges.find(g =>
+                g.materialType === 'Treliça' &&
+                ((code && g.productCode === code) ||
+                 ((g.description || '').toLowerCase() === modelo.toLowerCase() && (g.tamanho || g.gauge.replace(/\D/g, '')) === tamanho))
+            );
+
+            if (existingTrelica) {
+                onUpdate(existingTrelica.id, newTrelica);
+                syncTrelicaModelToCache({
+                    cod: code,
+                    modelo: modelo,
+                    tamanho: tamanho,
+                    superior: sup,
+                    inferior: inf,
+                    senozoide: sen,
+                    peso_final: pesoFinal,
+                    peso_superior: calculated?.pesoSuperior || '',
+                    peso_inferior: calculated?.pesoInferior || '',
+                    peso_senozoide: calculated?.pesoSenozoide || '',
+                    pesoFinal: pesoFinal,
+                    pesoSuperior: calculated?.pesoSuperior || '',
+                    pesoInferior: calculated?.pesoInferior || '',
+                    pesoSenozoide: calculated?.pesoSenozoide || ''
+                });
+                setTrModelo('');
+                setTrSuperior('5,6');
+                setTrInferior('3,2');
+                setTrSenozoide('3,2');
+                setTrPesoFinal('');
+                setTrCode('');
+                return;
+            }
 
             onAdd(newTrelica);
 
@@ -358,17 +394,6 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                 return;
             }
 
-            const isDuplicate = effectiveGauges.some(g =>
-                g.materialType === 'Malha' &&
-                ((code && g.productCode === code) ||
-                 (g.description || '').toLowerCase() === desc.toLowerCase())
-            );
-
-            if (isDuplicate) {
-                alert(`Já existe uma malha cadastrada com o código ${code} ou descrição.`);
-                return;
-            }
-
             const newMalha: Omit<StockGauge, 'id'> = {
                 materialType: 'Malha',
                 gauge: bitola.includes('mm') ? bitola : `${bitola}mm`,
@@ -382,6 +407,26 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                 peso_peca: peso,
                 peso_final: peso
             };
+
+            const existingMalha = effectiveGauges.find(g =>
+                g.materialType === 'Malha' &&
+                ((code && g.productCode === code) ||
+                 (g.description || '').toLowerCase() === desc.toLowerCase())
+            );
+
+            if (existingMalha) {
+                onUpdate(existingMalha.id, newMalha);
+                setMlCodigo('');
+                setMlDescricao('');
+                setMlBitola('3,40');
+                setMlLongitudinal('25 peças c/ 6mts');
+                setMlTransversal('60 peças c/ 2,45mts');
+                setMlMetros(297);
+                setMlEspacamento('10x10');
+                setMlDimensoes('6,00x2,45');
+                setMlPesoPeca('32,283');
+                return;
+            }
 
             onAdd(newMalha);
 
@@ -413,16 +458,24 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
         const formatted = numberVal.toFixed(2);
         const finalDesc = newDescription.trim() || `${materialType} ${formatted.replace('.', ',')}mm`;
 
-        // Check if already exists an EXACT DUPLICATE
-        const isExactDuplicate = effectiveGauges.some(g => 
+        // Check if this material and bitola (or product code) already exists
+        const existingGauge = effectiveGauges.find(g => 
             g.materialType === materialType && 
-            g.gauge === formatted && 
-            (g.description || '').trim().toLowerCase() === finalDesc.toLowerCase() &&
-            (g.productCode || '').trim().toLowerCase() === newProductCode.trim().toLowerCase()
+            (g.gauge === formatted || (newProductCode.trim() && g.productCode === newProductCode.trim()))
         );
 
-        if (isExactDuplicate) {
-            alert('Já existe exatamente este produto cadastrado com a mesma bitola, descrição e código para este material.');
+        if (existingGauge) {
+            // Se já existe um produto com esta bitola para este material, atualiza em vez de duplicar
+            onUpdate(existingGauge.id, {
+                materialType: materialType,
+                gauge: formatted,
+                description: finalDesc,
+                productCode: newProductCode.trim() || existingGauge.productCode
+            });
+
+            setNewGauge('');
+            setNewDescription('');
+            setNewProductCode('');
             return;
         }
 

@@ -680,7 +680,41 @@ const App: React.FC = () => {
                 } catch (e) {}
             }
 
-            showNotification('Produto atualizado e salvo no banco de dados com sucesso!', 'success');
+            // Sincroniza automaticamente a descrição e código atualizados com todos os lotes deste produto no estoque
+            const previousGauge = gauges.find(g => g.id === id);
+            const targetMaterial = data.materialType || savedOrUpdated?.materialType || previousGauge?.materialType;
+            const targetGauge = previousGauge?.gauge || data.gauge || savedOrUpdated?.gauge;
+            const newDesc = data.description !== undefined ? data.description : savedOrUpdated?.description;
+            const newCode = data.productCode !== undefined ? data.productCode : savedOrUpdated?.productCode;
+
+            if (targetMaterial && targetGauge && (newDesc !== undefined || newCode !== undefined)) {
+                setStock(prev => prev.map(item => {
+                    if (item.materialType === targetMaterial && item.bitola === targetGauge) {
+                        return {
+                            ...item,
+                            description: newDesc !== undefined ? newDesc : item.description,
+                            productCode: newCode !== undefined ? newCode : item.productCode
+                        };
+                    }
+                    return item;
+                }));
+
+                try {
+                    const stockItemUpdates: any = {};
+                    if (newDesc !== undefined) stockItemUpdates.description = newDesc;
+                    if (newCode !== undefined) stockItemUpdates.product_code = newCode;
+                    if (Object.keys(stockItemUpdates).length > 0) {
+                        await supabase.from('stock_items')
+                            .update(stockItemUpdates)
+                            .eq('material_type', targetMaterial)
+                            .eq('bitola', targetGauge);
+                    }
+                } catch (err) {
+                    console.warn('Erro ao atualizar descrição nos lotes de estoque:', err);
+                }
+            }
+
+            showNotification('Produto atualizado e salvo com sucesso!', 'success');
         } catch (error: any) {
             console.error('Erro ao atualizar produto:', error);
             setGauges(prev => {

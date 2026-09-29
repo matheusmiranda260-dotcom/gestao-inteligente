@@ -2600,8 +2600,7 @@ const StockControl: React.FC<{
             const exists = options.some(o => 
                 o.materialType === i.materialType && 
                 o.gauge === i.bitola &&
-                (!i.productCode || o.productCode === i.productCode) &&
-                (!i.description || o.description === i.description)
+                (!i.productCode || !o.productCode || o.productCode === i.productCode)
             );
 
             if (!exists) {
@@ -2838,8 +2837,8 @@ const StockControl: React.FC<{
                               (i.description && gaugeLookupMap.get(`${i.materialType}::${i.bitola}::${i.description}`)) ||
                               gaugeLookupMap.get(`${i.materialType}::${i.bitola}`);
 
-        const itemDescription = i.description || matchingGauge?.description || '';
-        const itemProductCode = i.productCode || matchingGauge?.productCode || '';
+        const itemDescription = matchingGauge?.description || i.description || '';
+        const itemProductCode = matchingGauge?.productCode || i.productCode || '';
 
         const searchLower = searchTerm.trim().toLowerCase();
         const itemMat = (i.materialType || '').trim();
@@ -4010,8 +4009,8 @@ const StockControl: React.FC<{
                                                         🧼 {item.bitola || 'Saco 25kg'}
                                                     </span>
                                                     {(() => {
-                                                        const displayDesc = item.description || matchingGauge?.description || 'Condat';
-                                                        const displayCode = item.productCode || matchingGauge?.productCode || '00010';
+                                                        const displayDesc = matchingGauge?.description || item.description || 'Condat';
+                                                        const displayCode = matchingGauge?.productCode || item.productCode || '00010';
                                                         return (
                                                             <>
                                                                 {displayDesc && (
@@ -4030,7 +4029,7 @@ const StockControl: React.FC<{
                                                 </>
                                             ) : item.materialType === 'Treliça' ? (
                                                 (() => {
-                                                    const code = item.productCode || matchingGauge?.productCode;
+                                                    const code = matchingGauge?.productCode || item.productCode;
                                                     const sup = matchingGauge?.superior || (item as any).superior;
                                                     const inf = matchingGauge?.inferior || (item as any).inferior;
                                                     const sen = matchingGauge?.senozoide || (item as any).senozoide;
@@ -4053,7 +4052,7 @@ const StockControl: React.FC<{
                                                                 </span>
                                                             )}
                                                             <span className="font-black text-slate-900 text-sm tracking-tight">
-                                                                    {item.description || matchingGauge?.description || `Treliça ${item.bitola}`}
+                                                                    {matchingGauge?.description || item.description || `Treliça ${item.bitola}`}
                                                                 </span>
                                                             {(matchingGauge?.tamanho || (item as any).tamanho) && (
                                                                 <span className="text-xs font-black text-white bg-blue-600 px-2 py-0.5 rounded shadow-2xs">
@@ -4065,7 +4064,7 @@ const StockControl: React.FC<{
                                                 })()
                                              ) : item.materialType === 'Malha' ? (
                                                 (() => {
-                                                    const code = item.productCode || matchingGauge?.productCode;
+                                                    const code = matchingGauge?.productCode || item.productCode;
                                                     const long = matchingGauge?.longitudinal || (item as any).longitudinal;
                                                     const trans = matchingGauge?.transversal || (item as any).transversal;
                                                     const mesh = matchingGauge?.meshSpacing || (item as any).meshSpacing;
@@ -4091,7 +4090,7 @@ const StockControl: React.FC<{
                                                                     </span>
                                                                 )}
                                                                 <span className="font-black text-slate-900 text-sm tracking-tight">
-                                                                    {item.description || matchingGauge?.description || `Malha ${item.bitola}`}
+                                                                    {matchingGauge?.description || item.description || `Malha ${item.bitola}`}
                                                                 </span>
                                                             </div>
                                                             {(mesh || panel) && (
@@ -4107,8 +4106,8 @@ const StockControl: React.FC<{
                                                 <>
                                                     <span className="font-black text-blue-600">{item.bitola.replace('.', ',')} mm</span>
                                                     {(() => {
-                                                        const displayDesc = item.description || matchingGauge?.description;
-                                                        const displayCode = item.productCode || matchingGauge?.productCode;
+                                                        const displayDesc = matchingGauge?.description || item.description;
+                                                        const displayCode = matchingGauge?.productCode || item.productCode;
 
                                                         return (
                                                             <>
