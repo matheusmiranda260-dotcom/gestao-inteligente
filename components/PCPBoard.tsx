@@ -420,22 +420,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             l.operator.toLowerCase() !== 'gestor'
         );
 
-        // Se o log aberto for antigo (mais de 16 horas sem encerramento, ou seja, de outro dia)
-        const isLogStale = (log: any): boolean => {
-            if (!log?.startTime) return true;
-            try {
-                const start = new Date(log.startTime).getTime();
-                const nowMs = Date.now();
-                // Mais de 16 horas: operador não fechou o turno anterior, não pode constar como online/produzindo hoje sozinho
-                if (nowMs - start > 16 * 60 * 60 * 1000) return true;
-                return false;
-            } catch {
-                return true;
-            }
-        };
-
-        if (!openLog || isLogStale(openLog)) {
-            // Sem operador de fato hoje -> máquina NÃO inicia nem opera sozinha
+        if (!openLog) {
             return null;
         }
 
