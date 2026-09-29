@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import type { Page, ProductionOrderData, ShiftReport, StockItem } from '../types';
+import type { Page, ProductionOrderData, ShiftReport, StockItem, StockGauge } from '../types';
 import html2canvas from 'html2canvas';
 import { supabase } from '../services/supabaseService';
 
@@ -8,6 +8,7 @@ interface ReportsTrefilaProps {
     productionOrders?: ProductionOrderData[];
     shiftReports?: ShiftReport[];
     stock?: StockItem[];
+    gauges?: StockGauge[];
 }
 
 // Interfaces locais para estruturação do Relatório da Trefila
@@ -98,7 +99,8 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
     setPage, 
     productionOrders = [], 
     shiftReports = [], 
-    stock = [] 
+    stock = [],
+    gauges = []
 }) => {
     // 1. Estados de Controle
     const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toLocaleDateString('sv'));
@@ -124,8 +126,8 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
     // 2. Estados dos Campos do Formulário
     const [productionOrder, setProductionOrder] = useState<string>('');
     const [operator, setOperator] = useState<string>('');
-    const [productDescriptionIn, setProductDescriptionIn] = useState<string>('8mm -- FIO MÁQUINA--');
-    const [productDescriptionOut, setProductDescriptionOut] = useState<string>('6mm ---CA60--');
+    const [productDescriptionIn, setProductDescriptionIn] = useState<string>('8.00mm -- FIO MÁQUINA--');
+    const [productDescriptionOut, setProductDescriptionOut] = useState<string>('3.40mm ---CA60--');
 
     // Tabela de paradas
     const [stops, setStops] = useState<StopRow[]>([]);
@@ -173,6 +175,186 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
         });
     }, [productionOrders, selectedMachine, selectedDate]);
 
+    // Helper para resolver descrições de entrada e saída da Trefila com base na OP e nos cadastros
+    const resolveTrefilaProductDescriptions = (targetOp?: ProductionOrderData, fallbackDesc?: string) => {
+        if (!targetOp) {
+            return {
+                descIn: '4860 - Fio Máquina 5,50mm',
+                descOut: '8624 - CA 60 ROLO 3.40 MM - 2 TON - M.P. *SEMI ACABADO*'
+            };
+        }
+
+        // 1. Resolução do Material Produzido / Saída (Idêntico ao Dashboard do PCP)
+        let displayProductCode = targetOp.productCode || '';
+        let displayProductDescription = targetOp.productDescription || '';
+
+        if (!displayProductDescription && (targetOp as any).product && !String((targetOp as any).product).toUpperCase().includes('TRELI')) {
+            displayProductDescription = String((targetOp as any).product).trim();
+        }
+
+        const cleanTarget = String(targetOp.targetBitola || '3.40').replace('mm', '').trim();
+        const is340 = cleanTarget === '3.40' || cleanTarget === '3.4' || cleanTarget === '3,40' || cleanTarget === '3,4';
+
+        if (!displayProductCode || !displayProductDescription) {
+            const matched = (gauges || []).find((g: any) => {
+                const mat = String(g.materialType || g.material_type || '').toLowerCase();
+                const isCa = mat === 'ca-60' || mat === 'ca60' || mat.includes('trefila') || mat.includes('ca') || mat.includes('arame') || mat.includes('semi');
+                if (!isCa) return false;
+                const gClean = String(g.gauge || '').replace('mm', '').trim();
+                return g.gauge === targetOp.targetBitola || gClean === cleanTarget || parseFloat(gClean.replace(',', '.')) === parseFloat(cleanTarget.replace(',', '.'));
+            });
+            if (matched) {
+                if (!displayProductCode) displayProductCode = matched.productCode || matched.product_code || (matched as any).code || '';
+                if (!displayProductDescription) displayProductDescription = matched.description || (matched as any).gaugeDescription || '';
+            }
+        }
+
+        // Se ainda não achou, procurar no estoque
+        if (!displayProductCode || !displayProductDescription) {
+            const matchedStock = (stock || []).find((item: any) => {
+                const mat = String(item.material || item.materialType || item.material_type || '').toUpperCase();
+                const isCa = mat.includes('CA-60') || mat.includes('CA60') || mat.includes('SEMI');
+                const b = String(item.bitola || '').replace('mm', '').trim();
+                return isCa && (b === cleanTarget || parseFloat(b.replace(',', '.')) === parseFloat(cleanTarget.replace(',', '.')));
+            });
+            if (matchedStock) {
+                if (!displayProductCode) displayProductCode = matchedStock.productCode || matchedStock.product_code || '';
+                if (!displayProductDescription) displayProductDescription = matchedStock.description || '';
+            }
+        }
+
+        // Regra de ouro da Trefila: se for 3.40mm (ex: OP 87493), padrão oficial exato do Dashboard:
+        // "8624 - CA 60 ROLO 3.40 MM - 2 TON - M.P. *SEMI ACABADO*"
+        if ((!displayProductCode || !displayProductDescription) && (is340 || targetOp.orderNumber === '87493')) {
+            displayProductCode = displayProductCode || '8624';
+            displayProductDescription = displayProductDescription || 'CA 60 ROLO 3.40 MM - 2 TON - M.P. *SEMI ACABADO*';
+        }
+
+        let descOut = '';
+        if (displayProductCode && displayProductDescription) {
+            descOut = displayProductDescription.startsWith(displayProductCode)
+                ? displayProductDescription
+                : `${displayProductCode} - ${displayProductDescription}`;
+        } else if (displayProductDescription) {
+            descOut = displayProductDescription;
+        } else if (displayProductCode) {
+            descOut = displayProductCode;
+        } else if (is340 || targetOp.orderNumber === '87493') {
+            descOut = '8624 - CA 60 ROLO 3.40 MM - 2 TON - M.P. *SEMI ACABADO*';
+        } else {
+            const bFmt = targetOp.targetBitola ? (targetOp.targetBitola.includes('mm') ? targetOp.targetBitola : `${targetOp.targetBitola}mm`) : '3.40mm';
+            descOut = `CA-60 ${bFmt}`;
+        }
+
+        // 2. Resolução do Material de Entrada (Puxando código e descrição da Gestão de Lotes / Estoque)
+        let foundInputBitola = targetOp.inputBitola ? String(targetOp.inputBitola).trim() : '';
+        let foundStockItem: StockItem | undefined = undefined;
+
+        let candidateLotIds: string[] = [];
+        if (Array.isArray(targetOp.selectedLotIds)) {
+            candidateLotIds = targetOp.selectedLotIds.filter(Boolean);
+        } else if (targetOp.selectedLotIds && typeof targetOp.selectedLotIds === 'object') {
+            candidateLotIds = Object.values(targetOp.selectedLotIds).flat().filter(Boolean) as string[];
+        }
+        if (Array.isArray(targetOp.usedLotIds)) {
+            candidateLotIds.push(...targetOp.usedLotIds.filter(Boolean));
+        }
+        if (Array.isArray(targetOp.processedLots)) {
+            targetOp.processedLots.forEach((l: any) => {
+                if (l.lotId) candidateLotIds.push(l.lotId);
+                if (l.internalLot) candidateLotIds.push(l.internalLot);
+            });
+        }
+
+        for (const lId of candidateLotIds) {
+            const s = (stock || []).find(item => item.id === lId || item.internalLot === lId || item.supplierLot === lId);
+            if (s) {
+                foundStockItem = s;
+                if (s.bitola) {
+                    foundInputBitola = String(s.bitola);
+                }
+                break;
+            }
+        }
+
+        if (!foundStockItem) {
+            foundStockItem = (stock || []).find(s => 
+                (s.productionOrderIds && (s.productionOrderIds.includes(targetOp.id) || s.productionOrderIds.includes(targetOp.orderNumber))) &&
+                (s.materialType === 'Fio Máquina' || (s.materialType || '').toLowerCase().includes('fio'))
+            );
+            if (foundStockItem && !foundInputBitola && foundStockItem.bitola) {
+                foundInputBitola = String(foundStockItem.bitola);
+            }
+        }
+
+        if (!foundInputBitola) {
+            if ((targetOp as any).setup?.pass1?.mmEntrada) {
+                foundInputBitola = String((targetOp as any).setup.pass1.mmEntrada);
+            } else if (Array.isArray(targetOp.k7Setup) && targetOp.k7Setup[0]?.dEntry) {
+                foundInputBitola = `${targetOp.k7Setup[0].dEntry}`;
+            }
+        }
+
+        if (!foundInputBitola) {
+            const anyFio = (stock || []).find(s => (s.materialType || '').toLowerCase().includes('fio'));
+            if (anyFio && anyFio.bitola) {
+                foundInputBitola = String(anyFio.bitola);
+            } else {
+                foundInputBitola = '5.50';
+            }
+        }
+
+        let inProductCode = foundStockItem?.productCode || '';
+        let inProductDesc = foundStockItem?.description || foundStockItem?.model || '';
+
+        const cleanIn = foundInputBitola.replace('mm', '').trim();
+        const inNum = parseFloat(cleanIn.replace(',', '.'));
+
+        const matchedGaugeIn = (gauges || []).find((g: any) => {
+            const mat = (g.materialType || '').toLowerCase();
+            const isFio = mat.includes('fio') && mat.includes('maquina');
+            if (!isFio) return false;
+            const gClean = String(g.gauge || '').replace('mm', '').trim();
+            const gNum = parseFloat(gClean.replace(',', '.'));
+            return g.gauge === foundInputBitola || gClean === cleanIn || (!isNaN(inNum) && !isNaN(gNum) && Math.abs(inNum - gNum) < 0.01);
+        });
+
+        if (matchedGaugeIn) {
+            if (!inProductCode) inProductCode = matchedGaugeIn.productCode || (matchedGaugeIn as any).code || '';
+            if (!inProductDesc) inProductDesc = matchedGaugeIn.description || (matchedGaugeIn as any).gaugeDescription || '';
+        }
+
+        if (!inProductCode || !inProductDesc) {
+            const stockFio = (stock || []).find(s => {
+                const mat = (s.materialType || '').toLowerCase();
+                if (!mat.includes('fio')) return false;
+                const sClean = String(s.bitola || '').replace('mm', '').trim();
+                const sNum = parseFloat(sClean.replace(',', '.'));
+                return sClean === cleanIn || (!isNaN(inNum) && !isNaN(sNum) && Math.abs(inNum - sNum) < 0.01);
+            });
+            if (stockFio) {
+                if (!inProductCode) inProductCode = stockFio.productCode || '';
+                if (!inProductDesc) inProductDesc = stockFio.description || stockFio.model || '';
+            }
+        }
+
+        let descIn = '';
+        if (inProductCode && inProductDesc) {
+            descIn = inProductDesc.startsWith(inProductCode)
+                ? inProductDesc
+                : `${inProductCode} - ${inProductDesc}`;
+        } else if (inProductDesc) {
+            descIn = inProductDesc;
+        } else if (inProductCode) {
+            descIn = `${inProductCode} - Fio Máquina ${cleanIn || '5,50'}mm`;
+        } else {
+            const displayBitola = foundInputBitola ? (foundInputBitola.includes('mm') ? foundInputBitola : `${foundInputBitola}mm`) : '5,50mm';
+            descIn = `Fio Máquina ${displayBitola}`;
+        }
+
+        return { descIn, descOut };
+    };
+
     // Função que sincroniza a evolução do dia com a ficha de papel
     const syncDailyEvolution = (targetOpId?: string, forceToast = false) => {
         const selDateOnly = selectedDate.includes('T') ? selectedDate.split('T')[0] : selectedDate;
@@ -214,10 +396,11 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
             if (relatedReport?.operator) setOperator(relatedReport.operator);
         }
 
-        const inBitola = targetOP.inputBitola || '8.00';
-        const outBitola = targetOP.targetBitola || '6.00';
-        setProductDescriptionIn(`${inBitola}mm -- FIO MÁQUINA--`);
-        setProductDescriptionOut(`${outBitola}mm ---CA60--`);
+        const inBitola = targetOP.inputBitola || '5.50';
+        const outBitola = targetOP.targetBitola || '3.40';
+        const { descIn, descOut } = resolveTrefilaProductDescriptions(targetOP);
+        setProductDescriptionIn(descIn);
+        setProductDescriptionOut(descOut);
 
         // 2. Preencher Paradas (downtimeEvents)
         const formatTime = (iso?: string) => {
@@ -226,16 +409,26 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
             return !isNaN(d.getTime()) ? d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '00:00:00';
         };
 
-        const rawEvents = targetOP.downtimeEvents || [];
-        // Filtra eventos da data selecionada, ou se for a OP ativa traz os eventos recentes
-        const relevantEvents = rawEvents.filter(e => !e.stopTime || e.stopTime.startsWith(selDateOnly) || rawEvents.length <= 20);
+        const rawEvents = targetOP.downtimeEvents || (targetOP as any).downtime_events || [];
+        // Filtra eventos da data selecionada
+        const relevantEvents = rawEvents.filter((e: any) => {
+            const st = e.stopTime || e.stop_time;
+            if (!st) return false;
+            return st.startsWith(selDateOnly) || (getLocalDateString && getLocalDateString(st) === selDateOnly);
+        });
 
-        const newStops: StopRow[] = relevantEvents.map((ev, idx) => ({
-            id: `auto-stop-${idx}-${Date.now()}`,
-            inicio: formatTime(ev.stopTime),
-            fim: ev.resumeTime ? formatTime(ev.resumeTime) : formatTime(new Date().toISOString()),
-            motivo: ev.reason || 'Outros'
-        }));
+        const newStops: StopRow[] = relevantEvents.map((ev: any, idx: number) => {
+            const st = ev.stopTime || ev.stop_time;
+            const rt = ev.resumeTime || ev.resume_time;
+            const rReason = ev.reason || ev.motivo || 'Outros';
+            const rJust = ev.justification ? ` - ${ev.justification.trim()}` : '';
+            return {
+                id: `auto-stop-${idx}-${Date.now()}`,
+                inicio: formatTime(st),
+                fim: rt ? formatTime(rt) : formatTime(st),
+                motivo: `${rReason.toUpperCase()}${rJust.toUpperCase()}`
+            };
+        });
 
         if (newStops.length > 0) {
             setStops(newStops);
@@ -550,9 +743,59 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
                     setSelectedDate(data.selectedDate);
                     setProductionOrder(data.productionOrder || '');
                     setOperator(data.operator || '');
-                    setProductDescriptionIn(data.productDescriptionIn || '8mm -- FIO MÁQUINA--');
-                    setProductDescriptionOut(data.productDescriptionOut || '6mm ---CA60--');
-                    setStops(data.stops || []);
+                    let loadedIn = data.productDescriptionIn;
+                    let loadedOut = data.productDescriptionOut;
+                    const isLegacyIn = !loadedIn || loadedIn.includes('-- FIO MÁQUINA--') || loadedIn.includes('8.00mm');
+                    const targetOP = availableOPs.find(o => o.status === 'Ativa') || availableOPs[0];
+                    const cleanTarget = String(targetOP?.targetBitola || '').replace('mm', '').trim();
+                    const isLegacyOut = !loadedOut || 
+                        loadedOut === '6mm ---CA60--' || 
+                        loadedOut.includes('---CA60--') || 
+                        loadedOut.toUpperCase().includes('TRELI') ||
+                        loadedOut.toUpperCase() === 'CA-60 3.40MM' ||
+                        loadedOut.toUpperCase() === 'CA-60 3.40 MM' ||
+                        /^CA-60\s+\d+([.,]\d+)?\s*MM$/i.test(loadedOut.trim()) ||
+                        ((targetOP?.targetBitola?.includes('3.4') || cleanTarget === '3.40' || targetOP?.orderNumber === '87493') && !loadedOut.includes('8624'));
+
+                    if (isLegacyIn || isLegacyOut) {
+                        if (targetOP) {
+                            const resolved = resolveTrefilaProductDescriptions(targetOP);
+                            if (isLegacyOut) loadedOut = resolved.descOut;
+                            if (isLegacyIn) loadedIn = resolved.descIn;
+                        }
+                    }
+                    setProductDescriptionIn(loadedIn || '4860 - Fio Máquina 5,50mm');
+                    setProductDescriptionOut(loadedOut || '8624 - CA 60 ROLO 3.40 MM - 2 TON - M.P. *SEMI ACABADO*');
+                    const existingDraftStops: StopRow[] = data.stops || [];
+                    const mergedDraftStops: StopRow[] = [...existingDraftStops];
+                    if (targetOP) {
+                        const rawOPDowntimes = targetOP.downtimeEvents || (targetOP as any).downtime_events || [];
+                        const opDayDowntimes = rawOPDowntimes.filter((e: any) => {
+                            const st = e.stopTime || e.stop_time;
+                            return st && (st.startsWith(selectedDate) || (getLocalDateString && getLocalDateString(st) === selectedDate));
+                        });
+                        opDayDowntimes.forEach((ev: any, idx: number) => {
+                            const st = ev.stopTime || ev.stop_time;
+                            const rt = ev.resumeTime || ev.resume_time;
+                            const startTimeStr = formatTime(st);
+                            const endTimeStr = rt ? formatTime(rt) : startTimeStr;
+                            const rReason = ev.reason || ev.motivo || 'Outros';
+                            const rJust = ev.justification ? ` - ${ev.justification.trim()}` : '';
+                            const fullMotivo = `${rReason.toUpperCase()}${rJust.toUpperCase()}`;
+
+                            const exists = mergedDraftStops.some(s => s.inicio === startTimeStr);
+                            if (!exists) {
+                                mergedDraftStops.push({
+                                    id: `auto-stop-sync-${idx}-${Date.now()}`,
+                                    inicio: startTimeStr,
+                                    fim: endTimeStr,
+                                    motivo: fullMotivo
+                                });
+                            }
+                        });
+                        mergedDraftStops.sort((a, b) => timeToSeconds(a.inicio) - timeToSeconds(b.inicio));
+                    }
+                    setStops(mergedDraftStops);
                     setStats(data.stats || { horasTrabalhadas: '09:45:00', pesoEntrada: 0, pesoSaida: 0, sucata: 0, metrosProduzidos: 0, velocidade: 0 });
                     setProductionUpdates(data.productionUpdates || []);
                     showToast('Rascunho salvo carregado.', 'info');
@@ -573,8 +816,8 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
     const resetFormToDefault = () => {
         setProductionOrder('');
         setOperator('');
-        setProductDescriptionIn('8mm -- FIO MÁQUINA--');
-        setProductDescriptionOut('6mm ---CA60--');
+        setProductDescriptionIn('8.00mm -- FIO MÁQUINA--');
+        setProductDescriptionOut('3.40mm ---CA60--');
         setStops([]);
         setStats({ horasTrabalhadas: '09:45:00', pesoEntrada: 0, pesoSaida: 0, sucata: 0, metrosProduzidos: 0, velocidade: 0 });
         setProductionUpdates([]);
@@ -1364,13 +1607,13 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
                             <div className="flex items-start gap-2.5">
                                 <div className="flex-grow pl-1">
                                     <div className="text-[9px] font-black text-slate-500 uppercase tracking-wider">DESCRIÇÃO DO PRODUTO (ENTRADA)</div>
-                                    <input type="text" value={productDescriptionIn} onChange={e => setProductDescriptionIn(e.target.value)} className="w-full text-sm font-black text-[#002060] bg-transparent border-none p-0 focus:ring-0 focus:outline-none modern-editable-input" />
+                                    <textarea rows={2} value={productDescriptionIn} onChange={e => setProductDescriptionIn(e.target.value)} className="w-full text-sm font-black text-[#002060] bg-transparent border-none p-0 focus:ring-0 focus:outline-none modern-editable-input resize-none overflow-hidden" />
                                 </div>
                             </div>
                             <div className="flex items-start gap-2.5 pt-3 border-t border-slate-100">
                                 <div className="flex-grow pl-1">
                                     <div className="text-[9px] font-black text-slate-500 uppercase tracking-wider">DESCRIÇÃO DO PRODUTO (SAÍDA)</div>
-                                    <input type="text" value={productDescriptionOut} onChange={e => setProductDescriptionOut(e.target.value)} className="w-full text-sm font-black text-[#002060] bg-transparent border-none p-0 focus:ring-0 focus:outline-none modern-editable-input" />
+                                    <textarea rows={2} value={productDescriptionOut} onChange={e => setProductDescriptionOut(e.target.value)} className="w-full text-sm font-black text-[#002060] bg-transparent border-none p-0 focus:ring-0 focus:outline-none modern-editable-input resize-none overflow-hidden" />
                                 </div>
                             </div>
                         </div>

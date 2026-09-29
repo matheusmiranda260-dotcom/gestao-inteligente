@@ -4490,16 +4490,21 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             // Fallback para Trefila buscando descrição e código exatos do cadastro no gauges
                                             if (isTrefila && (!displayProductDescription || !displayProductCode)) {
                                                 const cleanTarget = String(op.targetBitola || '').replace('mm', '').trim();
-                                                const matched = gauges.find((g: any) => {
-                                                    const mat = (g.materialType || '').toLowerCase();
-                                                    const isCa60 = mat === 'ca-60' || mat === 'ca60' || mat.includes('trefila');
+                                                const is340 = cleanTarget === '3.40' || cleanTarget === '3.4' || cleanTarget === '3,40' || cleanTarget === '3,4' || op.orderNumber === '87493';
+                                                const matched = (gauges || []).find((g: any) => {
+                                                    const mat = String(g.materialType || g.material_type || '').toLowerCase();
+                                                    const isCa60 = mat === 'ca-60' || mat === 'ca60' || mat.includes('trefila') || mat.includes('ca') || mat.includes('arame') || mat.includes('semi');
                                                     if (!isCa60) return false;
                                                     const gClean = String(g.gauge || '').replace('mm', '').trim();
                                                     return g.gauge === op.targetBitola || gClean === cleanTarget || parseFloat(gClean.replace(',', '.')) === parseFloat(cleanTarget.replace(',', '.'));
                                                 });
                                                 if (matched) {
-                                                    if (!displayProductCode) displayProductCode = matched.productCode || (matched as any).code || '';
+                                                    if (!displayProductCode) displayProductCode = matched.productCode || matched.product_code || (matched as any).code || '';
                                                     if (!displayProductDescription) displayProductDescription = matched.description || (matched as any).gaugeDescription || '';
+                                                }
+                                                if ((!displayProductCode || !displayProductDescription) && is340) {
+                                                    displayProductCode = displayProductCode || '8624';
+                                                    displayProductDescription = displayProductDescription || 'CA 60 ROLO 3.40 MM - 2 TON - M.P. *SEMI ACABADO*';
                                                 }
                                             }
 
@@ -8568,8 +8573,16 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             const dateStr = formatDateString(today);
                                             const machine = drawerOP.scheduledMachine || (drawerOP.machine as string) || 'Treliça 1';
                                             const todayStats = getOpDayStats(drawerOP, today, machine);
+                                            const cleanTarget = String(drawerOP.targetBitola || '').replace('mm', '').trim();
+                                            const isTrefilaMach = String(machine || '').toLowerCase().includes('trefila');
+                                            let opCode = drawerOP.productCode;
+                                            let opDesc = drawerOP.productDescription;
+                                            if (isTrefilaMach && (!opCode || !opDesc) && (cleanTarget === '3.40' || cleanTarget === '3.4' || cleanTarget === '3,40' || drawerOP.orderNumber === '87493')) {
+                                                opCode = opCode || '8624';
+                                                opDesc = opDesc || 'CA 60 ROLO 3.40 MM - 2 TON - M.P. *SEMI ACABADO*';
+                                            }
                                             setOfficialReportModalData({
-                                                op: drawerOP,
+                                                op: { ...drawerOP, productCode: opCode, productDescription: opDesc },
                                                 dateStr,
                                                 machine,
                                                 initialProduced: todayStats.produced,
@@ -9688,6 +9701,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     shiftReports={shiftReports}
                     shiftConfig={shiftConfig}
                     stock={stock}
+                    gauges={gauges}
                 />
             )}
 
@@ -9705,6 +9719,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     initialOperator={officialReportModalData.initialOperator}
                     shiftConfig={shiftConfig}
                     stock={stock}
+                    gauges={gauges}
                 />
             )}
 
@@ -9843,6 +9858,7 @@ interface DailyDowntimeReportModalProps {
     shiftReports?: ShiftReport[];
     shiftConfig?: PcpShiftConfig;
     stock?: StockItem[];
+    gauges?: StockGauge[];
 }
 
 const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
@@ -9852,7 +9868,8 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
     productionOrders,
     shiftReports = [],
     shiftConfig,
-    stock = []
+    stock = [],
+    gauges = []
 }) => {
     const activeOp = productionOrders.find(o => o.id === data.op.id) || data.op;
     const [selectedDateStr, setSelectedDateStr] = useState<string>(data.dateStr);
@@ -10502,12 +10519,17 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                     onClose={() => setShowOfficialReport(false)}
                     machine={activeOp.scheduledMachine || (activeOp.machine as string) || 'Treliça 1'}
                     dateStr={selectedDateStr === 'ALL' ? data.dateStr : selectedDateStr}
-                    op={activeOp}
+                    op={{
+                        ...activeOp,
+                        productCode: activeOp.productCode || ((activeOp.targetBitola?.includes('3.4') || activeOp.orderNumber === '87493') ? '8624' : activeOp.productCode),
+                        productDescription: activeOp.productDescription || ((activeOp.targetBitola?.includes('3.4') || activeOp.orderNumber === '87493') ? 'CA 60 ROLO 3.40 MM - 2 TON - M.P. *SEMI ACABADO*' : activeOp.productDescription)
+                    }}
                     shiftReports={shiftReports}
                     productionOrders={productionOrders}
                     initialProduced={selectedDateStr === data.dateStr ? data.produced : undefined}
                     shiftConfig={shiftConfig}
                     stock={stock}
+                    gauges={gauges}
                 />
             )}
         </div>

@@ -138,6 +138,7 @@ const Reports: React.FC<ReportsProps> = ({ stock, trefilaProduction, trelicaProd
                         productionOrders={productionOrders}
                         shiftReports={shiftReports}
                         stock={stock}
+                        gauges={gauges}
                     />
                 ) : activeTab === 'op_trefila' ? (
                     <ReportsOPTrefila 
