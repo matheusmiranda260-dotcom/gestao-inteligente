@@ -4411,17 +4411,54 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                     
                                                     if (massPerSecond > 0) {
                                                         const totalDurationSeconds = initialWeight > 0 ? (initialWeight / massPerSecond) : 0;
-                                                        const lotDowntimeMs = (op.downtimeEvents || []).reduce((acc: number, e: any) => {
+                                                        // Identificar se a máquina está pausada agora (Parada, Preparação, Fim de Turno, Desligada ou sem operador)
+                                                        const liveMach = machineLiveStatus.find(m => m.machine === mach.name);
+                                                        const activeOpOperator = getMachineOperator(mach.name);
+                                                        const openStopEvent = [...(op.downtimeEvents || [])].reverse().find((e: any) => !e.resumeTime);
+
+                                                        const isTrefilaPausedNow = Boolean(
+                                                            openStopEvent || 
+                                                            prog.isStopped || 
+                                                            prog.isPrep || 
+                                                            prog.isOffline || 
+                                                            !activeOpOperator || 
+                                                            (liveMach && liveMach.state !== 'producing')
+                                                        );
+
+                                                        const pauseReason = openStopEvent?.reason 
+                                                            || prog.downtimeReason 
+                                                            || (prog.isOffline ? 'Final de Turno' : '') 
+                                                            || (liveMach?.reason || '') 
+                                                            || (!activeOpOperator ? 'Sem Operador Ativo' : 'Parada');
+
+                                                        // Somar paradas e intervalos sem produção desde o início do lote
+                                                        let lotDowntimeMs = 0;
+                                                        (op.downtimeEvents || []).forEach((e: any) => {
+                                                            if (!e || !e.stopTime) return;
                                                             const stop = new Date(e.stopTime).getTime();
-                                                            if (stop < lotStartTime) {
-                                                                if (!e.resumeTime) return acc;
-                                                                const resume = new Date(e.resumeTime).getTime();
-                                                                if (resume <= lotStartTime) return acc;
-                                                                return acc + (resume - lotStartTime);
-                                                            }
+                                                            if (isNaN(stop)) return;
                                                             const resume = e.resumeTime ? new Date(e.resumeTime).getTime() : liveNow.getTime();
-                                                            return acc + (resume - stop);
-                                                        }, 0);
+                                                            if (isNaN(resume)) return;
+
+                                                            const startInLot = Math.max(stop, lotStartTime);
+                                                            const endInLot = Math.min(resume, liveNow.getTime());
+                                                            if (endInLot > startInLot) {
+                                                                lotDowntimeMs += (endInLot - startInLot);
+                                                            }
+                                                        });
+
+                                                        // Se estiver pausada agora (ex: fim de turno / desligada) sem parada aberta em downtimeEvents
+                                                        if (isTrefilaPausedNow && !openStopEvent) {
+                                                            const closedLogs = (op.operatorLogs || []).filter((l: any) => l.endTime);
+                                                            const lastLogEnd = closedLogs.length > 0 
+                                                                ? Math.max(...closedLogs.map((l: any) => new Date(l.endTime).getTime()).filter((t: number) => !isNaN(t)))
+                                                                : 0;
+                                                            const pauseStart = lastLogEnd > lotStartTime ? lastLogEnd : lotStartTime;
+                                                            const unloggedPauseMs = Math.max(0, liveNow.getTime() - pauseStart);
+                                                            if (unloggedPauseMs > 0 && lotDowntimeMs < unloggedPauseMs) {
+                                                                lotDowntimeMs = Math.max(lotDowntimeMs, unloggedPauseMs);
+                                                            }
+                                                        }
                                                         const totalElapsedMs = Math.max(0, liveNow.getTime() - lotStartTime);
                                                         const elapsedUptimeMs = Math.max(0, totalElapsedMs - lotDowntimeMs);
                                                         const elapsedUptimeSeconds = elapsedUptimeMs / 1000;
@@ -4433,10 +4470,12 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                         trefilaDashStats = {
                                                             lotIdStr,
                                                             lotWeight: initialWeight,
-                                                            elapsedMs: totalElapsedMs,
+                                                            elapsedMs: elapsedUptimeMs,
                                                             remainingSeconds,
                                                             delayedSeconds,
-                                                            isDelayed
+                                                            isDelayed,
+                                                            isPaused: isTrefilaPausedNow,
+                                                            pauseReason
                                                         };
                                                     }
                                                 }
@@ -4562,7 +4601,11 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                         </div>
 
                                                         {trefilaDashStats && (
-                                                            <div className="flex items-center justify-between gap-1.5 text-xs font-mono font-bold bg-blue-50/90 px-2.5 py-0.5 rounded-md border border-blue-200 shadow-sm shrink-0 overflow-hidden text-slate-800">
+                                                            <div className={`flex items-center justify-between gap-1.5 text-xs font-mono font-bold px-2.5 py-0.5 rounded-md border shadow-xs shrink-0 overflow-hidden ${
+                                                                trefilaDashStats.isPaused 
+                                                                    ? "bg-amber-50/95 border-amber-300 text-slate-800" 
+                                                                    : "bg-blue-50/90 border-blue-200 text-slate-800"
+                                                            }`}>
                                                                 <div className="flex items-center gap-1.5 min-w-0 truncate">
                                                                     <span className="text-blue-900 font-black text-xs truncate">
                                                                         Lote {trefilaDashStats.lotIdStr}
@@ -4570,15 +4613,23 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                     <span className="text-slate-600 font-bold text-[10px]">
                                                                         ({trefilaDashStats.lotWeight.toLocaleString('pt-BR')}kg)
                                                                     </span>
+                                                                    {trefilaDashStats.isPaused && (
+                                                                        <span className="inline-flex items-center gap-1 text-[8.5px] uppercase font-black px-1.5 py-0.2 rounded bg-amber-200/90 text-amber-900 border border-amber-300 shrink-0" title={trefilaDashStats.pauseReason || 'Pausado em parada / fim de turno'}>
+                                                                            <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                                                                            Pausado
+                                                                        </span>
+                                                                    )}
                                                                 </div>
                                                                 <div className="flex items-center gap-2 shrink-0 text-[10px]">
                                                                     <span className="text-slate-600">
-                                                                        Feito: <strong className="text-blue-900 font-black">{formatDuration(trefilaDashStats.elapsedMs)}</strong>
+                                                                        Feito: <strong className={trefilaDashStats.isPaused ? "text-amber-900 font-black" : "text-blue-900 font-black"}>{formatDuration(trefilaDashStats.elapsedMs)}</strong>
                                                                     </span>
                                                                     <span className={`px-1.5 py-0.5 rounded font-black ${
                                                                         trefilaDashStats.isDelayed 
                                                                             ? "bg-rose-100 text-rose-800 border border-rose-300 shadow-sm" 
-                                                                            : "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                                                                            : trefilaDashStats.isPaused
+                                                                                ? "bg-amber-100 text-amber-900 border border-amber-300"
+                                                                                : "bg-emerald-100 text-emerald-800 border border-emerald-300"
                                                                     }`}>
                                                                         {trefilaDashStats.isDelayed ? 'Atraso: ' : 'Rest: '}{formatDuration((trefilaDashStats.isDelayed ? trefilaDashStats.delayedSeconds : trefilaDashStats.remainingSeconds) * 1000)}
                                                                     </span>

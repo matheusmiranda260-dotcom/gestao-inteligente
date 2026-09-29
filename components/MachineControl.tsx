@@ -1667,58 +1667,6 @@ const MachineControl: React.FC<MachineControlProps> = ({
     }, [currentOperatorLog, currentUser]);
 
 
-    const activeLotProcessingData = useMemo(() => {
-        if (activeOrder?.activeLotProcessing?.lotId) {
-            const lotInfo = stock.find(s => s.id === activeOrder.activeLotProcessing!.lotId);
-
-            let estimatedTimeSeconds = null;
-            let isDelayed = false;
-            let elapsedUptimeSeconds = 0;
-            if (activeOrder?.activeLotProcessing?.speed && activeOrder?.targetBitola) {
-                const lotStartTime = new Date(activeOrder.activeLotProcessing.startTime).getTime();
-                const bitola = activeOrder.targetBitola ? parseFloat(activeOrder.targetBitola.replace(',', '.')) : 1;
-                const speed = activeOrder.activeLotProcessing.speed || 0; // m/s
-                const linearMass = bitola * bitola * 0.006162; // kg/m
-                const massPerSecond = speed * linearMass; // kg/s
-                
-                if (massPerSecond > 0) {
-                    const initialWeight = lotInfo?.initialQuantity || 0;
-                    const totalDurationSeconds = initialWeight / massPerSecond;
-
-                    // Calculate downtime specifically for this lot
-                    const lotDowntimeMs = (activeOrder?.downtimeEvents || []).reduce((acc, e) => {
-                        const stop = new Date(e.stopTime).getTime();
-                        if (stop < lotStartTime) {
-                            if (!e.resumeTime) return acc;
-                            const resume = new Date(e.resumeTime).getTime();
-                            if (resume <= lotStartTime) return acc;
-                            return acc + (resume - lotStartTime);
-                        }
-                        const resume = e.resumeTime ? new Date(e.resumeTime).getTime() : now.getTime();
-                        return acc + (resume - stop);
-                    }, 0);
-
-                    const totalElapsedMs = now.getTime() - lotStartTime;
-                    const elapsedUptimeMs = Math.max(0, totalElapsedMs - lotDowntimeMs);
-                    elapsedUptimeSeconds = elapsedUptimeMs / 1000;
-
-                    estimatedTimeSeconds = Math.max(0, totalDurationSeconds - elapsedUptimeSeconds);
-                    isDelayed = elapsedUptimeSeconds > totalDurationSeconds;
-                }
-            }
-
-            return { 
-                ...activeOrder.activeLotProcessing, 
-                lotInfo: lotInfo || { internalLot: activeOrder.activeLotProcessing.lotId, initialQuantity: 0 },
-                estimatedTimeSeconds,
-                isDelayed,
-                elapsedUptimeSeconds
-            };
-        }
-        return null;
-    }, [activeOrder, stock, now]);
-
-
     const isAnyActiveShift = useMemo(() => {
         return !!currentOperatorLog && !currentOperatorLog.endTime;
     }, [currentOperatorLog]);
@@ -1748,6 +1696,89 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
         return 'Parada';
     }, [activeOrder, isAnyActiveShift]);
+
+    const activeLotProcessingData = useMemo(() => {
+        if (activeOrder?.activeLotProcessing?.lotId) {
+            const lotInfo = stock.find(s => s.id === activeOrder.activeLotProcessing!.lotId);
+
+            let estimatedTimeSeconds = null;
+            let isDelayed = false;
+            let elapsedUptimeSeconds = 0;
+            let isPaused = false;
+            let pauseReason = '';
+
+            if (activeOrder?.activeLotProcessing?.speed && activeOrder?.targetBitola) {
+                const lotStartTime = new Date(activeOrder.activeLotProcessing.startTime).getTime();
+                const bitola = activeOrder.targetBitola ? parseFloat(activeOrder.targetBitola.replace(',', '.')) : 1;
+                const speed = activeOrder.activeLotProcessing.speed || 0; // m/s
+                const linearMass = bitola * bitola * 0.006162; // kg/m
+                const massPerSecond = speed * linearMass; // kg/s
+                
+                if (massPerSecond > 0 && !isNaN(lotStartTime)) {
+                    const initialWeight = lotInfo?.initialQuantity || activeOrder.totalWeight || 0;
+                    const totalDurationSeconds = initialWeight > 0 ? (initialWeight / massPerSecond) : 0;
+
+                    const openEvent = [...(activeOrder?.downtimeEvents || [])].reverse().find(e => !e.resumeTime);
+                    const isMachineCurrentlyPaused = Boolean(
+                        openEvent || 
+                        currentMachineStatus !== 'Produzindo' || 
+                        !isAnyActiveShift
+                    );
+
+                    isPaused = isMachineCurrentlyPaused;
+                    pauseReason = openEvent?.reason || (currentMachineStatus !== 'Produzindo' ? currentMachineStatus : 'Turno Encerrado');
+
+                    // Calculate downtime specifically for this lot
+                    let lotDowntimeMs = 0;
+                    (activeOrder?.downtimeEvents || []).forEach(e => {
+                        if (!e || !e.stopTime) return;
+                        const stop = new Date(e.stopTime).getTime();
+                        if (isNaN(stop)) return;
+                        const resume = e.resumeTime ? new Date(e.resumeTime).getTime() : now.getTime();
+                        if (isNaN(resume)) return;
+
+                        const startInLot = Math.max(stop, lotStartTime);
+                        const endInLot = Math.min(resume, now.getTime());
+                        if (endInLot > startInLot) {
+                            lotDowntimeMs += (endInLot - startInLot);
+                        }
+                    });
+
+                    // Se estiver pausada agora sem parada aberta em downtimeEvents (ex: fim de turno)
+                    if (isMachineCurrentlyPaused && !openEvent) {
+                        const closedLogs = (activeOrder?.operatorLogs || []).filter((l: any) => l.endTime);
+                        const lastLogEnd = closedLogs.length > 0 
+                            ? Math.max(...closedLogs.map((l: any) => new Date(l.endTime).getTime()).filter((t: number) => !isNaN(t)))
+                            : 0;
+                        const pauseStart = lastLogEnd > lotStartTime ? lastLogEnd : lotStartTime;
+                        const extraPauseMs = Math.max(0, now.getTime() - pauseStart);
+                        if (extraPauseMs > 0 && lotDowntimeMs < extraPauseMs) {
+                            lotDowntimeMs = Math.max(lotDowntimeMs, extraPauseMs);
+                        }
+                    }
+
+                    const totalElapsedMs = Math.max(0, now.getTime() - lotStartTime);
+                    const elapsedUptimeMs = Math.max(0, totalElapsedMs - lotDowntimeMs);
+                    elapsedUptimeSeconds = elapsedUptimeMs / 1000;
+
+                    const remainingSecondsRaw = totalDurationSeconds - elapsedUptimeSeconds;
+                    estimatedTimeSeconds = Math.max(0, remainingSecondsRaw);
+                    isDelayed = totalDurationSeconds > 0 && elapsedUptimeSeconds > totalDurationSeconds;
+                }
+            }
+
+            return { 
+                ...activeOrder.activeLotProcessing, 
+                lotInfo: lotInfo || { internalLot: activeOrder.activeLotProcessing.lotId, initialQuantity: 0 },
+                estimatedTimeSeconds,
+                isDelayed,
+                isPaused,
+                pauseReason,
+                elapsedUptimeSeconds
+            };
+        }
+        return null;
+    }, [activeOrder, stock, now, currentMachineStatus, isAnyActiveShift]);
 
     // Derived state for pulsing effects (must come AFTER currentMachineStatus declaration)
     const isActiveProcess = currentMachineStatus === 'Produzindo' && ((activeMachine.startsWith('Trefila') || activeMachine.startsWith('Desbobinadeira')) ? !!activeLotProcessingData : true);
@@ -4015,8 +4046,18 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                     <div className={`p-6 border rounded-xl transition-all duration-500 ${activeLotProcessingData.isDelayed ? 'bg-red-50 border-red-200 shadow-sm shadow-red-100' : 'bg-gradient-to-br from-indigo-50 to-blue-50 border-indigo-100'}`}>
                                                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                                                             <div>
-                                                                <span className={`text-xs font-bold px-2 py-1 rounded uppercase tracking-wide ${activeLotProcessingData.isDelayed ? 'bg-red-500 text-white' : 'text-indigo-500 bg-indigo-100'}`}>
-                                                                    {activeLotProcessingData.isDelayed ? '⚠ LOTE ATRASADO' : 'Em Andamento'}
+                                                                <span className={`text-xs font-bold px-2 py-1 rounded uppercase tracking-wide ${
+                                                                    activeLotProcessingData.isDelayed 
+                                                                        ? 'bg-red-500 text-white' 
+                                                                        : activeLotProcessingData.isPaused
+                                                                            ? 'bg-amber-500 text-white'
+                                                                            : 'text-indigo-500 bg-indigo-100'
+                                                                }`}>
+                                                                    {activeLotProcessingData.isDelayed 
+                                                                        ? '⚠ LOTE ATRASADO' 
+                                                                        : activeLotProcessingData.isPaused
+                                                                            ? `⏸️ PAUSADO (${activeLotProcessingData.pauseReason || 'PARADA'})`
+                                                                            : 'Em Andamento'}
                                                                 </span>
                                                                 <h4 className={`text-2xl font-bold mt-2 ${activeLotProcessingData.isDelayed ? 'text-red-700' : 'text-slate-800'}`}>
                                                                     {activeLotProcessingData.lotInfo?.internalLot || activeLotProcessingData.lotId} 
@@ -4034,9 +4075,19 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                         </p>
                                                                     )}
                                                                     {activeLotProcessingData.estimatedTimeSeconds !== null && (
-                                                                        <p className={`text-sm font-black flex items-center gap-2 px-3 py-1 rounded-lg border ${activeLotProcessingData.isDelayed ? 'text-red-700 bg-red-100 border-red-200' : 'text-emerald-600 bg-emerald-50 border-emerald-100'}`}>
+                                                                        <p className={`text-sm font-black flex items-center gap-2 px-3 py-1 rounded-lg border ${
+                                                                            activeLotProcessingData.isDelayed 
+                                                                                ? 'text-red-700 bg-red-100 border-red-200' 
+                                                                                : activeLotProcessingData.isPaused
+                                                                                    ? 'text-amber-800 bg-amber-50 border-amber-200'
+                                                                                    : 'text-emerald-600 bg-emerald-50 border-emerald-100'
+                                                                        }`}>
                                                                             <ClockIcon className="h-4 w-4" /> 
-                                                                            {activeLotProcessingData.isDelayed ? 'Atraso: ' : 'Tempo Est.: '}
+                                                                            {activeLotProcessingData.isDelayed 
+                                                                                ? 'Atraso: ' 
+                                                                                : activeLotProcessingData.isPaused 
+                                                                                    ? 'Tempo Rest. (Pausado): ' 
+                                                                                    : 'Tempo Est.: '}
                                                                             {activeLotProcessingData.isDelayed 
                                                                                 ? formatDuration((activeLotProcessingData.elapsedUptimeSeconds - ((activeLotProcessingData.lotInfo?.initialQuantity || 0) / (parseFloat(activeOrder?.targetBitola?.replace(',', '.') || '1')**2 * 0.006162 * (activeLotProcessingData.speed || 1)))) * 1000)
                                                                                 : formatDuration(activeLotProcessingData.estimatedTimeSeconds * 1000)}
