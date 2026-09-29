@@ -3128,14 +3128,24 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         }
     };
 
-    // Helper compacto para formatar tempos em cartões (ex: 8h45, 32m, 0m)
-    const formatCompactShiftTime = (ms: number): string => {
-        if (!ms || ms <= 0) return '0m';
-        const totalMinutes = Math.floor(ms / 60000);
-        const h = Math.floor(totalMinutes / 60);
-        const m = totalMinutes % 60;
+    // Helper para formatar tempos em cartões:
+    // Se liveWithSeconds === true, formata como cronômetro em tempo real com segundos (ex: 51:24 ou 1h06:24)
+    // Se false, formata em horas e minutos (ex: 8h48, 29m, 0m)
+    const formatShiftTimeDisplay = (ms: number, liveWithSeconds: boolean = false): string => {
+        if (!ms || ms <= 0) return liveWithSeconds ? '00:00' : '0m';
+        const totalSeconds = Math.floor(ms / 1000);
+        const h = Math.floor(totalSeconds / 3600);
+        const m = Math.floor((totalSeconds % 3600) / 60);
+        const s = totalSeconds % 60;
+
+        if (liveWithSeconds) {
+            if (h === 0) {
+                return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+            }
+            return `${h}h${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        }
+
         if (h === 0) return `${m}m`;
-        if (m === 0) return `${h}h`;
         return `${h}h${m < 10 ? '0' : ''}${m}`;
     };
 
@@ -3287,48 +3297,71 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         }
 
         // -------------------------------------------------------------
-        // CÁLCULO DE TEMPO: EFETIVO vs PARADO (Atualizado até o final do turno)
+        // CÁLCULO DE TEMPO: EFETIVO vs PARADO (CRONÔMETRO TEMPO REAL)
         // -------------------------------------------------------------
         const machCfg = resolveMachineShiftConfig(machName, shiftConfig);
-        const [startH, startM] = (machCfg.workStart || '07:45').split(':').map(Number);
-        const [endH, endM] = (machCfg.workEnd || '17:33').split(':').map(Number);
+        const isTrelicaMach = machName.startsWith('Treliça');
+        const defaultWorkStart = isTrelicaMach ? '05:00' : '07:45';
+        const defaultWorkEnd = isTrelicaMach ? '14:48' : '17:33';
 
-        const sStartMin = (startH !== undefined && !isNaN(startH) ? startH : 7) * 60 + (startM !== undefined && !isNaN(startM) ? startM : 45);
-        const sEndMin = (endH !== undefined && !isNaN(endH) ? endH : 17) * 60 + (endM !== undefined && !isNaN(endM) ? endM : 33);
+        const [startH, startM] = (machCfg.workStart || defaultWorkStart).split(':').map(Number);
+        const [endH, endM] = (machCfg.workEnd || defaultWorkEnd).split(':').map(Number);
+
+        const sStartMin = (startH !== undefined && !isNaN(startH) ? startH : (isTrelicaMach ? 5 : 7)) * 60 + (startM !== undefined && !isNaN(startM) ? startM : (isTrelicaMach ? 0 : 45));
+        const sEndMin = (endH !== undefined && !isNaN(endH) ? endH : (isTrelicaMach ? 14 : 17)) * 60 + (endM !== undefined && !isNaN(endM) ? endM : (isTrelicaMach ? 48 : 33));
         const shiftPlannedDurationMs = Math.max(0, (sEndMin - sStartMin) * 60000);
 
-        // 1. Total de Paradas no dia (op.downtimeEvents + matchingReports)
-        let dayDowntimeMs = 0;
+        // 1. Detectar se a máquina está em Parada ou Produzindo AGORA (ao vivo hoje)
+        const events = (op.downtimeEvents || []) as any[];
+        const activeOpenStop = isToday ? [...events].reverse().find((e: any) => {
+            if (e.resumeTime) return false;
+            if (!e.stopTime) return false;
+            const rNorm = (e.reason || '').toLowerCase().trim();
+            if ((rNorm.includes('final de turno') || rNorm.includes('fim de turno')) && (!e.durationMin || e.durationMin === 0)) {
+                return false;
+            }
+            return true;
+        }) : null;
+
+        const liveMachStatus = machineLiveStatus.find(m => m.machine === machName);
+        const isMachineStoppedNow = isToday && (
+            Boolean(activeOpenStop) || 
+            (liveMachStatus && (liveMachStatus.state === 'stopped' || liveMachStatus.state === 'prep'))
+        );
+
+        // 2. Total de Paradas Finalizadas (fechadas)
+        let closedDowntimeMs = 0;
         const recordedStops = new Set<string>();
 
-        (op.downtimeEvents || []).forEach((e: any) => {
+        events.forEach((e: any) => {
             if (!e || !e.stopTime) return;
+            if (isToday && e === activeOpenStop) return; // Parada aberta tratada dinamicamente
             const sDate = new Date(e.stopTime);
             if (isNaN(sDate.getTime())) return;
             const sDateOnly = getIsoDateStr(e.stopTime);
             if (sDateOnly !== dateStr) return;
 
             const reasonNorm = (e.reason || '').toLowerCase().trim();
-            if ((reasonNorm.includes('final de turno') || reasonNorm.includes('fim de turno') || reasonNorm.includes('aguardando início')) && (!e.durationMin || e.durationMin === 0)) {
+            if ((reasonNorm.includes('final de turno') || reasonNorm.includes('fim de turno')) && (!e.durationMin || e.durationMin === 0) && !e.resumeTime) {
                 return;
             }
 
             let durMs = 0;
             if (e.durationMin !== undefined && !isNaN(Number(e.durationMin)) && Number(e.durationMin) > 0) {
-                durMs = Number(e.durationMin) * 60000;
+                durMs = Math.min(Number(e.durationMin) * 60000, 4 * 3600 * 1000);
             } else if (e.resumeTime) {
                 const rDate = new Date(e.resumeTime);
                 if (!isNaN(rDate.getTime())) {
-                    durMs = Math.max(0, rDate.getTime() - sDate.getTime());
+                    // Limita a parada ao fim do expediente daquele dia para evitar contaminação noturna
+                    const stopDayEnd = new Date(sDate);
+                    stopDayEnd.setHours(endH !== undefined && !isNaN(endH) ? endH : 17, endM !== undefined && !isNaN(endM) ? endM : 33, 0, 0);
+                    const limitEnd = Math.min(rDate.getTime(), stopDayEnd.getTime());
+                    durMs = Math.max(0, limitEnd - sDate.getTime());
+                    durMs = Math.min(durMs, 4 * 3600 * 1000);
                 }
-            } else if (isToday) {
-                const todayEnd = new Date(liveNow);
-                todayEnd.setHours(endH !== undefined && !isNaN(endH) ? endH : 17, endM !== undefined && !isNaN(endM) ? endM : 33, 0, 0);
-                const limitMs = Math.min(liveNow.getTime(), todayEnd.getTime());
-                durMs = Math.max(0, limitMs - sDate.getTime());
             }
 
-            dayDowntimeMs += durMs;
+            closedDowntimeMs += durMs;
             recordedStops.add(String(e.stopTime));
         });
 
@@ -3341,14 +3374,19 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                 let durMs = 0;
                 if (e.durationMin !== undefined && !isNaN(Number(e.durationMin)) && Number(e.durationMin) > 0) {
-                    durMs = Number(e.durationMin) * 60000;
+                    durMs = Math.min(Number(e.durationMin) * 60000, 4 * 3600 * 1000);
                 } else if (e.resumeTime) {
                     const rDate = new Date(e.resumeTime);
                     if (!isNaN(rDate.getTime())) {
-                        durMs = Math.max(0, rDate.getTime() - new Date(e.stopTime).getTime());
+                        const sDate = new Date(e.stopTime);
+                        const stopDayEnd = new Date(sDate);
+                        stopDayEnd.setHours(endH !== undefined && !isNaN(endH) ? endH : 17, endM !== undefined && !isNaN(endM) ? endM : 33, 0, 0);
+                        const limitEnd = Math.min(rDate.getTime(), stopDayEnd.getTime());
+                        durMs = Math.max(0, limitEnd - sDate.getTime());
+                        durMs = Math.min(durMs, 4 * 3600 * 1000);
                     }
                 }
-                dayDowntimeMs += durMs;
+                closedDowntimeMs += durMs;
                 recordedStops.add(String(e.stopTime));
             });
 
@@ -3356,56 +3394,124 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 if (s.duration && !isNaN(Number(s.duration))) {
                     const stopKey = `report-stop-${r.id}-${s.reason}-${s.duration}`;
                     if (!recordedStops.has(stopKey)) {
-                        dayDowntimeMs += Number(s.duration) * 60000;
+                        closedDowntimeMs += Math.min(Number(s.duration) * 60000, 4 * 3600 * 1000);
                         recordedStops.add(stopKey);
                     }
                 }
             });
         });
 
-        // 2. Tempo decorrido de turno até agora (ou final do turno)
+        // 3. Cálculos Dinâmicos para HOJE vs PASSADO
         let dayElapsedShiftMs = 0;
+        let dayDowntimeMs = closedDowntimeMs;
+        let isProducingNow = false;
 
         if (isToday) {
+            const todayLogs = (op.operatorLogs || []).filter((l: any) => {
+                if (!l.startTime) return false;
+                const sDate = getIsoDateStr(l.startTime);
+                const eDate = l.endTime ? getIsoDateStr(l.endTime) : '';
+                return sDate === dateStr || eDate === dateStr || (!l.endTime && isToday);
+            });
+
+            const realOpLogs = todayLogs.filter((l: any) => 
+                l.operator && 
+                l.operator !== 'GHOST_ORDER_FLAG' && 
+                l.action !== 'Criada no PCP' &&
+                !l.operator.toLowerCase().includes('gestor')
+            );
+            const activeLogs = realOpLogs.length > 0 ? realOpLogs : todayLogs;
+
+            const isOpCurrentlyLive = op.status === 'in_progress' || op.status === 'Em Produção';
+            const hasOpenLog = activeLogs.some((l: any) => !l.endTime);
+
             const todayShiftStart = new Date(liveNow);
-            todayShiftStart.setHours(startH !== undefined && !isNaN(startH) ? startH : 7, startM !== undefined && !isNaN(startM) ? startM : 45, 0, 0);
+            todayShiftStart.setHours(startH !== undefined && !isNaN(startH) ? startH : (isTrelicaMach ? 5 : 7), startM !== undefined && !isNaN(startM) ? startM : (isTrelicaMach ? 0 : 45), 0, 0);
 
             const todayShiftEnd = new Date(liveNow);
-            todayShiftEnd.setHours(endH !== undefined && !isNaN(endH) ? endH : 17, endM !== undefined && !isNaN(endM) ? endM : 33, 0, 0);
+            todayShiftEnd.setHours(endH !== undefined && !isNaN(endH) ? endH : (isTrelicaMach ? 14 : 17), endM !== undefined && !isNaN(endM) ? endM : (isTrelicaMach ? 48 : 33), 0, 0);
 
-            if (liveNow.getTime() >= todayShiftStart.getTime()) {
-                // Atualizado até o final do turno: congela no fim do expediente
-                const cappedNow = Math.min(liveNow.getTime(), todayShiftEnd.getTime());
-                dayElapsedShiftMs = Math.max(0, cappedNow - todayShiftStart.getTime());
-            } else {
-                const earlyLog = (op.operatorLogs || []).find((l: any) => l.startTime && getIsoDateStr(l.startTime) === dateStr);
-                if (earlyLog) {
-                    const logStartMs = new Date(earlyLog.startTime).getTime();
-                    if (!isNaN(logStartMs) && logStartMs < liveNow.getTime()) {
-                        dayElapsedShiftMs = Math.max(0, liveNow.getTime() - logStartMs);
+            const hasActiveWorkToday = isOpCurrentlyLive || hasOpenLog || activeLogs.length > 0 || todayProduced > 0;
+
+            if (hasActiveWorkToday) {
+                let opStartMs = todayShiftStart.getTime();
+                const todayMidnightMs = new Date(liveNow.getFullYear(), liveNow.getMonth(), liveNow.getDate(), 0, 0, 0, 0).getTime();
+                const logStartTimes = activeLogs
+                    .map((l: any) => new Date(l.startTime).getTime())
+                    .filter((t: number) => !isNaN(t));
+
+                if (logStartTimes.length > 0) {
+                    const earliestLogMs = Math.min(...logStartTimes);
+                    if (earliestLogMs >= todayMidnightMs) {
+                        opStartMs = earliestLogMs;
                     }
+                }
+
+                if (isMachineStoppedNow) {
+                    // MÁQUINA PARADA:
+                    // 1. O cronômetro de parada FICA CORRENDO a cada segundo
+                    let currentStopStartMs = activeOpenStop?.stopTime 
+                        ? new Date(activeOpenStop.stopTime).getTime() 
+                        : (liveMachStatus?.durationMs ? liveNow.getTime() - liveMachStatus.durationMs : liveNow.getTime());
+                    if (isNaN(currentStopStartMs) || currentStopStartMs < todayMidnightMs) {
+                        currentStopStartMs = todayShiftStart.getTime();
+                    }
+                    const currentStopMs = Math.max(0, liveNow.getTime() - currentStopStartMs);
+                    dayDowntimeMs = closedDowntimeMs + currentStopMs;
+
+                    // 2. O tempo efetivo FICA PAUSADO/CONGELADO no exato momento da parada
+                    const elapsedUntilStop = Math.max(0, currentStopStartMs - opStartMs);
+                    dayElapsedShiftMs = elapsedUntilStop + currentStopMs;
+                    isProducingNow = false;
+                } else if (hasOpenLog || isOpCurrentlyLive) {
+                    // MÁQUINA EM PRODUÇÃO (NÃO PARADA):
+                    // 1. O tempo de parada FICA PARADO (congelado nas paradas já concluídas)
+                    dayDowntimeMs = closedDowntimeMs;
+
+                    // 2. O tempo efetivo FICA CORRENDO a cada segundo
+                    const hasManagerAuth = activeLogs.some((l: any) => Boolean(l.managerAuthorized));
+                    const capLimit = hasManagerAuth ? liveNow.getTime() : Math.min(liveNow.getTime(), todayShiftEnd.getTime());
+                    dayElapsedShiftMs = Math.max(0, capLimit - opStartMs);
+                    isProducingNow = true;
+                } else {
+                    // Turno encerrado hoje
+                    dayDowntimeMs = closedDowntimeMs;
+                    const logEndTimes = activeLogs
+                        .map((l: any) => l.endTime ? new Date(l.endTime).getTime() : 0)
+                        .filter((t: number) => t > 0);
+                    const latestEndMs = logEndTimes.length > 0 ? Math.max(...logEndTimes) : todayShiftEnd.getTime();
+                    dayElapsedShiftMs = Math.max(0, latestEndMs - opStartMs);
+                    isProducingNow = false;
                 }
             }
         } else if (isPast) {
-            const hasPastActivity = reportsDayQty > 0 || dayPackagesQty > 0 || dayLotsWeight > 0 || dayLogsPcs > 0 || dayDowntimeMs > 0;
+            const hasPastActivity = reportsDayQty > 0 || dayPackagesQty > 0 || dayLotsWeight > 0 || dayLogsPcs > 0 || closedDowntimeMs > 0;
             if (hasPastActivity) {
+                // Em dias passados, a jornada é limitada ao turno planejado da máquina
                 const repWithTimes = matchingReports.find(r => r.shiftStartTime && r.shiftEndTime);
                 if (repWithTimes) {
                     const s = new Date(repWithTimes.shiftStartTime).getTime();
                     const e = new Date(repWithTimes.shiftEndTime).getTime();
                     if (!isNaN(s) && !isNaN(e) && e > s) {
-                        dayElapsedShiftMs = e - s;
+                        dayElapsedShiftMs = Math.min(e - s, shiftPlannedDurationMs);
                     }
                 }
+
                 if (dayElapsedShiftMs === 0) {
                     dayElapsedShiftMs = shiftPlannedDurationMs;
                 }
+
+                // Assegura que em dia passado paradas não superem 60% da jornada
+                dayDowntimeMs = Math.min(closedDowntimeMs, Math.round(dayElapsedShiftMs * 0.6));
             }
         }
 
         const effectiveMs = Math.max(0, dayElapsedShiftMs - dayDowntimeMs);
-        const effectiveFormatted = formatCompactShiftTime(effectiveMs);
-        const downtimeFormatted = formatCompactShiftTime(dayDowntimeMs);
+
+        // Se está ao vivo hoje (rodando ou parado), exibe cronômetro com segundos para dar sensação imediata de "time"
+        const showSecondsLive = isToday && (isProducingNow || isMachineStoppedNow);
+        const effectiveFormatted = formatShiftTimeDisplay(effectiveMs, showSecondsLive);
+        const downtimeFormatted = formatShiftTimeDisplay(dayDowntimeMs, showSecondsLive);
 
         const hasTimeStats = !isHoliday && (
             (isToday && (status === 'live' || status === 'closed' || dayElapsedShiftMs > 0 || produced > 0)) ||
@@ -3428,7 +3534,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             downtimeMs: dayDowntimeMs,
             effectiveFormatted,
             downtimeFormatted,
-            hasTimeStats
+            hasTimeStats,
+            isProducingNow,
+            isMachineStoppedNow
         };
     };
 
@@ -4648,21 +4756,53 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                 </div>
                                                                             )}
 
-                                                                            {/* Estatística Pequena de Tempo (Efetivo e Parado) - Atualizado até o final do turno */}
+                                                                            {/* Estatística de Tempo (Efetivo e Parado) - Cronômetro em Tempo Real */}
                                                                             {dayStats.hasTimeStats && (
                                                                                 <div 
-                                                                                    className="flex flex-col items-end justify-center px-1.5 py-0.5 rounded bg-white/85 border border-slate-200/90 shadow-[0_1px_2px_rgba(0,0,0,0.03)] text-right shrink-0 select-none pointer-events-none"
-                                                                                    title={`Tempo do Turno (atualizado até o final):\n⚡ Efetivo: ${dayStats.effectiveFormatted}\n⏱️ Parado: ${dayStats.downtimeFormatted}`}
+                                                                                    className={`flex flex-col justify-center px-2 py-0.5 rounded-lg border shadow-xs text-right shrink-0 select-none pointer-events-none gap-0.5 transition-all min-w-[76px] ${
+                                                                                        dayStats.isMachineStoppedNow
+                                                                                            ? 'bg-amber-50/95 border-amber-300 ring-1 ring-amber-400/30'
+                                                                                            : dayStats.isProducingNow
+                                                                                                ? 'bg-emerald-50/95 border-emerald-300 ring-1 ring-emerald-400/30'
+                                                                                                : 'bg-white/95 border-slate-200/90 shadow-[0_1px_2px_rgba(0,0,0,0.03)]'
+                                                                                    }`}
+                                                                                    title={`Cronômetro do Turno (Tempo Real):\n⚡ Efetivo: ${dayStats.effectiveFormatted} ${dayStats.isProducingNow ? '(Correndo)' : '(Pausado)'}\n⏱️ Parado: ${dayStats.downtimeFormatted} ${dayStats.isMachineStoppedNow ? '(Correndo)' : '(Pausado)'}`}
                                                                                 >
-                                                                                    <div className="flex items-center gap-1 leading-tight">
-                                                                                        <span className="text-[7.5px] uppercase font-bold text-slate-400 tracking-tight">Ef:</span>
-                                                                                        <span className="text-[9px] sm:text-[9.5px] font-black font-mono text-emerald-700">
+                                                                                    <div className="flex items-center justify-between gap-1.5 leading-none">
+                                                                                        <span className={`text-[9px] sm:text-[9.5px] uppercase font-black tracking-tight flex items-center gap-0.5 ${
+                                                                                            dayStats.isProducingNow ? 'text-emerald-800' : 'text-slate-500'
+                                                                                        }`}>
+                                                                                            {dayStats.isProducingNow ? (
+                                                                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                                                                                            ) : (
+                                                                                                <span className="text-[7.5px]">⚡</span>
+                                                                                            )}
+                                                                                            EF:
+                                                                                        </span>
+                                                                                        <span className={`text-xs sm:text-[13px] md:text-[13.5px] font-black font-mono tracking-tight leading-none ${
+                                                                                            dayStats.isProducingNow ? 'text-emerald-700' : 'text-slate-700'
+                                                                                        }`}>
                                                                                             {dayStats.effectiveFormatted}
                                                                                         </span>
                                                                                     </div>
-                                                                                    <div className="flex items-center gap-1 leading-tight">
-                                                                                        <span className="text-[7.5px] uppercase font-bold text-slate-400 tracking-tight">Par:</span>
-                                                                                        <span className={`text-[9px] sm:text-[9.5px] font-black font-mono ${dayStats.downtimeMs > 0 ? 'text-amber-700 font-bold' : 'text-slate-400'}`}>
+                                                                                    <div className="flex items-center justify-between gap-1.5 leading-none">
+                                                                                        <span className={`text-[9px] sm:text-[9.5px] uppercase font-black tracking-tight flex items-center gap-0.5 ${
+                                                                                            dayStats.isMachineStoppedNow ? 'text-amber-800' : 'text-slate-400'
+                                                                                        }`}>
+                                                                                            {dayStats.isMachineStoppedNow ? (
+                                                                                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping inline-block" />
+                                                                                            ) : (
+                                                                                                <span className="text-[7.5px]">⏱️</span>
+                                                                                            )}
+                                                                                            PAR:
+                                                                                        </span>
+                                                                                        <span className={`text-xs sm:text-[13px] md:text-[13.5px] font-black font-mono tracking-tight leading-none ${
+                                                                                            dayStats.isMachineStoppedNow 
+                                                                                                ? 'text-amber-700 font-extrabold' 
+                                                                                                : dayStats.downtimeMs > 0 
+                                                                                                    ? 'text-amber-600' 
+                                                                                                    : 'text-slate-400'
+                                                                                        }`}>
                                                                                             {dayStats.downtimeFormatted}
                                                                                         </span>
                                                                                     </div>
