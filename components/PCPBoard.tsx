@@ -10146,7 +10146,9 @@ const AdjustQuantityModal: React.FC<{
     }, [order, currentTotal]);
 
     // Cálculos dinâmicos
-    const minAllowedQty = isShiftMode ? shiftBaseQty : currentTotal;
+    // O Gestor pode reduzir a quantidade, portanto o mínimo permitido é 0
+    const minAllowedQty = 0;
+    const originalQty = isShiftMode ? shiftBaseQty : currentTotal;
     const isBelowMinimum = qty < minAllowedQty;
 
     const shiftDelta = isShiftMode ? (qty - shiftBaseQty) : (qty - currentTotal);
@@ -10291,10 +10293,10 @@ const AdjustQuantityModal: React.FC<{
                             </label>
                             <button
                                 type="button"
-                                onClick={() => setQty(minAllowedQty)}
+                                onClick={() => setQty(originalQty)}
                                 className="text-[10px] font-bold text-slate-400 hover:text-white underline cursor-pointer"
                             >
-                                Restaurar Inicial ({minAllowedQty.toLocaleString('pt-BR')} {unit})
+                                Restaurar Inicial ({originalQty.toLocaleString('pt-BR')} {unit})
                             </button>
                         </div>
 
