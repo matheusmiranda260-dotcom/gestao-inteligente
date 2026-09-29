@@ -3143,10 +3143,21 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         }
     };
 
+    // Helper compacto para formatar tempos em cartões (ex: 8h45, 32m, 0m)
+    const formatCompactShiftTime = (ms: number): string => {
+        if (!ms || ms <= 0) return '0m';
+        const totalMinutes = Math.floor(ms / 60000);
+        const h = Math.floor(totalMinutes / 60);
+        const m = totalMinutes % 60;
+        if (h === 0) return `${m}m`;
+        if (m === 0) return `${h}h`;
+        return `${h}h${m < 10 ? '0' : ''}${m}`;
+    };
+
     // Helper para obter estatísticas de produção de uma OP em um dia específico da semana
     const getOpDayStats = (op: ProductionOrderData, date: Date, machName: string) => {
         const dateStr = formatDateString(date);
-        const todayStr = formatDateString(new Date());
+        const todayStr = formatDateString(liveNow);
         const isToday = dateStr === todayStr;
         const isPast = dateStr < todayStr;
         const isFuture = dateStr > todayStr;
@@ -3290,6 +3301,132 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             }
         }
 
+        // -------------------------------------------------------------
+        // CÁLCULO DE TEMPO: EFETIVO vs PARADO (Atualizado até o final do turno)
+        // -------------------------------------------------------------
+        const machCfg = resolveMachineShiftConfig(machName, shiftConfig);
+        const [startH, startM] = (machCfg.workStart || '07:45').split(':').map(Number);
+        const [endH, endM] = (machCfg.workEnd || '17:33').split(':').map(Number);
+
+        const sStartMin = (startH !== undefined && !isNaN(startH) ? startH : 7) * 60 + (startM !== undefined && !isNaN(startM) ? startM : 45);
+        const sEndMin = (endH !== undefined && !isNaN(endH) ? endH : 17) * 60 + (endM !== undefined && !isNaN(endM) ? endM : 33);
+        const shiftPlannedDurationMs = Math.max(0, (sEndMin - sStartMin) * 60000);
+
+        // 1. Total de Paradas no dia (op.downtimeEvents + matchingReports)
+        let dayDowntimeMs = 0;
+        const recordedStops = new Set<string>();
+
+        (op.downtimeEvents || []).forEach((e: any) => {
+            if (!e || !e.stopTime) return;
+            const sDate = new Date(e.stopTime);
+            if (isNaN(sDate.getTime())) return;
+            const sDateOnly = getIsoDateStr(e.stopTime);
+            if (sDateOnly !== dateStr) return;
+
+            const reasonNorm = (e.reason || '').toLowerCase().trim();
+            if ((reasonNorm.includes('final de turno') || reasonNorm.includes('fim de turno') || reasonNorm.includes('aguardando início')) && (!e.durationMin || e.durationMin === 0)) {
+                return;
+            }
+
+            let durMs = 0;
+            if (e.durationMin !== undefined && !isNaN(Number(e.durationMin)) && Number(e.durationMin) > 0) {
+                durMs = Number(e.durationMin) * 60000;
+            } else if (e.resumeTime) {
+                const rDate = new Date(e.resumeTime);
+                if (!isNaN(rDate.getTime())) {
+                    durMs = Math.max(0, rDate.getTime() - sDate.getTime());
+                }
+            } else if (isToday) {
+                const todayEnd = new Date(liveNow);
+                todayEnd.setHours(endH !== undefined && !isNaN(endH) ? endH : 17, endM !== undefined && !isNaN(endM) ? endM : 33, 0, 0);
+                const limitMs = Math.min(liveNow.getTime(), todayEnd.getTime());
+                durMs = Math.max(0, limitMs - sDate.getTime());
+            }
+
+            dayDowntimeMs += durMs;
+            recordedStops.add(String(e.stopTime));
+        });
+
+        matchingReports.forEach((r: any) => {
+            (r.downtimeEvents || []).forEach((e: any) => {
+                if (!e || !e.stopTime) return;
+                const sDateOnly = getIsoDateStr(e.stopTime) || r.date;
+                if (sDateOnly !== dateStr) return;
+                if (recordedStops.has(String(e.stopTime))) return;
+
+                let durMs = 0;
+                if (e.durationMin !== undefined && !isNaN(Number(e.durationMin)) && Number(e.durationMin) > 0) {
+                    durMs = Number(e.durationMin) * 60000;
+                } else if (e.resumeTime) {
+                    const rDate = new Date(e.resumeTime);
+                    if (!isNaN(rDate.getTime())) {
+                        durMs = Math.max(0, rDate.getTime() - new Date(e.stopTime).getTime());
+                    }
+                }
+                dayDowntimeMs += durMs;
+                recordedStops.add(String(e.stopTime));
+            });
+
+            (r.stops || []).forEach((s: any) => {
+                if (s.duration && !isNaN(Number(s.duration))) {
+                    const stopKey = `report-stop-${r.id}-${s.reason}-${s.duration}`;
+                    if (!recordedStops.has(stopKey)) {
+                        dayDowntimeMs += Number(s.duration) * 60000;
+                        recordedStops.add(stopKey);
+                    }
+                }
+            });
+        });
+
+        // 2. Tempo decorrido de turno até agora (ou final do turno)
+        let dayElapsedShiftMs = 0;
+
+        if (isToday) {
+            const todayShiftStart = new Date(liveNow);
+            todayShiftStart.setHours(startH !== undefined && !isNaN(startH) ? startH : 7, startM !== undefined && !isNaN(startM) ? startM : 45, 0, 0);
+
+            const todayShiftEnd = new Date(liveNow);
+            todayShiftEnd.setHours(endH !== undefined && !isNaN(endH) ? endH : 17, endM !== undefined && !isNaN(endM) ? endM : 33, 0, 0);
+
+            if (liveNow.getTime() >= todayShiftStart.getTime()) {
+                // Atualizado até o final do turno: congela no fim do expediente
+                const cappedNow = Math.min(liveNow.getTime(), todayShiftEnd.getTime());
+                dayElapsedShiftMs = Math.max(0, cappedNow - todayShiftStart.getTime());
+            } else {
+                const earlyLog = (op.operatorLogs || []).find((l: any) => l.startTime && getIsoDateStr(l.startTime) === dateStr);
+                if (earlyLog) {
+                    const logStartMs = new Date(earlyLog.startTime).getTime();
+                    if (!isNaN(logStartMs) && logStartMs < liveNow.getTime()) {
+                        dayElapsedShiftMs = Math.max(0, liveNow.getTime() - logStartMs);
+                    }
+                }
+            }
+        } else if (isPast) {
+            const hasPastActivity = reportsDayQty > 0 || dayPackagesQty > 0 || dayLotsWeight > 0 || dayLogsPcs > 0 || dayDowntimeMs > 0;
+            if (hasPastActivity) {
+                const repWithTimes = matchingReports.find(r => r.shiftStartTime && r.shiftEndTime);
+                if (repWithTimes) {
+                    const s = new Date(repWithTimes.shiftStartTime).getTime();
+                    const e = new Date(repWithTimes.shiftEndTime).getTime();
+                    if (!isNaN(s) && !isNaN(e) && e > s) {
+                        dayElapsedShiftMs = e - s;
+                    }
+                }
+                if (dayElapsedShiftMs === 0) {
+                    dayElapsedShiftMs = shiftPlannedDurationMs;
+                }
+            }
+        }
+
+        const effectiveMs = Math.max(0, dayElapsedShiftMs - dayDowntimeMs);
+        const effectiveFormatted = formatCompactShiftTime(effectiveMs);
+        const downtimeFormatted = formatCompactShiftTime(dayDowntimeMs);
+
+        const hasTimeStats = !isHoliday && (
+            (isToday && (status === 'live' || status === 'closed' || dayElapsedShiftMs > 0 || produced > 0)) ||
+            (isPast && (produced > 0 || matchingReports.length > 0 || dayDowntimeMs > 0))
+        );
+
         return {
             dateStr,
             isToday,
@@ -3301,7 +3438,12 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             produced,
             unit,
             operatorName,
-            matchingReportsCount: matchingReports.length
+            matchingReportsCount: matchingReports.length,
+            effectiveMs,
+            downtimeMs: dayDowntimeMs,
+            effectiveFormatted,
+            downtimeFormatted,
+            hasTimeStats
         };
     };
 
@@ -4454,13 +4596,13 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                             )}
                                                                         </div>
 
-                                                                        <div className="flex items-baseline gap-1 my-0.5">
+                                                                        <div className="flex items-center justify-between gap-1 my-0.5">
                                                                             {dayStats.isHoliday && dayStats.produced === 0 ? (
                                                                                 <span className="text-xs font-black text-rose-600 font-mono tracking-tight">
                                                                                     Folga / Feriado
                                                                                 </span>
                                                                             ) : (
-                                                                                <div className="flex items-center gap-1">
+                                                                                <div className="flex items-center gap-1 min-w-0">
                                                                                     {/* Botão Menos Rápido para Gestor */}
                                                                                     {isGestor && !dayStats.isFuture && (
                                                                                         <button
@@ -4518,6 +4660,27 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                             +
                                                                                         </button>
                                                                                     )}
+                                                                                </div>
+                                                                            )}
+
+                                                                            {/* Estatística Pequena de Tempo (Efetivo e Parado) - Atualizado até o final do turno */}
+                                                                            {dayStats.hasTimeStats && (
+                                                                                <div 
+                                                                                    className="flex flex-col items-end justify-center px-1.5 py-0.5 rounded bg-white/85 border border-slate-200/90 shadow-[0_1px_2px_rgba(0,0,0,0.03)] text-right shrink-0 select-none pointer-events-none"
+                                                                                    title={`Tempo do Turno (atualizado até o final):\n⚡ Efetivo: ${dayStats.effectiveFormatted}\n⏱️ Parado: ${dayStats.downtimeFormatted}`}
+                                                                                >
+                                                                                    <div className="flex items-center gap-1 leading-tight">
+                                                                                        <span className="text-[7.5px] uppercase font-bold text-slate-400 tracking-tight">Ef:</span>
+                                                                                        <span className="text-[9px] sm:text-[9.5px] font-black font-mono text-emerald-700">
+                                                                                            {dayStats.effectiveFormatted}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                    <div className="flex items-center gap-1 leading-tight">
+                                                                                        <span className="text-[7.5px] uppercase font-bold text-slate-400 tracking-tight">Par:</span>
+                                                                                        <span className={`text-[9px] sm:text-[9.5px] font-black font-mono ${dayStats.downtimeMs > 0 ? 'text-amber-700 font-bold' : 'text-slate-400'}`}>
+                                                                                            {dayStats.downtimeFormatted}
+                                                                                        </span>
+                                                                                    </div>
                                                                                 </div>
                                                                             )}
                                                                         </div>
@@ -6955,10 +7118,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                                             <div className="text-right shrink-0">
                                                 <span className="text-xs font-mono font-black text-[#00E5FF] block">
-                                                    {prog.totalProducedFormatted} / {prog.targetFormatted} {prog.unit}
+                                                    {prog.produced.toLocaleString('pt-BR')} / {prog.target.toLocaleString('pt-BR')} {prog.unit}
                                                 </span>
                                                 <span className="text-[10px] font-bold text-slate-400">
-                                                    Progresso: {prog.percent}%
+                                                    Progresso: {prog.pct}%
                                                 </span>
                                             </div>
                                         </div>
@@ -6967,7 +7130,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                         <div className="w-full bg-black/40 rounded-full h-2 mt-2.5 overflow-hidden border border-white/10">
                                             <div 
                                                 className={`h-full transition-all duration-300 ${isLive ? 'bg-gradient-to-r from-cyan-500 to-emerald-400' : 'bg-amber-400'}`}
-                                                style={{ width: `${Math.min(100, prog.percent)}%` }}
+                                                style={{ width: `${Math.min(100, prog.pct)}%` }}
                                             />
                                         </div>
                                     </div>
