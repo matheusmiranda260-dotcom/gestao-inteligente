@@ -682,18 +682,35 @@ const App: React.FC = () => {
 
             // Sincroniza automaticamente a descrição e código atualizados com todos os lotes deste produto no estoque
             const previousGauge = gauges.find(g => g.id === id);
+            const oldCode = previousGauge?.productCode;
             const targetMaterial = data.materialType || savedOrUpdated?.materialType || previousGauge?.materialType;
             const targetGauge = previousGauge?.gauge || data.gauge || savedOrUpdated?.gauge;
             const newDesc = data.description !== undefined ? data.description : savedOrUpdated?.description;
             const newCode = data.productCode !== undefined ? data.productCode : savedOrUpdated?.productCode;
+            const newGauge = data.gauge !== undefined ? data.gauge : savedOrUpdated?.gauge;
 
-            if (targetMaterial && targetGauge && (newDesc !== undefined || newCode !== undefined)) {
+            if (targetMaterial && (newDesc !== undefined || newCode !== undefined || newGauge !== undefined)) {
+                const gaugeVariations = targetGauge ? Array.from(new Set([
+                    targetGauge,
+                    targetGauge.replace('.', ','),
+                    targetGauge.replace(',', '.')
+                ])) : [];
+
                 setStock(prev => prev.map(item => {
-                    if (item.materialType === targetMaterial && item.bitola === targetGauge) {
+                    const matchesCode = Boolean(oldCode && item.productCode === oldCode);
+                    const matchesGauge = Boolean(
+                        item.materialType === targetMaterial && 
+                        targetGauge && 
+                        gaugeVariations.includes(item.bitola) &&
+                        (!oldCode || item.productCode === oldCode || !item.productCode)
+                    );
+
+                    if (matchesCode || matchesGauge) {
                         return {
                             ...item,
                             description: newDesc !== undefined ? newDesc : item.description,
-                            productCode: newCode !== undefined ? newCode : item.productCode
+                            productCode: newCode !== undefined ? newCode : item.productCode,
+                            bitola: newGauge !== undefined ? newGauge : item.bitola
                         };
                     }
                     return item;
@@ -703,11 +720,22 @@ const App: React.FC = () => {
                     const stockItemUpdates: any = {};
                     if (newDesc !== undefined) stockItemUpdates.description = newDesc;
                     if (newCode !== undefined) stockItemUpdates.product_code = newCode;
+                    if (newGauge !== undefined) stockItemUpdates.bitola = newGauge;
+
                     if (Object.keys(stockItemUpdates).length > 0) {
-                        await supabase.from('stock_items')
-                            .update(stockItemUpdates)
-                            .eq('material_type', targetMaterial)
-                            .eq('bitola', targetGauge);
+                        if (oldCode) {
+                            await supabase.from('stock_items')
+                                .update(stockItemUpdates)
+                                .eq('product_code', oldCode);
+                        }
+                        if (targetMaterial && targetGauge) {
+                            for (const gVar of gaugeVariations) {
+                                await supabase.from('stock_items')
+                                    .update(stockItemUpdates)
+                                    .eq('material_type', targetMaterial)
+                                    .eq('bitola', gVar);
+                            }
+                        }
                     }
                 } catch (err) {
                     console.warn('Erro ao atualizar descrição nos lotes de estoque:', err);
