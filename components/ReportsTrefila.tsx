@@ -30,6 +30,7 @@ interface ShiftStats {
 interface ProductionUpdateRow {
     id: string;
     data: string; // ex: "07/05"
+    lote?: string; // ex: "9860"
     kgEntrada: number;
     saida: number;
     bitola: string;
@@ -244,14 +245,97 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
         const newUpdates: ProductionUpdateRow[] = [];
         const dateShort = selDateOnly.split('-').slice(1).reverse().join('/'); // dd/mm
 
-        (targetOP.processedLots || []).forEach((lot, idx) => {
+        const findStockLot = (lotObjOrId: any) => {
+            if (!lotObjOrId) return undefined;
+            const targetId = typeof lotObjOrId === 'string' 
+                ? lotObjOrId 
+                : (lotObjOrId.lotId || lotObjOrId.id || lotObjOrId.internalLot);
+            if (!targetId) return undefined;
+            return (stock || []).find(s => 
+                s.id === targetId || 
+                s.internalLot === targetId ||
+                (typeof lotObjOrId === 'object' && lotObjOrId.internalLot && s.internalLot === lotObjOrId.internalLot) ||
+                (typeof lotObjOrId === 'object' && lotObjOrId.lotId && s.id === lotObjOrId.lotId)
+            );
+        };
+
+        const processedLots = targetOP.processedLots || [];
+        const processedLotIdsSet = new Set<string>();
+        let previousLotDate = '';
+
+        processedLots.forEach((lot, idx) => {
+            const stockItem = findStockLot(lot);
+            if (lot.lotId) processedLotIdsSet.add(lot.lotId);
+            if (stockItem?.id) processedLotIdsSet.add(stockItem.id);
+            if (stockItem?.internalLot) processedLotIdsSet.add(stockItem.internalLot);
+
+            const lotIso = lot.endTime || lot.startTime;
+            let lotDate = dateShort;
+            if (lotIso) {
+                const d = new Date(lotIso);
+                if (!isNaN(d.getTime())) {
+                    lotDate = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                }
+            }
+
+            // Se mudou de dia entre lotes, insere separador visual para separar dias e totais
+            if (previousLotDate && lotDate !== previousLotDate) {
+                newUpdates.push({
+                    id: `sep-${idx}-${Date.now()}`,
+                    data: '',
+                    lote: '',
+                    kgEntrada: 0,
+                    saida: 0,
+                    bitola: '',
+                    isSeparator: true
+                });
+            }
+            previousLotDate = lotDate;
+
+            const lotNum = stockItem?.internalLot || (lot as any).internalLot || (lot.lotId && !lot.lotId.startsWith('STOCK-') ? lot.lotId : `${idx + 1}`);
+            const inputWeight = Number(stockItem?.initialQuantity || stockItem?.weight || stockItem?.labelWeight || (lot as any).inputWeight || (lot as any).initialWeight || 0);
+            const outputWeight = lot.finalWeight !== null && lot.finalWeight !== undefined 
+                ? Number(lot.finalWeight) 
+                : ((lot as any).producedWeight !== null && (lot as any).producedWeight !== undefined ? Number((lot as any).producedWeight) : 0);
+
+            const lotBitola = lot.measuredGauge 
+                ? `${Number(lot.measuredGauge).toFixed(2)} mm` 
+                : (targetOP.targetBitola ? `${targetOP.targetBitola} mm` : `${outBitola} mm`);
+
             newUpdates.push({
                 id: `lot-${idx}-${Date.now()}`,
-                data: lot.startTime ? new Date(lot.startTime).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : dateShort,
-                kgEntrada: Number(lot.weight || lot.initialWeight || 0),
-                saida: Number(lot.producedWeight || lot.weight || 0),
-                bitola: `${outBitola} mm`
+                data: lotDate,
+                lote: lotNum,
+                kgEntrada: inputWeight,
+                saida: outputWeight,
+                bitola: lotBitola
             });
+        });
+
+        // Se houver lotes programados no PCP (selectedLotIds) que ainda não foram pesados
+        let selectedLotIdsList: string[] = [];
+        if (Array.isArray(targetOP.selectedLotIds)) {
+            selectedLotIdsList = targetOP.selectedLotIds.filter(Boolean);
+        } else if (targetOP.selectedLotIds && typeof targetOP.selectedLotIds === 'object') {
+            selectedLotIdsList = Object.values(targetOP.selectedLotIds).flat().filter(Boolean) as string[];
+        }
+
+        selectedLotIdsList.forEach((lotId, pIdx) => {
+            const stockItem = findStockLot(lotId);
+            const isAlreadyProcessed = processedLotIdsSet.has(lotId) || 
+                                       (stockItem && (processedLotIdsSet.has(stockItem.id) || (stockItem.internalLot && processedLotIdsSet.has(stockItem.internalLot))));
+            if (!isAlreadyProcessed) {
+                const lotNum = stockItem?.internalLot || (lotId && !lotId.startsWith('STOCK-') ? lotId : `${newUpdates.length + 1}`);
+                const inputWeight = Number(stockItem?.initialQuantity || stockItem?.weight || stockItem?.labelWeight || 0);
+                newUpdates.push({
+                    id: `sel-lot-${pIdx}-${Date.now()}`,
+                    data: dateShort,
+                    lote: lotNum,
+                    kgEntrada: inputWeight,
+                    saida: 0,
+                    bitola: `${outBitola} mm`
+                });
+            }
         });
 
         // Se houver weighedPackages não computados
@@ -260,6 +344,7 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
                 newUpdates.push({
                     id: `pkg-${pIdx}-${Date.now()}`,
                     data: dateShort,
+                    lote: pkg.packageNumber ? `Pacote ${pkg.packageNumber}` : `Pacote ${pIdx + 1}`,
                     kgEntrada: 0,
                     saida: Number(pkg.weight || 0),
                     bitola: `${outBitola} mm`
@@ -275,6 +360,7 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
                     newUpdates.push({
                         id: `rep-${rIdx}-${Date.now()}`,
                         data: rep.date || dateShort,
+                        lote: `Turno ${rep.shift || (rIdx + 1)}`,
                         kgEntrada: 0,
                         saida: Number(rep.totalProducedWeight),
                         bitola: `${outBitola} mm`
@@ -456,6 +542,11 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
                 const data = JSON.parse(saved);
                 // Se houver rascunho salvo para a data selecionada
                 if (data.selectedDate && data.selectedDate === selectedDate && (data.productionOrder || data.stops?.length > 0)) {
+                    const hasValidUpdates = (data.productionUpdates || []).some((u: any) => (u.kgEntrada > 0 || u.saida > 0 || Boolean(u.lote)));
+                    if (!hasValidUpdates && availableOPs.length > 0) {
+                        syncDailyEvolution();
+                        return;
+                    }
                     setSelectedDate(data.selectedDate);
                     setProductionOrder(data.productionOrder || '');
                     setOperator(data.operator || '');
@@ -539,7 +630,7 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
     };
 
     const addSeparatorRow = () => {
-        setProductionUpdates([...productionUpdates, { id: Math.random().toString(36).substring(2, 9), data: '', kgEntrada: 0, saida: 0, bitola: '', isSeparator: true }]);
+        setProductionUpdates([...productionUpdates, { id: Math.random().toString(36).substring(2, 9), data: '', lote: '', kgEntrada: 0, saida: 0, bitola: '', isSeparator: true }]);
     };
 
     const addProductionUpdateRow = () => {
@@ -550,7 +641,15 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
                 break;
             }
         }
-        setProductionUpdates([...productionUpdates, { id: Math.random().toString(36).substring(2, 9), data: lastData, kgEntrada: 0, saida: 0, bitola: '' }]);
+        const defaultBitola = productDescriptionOut ? productDescriptionOut.split('---')[0]?.trim() : '';
+        setProductionUpdates([...productionUpdates, { 
+            id: Math.random().toString(36).substring(2, 9), 
+            data: lastData, 
+            lote: '', 
+            kgEntrada: 0, 
+            saida: 0, 
+            bitola: defaultBitola 
+        }]);
     };
     const removeProductionUpdateRow = (id: string) => {
         setProductionUpdates(productionUpdates.filter(r => r.id !== id));
@@ -1428,10 +1527,18 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
                             <div className="bg-[#002060] text-white py-2 text-center text-xs font-black tracking-wider uppercase flex items-center justify-between px-4">
                                 <span className="mx-auto pl-14">ATUALIZAÇÃO DA PRODUÇÃO</span>
                                 <div className="flex gap-2">
-                                    <button onClick={addSeparatorRow} className="bg-slate-300 hover:bg-slate-400 text-[#002060] text-[10px] font-black py-1 px-3.5 rounded shadow transition-colors no-print uppercase">
+                                    <button 
+                                        type="button" 
+                                        onClick={() => syncDailyEvolution(selectedOPId || undefined, true)} 
+                                        className="bg-blue-700 hover:bg-blue-600 text-white text-[10px] font-black py-1 px-3 rounded shadow transition-colors no-print uppercase cursor-pointer"
+                                        title="Atualizar lotes a partir da OP ativa"
+                                    >
+                                        🔄 Sincronizar OP
+                                    </button>
+                                    <button onClick={addSeparatorRow} className="bg-slate-300 hover:bg-slate-400 text-[#002060] text-[10px] font-black py-1 px-3.5 rounded shadow transition-colors no-print uppercase cursor-pointer">
                                         Pular Linha
                                     </button>
-                                    <button onClick={addProductionUpdateRow} className="bg-white hover:bg-slate-100 text-[#002060] text-[10px] font-black py-1 px-3.5 rounded shadow transition-colors no-print uppercase">
+                                    <button onClick={addProductionUpdateRow} className="bg-white hover:bg-slate-100 text-[#002060] text-[10px] font-black py-1 px-3.5 rounded shadow transition-colors no-print uppercase cursor-pointer">
                                         + Registrar Peso
                                     </button>
                                 </div>
@@ -1440,18 +1547,19 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
                             <table className="w-full border-collapse">
                                 <thead>
                                     <tr className="bg-slate-50 text-[#002060] text-[10px] font-black uppercase">
-                                        <th className="py-2 border border-[#002060] text-center" style={{ width: '25%' }}>Data</th>
-                                        <th className="py-2 border border-[#002060] text-center" style={{ width: '25%' }}>kg (entrada)</th>
-                                        <th className="py-2 border border-[#002060] text-center" style={{ width: '25%' }}>saida</th>
-                                        <th className="py-2 border border-[#002060] text-center" style={{ width: '25%' }}>bitola</th>
+                                        <th className="py-2 border border-[#002060] text-center" style={{ width: '14%' }}>Data</th>
+                                        <th className="py-2 border border-[#002060] text-center" style={{ width: '18%' }}>Lote</th>
+                                        <th className="py-2 border border-[#002060] text-center" style={{ width: '22%' }}>KG (Entrada)</th>
+                                        <th className="py-2 border border-[#002060] text-center" style={{ width: '22%' }}>Saída (KG)</th>
+                                        <th className="py-2 border border-[#002060] text-center" style={{ width: '14%' }}>Bitola</th>
                                         <th className="py-2 border border-[#002060] text-center no-print" style={{ width: '60px' }}>Ações</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {productionUpdates.length === 0 ? (
                                         <tr>
-                                            <td colSpan={5} className="py-5 text-slate-400 italic font-bold text-center text-xs">
-                                                Nenhum lote de pesagem registrado. Clique em "+ Registrar Peso".
+                                            <td colSpan={6} className="py-5 text-slate-400 italic font-bold text-center text-xs">
+                                                Nenhum lote de pesagem registrado. Clique em "+ Registrar Peso" ou "🔄 Sincronizar OP".
                                             </td>
                                         </tr>
                                     ) : (() => {
@@ -1474,41 +1582,69 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
                                             
                                             return (
                                                 <React.Fragment key={`block-${blockIndex}`}>
-                                                    {block.rows.map((row, rowIndex) => (
+                                                    {block.rows.map((row) => (
                                                         <tr key={row.id} className="hover:bg-slate-50/50 group text-xs">
-                                                            {rowIndex === 0 && (
-                                                                <td rowSpan={block.rows.length} className="p-1 border-r border-b border-slate-200 text-center align-middle bg-slate-50/50">
-                                                                    <input type="text" value={row.data} onChange={e => {
-                                                                        const newData = e.target.value;
-                                                                        setProductionUpdates(prev => prev.map(r => block.rows.some(br => br.id === r.id) ? { ...r, data: newData } : r));
-                                                                    }} className="modern-editable-input text-center w-full font-black text-sm" placeholder="Ex: 12/05" />
-                                                                </td>
-                                                            )}
                                                             <td className="p-1 border-r border-b border-slate-200 text-center">
-                                                                <input type="number" value={row.kgEntrada || ''} onChange={e => updateProductionUpdateField(row.id, 'kgEntrada', parseInt(e.target.value, 10) || 0)} className="modern-editable-input text-center w-full font-black text-xs" placeholder="0" />
+                                                                <input 
+                                                                    type="text" 
+                                                                    value={row.data} 
+                                                                    onChange={e => updateProductionUpdateField(row.id, 'data', e.target.value)} 
+                                                                    className="modern-editable-input text-center w-full font-black text-xs" 
+                                                                    placeholder="Ex: 25/09" 
+                                                                />
                                                             </td>
                                                             <td className="p-1 border-r border-b border-slate-200 text-center">
-                                                                <input type="number" value={row.saida || ''} onChange={e => updateProductionUpdateField(row.id, 'saida', parseInt(e.target.value, 10) || 0)} className="modern-editable-input text-center w-full font-black text-xs" placeholder="0" />
+                                                                <input 
+                                                                    type="text" 
+                                                                    value={row.lote || ''} 
+                                                                    onChange={e => updateProductionUpdateField(row.id, 'lote', e.target.value)} 
+                                                                    className="modern-editable-input text-center w-full font-black text-xs text-blue-900" 
+                                                                    placeholder="Ex: 9860" 
+                                                                />
                                                             </td>
                                                             <td className="p-1 border-r border-b border-slate-200 text-center">
-                                                                <input type="text" value={row.bitola} onChange={e => updateProductionUpdateField(row.id, 'bitola', e.target.value)} className="modern-editable-input text-center w-full font-black text-xs" placeholder="Ex: 5,98mm" />
+                                                                <input 
+                                                                    type="number" 
+                                                                    value={row.kgEntrada || ''} 
+                                                                    onChange={e => updateProductionUpdateField(row.id, 'kgEntrada', parseInt(e.target.value, 10) || 0)} 
+                                                                    className="modern-editable-input text-center w-full font-black text-xs" 
+                                                                    placeholder="0" 
+                                                                />
+                                                            </td>
+                                                            <td className="p-1 border-r border-b border-slate-200 text-center">
+                                                                <input 
+                                                                    type="number" 
+                                                                    value={row.saida || ''} 
+                                                                    onChange={e => updateProductionUpdateField(row.id, 'saida', parseInt(e.target.value, 10) || 0)} 
+                                                                    className="modern-editable-input text-center w-full font-black text-xs text-emerald-700" 
+                                                                    placeholder="0" 
+                                                                />
+                                                            </td>
+                                                            <td className="p-1 border-r border-b border-slate-200 text-center">
+                                                                <input 
+                                                                    type="text" 
+                                                                    value={row.bitola} 
+                                                                    onChange={e => updateProductionUpdateField(row.id, 'bitola', e.target.value)} 
+                                                                    className="modern-editable-input text-center w-full font-black text-xs" 
+                                                                    placeholder="Ex: 3.40 mm" 
+                                                                />
                                                             </td>
                                                             <td className="p-1 border-b border-slate-200 text-center no-print">
-                                                                <button onClick={() => removeProductionUpdateRow(row.id)} className="text-rose-600 hover:text-rose-800 font-bold hover:bg-rose-50 px-2 py-0.5 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity" title="Remover pesagem">✕</button>
+                                                                <button onClick={() => removeProductionUpdateRow(row.id)} className="text-rose-600 hover:text-rose-800 font-bold hover:bg-rose-50 px-2 py-0.5 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" title="Remover pesagem">✕</button>
                                                             </td>
                                                         </tr>
                                                     ))}
                                                     
                                                     {hasRows && (
                                                         <tr className="bg-blue-50 font-black text-xs border-b-2 border-[#002060]/30">
-                                                            <td className="p-2 border-r border-[#002060]/20 text-right pr-4 uppercase tracking-wider text-[11px] font-black text-[#002060]">
+                                                            <td colSpan={2} className="p-2 border-r border-[#002060]/20 text-right pr-4 uppercase tracking-wider text-[11px] font-black text-[#002060]">
                                                                 TOTAL DIA:
                                                             </td>
                                                             <td className="p-2 border-r border-[#002060]/20 text-center font-black text-rose-600">
-                                                                {blockEntrada > 0 ? blockEntrada.toLocaleString('pt-BR') : '0'}
+                                                                {blockEntrada > 0 ? blockEntrada.toLocaleString('pt-BR') : '0'} kg
                                                             </td>
-                                                            <td className="p-2 border-r border-[#002060]/20 text-center font-black text-rose-600">
-                                                                {blockSaida > 0 ? blockSaida.toLocaleString('pt-BR') : '0'}
+                                                            <td className="p-2 border-r border-[#002060]/20 text-center font-black text-emerald-600">
+                                                                {blockSaida > 0 ? blockSaida.toLocaleString('pt-BR') : '0'} kg
                                                             </td>
                                                             <td className="p-2 border-r border-[#002060]/20 text-center font-black text-slate-500"></td>
                                                             <td className="p-2 text-center no-print"></td>
@@ -1517,11 +1653,11 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
                                                     
                                                     {block.separatorId && (
                                                         <tr className="bg-white group">
-                                                            <td colSpan={4} className="h-6 border-y-2 border-[#002060]/30 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                                            <td colSpan={5} className="h-6 border-y-2 border-[#002060]/30 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                                                                 <span className="no-print">--- Novo Dia / Nova Sessão ---</span>
                                                             </td>
                                                             <td className="border-y-2 border-[#002060]/30 text-center no-print">
-                                                                <button onClick={() => removeProductionUpdateRow(block.separatorId!)} className="text-rose-600 hover:text-rose-800 font-bold hover:bg-rose-50 px-2 py-0.5 rounded text-[10px] opacity-0 group-hover:opacity-100 transition-opacity" title="Remover Divisão">✕ Divisão</button>
+                                                                <button onClick={() => removeProductionUpdateRow(block.separatorId!)} className="text-rose-600 hover:text-rose-800 font-bold hover:bg-rose-50 px-2 py-0.5 rounded text-[10px] opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" title="Remover Divisão">✕ Divisão</button>
                                                             </td>
                                                         </tr>
                                                     )}
@@ -1532,10 +1668,10 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
                                     {productionUpdates.filter(r => !r.isSeparator).length > 0 && (
                                         <>
                                             <tr className="bg-white">
-                                                <td colSpan={5} className="h-6 border-t-2 border-slate-300"></td>
+                                                <td colSpan={6} className="h-6 border-t-2 border-slate-300"></td>
                                             </tr>
                                             <tr className="bg-[#002060] font-black text-white text-xs border-t-2 border-[#002060]">
-                                                <td className="p-2 border-r border-slate-700 text-center uppercase tracking-wider text-[10px] font-black text-white">
+                                                <td colSpan={2} className="p-2 border-r border-slate-700 text-center uppercase tracking-wider text-[10px] font-black text-white">
                                                     TOTAL GERAL
                                                 </td>
                                                 <td className="p-2 border-r border-slate-700 text-center font-black text-white">

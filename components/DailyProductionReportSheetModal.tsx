@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import type { ProductionOrderData, ShiftReport } from '../types';
+import type { ProductionOrderData, ShiftReport, StockItem } from '../types';
 import { supabase } from '../supabaseClient';
 import html2canvas from 'html2canvas';
 import { resolveMachineShiftConfig } from '../services/shiftConfigService';
@@ -16,6 +16,7 @@ export interface DailyProductionReportSheetModalProps {
     initialProduced?: number;
     initialOperator?: string;
     shiftConfig?: any;
+    stock?: StockItem[];
 }
 
 interface StopRow {
@@ -40,6 +41,10 @@ interface ProductionUpdateRow {
     qnt: number;
     peso: number;
     data: string;
+    lote?: string;
+    kgEntrada?: number;
+    saida?: number;
+    bitola?: string;
 }
 
 interface Toast {
@@ -107,6 +112,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
     initialProduced,
     initialOperator,
     shiftConfig,
+    stock = [],
 }) => {
     // Normalização da máquina (ex: Treliça 1, Treliça 2)
     const machine = useMemo(() => {
@@ -115,6 +121,13 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         if (raw.toLowerCase().includes('treliça') || raw.toLowerCase().includes('trelica')) return 'Treliça 1';
         return raw;
     }, [initialMachine, op]);
+
+    const isTrefila = useMemo(() => {
+        const m = (machine || '').toLowerCase();
+        const opM = (op?.machine as string || '').toLowerCase();
+        const opSched = (op?.scheduledMachine as string || '').toLowerCase();
+        return m.includes('trefila') || opM.includes('trefila') || opSched.includes('trefila');
+    }, [machine, op]);
 
     // Resolução da configuração de turnos da máquina (1 ou 2 turnos)
     const shiftCfg = useMemo(() => resolveMachineShiftConfig(machine, shiftConfig), [machine, shiftConfig]);
@@ -420,11 +433,72 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         });
     };
 
+    // Helper para gerar o histórico de lotes processados para Trefila
+    const generateTrefilaProductionUpdates = (
+        targetOp: ProductionOrderData,
+        stockList?: StockItem[],
+        fallbackDateStr?: string
+    ): ProductionUpdateRow[] => {
+        const rows: ProductionUpdateRow[] = [];
+        const findStockLot = (lotObjOrId: any) => {
+            if (!lotObjOrId) return undefined;
+            const targetId = typeof lotObjOrId === 'string' 
+                ? lotObjOrId 
+                : (lotObjOrId.lotId || lotObjOrId.id || lotObjOrId.internalLot);
+            if (!targetId) return undefined;
+            return (stockList || []).find(s => 
+                s.id === targetId || 
+                s.internalLot === targetId ||
+                (typeof lotObjOrId === 'object' && lotObjOrId.internalLot && s.internalLot === lotObjOrId.internalLot) ||
+                (typeof lotObjOrId === 'object' && lotObjOrId.lotId && s.id === lotObjOrId.lotId)
+            );
+        };
+
+        const dateFallback = fallbackDateStr ? formatDateBr(fallbackDateStr) : '';
+        const pLots = targetOp.processedLots || [];
+        pLots.forEach((lot, idx) => {
+            const stockItem = findStockLot(lot);
+            const lotIso = lot.endTime || lot.startTime;
+            let lotDate = dateFallback;
+            if (lotIso) {
+                const d = new Date(lotIso);
+                if (!isNaN(d.getTime())) {
+                    lotDate = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                }
+            }
+            const lotNum = stockItem?.internalLot || (lot as any).internalLot || (lot.lotId && !lot.lotId.startsWith('STOCK-') ? lot.lotId : `${idx + 1}`);
+            const inputWeight = Number(stockItem?.initialQuantity || stockItem?.weight || stockItem?.labelWeight || (lot as any).inputWeight || (lot as any).initialWeight || 0);
+            const outputWeight = lot.finalWeight !== null && lot.finalWeight !== undefined 
+                ? Number(lot.finalWeight) 
+                : ((lot as any).producedWeight !== null && (lot as any).producedWeight !== undefined ? Number((lot as any).producedWeight) : 0);
+            const bitolaStr = lot.measuredGauge 
+                ? `${Number(lot.measuredGauge).toFixed(2)} mm` 
+                : (targetOp.targetBitola ? `${targetOp.targetBitola} mm` : '');
+
+            rows.push({
+                id: `auto-trefila-lot-${idx}-${Date.now()}`,
+                qnt: 1,
+                peso: outputWeight,
+                data: lotDate,
+                lote: lotNum,
+                kgEntrada: inputWeight,
+                saida: outputWeight,
+                bitola: bitolaStr
+            });
+        });
+
+        return rows;
+    };
+
     // Auto-preenchimento automático inteligente dos dados com base no chão de fábrica
     const generateAutoDataFromShopFloor = () => {
         const prodOrder = op.orderNumber || '';
-        const prodDesc = (op.trelicaModel || op.product || 'TRELIÇA H-12 LEVE 6 MTS').toUpperCase();
-        const targetQ = op.quantityToProduce || op.targetQuantity || 4500;
+        const inBitola = op.inputBitola || '8.00';
+        const outBitola = op.targetBitola || '6.00';
+        const prodDesc = isTrefila 
+            ? `${outBitola}mm ---CA60--` 
+            : (op.trelicaModel || op.product || 'TRELIÇA H-12 LEVE 6 MTS').toUpperCase();
+        const targetQ = op.quantityToProduce || op.targetQuantity || (isTrefila ? 10000 : 4500);
         const defaultSize = resolvePieceSize(op, prodDesc);
 
         // 1. Relatórios de Turno desta OP nesta data específica
@@ -485,6 +559,23 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         if (initialProduced !== undefined && initialProduced > 0) {
             if (piecesA === 0 || piecesA < initialProduced) {
                 piecesA = initialProduced;
+            }
+        }
+
+        // Para Trefila, sincronizar com peso produzido
+        if (isTrefila) {
+            let trefilaDayWeight = 0;
+            (op.processedLots || []).forEach(l => {
+                const lDate = getLocalDateString(l.endTime || l.startTime);
+                if (lDate === selectedDate) {
+                    trefilaDayWeight += (Number(l.finalWeight) || 0);
+                }
+            });
+            if (trefilaDayWeight === 0 && op.actualProducedWeight) {
+                trefilaDayWeight = Number(op.actualProducedWeight);
+            }
+            if (piecesA === 0 && trefilaDayWeight > 0) {
+                piecesA = trefilaDayWeight;
             }
         }
 
@@ -606,6 +697,10 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         const shiftHoursA = isTrelica ? '08:48:00' : '09:48:00';
         const shiftHoursB = hasRealTurnoB ? (isTrelica ? '08:48:00' : '09:00:00') : '00:00:00';
 
+        const updates = isTrefila
+            ? generateTrefilaProductionUpdates(op, stock, selectedDate)
+            : generateProductionUpdatesHistory(op, shiftReports, getTheoreticalWeightPerPiece(prodDesc, defaultSize), selectedDate);
+
         return {
             productionOrder: prodOrder,
             productDescription: prodDesc,
@@ -626,7 +721,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 tamanhoPeca: defaultSize,
                 horarioTurnoPrevisto: hasRealTurnoB ? shiftScheduleStrB : '',
             },
-            productionUpdates: generateProductionUpdatesHistory(op, shiftReports, getTheoreticalWeightPerPiece(prodDesc, defaultSize), selectedDate)
+            productionUpdates: updates
         };
     };
 
@@ -735,9 +830,14 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 const currentDesc = dbReport.product_description || op.trelicaModel || 'TRELIÇA';
                 const currentSize = resolvedTamanhoA;
                 const theoreticalUnitWeight = getTheoreticalWeightPerPiece(currentDesc, currentSize);
-                const autoHistory = generateProductionUpdatesHistory(op, shiftReports, theoreticalUnitWeight, targetDate);
+                const autoHistory = isTrefila
+                    ? generateTrefilaProductionUpdates(op, stock, targetDate)
+                    : generateProductionUpdatesHistory(op, shiftReports, theoreticalUnitWeight, targetDate);
 
-                const finalUpdates = (dbReport.production_updates && dbReport.production_updates.length > 0)
+                const hasValidDbUpdates = (dbReport.production_updates && dbReport.production_updates.length > 0) &&
+                    (!isTrefila || dbReport.production_updates.some((u: any) => u.lote || u.kgEntrada > 0 || u.saida > 0));
+
+                const finalUpdates = hasValidDbUpdates
                     ? dbReport.production_updates
                     : autoHistory;
 
@@ -944,9 +1044,13 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
     const addProductionUpdateRow = () => {
         const newRow: ProductionUpdateRow = {
             id: `pesagem-${Date.now()}`,
-            qnt: 0,
+            qnt: isTrefila ? 1 : 0,
             peso: 0,
-            data: formattedDateNumbers
+            data: formattedDateNumbers,
+            lote: '',
+            kgEntrada: 0,
+            saida: 0,
+            bitola: isTrefila && op.targetBitola ? `${op.targetBitola} mm` : ''
         };
         setProductionUpdates(prev => [...prev, newRow]);
     };
@@ -1745,30 +1849,45 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                             <span className="w-12 text-right">{calculatedData.turnoA.percentEfetivo}%</span>
                                         </div>
                                     </div>
-                                    {/* Peças Produzidas */}
+                                    {/* Peças Produzidas / Peso Produzido */}
                                     <div className="flex items-center justify-between py-2.5">
                                         <div className="flex items-center gap-2 mr-2">
                                             <LayersIcon className="h-4 w-4 text-slate-400" />
-                                            <span className="text-sm font-extrabold text-slate-700">Quantidade de peças produzidas</span>
+                                            <span className="text-sm font-extrabold text-slate-700">
+                                                {isTrefila ? 'Peso produzido no turno' : 'Quantidade de peças produzidas'}
+                                            </span>
                                         </div>
-                                        <div className="flex items-center gap-1 font-bold text-sm text-slate-950 shrink-0 whitespace-nowrap">
-                                            <input
-                                                type="number"
-                                                value={statsShiftA.pecasProduzidas || ''}
-                                                onChange={e => setStatsShiftA({ ...statsShiftA, pecasProduzidas: parseInt(e.target.value, 10) || 0 })}
-                                                className="modern-editable-input text-center w-12 text-slate-950 border-b border-slate-200 font-black text-sm"
-                                                placeholder="0"
-                                            />
-                                            <span className="text-slate-500 font-bold text-xs px-0.5">peças de</span>
-                                            <input
-                                                type="number"
-                                                value={statsShiftA.tamanhoPeca || ''}
-                                                onChange={e => setStatsShiftA({ ...statsShiftA, tamanhoPeca: parseFloat(e.target.value) || 0 })}
-                                                className="modern-editable-input text-center w-8 text-slate-950 border-b border-slate-200 font-black text-sm"
-                                                placeholder="0"
-                                            />
-                                            <span className="text-slate-500 font-bold text-xs pl-0.5">metros</span>
-                                        </div>
+                                        {isTrefila ? (
+                                            <div className="flex items-center gap-1 font-bold text-sm text-slate-950 shrink-0 whitespace-nowrap">
+                                                <input
+                                                    type="number"
+                                                    value={statsShiftA.pecasProduzidas || ''}
+                                                    onChange={e => setStatsShiftA({ ...statsShiftA, pecasProduzidas: parseFloat(e.target.value) || 0 })}
+                                                    className="modern-editable-input text-center w-20 text-slate-950 border-b border-slate-200 font-black text-sm"
+                                                    placeholder="0"
+                                                />
+                                                <span className="text-slate-500 font-bold text-xs px-1">kg</span>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-1 font-bold text-sm text-slate-950 shrink-0 whitespace-nowrap">
+                                                <input
+                                                    type="number"
+                                                    value={statsShiftA.pecasProduzidas || ''}
+                                                    onChange={e => setStatsShiftA({ ...statsShiftA, pecasProduzidas: parseInt(e.target.value, 10) || 0 })}
+                                                    className="modern-editable-input text-center w-12 text-slate-950 border-b border-slate-200 font-black text-sm"
+                                                    placeholder="0"
+                                                />
+                                                <span className="text-slate-500 font-bold text-xs px-0.5">peças de</span>
+                                                <input
+                                                    type="number"
+                                                    value={statsShiftA.tamanhoPeca || ''}
+                                                    onChange={e => setStatsShiftA({ ...statsShiftA, tamanhoPeca: parseFloat(e.target.value) || 0 })}
+                                                    className="modern-editable-input text-center w-8 text-slate-950 border-b border-slate-200 font-black text-sm"
+                                                    placeholder="0"
+                                                />
+                                                <span className="text-slate-500 font-bold text-xs pl-0.5">metros</span>
+                                            </div>
+                                        )}
                                     </div>
                                     {/* Metros Produzidos */}
                                     <div className="flex items-center justify-between py-2.5">
@@ -1871,30 +1990,45 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                             <span className="w-12 text-right">{calculatedData.turnoB.percentEfetivo}%</span>
                                         </div>
                                     </div>
-                                    {/* Peças Produzidas */}
+                                    {/* Peças Produzidas / Peso Produzido */}
                                     <div className="flex items-center justify-between py-2.5">
                                         <div className="flex items-center gap-2 mr-2">
                                             <LayersIcon className="h-4 w-4 text-slate-400" />
-                                            <span className="text-sm font-extrabold text-slate-700">Quantidade de peças produzidas</span>
+                                            <span className="text-sm font-extrabold text-slate-700">
+                                                {isTrefila ? 'Peso produzido no turno' : 'Quantidade de peças produzidas'}
+                                            </span>
                                         </div>
-                                        <div className="flex items-center gap-1 font-bold text-sm text-slate-950 shrink-0 whitespace-nowrap">
-                                            <input
-                                                type="number"
-                                                value={statsShiftB.pecasProduzidas || ''}
-                                                onChange={e => setStatsShiftB({ ...statsShiftB, pecasProduzidas: parseInt(e.target.value, 10) || 0 })}
-                                                className="modern-editable-input text-center w-12 text-slate-950 border-b border-slate-200 font-black text-sm"
-                                                placeholder="0"
-                                            />
-                                            <span className="text-slate-500 font-bold text-xs px-0.5">peças de</span>
-                                            <input
-                                                type="number"
-                                                value={statsShiftB.tamanhoPeca || ''}
-                                                onChange={e => setStatsShiftB({ ...statsShiftB, tamanhoPeca: parseFloat(e.target.value) || 0 })}
-                                                className="modern-editable-input text-center w-8 text-slate-950 border-b border-slate-200 font-black text-sm"
-                                                placeholder="0"
-                                            />
-                                            <span className="text-slate-500 font-bold text-xs pl-0.5">metros</span>
-                                        </div>
+                                        {isTrefila ? (
+                                            <div className="flex items-center gap-1 font-bold text-sm text-slate-950 shrink-0 whitespace-nowrap">
+                                                <input
+                                                    type="number"
+                                                    value={statsShiftB.pecasProduzidas || ''}
+                                                    onChange={e => setStatsShiftB({ ...statsShiftB, pecasProduzidas: parseFloat(e.target.value) || 0 })}
+                                                    className="modern-editable-input text-center w-20 text-slate-950 border-b border-slate-200 font-black text-sm"
+                                                    placeholder="0"
+                                                />
+                                                <span className="text-slate-500 font-bold text-xs px-1">kg</span>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-1 font-bold text-sm text-slate-950 shrink-0 whitespace-nowrap">
+                                                <input
+                                                    type="number"
+                                                    value={statsShiftB.pecasProduzidas || ''}
+                                                    onChange={e => setStatsShiftB({ ...statsShiftB, pecasProduzidas: parseInt(e.target.value, 10) || 0 })}
+                                                    className="modern-editable-input text-center w-12 text-slate-950 border-b border-slate-200 font-black text-sm"
+                                                    placeholder="0"
+                                                />
+                                                <span className="text-slate-500 font-bold text-xs px-0.5">peças de</span>
+                                                <input
+                                                    type="number"
+                                                    value={statsShiftB.tamanhoPeca || ''}
+                                                    onChange={e => setStatsShiftB({ ...statsShiftB, tamanhoPeca: parseFloat(e.target.value) || 0 })}
+                                                    className="modern-editable-input text-center w-8 text-slate-950 border-b border-slate-200 font-black text-sm"
+                                                    placeholder="0"
+                                                />
+                                                <span className="text-slate-500 font-bold text-xs pl-0.5">metros</span>
+                                            </div>
+                                        )}
                                     </div>
                                     {/* Metros Produzidos */}
                                     <div className="flex items-center justify-between py-2.5">
@@ -1934,44 +2068,131 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
 
                                 <div className="flex flex-col sm:flex-row items-center justify-between border-b border-slate-200 bg-slate-50/50 py-2 px-4 gap-2">
                                     <div className="flex items-center gap-1 text-xs font-bold text-slate-700">
-                                        <span>Quantidade de peças a produzir:</span>
+                                        <span>{isTrefila ? 'Meta programada:' : 'Quantidade de peças a produzir:'}</span>
                                         <input
                                             type="number"
                                             value={piecesToProduce}
                                             onChange={e => setPiecesToProduce(parseInt(e.target.value, 10) || 0)}
-                                            className="modern-editable-input text-center w-16 text-[#002060] font-black text-xs"
+                                            className="modern-editable-input text-center w-24 text-[#002060] font-black text-xs"
                                         />
-                                        <span className="text-slate-500 font-medium">treliças</span>
+                                        <span className="text-slate-500 font-medium">{isTrefila ? 'kg' : 'treliças'}</span>
                                     </div>
 
-                                    <button
-                                        type="button"
-                                        onClick={addProductionUpdateRow}
-                                        className="bg-[#002060] hover:bg-slate-800 text-white text-[10px] font-black py-1 px-3.5 rounded shadow transition-colors no-print uppercase cursor-pointer"
-                                    >
-                                        + Registrar Peso
-                                    </button>
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={handleReloadAutoData}
+                                            className="bg-blue-700 hover:bg-blue-600 text-white text-[10px] font-black py-1 px-3 rounded shadow transition-colors no-print uppercase cursor-pointer"
+                                            title="Sincronizar dados com a produção da máquina"
+                                        >
+                                            🔄 Sincronizar OP
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={addProductionUpdateRow}
+                                            className="bg-[#002060] hover:bg-slate-800 text-white text-[10px] font-black py-1 px-3.5 rounded shadow transition-colors no-print uppercase cursor-pointer"
+                                        >
+                                            + Registrar Peso
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <table className="w-full border-collapse">
                                     <thead>
-                                        <tr className="bg-[#002060] text-white text-[10px] font-black uppercase border-b border-slate-700">
-                                            <th className="py-2 border-r border-slate-700 text-center" style={{ width: '25%' }}>Qnt.</th>
-                                            <th className="py-2 border-r border-slate-700 text-center" style={{ width: '25%' }}>Peso (kg)</th>
-                                            <th className="py-2 border-r border-slate-700 text-center" style={{ width: '25%' }}>Média (kg/peça)</th>
-                                            <th className="py-2 border-r border-slate-700 text-center" style={{ width: '25%' }}>Data</th>
-                                            <th className="py-2 text-center no-print" style={{ width: '60px' }}>Ações</th>
-                                        </tr>
+                                        {isTrefila ? (
+                                            <tr className="bg-[#002060] text-white text-[10px] font-black uppercase border-b border-slate-700">
+                                                <th className="py-2 border-r border-slate-700 text-center" style={{ width: '15%' }}>Data</th>
+                                                <th className="py-2 border-r border-slate-700 text-center" style={{ width: '20%' }}>Lote</th>
+                                                <th className="py-2 border-r border-slate-700 text-center" style={{ width: '20%' }}>KG (Entrada)</th>
+                                                <th className="py-2 border-r border-slate-700 text-center" style={{ width: '20%' }}>Saída (KG)</th>
+                                                <th className="py-2 border-r border-slate-700 text-center" style={{ width: '15%' }}>Bitola</th>
+                                                <th className="py-2 text-center no-print" style={{ width: '60px' }}>Ações</th>
+                                            </tr>
+                                        ) : (
+                                            <tr className="bg-[#002060] text-white text-[10px] font-black uppercase border-b border-slate-700">
+                                                <th className="py-2 border-r border-slate-700 text-center" style={{ width: '25%' }}>Qnt.</th>
+                                                <th className="py-2 border-r border-slate-700 text-center" style={{ width: '25%' }}>Peso (kg)</th>
+                                                <th className="py-2 border-r border-slate-700 text-center" style={{ width: '25%' }}>Média (kg/peça)</th>
+                                                <th className="py-2 border-r border-slate-700 text-center" style={{ width: '25%' }}>Data</th>
+                                                <th className="py-2 text-center no-print" style={{ width: '60px' }}>Ações</th>
+                                            </tr>
+                                        )}
                                     </thead>
                                     <tbody>
                                         {productionUpdates.length === 0 ? (
                                             <tr>
-                                                <td colSpan={5} className="py-5 text-slate-400 italic font-bold text-center text-xs">
-                                                    Nenhum lote de pesagem registrado. Clique em "+ Registrar Peso".
+                                                <td colSpan={isTrefila ? 6 : 5} className="py-5 text-slate-400 italic font-bold text-center text-xs">
+                                                    Nenhum lote de pesagem registrado. Clique em "+ Registrar Peso" ou "🔄 Sincronizar OP".
                                                 </td>
                                             </tr>
                                         ) : (
                                             productionUpdates.map(row => {
+                                                if (isTrefila) {
+                                                    return (
+                                                        <tr key={row.id} className="border-b border-slate-200 hover:bg-slate-50/50 group text-xs">
+                                                            <td className="p-1 border-r border-slate-200 text-center">
+                                                                <input
+                                                                    type="text"
+                                                                    value={row.data}
+                                                                    onChange={e => updateProductionUpdateField(row.id, 'data', e.target.value)}
+                                                                    className="modern-editable-input text-center w-full font-black text-xs"
+                                                                    placeholder="Ex: 25/09"
+                                                                />
+                                                            </td>
+                                                            <td className="p-1 border-r border-slate-200 text-center">
+                                                                <input
+                                                                    type="text"
+                                                                    value={row.lote || ''}
+                                                                    onChange={e => updateProductionUpdateField(row.id, 'lote', e.target.value)}
+                                                                    className="modern-editable-input text-center w-full font-black text-xs text-blue-900"
+                                                                    placeholder="Ex: 9860"
+                                                                />
+                                                            </td>
+                                                            <td className="p-1 border-r border-slate-200 text-center">
+                                                                <input
+                                                                    type="number"
+                                                                    value={row.kgEntrada ?? ''}
+                                                                    onChange={e => updateProductionUpdateField(row.id, 'kgEntrada', parseFloat(e.target.value) || 0)}
+                                                                    className="modern-editable-input text-center w-full font-black text-xs"
+                                                                    placeholder="0"
+                                                                />
+                                                            </td>
+                                                            <td className="p-1 border-r border-slate-200 text-center">
+                                                                <input
+                                                                    type="number"
+                                                                    value={row.saida ?? row.peso ?? ''}
+                                                                    onChange={e => {
+                                                                        const val = parseFloat(e.target.value) || 0;
+                                                                        updateProductionUpdateField(row.id, 'saida', val);
+                                                                        updateProductionUpdateField(row.id, 'peso', val);
+                                                                    }}
+                                                                    className="modern-editable-input text-center w-full font-black text-xs text-emerald-700"
+                                                                    placeholder="0"
+                                                                />
+                                                            </td>
+                                                            <td className="p-1 border-r border-slate-200 text-center">
+                                                                <input
+                                                                    type="text"
+                                                                    value={row.bitola || ''}
+                                                                    onChange={e => updateProductionUpdateField(row.id, 'bitola', e.target.value)}
+                                                                    className="modern-editable-input text-center w-full font-black text-xs"
+                                                                    placeholder="Ex: 3.40 mm"
+                                                                />
+                                                            </td>
+                                                            <td className="p-1 text-center no-print">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => removeProductionUpdateRow(row.id)}
+                                                                    className="text-rose-600 hover:text-rose-800 font-bold hover:bg-rose-50 px-2 py-0.5 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                                                                    title="Remover pesagem"
+                                                                >
+                                                                    ✕
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                }
+
                                                 const weightAverage = row.qnt > 0 ? (row.peso / row.qnt) : 0;
                                                 return (
                                                     <tr key={row.id} className="border-b border-slate-200 hover:bg-slate-50/50 group text-xs">
@@ -2012,7 +2233,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                                                 className="text-rose-600 hover:text-rose-800 font-bold hover:bg-rose-50 px-2 py-0.5 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                                                                 title="Remover pesagem"
                                                             >
-                                                                ×
+                                                                ✕
                                                             </button>
                                                         </td>
                                                     </tr>
@@ -2020,21 +2241,37 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                             })
                                         )}
                                         {productionUpdates.length > 0 && (
-                                            <tr className="bg-[#002060] font-black text-white text-xs border-t-2 border-[#002060]">
-                                                <td className="p-2 border-r border-slate-700 text-center font-black text-white">
-                                                    {calculatedData.totalUpdateQnt}
-                                                </td>
-                                                <td className="p-2 border-r border-slate-700 text-center font-black text-white">
-                                                    {calculatedData.totalUpdateWeight > 0 ? calculatedData.totalUpdateWeight.toLocaleString('pt-BR') : '0'}
-                                                </td>
-                                                <td className="p-2 border-r border-slate-700 text-center font-black text-white">
-                                                    {calculatedData.totalUpdateAverage > 0 ? calculatedData.totalUpdateAverage.toFixed(2).replace('.', ',') : '0,00'}
-                                                </td>
-                                                <td className="p-2 border-r border-slate-700 text-center uppercase tracking-wider text-[10px] font-black text-white">
-                                                    TOTAL / MÉDIA
-                                                </td>
-                                                <td className="p-2 text-center no-print"></td>
-                                            </tr>
+                                            isTrefila ? (
+                                                <tr className="bg-[#002060] font-black text-white text-xs border-t-2 border-[#002060]">
+                                                    <td colSpan={2} className="p-2 border-r border-slate-700 text-center uppercase tracking-wider text-[10px] font-black text-white">
+                                                        TOTAL GERAL
+                                                    </td>
+                                                    <td className="p-2 border-r border-slate-700 text-center font-black text-white">
+                                                        {productionUpdates.reduce((sum, r) => sum + (Number(r.kgEntrada) || 0), 0).toLocaleString('pt-BR')} kg
+                                                    </td>
+                                                    <td className="p-2 border-r border-slate-700 text-center font-black text-white">
+                                                        {productionUpdates.reduce((sum, r) => sum + (Number(r.saida || r.peso) || 0), 0).toLocaleString('pt-BR')} kg
+                                                    </td>
+                                                    <td className="p-2 border-r border-slate-700 text-center font-black text-white"></td>
+                                                    <td className="p-2 text-center no-print"></td>
+                                                </tr>
+                                            ) : (
+                                                <tr className="bg-[#002060] font-black text-white text-xs border-t-2 border-[#002060]">
+                                                    <td className="p-2 border-r border-slate-700 text-center font-black text-white">
+                                                        {calculatedData.totalUpdateQnt}
+                                                    </td>
+                                                    <td className="p-2 border-r border-slate-700 text-center font-black text-white">
+                                                        {calculatedData.totalUpdateWeight > 0 ? calculatedData.totalUpdateWeight.toLocaleString('pt-BR') : '0'}
+                                                    </td>
+                                                    <td className="p-2 border-r border-slate-700 text-center font-black text-white">
+                                                        {calculatedData.totalUpdateAverage > 0 ? calculatedData.totalUpdateAverage.toFixed(2).replace('.', ',') : '0,00'}
+                                                    </td>
+                                                    <td className="p-2 border-r border-slate-700 text-center uppercase tracking-wider text-[10px] font-black text-white">
+                                                        TOTAL / MÉDIA
+                                                    </td>
+                                                    <td className="p-2 text-center no-print"></td>
+                                                </tr>
+                                            )
                                         )}
                                     </tbody>
                                 </table>

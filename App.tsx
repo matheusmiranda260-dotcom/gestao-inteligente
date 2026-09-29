@@ -3083,6 +3083,7 @@ const App: React.FC = () => {
                 updateProducedQuantity={updateProducedQuantity}
                 shiftConfig={pcpShiftConfig}
                 onUpdateShiftConfig={setPcpShiftConfig}
+                recordLotWeight={recordLotWeight}
             />;
         }
     };

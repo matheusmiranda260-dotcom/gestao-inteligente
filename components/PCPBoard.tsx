@@ -58,6 +58,7 @@ interface PCPBoardProps {
     updateProducedQuantity?: (orderId: string, quantity: number) => Promise<void>;
     shiftConfig?: PcpShiftConfig;
     onUpdateShiftConfig?: (config: PcpShiftConfig) => void;
+    recordLotWeight?: (orderId: string, lotId: string, finalWeight?: number | null, measuredGauge?: number) => Promise<void> | void;
 }
 
 // Configurações de capacidade produtiva padrão por máquina para sugerir duração
@@ -157,12 +158,82 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     users = [],
     updateProducedQuantity,
     shiftConfig: incomingShiftConfig,
-    onUpdateShiftConfig
+    onUpdateShiftConfig,
+    recordLotWeight
 }) => {
     // Estado de cabeçalho minimizado/expandido (persistido)
     const [isHeaderCollapsed, setIsHeaderCollapsed] = useState<boolean>(() => {
         return localStorage.getItem('pcp_header_collapsed') === 'true';
     });
+
+    // Estado para lançamento rápido de peso de lote aguardando pesagem (Trefila 1 e 2)
+    const [weighingLotModal, setWeighingLotModal] = useState<{
+        op: ProductionOrderData;
+        lotId: string;
+        lotName: string;
+        entryWeight: number;
+        initialWeightInput: string;
+    } | null>(null);
+    const [lotWeightInput, setLotWeightInput] = useState<string>('');
+    const [measuredGaugeInput, setMeasuredGaugeInput] = useState<string>('');
+    const [isSavingLotWeight, setIsSavingLotWeight] = useState(false);
+
+    const handleOpenWeighLot = (op: ProductionOrderData, lotId: string, lotName: string, entryWeight: number) => {
+        setWeighingLotModal({
+            op,
+            lotId,
+            lotName,
+            entryWeight,
+            initialWeightInput: entryWeight > 0 ? String(entryWeight) : ''
+        });
+        setLotWeightInput(entryWeight > 0 ? String(entryWeight) : '');
+        setMeasuredGaugeInput(op.targetBitola || '');
+    };
+
+    const handleSaveLotWeight = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        if (!weighingLotModal) return;
+
+        const parsedWeight = parseFloat(lotWeightInput.replace(',', '.'));
+        if (isNaN(parsedWeight) || parsedWeight <= 0) {
+            showNotification?.('Informe um peso válido maior que zero (kg).', 'error');
+            return;
+        }
+
+        const parsedGauge = measuredGaugeInput ? parseFloat(measuredGaugeInput.replace(',', '.')) : undefined;
+        const finalGauge = (parsedGauge !== undefined && !isNaN(parsedGauge)) ? parsedGauge : undefined;
+
+        setIsSavingLotWeight(true);
+        try {
+            if (recordLotWeight) {
+                await recordLotWeight(weighingLotModal.op.id, weighingLotModal.lotId, parsedWeight, finalGauge);
+            } else {
+                const targetOp = weighingLotModal.op;
+                const updatedLots = (targetOp.processedLots || []).map((l: any) => {
+                    if (l.lotId === weighingLotModal.lotId) {
+                        return {
+                            ...l,
+                            finalWeight: parsedWeight,
+                            measuredGauge: finalGauge !== undefined ? finalGauge : l.measuredGauge
+                        };
+                    }
+                    return l;
+                });
+                const newActualWeight = updatedLots.reduce((sum: number, l: any) => sum + (Number(l.finalWeight) || 0), 0);
+                await updateProductionOrder(targetOp.id, {
+                    processedLots: updatedLots,
+                    actualProducedWeight: newActualWeight
+                });
+            }
+            showNotification?.(`Peso do Lote ${weighingLotModal.lotName} (${parsedWeight.toLocaleString('pt-BR')} kg) registrado com sucesso!`, 'success');
+            setWeighingLotModal(null);
+        } catch (err: any) {
+            console.error('Erro ao registrar peso do lote:', err);
+            showNotification?.(`Erro ao salvar peso: ${err.message || err}`, 'error');
+        } finally {
+            setIsSavingLotWeight(false);
+        }
+    };
 
     const [selectedDailyReport, setSelectedDailyReport] = useState<{ op: ProductionOrderData, date: Date, dateStr: string, dayName: string, produced: number, unit: string } | null>(null);
     const [officialReportModalData, setOfficialReportModalData] = useState<{ op: ProductionOrderData; dateStr: string; machine: string; initialProduced?: number; initialOperator?: string } | null>(null);
@@ -4481,6 +4552,13 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                 }
                                             }
 
+                                            // Lotes que aguardam pesagem na Trefila (finalizados na máquina, mas sem peso balança ainda)
+                                            const pendingWeightLots = isTrefila 
+                                                ? (op.processedLots || []).filter((l: any) => 
+                                                    l.finalWeight === null || l.finalWeight === undefined || isNaN(Number(l.finalWeight)) || Number(l.finalWeight) <= 0
+                                                  )
+                                                : [];
+
                                             // Estilos de Cartão OP adaptados para tema Ita Aços (Azul, Laranja, Branco, Sombra Premium)
                                             let barBg = 'bg-white border-2 border-slate-200 border-l-8 border-l-slate-400 text-slate-800 shadow-sm';
                                             let barProgressColor = 'bg-slate-400';
@@ -4634,6 +4712,86 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                         {trefilaDashStats.isDelayed ? 'Atraso: ' : 'Rest: '}{formatDuration((trefilaDashStats.isDelayed ? trefilaDashStats.delayedSeconds : trefilaDashStats.remainingSeconds) * 1000)}
                                                                     </span>
                                                                 </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Lotes Aguardando Pesagem (Trefila 1 e 2) */}
+                                                        {isTrefila && pendingWeightLots.length > 0 && (
+                                                            <div className="flex flex-col gap-1 shrink-0 select-none" onClick={(e) => e.stopPropagation()}>
+                                                                {pendingWeightLots.length === 1 ? (
+                                                                    (() => {
+                                                                        const pLot = pendingWeightLots[0];
+                                                                        const lotStock = stock.find(s => s.id === pLot.lotId || s.internalLot === pLot.lotId);
+                                                                        const lotName = lotStock?.internalLot || pLot.lotId || '---';
+                                                                        const entryWeight = lotStock?.initialQuantity || lotStock?.weight || 0;
+                                                                        const endTimeStr = pLot.endTime ? new Date(pLot.endTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+
+                                                                        return (
+                                                                            <div className="flex items-center justify-between gap-1.5 text-xs font-mono font-bold px-2.5 py-0.5 rounded-md border border-amber-300 bg-amber-50/95 text-slate-800 shadow-xs shrink-0 overflow-hidden">
+                                                                                <div className="flex items-center gap-1.5 min-w-0 truncate">
+                                                                                    <span className="inline-flex items-center gap-1 text-[8.5px] uppercase font-black px-1.5 py-0.2 rounded bg-amber-200 text-amber-900 border border-amber-300 shrink-0">
+                                                                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse" />
+                                                                                        ⚖️ Aguarda Peso
+                                                                                    </span>
+                                                                                    <span className="text-amber-950 font-black text-xs truncate">
+                                                                                        Lote {lotName}
+                                                                                    </span>
+                                                                                    {entryWeight > 0 && (
+                                                                                        <span className="text-slate-600 font-bold text-[10px]">
+                                                                                            (~{entryWeight.toLocaleString('pt-BR')}kg)
+                                                                                        </span>
+                                                                                    )}
+                                                                                    {endTimeStr && (
+                                                                                        <span className="text-slate-500 font-normal text-[9px] hidden sm:inline">
+                                                                                            às {endTimeStr}
+                                                                                        </span>
+                                                                                    )}
+                                                                                </div>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        handleOpenWeighLot(op, pLot.lotId, lotName, entryWeight);
+                                                                                    }}
+                                                                                    className="px-2 py-0.5 rounded bg-amber-500 hover:bg-amber-600 text-white font-black text-[9px] uppercase tracking-wider shadow-xs transition active:scale-95 shrink-0 flex items-center gap-1 cursor-pointer"
+                                                                                    title="Clique para lançar o peso deste lote"
+                                                                                >
+                                                                                    <span>Pesar</span>
+                                                                                    <span className="text-[10px]">⚖️</span>
+                                                                                </button>
+                                                                            </div>
+                                                                        );
+                                                                    })()
+                                                                ) : (
+                                                                    <div className="flex items-center justify-between gap-1.5 text-xs font-mono font-bold px-2 py-0.5 rounded-md border border-amber-300 bg-amber-50/95 text-slate-800 shadow-xs shrink-0 overflow-hidden">
+                                                                        <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                                                                            <span className="inline-flex items-center gap-1 text-[8.5px] uppercase font-black px-1.5 py-0.2 rounded bg-amber-200 text-amber-900 border border-amber-300 shrink-0">
+                                                                                <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse" />
+                                                                                ⚖️ Aguarda Peso ({pendingWeightLots.length}):
+                                                                            </span>
+                                                                            {pendingWeightLots.map((pLot: any) => {
+                                                                                const lotStock = stock.find(s => s.id === pLot.lotId || s.internalLot === pLot.lotId);
+                                                                                const lotName = lotStock?.internalLot || pLot.lotId || '---';
+                                                                                const entryWeight = lotStock?.initialQuantity || lotStock?.weight || 0;
+                                                                                return (
+                                                                                    <button
+                                                                                        key={pLot.lotId}
+                                                                                        type="button"
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            handleOpenWeighLot(op, pLot.lotId, lotName, entryWeight);
+                                                                                        }}
+                                                                                        className="inline-flex items-center gap-1 text-[9px] font-black px-1.5 py-0.2 rounded bg-white hover:bg-amber-100 text-amber-950 border border-amber-300 shadow-xs transition active:scale-95 cursor-pointer"
+                                                                                        title={`Clique para pesar Lote ${lotName}`}
+                                                                                    >
+                                                                                        <span>Lote {lotName}</span>
+                                                                                        <span className="text-[8px] text-amber-600">⚖️</span>
+                                                                                    </button>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         )}
 
@@ -9387,6 +9545,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     productionOrders={productionOrders}
                     shiftReports={shiftReports}
                     shiftConfig={shiftConfig}
+                    stock={stock}
                 />
             )}
 
@@ -9403,7 +9562,122 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     initialProduced={officialReportModalData.initialProduced}
                     initialOperator={officialReportModalData.initialOperator}
                     shiftConfig={shiftConfig}
+                    stock={stock}
                 />
+            )}
+
+            {/* Modal de Lançamento de Peso de Lote Aguardando Pesagem (Trefila 1 e 2) */}
+            {weighingLotModal && (
+                <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-[150] p-4 animate-fade" onClick={() => setWeighingLotModal(null)}>
+                    <div className="bg-[#0A1B27] rounded-2xl border border-amber-400/40 shadow-2xl w-full max-w-md text-slate-100 flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+                        {/* Topo */}
+                        <div className="p-4 border-b border-white/10 bg-[#08131B] flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-400/30 flex items-center justify-center text-amber-400 text-xl font-bold">
+                                    ⚖️
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-black uppercase tracking-wider text-white">
+                                        Lançar Peso do Lote
+                                    </h3>
+                                    <p className="text-xs text-amber-300 font-mono">
+                                        OP #{weighingLotModal.op.orderNumber} • {weighingLotModal.op.scheduledMachine || weighingLotModal.op.machine}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setWeighingLotModal(null)}
+                                className="p-1 rounded-lg text-slate-400 hover:text-white transition-colors"
+                            >
+                                <XIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Conteúdo */}
+                        <form onSubmit={handleSaveLotWeight} className="p-5 flex flex-col gap-4">
+                            <div className="p-3 bg-amber-950/20 border border-amber-400/20 rounded-xl flex items-center justify-between font-mono text-xs">
+                                <div>
+                                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Lote Finalizado</span>
+                                    <strong className="text-amber-300 text-sm">{weighingLotModal.lotName}</strong>
+                                </div>
+                                {weighingLotModal.entryWeight > 0 && (
+                                    <div className="text-right">
+                                        <span className="text-slate-400 block text-[10px] uppercase font-bold">Peso Inicial (MP)</span>
+                                        <span className="text-slate-200 font-black">{weighingLotModal.entryWeight.toLocaleString('pt-BR')} kg</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold uppercase tracking-wider text-amber-300 mb-1">
+                                    Peso da Balança (KG Saída) *
+                                </label>
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        inputMode="decimal"
+                                        value={lotWeightInput}
+                                        onChange={(e) => setLotWeightInput(e.target.value)}
+                                        placeholder="Ex: 2050"
+                                        autoFocus
+                                        required
+                                        className="w-full p-3 pr-12 bg-black/50 border border-white/20 focus:border-amber-400 rounded-xl text-white font-mono text-xl font-black outline-none transition text-center"
+                                    />
+                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-black font-mono pointer-events-none">
+                                        KG
+                                    </span>
+                                </div>
+                                <span className="text-[10px] text-slate-400 mt-1 block">
+                                    Ao salvar, o lote sai de "Aguardando Peso" e soma automaticamente na produção do dia e total da OP.
+                                </span>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
+                                    Bitola Aferida (mm) - Opcional
+                                </label>
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        inputMode="decimal"
+                                        value={measuredGaugeInput}
+                                        onChange={(e) => setMeasuredGaugeInput(e.target.value)}
+                                        placeholder={weighingLotModal.op.targetBitola || '4.20'}
+                                        className="w-full p-2.5 pr-12 bg-black/40 border border-white/10 focus:border-amber-400 rounded-xl text-slate-200 font-mono text-sm font-bold outline-none transition text-center"
+                                    />
+                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-mono pointer-events-none">
+                                        mm
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-3 border-t border-white/10 mt-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setWeighingLotModal(null)}
+                                    className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-bold text-xs transition cursor-pointer"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSavingLotWeight}
+                                    className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-black text-xs uppercase tracking-wider transition shadow-lg shadow-amber-500/20 cursor-pointer active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
+                                >
+                                    {isSavingLotWeight ? (
+                                        <span>Salvando...</span>
+                                    ) : (
+                                        <>
+                                            <span>Salvar Peso</span>
+                                            <span>⚖️</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             )}
         </div>
     );
@@ -9426,6 +9700,7 @@ interface DailyDowntimeReportModalProps {
     productionOrders: ProductionOrderData[];
     shiftReports?: ShiftReport[];
     shiftConfig?: PcpShiftConfig;
+    stock?: StockItem[];
 }
 
 const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
@@ -9434,7 +9709,8 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
     weekDays,
     productionOrders,
     shiftReports = [],
-    shiftConfig
+    shiftConfig,
+    stock = []
 }) => {
     const activeOp = productionOrders.find(o => o.id === data.op.id) || data.op;
     const [selectedDateStr, setSelectedDateStr] = useState<string>(data.dateStr);
@@ -10089,6 +10365,7 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                     productionOrders={productionOrders}
                     initialProduced={selectedDateStr === data.dateStr ? data.produced : undefined}
                     shiftConfig={shiftConfig}
+                    stock={stock}
                 />
             )}
         </div>
