@@ -452,17 +452,17 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
             );
         };
 
-        const processedLots = targetOP.processedLots || [];
+        const processedLots = targetOP.processedLots || (targetOP as any).processed_lots || [];
         const processedLotIdsSet = new Set<string>();
         let previousLotDate = '';
 
-        processedLots.forEach((lot, idx) => {
+        processedLots.forEach((lot: any, idx: number) => {
             const stockItem = findStockLot(lot);
-            if (lot.lotId) processedLotIdsSet.add(lot.lotId);
+            if (lot.lotId || lot.lot_id) processedLotIdsSet.add(lot.lotId || lot.lot_id);
             if (stockItem?.id) processedLotIdsSet.add(stockItem.id);
-            if (stockItem?.internalLot) processedLotIdsSet.add(stockItem.internalLot);
+            if (stockItem?.internalLot || (stockItem as any)?.internal_lot) processedLotIdsSet.add(stockItem.internalLot || (stockItem as any)?.internal_lot);
 
-            const lotIso = lot.endTime || lot.startTime;
+            const lotIso = lot.endTime || lot.end_time || lot.startTime || lot.start_time;
             let lotDate = dateShort;
             if (lotIso) {
                 const d = new Date(lotIso);
@@ -485,14 +485,16 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
             }
             previousLotDate = lotDate;
 
-            const lotNum = stockItem?.internalLot || (lot as any).internalLot || (lot.lotId && !lot.lotId.startsWith('STOCK-') ? lot.lotId : `${idx + 1}`);
-            const inputWeight = Number(stockItem?.initialQuantity || stockItem?.weight || stockItem?.labelWeight || (lot as any).inputWeight || (lot as any).initialWeight || 0);
+            const lotNum = stockItem?.internalLot || (stockItem as any)?.internal_lot || lot.internalLot || lot.internal_lot || ((lot.lotId || lot.lot_id) && !(lot.lotId || lot.lot_id).startsWith('STOCK-') ? (lot.lotId || lot.lot_id) : `${idx + 1}`);
+            const inputWeight = Number(stockItem?.initialQuantity || (stockItem as any)?.initial_quantity || stockItem?.weight || stockItem?.labelWeight || lot.inputWeight || lot.input_weight || (lot as any).initialWeight || 0);
             const outputWeight = lot.finalWeight !== null && lot.finalWeight !== undefined 
                 ? Number(lot.finalWeight) 
-                : ((lot as any).producedWeight !== null && (lot as any).producedWeight !== undefined ? Number((lot as any).producedWeight) : 0);
+                : (lot.final_weight !== null && lot.final_weight !== undefined 
+                    ? Number(lot.final_weight) 
+                    : Number(lot.producedWeight || lot.produced_weight || 0));
 
-            const lotBitola = lot.measuredGauge 
-                ? `${Number(lot.measuredGauge).toFixed(2)} mm` 
+            const lotBitola = (lot.measuredGauge || lot.measured_gauge)
+                ? `${Number(lot.measuredGauge || lot.measured_gauge).toFixed(2)} mm` 
                 : (targetOP.targetBitola ? `${targetOP.targetBitola} mm` : `${outBitola} mm`);
 
             newUpdates.push({

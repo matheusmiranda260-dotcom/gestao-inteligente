@@ -221,6 +221,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
     // Refs
     const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const reportIdRef = useRef<string | null>(null);
+    const isLoadedRef = useRef<boolean>(false);
     const dateInputRef = useRef<HTMLInputElement>(null);
     useEffect(() => { reportIdRef.current = reportId; }, [reportId]);
 
@@ -493,10 +494,10 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         };
 
         const dateFallback = fallbackDateStr ? formatDateBr(fallbackDateStr) : '';
-        const pLots = targetOp.processedLots || [];
-        pLots.forEach((lot, idx) => {
+        const pLots = targetOp.processedLots || (targetOp as any).processed_lots || [];
+        pLots.forEach((lot: any, idx: number) => {
             const stockItem = findStockLot(lot);
-            const lotIso = lot.endTime || lot.startTime;
+            const lotIso = lot.endTime || lot.end_time || lot.startTime || lot.start_time;
             let lotDate = dateFallback;
             if (lotIso) {
                 const d = new Date(lotIso);
@@ -504,13 +505,16 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     lotDate = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
                 }
             }
-            const lotNum = stockItem?.internalLot || (lot as any).internalLot || (lot.lotId && !lot.lotId.startsWith('STOCK-') ? lot.lotId : `${idx + 1}`);
-            const inputWeight = Number(stockItem?.initialQuantity || stockItem?.weight || stockItem?.labelWeight || (lot as any).inputWeight || (lot as any).initialWeight || 0);
+            const lotNum = stockItem?.internalLot || (stockItem as any)?.internal_lot || lot.internalLot || lot.internal_lot || ((lot.lotId || lot.lot_id) && !(lot.lotId || lot.lot_id).startsWith('STOCK-') ? (lot.lotId || lot.lot_id) : `${idx + 1}`);
+            const inputWeight = Number(stockItem?.initialQuantity || (stockItem as any)?.initial_quantity || stockItem?.weight || stockItem?.labelWeight || lot.inputWeight || lot.input_weight || (lot as any).initialWeight || 0);
             const outputWeight = lot.finalWeight !== null && lot.finalWeight !== undefined 
                 ? Number(lot.finalWeight) 
-                : ((lot as any).producedWeight !== null && (lot as any).producedWeight !== undefined ? Number((lot as any).producedWeight) : 0);
-            const bitolaStr = lot.measuredGauge 
-                ? `${Number(lot.measuredGauge).toFixed(2)} mm` 
+                : (lot.final_weight !== null && lot.final_weight !== undefined 
+                    ? Number(lot.final_weight) 
+                    : Number(lot.producedWeight || lot.produced_weight || 0));
+            const gaugeVal = lot.measuredGauge || lot.measured_gauge;
+            const bitolaStr = gaugeVal 
+                ? `${Number(gaugeVal).toFixed(2)} mm` 
                 : (targetOp.targetBitola ? `${targetOp.targetBitola} mm` : '');
 
             rows.push({
@@ -797,14 +801,16 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         // Para Trefila, sincronizar com peso produzido
         if (isTrefila) {
             let trefilaDayWeight = 0;
-            (op.processedLots || []).forEach(l => {
-                const lDate = getLocalDateString(l.endTime || l.startTime);
+            const pLots = op.processedLots || (op as any).processed_lots || [];
+            pLots.forEach((l: any) => {
+                const lIso = l.endTime || l.end_time || l.startTime || l.start_time;
+                const lDate = getLocalDateString(lIso);
                 if (lDate === selectedDate) {
-                    trefilaDayWeight += (Number(l.finalWeight) || 0);
+                    trefilaDayWeight += (Number(l.finalWeight || l.final_weight || l.producedWeight || l.produced_weight) || 0);
                 }
             });
-            if (trefilaDayWeight === 0 && op.actualProducedWeight) {
-                trefilaDayWeight = Number(op.actualProducedWeight);
+            if (trefilaDayWeight === 0 && (op.actualProducedWeight || (op as any).actual_produced_weight)) {
+                trefilaDayWeight = Number(op.actualProducedWeight || (op as any).actual_produced_weight);
             }
             if (piecesA === 0 && trefilaDayWeight > 0) {
                 piecesA = trefilaDayWeight;
@@ -1049,11 +1055,18 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 const mergedStopsA: StopRow[] = [...existingStopsA];
 
                 (auto.stopsShiftA || []).forEach(autoStop => {
-                    const isAlreadyPresent = mergedStopsA.some(s => 
-                        s.inicio === autoStop.inicio || 
-                        (s.inicio.substring(0, 5) === autoStop.inicio.substring(0, 5) && 
-                         (s.motivo.toLowerCase().includes(autoStop.motivo.toLowerCase().substring(0, 8)) || autoStop.motivo.toLowerCase().includes(s.motivo.toLowerCase().substring(0, 8))))
-                    );
+                    const isAlreadyPresent = mergedStopsA.some(s => {
+                        if (!s || !s.inicio || !autoStop.inicio) return false;
+                        if (s.inicio === autoStop.inicio) return true;
+                        const sPrefix = (s.inicio || '').substring(0, 5);
+                        const autoPrefix = (autoStop.inicio || '').substring(0, 5);
+                        if (sPrefix && autoPrefix && sPrefix === autoPrefix) {
+                            const sMot = (s.motivo || '').toLowerCase();
+                            const autoMot = (autoStop.motivo || '').toLowerCase();
+                            return sMot.includes(autoMot.substring(0, 8)) || autoMot.includes(sMot.substring(0, 8));
+                        }
+                        return false;
+                    });
                     if (!isAlreadyPresent) {
                         mergedStopsA.push(autoStop);
                     }
@@ -1064,10 +1077,10 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 const existingStopsB: StopRow[] = dbReport.stops_shift_b || [];
                 const mergedStopsB: StopRow[] = [...existingStopsB];
                 (auto.stopsShiftB || []).forEach(autoStop => {
-                    const isAlreadyPresent = mergedStopsB.some(s => 
-                        s.inicio === autoStop.inicio || 
-                        (s.inicio.substring(0, 5) === autoStop.inicio.substring(0, 5))
-                    );
+                    const isAlreadyPresent = mergedStopsB.some(s => {
+                        if (!s || !s.inicio || !autoStop.inicio) return false;
+                        return s.inicio === autoStop.inicio || ((s.inicio || '').substring(0, 5) === (autoStop.inicio || '').substring(0, 5));
+                    });
                     if (!isAlreadyPresent) {
                         mergedStopsB.push(autoStop);
                     }
@@ -1156,11 +1169,11 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     : generateProductionUpdatesHistory(op, shiftReports, theoreticalUnitWeight, targetDate);
 
                 const hasValidDbUpdates = (dbReport.production_updates && dbReport.production_updates.length > 0) &&
-                    (!isTrefila || dbReport.production_updates.some((u: any) => u.lote || u.kgEntrada > 0 || u.saida > 0));
+                    (!isTrefila || dbReport.production_updates.some((u: any) => Boolean(u.lote) || Number(u.kgEntrada) > 0 || Number(u.saida) > 0 || Number(u.peso) > 0));
 
                 const finalUpdates = hasValidDbUpdates
                     ? dbReport.production_updates
-                    : autoHistory;
+                    : (autoHistory.length > 0 ? autoHistory : (dbReport.production_updates || []));
 
                 setProductionUpdates(finalUpdates);
                 
@@ -1170,6 +1183,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     hasHoursB;
                 setHasSecondShift(hasTurnoBFromDb ? true : (shiftCfg.shiftCount === 2));
 
+                isLoadedRef.current = true;
                 setSaveStatus('saved');
                 showToast(`Relatório do dia ${targetDate.split('-').reverse().join('/')} carregado do banco.`, 'info');
             } else {
@@ -1226,7 +1240,10 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
     // Carregar ao abrir ou ao trocar de data
     useEffect(() => {
         if (isOpen && selectedDate) {
+            isLoadedRef.current = false;
             loadReportData(selectedDate);
+        } else {
+            isLoadedRef.current = false;
         }
     }, [isOpen, selectedDate, machine]);
 
@@ -1249,6 +1266,24 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         showNotification: boolean = true
     ) => {
         setSaveStatus('saving');
+        // Segurança contra salvar dados vazios quando existem dados no chão de fábrica
+        let safeUpdates = dataToSave.productionUpdates;
+        let safeStopsA = dataToSave.stopsShiftA;
+        let safePecasA = dataToSave.statsShiftA?.pecasProduzidas;
+
+        if ((!safeUpdates || safeUpdates.length === 0) || (!safeStopsA || safeStopsA.length === 0)) {
+            const auto = generateAutoDataFromShopFloor();
+            if ((!safeUpdates || safeUpdates.length === 0) && auto.productionUpdates.length > 0) {
+                safeUpdates = auto.productionUpdates;
+            }
+            if ((!safeStopsA || safeStopsA.length === 0) && auto.stopsShiftA.length > 0) {
+                safeStopsA = auto.stopsShiftA;
+            }
+            if ((!safePecasA || safePecasA === 0) && auto.statsShiftA.pecasProduzidas > 0) {
+                safePecasA = auto.statsShiftA.pecasProduzidas;
+            }
+        }
+
         const payload = {
             date: targetDate,
             machine_type: machine,
@@ -1257,17 +1292,18 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             operator_shift_b: dataToSave.operatorShiftB,
             product_description: isTrefila ? (productDescriptionOut || dataToSave.productDescription) : dataToSave.productDescription,
             pieces_to_produce: dataToSave.piecesToProduce,
-            stops_shift_a: dataToSave.stopsShiftA,
+            stops_shift_a: safeStopsA,
             stops_shift_b: dataToSave.stopsShiftB,
             stats_shift_a: {
                 ...dataToSave.statsShiftA,
+                pecasProduzidas: safePecasA,
                 ...(isTrefila ? {
                     productDescriptionIn,
                     productDescriptionOut: productDescriptionOut || dataToSave.productDescription
                 } : {})
             },
             stats_shift_b: dataToSave.statsShiftB,
-            production_updates: dataToSave.productionUpdates,
+            production_updates: safeUpdates,
         };
 
         const localKey = `daily_report_${machine}_${targetDate}`;
@@ -1304,7 +1340,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
 
     // Auto-save com debounce de 600ms
     useEffect(() => {
-        if (loading || !isOpen) return;
+        if (loading || !isOpen || !isLoadedRef.current) return;
 
         if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
         autoSaveTimerRef.current = setTimeout(() => {
