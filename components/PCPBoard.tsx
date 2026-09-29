@@ -4846,18 +4846,6 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                     <span className="text-slate-500 font-medium italic">Planejado</span>
                                                                                 )}
                                                                             </span>
-                                                                            <span 
-                                                                                className={`text-[8px] sm:text-[8.5px] font-black uppercase px-1 py-0.5 rounded transition shrink-0 ml-1 border ${
-                                                                                    dayStats.isToday && prog.isLive && (prog.isStopped || prog.isPrep)
-                                                                                        ? (isDowntimeOverLimit ? 'bg-rose-100 text-rose-800 border-rose-300 hover:bg-rose-200' : 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200')
-                                                                                        : hasRealPastProd
-                                                                                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200'
-                                                                                            : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
-                                                                                }`}
-                                                                                title={`Ver paradas e motivos de ${dayColName} ${formatFriendlyDate(currentDay)}`}
-                                                                            >
-                                                                                🛑 Paradas
-                                                                            </span>
                                                                         </div>
                                                                     </div>
                                                                 );
