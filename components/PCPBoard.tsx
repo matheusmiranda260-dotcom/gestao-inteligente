@@ -928,6 +928,26 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             if (isTrefila) {
                 updates.quantityToProduce = data.newQuantityToProduce;
                 updates.totalWeight = data.newQuantityToProduce;
+
+                // Sincronizar descrição e código de produto se estavam ausentes
+                if (!targetOrder.productDescription || !targetOrder.productCode) {
+                    const cleanTarget = String(targetOrder.targetBitola || '').replace('mm', '').trim();
+                    const matched = gauges.find((g: any) => {
+                        const mat = (g.materialType || '').toLowerCase();
+                        const isCa60 = mat === 'ca-60' || mat === 'ca60' || mat.includes('trefila');
+                        if (!isCa60) return false;
+                        const gClean = String(g.gauge || '').replace('mm', '').trim();
+                        return g.gauge === targetOrder.targetBitola || gClean === cleanTarget || parseFloat(gClean.replace(',', '.')) === parseFloat(cleanTarget.replace(',', '.'));
+                    });
+                    if (matched) {
+                        if (!targetOrder.productCode && (matched.productCode || (matched as any).code)) {
+                            updates.productCode = matched.productCode || (matched as any).code;
+                        }
+                        if (!targetOrder.productDescription && (matched.description || (matched as any).gaugeDescription)) {
+                            updates.productDescription = matched.description || (matched as any).gaugeDescription;
+                        }
+                    }
+                }
             } else {
                 updates.quantityToProduce = data.newQuantityToProduce;
             }
@@ -2671,7 +2691,19 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
             const calculatedWeight = totalSelectedWeight;
 
+            const cleanTarget = String(targetBitola || '').replace('mm', '').trim();
+            const matchedGauge = gauges.find((g: any) => {
+                const mat = (g.materialType || '').toLowerCase();
+                const isCa60 = mat === 'ca-60' || mat === 'ca60' || mat.includes('trefila');
+                if (!isCa60) return false;
+                const gClean = String(g.gauge || '').replace('mm', '').trim();
+                return g.gauge === targetBitola || gClean === cleanTarget || parseFloat(gClean.replace(',', '.')) === parseFloat(cleanTarget.replace(',', '.'));
+            });
             orderData.targetBitola = targetBitola;
+            if (matchedGauge) {
+                orderData.productCode = matchedGauge.productCode || (matchedGauge as any).code || '';
+                orderData.productDescription = matchedGauge.description || (matchedGauge as any).gaugeDescription || '';
+            }
             orderData.selectedLotIds = selectedLotIds;
             orderData.totalWeight = calculatedWeight;
             orderData.quantityToProduce = calculatedWeight;
@@ -3666,9 +3698,17 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     };
 
     // Bitolas disponíveis de CA-60 para Trefila
+    // Bitolas disponíveis de CA-60 para Trefila
     const availableTrefilaGauges = useMemo(() => {
         const customGauges = gauges.filter(g => g.materialType === 'CA-60').map(g => g.gauge);
         return customGauges.length > 0 ? customGauges : TrefilaBitolaOptions;
+    }, [gauges]);
+
+    const availableTrefilaGaugesData = useMemo(() => {
+        return gauges.filter(g => {
+            const mat = (g.materialType || '').toLowerCase();
+            return mat === 'ca-60' || mat === 'ca60' || mat.includes('trefila');
+        });
     }, [gauges]);
 
     // Bitolas disponíveis de Fio Máquina para entrada
@@ -4444,11 +4484,32 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             const isTrefila = typeof op.machine === 'string' && op.machine.startsWith('Trefila') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Trefila'));
                                             const title = op.orderNumber;
                                             
+                                            let displayProductCode = op.productCode || '';
+                                            let displayProductDescription = op.productDescription || '';
+
+                                            // Fallback para Trefila buscando descrição e código exatos do cadastro no gauges
+                                            if (isTrefila && (!displayProductDescription || !displayProductCode)) {
+                                                const cleanTarget = String(op.targetBitola || '').replace('mm', '').trim();
+                                                const matched = gauges.find((g: any) => {
+                                                    const mat = (g.materialType || '').toLowerCase();
+                                                    const isCa60 = mat === 'ca-60' || mat === 'ca60' || mat.includes('trefila');
+                                                    if (!isCa60) return false;
+                                                    const gClean = String(g.gauge || '').replace('mm', '').trim();
+                                                    return g.gauge === op.targetBitola || gClean === cleanTarget || parseFloat(gClean.replace(',', '.')) === parseFloat(cleanTarget.replace(',', '.'));
+                                                });
+                                                if (matched) {
+                                                    if (!displayProductCode) displayProductCode = matched.productCode || (matched as any).code || '';
+                                                    if (!displayProductDescription) displayProductDescription = matched.description || (matched as any).gaugeDescription || '';
+                                                }
+                                            }
+
                                             const subtitleParts = [];
-                                            if (op.productCode) subtitleParts.push(op.productCode);
+                                            if (displayProductCode && !displayProductDescription?.startsWith(displayProductCode)) {
+                                                subtitleParts.push(displayProductCode);
+                                            }
                                             
-                                            if (op.productDescription) {
-                                                subtitleParts.push(op.productDescription);
+                                            if (displayProductDescription) {
+                                                subtitleParts.push(displayProductDescription);
                                             } else {
                                                 if (isTrelica) subtitleParts.push(op.trelicaModel);
                                                 else if (isMalha) subtitleParts.push(op.malhaModel);
@@ -5350,16 +5411,53 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                 onChange={(e) => setTargetBitola(e.target.value as Bitola)}
                                                 className="w-full bg-[#07131B] border border-white/10 rounded-xl py-2 px-2.5 text-xs focus:outline-none focus:border-[#00E5FF]/50 text-white font-bold"
                                             >
-                                                {availableTrefilaGauges
-                                                    .filter(g => {
-                                                        if (!inputBitolaFilter) return true;
-                                                        const inVal = parseFloat(inputBitolaFilter.replace(',', '.'));
-                                                        const outVal = parseFloat(g.replace(',', '.'));
-                                                        return outVal < inVal;
-                                                    })
-                                                    .map(g => (
-                                                        <option key={g} value={g}>{g} mm</option>
-                                                    ))}
+                                                {availableTrefilaGaugesData.length > 0 ? (
+                                                    availableTrefilaGaugesData
+                                                        .filter(g => {
+                                                            if (!inputBitolaFilter) return true;
+                                                            const inVal = parseFloat(inputBitolaFilter.replace(',', '.'));
+                                                            const outVal = parseFloat(g.gauge.replace(',', '.'));
+                                                            return outVal < inVal;
+                                                        })
+                                                        .map(g => {
+                                                            const code = g.productCode || (g as any).code || '';
+                                                            const desc = g.description || (g as any).gaugeDescription || '';
+                                                            const label = desc
+                                                                ? (code && !desc.startsWith(code) ? `[${code}] ${desc}` : desc)
+                                                                : `${g.gauge} mm`;
+                                                            return (
+                                                                <option key={g.id || g.gauge} value={g.gauge}>
+                                                                    {label}
+                                                                </option>
+                                                            );
+                                                        })
+                                                ) : (
+                                                    availableTrefilaGauges
+                                                        .filter(g => {
+                                                            if (!inputBitolaFilter) return true;
+                                                            const inVal = parseFloat(inputBitolaFilter.replace(',', '.'));
+                                                            const outVal = parseFloat(g.replace(',', '.'));
+                                                            return outVal < inVal;
+                                                        })
+                                                        .map(g => {
+                                                            const cleanG = g.replace('mm', '').trim();
+                                                            const matched = gauges.find((item: any) => {
+                                                                const mat = (item.materialType || '').toLowerCase();
+                                                                const isCa60 = mat === 'ca-60' || mat === 'ca60' || mat.includes('trefila');
+                                                                if (!isCa60) return false;
+                                                                const itemClean = String(item.gauge || '').replace('mm', '').trim();
+                                                                return item.gauge === g || itemClean === cleanG || parseFloat(itemClean.replace(',', '.')) === parseFloat(cleanG.replace(',', '.'));
+                                                            });
+                                                            const code = matched?.productCode || (matched as any)?.code || '';
+                                                            const desc = matched?.description || (matched as any)?.gaugeDescription || '';
+                                                            const label = desc
+                                                                ? (code && !desc.startsWith(code) ? `[${code}] ${desc}` : desc)
+                                                                : `${g} mm`;
+                                                            return (
+                                                                <option key={g} value={g}>{label}</option>
+                                                            );
+                                                        })
+                                                )}
                                             </select>
                                         </div>
                                     </div>
@@ -7398,8 +7496,33 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                             const prog = getOPProgress(activeOP);
                             const title = activeOP.orderNumber || activeOP.id.slice(0, 6);
+                            let trefilaSubtitle = '';
+                            if (activeOP.machine?.startsWith('Trefila')) {
+                                let pCode = activeOP.productCode || '';
+                                let pDesc = activeOP.productDescription || '';
+                                if (!pDesc || !pCode) {
+                                    const cleanTarget = String(activeOP.targetBitola || '').replace('mm', '').trim();
+                                    const matched = gauges.find((g: any) => {
+                                        const mat = (g.materialType || '').toLowerCase();
+                                        const isCa60 = mat === 'ca-60' || mat === 'ca60' || mat.includes('trefila');
+                                        if (!isCa60) return false;
+                                        const gClean = String(g.gauge || '').replace('mm', '').trim();
+                                        return g.gauge === activeOP.targetBitola || gClean === cleanTarget || parseFloat(gClean.replace(',', '.')) === parseFloat(cleanTarget.replace(',', '.'));
+                                    });
+                                    if (matched) {
+                                        if (!pCode) pCode = matched.productCode || (matched as any).code || '';
+                                        if (!pDesc) pDesc = matched.description || (matched as any).gaugeDescription || '';
+                                    }
+                                }
+                                if (pDesc) {
+                                    trefilaSubtitle = pCode && !pDesc.startsWith(pCode) ? `${pCode} - ${pDesc}` : pDesc;
+                                } else {
+                                    trefilaSubtitle = `Bitola ${activeOP.targetBitola || 'N/A'}mm`;
+                                }
+                            }
+
                             const subtitle = activeOP.productName || (
-                                activeOP.machine?.startsWith('Trefila') ? `Bitola ${activeOP.targetBitola || 'N/A'}mm` :
+                                activeOP.machine?.startsWith('Trefila') ? trefilaSubtitle :
                                 activeOP.machine?.startsWith('Treliça') ? `${activeOP.trelicaModel || 'Treliça'} • ${activeOP.tamanho || ''}m` :
                                 activeOP.machine?.startsWith('Malha') ? `${activeOP.malhaModel || 'Malha'} (${activeOP.tamanho || ''})` :
                                 'Ordem de Produção'
@@ -7605,7 +7728,25 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                         <div className="min-w-0 truncate">
                                                             <span className="font-bold text-white">#{queuedOp.orderNumber}</span>
                                                             <span className="text-slate-400 text-[10px] ml-2 truncate">
-                                                                {queuedOp.productName || queuedOp.targetBitola || queuedOp.trelicaModel || queuedOp.malhaModel}
+                                                                {(() => {
+                                                                    let qSub = queuedOp.productName || queuedOp.productDescription;
+                                                                    if (!qSub && (queuedOp.machine?.startsWith('Trefila') || (queuedOp as any).scheduledMachine?.startsWith('Trefila'))) {
+                                                                        const cleanTarget = String(queuedOp.targetBitola || '').replace('mm', '').trim();
+                                                                        const matched = gauges.find((g: any) => {
+                                                                            const mat = (g.materialType || '').toLowerCase();
+                                                                            const isCa60 = mat === 'ca-60' || mat === 'ca60' || mat.includes('trefila');
+                                                                            if (!isCa60) return false;
+                                                                            const gClean = String(g.gauge || '').replace('mm', '').trim();
+                                                                            return g.gauge === queuedOp.targetBitola || gClean === cleanTarget || parseFloat(gClean.replace(',', '.')) === parseFloat(cleanTarget.replace(',', '.'));
+                                                                        });
+                                                                        if (matched) {
+                                                                            const c = queuedOp.productCode || matched.productCode || (matched as any).code;
+                                                                            const d = matched.description || (matched as any).gaugeDescription;
+                                                                            qSub = d ? (c && !d.startsWith(c) ? `[${c}] ${d}` : d) : undefined;
+                                                                        }
+                                                                    }
+                                                                    return qSub || (queuedOp.targetBitola ? `Bitola ${queuedOp.targetBitola}mm` : '') || queuedOp.trelicaModel || queuedOp.malhaModel;
+                                                                })()}
                                                             </span>
                                                         </div>
                                                         <div className="flex items-center gap-1 shrink-0">
@@ -9519,6 +9660,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 <EditActiveOPModal
                     order={editingInProgressOP}
                     shiftReports={shiftReports}
+                    gauges={gauges}
                     onClose={() => setEditingInProgressOP(null)}
                     onSave={handleSaveActiveOPEdit}
                 />
@@ -10858,6 +11000,7 @@ const ManagerAuthModalForAdjust: React.FC<{
 interface EditActiveOPModalProps {
     order: ProductionOrderData;
     shiftReports?: ShiftReport[];
+    gauges?: any[];
     onClose: () => void;
     onSave: (
         orderId: string,
@@ -10892,6 +11035,7 @@ interface FinalizedShiftItem {
 const EditActiveOPModal: React.FC<EditActiveOPModalProps> = ({
     order,
     shiftReports = [],
+    gauges = [],
     onClose,
     onSave
 }) => {
@@ -10918,10 +11062,30 @@ const EditActiveOPModal: React.FC<EditActiveOPModalProps> = ({
             return `${order.trelicaModel || 'Treliça'}${order.tamanho ? ` • ${order.tamanho}` : ''}`;
         }
         if (isTrefila) {
+            let pCode = order.productCode || '';
+            let pDesc = order.productDescription || '';
+            if (!pDesc || !pCode) {
+                // Fallback for old orders: lookup in gauges
+                const cleanTarget = String(order.targetBitola || '').replace('mm', '').trim();
+                const matchedGauge = gauges.find((g: any) => {
+                    const mat = (g.materialType || '').toLowerCase();
+                    const isCa60 = mat === 'ca-60' || mat === 'ca60' || mat.includes('trefila');
+                    if (!isCa60) return false;
+                    const gClean = String(g.gauge || '').replace('mm', '').trim();
+                    return g.gauge === order.targetBitola || gClean === cleanTarget || parseFloat(gClean.replace(',', '.')) === parseFloat(cleanTarget.replace(',', '.'));
+                });
+                if (matchedGauge) {
+                    if (!pCode) pCode = matchedGauge.productCode || (matchedGauge as any).code || '';
+                    if (!pDesc) pDesc = matchedGauge.description || (matchedGauge as any).gaugeDescription || '';
+                }
+            }
+            if (pDesc) {
+                return pCode && !pDesc.startsWith(pCode) ? `[${pCode}] ${pDesc}` : pDesc;
+            }
             return `Bitola ${order.targetBitola || 'N/A'}mm${order.inputBitola ? ` (Entrada: ${order.inputBitola}mm)` : ''}`;
         }
         return order.malhaModel || 'Malha Padrão';
-    }, [order, isTrelica, isTrefila]);
+    }, [order, isTrelica, isTrefila, gauges]);
 
     // 4. Turnos Finalizados (Peças Produzidas)
     const initialShifts = useMemo(() => {

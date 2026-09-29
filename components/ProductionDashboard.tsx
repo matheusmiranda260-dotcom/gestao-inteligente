@@ -504,13 +504,16 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
         if (machineType.startsWith('Trefila')) {
             const bitola = activeOrder.targetBitola ? `ø${activeOrder.targetBitola}mm` : 'CA-60';
             const weightStr = activeOrder.totalWeight ? `${activeOrder.totalWeight.toLocaleString('pt-BR')} kg` : '';
+            const code = activeOrder.productCode || '';
+            const desc = activeOrder.productDescription || `Arame Trefilado CA-60 ${bitola}`;
+            const headerTitle = code && !desc.startsWith(code) ? `${code} - ${desc}` : desc;
             return {
                 orderNumber: activeOrder.orderNumber,
-                code: activeOrder.productCode || 'CA-60',
-                description: activeOrder.productDescription || `Aramo Trefilado CA-60`,
+                code: code || 'CA-60',
+                description: desc,
                 size: bitola,
                 weight: weightStr,
-                formattedHeader: `#${activeOrder.orderNumber}# CA-60 + Aramo Trefilado ${bitola}${weightStr ? ` • ${weightStr}` : ''}`
+                formattedHeader: `#${activeOrder.orderNumber}# ${headerTitle}${weightStr ? ` • ${weightStr}` : ''}`
             };
         }
 
