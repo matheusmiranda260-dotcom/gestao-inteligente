@@ -2125,58 +2125,250 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                                     Nenhum lote de pesagem registrado. Clique em "+ Registrar Peso" ou "🔄 Sincronizar OP".
                                                 </td>
                                             </tr>
+                                        ) : isTrefila ? (
+                                            (() => {
+                                                const dayGroups: { date: string; rows: ProductionUpdateRow[] }[] = [];
+                                                productionUpdates.forEach(row => {
+                                                    const d = (row.data || '').trim() || 'Sem Data';
+                                                    const lastGroup = dayGroups[dayGroups.length - 1];
+                                                    if (lastGroup && lastGroup.date === d) {
+                                                        lastGroup.rows.push(row);
+                                                    } else {
+                                                        dayGroups.push({ date: d, rows: [row] });
+                                                    }
+                                                });
+
+                                                const overallEntrada = productionUpdates.reduce((sum, r) => sum + (Number(r.kgEntrada) || 0), 0);
+                                                const overallSaida = productionUpdates.reduce((sum, r) => sum + (Number(r.saida || r.peso) || 0), 0);
+                                                let overallRendimentoStr = '-';
+                                                let overallPerdaStr = '-';
+                                                let overallPerdaNum = 0;
+                                                if (overallEntrada > 0) {
+                                                    const rend = (overallSaida / overallEntrada) * 100;
+                                                    overallRendimentoStr = rend.toFixed(1).replace('.', ',') + '%';
+                                                    overallPerdaNum = Math.max(0, 100 - rend);
+                                                    overallPerdaStr = overallPerdaNum.toFixed(1).replace('.', ',') + '%';
+                                                }
+
+                                                return (
+                                                    <>
+                                                        {dayGroups.map((group, gIdx) => {
+                                                            const totalEntradaDia = group.rows.reduce((sum, r) => sum + (Number(r.kgEntrada) || 0), 0);
+                                                            const totalSaidaDia = group.rows.reduce((sum, r) => sum + (Number(r.saida || r.peso) || 0), 0);
+                                                            let rendimentoStr = '-';
+                                                            let perdaStr = '-';
+                                                            let rendimentoNum = 0;
+                                                            let perdaNum = 0;
+                                                            if (totalEntradaDia > 0) {
+                                                                rendimentoNum = (totalSaidaDia / totalEntradaDia) * 100;
+                                                                rendimentoStr = rendimentoNum.toFixed(1).replace('.', ',') + '%';
+                                                                perdaNum = Math.max(0, 100 - rendimentoNum);
+                                                                perdaStr = perdaNum.toFixed(1).replace('.', ',') + '%';
+                                                            }
+
+                                                            return (
+                                                                <React.Fragment key={`group-${group.date}-${gIdx}`}>
+                                                                    {group.rows.map((row, rIdx) => (
+                                                                        <tr key={row.id} className="border-b border-slate-200 hover:bg-slate-50/50 group text-xs">
+                                                                            {rIdx === 0 && (
+                                                                                <td
+                                                                                    rowSpan={group.rows.length}
+                                                                                    className="p-2 border-r border-b border-slate-200 text-center align-middle bg-slate-50/80 font-black text-sm text-[#002060]"
+                                                                                >
+                                                                                    <div className="flex flex-col items-center justify-center gap-1">
+                                                                                        <input
+                                                                                            type="text"
+                                                                                            value={group.date}
+                                                                                            onChange={e => {
+                                                                                                const newDate = e.target.value;
+                                                                                                setProductionUpdates(prev => prev.map(p => {
+                                                                                                    if (group.rows.some(gr => gr.id === p.id)) {
+                                                                                                        return { ...p, data: newDate };
+                                                                                                    }
+                                                                                                    return p;
+                                                                                                }));
+                                                                                            }}
+                                                                                            className="modern-editable-input text-center font-black text-sm text-[#002060] w-20 bg-white rounded border border-slate-200 shadow-sm py-1"
+                                                                                            placeholder="Ex: 25/09"
+                                                                                            title="Data do dia / turno (editável para o grupo)"
+                                                                                        />
+                                                                                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                                                                                            {group.rows.length} {group.rows.length === 1 ? 'lote' : 'lotes'}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                </td>
+                                                                            )}
+                                                                            <td className="p-1 border-r border-slate-200 text-center">
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={row.lote || ''}
+                                                                                    onChange={e => updateProductionUpdateField(row.id, 'lote', e.target.value)}
+                                                                                    className="modern-editable-input text-center w-full font-black text-xs text-blue-900"
+                                                                                    placeholder="Ex: 9860"
+                                                                                />
+                                                                            </td>
+                                                                            <td className="p-1 border-r border-slate-200 text-center">
+                                                                                <input
+                                                                                    type="number"
+                                                                                    value={row.kgEntrada ?? ''}
+                                                                                    onChange={e => updateProductionUpdateField(row.id, 'kgEntrada', parseFloat(e.target.value) || 0)}
+                                                                                    className="modern-editable-input text-center w-full font-black text-xs"
+                                                                                    placeholder="0"
+                                                                                />
+                                                                            </td>
+                                                                            <td className="p-1 border-r border-slate-200 text-center">
+                                                                                <input
+                                                                                    type="number"
+                                                                                    value={row.saida ?? row.peso ?? ''}
+                                                                                    onChange={e => {
+                                                                                        const val = parseFloat(e.target.value) || 0;
+                                                                                        updateProductionUpdateField(row.id, 'saida', val);
+                                                                                        updateProductionUpdateField(row.id, 'peso', val);
+                                                                                    }}
+                                                                                    className="modern-editable-input text-center w-full font-black text-xs text-emerald-700"
+                                                                                    placeholder="0"
+                                                                                />
+                                                                            </td>
+                                                                            <td className="p-1 border-r border-slate-200 text-center">
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={row.bitola || ''}
+                                                                                    onChange={e => updateProductionUpdateField(row.id, 'bitola', e.target.value)}
+                                                                                    className="modern-editable-input text-center w-full font-black text-xs"
+                                                                                    placeholder="Ex: 3.40 mm"
+                                                                                />
+                                                                            </td>
+                                                                            <td className="p-1 text-center no-print">
+                                                                                <div className="flex items-center justify-center gap-1">
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => {
+                                                                                            const newDate = prompt('Digite a nova data para este lote individual (ex: 28/09):', row.data);
+                                                                                            if (newDate && newDate.trim()) {
+                                                                                                updateProductionUpdateField(row.id, 'data', newDate.trim());
+                                                                                            }
+                                                                                        }}
+                                                                                        className="text-slate-400 hover:text-blue-600 font-bold p-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                                                                                        title="Mudar data deste lote individual"
+                                                                                    >
+                                                                                        📅
+                                                                                    </button>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => removeProductionUpdateRow(row.id)}
+                                                                                        className="text-rose-600 hover:text-rose-800 font-bold hover:bg-rose-50 px-1.5 py-0.5 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                                                                                        title="Remover pesagem"
+                                                                                    >
+                                                                                        ✕
+                                                                                    </button>
+                                                                                </div>
+                                                                            </td>
+                                                                        </tr>
+                                                                    ))}
+
+                                                                    {/* Rodapé do Dia com Totais e % de Rendimento */}
+                                                                    <tr className="bg-blue-50/90 font-black text-xs border-y-2 border-[#002060]/30">
+                                                                        <td colSpan={2} className="py-2.5 px-3 border-r border-[#002060]/20 text-right uppercase tracking-wider text-[11px] font-black text-[#002060]">
+                                                                            TOTAL DIA ({group.date}):
+                                                                        </td>
+                                                                        <td className="py-2.5 px-2 border-r border-[#002060]/20 text-center font-black text-slate-900">
+                                                                            {totalEntradaDia > 0 ? totalEntradaDia.toLocaleString('pt-BR') : '0'} kg
+                                                                        </td>
+                                                                        <td className="py-2.5 px-2 border-r border-[#002060]/20 text-center font-black text-emerald-700">
+                                                                            {totalSaidaDia > 0 ? totalSaidaDia.toLocaleString('pt-BR') : '0'} kg
+                                                                        </td>
+                                                                        <td className="py-2.5 px-2 border-r border-[#002060]/20 text-center font-black">
+                                                                            <div className="flex items-center justify-center gap-1.5">
+                                                                                <span className={`px-2 py-0.5 rounded text-[11px] font-black ${
+                                                                                    rendimentoNum >= 99 ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
+                                                                                    rendimentoNum >= 97 ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                                                                                    rendimentoNum > 0 ? 'bg-amber-100 text-amber-800 border border-amber-200' :
+                                                                                    'text-slate-400'
+                                                                                }`}>
+                                                                                    {rendimentoStr}
+                                                                                </span>
+                                                                                {perdaNum > 0 && (
+                                                                                    <span className="text-[10px] text-slate-500 font-bold" title="Perda metálica">
+                                                                                        (Perda: {perdaStr})
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="py-2.5 px-2 text-center no-print"></td>
+                                                                    </tr>
+
+                                                                    {/* Espaço de respiro entre os dias */}
+                                                                    {gIdx < dayGroups.length - 1 && (
+                                                                        <tr className="h-4 bg-slate-100/60 border-y border-slate-200/80">
+                                                                            <td colSpan={6} className="h-4 p-0"></td>
+                                                                        </tr>
+                                                                    )}
+                                                                </React.Fragment>
+                                                            );
+                                                        })}
+
+                                                        {/* TOTAL GERAL */}
+                                                        <tr className="bg-[#002060] font-black text-white text-xs border-t-2 border-[#002060]">
+                                                            <td colSpan={2} className="py-2.5 px-3 border-r border-slate-700 text-center uppercase tracking-wider text-[11px] font-black text-white">
+                                                                TOTAL GERAL
+                                                            </td>
+                                                            <td className="py-2.5 px-2 border-r border-slate-700 text-center font-black text-white">
+                                                                {overallEntrada > 0 ? overallEntrada.toLocaleString('pt-BR') : '0'} kg
+                                                            </td>
+                                                            <td className="py-2.5 px-2 border-r border-slate-700 text-center font-black text-white">
+                                                                {overallSaida > 0 ? overallSaida.toLocaleString('pt-BR') : '0'} kg
+                                                            </td>
+                                                            <td className="py-2.5 px-2 border-r border-slate-700 text-center font-black">
+                                                                <div className="flex items-center justify-center gap-1.5">
+                                                                    <span className="bg-white/20 text-white px-2 py-0.5 rounded text-[11px] font-black">
+                                                                        {overallRendimentoStr}
+                                                                    </span>
+                                                                    {overallPerdaNum > 0 && (
+                                                                        <span className="text-[10px] text-slate-300 font-bold">
+                                                                            (Perda: {overallPerdaStr})
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                            <td className="py-2.5 px-2 text-center no-print"></td>
+                                                        </tr>
+                                                    </>
+                                                );
+                                            })()
                                         ) : (
-                                            productionUpdates.map(row => {
-                                                if (isTrefila) {
+                                            <>
+                                                {productionUpdates.map(row => {
+                                                    const weightAverage = row.qnt > 0 ? (row.peso / row.qnt) : 0;
                                                     return (
                                                         <tr key={row.id} className="border-b border-slate-200 hover:bg-slate-50/50 group text-xs">
+                                                            <td className="p-1 border-r border-slate-200 text-center">
+                                                                <input
+                                                                    type="number"
+                                                                    value={row.qnt || ''}
+                                                                    onChange={e => updateProductionUpdateField(row.id, 'qnt', parseInt(e.target.value, 10) || 0)}
+                                                                    className="modern-editable-input text-center w-full font-black text-xs"
+                                                                    placeholder="Qnt."
+                                                                />
+                                                            </td>
+                                                            <td className="p-1 border-r border-slate-200 text-center">
+                                                                <input
+                                                                    type="number"
+                                                                    value={row.peso || ''}
+                                                                    onChange={e => updateProductionUpdateField(row.id, 'peso', parseFloat(e.target.value) || 0)}
+                                                                    className="modern-editable-input text-center w-full font-black text-xs"
+                                                                    placeholder="Peso (Kg)"
+                                                                />
+                                                            </td>
+                                                            <td className="p-1 border-r border-slate-200 text-center font-black text-slate-800 text-xs">
+                                                                {weightAverage > 0 ? weightAverage.toFixed(2).replace('.', ',') : ''}
+                                                            </td>
                                                             <td className="p-1 border-r border-slate-200 text-center">
                                                                 <input
                                                                     type="text"
                                                                     value={row.data}
                                                                     onChange={e => updateProductionUpdateField(row.id, 'data', e.target.value)}
                                                                     className="modern-editable-input text-center w-full font-black text-xs"
-                                                                    placeholder="Ex: 25/09"
-                                                                />
-                                                            </td>
-                                                            <td className="p-1 border-r border-slate-200 text-center">
-                                                                <input
-                                                                    type="text"
-                                                                    value={row.lote || ''}
-                                                                    onChange={e => updateProductionUpdateField(row.id, 'lote', e.target.value)}
-                                                                    className="modern-editable-input text-center w-full font-black text-xs text-blue-900"
-                                                                    placeholder="Ex: 9860"
-                                                                />
-                                                            </td>
-                                                            <td className="p-1 border-r border-slate-200 text-center">
-                                                                <input
-                                                                    type="number"
-                                                                    value={row.kgEntrada ?? ''}
-                                                                    onChange={e => updateProductionUpdateField(row.id, 'kgEntrada', parseFloat(e.target.value) || 0)}
-                                                                    className="modern-editable-input text-center w-full font-black text-xs"
-                                                                    placeholder="0"
-                                                                />
-                                                            </td>
-                                                            <td className="p-1 border-r border-slate-200 text-center">
-                                                                <input
-                                                                    type="number"
-                                                                    value={row.saida ?? row.peso ?? ''}
-                                                                    onChange={e => {
-                                                                        const val = parseFloat(e.target.value) || 0;
-                                                                        updateProductionUpdateField(row.id, 'saida', val);
-                                                                        updateProductionUpdateField(row.id, 'peso', val);
-                                                                    }}
-                                                                    className="modern-editable-input text-center w-full font-black text-xs text-emerald-700"
-                                                                    placeholder="0"
-                                                                />
-                                                            </td>
-                                                            <td className="p-1 border-r border-slate-200 text-center">
-                                                                <input
-                                                                    type="text"
-                                                                    value={row.bitola || ''}
-                                                                    onChange={e => updateProductionUpdateField(row.id, 'bitola', e.target.value)}
-                                                                    className="modern-editable-input text-center w-full font-black text-xs"
-                                                                    placeholder="Ex: 3.40 mm"
+                                                                    placeholder="Ex: 01/04"
                                                                 />
                                                             </td>
                                                             <td className="p-1 text-center no-print">
@@ -2191,71 +2383,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                                             </td>
                                                         </tr>
                                                     );
-                                                }
-
-                                                const weightAverage = row.qnt > 0 ? (row.peso / row.qnt) : 0;
-                                                return (
-                                                    <tr key={row.id} className="border-b border-slate-200 hover:bg-slate-50/50 group text-xs">
-                                                        <td className="p-1 border-r border-slate-200 text-center">
-                                                            <input
-                                                                type="number"
-                                                                value={row.qnt || ''}
-                                                                onChange={e => updateProductionUpdateField(row.id, 'qnt', parseInt(e.target.value, 10) || 0)}
-                                                                className="modern-editable-input text-center w-full font-black text-xs"
-                                                                placeholder="Qnt."
-                                                            />
-                                                        </td>
-                                                        <td className="p-1 border-r border-slate-200 text-center">
-                                                            <input
-                                                                type="number"
-                                                                value={row.peso || ''}
-                                                                onChange={e => updateProductionUpdateField(row.id, 'peso', parseFloat(e.target.value) || 0)}
-                                                                className="modern-editable-input text-center w-full font-black text-xs"
-                                                                placeholder="Peso (Kg)"
-                                                            />
-                                                        </td>
-                                                        <td className="p-1 border-r border-slate-200 text-center font-black text-slate-800 text-xs">
-                                                            {weightAverage > 0 ? weightAverage.toFixed(2).replace('.', ',') : ''}
-                                                        </td>
-                                                        <td className="p-1 border-r border-slate-200 text-center">
-                                                            <input
-                                                                type="text"
-                                                                value={row.data}
-                                                                onChange={e => updateProductionUpdateField(row.id, 'data', e.target.value)}
-                                                                className="modern-editable-input text-center w-full font-black text-xs"
-                                                                placeholder="Ex: 01/04"
-                                                            />
-                                                        </td>
-                                                        <td className="p-1 text-center no-print">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => removeProductionUpdateRow(row.id)}
-                                                                className="text-rose-600 hover:text-rose-800 font-bold hover:bg-rose-50 px-2 py-0.5 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                                                                title="Remover pesagem"
-                                                            >
-                                                                ✕
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })
-                                        )}
-                                        {productionUpdates.length > 0 && (
-                                            isTrefila ? (
-                                                <tr className="bg-[#002060] font-black text-white text-xs border-t-2 border-[#002060]">
-                                                    <td colSpan={2} className="p-2 border-r border-slate-700 text-center uppercase tracking-wider text-[10px] font-black text-white">
-                                                        TOTAL GERAL
-                                                    </td>
-                                                    <td className="p-2 border-r border-slate-700 text-center font-black text-white">
-                                                        {productionUpdates.reduce((sum, r) => sum + (Number(r.kgEntrada) || 0), 0).toLocaleString('pt-BR')} kg
-                                                    </td>
-                                                    <td className="p-2 border-r border-slate-700 text-center font-black text-white">
-                                                        {productionUpdates.reduce((sum, r) => sum + (Number(r.saida || r.peso) || 0), 0).toLocaleString('pt-BR')} kg
-                                                    </td>
-                                                    <td className="p-2 border-r border-slate-700 text-center font-black text-white"></td>
-                                                    <td className="p-2 text-center no-print"></td>
-                                                </tr>
-                                            ) : (
+                                                })}
                                                 <tr className="bg-[#002060] font-black text-white text-xs border-t-2 border-[#002060]">
                                                     <td className="p-2 border-r border-slate-700 text-center font-black text-white">
                                                         {calculatedData.totalUpdateQnt}
@@ -2271,7 +2399,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                                     </td>
                                                     <td className="p-2 text-center no-print"></td>
                                                 </tr>
-                                            )
+                                            </>
                                         )}
                                     </tbody>
                                 </table>
