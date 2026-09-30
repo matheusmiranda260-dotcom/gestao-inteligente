@@ -9702,6 +9702,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     shiftConfig={shiftConfig}
                     stock={stock}
                     gauges={gauges}
+                    employees={employees}
+                    users={users}
                 />
             )}
 
@@ -9720,6 +9722,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     shiftConfig={shiftConfig}
                     stock={stock}
                     gauges={gauges}
+                    employees={employees}
+                    users={users}
                 />
             )}
 
@@ -9859,6 +9863,8 @@ interface DailyDowntimeReportModalProps {
     shiftConfig?: PcpShiftConfig;
     stock?: StockItem[];
     gauges?: StockGauge[];
+    employees?: Employee[];
+    users?: User[];
 }
 
 const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
@@ -9869,7 +9875,9 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
     shiftReports = [],
     shiftConfig,
     stock = [],
-    gauges = []
+    gauges = [],
+    employees = [],
+    users = []
 }) => {
     const activeOp = productionOrders.find(o => o.id === data.op.id) || data.op;
     const [selectedDateStr, setSelectedDateStr] = useState<string>(data.dateStr);
@@ -10610,6 +10618,8 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                     shiftConfig={shiftConfig}
                     stock={stock}
                     gauges={gauges}
+                    employees={employees}
+                    users={users}
                 />
             )}
         </div>

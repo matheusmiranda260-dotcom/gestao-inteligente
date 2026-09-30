@@ -145,6 +145,79 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
     // Tabela de atualização da produção
     const [productionUpdates, setProductionUpdates] = useState<ProductionUpdateRow[]>([]);
 
+    // Carregamento de Funcionários para foto e nome padrão oficial
+    const [loadedEmployees, setLoadedEmployees] = useState<any[]>([]);
+    useEffect(() => {
+        supabase.from('employees').select('*').then(({ data }) => {
+            if (data && data.length > 0) {
+                setLoadedEmployees(data);
+            }
+        });
+    }, []);
+
+    // Helper para buscar operador por nome ou identificador e retornar Nome Oficial e Foto
+    const getEmployeeForOperator = (nameOrId?: string): { name: string; photoUrl?: string; initials: string } => {
+        if (!nameOrId) return { name: '', initials: 'OP' };
+        const clean = nameOrId.trim().toLowerCase();
+        if (clean === 'gestor' || clean === 'ghost_order_flag' || clean === 'sistema') {
+            return { name: nameOrId, initials: 'OP' };
+        }
+
+        let found: any = null;
+        if (loadedEmployees && loadedEmployees.length > 0) {
+            found = loadedEmployees.find(e => {
+                const en = (e.name || '').toLowerCase();
+                return en === clean || en.includes(clean) || clean.includes(en);
+            });
+            if (!found) {
+                const parts = clean.split(/\s+/).filter(p => p.length >= 3);
+                if (parts.length > 0) {
+                    found = loadedEmployees.find(e => (e.name || '').toLowerCase().startsWith(parts[0]));
+                }
+            }
+        }
+
+        if (!found && (clean.includes('willian') || clean.includes('william'))) {
+            const willianEmp = loadedEmployees?.find(e => (e.name || '').toLowerCase().includes('willian'));
+            if (willianEmp) {
+                found = willianEmp;
+            } else {
+                return {
+                    name: 'WILLIAN CAMARGO',
+                    photoUrl: undefined,
+                    initials: 'WC'
+                };
+            }
+        }
+
+        if (found) {
+            const photo = found.photoUrl || found.photo_url || found.avatar_url;
+            const rawFullName = found.name || nameOrId;
+            const parts = rawFullName.trim().split(/\s+/).filter(Boolean);
+            const shortName = parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1]}`.toUpperCase() : rawFullName.toUpperCase();
+            const initials = parts.length > 1 
+                ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+                : (parts[0]?.slice(0, 2) || 'OP').toUpperCase();
+            return {
+                name: shortName,
+                photoUrl: photo || undefined,
+                initials
+            };
+        }
+
+        const parts = nameOrId.trim().split(/\s+/).filter(Boolean);
+        const shortName = parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1]}`.toUpperCase() : nameOrId.toUpperCase();
+        const initials = parts.length > 1 
+            ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+            : (parts[0]?.slice(0, 2) || 'OP').toUpperCase();
+
+        return {
+            name: shortName,
+            photoUrl: undefined,
+            initials
+        };
+    };
+
     const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // 3. Sistema de Toasts
@@ -402,12 +475,16 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
 
         // 1. Preencher Metadados
         setProductionOrder(targetOP.orderNumber || '');
-        if (targetOP.operator) {
-            setOperator(targetOP.operator);
-        } else {
-            // Tenta buscar no shiftReports
+        let foundOp = targetOP.operator || '';
+        if (!foundOp) {
             const relatedReport = (shiftReports || []).find(r => r.productionOrderId === targetOP?.id || r.orderNumber === targetOP?.orderNumber);
-            if (relatedReport?.operator) setOperator(relatedReport.operator);
+            if (relatedReport?.operator) foundOp = relatedReport.operator;
+        }
+        if (foundOp) {
+            const empInfo = getEmployeeForOperator(foundOp);
+            setOperator(empInfo.name || foundOp);
+        } else {
+            setOperator('WILLIAN CAMARGO');
         }
 
         const inBitola = targetOP.inputBitola || '5.50';
@@ -431,18 +508,40 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
             return st.startsWith(selDateOnly) || (getLocalDateString && getLocalDateString(st) === selDateOnly);
         });
 
-        const newStops: StopRow[] = relevantEvents.map((ev: any, idx: number) => {
-            const st = ev.stopTime || ev.stop_time;
-            const rt = ev.resumeTime || ev.resume_time;
-            const rReason = ev.reason || ev.motivo || 'Outros';
-            const rJust = ev.justification ? ` - ${ev.justification.trim()}` : '';
-            return {
-                id: `auto-stop-${idx}-${Date.now()}`,
-                inicio: formatTime(st),
-                fim: rt ? formatTime(rt) : formatTime(st),
-                motivo: `${rReason.toUpperCase()}${rJust.toUpperCase()}`
-            };
-        });
+        const seenTimes = new Set<string>();
+        const newStops: StopRow[] = relevantEvents
+            .filter((ev: any) => {
+                const st = ev.stopTime || ev.stop_time;
+                const rt = ev.resumeTime || ev.resume_time;
+                if (!st) return false;
+                const sDate = new Date(st);
+                if (isNaN(sDate.getTime())) return false;
+                const rDate = rt ? new Date(rt) : null;
+                // Ignorar se resumeTime for anterior a stopTime (erro de timestamp)
+                if (rDate && !isNaN(rDate.getTime()) && rDate.getTime() < sDate.getTime()) return false;
+                const durMs = rDate && !isNaN(rDate.getTime()) ? (rDate.getTime() - sDate.getTime()) : 0;
+                // Ignorar micro-paradas (< 15s sem justificativa)
+                if (rDate && durMs > 0 && durMs < 15000 && (!ev.justification || !ev.justification.trim())) return false;
+                return true;
+            })
+            .map((ev: any, idx: number) => {
+                const st = ev.stopTime || ev.stop_time;
+                const rt = ev.resumeTime || ev.resume_time;
+                const rReason = ev.reason || ev.motivo || 'Outros';
+                const rJust = ev.justification ? ` - ${ev.justification.trim()}` : '';
+                return {
+                    id: `auto-stop-${idx}-${Date.now()}`,
+                    inicio: formatTime(st),
+                    fim: rt ? formatTime(rt) : formatTime(st),
+                    motivo: `${rReason.toUpperCase()}${rJust.toUpperCase()}`
+                };
+            })
+            .filter((stop: StopRow) => {
+                if (stop.inicio === stop.fim && (!stop.motivo || stop.motivo.includes('TROCA DE ROLO'))) return false;
+                if (seenTimes.has(stop.inicio)) return false;
+                seenTimes.add(stop.inicio);
+                return true;
+            });
 
         if (newStops.length > 0) {
             setStops(newStops);
@@ -1658,19 +1757,51 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
                     <div className="grid grid-cols-1 md:grid-cols-12 border-b border-slate-200 bg-[#fbfcfd]">
                         {/* OP e Operador */}
                         <div className="col-span-1 md:col-span-4 p-4 flex flex-col justify-between gap-3.5 border-r border-slate-200">
-                            <div className="flex items-start gap-2.5">
-                                <ClipboardIcon className="h-5 w-5 text-[#002060] mt-0.5" />
-                                <div className="flex-grow">
-                                    <div className="text-[9px] font-black text-slate-500 uppercase tracking-wider">ORDEM DE PRODUÇÃO</div>
-                                    <input type="text" value={productionOrder} onChange={e => setProductionOrder(e.target.value)} className="w-full text-sm font-black text-[#002060] bg-transparent border-none p-0 focus:ring-0 focus:outline-none modern-editable-input" placeholder="Digite a OP..." />
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center shrink-0 shadow-sm">
+                                    <ClipboardIcon className="h-5 w-5 text-[#002060]" />
+                                </div>
+                                <div className="flex-grow min-w-0">
+                                    <div className="text-[10px] font-black text-slate-500 uppercase tracking-wider">ORDEM DE PRODUÇÃO</div>
+                                    <input type="text" value={productionOrder} onChange={e => setProductionOrder(e.target.value)} className="w-full text-2xl font-black text-[#002060] bg-transparent border-none p-0 focus:ring-0 focus:outline-none modern-editable-input tracking-tight" placeholder="Digite a OP..." />
                                 </div>
                             </div>
-                            <div className="flex items-start gap-2.5 pt-3 border-t border-slate-100">
-                                <UserIcon className="h-5 w-5 text-[#002060] mt-0.5" />
-                                <div className="flex-grow">
-                                    <div className="text-[9px] font-black text-slate-500 uppercase tracking-wider">OPERADOR / AUXILIAR</div>
-                                    <input type="text" value={operator} onChange={e => setOperator(e.target.value)} className="w-full text-sm font-black text-[#002060] bg-transparent border-none p-0 focus:ring-0 focus:outline-none modern-editable-input uppercase" placeholder="Nome do Operador..." />
-                                </div>
+                            <div className="flex items-center gap-3 pt-3 border-t border-slate-100">
+                                {(() => {
+                                    const empInfo = getEmployeeForOperator(operator);
+                                    return (
+                                        <>
+                                            <div className="relative shrink-0">
+                                                {empInfo.photoUrl ? (
+                                                    <img
+                                                        src={empInfo.photoUrl}
+                                                        alt={empInfo.name || operator}
+                                                        className="w-10 h-10 rounded-full object-cover border-2 border-[#002060] shadow-md ring-2 ring-blue-400/30"
+                                                    />
+                                                ) : (
+                                                    <div className="w-10 h-10 rounded-full bg-[#002060] text-white flex items-center justify-center font-black text-xs border-2 border-white shadow-md">
+                                                        {empInfo.initials}
+                                                    </div>
+                                                )}
+                                                <span className="w-3 h-3 rounded-full absolute -bottom-0.5 -right-0.5 border-2 border-white bg-emerald-500 shadow-sm" />
+                                            </div>
+                                            <div className="flex-grow min-w-0">
+                                                <div className="text-[10px] font-black text-slate-500 uppercase tracking-wider">OPERADOR / AUXILIAR</div>
+                                                <input 
+                                                    type="text" 
+                                                    value={empInfo.name || operator} 
+                                                    onChange={e => setOperator(e.target.value)} 
+                                                    onBlur={e => {
+                                                        const full = getEmployeeForOperator(e.target.value).name;
+                                                        if (full) setOperator(full);
+                                                    }}
+                                                    className="w-full text-base sm:text-lg font-black text-[#002060] bg-transparent border-none p-0 focus:ring-0 focus:outline-none modern-editable-input uppercase" 
+                                                    placeholder="Nome do Operador..." 
+                                                />
+                                            </div>
+                                        </>
+                                    );
+                                })()}
                             </div>
                         </div>
 
@@ -1712,17 +1843,17 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
                             </div>
                             <table className="w-full border-collapse">
                                 <thead>
-                                    <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-700 uppercase">
-                                        <th className="py-1.5 border-r border-slate-200 text-center" style={{ width: '75px' }}>Início</th>
-                                        <th className="py-1.5 border-r border-slate-200 text-center" style={{ width: '75px' }}>Fim</th>
-                                        <th className="py-1.5 border-r border-slate-200 text-center" style={{ width: '70px' }}>Duração</th>
-                                        <th className="py-1.5 text-left pl-3">Motivo</th>
+                                    <tr className="bg-slate-50 border-b border-slate-200 text-xl font-black text-slate-700 uppercase">
+                                        <th className="py-4 border-r border-slate-200 text-center" style={{ width: '120px' }}>Início</th>
+                                        <th className="py-4 border-r border-slate-200 text-center" style={{ width: '120px' }}>Fim</th>
+                                        <th className="py-4 border-r border-slate-200 text-center" style={{ width: '120px' }}>Duração</th>
+                                        <th className="py-4 text-center">Motivo</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {stops.length === 0 ? (
                                         <tr>
-                                            <td colSpan={4} className="text-center py-6 text-slate-400 italic font-bold text-xs">
+                                            <td colSpan={4} className="text-center py-8 text-slate-400 italic font-bold text-xl">
                                                 Nenhuma parada registrada.
                                             </td>
                                         </tr>
@@ -1730,19 +1861,19 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
                                         stops.map(stop => {
                                             const durationSecs = calculateStopDurationSeconds(stop.inicio, stop.fim);
                                             return (
-                                                <tr key={stop.id} className="border-b border-slate-200 hover:bg-slate-50/50 group text-xs">
-                                                    <td className="p-1 border-r border-slate-200 text-center">
-                                                        <input type="text" value={stop.inicio} onChange={e => updateStopField(stop.id, 'inicio', e.target.value)} className="modern-editable-input text-center text-rose-600 w-full font-black text-xs" placeholder="00:00:00" />
+                                                <tr key={stop.id} className="border-b border-slate-200 hover:bg-slate-50/50 group text-2xl">
+                                                    <td className="p-4 border-r border-slate-200 text-center">
+                                                        <input type="text" value={stop.inicio} onChange={e => updateStopField(stop.id, 'inicio', e.target.value)} className="modern-editable-input text-center text-rose-600 w-full font-black text-3xl" placeholder="00:00:00" />
                                                     </td>
-                                                    <td className="p-1 border-r border-slate-200 text-center">
-                                                        <input type="text" value={stop.fim} onChange={e => updateStopField(stop.id, 'fim', e.target.value)} className="modern-editable-input text-center text-emerald-600 w-full font-black text-xs" placeholder="00:00:00" />
+                                                    <td className="p-4 border-r border-slate-200 text-center">
+                                                        <input type="text" value={stop.fim} onChange={e => updateStopField(stop.id, 'fim', e.target.value)} className="modern-editable-input text-center text-emerald-600 w-full font-black text-3xl" placeholder="00:00:00" />
                                                     </td>
-                                                    <td className="p-1 border-r border-slate-200 text-center font-black text-rose-600 text-xs">
+                                                    <td className="p-4 border-r border-slate-200 text-center font-black text-rose-600 text-3xl">
                                                         {secondsToTime(durationSecs)}
                                                     </td>
-                                                    <td className="p-1 text-left pl-3 relative pr-8">
-                                                        <input type="text" value={stop.motivo} onChange={e => updateStopField(stop.id, 'motivo', e.target.value)} className="modern-editable-input text-left text-slate-800 w-full font-bold text-xs" placeholder="Motivo..." />
-                                                        <button onClick={() => removeStopRow(stop.id)} className="absolute right-2 top-1/2 -translate-y-1/2 text-rose-600 hover:text-rose-800 font-black text-sm no-print opacity-0 group-hover:opacity-100 transition-opacity" title="Remover parada">✕</button>
+                                                    <td className="p-4 text-center relative pr-10">
+                                                        <input type="text" value={stop.motivo} onChange={e => updateStopField(stop.id, 'motivo', e.target.value)} className="modern-editable-input text-center text-slate-800 w-full font-bold text-3xl uppercase" placeholder="Motivo..." />
+                                                        <button onClick={() => removeStopRow(stop.id)} className="absolute right-4 top-1/2 -translate-y-1/2 text-rose-600 hover:text-rose-800 font-black text-3xl no-print opacity-0 group-hover:opacity-100 transition-opacity" title="Remover parada">✕</button>
                                                     </td>
                                                 </tr>
                                             );

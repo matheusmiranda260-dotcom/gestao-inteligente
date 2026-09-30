@@ -18,6 +18,8 @@ export interface DailyProductionReportSheetModalProps {
     shiftConfig?: any;
     stock?: StockItem[];
     gauges?: StockGauge[];
+    employees?: any[];
+    users?: any[];
 }
 
 interface StopRow {
@@ -116,6 +118,8 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
     shiftConfig,
     stock = [],
     gauges = [],
+    employees = [],
+    users = [],
 }) => {
     // Normalização da máquina (ex: Treliça 1, Treliça 2)
     const machine = useMemo(() => {
@@ -153,6 +157,84 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
     const [loading, setLoading] = useState<boolean>(true);
     const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
     const [toasts, setToasts] = useState<Toast[]>([]);
+
+    // Carregamento de Funcionários e Usuários para exibição de foto e nome padrão oficial
+    const [loadedEmployees, setLoadedEmployees] = useState<any[]>(employees || []);
+    useEffect(() => {
+        if (!employees || employees.length === 0) {
+            supabase.from('employees').select('*').then(({ data }) => {
+                if (data && data.length > 0) {
+                    setLoadedEmployees(data);
+                }
+            });
+        } else {
+            setLoadedEmployees(employees);
+        }
+    }, [employees]);
+
+    // Helper para buscar operador por nome ou identificador e retornar Nome Oficial e Foto
+    const getEmployeeForOperator = (nameOrId?: string): { name: string; photoUrl?: string; initials: string } => {
+        if (!nameOrId) return { name: '', initials: 'OP' };
+        const clean = nameOrId.trim().toLowerCase();
+        if (clean === 'gestor' || clean === 'ghost_order_flag' || clean === 'sistema') {
+            return { name: nameOrId, initials: 'OP' };
+        }
+
+        let found: any = null;
+        if (loadedEmployees && loadedEmployees.length > 0) {
+            found = loadedEmployees.find(e => {
+                const en = (e.name || '').toLowerCase();
+                return en === clean || en.includes(clean) || clean.includes(en);
+            });
+            if (!found) {
+                const parts = clean.split(/\s+/).filter(p => p.length >= 3);
+                if (parts.length > 0) {
+                    found = loadedEmployees.find(e => (e.name || '').toLowerCase().startsWith(parts[0]));
+                }
+            }
+        }
+
+        // Se for "willian" e não achou ainda, buscar especificamente por willian no cadastro ou aplicar padrão oficial Willian Camargo
+        if (!found && (clean.includes('willian') || clean.includes('william'))) {
+            const willianEmp = loadedEmployees?.find(e => (e.name || '').toLowerCase().includes('willian'));
+            if (willianEmp) {
+                found = willianEmp;
+            } else {
+                return {
+                    name: 'WILLIAN CAMARGO',
+                    photoUrl: undefined,
+                    initials: 'WC'
+                };
+            }
+        }
+
+        if (found) {
+            const photo = found.photoUrl || found.photo_url || found.avatar_url;
+            const rawFullName = found.name || nameOrId;
+            const parts = rawFullName.trim().split(/\s+/).filter(Boolean);
+            const shortName = parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1]}`.toUpperCase() : rawFullName.toUpperCase();
+            const initials = parts.length > 1 
+                ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+                : (parts[0]?.slice(0, 2) || 'OP').toUpperCase();
+            return {
+                name: shortName,
+                photoUrl: photo || undefined,
+                initials
+            };
+        }
+
+        const parts = nameOrId.trim().split(/\s+/).filter(Boolean);
+        const shortName = parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1]}`.toUpperCase() : nameOrId.toUpperCase();
+        const initials = parts.length > 1 
+            ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+            : (parts[0]?.slice(0, 2) || 'OP').toUpperCase();
+
+        return {
+            name: shortName,
+            photoUrl: undefined,
+            initials
+        };
+    };
 
     // Cache e fallback de bitolas / produtos / estoque
     const [cachedGauges, setCachedGauges] = useState<StockGauge[]>(() => {
@@ -258,6 +340,8 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         if (!inicio || !fim) return 0;
         let diff = timeToSeconds(fim) - timeToSeconds(inicio);
         if (diff < 0) diff += 24 * 3600;
+        // Se a duração calculada for superior a 12 horas em uma única parada, trata-se de inconsistência de timestamp (ex: 07:52 às 03:01)
+        if (diff > 12 * 3600) return 0;
         return diff;
     };
 
@@ -1024,6 +1108,12 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
 
             const resumeTime = e.resumeTime || e.resume_time;
             const rDate = resumeTime ? new Date(resumeTime) : null;
+
+            // Segurança: ignorar se resumeTime for anterior a stopTime (dados corrompidos ou inconsistentes)
+            if (rDate && !isNaN(rDate.getTime()) && rDate.getTime() < sDate.getTime()) {
+                return;
+            }
+
             const startH = sDate.getHours();
             const startM = sDate.getMinutes();
 
@@ -1032,6 +1122,11 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
 
             const durMs = rDate && !isNaN(rDate.getTime()) ? (rDate.getTime() - sDate.getTime()) : 0;
             const durMin = durMs > 0 ? Math.round(durMs / 60000) : (Number(e.durationMin || e.duration_min) || 0);
+
+            // Ignorar micro-paradas acidentais (< 15s sem justificativa) geradas por cliques rápidos de transição
+            if (rDate && durMs > 0 && durMs < 15000 && (!e.justification || !e.justification.trim())) {
+                return;
+            }
 
             const reasonStr = e.reason || e.motivo || 'PARADA DE MÁQUINA';
             // Desconsiderar paradas de máquina desligada fora do expediente (interjornada noturna)
@@ -1044,6 +1139,11 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 ? `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`
                 : startTimeStr;
 
+            // Se início e fim forem exatamente iguais e não tiver justificativa nem duração, ignorar
+            if (startTimeStr === endTimeStr && durMin === 0 && (!e.justification || !e.justification.trim())) {
+                return;
+            }
+
             const justStr = e.justification ? ` - ${e.justification.trim()}` : '';
             const row: StopRow = {
                 id: `auto-op-stop-${idx}`,
@@ -1054,6 +1154,18 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
 
             // Se não há Turno B confirmado (sem operador e sem produção no Turno B) ou se ocorreu até o fim da tarde (ex: 18h), pertence ao Turno A
             const belongsToTurnoB = hasTurnoBReport && startH >= 17;
+            const targetList = !belongsToTurnoB ? stopsListA : stopsListB;
+
+            // Prevenção de duplicidade por mesmo horário de início (ex: múltiplos cliques no mesmo minuto como 07:52)
+            const existingIdx = targetList.findIndex(s => s.inicio === startTimeStr);
+            if (existingIdx !== -1) {
+                const existingDur = calculateStopDurationSeconds(targetList[existingIdx].inicio, targetList[existingIdx].fim);
+                const currentDur = calculateStopDurationSeconds(startTimeStr, endTimeStr);
+                if (currentDur > existingDur) {
+                    targetList[existingIdx] = row;
+                }
+                return;
+            }
 
             if (!belongsToTurnoB) {
                 stopsListA.push(row);
@@ -1152,14 +1264,17 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             }
         }
 
+        const resolvedOpA = opA ? (getEmployeeForOperator(opA).name || opA) : '';
+        const resolvedOpB = opB ? (getEmployeeForOperator(opB).name || opB) : '';
+
         return {
             productionOrder: prodOrder,
             productDescription: prodDesc,
             productDescriptionIn: prodDescIn,
             productDescriptionOut: prodDescOut,
             piecesToProduce: targetQ,
-            operatorShiftA: opA || '',
-            operatorShiftB: hasRealTurnoB ? opB : '',
+            operatorShiftA: resolvedOpA,
+            operatorShiftB: hasRealTurnoB ? resolvedOpB : '',
             stopsShiftA: stopsListA,
             stopsShiftB: stopsListB,
             statsShiftA: {
@@ -1217,9 +1332,11 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 setProductionOrder(dbReport.production_order || op.orderNumber || '');
 
                 const auto = generateAutoDataFromShopFloor();
-                const resolvedOpA = dbReport.operator_shift_a || auto.operatorShiftA || initialOperator || op.operatorName || (op as any).operator || '';
+                const rawOpA = dbReport.operator_shift_a || auto.operatorShiftA || initialOperator || op.operatorName || (op as any).operator || '';
+                const resolvedOpA = (rawOpA && rawOpA.trim().toLowerCase().includes('willian')) ? 'WILLIAN CAMARGO' : (getEmployeeForOperator(rawOpA).name || rawOpA);
                 setOperatorShiftA(resolvedOpA);
-                const resolvedOpB = dbReport.operator_shift_b || auto.operatorShiftB || '';
+                const rawOpB = dbReport.operator_shift_b || auto.operatorShiftB || '';
+                const resolvedOpB = rawOpB ? (getEmployeeForOperator(rawOpB).name || rawOpB) : '';
                 setOperatorShiftB(resolvedOpB);
                 
                 if (isTrefila) {
@@ -1253,7 +1370,23 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 // Sincronização inteligente de paradas:
                 // Se a máquina/OP teve novas paradas registradas após o salvamento inicial do relatório (ex: durante o expediente),
                 // mescla automaticamente as paradas reais geradas do chão de fábrica preservando edições manuais
-                const existingStopsA: StopRow[] = dbReport.stops_shift_a || [];
+                const sanitizeLoadedStops = (list: StopRow[]) => {
+                    const seen = new Set<string>();
+                    return (list || []).filter(s => {
+                        if (!s || !s.inicio) return false;
+                        const dur = calculateStopDurationSeconds(s.inicio, s.fim);
+                        // Remover paradas com duração absurda (> 12h, ex: 19h09m por timestamp invertido)
+                        if (dur > 12 * 3600) return false;
+                        // Remover paradas de 00:00:00 sem justificativa/motivo específico
+                        if (s.inicio === s.fim && dur === 0 && (!s.motivo || s.motivo.includes('TROCA DE ROLO'))) return false;
+                        // Deduplicar mesmo horário de início
+                        if (seen.has(s.inicio)) return false;
+                        seen.add(s.inicio);
+                        return true;
+                    });
+                };
+
+                const existingStopsA: StopRow[] = sanitizeLoadedStops(dbReport.stops_shift_a || []);
                 let mergedStopsA: StopRow[] = [...existingStopsA];
 
                 if (mergedStopsA.length === 0 && auto.stopsShiftA && auto.stopsShiftA.length > 0) {
@@ -1277,10 +1410,11 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                         }
                     });
                 }
+                mergedStopsA = sanitizeLoadedStops(mergedStopsA);
                 mergedStopsA.sort((a, b) => timeToSeconds(a.inicio) - timeToSeconds(b.inicio));
                 setStopsShiftA(mergedStopsA);
 
-                const existingStopsB: StopRow[] = dbReport.stops_shift_b || [];
+                const existingStopsB: StopRow[] = sanitizeLoadedStops(dbReport.stops_shift_b || []);
                 let mergedStopsB: StopRow[] = [...existingStopsB];
                 if (mergedStopsB.length === 0 && auto.stopsShiftB && auto.stopsShiftB.length > 0) {
                     mergedStopsB = [...auto.stopsShiftB];
@@ -2234,47 +2368,104 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                         <div className="grid grid-cols-1 md:grid-cols-12 border-b border-slate-200 bg-[#fbfcfd]">
                             {/* Coluna 1: Ordem de Produção e Operador */}
                             <div className={`${hasSecondShift ? 'col-span-1 md:col-span-4' : 'col-span-1 md:col-span-5'} p-4 flex flex-col justify-between gap-3.5 border-r border-slate-200`}>
-                                <div className="flex items-start gap-2.5">
-                                    <ClipboardIcon className="h-5 w-5 text-[#002060] mt-0.5 shrink-0" />
-                                    <div className="flex-grow">
-                                        <div className="text-[9px] font-black text-slate-500 uppercase tracking-wider">ORDEM DE PRODUÇÃO</div>
+                                {/* Bloco Ordem de Produção */}
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center shrink-0 shadow-sm">
+                                        <ClipboardIcon className="h-5 w-5 text-[#002060]" />
+                                    </div>
+                                    <div className="flex-grow min-w-0">
+                                        <div className="text-[10px] font-black text-slate-500 uppercase tracking-wider">ORDEM DE PRODUÇÃO</div>
                                         <input
                                             type="text"
                                             value={productionOrder}
                                             onChange={e => setProductionOrder(e.target.value)}
-                                            className="w-full text-sm font-black text-[#002060] bg-transparent border-none p-0 focus:ring-0 focus:outline-none modern-editable-input"
+                                            className="w-full text-2xl font-black text-[#002060] bg-transparent border-none p-0 focus:ring-0 focus:outline-none modern-editable-input tracking-tight"
                                             placeholder="Digite a OP..."
                                         />
                                     </div>
                                 </div>
-                                <div className="flex items-start gap-2.5 pt-3 border-t border-slate-100">
-                                    <UserIcon className="h-5 w-5 text-[#002060] mt-0.5 shrink-0" />
-                                    <div className="flex-grow">
-                                        <div className="text-[9px] font-black text-slate-500 uppercase tracking-wider">
-                                            {hasSecondShift ? 'OPERADOR / AUXILIAR - TURNO A' : 'OPERADOR / AUXILIAR'}
-                                        </div>
-                                        <input
-                                            type="text"
-                                            value={operatorShiftA}
-                                            onChange={e => setOperatorShiftA(e.target.value)}
-                                            className="w-full text-xs font-black text-slate-700 bg-transparent border-none p-0 focus:ring-0 focus:outline-none uppercase modern-editable-input"
-                                            placeholder="Nome do operador..."
-                                        />
-                                    </div>
+
+                                {/* Bloco Operador Turno A */}
+                                <div className="flex items-center gap-3 pt-3 border-t border-slate-100">
+                                    {(() => {
+                                        const empInfo = getEmployeeForOperator(operatorShiftA);
+                                        return (
+                                            <>
+                                                <div className="relative shrink-0">
+                                                    {empInfo.photoUrl ? (
+                                                        <img
+                                                            src={empInfo.photoUrl}
+                                                            alt={empInfo.name || operatorShiftA}
+                                                            className="w-10 h-10 rounded-full object-cover border-2 border-[#002060] shadow-md ring-2 ring-blue-400/30"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-10 h-10 rounded-full bg-[#002060] text-white flex items-center justify-center font-black text-xs border-2 border-white shadow-md">
+                                                            {empInfo.initials}
+                                                        </div>
+                                                    )}
+                                                    <span className="w-3 h-3 rounded-full absolute -bottom-0.5 -right-0.5 border-2 border-white bg-emerald-500 shadow-sm" />
+                                                </div>
+                                                <div className="flex-grow min-w-0">
+                                                    <div className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                                                        {hasSecondShift ? 'OPERADOR / AUXILIAR - TURNO A' : 'OPERADOR / AUXILIAR'}
+                                                    </div>
+                                                    <input
+                                                        type="text"
+                                                        value={empInfo.name || operatorShiftA}
+                                                        onChange={e => setOperatorShiftA(e.target.value)}
+                                                        onBlur={e => {
+                                                            const full = getEmployeeForOperator(e.target.value).name;
+                                                            if (full) setOperatorShiftA(full);
+                                                        }}
+                                                        className="w-full text-base sm:text-lg font-black text-[#002060] bg-transparent border-none p-0 focus:ring-0 focus:outline-none uppercase modern-editable-input"
+                                                        placeholder="Nome do operador..."
+                                                    />
+                                                </div>
+                                            </>
+                                        );
+                                    })()}
                                 </div>
+
+                                {/* Bloco Operador Turno B (se existir) */}
                                 {isTrefila && hasSecondShift && (
-                                    <div className="flex items-start gap-2.5 pt-3 border-t border-slate-100">
-                                        <UserIcon className="h-5 w-5 text-[#002060] mt-0.5 shrink-0" />
-                                        <div className="flex-grow">
-                                            <div className="text-[9px] font-black text-slate-500 uppercase tracking-wider">OPERADOR / AUXILIAR - TURNO B</div>
-                                            <input
-                                                type="text"
-                                                value={operatorShiftB}
-                                                onChange={e => setOperatorShiftB(e.target.value)}
-                                                className="w-full text-xs font-black text-slate-700 bg-transparent border-none p-0 focus:ring-0 focus:outline-none uppercase modern-editable-input"
-                                                placeholder="Nome do operador..."
-                                            />
-                                        </div>
+                                    <div className="flex items-center gap-3 pt-3 border-t border-slate-100">
+                                        {(() => {
+                                            const empInfoB = getEmployeeForOperator(operatorShiftB);
+                                            return (
+                                                <>
+                                                    <div className="relative shrink-0">
+                                                        {empInfoB.photoUrl ? (
+                                                            <img
+                                                                src={empInfoB.photoUrl}
+                                                                alt={empInfoB.name || operatorShiftB}
+                                                                className="w-10 h-10 rounded-full object-cover border-2 border-emerald-600 shadow-md ring-2 ring-emerald-400/30"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-10 h-10 rounded-full bg-emerald-700 text-white flex items-center justify-center font-black text-xs border-2 border-white shadow-md">
+                                                                {empInfoB.initials}
+                                                            </div>
+                                                        )}
+                                                        <span className="w-3 h-3 rounded-full absolute -bottom-0.5 -right-0.5 border-2 border-white bg-blue-500 shadow-sm" />
+                                                    </div>
+                                                    <div className="flex-grow min-w-0">
+                                                        <div className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                                                            OPERADOR / AUXILIAR - TURNO B
+                                                        </div>
+                                                        <input
+                                                            type="text"
+                                                            value={empInfoB.name || operatorShiftB}
+                                                            onChange={e => setOperatorShiftB(e.target.value)}
+                                                            onBlur={e => {
+                                                                const full = getEmployeeForOperator(e.target.value).name;
+                                                                if (full) setOperatorShiftB(full);
+                                                            }}
+                                                            className="w-full text-base sm:text-lg font-black text-emerald-800 bg-transparent border-none p-0 focus:ring-0 focus:outline-none uppercase modern-editable-input"
+                                                            placeholder="Nome do operador..."
+                                                        />
+                                                    </div>
+                                                </>
+                                            );
+                                        })()}
                                     </div>
                                 )}
                             </div>
