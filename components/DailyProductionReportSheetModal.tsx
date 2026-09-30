@@ -2264,7 +2264,10 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex flex-col z-[150] overflow-y-auto print:bg-white print:p-0 print:overflow-visible animate-fade select-none">
+        <div 
+            className="fixed inset-0 bg-black/85 backdrop-blur-md flex flex-col z-[150] overflow-y-auto print:bg-white print:p-0 print:overflow-visible animate-fade"
+            onClick={e => e.stopPropagation()}
+        >
             {/* CSS de Impressão e Captura */}
             <style dangerouslySetInnerHTML={{ __html: `
                 input::-webkit-outer-spin-button,
