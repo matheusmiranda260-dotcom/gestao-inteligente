@@ -710,12 +710,14 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
             const currEndSec = timeToSeconds(current.fim || current.inicio);
             const currDurSec = calculateStopDurationSeconds(current.inicio, current.fim);
 
+            const prevDurSec = calculateStopDurationSeconds(prev.inicio, prev.fim);
             const isPrevRoll = (prev.motivo || '').toUpperCase().includes('ROLO') || (prev.motivo || '').toUpperCase().includes('BOBINA') || (prev.motivo || '').toUpperCase().includes('PREPARA');
             const isCurrRoll = (current.motivo || '').toUpperCase().includes('ROLO') || (current.motivo || '').toUpperCase().includes('BOBINA') || (current.motivo || '').toUpperCase().includes('PREPARA');
 
-            const isVeryClose = (currStartSec - prevEndSec) <= 180 && (currStartSec >= prevEndSec - 60);
+            const isMicroStop = currDurSec <= 60 || prevDurSec <= 60;
+            const isVeryClose = (currStartSec - prevEndSec) <= 120 && (currStartSec >= prevEndSec - 60);
 
-            if (isPrevRoll && isCurrRoll && isVeryClose) {
+            if (isPrevRoll && isCurrRoll && isVeryClose && isMicroStop) {
                 if (currEndSec > prevEndSec) {
                     prev.fim = current.fim;
                 }
@@ -726,7 +728,7 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
                 continue;
             }
 
-            if (isCurrRoll && currDurSec <= 60 && (currStartSec - prevEndSec) <= 300) {
+            if (isCurrRoll && currDurSec <= 60 && (currStartSec - prevEndSec) <= 120 && (!current.motivo || !current.motivo.includes('-'))) {
                 continue;
             }
 

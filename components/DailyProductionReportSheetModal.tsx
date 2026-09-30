@@ -972,15 +972,17 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             const currStartSec = timeToSeconds(current.inicio);
             const currEndSec = timeToSeconds(current.fim || current.inicio);
             const currDurSec = calculateStopDurationSeconds(current.inicio, current.fim);
+            const prevDurSec = calculateStopDurationSeconds(prev.inicio, prev.fim);
 
             const isPrevRoll = (prev.motivo || '').toUpperCase().includes('ROLO') || (prev.motivo || '').toUpperCase().includes('BOBINA') || (prev.motivo || '').toUpperCase().includes('PREPARA');
             const isCurrRoll = (current.motivo || '').toUpperCase().includes('ROLO') || (current.motivo || '').toUpperCase().includes('BOBINA') || (current.motivo || '').toUpperCase().includes('PREPARA');
 
-            // Critério de mesclagem:
-            // Ambas são paradas de troca de rolo ocorrendo coladas (intervalo <= 3 minutos, ex: 13:39 e 13:40, ou 14:16 e 14:17)
-            const isVeryClose = (currStartSec - prevEndSec) <= 180 && (currStartSec >= prevEndSec - 60);
+            // Mesclar SOMENTE se pelo menos uma das paradas for um micro-clique fantasma / sub-evento (duração <= 60s)
+            // Se ambas tiverem duração real (> 60s, como 24min e 5min), NÃO mescla porque são trocas de rolo distintas!
+            const isMicroStop = currDurSec <= 60 || prevDurSec <= 60;
+            const isVeryClose = (currStartSec - prevEndSec) <= 120 && (currStartSec >= prevEndSec - 60);
 
-            if (isPrevRoll && isCurrRoll && isVeryClose) {
+            if (isPrevRoll && isCurrRoll && isVeryClose && isMicroStop) {
                 // Estender o fim da parada anterior se a atual terminar depois
                 if (currEndSec > prevEndSec) {
                     prev.fim = current.fim;
@@ -993,8 +995,8 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 continue;
             }
 
-            // Ignorar micro-paradas fantasmas (dur <= 60s) duplicadas de troca de rolo logo após uma parada real
-            if (isCurrRoll && currDurSec <= 60 && (currStartSec - prevEndSec) <= 300) {
+            // Ignorar micro-paradas fantasmas isoladas de <= 60s sem justificativa se ocorreram dentro de 2 min de uma parada
+            if (isCurrRoll && currDurSec <= 60 && (currStartSec - prevEndSec) <= 120 && (!current.motivo || !current.motivo.includes('-'))) {
                 continue;
             }
 
