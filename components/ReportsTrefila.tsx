@@ -156,6 +156,35 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
         });
     }, []);
 
+    // Helper para buscar funcionário da máquina pelo cargo/função (ex: Auxiliar ou Operador na Gestão de Pessoas)
+    const findEmployeeByMachineAndRole = (targetMach: string, roleKeyword: 'operador' | 'auxiliar'): string => {
+        if (!loadedEmployees || loadedEmployees.length === 0) return '';
+        const normMach = (targetMach || selectedMachine || 'Trefila 1').toLowerCase().replace(/\s+/g, '');
+        const match = loadedEmployees.find(e => {
+            const eSector = (e.sector || e.setor || '').toLowerCase().replace(/\s+/g, '');
+            const eRole = (e.jobTitle || e.role || e.cargo || '').toLowerCase();
+            const machMatch = eSector === normMach || 
+                              (normMach.includes('trefila') && eSector.includes('trefila')) || 
+                              (normMach.includes('trelica') && eSector.includes('trelica')) || 
+                              (normMach.includes('malha') && eSector.includes('malha'));
+            return machMatch && eRole.includes(roleKeyword);
+        });
+        return match?.name || '';
+    };
+
+    // Auto-preencher auxiliar se estiver vazio
+    useEffect(() => {
+        if (loadedEmployees && loadedEmployees.length > 0) {
+            if (!assistant) {
+                const autoAux = findEmployeeByMachineAndRole(selectedMachine, 'auxiliar');
+                if (autoAux) {
+                    const full = getEmployeeForOperator(autoAux).name || autoAux;
+                    setAssistant(full);
+                }
+            }
+        }
+    }, [loadedEmployees, selectedMachine]);
+
     // Helper para buscar operador por nome ou identificador e retornar Nome Oficial e Foto
     const getEmployeeForOperator = (nameOrId?: string): { name: string; photoUrl?: string; initials: string } => {
         if (!nameOrId) return { name: '', initials: 'OP' };
@@ -188,6 +217,13 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
                     photoUrl: undefined,
                     initials: 'WC'
                 };
+            }
+        }
+
+        if (!found && (clean.includes('carlos') || clean.includes('eduardo'))) {
+            const carlosEmp = loadedEmployees?.find(e => (e.name || '').toLowerCase().includes('carlos'));
+            if (carlosEmp) {
+                found = carlosEmp;
             }
         }
 
@@ -1923,14 +1959,15 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
                                                 <div className="text-[10px] font-black text-slate-500 uppercase tracking-wider">OPERADOR</div>
                                                 <input 
                                                     type="text" 
-                                                    value={empInfo.name || operator} 
+                                                    list="operator-options-trefila"
+                                                    value={operator} 
                                                     onChange={e => setOperator(e.target.value)} 
                                                     onBlur={e => {
                                                         const full = getEmployeeForOperator(e.target.value).name;
                                                         if (full) setOperator(full);
                                                     }}
                                                     className="w-full text-base sm:text-lg font-black text-[#002060] bg-transparent border-none p-0 focus:ring-0 focus:outline-none modern-editable-input uppercase" 
-                                                    placeholder="Nome do Operador..." 
+                                                    placeholder="Selecione ou digite o Operador..." 
                                                 />
                                             </div>
                                         </div>
@@ -1959,19 +1996,36 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
                                                 <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider">AUXILIAR</div>
                                                 <input 
                                                     type="text" 
-                                                    value={auxInfo.name || assistant} 
+                                                    list="auxiliar-options-trefila"
+                                                    value={assistant} 
                                                     onChange={e => setAssistant(e.target.value)} 
                                                     onBlur={e => {
                                                         const full = getEmployeeForOperator(e.target.value).name;
                                                         if (full) setAssistant(full);
                                                     }}
                                                     className="w-full text-sm font-bold text-slate-700 bg-transparent border-none p-0 focus:ring-0 focus:outline-none modern-editable-input uppercase" 
-                                                    placeholder="Nome do Auxiliar..." 
+                                                    placeholder="Selecione ou digite o Auxiliar..." 
                                                 />
                                             </div>
                                         </div>
                                     );
                                 })()}
+
+                                {/* Datalists de sugestões inteligentes */}
+                                <datalist id="operator-options-trefila">
+                                    {(loadedEmployees || []).map((emp: any) => (
+                                        <option key={`op-tref-${emp.id || emp.name}`} value={emp.name}>
+                                            {emp.sector ? `${emp.sector} • ` : ''}{emp.jobTitle || 'Operador'}
+                                        </option>
+                                    ))}
+                                </datalist>
+                                <datalist id="auxiliar-options-trefila">
+                                    {(loadedEmployees || []).map((emp: any) => (
+                                        <option key={`aux-tref-${emp.id || emp.name}`} value={emp.name}>
+                                            {emp.sector ? `${emp.sector} • ` : ''}{emp.jobTitle || 'Auxiliar'}
+                                        </option>
+                                    ))}
+                                </datalist>
                             </div>
                         </div>
 

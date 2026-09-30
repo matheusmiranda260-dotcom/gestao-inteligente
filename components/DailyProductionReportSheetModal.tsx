@@ -161,16 +161,48 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
     // Carregamento de Funcionários e Usuários para exibição de foto e nome padrão oficial
     const [loadedEmployees, setLoadedEmployees] = useState<any[]>(employees || []);
     useEffect(() => {
-        if (!employees || employees.length === 0) {
-            supabase.from('employees').select('*').then(({ data }) => {
-                if (data && data.length > 0) {
-                    setLoadedEmployees(data);
+        supabase.from('employees').select('*').then(({ data }) => {
+            if (data && data.length > 0) {
+                setLoadedEmployees(data);
+            }
+        });
+    }, []);
+
+    // Helper para buscar funcionário da máquina pelo cargo/função (ex: Auxiliar ou Operador na Gestão de Pessoas)
+    const findEmployeeByMachineAndRole = (targetMach: string, roleKeyword: 'operador' | 'auxiliar'): string => {
+        if (!loadedEmployees || loadedEmployees.length === 0) return '';
+        const normMach = (targetMach || machine || '').toLowerCase().replace(/\s+/g, '');
+        const match = loadedEmployees.find(e => {
+            const eSector = (e.sector || e.setor || '').toLowerCase().replace(/\s+/g, '');
+            const eRole = (e.jobTitle || e.role || e.cargo || '').toLowerCase();
+            const machMatch = eSector === normMach || 
+                              (normMach.includes('trefila') && eSector.includes('trefila')) || 
+                              (normMach.includes('trelica') && eSector.includes('trelica')) || 
+                              (normMach.includes('malha') && eSector.includes('malha'));
+            return machMatch && eRole.includes(roleKeyword);
+        });
+        return match?.name || '';
+    };
+
+    // Auto-preencher operador e auxiliar a partir da Gestão de Pessoas se ainda estiverem vazios
+    useEffect(() => {
+        if (loadedEmployees && loadedEmployees.length > 0) {
+            if (!assistantShiftA) {
+                const autoAux = findEmployeeByMachineAndRole(machine, 'auxiliar');
+                if (autoAux) {
+                    const full = getEmployeeForOperator(autoAux).name || autoAux;
+                    setAssistantShiftA(full);
                 }
-            });
-        } else {
-            setLoadedEmployees(employees);
+            }
+            if (!operatorShiftA) {
+                const autoOp = findEmployeeByMachineAndRole(machine, 'operador');
+                if (autoOp) {
+                    const full = getEmployeeForOperator(autoOp).name || autoOp;
+                    setOperatorShiftA(full);
+                }
+            }
         }
-    }, [employees]);
+    }, [loadedEmployees, machine]);
 
     // Helper para buscar operador por nome ou identificador e retornar Nome Oficial e Foto
     const getEmployeeForOperator = (nameOrId?: string): { name: string; photoUrl?: string; initials: string } => {
@@ -194,7 +226,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             }
         }
 
-        // Se for "willian" e não achou ainda, buscar especificamente por willian no cadastro ou aplicar padrão oficial Willian Camargo
+        // Busca dedicada para nomes comuns
         if (!found && (clean.includes('willian') || clean.includes('william'))) {
             const willianEmp = loadedEmployees?.find(e => (e.name || '').toLowerCase().includes('willian'));
             if (willianEmp) {
@@ -205,6 +237,13 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     photoUrl: undefined,
                     initials: 'WC'
                 };
+            }
+        }
+
+        if (!found && (clean.includes('carlos') || clean.includes('eduardo'))) {
+            const carlosEmp = loadedEmployees?.find(e => (e.name || '').toLowerCase().includes('carlos'));
+            if (carlosEmp) {
+                found = carlosEmp;
             }
         }
 
@@ -2607,14 +2646,15 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                                     </div>
                                                     <input
                                                         type="text"
-                                                        value={empInfo.name || operatorShiftA}
+                                                        list="operator-options-list"
+                                                        value={operatorShiftA}
                                                         onChange={e => setOperatorShiftA(e.target.value)}
                                                         onBlur={e => {
                                                             const full = getEmployeeForOperator(e.target.value).name;
                                                             if (full) setOperatorShiftA(full);
                                                         }}
                                                         className="w-full text-base sm:text-lg font-black text-[#002060] bg-transparent border-none p-0 focus:ring-0 focus:outline-none uppercase modern-editable-input"
-                                                        placeholder="Nome do operador..."
+                                                        placeholder="Selecione ou digite o operador..."
                                                     />
                                                 </div>
                                             </div>
@@ -2645,14 +2685,15 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                                     </div>
                                                     <input
                                                         type="text"
-                                                        value={auxInfo.name || assistantShiftA}
+                                                        list="auxiliar-options-list"
+                                                        value={assistantShiftA}
                                                         onChange={e => setAssistantShiftA(e.target.value)}
                                                         onBlur={e => {
                                                             const full = getEmployeeForOperator(e.target.value).name;
                                                             if (full) setAssistantShiftA(full);
                                                         }}
                                                         className="w-full text-sm font-bold text-slate-700 bg-transparent border-none p-0 focus:ring-0 focus:outline-none uppercase modern-editable-input"
-                                                        placeholder="Nome do auxiliar..."
+                                                        placeholder="Selecione ou digite o auxiliar..."
                                                     />
                                                 </div>
                                             </div>
@@ -2688,14 +2729,15 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                                         </div>
                                                         <input
                                                             type="text"
-                                                            value={empInfoB.name || operatorShiftB}
+                                                            list="operator-options-list"
+                                                            value={operatorShiftB}
                                                             onChange={e => setOperatorShiftB(e.target.value)}
                                                             onBlur={e => {
                                                                 const full = getEmployeeForOperator(e.target.value).name;
                                                                 if (full) setOperatorShiftB(full);
                                                             }}
                                                             className="w-full text-base sm:text-lg font-black text-emerald-800 bg-transparent border-none p-0 focus:ring-0 focus:outline-none uppercase modern-editable-input"
-                                                            placeholder="Nome do operador..."
+                                                            placeholder="Selecione ou digite o operador..."
                                                         />
                                                     </div>
                                                 </div>
@@ -2726,14 +2768,15 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                                         </div>
                                                         <input
                                                             type="text"
-                                                            value={auxInfoB.name || assistantShiftB}
+                                                            list="auxiliar-options-list"
+                                                            value={assistantShiftB}
                                                             onChange={e => setAssistantShiftB(e.target.value)}
                                                             onBlur={e => {
                                                                 const full = getEmployeeForOperator(e.target.value).name;
                                                                 if (full) setAssistantShiftB(full);
                                                             }}
                                                             className="w-full text-sm font-bold text-emerald-900 bg-transparent border-none p-0 focus:ring-0 focus:outline-none uppercase modern-editable-input"
-                                                            placeholder="Nome do auxiliar..."
+                                                            placeholder="Selecione ou digite o auxiliar..."
                                                         />
                                                     </div>
                                                 </div>
@@ -2741,6 +2784,22 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                         })()}
                                     </div>
                                 )}
+
+                                {/* Datalists para Autocomplete inteligente com os funcionários cadastrados */}
+                                <datalist id="operator-options-list">
+                                    {(loadedEmployees || []).map((emp: any) => (
+                                        <option key={`op-opt-${emp.id || emp.name}`} value={emp.name}>
+                                            {emp.sector ? `${emp.sector} • ` : ''}{emp.jobTitle || 'Operador'}
+                                        </option>
+                                    ))}
+                                </datalist>
+                                <datalist id="auxiliar-options-list">
+                                    {(loadedEmployees || []).map((emp: any) => (
+                                        <option key={`aux-opt-${emp.id || emp.name}`} value={emp.name}>
+                                            {emp.sector ? `${emp.sector} • ` : ''}{emp.jobTitle || 'Auxiliar'}
+                                        </option>
+                                    ))}
+                                </datalist>
                             </div>
 
                             {/* Coluna 2: Descrição do Produto (Entrada e Saída para Trefila, ou Produto e Turno B para Treliça) */}
