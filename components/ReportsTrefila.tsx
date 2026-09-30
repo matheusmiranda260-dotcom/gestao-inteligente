@@ -543,81 +543,7 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
                 return true;
             });
 
-        // Formatar paradas de Troca de Rolo vinculando o lote finalizado e removendo "PREPARAÇÃO"
-        const pLots = targetOP.processedLots || (targetOP as any).processed_lots || [];
-        let rollChangeCounter = 0;
-        const formattedStops = newStops.map(s => {
-            if (!s) return s;
-            const mot = (s.motivo || '').trim();
-            const upper = mot.toUpperCase();
-
-            const isRollChange = upper.includes('TROCA DE ROLO') || 
-                                 upper.includes('TROCA DO ROLO') || 
-                                 upper.includes('TROCA DE BOBINA') || 
-                                 (upper.includes('PREPARA') && (upper.includes('ROLO') || upper.includes('BOBINA') || upper.includes('LOTE')));
-
-            if (isRollChange) {
-                rollChangeCounter++;
-                let lotIdent = '';
-
-                // 1. Tentar encontrar por proximidade de horário do lote concluído
-                if (s.inicio && pLots.length > 0) {
-                    const sSec = timeToSeconds(s.inicio);
-                    const matched = pLots.find((l: any) => {
-                        const lEnd = l.endTime || l.end_time || l.startTime || l.start_time;
-                        if (!lEnd) return false;
-                        const d = new Date(lEnd);
-                        if (isNaN(d.getTime())) return false;
-                        const lotSec = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
-                        return Math.abs(lotSec - sSec) <= 600;
-                    });
-                    if (matched) {
-                        const stockItem = (stock || []).find((st: any) => st.id === (matched.lotId || matched.lot_id) || st.internalLot === matched.internalLot);
-                        lotIdent = stockItem?.internalLot || matched.internalLot || (matched.lotId && !matched.lotId.startsWith('STOCK-') ? matched.lotId : '');
-                    }
-                }
-
-                // 2. Se não achou por horário, usar índice sequencial de troca de rolo
-                if (!lotIdent) {
-                    const targetLotIdx = rollChangeCounter - 1;
-                    if (targetLotIdx >= 0 && targetLotIdx < pLots.length) {
-                        const l = pLots[targetLotIdx];
-                        const stockItem = (stock || []).find((st: any) => st.id === (l.lotId || l.lot_id) || st.internalLot === l.internalLot);
-                        lotIdent = stockItem?.internalLot || l.internalLot || (l.lotId && !l.lotId.startsWith('STOCK-') ? l.lotId : `${rollChangeCounter}`);
-                    } else {
-                        lotIdent = `${rollChangeCounter}`;
-                    }
-                }
-
-                let cleanedExtra = upper
-                    .replace(/TROCA\s+DE\s+ROLO/gi, '')
-                    .replace(/TROCA\s+DO\s+ROLO/gi, '')
-                    .replace(/TROCA\s+DE\s+BOBINA/gi, '')
-                    .replace(/\/\s*PREPARA[ÇC][AÃ]O/gi, '')
-                    .replace(/PREPARA[ÇC][AÃ]O/gi, '')
-                    .replace(/\(\s*LOTE[^\)]*\)/gi, '')
-                    .replace(/^[\s\-\/]+/, '')
-                    .replace(/[\s\-\/]+$/, '')
-                    .trim();
-
-                const lotLabel = lotIdent.toUpperCase().startsWith('LOTE') ? lotIdent.toUpperCase() : `LOTE ${lotIdent}`;
-                let finalMotivo = `TROCA DE ROLO (${lotLabel})`;
-                if (cleanedExtra && cleanedExtra !== '-' && !cleanedExtra.includes('ROLO')) {
-                    finalMotivo += ` - ${cleanedExtra}`;
-                }
-
-                return {
-                    ...s,
-                    motivo: finalMotivo
-                };
-            }
-
-            return s;
-        });
-
-        if (formattedStops.length > 0) {
-            setStops(formattedStops);
-        }
+        // (Paradas serão formatadas após a consolidação dos lotes do dia abaixo)
 
         // 3. Preencher Lotes de Produção (processedLots, weighedPackages ou shiftReports)
         const newUpdates: ProductionUpdateRow[] = [];
@@ -760,6 +686,76 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
             if (sumOut > 0) {
                 setStats(prev => ({ ...prev, pesoSaida: sumOut }));
             }
+        }
+
+        // Formatar paradas de Troca de Rolo vinculando com precisão os lotes finalizados desta data específica
+        const dayLotsList: string[] = newUpdates
+            .filter(u => !u.isSeparator && Boolean(u.lote) && (!u.data || u.data === dateShort || matchesDate(u.data, selDateOnly)))
+            .map(u => String(u.lote));
+
+        let rollChangeCounter = 0;
+        let lastStopEndSec = -1;
+        let lastAssignedLot = '';
+
+        const formattedStops = newStops.map(s => {
+            if (!s) return s;
+            const mot = (s.motivo || '').trim();
+            const upper = mot.toUpperCase();
+
+            const isRollChange = upper.includes('TROCA DE ROLO') || 
+                                 upper.includes('TROCA DO ROLO') || 
+                                 upper.includes('TROCA DE BOBINA') || 
+                                 (upper.includes('PREPARA') && (upper.includes('ROLO') || upper.includes('BOBINA') || upper.includes('LOTE')));
+
+            if (isRollChange) {
+                const sStartSec = timeToSeconds(s.inicio);
+                const sEndSec = timeToSeconds(s.fim);
+
+                const isContinuation = lastStopEndSec > 0 && Math.abs(sStartSec - lastStopEndSec) <= 180 && Boolean(lastAssignedLot);
+
+                let lotIdent = '';
+                if (isContinuation) {
+                    lotIdent = lastAssignedLot;
+                } else {
+                    rollChangeCounter++;
+                    const targetLotIdx = rollChangeCounter - 1;
+                    if (targetLotIdx >= 0 && targetLotIdx < dayLotsList.length) {
+                        lotIdent = dayLotsList[targetLotIdx];
+                    } else {
+                        lotIdent = `${rollChangeCounter}`;
+                    }
+                    lastAssignedLot = lotIdent;
+                    lastStopEndSec = sEndSec;
+                }
+
+                let cleanedExtra = upper
+                    .replace(/TROCA\s+DE\s+ROLO/gi, '')
+                    .replace(/TROCA\s+DO\s+ROLO/gi, '')
+                    .replace(/TROCA\s+DE\s+BOBINA/gi, '')
+                    .replace(/\/\s*PREPARA[ÇC][AÃ]O/gi, '')
+                    .replace(/PREPARA[ÇC][AÃ]O/gi, '')
+                    .replace(/\(\s*LOTE[^\)]*\)/gi, '')
+                    .replace(/^[\s\-\/]+/, '')
+                    .replace(/[\s\-\/]+$/, '')
+                    .trim();
+
+                const lotLabel = lotIdent.toUpperCase().startsWith('LOTE') ? lotIdent.toUpperCase() : `LOTE ${lotIdent}`;
+                let finalMotivo = `TROCA DE ROLO (${lotLabel})`;
+                if (cleanedExtra && cleanedExtra !== '-' && !cleanedExtra.includes('ROLO')) {
+                    finalMotivo += ` - ${cleanedExtra}`;
+                }
+
+                return {
+                    ...s,
+                    motivo: finalMotivo
+                };
+            }
+
+            return s;
+        });
+
+        if (formattedStops.length > 0) {
+            setStops(formattedStops);
         }
 
         // 4. Calcular Horas Trabalhadas

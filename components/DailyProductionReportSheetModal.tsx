@@ -955,13 +955,48 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         return { descIn, descOut };
     };
 
-    // Helper para formatar paradas de Troca de Rolo vinculando o lote finalizado e removendo "PREPARAÇÃO"
-    const formatStopsRollChanges = (stops: StopRow[], targetOp: ProductionOrderData, stockList?: StockItem[]) => {
+    // Helper para formatar paradas de Troca de Rolo vinculando o lote finalizado daquela data e removendo "PREPARAÇÃO"
+    const formatStopsRollChanges = (stops: StopRow[], targetOp: ProductionOrderData, stockList?: StockItem[], targetDate?: string) => {
         const sorted = [...(stops || [])].sort((a, b) => timeToSeconds(a.inicio) - timeToSeconds(b.inicio));
-        const pLots = targetOp.processedLots || (targetOp as any).processed_lots || [];
+        const effectiveDate = targetDate || selectedDate;
         const effectiveStock = (stockList && stockList.length > 0) ? stockList : (stock && stock.length > 0 ? stock : cachedStock);
 
+        // Obter os lotes do dia selecionado (na mesma ordem exata do relatório de pesagens / produção diária)
+        let dayLotsList: { lotNum: string; endTimeIso?: string; endSec?: number }[] = [];
+        
+        if (isTrefila) {
+            const allUpdates = generateTrefilaProductionUpdates(targetOp, effectiveStock, effectiveDate);
+            const filteredUpdates = allUpdates.filter(u => 
+                !u.isSeparator && 
+                (matchesDate(u.data, effectiveDate) || (effectiveDate && formatDateBr(effectiveDate).startsWith(u.data)) || !u.data)
+            );
+            dayLotsList = filteredUpdates.map(u => ({ lotNum: String(u.lote) }));
+        }
+
+        // Se ainda não tiver dayLotsList, buscar em targetOp.processedLots filtrando pela data
+        if (dayLotsList.length === 0) {
+            const rawLots = (targetOp.processedLots || (targetOp as any).processed_lots || []).filter((l: any) => {
+                const lIso = l.endTime || l.end_time || l.startTime || l.start_time;
+                return !lIso || !effectiveDate || matchesDate(lIso, effectiveDate);
+            });
+            dayLotsList = rawLots.map((l: any, idx: number) => {
+                const stockItem = (effectiveStock || []).find((st: any) => st.id === (l.lotId || l.lot_id) || st.internalLot === l.internalLot);
+                const lotNum = stockItem?.internalLot || (stockItem as any)?.internal_lot || l.internalLot || l.internal_lot || ((l.lotId || l.lot_id) && !(l.lotId || l.lot_id).startsWith('STOCK-') ? (l.lotId || l.lot_id) : `${idx + 1}`);
+                const lIso = l.endTime || l.end_time || l.startTime || l.start_time;
+                let endSec: number | undefined = undefined;
+                if (lIso) {
+                    const d = new Date(lIso);
+                    if (!isNaN(d.getTime())) {
+                        endSec = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
+                    }
+                }
+                return { lotNum: String(lotNum), endTimeIso: lIso, endSec };
+            });
+        }
+
         let rollChangeCounter = 0;
+        let lastStopEndSec = -1;
+        let lastAssignedLot = '';
 
         return sorted.map(s => {
             if (!s) return s;
@@ -975,37 +1010,38 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                  (upper.includes('PREPARA') && (upper.includes('ROLO') || upper.includes('BOBINA') || upper.includes('LOTE')));
 
             if (isRollChange) {
-                rollChangeCounter++;
+                const sStartSec = timeToSeconds(s.inicio);
+                const sEndSec = timeToSeconds(s.fim);
+
+                // Se a parada começou logo após o término da parada anterior (em até 3 minutos) ou mesmo minuto, é continuação/sub-evento do mesmo lote
+                const isContinuation = lastStopEndSec > 0 && Math.abs(sStartSec - lastStopEndSec) <= 180 && Boolean(lastAssignedLot);
 
                 let lotIdent = '';
+                if (isContinuation) {
+                    lotIdent = lastAssignedLot;
+                } else {
+                    rollChangeCounter++;
 
-                // 1. Tentar encontrar por proximidade de horário do lote concluído
-                if (s.inicio && pLots.length > 0) {
-                    const sSec = timeToSeconds(s.inicio);
-                    const matched = pLots.find((l: any) => {
-                        const lEnd = l.endTime || l.end_time || l.startTime || l.start_time;
-                        if (!lEnd) return false;
-                        const d = new Date(lEnd);
-                        if (isNaN(d.getTime())) return false;
-                        const lotSec = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
-                        return Math.abs(lotSec - sSec) <= 600; // tolerância de até 10 minutos
-                    });
-                    if (matched) {
-                        const stockItem = (effectiveStock || []).find((st: any) => st.id === (matched.lotId || matched.lot_id) || st.internalLot === matched.internalLot);
-                        lotIdent = stockItem?.internalLot || matched.internalLot || (matched.lotId && !matched.lotId.startsWith('STOCK-') ? matched.lotId : '');
+                    // 1. Tentar encontrar lote por proximidade de horário se disponível
+                    if (s.inicio && dayLotsList.some(d => d.endSec !== undefined)) {
+                        const matched = dayLotsList.find(d => d.endSec !== undefined && Math.abs(d.endSec - sStartSec) <= 600);
+                        if (matched) {
+                            lotIdent = matched.lotNum;
+                        }
                     }
-                }
 
-                // 2. Se não achou por horário, usar índice sequencial de troca de rolo daquele dia/OP
-                if (!lotIdent) {
-                    const targetLotIdx = rollChangeCounter - 1;
-                    if (targetLotIdx >= 0 && targetLotIdx < pLots.length) {
-                        const l = pLots[targetLotIdx];
-                        const stockItem = (effectiveStock || []).find((st: any) => st.id === (l.lotId || l.lot_id) || st.internalLot === l.internalLot);
-                        lotIdent = stockItem?.internalLot || l.internalLot || (l.lotId && !l.lotId.startsWith('STOCK-') ? l.lotId : `${rollChangeCounter}`);
-                    } else {
-                        lotIdent = `${rollChangeCounter}`;
+                    // 2. Se não achou por horário, usar a ordem cronológica dos lotes do dia
+                    if (!lotIdent) {
+                        const targetLotIdx = rollChangeCounter - 1;
+                        if (targetLotIdx >= 0 && targetLotIdx < dayLotsList.length) {
+                            lotIdent = dayLotsList[targetLotIdx].lotNum;
+                        } else {
+                            lotIdent = `${rollChangeCounter}`;
+                        }
                     }
+
+                    lastAssignedLot = lotIdent;
+                    lastStopEndSec = sEndSec;
                 }
 
                 // Limpar "PREPARAÇÃO" ou "/ PREPARAÇÃO" ou "PREPARACAO" e resquícios
@@ -1348,8 +1384,8 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         const resolvedOpA = opA ? (getEmployeeForOperator(opA).name || opA) : '';
         const resolvedOpB = opB ? (getEmployeeForOperator(opB).name || opB) : '';
 
-        const formattedStopsA = formatStopsRollChanges(stopsListA, op, stock);
-        const formattedStopsB = formatStopsRollChanges(stopsListB, op, stock);
+        const formattedStopsA = formatStopsRollChanges(stopsListA, op, stock, selectedDate);
+        const formattedStopsB = formatStopsRollChanges(stopsListB, op, stock, selectedDate);
 
         return {
             productionOrder: prodOrder,
@@ -1495,7 +1531,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     });
                 }
                 mergedStopsA = sanitizeLoadedStops(mergedStopsA);
-                mergedStopsA = formatStopsRollChanges(mergedStopsA, op, stock);
+                mergedStopsA = formatStopsRollChanges(mergedStopsA, op, stock, targetDate);
                 mergedStopsA.sort((a, b) => timeToSeconds(a.inicio) - timeToSeconds(b.inicio));
                 setStopsShiftA(mergedStopsA);
 
@@ -1515,7 +1551,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     });
                 }
                 mergedStopsB = sanitizeLoadedStops(mergedStopsB);
-                mergedStopsB = formatStopsRollChanges(mergedStopsB, op, stock);
+                mergedStopsB = formatStopsRollChanges(mergedStopsB, op, stock, targetDate);
                 mergedStopsB.sort((a, b) => timeToSeconds(a.inicio) - timeToSeconds(b.inicio));
                 setStopsShiftB(mergedStopsB);
                 const isTrelica = machine.toLowerCase().includes('treli') || machine.toLowerCase().includes('trelica');
