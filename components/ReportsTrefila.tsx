@@ -693,11 +693,49 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
             .filter(u => !u.isSeparator && Boolean(u.lote) && (!u.data || u.data === dateShort || matchesDate(u.data, selDateOnly)))
             .map(u => String(u.lote));
 
-        let rollChangeCounter = 0;
-        let lastStopEndSec = -1;
-        let lastAssignedLot = '';
+        // Mesclar paradas duplicadas/consecutivas antes de formatar
+        const sortedStops = [...(newStops || [])].filter(s => Boolean(s && s.inicio)).sort((a, b) => timeToSeconds(a.inicio) - timeToSeconds(b.inicio));
+        const mergedStops: StopRow[] = [];
 
-        const formattedStops = newStops.map(s => {
+        for (let i = 0; i < sortedStops.length; i++) {
+            const current = { ...sortedStops[i] };
+            if (mergedStops.length === 0) {
+                mergedStops.push(current);
+                continue;
+            }
+
+            const prev = mergedStops[mergedStops.length - 1];
+            const prevEndSec = timeToSeconds(prev.fim || prev.inicio);
+            const currStartSec = timeToSeconds(current.inicio);
+            const currEndSec = timeToSeconds(current.fim || current.inicio);
+            const currDurSec = calculateStopDurationSeconds(current.inicio, current.fim);
+
+            const isPrevRoll = (prev.motivo || '').toUpperCase().includes('ROLO') || (prev.motivo || '').toUpperCase().includes('BOBINA') || (prev.motivo || '').toUpperCase().includes('PREPARA');
+            const isCurrRoll = (current.motivo || '').toUpperCase().includes('ROLO') || (current.motivo || '').toUpperCase().includes('BOBINA') || (current.motivo || '').toUpperCase().includes('PREPARA');
+
+            const isVeryClose = (currStartSec - prevEndSec) <= 180 && (currStartSec >= prevEndSec - 60);
+
+            if (isPrevRoll && isCurrRoll && isVeryClose) {
+                if (currEndSec > prevEndSec) {
+                    prev.fim = current.fim;
+                }
+                const currJust = (current.motivo || '').replace(/TROCA\s+DE\s+ROLO/gi, '').replace(/\/\s*PREPARA[ÇC][AÃ]O/gi, '').replace(/^[\s\-\/]+/, '').trim();
+                if (currJust && !prev.motivo.includes(currJust)) {
+                    prev.motivo = `${prev.motivo} - ${currJust}`;
+                }
+                continue;
+            }
+
+            if (isCurrRoll && currDurSec <= 60 && (currStartSec - prevEndSec) <= 300) {
+                continue;
+            }
+
+            mergedStops.push(current);
+        }
+
+        let rollChangeCounter = 0;
+
+        const formattedStops = mergedStops.map(s => {
             if (!s) return s;
             const mot = (s.motivo || '').trim();
             const upper = mot.toUpperCase();
@@ -708,24 +746,20 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
                                  (upper.includes('PREPARA') && (upper.includes('ROLO') || upper.includes('BOBINA') || upper.includes('LOTE')));
 
             if (isRollChange) {
-                const sStartSec = timeToSeconds(s.inicio);
-                const sEndSec = timeToSeconds(s.fim);
+                rollChangeCounter++;
+                const targetLotIdx = rollChangeCounter - 1;
 
-                const isContinuation = lastStopEndSec > 0 && Math.abs(sStartSec - lastStopEndSec) <= 180 && Boolean(lastAssignedLot);
+                let lotSai = '';
+                let lotEntra = '';
 
-                let lotIdent = '';
-                if (isContinuation) {
-                    lotIdent = lastAssignedLot;
+                if (targetLotIdx >= 0 && targetLotIdx < dayLotsList.length) {
+                    lotSai = dayLotsList[targetLotIdx];
                 } else {
-                    rollChangeCounter++;
-                    const targetLotIdx = rollChangeCounter - 1;
-                    if (targetLotIdx >= 0 && targetLotIdx < dayLotsList.length) {
-                        lotIdent = dayLotsList[targetLotIdx];
-                    } else {
-                        lotIdent = `${rollChangeCounter}`;
-                    }
-                    lastAssignedLot = lotIdent;
-                    lastStopEndSec = sEndSec;
+                    lotSai = `${rollChangeCounter}`;
+                }
+
+                if (targetLotIdx + 1 < dayLotsList.length) {
+                    lotEntra = dayLotsList[targetLotIdx + 1];
                 }
 
                 let cleanedExtra = upper
@@ -734,13 +768,19 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
                     .replace(/TROCA\s+DE\s+BOBINA/gi, '')
                     .replace(/\/\s*PREPARA[ÇC][AÃ]O/gi, '')
                     .replace(/PREPARA[ÇC][AÃ]O/gi, '')
+                    .replace(/\(\s*SAI:[^\)]*\)/gi, '')
                     .replace(/\(\s*LOTE[^\)]*\)/gi, '')
                     .replace(/^[\s\-\/]+/, '')
                     .replace(/[\s\-\/]+$/, '')
                     .trim();
 
-                const lotLabel = lotIdent.toUpperCase().startsWith('LOTE') ? lotIdent.toUpperCase() : `LOTE ${lotIdent}`;
-                let finalMotivo = `TROCA DE ROLO (${lotLabel})`;
+                const saiLabel = lotSai.toUpperCase().startsWith('LOTE') ? lotSai.toUpperCase() : `LOTE ${lotSai}`;
+                const entraLabel = lotEntra ? (lotEntra.toUpperCase().startsWith('LOTE') ? lotEntra.toUpperCase() : `LOTE ${lotEntra}`) : '';
+
+                let finalMotivo = entraLabel 
+                    ? `TROCA DE ROLO (SAI: ${saiLabel} / ENTRA: ${entraLabel})`
+                    : `TROCA DE ROLO (SAI: ${saiLabel})`;
+
                 if (cleanedExtra && cleanedExtra !== '-' && !cleanedExtra.includes('ROLO')) {
                     finalMotivo += ` - ${cleanedExtra}`;
                 }

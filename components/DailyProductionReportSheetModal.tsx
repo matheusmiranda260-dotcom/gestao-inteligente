@@ -955,9 +955,60 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         return { descIn, descOut };
     };
 
-    // Helper para formatar paradas de Troca de Rolo vinculando o lote finalizado daquela data e removendo "PREPARAÇÃO"
+    // Helper para mesclar paradas adjacentes/duplicadas (ex: micro-cliques no mesmo minuto ou logo após o término da parada)
+    const mergeAdjacentDuplicateStops = (stops: StopRow[]): StopRow[] => {
+        const sorted = [...(stops || [])].filter(s => Boolean(s && s.inicio)).sort((a, b) => timeToSeconds(a.inicio) - timeToSeconds(b.inicio));
+        const merged: StopRow[] = [];
+
+        for (let i = 0; i < sorted.length; i++) {
+            const current = { ...sorted[i] };
+            if (merged.length === 0) {
+                merged.push(current);
+                continue;
+            }
+
+            const prev = merged[merged.length - 1];
+            const prevEndSec = timeToSeconds(prev.fim || prev.inicio);
+            const currStartSec = timeToSeconds(current.inicio);
+            const currEndSec = timeToSeconds(current.fim || current.inicio);
+            const currDurSec = calculateStopDurationSeconds(current.inicio, current.fim);
+
+            const isPrevRoll = (prev.motivo || '').toUpperCase().includes('ROLO') || (prev.motivo || '').toUpperCase().includes('BOBINA') || (prev.motivo || '').toUpperCase().includes('PREPARA');
+            const isCurrRoll = (current.motivo || '').toUpperCase().includes('ROLO') || (current.motivo || '').toUpperCase().includes('BOBINA') || (current.motivo || '').toUpperCase().includes('PREPARA');
+
+            // Critério de mesclagem:
+            // Ambas são paradas de troca de rolo ocorrendo coladas (intervalo <= 3 minutos, ex: 13:39 e 13:40, ou 14:16 e 14:17)
+            const isVeryClose = (currStartSec - prevEndSec) <= 180 && (currStartSec >= prevEndSec - 60);
+
+            if (isPrevRoll && isCurrRoll && isVeryClose) {
+                // Estender o fim da parada anterior se a atual terminar depois
+                if (currEndSec > prevEndSec) {
+                    prev.fim = current.fim;
+                }
+                // Anexar justificativa relevante se houver
+                const currJust = (current.motivo || '').replace(/TROCA\s+DE\s+ROLO/gi, '').replace(/\/\s*PREPARA[ÇC][AÃ]O/gi, '').replace(/^[\s\-\/]+/, '').trim();
+                if (currJust && !prev.motivo.includes(currJust)) {
+                    prev.motivo = `${prev.motivo} - ${currJust}`;
+                }
+                continue;
+            }
+
+            // Ignorar micro-paradas fantasmas (dur <= 60s) duplicadas de troca de rolo logo após uma parada real
+            if (isCurrRoll && currDurSec <= 60 && (currStartSec - prevEndSec) <= 300) {
+                continue;
+            }
+
+            merged.push(current);
+        }
+
+        return merged;
+    };
+
+    // Helper para formatar paradas de Troca de Rolo vinculando o lote finalizado (sai) e o novo lote (entra)
     const formatStopsRollChanges = (stops: StopRow[], targetOp: ProductionOrderData, stockList?: StockItem[], targetDate?: string) => {
-        const sorted = [...(stops || [])].sort((a, b) => timeToSeconds(a.inicio) - timeToSeconds(b.inicio));
+        // 1. Mesclar paradas duplicadas/consecutivas antes de formatar
+        const sanitized = mergeAdjacentDuplicateStops(stops);
+        const sorted = sanitized.sort((a, b) => timeToSeconds(a.inicio) - timeToSeconds(b.inicio));
         const effectiveDate = targetDate || selectedDate;
         const effectiveStock = (stockList && stockList.length > 0) ? stockList : (stock && stock.length > 0 ? stock : cachedStock);
 
@@ -995,8 +1046,6 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         }
 
         let rollChangeCounter = 0;
-        let lastStopEndSec = -1;
-        let lastAssignedLot = '';
 
         return sorted.map(s => {
             if (!s) return s;
@@ -1010,38 +1059,21 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                  (upper.includes('PREPARA') && (upper.includes('ROLO') || upper.includes('BOBINA') || upper.includes('LOTE')));
 
             if (isRollChange) {
-                const sStartSec = timeToSeconds(s.inicio);
-                const sEndSec = timeToSeconds(s.fim);
+                rollChangeCounter++;
+                const targetLotIdx = rollChangeCounter - 1;
 
-                // Se a parada começou logo após o término da parada anterior (em até 3 minutos) ou mesmo minuto, é continuação/sub-evento do mesmo lote
-                const isContinuation = lastStopEndSec > 0 && Math.abs(sStartSec - lastStopEndSec) <= 180 && Boolean(lastAssignedLot);
+                let lotSai = '';
+                let lotEntra = '';
 
-                let lotIdent = '';
-                if (isContinuation) {
-                    lotIdent = lastAssignedLot;
+                if (targetLotIdx >= 0 && targetLotIdx < dayLotsList.length) {
+                    lotSai = dayLotsList[targetLotIdx].lotNum;
                 } else {
-                    rollChangeCounter++;
+                    lotSai = `${rollChangeCounter}`;
+                }
 
-                    // 1. Tentar encontrar lote por proximidade de horário se disponível
-                    if (s.inicio && dayLotsList.some(d => d.endSec !== undefined)) {
-                        const matched = dayLotsList.find(d => d.endSec !== undefined && Math.abs(d.endSec - sStartSec) <= 600);
-                        if (matched) {
-                            lotIdent = matched.lotNum;
-                        }
-                    }
-
-                    // 2. Se não achou por horário, usar a ordem cronológica dos lotes do dia
-                    if (!lotIdent) {
-                        const targetLotIdx = rollChangeCounter - 1;
-                        if (targetLotIdx >= 0 && targetLotIdx < dayLotsList.length) {
-                            lotIdent = dayLotsList[targetLotIdx].lotNum;
-                        } else {
-                            lotIdent = `${rollChangeCounter}`;
-                        }
-                    }
-
-                    lastAssignedLot = lotIdent;
-                    lastStopEndSec = sEndSec;
+                // Próximo lote que entra no processo
+                if (targetLotIdx + 1 < dayLotsList.length) {
+                    lotEntra = dayLotsList[targetLotIdx + 1].lotNum;
                 }
 
                 // Limpar "PREPARAÇÃO" ou "/ PREPARAÇÃO" ou "PREPARACAO" e resquícios
@@ -1051,13 +1083,19 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     .replace(/TROCA\s+DE\s+BOBINA/gi, '')
                     .replace(/\/\s*PREPARA[ÇC][AÃ]O/gi, '')
                     .replace(/PREPARA[ÇC][AÃ]O/gi, '')
+                    .replace(/\(\s*SAI:[^\)]*\)/gi, '')
                     .replace(/\(\s*LOTE[^\)]*\)/gi, '')
                     .replace(/^[\s\-\/]+/, '')
                     .replace(/[\s\-\/]+$/, '')
                     .trim();
 
-                const lotLabel = lotIdent.toUpperCase().startsWith('LOTE') ? lotIdent.toUpperCase() : `LOTE ${lotIdent}`;
-                let finalMotivo = `TROCA DE ROLO (${lotLabel})`;
+                const saiLabel = lotSai.toUpperCase().startsWith('LOTE') ? lotSai.toUpperCase() : `LOTE ${lotSai}`;
+                const entraLabel = lotEntra ? (lotEntra.toUpperCase().startsWith('LOTE') ? lotEntra.toUpperCase() : `LOTE ${lotEntra}`) : '';
+
+                let finalMotivo = entraLabel 
+                    ? `TROCA DE ROLO (SAI: ${saiLabel} / ENTRA: ${entraLabel})`
+                    : `TROCA DE ROLO (SAI: ${saiLabel})`;
+
                 if (cleanedExtra && cleanedExtra !== '-' && !cleanedExtra.includes('ROLO')) {
                     finalMotivo += ` - ${cleanedExtra}`;
                 }
