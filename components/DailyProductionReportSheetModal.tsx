@@ -2206,11 +2206,12 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             });
 
             element.classList.add('is-capturing');
-            await new Promise(resolve => setTimeout(resolve, 80));
+            await new Promise(resolve => setTimeout(resolve, 100));
 
             const canvas = await html2canvas(element, {
                 scale: 2,
                 useCORS: true,
+                allowTaint: true,
                 logging: false,
                 backgroundColor: '#ffffff',
                 onclone: (clonedDoc) => {
@@ -2221,7 +2222,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     clonedInputs.forEach((input: any) => {
                         const div = clonedDoc.createElement('div');
                         div.className = input.className;
-                        div.textContent = input.getAttribute('value') || '';
+                        div.textContent = input.getAttribute('value') || input.value || '';
                         div.style.display = 'inline-block';
                         div.style.minHeight = '1.5em';
                         div.style.lineHeight = '1.4';
@@ -2236,25 +2237,36 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
 
             element.classList.remove('is-capturing');
 
-            canvas.toBlob(async (blob) => {
-                if (blob) {
-                    try {
+            const fileName = `Relatorio_${machine.replace(/\s+/g, '_')}_${selectedDate}.png`;
+
+            // Tentativa 1: Copiar direto para a área de transferência do sistema (Clipboard)
+            let copiedToClipboard = false;
+            if (navigator.clipboard && typeof ClipboardItem !== 'undefined') {
+                try {
+                    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+                    if (blob) {
                         await navigator.clipboard.write([
-                            new ClipboardItem({ [blob.type]: blob })
+                            new ClipboardItem({ 'image/png': blob })
                         ]);
-                        showToast('Imagem copiada com sucesso! Cole (Ctrl+V) no WhatsApp.', 'success');
-                    } catch (err) {
-                        console.error('Falha ao copiar direto para o clipboard:', err);
-                        const link = document.createElement('a');
-                        link.download = `Relatorio_${machine.replace(/\s+/g, '_')}_${selectedDate}.png`;
-                        link.href = canvas.toDataURL('image/png');
-                        link.click();
-                        showToast('Baixamos o relatório como imagem! Envie o arquivo no WhatsApp.', 'info');
+                        copiedToClipboard = true;
+                        showToast('✅ Imagem copiada com sucesso! Cole (Ctrl+V) no WhatsApp.', 'success');
+                        return;
                     }
+                } catch (clipErr) {
+                    console.warn('Clipboard write de imagem bloqueado ou não suportado, usando download como fallback:', clipErr);
                 }
-            }, 'image/png');
+            }
+
+            // Tentativa 2: Download automático da imagem caso o navegador restrinja acesso direto ao clipboard
+            if (!copiedToClipboard) {
+                const link = document.createElement('a');
+                link.download = fileName;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                showToast('📥 Imagem baixada com sucesso! Envie o arquivo gerado no WhatsApp.', 'info');
+            }
         } catch (e) {
-            console.error(e);
+            console.error('Erro ao gerar captura:', e);
             const element = document.getElementById('pcp-daily-report-sheet');
             if (element) element.classList.remove('is-capturing');
             showToast('Erro ao gerar imagem para o WhatsApp.', 'error');
@@ -2370,8 +2382,8 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 }
             `}} />
 
-            {/* Toasts Flutuantes */}
-            <div className="fixed top-5 right-5 z-[200] flex flex-col gap-2 pointer-events-none no-print">
+            {/* Toasts Flutuantes (Posicionados no canto inferior direito para NUNCA tampar os botões de ação) */}
+            <div className="fixed bottom-5 right-5 z-[300] flex flex-col gap-2 pointer-events-none no-print">
                 {toasts.map(toast => (
                     <div
                         key={toast.id}
@@ -2389,12 +2401,12 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             </div>
 
             {/* Barra de Ações Superior (Exclusiva do PCP, Oculta na Impressão) */}
-            <div className="sticky top-0 z-50 bg-[#08131B]/95 backdrop-blur-md border-b border-white/10 px-4 sm:px-6 py-3 shadow-2xl flex flex-wrap items-center justify-between gap-3 no-print">
+            <div className="sticky top-0 z-50 bg-[#08131B]/95 backdrop-blur-md border-b border-white/10 px-3 sm:px-5 py-2.5 shadow-2xl flex flex-wrap items-center justify-between gap-2.5 no-print">
                 {/* Lado Esquerdo: Identificação e Navegação de Data */}
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2.5 shrink-0">
                     <button
                         onClick={onClose}
-                        className="p-2 text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition cursor-pointer"
+                        className="p-1.5 text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition cursor-pointer"
                         title="Voltar para o Quadro PCP"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2403,15 +2415,15 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     </button>
                     <div>
                         <div className="flex items-center gap-2">
-                            <h2 className="text-white text-sm sm:text-base font-black uppercase tracking-wider">
-                                Ficha Oficial de Produção Diária
+                            <h2 className="text-white text-xs sm:text-sm font-black uppercase tracking-wider">
+                                Ficha Oficial de Produção
                             </h2>
                             <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-[#00E5FF]/20 text-[#00E5FF] border border-[#00E5FF]/40 font-mono">
                                 {machine}
                             </span>
                         </div>
-                        <p className="text-xs text-slate-400 font-mono flex items-center gap-2">
-                            <span>Quadro PCP • OP #{productionOrder || op.orderNumber}</span>
+                        <p className="text-[11px] text-slate-400 font-mono flex items-center gap-2">
+                            <span>OP #{productionOrder || op.orderNumber}</span>
                             <span className="text-slate-600">•</span>
                             {saveStatus === 'saving' ? (
                                 <span className="text-amber-400 font-bold flex items-center gap-1">
@@ -2430,7 +2442,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 </div>
 
                 {/* Centro/Direita: Controles e Ações */}
-                <div className="flex items-center flex-wrap gap-2">
+                <div className="flex items-center flex-wrap gap-2 shrink-0">
                     {/* Seletor de Data */}
                     <div className="flex items-center gap-1.5 bg-black/40 border border-white/10 rounded-xl px-2.5 py-1">
                         <span className="text-[10px] font-black text-slate-400 uppercase font-mono">Data:</span>
@@ -2448,7 +2460,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                         <button
                             type="button"
                             onClick={() => setHasSecondShift(false)}
-                            className={`px-2.5 py-1 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                            className={`px-2 py-1 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
                                 !hasSecondShift 
                                     ? 'bg-[#00E5FF]/20 text-[#00E5FF] border border-[#00E5FF]/40 shadow-sm' 
                                     : 'text-slate-400 hover:text-white'
@@ -2460,7 +2472,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                         <button
                             type="button"
                             onClick={() => setHasSecondShift(true)}
-                            className={`px-2.5 py-1 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                            className={`px-2 py-1 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
                                 hasSecondShift 
                                     ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm' 
                                     : 'text-slate-400 hover:text-white'
@@ -2475,11 +2487,11 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     <button
                         type="button"
                         onClick={handleReloadAutoData}
-                        className="px-3 py-1.5 rounded-xl bg-[#00E5FF]/15 hover:bg-[#00E5FF]/25 text-[#00E5FF] hover:text-white border border-[#00E5FF]/40 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer active:scale-95"
+                        className="px-2.5 py-1.5 rounded-xl bg-[#00E5FF]/15 hover:bg-[#00E5FF]/25 text-[#00E5FF] hover:text-white border border-[#00E5FF]/40 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer active:scale-95 shrink-0"
                         title="Sincronizar e recarregar dados exatos do chão de fábrica e PCP desta data"
                     >
                         <span>🔄</span>
-                        <span className="hidden sm:inline">Sincronizar Chão de Fábrica</span>
+                        <span className="hidden md:inline">Sincronizar</span>
                     </button>
 
                     {/* Botão Salvar Manual */}
@@ -2498,7 +2510,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                             productionUpdates,
                             reportId: reportIdRef.current,
                         }, true)}
-                        className="px-3 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer active:scale-95"
+                        className="px-2.5 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer active:scale-95 shrink-0"
                         title="Salvar agora no Supabase"
                     >
                         <span>💾</span>
@@ -2509,7 +2521,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     <button
                         type="button"
                         onClick={handleCopyToWhatsApp}
-                        className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-lg shadow-emerald-600/30 transition cursor-pointer active:scale-95"
+                        className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-lg shadow-emerald-600/30 transition cursor-pointer active:scale-95 shrink-0"
                         title="Copiar imagem de alta resolução para colar no WhatsApp"
                     >
                         <span>🟢</span>
@@ -2520,18 +2532,19 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     <button
                         type="button"
                         onClick={handlePrint}
-                        className="px-3.5 py-1.5 rounded-xl bg-[#002060] hover:bg-slate-800 text-white font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-lg transition cursor-pointer active:scale-95"
+                        className="px-3 py-1.5 rounded-xl bg-[#002060] hover:bg-slate-800 text-white font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-lg transition cursor-pointer active:scale-95 shrink-0"
                         title="Imprimir ficha em formato A4"
                     >
                         <span>🖨️</span>
-                        <span>Imprimir</span>
+                        <span className="hidden sm:inline">Imprimir</span>
                     </button>
 
                     {/* Botão Fechar */}
                     <button
                         type="button"
                         onClick={onClose}
-                        className="p-1.5 text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition cursor-pointer ml-1"
+                        className="p-1.5 text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition cursor-pointer ml-1 shrink-0"
+                        title="Fechar"
                     >
                         ✕
                     </button>
