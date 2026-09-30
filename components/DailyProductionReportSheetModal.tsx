@@ -955,6 +955,87 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         return { descIn, descOut };
     };
 
+    // Helper para formatar paradas de Troca de Rolo vinculando o lote finalizado e removendo "PREPARAÇÃO"
+    const formatStopsRollChanges = (stops: StopRow[], targetOp: ProductionOrderData, stockList?: StockItem[]) => {
+        const sorted = [...(stops || [])].sort((a, b) => timeToSeconds(a.inicio) - timeToSeconds(b.inicio));
+        const pLots = targetOp.processedLots || (targetOp as any).processed_lots || [];
+        const effectiveStock = (stockList && stockList.length > 0) ? stockList : (stock && stock.length > 0 ? stock : cachedStock);
+
+        let rollChangeCounter = 0;
+
+        return sorted.map(s => {
+            if (!s) return s;
+            const mot = (s.motivo || '').trim();
+            const upper = mot.toUpperCase();
+
+            // Identificar se a parada é troca de rolo / bobina / preparação
+            const isRollChange = upper.includes('TROCA DE ROLO') || 
+                                 upper.includes('TROCA DO ROLO') || 
+                                 upper.includes('TROCA DE BOBINA') || 
+                                 (upper.includes('PREPARA') && (upper.includes('ROLO') || upper.includes('BOBINA') || upper.includes('LOTE')));
+
+            if (isRollChange) {
+                rollChangeCounter++;
+
+                let lotIdent = '';
+
+                // 1. Tentar encontrar por proximidade de horário do lote concluído
+                if (s.inicio && pLots.length > 0) {
+                    const sSec = timeToSeconds(s.inicio);
+                    const matched = pLots.find((l: any) => {
+                        const lEnd = l.endTime || l.end_time || l.startTime || l.start_time;
+                        if (!lEnd) return false;
+                        const d = new Date(lEnd);
+                        if (isNaN(d.getTime())) return false;
+                        const lotSec = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
+                        return Math.abs(lotSec - sSec) <= 600; // tolerância de até 10 minutos
+                    });
+                    if (matched) {
+                        const stockItem = (effectiveStock || []).find((st: any) => st.id === (matched.lotId || matched.lot_id) || st.internalLot === matched.internalLot);
+                        lotIdent = stockItem?.internalLot || matched.internalLot || (matched.lotId && !matched.lotId.startsWith('STOCK-') ? matched.lotId : '');
+                    }
+                }
+
+                // 2. Se não achou por horário, usar índice sequencial de troca de rolo daquele dia/OP
+                if (!lotIdent) {
+                    const targetLotIdx = rollChangeCounter - 1;
+                    if (targetLotIdx >= 0 && targetLotIdx < pLots.length) {
+                        const l = pLots[targetLotIdx];
+                        const stockItem = (effectiveStock || []).find((st: any) => st.id === (l.lotId || l.lot_id) || st.internalLot === l.internalLot);
+                        lotIdent = stockItem?.internalLot || l.internalLot || (l.lotId && !l.lotId.startsWith('STOCK-') ? l.lotId : `${rollChangeCounter}`);
+                    } else {
+                        lotIdent = `${rollChangeCounter}`;
+                    }
+                }
+
+                // Limpar "PREPARAÇÃO" ou "/ PREPARAÇÃO" ou "PREPARACAO" e resquícios
+                let cleanedExtra = upper
+                    .replace(/TROCA\s+DE\s+ROLO/gi, '')
+                    .replace(/TROCA\s+DO\s+ROLO/gi, '')
+                    .replace(/TROCA\s+DE\s+BOBINA/gi, '')
+                    .replace(/\/\s*PREPARA[ÇC][AÃ]O/gi, '')
+                    .replace(/PREPARA[ÇC][AÃ]O/gi, '')
+                    .replace(/\(\s*LOTE[^\)]*\)/gi, '')
+                    .replace(/^[\s\-\/]+/, '')
+                    .replace(/[\s\-\/]+$/, '')
+                    .trim();
+
+                const lotLabel = lotIdent.toUpperCase().startsWith('LOTE') ? lotIdent.toUpperCase() : `LOTE ${lotIdent}`;
+                let finalMotivo = `TROCA DE ROLO (${lotLabel})`;
+                if (cleanedExtra && cleanedExtra !== '-' && !cleanedExtra.includes('ROLO')) {
+                    finalMotivo += ` - ${cleanedExtra}`;
+                }
+
+                return {
+                    ...s,
+                    motivo: finalMotivo
+                };
+            }
+
+            return s;
+        });
+    };
+
     // Auto-preenchimento automático inteligente dos dados com base no chão de fábrica
     const generateAutoDataFromShopFloor = () => {
         const prodOrder = op.orderNumber || '';
@@ -1267,6 +1348,9 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         const resolvedOpA = opA ? (getEmployeeForOperator(opA).name || opA) : '';
         const resolvedOpB = opB ? (getEmployeeForOperator(opB).name || opB) : '';
 
+        const formattedStopsA = formatStopsRollChanges(stopsListA, op, stock);
+        const formattedStopsB = formatStopsRollChanges(stopsListB, op, stock);
+
         return {
             productionOrder: prodOrder,
             productDescription: prodDesc,
@@ -1275,8 +1359,8 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             piecesToProduce: targetQ,
             operatorShiftA: resolvedOpA,
             operatorShiftB: hasRealTurnoB ? resolvedOpB : '',
-            stopsShiftA: stopsListA,
-            stopsShiftB: stopsListB,
+            stopsShiftA: formattedStopsA,
+            stopsShiftB: formattedStopsB,
             statsShiftA: {
                 horasTrabalhadas: shiftHoursA,
                 pecasProduzidas: piecesA,
@@ -1411,6 +1495,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     });
                 }
                 mergedStopsA = sanitizeLoadedStops(mergedStopsA);
+                mergedStopsA = formatStopsRollChanges(mergedStopsA, op, stock);
                 mergedStopsA.sort((a, b) => timeToSeconds(a.inicio) - timeToSeconds(b.inicio));
                 setStopsShiftA(mergedStopsA);
 
@@ -1429,6 +1514,8 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                         }
                     });
                 }
+                mergedStopsB = sanitizeLoadedStops(mergedStopsB);
+                mergedStopsB = formatStopsRollChanges(mergedStopsB, op, stock);
                 mergedStopsB.sort((a, b) => timeToSeconds(a.inicio) - timeToSeconds(b.inicio));
                 setStopsShiftB(mergedStopsB);
                 const isTrelica = machine.toLowerCase().includes('treli') || machine.toLowerCase().includes('trelica');
