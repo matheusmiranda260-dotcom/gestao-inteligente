@@ -110,6 +110,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
     dateStr: initialDateStr,
     op,
     shiftReports = [],
+    productionOrders = [],
     initialProduced,
     initialOperator,
     shiftConfig,
@@ -351,6 +352,18 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
 
     const getLocalDateString = (val: any): string => {
         if (!val) return '';
+        if (typeof val === 'string') {
+            const raw = val.trim();
+            // Se já for formato YYYY-MM-DD
+            if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
+                return raw.split('T')[0];
+            }
+            // Se for formato DD/MM/YYYY
+            if (/^\d{2}\/\d{2}\/\d{4}/.test(raw)) {
+                const parts = raw.split('/');
+                return `${parts[2]}-${parts[1]}-${parts[0]}`;
+            }
+        }
         try {
             const dt = new Date(val);
             if (isNaN(dt.getTime())) return String(val).split('T')[0] || '';
@@ -363,12 +376,51 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         }
     };
 
+    const matchesDate = (val: any, target: string): boolean => {
+        if (!val || !target) return false;
+        const targetClean = target.trim();
+        const s = String(val).trim();
+        if (s.startsWith(targetClean)) return true;
+        if (s.split('T')[0] === targetClean) return true;
+        const local = getLocalDateString(val);
+        if (local === targetClean) return true;
+        if (targetClean.includes('/')) {
+            const parts = targetClean.split('/');
+            const targetIso = `${parts[2]}-${parts[1]}-${parts[0]}`;
+            if (s.startsWith(targetIso) || local === targetIso) return true;
+        }
+        return false;
+    };
+
     // Helper para formatar data ISO YYYY-MM-DD para DD/MM/YYYY
     const formatDateBr = (isoStr: string): string => {
         if (!isoStr) return '';
         const parts = isoStr.split('-');
         if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
         return isoStr;
+    };
+
+    // Helper para chave de ordenação cronológica de datas (DD/MM, DD/MM/YYYY ou YYYY-MM-DD)
+    const parseDateSortKey = (dateStr?: string): number => {
+        if (!dateStr) return 99999999;
+        const clean = dateStr.trim();
+        if (clean.includes('/')) {
+            const parts = clean.split('/');
+            const day = parseInt(parts[0], 10) || 1;
+            const month = parseInt(parts[1], 10) || 1;
+            const year = parts[2] ? parseInt(parts[2], 10) : 2026;
+            return year * 10000 + month * 100 + day;
+        }
+        if (clean.includes('-')) {
+            const parts = clean.split('-');
+            if (parts[0].length === 4) {
+                const year = parseInt(parts[0], 10) || 2026;
+                const month = parseInt(parts[1], 10) || 1;
+                const day = parseInt(parts[2], 10) || 1;
+                return year * 10000 + month * 100 + day;
+            }
+        }
+        return 99999999;
     };
 
     // Helper para obter o peso teórico por peça (em kg) a partir do catálogo oficial
@@ -460,6 +512,20 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
 
         const sortedDates = [...dayMap.keys()].filter(d => !upToDateStr || d <= upToDateStr).sort();
 
+        if (sortedDates.length === 0 && (initialProduced || targetOp.actualProducedQuantity)) {
+            const fallbackQty = initialProduced || Number(targetOp.actualProducedQuantity) || 0;
+            if (fallbackQty > 0) {
+                const targetD = upToDateStr || getLocalDateString(new Date());
+                const peso = Math.round(fallbackQty * unitWeight * 100) / 100;
+                return [{
+                    id: `auto-prod-${targetD}-fallback`,
+                    qnt: fallbackQty,
+                    peso,
+                    data: formatDateBr(targetD)
+                }];
+            }
+        }
+
         return sortedDates.map((dStr, idx) => {
             const qnt = dayMap.get(dStr) || 0;
             const peso = Math.round(qnt * unitWeight * 100) / 100;
@@ -472,31 +538,45 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         });
     };
 
-    // Helper para gerar o histórico de lotes processados para Trefila
+    // Helper para gerar o histórico de lotes processados para Trefila com sincronização total (paridade com Relatórios)
     const generateTrefilaProductionUpdates = (
         targetOp: ProductionOrderData,
         stockList?: StockItem[],
         fallbackDateStr?: string
     ): ProductionUpdateRow[] => {
         const rows: ProductionUpdateRow[] = [];
+        const effectiveStock = (stockList && stockList.length > 0) ? stockList : (stock && stock.length > 0 ? stock : cachedStock);
         const findStockLot = (lotObjOrId: any) => {
             if (!lotObjOrId) return undefined;
             const targetId = typeof lotObjOrId === 'string' 
                 ? lotObjOrId 
-                : (lotObjOrId.lotId || lotObjOrId.id || lotObjOrId.internalLot);
+                : (lotObjOrId.lotId || lotObjOrId.lot_id || lotObjOrId.id || lotObjOrId.internalLot || lotObjOrId.internal_lot);
             if (!targetId) return undefined;
-            return (stockList || []).find(s => 
+            return (effectiveStock || []).find((s: any) => 
                 s.id === targetId || 
                 s.internalLot === targetId ||
-                (typeof lotObjOrId === 'object' && lotObjOrId.internalLot && s.internalLot === lotObjOrId.internalLot) ||
-                (typeof lotObjOrId === 'object' && lotObjOrId.lotId && s.id === lotObjOrId.lotId)
+                s.internal_lot === targetId ||
+                (typeof lotObjOrId === 'object' && (lotObjOrId.internalLot || lotObjOrId.internal_lot) && (s.internalLot === (lotObjOrId.internalLot || lotObjOrId.internal_lot) || s.internal_lot === (lotObjOrId.internalLot || lotObjOrId.internal_lot))) ||
+                (typeof lotObjOrId === 'object' && (lotObjOrId.lotId || lotObjOrId.lot_id) && s.id === (lotObjOrId.lotId || lotObjOrId.lot_id))
             );
         };
 
         const dateFallback = fallbackDateStr ? formatDateBr(fallbackDateStr) : '';
+        const bitolaFallback = targetOp.targetBitola ? `${targetOp.targetBitola} mm` : '';
         const pLots = targetOp.processedLots || (targetOp as any).processed_lots || [];
+
+        // 1. Processar lotes pesados/concluídos
         pLots.forEach((lot: any, idx: number) => {
             const stockItem = findStockLot(lot);
+            const outputWeight = lot.finalWeight !== null && lot.finalWeight !== undefined 
+                ? Number(lot.finalWeight) 
+                : (lot.final_weight !== null && lot.final_weight !== undefined 
+                    ? Number(lot.final_weight) 
+                    : Number(lot.producedWeight || lot.produced_weight || 0));
+
+            // Na ficha oficial de pesagens, só incluímos lotes concluídos/pesados
+            if (outputWeight <= 0) return;
+
             const lotIso = lot.endTime || lot.end_time || lot.startTime || lot.start_time;
             let lotDate = dateFallback;
             if (lotIso) {
@@ -506,28 +586,96 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 }
             }
             const lotNum = stockItem?.internalLot || (stockItem as any)?.internal_lot || lot.internalLot || lot.internal_lot || ((lot.lotId || lot.lot_id) && !(lot.lotId || lot.lot_id).startsWith('STOCK-') ? (lot.lotId || lot.lot_id) : `${idx + 1}`);
-            const inputWeight = Number(stockItem?.initialQuantity || (stockItem as any)?.initial_quantity || stockItem?.weight || stockItem?.labelWeight || lot.inputWeight || lot.input_weight || (lot as any).initialWeight || 0);
-            const outputWeight = lot.finalWeight !== null && lot.finalWeight !== undefined 
-                ? Number(lot.finalWeight) 
-                : (lot.final_weight !== null && lot.final_weight !== undefined 
-                    ? Number(lot.final_weight) 
-                    : Number(lot.producedWeight || lot.produced_weight || 0));
-            const gaugeVal = lot.measuredGauge || lot.measured_gauge;
+            let inputWeight = Number(stockItem?.initialQuantity || (stockItem as any)?.initial_quantity || stockItem?.weight || stockItem?.labelWeight || lot.inputWeight || lot.input_weight || (lot as any).initialWeight || 0);
+            
+            // Garantia industrial: rendimento ~99.5% (perda de ~0.5%)
+            if (inputWeight === 0 && outputWeight > 0) {
+                inputWeight = Math.round(outputWeight / 0.995);
+            }
+
+            let gaugeVal = lot.measuredGauge || lot.measured_gauge;
+            const targetGaugeNum = targetOp.targetBitola ? parseFloat(String(targetOp.targetBitola).replace(',', '.')) : 0;
+            if (Number(gaugeVal) === 3 && targetGaugeNum > 3.10 && targetGaugeNum < 3.90) {
+                gaugeVal = targetGaugeNum;
+            }
             const bitolaStr = gaugeVal 
                 ? `${Number(gaugeVal).toFixed(2)} mm` 
-                : (targetOp.targetBitola ? `${targetOp.targetBitola} mm` : '');
+                : bitolaFallback;
 
             rows.push({
                 id: `auto-trefila-lot-${idx}-${Date.now()}`,
                 qnt: 1,
                 peso: outputWeight,
                 data: lotDate,
-                lote: lotNum,
+                lote: String(lotNum),
                 kgEntrada: inputWeight,
                 saida: outputWeight,
                 bitola: bitolaStr
             });
         });
+
+        // 2. Se houver pacotes pesados (weighedPackages) que não estejam nos rows
+        (targetOp.weighedPackages || []).forEach((pkg, pIdx) => {
+            const pkgWeight = Number(pkg.weight || 0);
+            if (pkgWeight > 0 && !rows.some(u => (u.saida === pkgWeight && pkgWeight > 0) || (u.peso === pkgWeight && pkgWeight > 0))) {
+                rows.push({
+                    id: `auto-trefila-pkg-${pIdx}-${Date.now()}`,
+                    qnt: 1,
+                    peso: pkgWeight,
+                    data: dateFallback,
+                    lote: pkg.packageNumber ? `Pacote ${pkg.packageNumber}` : `Pacote ${pIdx + 1}`,
+                    kgEntrada: Math.round(pkgWeight / 0.995),
+                    saida: pkgWeight,
+                    bitola: bitolaFallback
+                });
+            }
+        });
+
+        // 3. Se ainda não houver lotes mas houver shiftReports correspondentes com peso
+        if (rows.length === 0 && shiftReports && shiftReports.length > 0) {
+            const reportsForOP = shiftReports.filter(r => 
+                (r.productionOrderId === targetOp?.id || r.orderNumber === targetOp?.orderNumber) &&
+                (!fallbackDateStr || matchesDate(r.date, fallbackDateStr) || matchesDate(r.shiftStartTime, fallbackDateStr))
+            );
+            reportsForOP.forEach((rep, rIdx) => {
+                const repDate = rep.date ? formatDateBr(rep.date) : dateFallback;
+                const weight = Number(rep.totalProducedWeight || rep.totalProducedQuantity || 0);
+                if (weight > 0) {
+                    rows.push({
+                        id: `auto-trefila-rep-${rIdx}-${Date.now()}`,
+                        qnt: 1,
+                        peso: weight,
+                        data: repDate,
+                        lote: rep.shift ? `Turno ${rep.shift}` : `Lote ${rIdx + 1}`,
+                        kgEntrada: Math.round(weight / 0.995),
+                        saida: weight,
+                        bitola: bitolaFallback
+                    });
+                }
+            });
+        }
+
+        // 4. Fallback final para peso registrado na OP ou initialProduced
+        if (rows.length === 0) {
+            const fallbackWeight = (initialProduced && initialProduced > 0)
+                ? initialProduced
+                : Number(targetOp.actualProducedWeight || (targetOp as any).actual_produced_weight || 0);
+            if (fallbackWeight > 0) {
+                rows.push({
+                    id: `auto-trefila-summary-${Date.now()}`,
+                    qnt: 1,
+                    peso: fallbackWeight,
+                    data: dateFallback,
+                    lote: 'Lote 1',
+                    kgEntrada: Math.round(fallbackWeight / 0.995),
+                    saida: fallbackWeight,
+                    bitola: bitolaFallback
+                });
+            }
+        }
+
+        // Ordenar cronologicamente por data
+        rows.sort((a, b) => parseDateSortKey(a.data) - parseDateSortKey(b.data));
 
         return rows;
     };
@@ -741,8 +889,9 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         const dayShiftReports = shiftReports.filter(r => {
             const isThisOp = r.productionOrderId === op.id || r.orderNumber === op.orderNumber;
             if (!isThisOp) return false;
-            const rDate = getLocalDateString(r.date || r.shiftStartTime || r.shiftEndTime);
-            return rDate === selectedDate;
+            return matchesDate(r.date, selectedDate) || 
+                   matchesDate(r.shiftStartTime, selectedDate) || 
+                   matchesDate(r.shiftEndTime, selectedDate);
         });
 
         let opA = initialOperator || '';
@@ -761,20 +910,18 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
 
             if (!isTurnoB) {
                 if (!opA && r.operator) opA = r.operator;
-                piecesA += Number(r.totalProducedQuantity || 0);
+                piecesA += Number(r.totalProducedQuantity || r.totalProducedWeight || 0);
             } else {
                 hasTurnoBReport = true;
                 if (!opB && r.operator) opB = r.operator;
-                piecesB += Number(r.totalProducedQuantity || 0);
+                piecesB += Number(r.totalProducedQuantity || r.totalProducedWeight || 0);
             }
         });
 
         // 2. Se não encontrou quantidade em shiftReports, checar operatorLogs desta data
         if (piecesA === 0 && piecesB === 0) {
             const dayLogs = (op.operatorLogs || []).filter(l => {
-                const s = getLocalDateString(l.startTime);
-                const e = getLocalDateString(l.endTime);
-                return s === selectedDate || e === selectedDate;
+                return matchesDate(l.startTime, selectedDate) || matchesDate(l.endTime, selectedDate);
             });
 
             dayLogs.forEach(l => {
@@ -804,11 +951,18 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             const pLots = op.processedLots || (op as any).processed_lots || [];
             pLots.forEach((l: any) => {
                 const lIso = l.endTime || l.end_time || l.startTime || l.start_time;
-                const lDate = getLocalDateString(lIso);
-                if (lDate === selectedDate) {
+                if (!lIso || matchesDate(lIso, selectedDate)) {
                     trefilaDayWeight += (Number(l.finalWeight || l.final_weight || l.producedWeight || l.produced_weight) || 0);
                 }
             });
+            if (trefilaDayWeight === 0 && dayShiftReports.length > 0) {
+                dayShiftReports.forEach(r => {
+                    trefilaDayWeight += Number(r.totalProducedWeight || r.totalProducedQuantity || 0);
+                });
+            }
+            if (trefilaDayWeight === 0 && initialProduced && initialProduced > 0) {
+                trefilaDayWeight = initialProduced;
+            }
             if (trefilaDayWeight === 0 && (op.actualProducedWeight || (op as any).actual_produced_weight)) {
                 trefilaDayWeight = Number(op.actualProducedWeight || (op as any).actual_produced_weight);
             }
@@ -852,7 +1006,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     : ((otherOp as any).downtime_events || []);
                 otherEvents.forEach((ev: any) => {
                     const sTime = ev.stopTime || ev.stop_time;
-                    if (sTime && getLocalDateString(sTime) === selectedDate) {
+                    if (sTime && matchesDate(sTime, selectedDate)) {
                         const isDupe = allMachineEvents.some(ex => (ex.stopTime || ex.stop_time) === sTime);
                         if (!isDupe) allMachineEvents.push(ev);
                     }
@@ -866,8 +1020,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             const sDate = new Date(stopTime);
             if (isNaN(sDate.getTime())) return;
 
-            const eventDateStr = getLocalDateString(stopTime);
-            if (eventDateStr !== selectedDate) return;
+            if (!matchesDate(stopTime, selectedDate)) return;
 
             const resumeTime = e.resumeTime || e.resume_time;
             const rDate = resumeTime ? new Date(resumeTime) : null;
@@ -945,7 +1098,29 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     });
                 }
             });
+
+            // Processar também paradas registradas no fechamento do turno (r.stops)
+            (r.stops || []).forEach((s: any, sIdx: number) => {
+                const sReason = (s.reason || '').toUpperCase();
+                const isDupe = stopsListA.some(item => item.motivo.includes(sReason)) || stopsListB.some(item => item.motivo.includes(sReason));
+                if (!isDupe) {
+                    const startH = r.shiftStartTime ? new Date(r.shiftStartTime).getHours() : 7;
+                    const isTurnoB = hasTurnoBReport && (r.shift?.toLowerCase().includes('b') || startH >= 17);
+                    const targetList = isTurnoB ? stopsListB : stopsListA;
+                    targetList.push({
+                        id: `auto-shift-stop-closed-${rIdx}-${sIdx}`,
+                        inicio: r.shiftStartTime ? new Date(r.shiftStartTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '07:45',
+                        fim: 'Fechamento',
+                        motivo: `${sReason || 'PARADA DE TURNO'}${s.duration ? ` (${s.duration} min)` : ''}`
+                    });
+                }
+            });
         });
+
+        // Fallback para operador caso ainda não definido
+        if (!opA) {
+            opA = initialOperator || op.operatorName || (op as any).operator || '';
+        }
 
         // Obter configuração da jornada da máquina
         const resolvedCfg = resolveMachineShiftConfig(machine, shiftConfig);
@@ -967,6 +1142,15 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         const updates = isTrefila
             ? generateTrefilaProductionUpdates(op, stock, selectedDate)
             : generateProductionUpdatesHistory(op, shiftReports, getTheoreticalWeightPerPiece(prodDesc, defaultSize), selectedDate);
+
+        // Se for Trefila e piecesA for 0, somar do updates do dia selecionado
+        if (isTrefila && piecesA === 0) {
+            const dayUpdates = updates.filter(u => matchesDate(u.data, selectedDate) || (selectedDate && formatDateBr(selectedDate).startsWith(u.data)));
+            const sumOut = (dayUpdates.length > 0 ? dayUpdates : updates).reduce((acc, u) => acc + (Number(u.saida ?? u.peso) || 0), 0);
+            if (sumOut > 0) {
+                piecesA = sumOut;
+            }
+        }
 
         return {
             productionOrder: prodOrder,
@@ -1031,8 +1215,12 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 setReportId(dbReport.id);
                 reportIdRef.current = dbReport.id;
                 setProductionOrder(dbReport.production_order || op.orderNumber || '');
-                setOperatorShiftA(dbReport.operator_shift_a || '');
-                setOperatorShiftB(dbReport.operator_shift_b || '');
+
+                const auto = generateAutoDataFromShopFloor();
+                const resolvedOpA = dbReport.operator_shift_a || auto.operatorShiftA || initialOperator || op.operatorName || (op as any).operator || '';
+                setOperatorShiftA(resolvedOpA);
+                const resolvedOpB = dbReport.operator_shift_b || auto.operatorShiftB || '';
+                setOperatorShiftB(resolvedOpB);
                 
                 if (isTrefila) {
                     const resolved = resolveTrefilaProductDescriptions(op);
@@ -1065,41 +1253,48 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 // Sincronização inteligente de paradas:
                 // Se a máquina/OP teve novas paradas registradas após o salvamento inicial do relatório (ex: durante o expediente),
                 // mescla automaticamente as paradas reais geradas do chão de fábrica preservando edições manuais
-                const auto = generateAutoDataFromShopFloor();
                 const existingStopsA: StopRow[] = dbReport.stops_shift_a || [];
-                const mergedStopsA: StopRow[] = [...existingStopsA];
+                let mergedStopsA: StopRow[] = [...existingStopsA];
 
-                (auto.stopsShiftA || []).forEach(autoStop => {
-                    const isAlreadyPresent = mergedStopsA.some(s => {
-                        if (!s || !s.inicio || !autoStop.inicio) return false;
-                        if (s.inicio === autoStop.inicio) return true;
-                        const sPrefix = (s.inicio || '').substring(0, 5);
-                        const autoPrefix = (autoStop.inicio || '').substring(0, 5);
-                        if (sPrefix && autoPrefix && sPrefix === autoPrefix) {
-                            const sMot = (s.motivo || '').toLowerCase();
-                            const autoMot = (autoStop.motivo || '').toLowerCase();
-                            return sMot.includes(autoMot.substring(0, 8)) || autoMot.includes(sMot.substring(0, 8));
+                if (mergedStopsA.length === 0 && auto.stopsShiftA && auto.stopsShiftA.length > 0) {
+                    mergedStopsA = [...auto.stopsShiftA];
+                } else {
+                    (auto.stopsShiftA || []).forEach(autoStop => {
+                        const isAlreadyPresent = mergedStopsA.some(s => {
+                            if (!s || !s.inicio || !autoStop.inicio) return false;
+                            if (s.inicio === autoStop.inicio) return true;
+                            const sPrefix = (s.inicio || '').substring(0, 5);
+                            const autoPrefix = (autoStop.inicio || '').substring(0, 5);
+                            if (sPrefix && autoPrefix && sPrefix === autoPrefix) {
+                                const sMot = (s.motivo || '').toLowerCase();
+                                const autoMot = (autoStop.motivo || '').toLowerCase();
+                                return sMot.includes(autoMot.substring(0, 8)) || autoMot.includes(sMot.substring(0, 8));
+                            }
+                            return false;
+                        });
+                        if (!isAlreadyPresent) {
+                            mergedStopsA.push(autoStop);
                         }
-                        return false;
                     });
-                    if (!isAlreadyPresent) {
-                        mergedStopsA.push(autoStop);
-                    }
-                });
+                }
                 mergedStopsA.sort((a, b) => timeToSeconds(a.inicio) - timeToSeconds(b.inicio));
                 setStopsShiftA(mergedStopsA);
 
                 const existingStopsB: StopRow[] = dbReport.stops_shift_b || [];
-                const mergedStopsB: StopRow[] = [...existingStopsB];
-                (auto.stopsShiftB || []).forEach(autoStop => {
-                    const isAlreadyPresent = mergedStopsB.some(s => {
-                        if (!s || !s.inicio || !autoStop.inicio) return false;
-                        return s.inicio === autoStop.inicio || ((s.inicio || '').substring(0, 5) === (autoStop.inicio || '').substring(0, 5));
+                let mergedStopsB: StopRow[] = [...existingStopsB];
+                if (mergedStopsB.length === 0 && auto.stopsShiftB && auto.stopsShiftB.length > 0) {
+                    mergedStopsB = [...auto.stopsShiftB];
+                } else {
+                    (auto.stopsShiftB || []).forEach(autoStop => {
+                        const isAlreadyPresent = mergedStopsB.some(s => {
+                            if (!s || !s.inicio || !autoStop.inicio) return false;
+                            return s.inicio === autoStop.inicio || ((s.inicio || '').substring(0, 5) === (autoStop.inicio || '').substring(0, 5));
+                        });
+                        if (!isAlreadyPresent) {
+                            mergedStopsB.push(autoStop);
+                        }
                     });
-                    if (!isAlreadyPresent) {
-                        mergedStopsB.push(autoStop);
-                    }
-                });
+                }
                 mergedStopsB.sort((a, b) => timeToSeconds(a.inicio) - timeToSeconds(b.inicio));
                 setStopsShiftB(mergedStopsB);
                 const isTrelica = machine.toLowerCase().includes('treli') || machine.toLowerCase().includes('trelica');
@@ -1118,29 +1313,16 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     : defaultSchedA;
 
                 // Sincronização inteligente com a produção real do chão de fábrica:
-                // Se a data for hoje ou se o turno ainda estiver em andamento,
-                // ou se initialProduced for maior que o valor estático que foi salvo no banco:
                 let piecesAFromDb = Number(rawStatsA.pecasProduzidas || 0);
-                const todayStr = getLocalDateString(new Date());
-                const isCurrentActiveDay = targetDate === todayStr || rawStatsA.horarioFimApp === 'Em andamento' || op.status === 'in_progress' || op.status === 'Em Produção';
-
-                const liveTotal = Number(op.actualProducedQuantity) || 0;
-                const openLog = (op.operatorLogs || []).find((l: any) => !l.endTime);
-                let liveProducedPcs = 0;
-                if (openLog && openLog.startQuantity !== undefined) {
-                    liveProducedPcs = Math.max(0, liveTotal - Number(openLog.startQuantity));
-                }
-
-                if (initialProduced !== undefined && initialProduced > 0 && isCurrentActiveDay) {
-                    piecesAFromDb = Math.max(piecesAFromDb, initialProduced);
-                } else if (liveProducedPcs > 0 && isCurrentActiveDay) {
-                    piecesAFromDb = Math.max(piecesAFromDb, liveProducedPcs);
+                if (piecesAFromDb === 0) {
+                    piecesAFromDb = initialProduced || auto.statsShiftA.pecasProduzidas || 0;
+                } else if (initialProduced !== undefined && initialProduced > 0 && piecesAFromDb < initialProduced) {
+                    piecesAFromDb = initialProduced;
                 }
 
                 const expectedPieceSize = resolvePieceSize(op, dbReport.product_description);
 
                 // Sincronização inteligente de tamanho de peça:
-                // Se a OP tem um tamanho definido (ex: op.tamanho = '12') ou se o banco tem valor incorreto anterior (6 em vez de 12 para treliça de 12m):
                 let resolvedTamanhoA = Number(rawStatsA.tamanhoPeca);
                 if (!resolvedTamanhoA || (op.tamanho && expectedPieceSize && resolvedTamanhoA !== expectedPieceSize)) {
                     resolvedTamanhoA = expectedPieceSize;
@@ -1153,14 +1335,6 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     resolvedTamanhoB = resolvedTamanhoA;
                 }
 
-                setStatsShiftA({
-                    ...rawStatsA,
-                    horasTrabalhadas: horasTrabalhadasA,
-                    pecasProduzidas: piecesAFromDb,
-                    tamanhoPeca: resolvedTamanhoA,
-                    horarioTurnoPrevisto: horarioTurnoA
-                });
-
                 const defaultSchedB = isTrelica ? '14:48 às 23:36' : '14:00 às 23:59';
                 const defaultShiftB = isTrelica ? '08:48:00' : '09:00:00';
                 const workedSecB = timeToSeconds(rawStatsB.horasTrabalhadas || '');
@@ -1169,13 +1343,6 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     ? rawStatsB.horarioTurnoPrevisto
                     : (hasHoursB ? defaultSchedB : '');
 
-                setStatsShiftB({
-                    ...rawStatsB,
-                    horasTrabalhadas: workedSecB > 11 * 3600 ? defaultShiftB : (hasHoursB ? (isTrelica && rawStatsB.horasTrabalhadas === '09:00:00' ? defaultShiftB : rawStatsB.horasTrabalhadas) : '00:00:00'),
-                    pecasProduzidas: Number(rawStatsB.pecasProduzidas || 0),
-                    tamanhoPeca: resolvedTamanhoB,
-                    horarioTurnoPrevisto: horarioTurnoB
-                });
                 const currentDesc = dbReport.product_description || op.trelicaModel || 'TRELIÇA';
                 const currentSize = resolvedTamanhoA;
                 const theoreticalUnitWeight = getTheoreticalWeightPerPiece(currentDesc, currentSize);
@@ -1186,20 +1353,127 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 const hasValidDbUpdates = (dbReport.production_updates && dbReport.production_updates.length > 0) &&
                     (!isTrefila || dbReport.production_updates.some((u: any) => Boolean(u.lote) || Number(u.kgEntrada) > 0 || Number(u.saida) > 0 || Number(u.peso) > 0));
 
-                const finalUpdates = hasValidDbUpdates
+                let finalUpdates = hasValidDbUpdates
                     ? dbReport.production_updates
-                    : (autoHistory.length > 0 ? autoHistory : (dbReport.production_updates || []));
+                    : (autoHistory.length > 0 ? autoHistory : (auto.productionUpdates.length > 0 ? auto.productionUpdates : (dbReport.production_updates || [])));
+
+                if (!isTrefila && finalUpdates && finalUpdates.length > 0) {
+                    finalUpdates = finalUpdates.map((u: any) => {
+                        const q = Number(u.qnt) || 0;
+                        let p = Number(u.peso) || 0;
+                        if (p === 0 && q > 0) {
+                            p = Math.round(q * theoreticalUnitWeight * 100) / 100;
+                        }
+                        return { ...u, qnt: q, peso: p };
+                    });
+                }
+
+                if (isTrefila && autoHistory.length > 0) {
+                    // Reconciliação inteligente com autoHistory:
+                    // 1. Corrigir números de lote que eram índices (ex: "7", "8", "11", "14") ou que tinham entrada zerada
+                    let repairedUpdates = (finalUpdates || []).map((u: any, uIdx: number) => {
+                        // Tentar achar correspondente no autoHistory:
+                        // Prioridade 1: lote exato
+                        let matchingAuto = autoHistory.find((a: any) => a.lote && a.lote === u.lote);
+                        // Prioridade 2: lote era índice ("7", "8") correspondente à posição no processedLots
+                        if (!matchingAuto && /^\d+$/.test(String(u.lote).trim())) {
+                            const num = parseInt(String(u.lote).trim(), 10);
+                            if (num >= 1 && num <= autoHistory.length) {
+                                matchingAuto = autoHistory[num - 1];
+                            }
+                        }
+                        // Prioridade 3: correspondência por peso de saída e data
+                        if (!matchingAuto && Number(u.saida || u.peso) > 0) {
+                            const uSaida = Number(u.saida || u.peso);
+                            matchingAuto = autoHistory.find((a: any) => 
+                                Math.abs((Number(a.saida || a.peso) || 0) - uSaida) <= 1 && 
+                                (!u.data || u.data === a.data)
+                            );
+                        }
+
+                        if (matchingAuto) {
+                            const p = Number(u.peso) || Number(matchingAuto.peso) || 0;
+                            const s = Number(u.saida) || Number(matchingAuto.saida) || p;
+                            const kg = (Number(u.kgEntrada) > 0) ? Number(u.kgEntrada) : Number(matchingAuto.kgEntrada);
+                            
+                            // Se o lote salvo era apenas um número de índice ou estava genérico, substituir pelo número real da bobina/fio
+                            const resolvedLote = (!u.lote || /^\d{1,2}$/.test(String(u.lote).trim())) 
+                                ? matchingAuto.lote 
+                                : u.lote;
+
+                            return {
+                                ...u,
+                                lote: resolvedLote,
+                                kgEntrada: kg,
+                                saida: s,
+                                peso: p,
+                                data: u.data || matchingAuto.data,
+                                bitola: u.bitola || matchingAuto.bitola
+                            };
+                        }
+                        return u;
+                    });
+
+                    // 2. Remover duplicatas (ex: se existia o lote "7" que virou "9857" e também já tinha outro "9857")
+                    const seenLots = new Set<string>();
+                    repairedUpdates = repairedUpdates.filter((u: any) => {
+                        const sVal = Number(u.saida || u.peso || 0);
+                        const kVal = Number(u.kgEntrada || 0);
+                        // Ignorar linhas puramente vazias / futuras de peso zero
+                        if (sVal === 0 && kVal === 0) return false;
+
+                        const lotKey = (u.lote || '').trim();
+                        if (lotKey && seenLots.has(lotKey)) {
+                            return false; // Descartar duplicata
+                        }
+                        if (lotKey) seenLots.add(lotKey);
+                        return true;
+                    });
+
+                    // 3. Adicionar lotes do autoHistory que ainda não estejam na lista
+                    autoHistory.forEach((a: any) => {
+                        if (!repairedUpdates.some((u: any) => u.lote === a.lote)) {
+                            repairedUpdates.push({ ...a });
+                        }
+                    });
+
+                    // 4. Ordenar rigorosamente por data para nunca dividir o mesmo dia em múltiplos blocos
+                    repairedUpdates.sort((a: any, b: any) => parseDateSortKey(a.data) - parseDateSortKey(b.data));
+
+                    finalUpdates = repairedUpdates;
+                }
 
                 setProductionUpdates(finalUpdates);
 
-                // Para Trefila, se o peso do banco for 0, calcula com base nos lotes da produção
+                // Para Trefila, sincroniza a produção do turno A com a soma dos lotes do dia selecionado
                 if (isTrefila) {
-                    const sumUpdates = (finalUpdates || []).reduce((acc: number, u: any) => acc + (Number(u.saida ?? u.peso) || 0), 0);
-                    if ((piecesAFromDb === 0 || !piecesAFromDb) && sumUpdates > 0) {
-                        piecesAFromDb = sumUpdates;
-                        setStatsShiftA(prev => ({ ...prev, pecasProduzidas: sumUpdates }));
+                    const dayUpdates = (finalUpdates || []).filter((u: any) => 
+                        matchesDate(u.data, targetDate) || (targetDate && formatDateBr(targetDate).startsWith(u.data))
+                    );
+                    const sumDayOut = dayUpdates.reduce((acc: number, u: any) => acc + (Number(u.saida ?? u.peso) || 0), 0);
+                    if ((piecesAFromDb === 0 || !piecesAFromDb) && sumDayOut > 0) {
+                        piecesAFromDb = sumDayOut;
+                    }
+                    if (piecesAFromDb === 0 && auto.statsShiftA.pecasProduzidas > 0) {
+                        piecesAFromDb = auto.statsShiftA.pecasProduzidas;
                     }
                 }
+
+                setStatsShiftA({
+                    ...rawStatsA,
+                    horasTrabalhadas: horasTrabalhadasA,
+                    pecasProduzidas: piecesAFromDb,
+                    tamanhoPeca: resolvedTamanhoA,
+                    horarioTurnoPrevisto: horarioTurnoA
+                });
+
+                setStatsShiftB({
+                    ...rawStatsB,
+                    horasTrabalhadas: workedSecB > 11 * 3600 ? defaultShiftB : (hasHoursB ? (isTrelica && rawStatsB.horasTrabalhadas === '09:00:00' ? defaultShiftB : rawStatsB.horasTrabalhadas) : '00:00:00'),
+                    pecasProduzidas: Number(rawStatsB.pecasProduzidas || 0),
+                    tamanhoPeca: resolvedTamanhoB,
+                    horarioTurnoPrevisto: horarioTurnoB
+                });
                 
                 const hasTurnoBFromDb = Boolean(dbReport.operator_shift_b) || 
                     (dbReport.stops_shift_b && dbReport.stops_shift_b.length > 0) || 
@@ -2601,8 +2875,13 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                             </tr>
                                         ) : isTrefila ? (
                                             (() => {
+                                                // Ordenar rigorosamente para garantir que dias iguais fiquem agrupados juntos
+                                                const sortedUpdates = [...productionUpdates].sort((a, b) => 
+                                                    parseDateSortKey(a.data) - parseDateSortKey(b.data)
+                                                );
+
                                                 const dayGroups: { date: string; rows: ProductionUpdateRow[] }[] = [];
-                                                productionUpdates.forEach(row => {
+                                                sortedUpdates.forEach(row => {
                                                     const d = (row.data || '').trim() || 'Sem Data';
                                                     const lastGroup = dayGroups[dayGroups.length - 1];
                                                     if (lastGroup && lastGroup.date === d) {
@@ -2612,8 +2891,8 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                                     }
                                                 });
 
-                                                const overallEntrada = productionUpdates.reduce((sum, r) => sum + (Number(r.kgEntrada) || 0), 0);
-                                                const overallSaida = productionUpdates.reduce((sum, r) => sum + (Number(r.saida || r.peso) || 0), 0);
+                                                const overallEntrada = sortedUpdates.reduce((sum, r) => sum + (Number(r.kgEntrada) || 0), 0);
+                                                const overallSaida = sortedUpdates.reduce((sum, r) => sum + (Number(r.saida || r.peso) || 0), 0);
                                                 let overallRendimentoStr = '-';
                                                 let overallPerdaStr = '-';
                                                 let overallPerdaNum = 0;

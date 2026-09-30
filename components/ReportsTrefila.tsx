@@ -507,8 +507,13 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
                     ? Number(lot.final_weight) 
                     : Number(lot.producedWeight || lot.produced_weight || 0));
 
-            const lotBitola = (lot.measuredGauge || lot.measured_gauge)
-                ? `${Number(lot.measuredGauge || lot.measured_gauge).toFixed(2)} mm` 
+            let lotGaugeVal = lot.measuredGauge || lot.measured_gauge;
+            const targetGaugeNum = targetOP.targetBitola ? parseFloat(String(targetOP.targetBitola).replace(',', '.')) : 0;
+            if (Number(lotGaugeVal) === 3 && targetGaugeNum > 3.10 && targetGaugeNum < 3.90) {
+                lotGaugeVal = targetGaugeNum;
+            }
+            const lotBitola = lotGaugeVal
+                ? `${Number(lotGaugeVal).toFixed(2)} mm` 
                 : (targetOP.targetBitola ? `${targetOP.targetBitola} mm` : `${outBitola} mm`);
 
             newUpdates.push({
@@ -831,6 +836,16 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
                             const st = e.stopTime || e.stop_time;
                             return st && (st.startsWith(selectedDate) || (getLocalDateString && getLocalDateString(st) === selectedDate));
                         });
+                        const formatTime = (iso?: string) => {
+                            if (!iso) return '07:45';
+                            try {
+                                const d = new Date(iso);
+                                if (isNaN(d.getTime())) return String(iso).substring(11, 16) || '07:45';
+                                return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                            } catch {
+                                return '07:45';
+                            }
+                        };
                         opDayDowntimes.forEach((ev: any, idx: number) => {
                             const st = ev.stopTime || ev.stop_time;
                             const rt = ev.resumeTime || ev.resume_time;

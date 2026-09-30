@@ -1233,11 +1233,13 @@ const MachineControl: React.FC<MachineControlProps> = ({
     const [osElapsed, setOsElapsed] = useState(0);
     const [osSearchTerm, setOsSearchTerm] = useState('');
 
+    const [editingLotId, setEditingLotId] = useState<string | null>(null);
+
     const handlePendingWeightChange = (lotId: string, value: string) => {
         setPendingWeights(prev => new Map(prev).set(lotId, value));
     };
 
-    const handlePendingGaugeChange = (lotId: string, value: string) => { // Novo handler
+    const handlePendingGaugeChange = (lotId: string, value: string) => {
         setPendingGauges(prev => new Map(prev).set(lotId, value));
     };
 
@@ -1248,14 +1250,30 @@ const MachineControl: React.FC<MachineControlProps> = ({
     const handleRecordWeight = (lotId: string) => {
         if (!activeOrder || !recordLotWeight) return;
 
-        const lot = (activeOrder.processedLots || []).find(p => p.lotId === lotId);
+        const lot = (activeOrder.processedLots || []).find((p: any) => (p.lotId === lotId || p.lot_id === lotId));
         if (!lot) return;
 
         const weightStr = pendingWeights.get(lotId);
         const gaugeStr = pendingGauges.get(lotId);
 
-        const parsedWeight = weightStr ? parseFloat(weightStr.replace(',', '.')) : undefined;
-        const parsedGauge = gaugeStr ? parseFloat(gaugeStr.replace(',', '.')) : undefined;
+        const parsedWeight = weightStr ? parseFloat(weightStr.toString().replace(',', '.')) : undefined;
+
+        let parsedGauge: number | undefined = undefined;
+        if (gaugeStr && gaugeStr.toString().trim() !== '') {
+            const clean = gaugeStr.toString().trim().replace(',', '.').replace(/[^\d.]/g, '');
+            const val = parseFloat(clean);
+            if (!isNaN(val) && val > 0) {
+                parsedGauge = val;
+            }
+        }
+
+        // Se o operador não digitou a bitola ou digitou 3 puro mas a OP tem targetBitola decimal (ex: 3.40), usar targetBitola
+        const targetGaugeNum = activeOrder.targetBitola ? parseFloat(activeOrder.targetBitola.replace(',', '.')) : 0;
+        if (parsedGauge === undefined && targetGaugeNum > 0) {
+            parsedGauge = targetGaugeNum;
+        } else if (parsedGauge === 3 && targetGaugeNum > 3.10 && targetGaugeNum < 3.90) {
+            parsedGauge = targetGaugeNum;
+        }
 
         const finalWeight = (parsedWeight !== undefined && !isNaN(parsedWeight)) ? parsedWeight : undefined;
         const measuredGauge = (parsedGauge !== undefined && !isNaN(parsedGauge)) ? parsedGauge : undefined;
@@ -1277,7 +1295,38 @@ const MachineControl: React.FC<MachineControlProps> = ({
                     return newMap;
                 });
             }
+            setEditingLotId(null);
         }
+    };
+
+    const handleStartEditLot = (lot: any) => {
+        const id = lot.lotId || lot.lot_id;
+        if (!id) return;
+        setEditingLotId(id);
+        const w = lot.finalWeight ?? lot.final_weight;
+        const g = lot.measuredGauge ?? lot.measured_gauge;
+        if (w !== null && w !== undefined) {
+            setPendingWeights(prev => new Map(prev).set(id, String(w)));
+        }
+        if (g !== null && g !== undefined) {
+            setPendingGauges(prev => new Map(prev).set(id, Number(g).toFixed(2)));
+        } else if (activeOrder?.targetBitola) {
+            setPendingGauges(prev => new Map(prev).set(id, activeOrder.targetBitola));
+        }
+    };
+
+    const handleCancelEditLot = (lotId: string) => {
+        setEditingLotId(null);
+        setPendingWeights(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(lotId);
+            return newMap;
+        });
+        setPendingGauges(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(lotId);
+            return newMap;
+        });
     };
 
     const [showResumePreviousStopModal, setShowResumePreviousStopModal] = useState(false);
@@ -2003,22 +2052,36 @@ const MachineControl: React.FC<MachineControlProps> = ({
     const { waitingLots, completedLots } = useMemo(() => {
         if (!activeOrder || (!activeOrder.machine.startsWith('Trefila') && !activeOrder.machine.startsWith('Desbobinadeira'))) return { waitingLots: [], completedLots: [] };
 
-        const processedLotIds = new Set(activeOrder.processedLots?.map(p => p.lotId) || []);
+        const rawLots = activeOrder.processedLots || (activeOrder as any).processed_lots || [];
+        const processedLotIds = new Set(rawLots.map((p: any) => p.lotId || p.lot_id).filter(Boolean));
 
         // Para ordens fantasma, selectedLotIds pode começar vazio e lotes são adicionados dinamicamente
         const selectedIds = Array.isArray(activeOrder.selectedLotIds) 
-            ? activeOrder.selectedLotIds.map((l: any) => typeof l === 'string' ? l : l.lotId).filter(Boolean)
+            ? activeOrder.selectedLotIds.map((l: any) => typeof l === 'string' ? l : (l.lotId || l.lot_id)).filter(Boolean)
             : [];
-        const processedIds = (activeOrder.processedLots || []).map(p => p.lotId);
+        const processedIds = rawLots.map((p: any) => p.lotId || p.lot_id).filter(Boolean);
         const allKnownLotIds = [...new Set([...selectedIds, ...processedIds])];
 
         const allOrderLots = stock.filter(s => allKnownLotIds.includes(s.id));
 
         const waiting = allOrderLots.filter(lot => !processedLotIds.has(lot.id) && lot.id !== activeLotProcessingData?.lotId);
 
-        const completed = (activeOrder.processedLots || []).map(processedLot => {
-            const lotInfo = stock.find(s => s.id === processedLot.lotId);
-            return { ...processedLot, lotInfo: lotInfo || null };
+        const completed = rawLots.map((processedLot: any) => {
+            const lotId = processedLot.lotId || processedLot.lot_id;
+            const finalWeight = processedLot.finalWeight !== undefined && processedLot.finalWeight !== null 
+                ? Number(processedLot.finalWeight) 
+                : (processedLot.final_weight !== undefined && processedLot.final_weight !== null ? Number(processedLot.final_weight) : null);
+            const measuredGauge = processedLot.measuredGauge !== undefined && processedLot.measuredGauge !== null 
+                ? Number(processedLot.measuredGauge) 
+                : (processedLot.measured_gauge !== undefined && processedLot.measured_gauge !== null ? Number(processedLot.measured_gauge) : undefined);
+            const lotInfo = stock.find(s => s.id === lotId || s.internalLot === lotId);
+            return { 
+                ...processedLot, 
+                lotId, 
+                finalWeight,
+                measuredGauge,
+                lotInfo: lotInfo || null 
+            };
         });
 
         return { waitingLots: waiting, completedLots: completed };
@@ -4153,22 +4216,24 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                         </thead>
                                                         <tbody className="divide-y divide-slate-100">
                                                             {[...completedLots].reverse().map(lot => {
+                                                                const isEditing = editingLotId === lot.lotId;
                                                                 const isWaiting = lot.finalWeight === null || lot.measuredGauge === null || lot.measuredGauge === undefined;
                                                                 const waitingMs = isWaiting ? now.getTime() - new Date(lot.endTime).getTime() : 0;
+                                                                const targetBitolaPlaceholder = activeOrder.targetBitola ? activeOrder.targetBitola : '0.00';
 
                                                                 return (
-                                                                    <tr key={lot.lotId} className="hover:bg-slate-50/50 transition-colors">
+                                                                    <tr key={lot.lotId} className={`hover:bg-slate-50/50 transition-colors ${isEditing ? 'bg-amber-50/50' : ''}`}>
                                                                         <td className="p-3 font-bold text-slate-700">{lot.lotInfo?.internalLot}</td>
                                                                         <td className="p-3 text-right text-slate-500 font-medium">{lot.lotInfo?.initialQuantity?.toFixed(0) || '-'} kg</td>
                                                                         <td className="p-3">
-                                                                            {lot.finalWeight == null ? (
+                                                                            {(isWaiting || isEditing) ? (
                                                                                 <div className="flex items-center gap-1">
                                                                                     <input
                                                                                         type="text"
                                                                                         inputMode="decimal"
-                                                                                        className="w-3/4 p-2 border-2 border-slate-100 rounded-lg text-center focus:border-indigo-500 bg-slate-50 focus:bg-white transition font-bold"
-                                                                                        placeholder="0.0"
-                                                                                        value={pendingWeights?.get(lot.lotId) || ''}
+                                                                                        className="w-3/4 p-2 border-2 border-slate-200 rounded-lg text-center focus:border-indigo-500 bg-white transition font-bold text-xs"
+                                                                                        placeholder={lot.lotInfo?.initialQuantity ? String(lot.lotInfo.initialQuantity) : "0.0"}
+                                                                                        value={pendingWeights?.get(lot.lotId) ?? (isEditing && lot.finalWeight ? String(lot.finalWeight) : '')}
                                                                                         onChange={e => handlePendingWeightChange(lot.lotId, e.target.value)}
                                                                                     />
                                                                                     <span className="text-[10px] font-bold text-slate-400">kg</span>
@@ -4178,14 +4243,14 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                             )}
                                                                         </td>
                                                                         <td className="p-3">
-                                                                            {lot.measuredGauge == null ? (
+                                                                            {(isWaiting || isEditing) ? (
                                                                                 <div className="flex items-center gap-1">
                                                                                     <input
                                                                                         type="text"
                                                                                         inputMode="decimal"
-                                                                                        className="w-3/4 p-2 border-2 border-slate-100 rounded-lg text-center focus:border-indigo-500 bg-slate-50 focus:bg-white transition"
-                                                                                        placeholder="0.00"
-                                                                                        value={pendingGauges?.get(lot.lotId) || ''}
+                                                                                        className="w-3/4 p-2 border-2 border-slate-200 rounded-lg text-center focus:border-indigo-500 bg-white transition font-bold text-xs text-indigo-700"
+                                                                                        placeholder={targetBitolaPlaceholder}
+                                                                                        value={pendingGauges?.get(lot.lotId) ?? (isEditing && lot.measuredGauge ? Number(lot.measuredGauge).toFixed(2) : '')}
                                                                                         onChange={e => handlePendingGaugeChange(lot.lotId, e.target.value)}
                                                                                     />
                                                                                     <span className="text-[10px] font-bold text-slate-400">mm</span>
@@ -4200,22 +4265,47 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                                     <span className="text-[9px] font-black text-amber-600 animate-pulse uppercase leading-none">Aguardando</span>
                                                                                     <span className="text-[10px] font-mono font-bold text-slate-400 mt-0.5">{formatDuration(waitingMs)}</span>
                                                                                 </div>
+                                                                            ) : isEditing ? (
+                                                                                <span className="text-[10px] font-black text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full uppercase">Editando</span>
                                                                             ) : (
                                                                                 <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full uppercase">Concluído</span>
                                                                             )}
                                                                         </td>
                                                                         <td className="p-3">
-                                                                            {isWaiting ? (
-                                                                                <button
-                                                                                    onClick={() => handleRecordWeight(lot.lotId)}
-                                                                                    disabled={!hasActiveShift && !isGestor}
-                                                                                    className="bg-emerald-500 text-white text-[10px] font-black py-2 px-3 rounded-lg hover:bg-emerald-600 w-full shadow-lg shadow-emerald-100 transition active:scale-95 disabled:opacity-50"
-                                                                                >
-                                                                                    SALVAR
-                                                                                </button>
+                                                                            {(isWaiting || isEditing) ? (
+                                                                                <div className="flex items-center gap-1">
+                                                                                    <button
+                                                                                        onClick={() => handleRecordWeight(lot.lotId)}
+                                                                                        disabled={!hasActiveShift && !isGestor}
+                                                                                        className="bg-emerald-500 text-white text-[10px] font-black py-2 px-3 rounded-lg hover:bg-emerald-600 w-full shadow-lg shadow-emerald-100 transition active:scale-95 disabled:opacity-50 cursor-pointer"
+                                                                                    >
+                                                                                        SALVAR
+                                                                                    </button>
+                                                                                    {isEditing && (
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={() => handleCancelEditLot(lot.lotId)}
+                                                                                            className="p-2 bg-slate-200 text-slate-600 hover:bg-slate-300 rounded-lg text-xs font-bold transition active:scale-95 cursor-pointer"
+                                                                                            title="Cancelar edição"
+                                                                                        >
+                                                                                            ✕
+                                                                                        </button>
+                                                                                    )}
+                                                                                </div>
                                                                             ) : (
-                                                                                <div className="bg-slate-100 text-slate-400 p-1.5 rounded-lg w-fit mx-auto">
-                                                                                    <CheckCircleIcon className="h-4 w-4" />
+                                                                                <div className="flex items-center justify-center gap-1">
+                                                                                    <div className="bg-slate-100 text-slate-400 p-1.5 rounded-lg" title="Concluído">
+                                                                                        <CheckCircleIcon className="h-4 w-4 text-emerald-500" />
+                                                                                    </div>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => handleStartEditLot(lot)}
+                                                                                        disabled={!hasActiveShift && !isGestor}
+                                                                                        className="p-1.5 bg-slate-100 hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 rounded-lg text-xs font-bold transition active:scale-95 cursor-pointer disabled:opacity-50"
+                                                                                        title="Ajustar / Corrigir Peso ou Bitola deste lote"
+                                                                                    >
+                                                                                        ✏️
+                                                                                    </button>
                                                                                 </div>
                                                                             )}
                                                                         </td>
@@ -4228,12 +4318,15 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                     {/* Mobile Card List */}
                                                     <div className="flex flex-col gap-3 sm:hidden">
                                                         {[...completedLots].reverse().map(lot => {
+                                                            const isEditing = editingLotId === lot.lotId;
                                                             const isWaiting = lot.finalWeight == null || lot.measuredGauge == null;
                                                             const waitingMs = isWaiting ? timer.getTime() - new Date(lot.endTime).getTime() : 0;
+                                                            const targetBitolaPlaceholder = activeOrder.targetBitola ? activeOrder.targetBitola : '0.00';
 
                                                             return (
-                                                                <div key={lot.lotId} className="bg-white border-2 border-slate-100 p-4 rounded-2xl shadow-sm flex flex-col gap-4 relative overflow-hidden">
-                                                                    {!isWaiting && <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[8px] font-black px-3 py-1 rounded-bl-xl uppercase">Concluído</div>}
+                                                                <div key={lot.lotId} className={`bg-white border-2 p-4 rounded-2xl shadow-sm flex flex-col gap-4 relative overflow-hidden ${isEditing ? 'border-amber-300 bg-amber-50/20' : 'border-slate-100'}`}>
+                                                                    {!isWaiting && !isEditing && <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[8px] font-black px-3 py-1 rounded-bl-xl uppercase">Concluído</div>}
+                                                                    {isEditing && <div className="absolute top-0 right-0 bg-amber-500 text-white text-[8px] font-black px-3 py-1 rounded-bl-xl uppercase">Editando</div>}
 
                                                                     <div className="flex justify-between items-start">
                                                                         <div>
@@ -4251,13 +4344,13 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                     <div className="grid grid-cols-2 gap-3">
                                                                         <div className="space-y-1">
                                                                             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Peso Saída (kg)</label>
-                                                                            {lot.finalWeight == null ? (
+                                                                            {(isWaiting || isEditing) ? (
                                                                                 <input
                                                                                     type="text"
                                                                                     inputMode="decimal"
-                                                                                    className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-center font-bold focus:border-indigo-500 outline-none transition uppercase"
-                                                                                    placeholder="0.0"
-                                                                                    value={pendingWeights?.get(lot.lotId) || ''}
+                                                                                    className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl text-center font-bold focus:border-indigo-500 outline-none transition uppercase text-xs"
+                                                                                    placeholder={lot.lotInfo?.initialQuantity ? String(lot.lotInfo.initialQuantity) : "0.0"}
+                                                                                    value={pendingWeights?.get(lot.lotId) ?? (isEditing && lot.finalWeight ? String(lot.finalWeight) : '')}
                                                                                     onChange={e => handlePendingWeightChange(lot.lotId, e.target.value)}
                                                                                 />
                                                                             ) : (
@@ -4266,13 +4359,13 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                         </div>
                                                                         <div className="space-y-1">
                                                                             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Bitola (mm)</label>
-                                                                            {lot.measuredGauge == null ? (
+                                                                            {(isWaiting || isEditing) ? (
                                                                                 <input
                                                                                     type="text"
                                                                                     inputMode="decimal"
-                                                                                    className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-center font-bold focus:border-indigo-500 outline-none transition uppercase"
-                                                                                    placeholder="0.00"
-                                                                                    value={pendingGauges?.get(lot.lotId) || ''}
+                                                                                    className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl text-center font-bold focus:border-indigo-500 outline-none transition uppercase text-indigo-700 text-xs"
+                                                                                    placeholder={targetBitolaPlaceholder}
+                                                                                    value={pendingGauges?.get(lot.lotId) ?? (isEditing && lot.measuredGauge ? Number(lot.measuredGauge).toFixed(2) : '')}
                                                                                     onChange={e => handlePendingGaugeChange(lot.lotId, e.target.value)}
                                                                                 />
                                                                             ) : (
@@ -4281,14 +4374,35 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                                         </div>
                                                                     </div>
 
-                                                                    {isWaiting && (
+                                                                    {(isWaiting || isEditing) ? (
+                                                                        <div className="flex gap-2">
+                                                                            <button
+                                                                                onClick={() => handleRecordWeight(lot.lotId)}
+                                                                                disabled={!hasActiveShift && !isGestor}
+                                                                                className="flex-1 bg-emerald-600 text-white font-black py-4 rounded-xl shadow-lg shadow-emerald-100 active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                                                                            >
+                                                                                <CheckCircleIcon className="h-6 w-6" />
+                                                                                {isEditing ? 'SALVAR ALTERAÇÃO' : 'SALVAR PESAGEM (OK)'}
+                                                                            </button>
+                                                                            {isEditing && (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => handleCancelEditLot(lot.lotId)}
+                                                                                    className="px-4 bg-slate-200 text-slate-700 font-bold rounded-xl active:scale-95 transition"
+                                                                                >
+                                                                                    Cancelar
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
+                                                                    ) : (
                                                                         <button
-                                                                            onClick={() => handleRecordWeight(lot.lotId)}
+                                                                            type="button"
+                                                                            onClick={() => handleStartEditLot(lot)}
                                                                             disabled={!hasActiveShift && !isGestor}
-                                                                            className="w-full bg-emerald-600 text-white font-black py-4 rounded-xl shadow-lg shadow-emerald-100 active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                                                                            className="w-full py-2.5 bg-slate-100 hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 text-xs font-bold rounded-xl transition active:scale-95 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
                                                                         >
-                                                                            <CheckCircleIcon className="h-6 w-6" />
-                                                                            SALVAR PESAGEM (OK)
+                                                                            <span>✏️</span>
+                                                                            <span>Ajustar Peso ou Bitola</span>
                                                                         </button>
                                                                     )}
                                                                 </div>

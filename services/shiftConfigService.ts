@@ -221,12 +221,15 @@ export const checkMachineShiftStatus = (
     const isWithinHours = nowMs >= (startMs - earlyToleranceMs) && nowMs <= endMs;
     const inShiftWindow = isWorkDay && isWithinHours;
 
-    let isOvertime = !inShiftWindow;
+    // Hora extra ocorre estritamente APÓS o horário final de expediente programado
+    // Se o horário atual é anterior ao início do turno (ex: madrugada / manhã cedo), NÃO é hora extra!
+    let isOvertime = false;
     let isAutoEndCountdown = false;
     let remainingCountdownSeconds = 0;
 
-    // Se passou do horário de encerramento
-    if (nowMs >= endMs) {
+    // Se passou do horário de encerramento do turno
+    if (nowMs > endMs) {
+        isOvertime = true;
         const elapsedSinceEnd = nowMs - endMs;
         if (elapsedSinceEnd < autoTimeoutMs) {
             isAutoEndCountdown = true;

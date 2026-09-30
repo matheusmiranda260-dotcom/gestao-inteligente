@@ -10076,6 +10076,80 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
     const selectedTab = dayTabs.find(t => t.dateStr === selectedDateStr);
     const activeLabel = selectedDateStr === 'ALL' ? 'Todas as Paradas da OP' : (selectedTab?.label || selectedDateStr);
 
+    const targetReportDateStr = selectedDateStr === 'ALL' ? data.dateStr : selectedDateStr;
+
+    // Calcular produção e operador para a data ativa na Ficha Oficial
+    const { dayProduced, dayOperator } = useMemo(() => {
+        let produced = 0;
+        let operatorName = '';
+
+        // 1. ShiftReports correspondentes a esta OP e data
+        const opReports = (shiftReports || []).filter(r => 
+            (r.productionOrderId === activeOp.id || r.orderNumber === activeOp.orderNumber) &&
+            (r.date === targetReportDateStr || parseDateOnly(r.shiftStartTime || r.shiftEndTime) === targetReportDateStr)
+        );
+
+        opReports.forEach(r => {
+            if (!operatorName && r.operator) operatorName = r.operator;
+            produced += Number(r.totalProducedWeight || r.totalProducedQuantity || 0);
+        });
+
+        // 2. Lotes processados se for Trefila
+        const isTrefilaMach = (activeOp.scheduledMachine || activeOp.machine || '').toLowerCase().includes('trefila');
+        if (isTrefilaMach) {
+            const pLots = activeOp.processedLots || (activeOp as any).processed_lots || [];
+            let lotWeight = 0;
+            pLots.forEach((l: any) => {
+                const lIso = l.endTime || l.end_time || l.startTime || l.start_time;
+                if (lIso && parseDateOnly(lIso) === targetReportDateStr) {
+                    lotWeight += Number(l.finalWeight || l.final_weight || l.producedWeight || l.produced_weight || 0);
+                }
+            });
+            if (lotWeight > 0) {
+                produced = Math.max(produced, lotWeight);
+            }
+        }
+
+        // 3. OperatorLogs desta data
+        const opLogs = (activeOp.operatorLogs || []).filter(l => {
+            const s = parseDateOnly(l.startTime);
+            const e = parseDateOnly(l.endTime);
+            return s === targetReportDateStr || e === targetReportDateStr;
+        });
+        opLogs.forEach(l => {
+            if (!operatorName && l.operator) operatorName = l.operator;
+            if (produced === 0) {
+                if (l.endQuantity !== undefined && l.startQuantity !== undefined) {
+                    produced += Math.max(0, (Number(l.endQuantity) || 0) - (Number(l.startQuantity) || 0));
+                }
+            }
+        });
+
+        // 4. Se a data bater com data.dateStr e produced ainda for 0, usar data.produced
+        if (targetReportDateStr === data.dateStr && (produced === 0 || !produced)) {
+            produced = data.produced || 0;
+        }
+
+        // 5. Se ainda for 0 e a OP tem peso/quantidade produzida
+        if (produced === 0) {
+            const totalOpProduced = Number(activeOp.actualProducedWeight || activeOp.actualProducedQuantity || 0);
+            if (totalOpProduced > 0) {
+                produced = totalOpProduced;
+            }
+        }
+
+        // 6. Operador fallback das paradas ou da OP
+        if (!operatorName) {
+            const stopWithOp = allStops.find(s => s.dateStr === targetReportDateStr && s.operator);
+            if (stopWithOp) operatorName = stopWithOp.operator!;
+        }
+        if (!operatorName) {
+            operatorName = activeOp.operatorName || (activeOp as any).operator || '';
+        }
+
+        return { dayProduced: produced, dayOperator: operatorName };
+    }, [activeOp, targetReportDateStr, shiftReports, allStops, data.dateStr, data.produced]);
+
     return (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-[140] p-3 sm:p-4 animate-fade" onClick={onClose}>
             <div className="bg-[#0A1B27] rounded-2xl border border-white/15 shadow-2xl w-full max-w-2xl text-slate-100 flex flex-col max-h-[90vh] my-auto overflow-hidden" onClick={e => e.stopPropagation()}>
@@ -10523,7 +10597,7 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                     isOpen={showOfficialReport}
                     onClose={() => setShowOfficialReport(false)}
                     machine={activeOp.scheduledMachine || (activeOp.machine as string) || 'Treliça 1'}
-                    dateStr={selectedDateStr === 'ALL' ? data.dateStr : selectedDateStr}
+                    dateStr={targetReportDateStr}
                     op={{
                         ...activeOp,
                         productCode: activeOp.productCode || ((activeOp.targetBitola?.includes('3.4') || activeOp.orderNumber === '87493') ? '8624' : activeOp.productCode),
@@ -10531,7 +10605,8 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                     }}
                     shiftReports={shiftReports}
                     productionOrders={productionOrders}
-                    initialProduced={selectedDateStr === data.dateStr ? data.produced : undefined}
+                    initialProduced={dayProduced > 0 ? dayProduced : (selectedDateStr === data.dateStr ? data.produced : undefined)}
+                    initialOperator={dayOperator}
                     shiftConfig={shiftConfig}
                     stock={stock}
                     gauges={gauges}

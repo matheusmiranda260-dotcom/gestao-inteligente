@@ -2501,21 +2501,27 @@ const App: React.FC = () => {
                 return;
             }
 
-            // Map and merge updates - now 'order' is already in camelCase
-            const currentProcessedLots = order.processedLots || [];
+            // Map and merge updates - support both lotId and lot_id
+            const currentProcessedLots = order.processedLots || (order as any).processed_lots || [];
             const newProcessedLots = currentProcessedLots.map((p: any) => {
-                if (p.lotId === lotId) {
+                const pLotId = p.lotId || p.lot_id;
+                if (pLotId === lotId) {
+                    const updatedWeight = finalWeight !== undefined ? finalWeight : (p.finalWeight ?? p.final_weight);
+                    const updatedGauge = measuredGauge !== undefined ? measuredGauge : (p.measuredGauge ?? p.measured_gauge);
                     return {
                         ...p,
-                        finalWeight: finalWeight !== undefined ? finalWeight : p.finalWeight,
-                        measuredGauge: measuredGauge !== undefined ? measuredGauge : p.measuredGauge
+                        lotId: pLotId,
+                        finalWeight: updatedWeight,
+                        measuredGauge: updatedGauge,
+                        final_weight: updatedWeight,
+                        measured_gauge: updatedGauge
                     };
                 }
                 return p;
             });
 
             // Calculate actualProducedWeight as the sum of all weighed lots
-            const newActualWeight = newProcessedLots.reduce((sum: number, lot: any) => sum + (lot.finalWeight || 0), 0);
+            const newActualWeight = newProcessedLots.reduce((sum: number, lot: any) => sum + (lot.finalWeight || lot.final_weight || 0), 0);
 
             // Use updateItem service which handles snake_case conversion for the database
             const updatedOrder = await updateItem<ProductionOrderData>('production_orders', orderId, {
@@ -2524,14 +2530,24 @@ const App: React.FC = () => {
             });
 
             // 3. Find and update the shift report that contains this lotId
-            const matchingReport = shiftReports?.find(r => r.productionOrderId === orderId && r.processedLots?.some(l => l.lotId === lotId));
+            const matchingReport = shiftReports?.find(r => 
+                r.productionOrderId === orderId && 
+                (r.processedLots || (r as any).processed_lots || []).some((l: any) => (l.lotId || l.lot_id) === lotId)
+            );
             if (matchingReport) {
-                const updatedReportLots = (matchingReport.processedLots || []).map((l: any) => {
-                    if (l.lotId === lotId) {
+                const currentReportLots = matchingReport.processedLots || (matchingReport as any).processed_lots || [];
+                const updatedReportLots = currentReportLots.map((l: any) => {
+                    const lLotId = l.lotId || l.lot_id;
+                    if (lLotId === lotId) {
+                        const updatedWeight = finalWeight !== undefined ? finalWeight : (l.finalWeight ?? l.final_weight);
+                        const updatedGauge = measuredGauge !== undefined ? measuredGauge : (l.measuredGauge ?? l.measured_gauge);
                         return {
                             ...l,
-                            finalWeight: finalWeight !== undefined ? finalWeight : l.finalWeight,
-                            measuredGauge: measuredGauge !== undefined ? measuredGauge : l.measuredGauge
+                            lotId: lLotId,
+                            finalWeight: updatedWeight,
+                            measuredGauge: updatedGauge,
+                            final_weight: updatedWeight,
+                            measured_gauge: updatedGauge
                         };
                     }
                     return l;
