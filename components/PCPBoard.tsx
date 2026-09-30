@@ -9903,24 +9903,29 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
             isOngoing: boolean;
         }[] = [];
 
-        // 1. Paradas de activeOp.downtimeEvents
-        (activeOp.downtimeEvents || []).forEach((e: any, idx: number) => {
+        // 1. Paradas de activeOp.downtimeEvents (ou downtime_events)
+        const rawOpEvents = activeOp.downtimeEvents || (activeOp as any).downtime_events || [];
+        rawOpEvents.forEach((e: any, idx: number) => {
             if (!e) return;
-            const stopTime = e.stopTime || '';
-            const resumeTime = e.resumeTime || null;
+            const stopTime = e.stopTime || e.stop_time || '';
+            const resumeTime = e.resumeTime || e.resume_time || null;
             const sDate = new Date(stopTime);
             const rDate = resumeTime ? new Date(resumeTime) : null;
             const isValidStop = !isNaN(sDate.getTime());
             
             let dur = 0;
-            if (e.durationMin !== undefined && !isNaN(Number(e.durationMin)) && Number(e.durationMin) > 0) {
-                dur = Number(e.durationMin);
+            const rawDur = e.durationMin ?? e.duration_min;
+            if (rawDur !== undefined && !isNaN(Number(rawDur)) && Number(rawDur) > 0) {
+                dur = Number(rawDur);
             } else if (isValidStop) {
                 const endMs = rDate && !isNaN(rDate.getTime()) ? rDate.getTime() : Date.now();
                 dur = Math.max(0, Math.round((endMs - sDate.getTime()) / 60000));
             }
 
-            const reasonNorm = (e.reason || '').toLowerCase().trim();
+            const rawReason = e.reason || e.motivo || 'Sem motivo registrado';
+            const justStr = e.justification ? ` - ${e.justification.trim()}` : '';
+            const fullReason = `${rawReason}${justStr}`;
+            const reasonNorm = rawReason.toLowerCase().trim();
             // Desconsiderar paradas fantasmas de 'Final de Turno' com 0 minutos ou stopTime igual a resumeTime
             if ((reasonNorm.includes('final de turno') || reasonNorm.includes('fim de turno') || reasonNorm.includes('aguardando início')) && dur === 0) {
                 return;
@@ -9940,7 +9945,7 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
 
             stopsList.push({
                 id: `op-event-${idx}`,
-                reason: e.reason || 'Sem motivo registrado',
+                reason: fullReason,
                 stopTime: String(stopTime),
                 resumeTime: resumeTime ? String(resumeTime) : null,
                 durationMin: dur,

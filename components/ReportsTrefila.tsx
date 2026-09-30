@@ -355,6 +355,20 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
         return { descIn, descOut };
     };
 
+    const getLocalDateString = (val: any): string => {
+        if (!val) return '';
+        try {
+            const dt = new Date(val);
+            if (isNaN(dt.getTime())) return String(val).split('T')[0] || '';
+            const y = dt.getFullYear();
+            const m = String(dt.getMonth() + 1).padStart(2, '0');
+            const d = String(dt.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        } catch {
+            return String(val).split('T')[0] || '';
+        }
+    };
+
     // Função que sincroniza a evolução do dia com a ficha de papel
     const syncDailyEvolution = (targetOpId?: string, forceToast = false) => {
         const selDateOnly = selectedDate.includes('T') ? selectedDate.split('T')[0] : selectedDate;
@@ -566,6 +580,10 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
 
         if (newUpdates.length > 0) {
             setProductionUpdates(newUpdates);
+            const sumOut = newUpdates.reduce((acc, r) => acc + (r.isSeparator ? 0 : (r.saida || 0)), 0);
+            if (sumOut > 0) {
+                setStats(prev => ({ ...prev, pesoSaida: sumOut }));
+            }
         }
 
         // 4. Calcular Horas Trabalhadas
@@ -729,9 +747,46 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
     // 6. Persistência de Dados (Local Storage)
     const DRAFT_KEY = 'trefila_report_draft';
 
-    const loadDraft = () => {
+    const loadDraft = async () => {
         setLoading(true);
         try {
+            // 1. Tentar buscar em trelica_daily_reports no Supabase para a data selecionada
+            try {
+                const { data: dbReports } = await supabase
+                    .from('trelica_daily_reports')
+                    .select('*')
+                    .eq('date', selectedDate);
+
+                let dbReport: any = null;
+                if (dbReports && dbReports.length > 0) {
+                    dbReport = dbReports.find((r: any) => {
+                        const m = (r.machine_type || '').toLowerCase();
+                        return m.includes('trefila');
+                    });
+                }
+
+                if (dbReport) {
+                    setSelectedDate(dbReport.date);
+                    setProductionOrder(dbReport.production_order || '');
+                    setOperator(dbReport.operator_shift_a || '');
+                    setProductDescriptionIn(dbReport.stats_shift_a?.productDescriptionIn || '4860 - Fio Máquina 5,50mm');
+                    setProductDescriptionOut(dbReport.stats_shift_a?.productDescriptionOut || dbReport.product_description || '8624 - CA 60 ROLO 3.40 MM - 2 TON - M.P. *SEMI ACABADO*');
+                    setStops(dbReport.stops_shift_a || []);
+                    const sumUpdates = (dbReport.production_updates || []).reduce((acc: number, u: any) => acc + (Number(u.saida || u.peso) || 0), 0);
+                    const finalProduced = Number(dbReport.stats_shift_a?.pecasProduzidas || 0) || sumUpdates;
+                    setStats(prev => ({
+                        ...prev,
+                        horasTrabalhadas: dbReport.stats_shift_a?.horasTrabalhadas || '09:48:00',
+                        pesoSaida: finalProduced
+                    }));
+                    setProductionUpdates(dbReport.production_updates || []);
+                    showToast('Relatório carregado da nuvem com sucesso.', 'info');
+                    return;
+                }
+            } catch (sbErr) {
+                console.warn('Erro ao consultar Supabase em ReportsTrefila:', sbErr);
+            }
+
             const saved = localStorage.getItem(DRAFT_KEY);
             if (saved) {
                 const data = JSON.parse(saved);

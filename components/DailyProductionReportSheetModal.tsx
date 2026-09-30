@@ -999,16 +999,31 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         setLoading(true);
         setSaveStatus('saving');
         try {
-            // 1. Tentar buscar no Supabase
-            const { data: dbReport, error } = await supabase
+            // 1. Tentar buscar no Supabase (pela data e pela OP ou máquina)
+            const cleanOpNum = String(op.orderNumber || (op as any).order_number || '').trim();
+            const { data: dbReports, error } = await supabase
                 .from('trelica_daily_reports')
                 .select('*')
-                .eq('date', targetDate)
-                .eq('machine_type', machine)
-                .maybeSingle();
+                .eq('date', targetDate);
 
             if (error) {
                 console.warn('Erro ao buscar no Supabase, tentando cache local:', error);
+            }
+
+            let dbReport: any = null;
+            if (dbReports && dbReports.length > 0) {
+                // 1. Prioridade para relatório que corresponde à OP
+                if (cleanOpNum) {
+                    dbReport = dbReports.find((r: any) => String(r.production_order || '').trim() === cleanOpNum);
+                }
+                // 2. Se não achou pela OP, busca pela máquina (normalizada sem espaços e case-insensitive)
+                if (!dbReport) {
+                    const normMach = (machine || '').toLowerCase().replace(/\s+/g, '');
+                    dbReport = dbReports.find((r: any) => {
+                        const rMach = (r.machine_type || '').toLowerCase().replace(/\s+/g, '');
+                        return rMach === normMach || (normMach.includes('trefila') && rMach.includes('trefila'));
+                    });
+                }
             }
 
             if (dbReport) {
@@ -1176,6 +1191,15 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     : (autoHistory.length > 0 ? autoHistory : (dbReport.production_updates || []));
 
                 setProductionUpdates(finalUpdates);
+
+                // Para Trefila, se o peso do banco for 0, calcula com base nos lotes da produção
+                if (isTrefila) {
+                    const sumUpdates = (finalUpdates || []).reduce((acc: number, u: any) => acc + (Number(u.saida ?? u.peso) || 0), 0);
+                    if ((piecesAFromDb === 0 || !piecesAFromDb) && sumUpdates > 0) {
+                        piecesAFromDb = sumUpdates;
+                        setStatsShiftA(prev => ({ ...prev, pecasProduzidas: sumUpdates }));
+                    }
+                }
                 
                 const hasTurnoBFromDb = Boolean(dbReport.operator_shift_b) || 
                     (dbReport.stops_shift_b && dbReport.stops_shift_b.length > 0) || 
@@ -1185,7 +1209,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
 
                 isLoadedRef.current = true;
                 setSaveStatus('saved');
-                showToast(`Relatório do dia ${targetDate.split('-').reverse().join('/')} carregado do banco.`, 'info');
+                showToast(`Relatório do dia ${targetDate.split('-').reverse().join('/')} carregado com sucesso.`, 'info');
             } else {
                 // Não existe no banco ainda: gerar automaticamente com base nos dados do dia
                 const auto = generateAutoDataFromShopFloor();
