@@ -273,7 +273,9 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
     // Campos da Ficha Técnica
     const [productionOrder, setProductionOrder] = useState<string>('');
     const [operatorShiftA, setOperatorShiftA] = useState<string>('');
+    const [assistantShiftA, setAssistantShiftA] = useState<string>('');
     const [operatorShiftB, setOperatorShiftB] = useState<string>('');
+    const [assistantShiftB, setAssistantShiftB] = useState<string>('');
     const [productDescription, setProductDescription] = useState<string>('');
     const [productDescriptionIn, setProductDescriptionIn] = useState<string>('');
     const [productDescriptionOut, setProductDescriptionOut] = useState<string>('');
@@ -1054,6 +1056,23 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             const mot = (s.motivo || '').trim();
             const upper = mot.toUpperCase();
 
+            // Identificar se é parada de fim de turno / desligamento / interjornada (não deve ser convertida em troca de rolo)
+            const isShiftEndOrTurnOff = upper.includes('FINAL DE TURNO') || 
+                                        upper.includes('FIM DE TURNO') || 
+                                        upper.includes('MÁQUINA DESLIGADA') || 
+                                        upper.includes('MAQUINA DESLIGADA') || 
+                                        upper.includes('INTERJORNADA') ||
+                                        upper.includes('ENCERRAMENTO DE TURNO');
+
+            if (isShiftEndOrTurnOff) {
+                let finalLabel = 'MÁQUINA DESLIGADA: FINAL DE TURNO';
+                if (upper.includes('INTERJORNADA')) finalLabel = 'MÁQUINA DESLIGADA: INTERJORNADA';
+                return {
+                    ...s,
+                    motivo: s.motivo?.includes(':') ? s.motivo : finalLabel
+                };
+            }
+
             // Identificar se a parada é troca de rolo / bobina / preparação
             const isRollChange = upper.includes('TROCA DE ROLO') || 
                                  upper.includes('TROCA DO ROLO') || 
@@ -1495,9 +1514,16 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 const rawOpA = dbReport.operator_shift_a || auto.operatorShiftA || initialOperator || op.operatorName || (op as any).operator || '';
                 const resolvedOpA = (rawOpA && rawOpA.trim().toLowerCase().includes('willian')) ? 'WILLIAN CAMARGO' : (getEmployeeForOperator(rawOpA).name || rawOpA);
                 setOperatorShiftA(resolvedOpA);
+                const rawAuxA = dbReport.assistant_shift_a || dbReport.stats_shift_a?.assistant || '';
+                const resolvedAuxA = rawAuxA ? (getEmployeeForOperator(rawAuxA).name || rawAuxA) : '';
+                setAssistantShiftA(resolvedAuxA);
+
                 const rawOpB = dbReport.operator_shift_b || auto.operatorShiftB || '';
                 const resolvedOpB = rawOpB ? (getEmployeeForOperator(rawOpB).name || rawOpB) : '';
                 setOperatorShiftB(resolvedOpB);
+                const rawAuxB = dbReport.assistant_shift_b || dbReport.stats_shift_b?.assistant || '';
+                const resolvedAuxB = rawAuxB ? (getEmployeeForOperator(rawAuxB).name || rawAuxB) : '';
+                setAssistantShiftB(resolvedAuxB);
                 
                 if (isTrefila) {
                     const resolved = resolveTrefilaProductDescriptions(op);
@@ -1884,20 +1910,26 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             machine_type: machine,
             production_order: dataToSave.productionOrder,
             operator_shift_a: dataToSave.operatorShiftA,
+            assistant_shift_a: assistantShiftA,
             operator_shift_b: dataToSave.operatorShiftB,
+            assistant_shift_b: assistantShiftB,
             product_description: isTrefila ? (productDescriptionOut || dataToSave.productDescription) : dataToSave.productDescription,
             pieces_to_produce: dataToSave.piecesToProduce,
             stops_shift_a: safeStopsA,
             stops_shift_b: dataToSave.stopsShiftB,
             stats_shift_a: {
                 ...dataToSave.statsShiftA,
+                assistant: assistantShiftA,
                 pecasProduzidas: safePecasA,
                 ...(isTrefila ? {
                     productDescriptionIn,
                     productDescriptionOut: productDescriptionOut || dataToSave.productDescription
                 } : {})
             },
-            stats_shift_b: dataToSave.statsShiftB,
+            stats_shift_b: {
+                ...dataToSave.statsShiftB,
+                assistant: assistantShiftB
+            },
             production_updates: safeUpdates,
         };
 
@@ -1958,7 +1990,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
         };
     }, [
-        productionOrder, operatorShiftA, operatorShiftB, productDescription,
+        productionOrder, operatorShiftA, assistantShiftA, operatorShiftB, assistantShiftB, productDescription,
         productDescriptionIn, productDescriptionOut,
         piecesToProduce, stopsShiftA, stopsShiftB, statsShiftA, statsShiftB,
         productionUpdates, selectedDate, machine, loading, isOpen
@@ -2548,12 +2580,13 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                     </div>
                                 </div>
 
-                                {/* Bloco Operador Turno A */}
-                                <div className="flex items-center gap-3 pt-3 border-t border-slate-100">
+                                {/* Bloco Operador e Auxiliar Turno A */}
+                                <div className="flex flex-col gap-2.5 pt-3 border-t border-slate-100">
+                                    {/* Operador Turno A */}
                                     {(() => {
                                         const empInfo = getEmployeeForOperator(operatorShiftA);
                                         return (
-                                            <>
+                                            <div className="flex items-center gap-3">
                                                 <div className="relative shrink-0">
                                                     {empInfo.photoUrl ? (
                                                         <img
@@ -2570,7 +2603,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                                 </div>
                                                 <div className="flex-grow min-w-0">
                                                     <div className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
-                                                        {hasSecondShift ? 'OPERADOR / AUXILIAR - TURNO A' : 'OPERADOR / AUXILIAR'}
+                                                        {hasSecondShift ? 'OPERADOR - TURNO A' : 'OPERADOR'}
                                                     </div>
                                                     <input
                                                         type="text"
@@ -2584,18 +2617,57 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                                         placeholder="Nome do operador..."
                                                     />
                                                 </div>
-                                            </>
+                                            </div>
+                                        );
+                                    })()}
+
+                                    {/* Auxiliar Turno A */}
+                                    {(() => {
+                                        const auxInfo = getEmployeeForOperator(assistantShiftA);
+                                        return (
+                                            <div className="flex items-center gap-3 pl-1 pt-1.5 border-t border-slate-100/70">
+                                                <div className="relative shrink-0">
+                                                    {auxInfo.photoUrl ? (
+                                                        <img
+                                                            src={auxInfo.photoUrl}
+                                                            alt={auxInfo.name || assistantShiftA}
+                                                            className="w-8 h-8 rounded-full object-cover border border-slate-300 shadow-sm ring-1 ring-slate-200"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-8 h-8 rounded-full bg-slate-600 text-white flex items-center justify-center font-black text-[10px] border border-white shadow-sm">
+                                                            {auxInfo.initials || 'AX'}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="flex-grow min-w-0">
+                                                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider">
+                                                        {hasSecondShift ? 'AUXILIAR - TURNO A' : 'AUXILIAR'}
+                                                    </div>
+                                                    <input
+                                                        type="text"
+                                                        value={auxInfo.name || assistantShiftA}
+                                                        onChange={e => setAssistantShiftA(e.target.value)}
+                                                        onBlur={e => {
+                                                            const full = getEmployeeForOperator(e.target.value).name;
+                                                            if (full) setAssistantShiftA(full);
+                                                        }}
+                                                        className="w-full text-sm font-bold text-slate-700 bg-transparent border-none p-0 focus:ring-0 focus:outline-none uppercase modern-editable-input"
+                                                        placeholder="Nome do auxiliar..."
+                                                    />
+                                                </div>
+                                            </div>
                                         );
                                     })()}
                                 </div>
 
-                                {/* Bloco Operador Turno B (se existir) */}
+                                {/* Bloco Operador e Auxiliar Turno B (se existir) */}
                                 {isTrefila && hasSecondShift && (
-                                    <div className="flex items-center gap-3 pt-3 border-t border-slate-100">
+                                    <div className="flex flex-col gap-2.5 pt-3 border-t border-slate-200">
+                                        {/* Operador Turno B */}
                                         {(() => {
                                             const empInfoB = getEmployeeForOperator(operatorShiftB);
                                             return (
-                                                <>
+                                                <div className="flex items-center gap-3">
                                                     <div className="relative shrink-0">
                                                         {empInfoB.photoUrl ? (
                                                             <img
@@ -2612,7 +2684,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                                     </div>
                                                     <div className="flex-grow min-w-0">
                                                         <div className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
-                                                            OPERADOR / AUXILIAR - TURNO B
+                                                            OPERADOR - TURNO B
                                                         </div>
                                                         <input
                                                             type="text"
@@ -2626,7 +2698,45 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                                             placeholder="Nome do operador..."
                                                         />
                                                     </div>
-                                                </>
+                                                </div>
+                                            );
+                                        })()}
+
+                                        {/* Auxiliar Turno B */}
+                                        {(() => {
+                                            const auxInfoB = getEmployeeForOperator(assistantShiftB);
+                                            return (
+                                                <div className="flex items-center gap-3 pl-1 pt-1.5 border-t border-slate-100/70">
+                                                    <div className="relative shrink-0">
+                                                        {auxInfoB.photoUrl ? (
+                                                            <img
+                                                                src={auxInfoB.photoUrl}
+                                                                alt={auxInfoB.name || assistantShiftB}
+                                                                className="w-8 h-8 rounded-full object-cover border border-emerald-300 shadow-sm ring-1 ring-emerald-200"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-8 h-8 rounded-full bg-emerald-800 text-white flex items-center justify-center font-black text-[10px] border border-white shadow-sm">
+                                                                {auxInfoB.initials || 'AX'}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex-grow min-w-0">
+                                                        <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider">
+                                                            AUXILIAR - TURNO B
+                                                        </div>
+                                                        <input
+                                                            type="text"
+                                                            value={auxInfoB.name || assistantShiftB}
+                                                            onChange={e => setAssistantShiftB(e.target.value)}
+                                                            onBlur={e => {
+                                                                const full = getEmployeeForOperator(e.target.value).name;
+                                                                if (full) setAssistantShiftB(full);
+                                                            }}
+                                                            className="w-full text-sm font-bold text-emerald-900 bg-transparent border-none p-0 focus:ring-0 focus:outline-none uppercase modern-editable-input"
+                                                            placeholder="Nome do auxiliar..."
+                                                        />
+                                                    </div>
+                                                </div>
                                             );
                                         })()}
                                     </div>

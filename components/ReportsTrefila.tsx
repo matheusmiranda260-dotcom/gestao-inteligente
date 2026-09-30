@@ -126,6 +126,7 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
     // 2. Estados dos Campos do Formulário
     const [productionOrder, setProductionOrder] = useState<string>('');
     const [operator, setOperator] = useState<string>('');
+    const [assistant, setAssistant] = useState<string>('');
     const [productDescriptionIn, setProductDescriptionIn] = useState<string>('8.00mm -- FIO MÁQUINA--');
     const [productDescriptionOut, setProductDescriptionOut] = useState<string>('3.40mm ---CA60--');
 
@@ -742,6 +743,23 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
             const mot = (s.motivo || '').trim();
             const upper = mot.toUpperCase();
 
+            // Identificar se é parada de fim de turno / desligamento / interjornada
+            const isShiftEndOrTurnOff = upper.includes('FINAL DE TURNO') || 
+                                        upper.includes('FIM DE TURNO') || 
+                                        upper.includes('MÁQUINA DESLIGADA') || 
+                                        upper.includes('MAQUINA DESLIGADA') || 
+                                        upper.includes('INTERJORNADA') ||
+                                        upper.includes('ENCERRAMENTO DE TURNO');
+
+            if (isShiftEndOrTurnOff) {
+                let finalLabel = 'MÁQUINA DESLIGADA: FINAL DE TURNO';
+                if (upper.includes('INTERJORNADA')) finalLabel = 'MÁQUINA DESLIGADA: INTERJORNADA';
+                return {
+                    ...s,
+                    motivo: s.motivo?.includes(':') ? s.motivo : finalLabel
+                };
+            }
+
             const isRollChange = upper.includes('TROCA DE ROLO') || 
                                  upper.includes('TROCA DO ROLO') || 
                                  upper.includes('TROCA DE BOBINA') || 
@@ -983,6 +1001,7 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
                     setSelectedDate(dbReport.date);
                     setProductionOrder(dbReport.production_order || '');
                     setOperator(dbReport.operator_shift_a || '');
+                    setAssistant(dbReport.assistant_shift_a || dbReport.stats_shift_a?.assistant || '');
                     setProductDescriptionIn(dbReport.stats_shift_a?.productDescriptionIn || '4860 - Fio Máquina 5,50mm');
                     setProductDescriptionOut(dbReport.stats_shift_a?.productDescriptionOut || dbReport.product_description || '8624 - CA 60 ROLO 3.40 MM - 2 TON - M.P. *SEMI ACABADO*');
                     setStops(dbReport.stops_shift_a || []);
@@ -1014,6 +1033,7 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
                     setSelectedDate(data.selectedDate);
                     setProductionOrder(data.productionOrder || '');
                     setOperator(data.operator || '');
+                    setAssistant(data.assistant || '');
                     let loadedIn = data.productDescriptionIn;
                     let loadedOut = data.productDescriptionOut;
                     const isLegacyIn = !loadedIn || loadedIn.includes('-- FIO MÁQUINA--') || loadedIn.includes('8.00mm');
@@ -1253,6 +1273,7 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
                 selectedDate: saveModalDate,
                 productionOrder,
                 operator,
+                assistant,
                 productDescriptionIn,
                 productDescriptionOut,
                 stops,
@@ -1298,6 +1319,7 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
             if (d.selectedDate) setSelectedDate(d.selectedDate);
             if (d.productionOrder !== undefined) setProductionOrder(d.productionOrder);
             if (d.operator !== undefined) setOperator(d.operator);
+            if (d.assistant !== undefined) setAssistant(d.assistant);
             if (d.productDescriptionIn !== undefined) setProductDescriptionIn(d.productDescriptionIn);
             if (d.productDescriptionOut !== undefined) setProductDescriptionOut(d.productDescriptionOut);
             if (d.stops) setStops(d.stops);
@@ -1876,11 +1898,13 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
                                     <input type="text" value={productionOrder} onChange={e => setProductionOrder(e.target.value)} className="w-full text-2xl font-black text-[#002060] bg-transparent border-none p-0 focus:ring-0 focus:outline-none modern-editable-input tracking-tight" placeholder="Digite a OP..." />
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3 pt-3 border-t border-slate-100">
+                            {/* Bloco Operador e Auxiliar */}
+                            <div className="flex flex-col gap-2.5 pt-3 border-t border-slate-100">
+                                {/* Operador */}
                                 {(() => {
                                     const empInfo = getEmployeeForOperator(operator);
                                     return (
-                                        <>
+                                        <div className="flex items-center gap-3">
                                             <div className="relative shrink-0">
                                                 {empInfo.photoUrl ? (
                                                     <img
@@ -1896,7 +1920,7 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
                                                 <span className="w-3 h-3 rounded-full absolute -bottom-0.5 -right-0.5 border-2 border-white bg-emerald-500 shadow-sm" />
                                             </div>
                                             <div className="flex-grow min-w-0">
-                                                <div className="text-[10px] font-black text-slate-500 uppercase tracking-wider">OPERADOR / AUXILIAR</div>
+                                                <div className="text-[10px] font-black text-slate-500 uppercase tracking-wider">OPERADOR</div>
                                                 <input 
                                                     type="text" 
                                                     value={empInfo.name || operator} 
@@ -1909,7 +1933,43 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
                                                     placeholder="Nome do Operador..." 
                                                 />
                                             </div>
-                                        </>
+                                        </div>
+                                    );
+                                })()}
+
+                                {/* Auxiliar */}
+                                {(() => {
+                                    const auxInfo = getEmployeeForOperator(assistant);
+                                    return (
+                                        <div className="flex items-center gap-3 pl-1 pt-1.5 border-t border-slate-100/70">
+                                            <div className="relative shrink-0">
+                                                {auxInfo.photoUrl ? (
+                                                    <img
+                                                        src={auxInfo.photoUrl}
+                                                        alt={auxInfo.name || assistant}
+                                                        className="w-8 h-8 rounded-full object-cover border border-slate-300 shadow-sm ring-1 ring-slate-200"
+                                                    />
+                                                ) : (
+                                                    <div className="w-8 h-8 rounded-full bg-slate-600 text-white flex items-center justify-center font-black text-[10px] border border-white shadow-sm">
+                                                        {auxInfo.initials || 'AX'}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="flex-grow min-w-0">
+                                                <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider">AUXILIAR</div>
+                                                <input 
+                                                    type="text" 
+                                                    value={auxInfo.name || assistant} 
+                                                    onChange={e => setAssistant(e.target.value)} 
+                                                    onBlur={e => {
+                                                        const full = getEmployeeForOperator(e.target.value).name;
+                                                        if (full) setAssistant(full);
+                                                    }}
+                                                    className="w-full text-sm font-bold text-slate-700 bg-transparent border-none p-0 focus:ring-0 focus:outline-none modern-editable-input uppercase" 
+                                                    placeholder="Nome do Auxiliar..." 
+                                                />
+                                            </div>
+                                        </div>
                                     );
                                 })()}
                             </div>
