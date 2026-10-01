@@ -531,8 +531,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         let isStopped = false;
         let isPrep = false;
         if (openDowntime) {
-            const rNorm = (openDowntime.reason || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            isPrep = rNorm.includes('preparacao') || rNorm.includes('setup') || rNorm.includes('troca de rolo') || rNorm.includes('ajuste') || rNorm.includes('aguardando inicio');
+            const rNorm = (openDowntime.reason || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+            isPrep = rNorm.includes('aguardando inicio') || rNorm.includes('setup') || rNorm === 'preparacao' || rNorm.startsWith('preparacao') || rNorm.includes('troca de rolo / preparacao') || rNorm.includes('setup + preparacao');
             isStopped = !isPrep;
         }
         const isProducing = !isStopped && !isPrep;
@@ -1800,9 +1800,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 const reason = openEvent.reason || 'Parada';
                 const stopMs = openEvent.stopTime ? new Date(openEvent.stopTime).getTime() : 0;
                 const durMs = stopMs > 0 ? Math.max(0, liveNow.getTime() - stopMs) : 0;
-                const rNorm = reason.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                const rNorm = reason.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 
-                const isPrep = rNorm.includes('preparacao') || rNorm.includes('setup') || rNorm.includes('troca de rolo') || rNorm.includes('ajuste') || rNorm.includes('aguardando inicio');
+                const isPrep = rNorm.includes('aguardando inicio') || rNorm.includes('setup') || rNorm === 'preparacao' || rNorm.startsWith('preparacao') || rNorm.includes('troca de rolo / preparacao') || rNorm.includes('setup + preparacao');
                 const isOffline = rNorm.includes('final de turno') || rNorm.includes('turno');
 
                 if (isOffline) {
@@ -3163,15 +3163,15 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             const stopMs = openDowntime.stopTime ? new Date(openDowntime.stopTime).getTime() : 0;
             downtimeDurationMs = stopMs > 0 ? Math.max(0, liveNow.getTime() - stopMs) : 0;
 
-            const rNorm = downtimeReason.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            const rNorm = downtimeReason.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
             isOffline = rNorm.includes('final de turno') || rNorm.includes('turno');
             
             if (isOffline) {
                 statusLabel = `Desligada: ${downtimeReason}`;
                 statusColor = 'bg-slate-500/20 text-slate-300 border-slate-500/40';
-            } else if (rNorm.includes('preparacao') || rNorm.includes('setup') || rNorm.includes('troca de rolo') || rNorm.includes('ajuste') || rNorm.includes('aguardando inicio')) {
+            } else if (rNorm.includes('aguardando inicio') || rNorm.includes('setup') || rNorm === 'preparacao' || rNorm.startsWith('preparacao') || rNorm.includes('troca de rolo / preparacao') || rNorm.includes('setup + preparacao')) {
                 isPrep = true;
-                statusLabel = `Preparação: ${downtimeReason}`;
+                statusLabel = rNorm === 'preparacao' ? 'Preparação' : `Preparação: ${downtimeReason}`;
                 statusColor = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
             } else {
                 isStopped = true;
@@ -4721,7 +4721,11 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                         isDowntimeOverLimit ? 'bg-rose-600 animate-pulse' : 'bg-amber-500 animate-pulse'
                                                                     }`}>
                                                                         <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-                                                                        {isDowntimeOverLimit ? 'PREPARAÇÃO ULTRAPASSADA' : 'PREPARAÇÃO'}: {prog.downtimeReason} ({formatDuration(prog.downtimeDurationMs)})
+                                                                        {(() => {
+                                                                            const isRedundant = (prog.downtimeReason || '').trim().toLowerCase() === 'preparação' || (prog.downtimeReason || '').trim().toLowerCase() === 'preparacao';
+                                                                            const baseText = isDowntimeOverLimit ? 'PREPARAÇÃO ULTRAPASSADA' : 'PREPARAÇÃO';
+                                                                            return isRedundant ? `${baseText} (${formatDuration(prog.downtimeDurationMs)})` : `${baseText}: ${prog.downtimeReason} (${formatDuration(prog.downtimeDurationMs)})`;
+                                                                        })()}
                                                                     </span>
                                                                 )}
                                                                 {prog.isLive && prog.isOffline && (
@@ -8449,10 +8453,11 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                 );
                                             }
                                             if (p.isPrep) {
+                                                const isRedundant = (p.downtimeReason || '').trim().toLowerCase() === 'preparação' || (p.downtimeReason || '').trim().toLowerCase() === 'preparacao';
                                                 return (
                                                     <span className="flex items-center gap-1 text-[8px] font-black uppercase bg-amber-500 text-white px-2 py-0.5 rounded shadow-sm">
                                                         <span className="w-1.5 h-1.5 rounded-full bg-white" />
-                                                        PREPARAÇÃO: {p.downtimeReason} ({formatDuration(p.downtimeDurationMs)})
+                                                        {isRedundant ? `PREPARAÇÃO (${formatDuration(p.downtimeDurationMs)})` : `PREPARAÇÃO: ${p.downtimeReason} (${formatDuration(p.downtimeDurationMs)})`}
                                                     </span>
                                                 );
                                             }

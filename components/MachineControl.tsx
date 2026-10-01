@@ -75,8 +75,6 @@ const DowntimeModal: React.FC<{
     machineType?: string;
 }> = ({ onClose, onSubmit, onEndShift, onPauseOrder, canPause, downtimeEvents, downtimeConfigs = [], machineType = 'Geral' }) => {
     const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
-    const [otherReason, setOtherReason] = useState('');
-    const [isOtherActive, setIsOtherActive] = useState(false);
 
     // Controladoria de Eletrodos para Treliça
     const isTrelica = (machineType || '').startsWith('Treliça');
@@ -132,10 +130,10 @@ const DowntimeModal: React.FC<{
         ];
         const defaultMalha = [
             'Troca de Rolo', 'Falha de Solda', 'Ajuste de Espaçamento', 
-            'Manutenção Mecânica', 'Manutenção Elétrica', 'Falta de Fio', 'Falta de Energia'
+            'Manutenção Mecânica', 'Manutenção Elétrica', 'Falta de Fio', 'Falta de Energia', 'Refeição / Intervalo'
         ];
         const defaultDesbobinadeira = [
-            'Troca de Rolo', 'Enrosco de Fio', 'Corte / Descarte', 'Manutenção Mecânica', 'Manutenção Elétrica'
+            'Troca de Rolo', 'Enrosco de Fio', 'Corte / Descarte', 'Manutenção Mecânica', 'Manutenção Elétrica', 'Refeição / Intervalo'
         ];
 
         const mTypeNorm = (machineType || '').toLowerCase();
@@ -148,31 +146,30 @@ const DowntimeModal: React.FC<{
         const dbFiltered = (downtimeConfigs || [])
             .filter(c => {
                 if (!c.isActive) return false;
+                const reasonLower = (c.reason || '').toLowerCase().trim();
+                if (reasonLower === 'outros' || reasonLower === 'outro') return false;
                 if (!c.machineType || c.machineType === 'Geral') return true;
                 const cNorm = c.machineType.toLowerCase();
                 return mTypeNorm.includes(cNorm) || cNorm.includes(mTypeNorm.split(' ')[0]);
             })
             .map(c => c.reason);
 
-        // Combina motivos do banco de dados (prioridade) com lista padrão sem duplicações
+        // Combina motivos do banco de dados (prioridade) com lista padrão sem duplicações e sem 'Outros'
         const combined = [...dbFiltered];
         fallbackList.forEach(item => {
-            const exists = combined.some(r => r.toLowerCase().trim() === item.toLowerCase().trim());
+            const itemLower = item.toLowerCase().trim();
+            if (itemLower === 'outros' || itemLower === 'outro') return;
+            const exists = combined.some(r => r.toLowerCase().trim() === itemLower);
             if (!exists) combined.push(item);
         });
 
-        // Garantir que Preparação e Outros sempre estejam presentes
-        if (!combined.some(r => r.toLowerCase().includes('prepara'))) combined.push('Preparação');
-        if (!combined.some(r => r.toLowerCase() === 'outros')) combined.push('Outros');
-
-        return combined;
+        return combined.filter(r => {
+            const low = r.toLowerCase().trim();
+            return low !== 'outros' && low !== 'outro';
+        });
     }, [downtimeConfigs, machineType]);
 
     const toggleReason = (r: string) => {
-        if (r === 'Outros') {
-            setIsOtherActive(!isOtherActive);
-            return;
-        }
         setSelectedReasons(prev =>
             prev.includes(r) ? prev.filter(item => item !== r) : [...prev, r]
         );
@@ -180,13 +177,10 @@ const DowntimeModal: React.FC<{
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const reasons = [...selectedReasons];
-        if (isOtherActive && otherReason.trim()) {
-            reasons.push(otherReason.trim());
-        }
 
         let finalReason = reasons.join(' + ');
         if (!finalReason) {
-            alert('Por favor, selecione pelo menos um motivo.');
+            alert('Por favor, selecione pelo menos um motivo de parada.');
             return;
         }
 
@@ -324,23 +318,6 @@ const DowntimeModal: React.FC<{
                                 </button>
                             );
                         })}
-                        <button
-                            type="button"
-                            onClick={() => toggleReason('Outros')}
-                            className={`flex flex-col items-start gap-1 p-5 rounded-2xl border-2 font-black text-sm transition-all active:scale-95 ${
-                                isOtherActive
-                                    ? 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-200'
-                                    : 'bg-white border-slate-100 text-slate-600 hover:border-slate-300'
-                            }`}
-                        >
-                            <div className="flex items-center gap-3">
-                                <div className={`w-3 h-3 rounded-full ${isOtherActive ? 'bg-white animate-pulse' : 'bg-slate-200'}`} />
-                                Outros
-                            </div>
-                            <span className={`text-[8px] uppercase tracking-widest mt-1 px-1.5 py-0.5 rounded ${isOtherActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-400'}`}>
-                                Limite: 15min
-                            </span>
-                        </button>
                     </div>
 
                     {/* PAINEL DE CONTROLADORIA DE ELETRODOS */}
@@ -426,8 +403,8 @@ const DowntimeModal: React.FC<{
                         <button 
                             type="button"
                             onClick={handleSubmit} 
-                            disabled={selectedReasons.length === 0 && !isOtherActive}
-                            className="w-full h-16 bg-slate-900 text-white font-black rounded-3xl hover:bg-slate-800 transition-all active:scale-95 flex items-center justify-center gap-3 shadow-xl shadow-slate-200 disabled:opacity-30"
+                            disabled={selectedReasons.length === 0}
+                            className="w-full h-16 bg-slate-900 text-white font-black rounded-3xl hover:bg-slate-800 transition-all active:scale-95 flex items-center justify-center gap-3 shadow-xl shadow-slate-200 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
                         >
                             <StopIcon className="h-6 w-6" /> REGISTRAR MOTIVO E PARAR
                         </button>
@@ -1732,8 +1709,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
         const normalize = (s: string) => s ? s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : '';
         const normReason = normalize(openEvent.reason);
 
-        const prepReasons = ['Aguardando Início da Produção', 'Aguardando Início de Lote', 'Troca de Rolo / Preparação', 'Setup', 'Ajuste', 'Setup + Preparação'];
-        if (prepReasons.some(r => normReason.includes(normalize(r)))) {
+        const prepReasons = ['Aguardando Início da Produção', 'Aguardando Início de Lote', 'Troca de Rolo / Preparação', 'Setup', 'Setup de Medida', 'Preparação', 'Setup + Preparação'];
+        if (prepReasons.some(r => normReason === normalize(r) || normReason.startsWith(normalize(r)) || normReason.includes(normalize(r)))) {
             return 'Preparacao';
         }
 

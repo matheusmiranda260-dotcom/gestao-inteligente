@@ -194,10 +194,13 @@ const MachineStatusView: React.FC<MachineStatusViewProps> = ({ machineType, acti
             const stopMs = parseDate(openEvent.stopTime);
             const dur = stopMs > 0 ? Math.max(0, nowMs - stopMs) : 0;
             
-            const isPrep = reason.includes('Preparação') || 
-                           reason.includes('Setup') || 
-                           reason.includes('Aguardando') || 
-                           reason.includes('Ajuste');
+            const rNorm = (reason || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+            const isPrep = rNorm.includes('aguardando') || 
+                           rNorm.includes('setup') || 
+                           rNorm === 'preparacao' || 
+                           rNorm.startsWith('preparacao') || 
+                           rNorm.includes('troca de rolo / preparacao') || 
+                           rNorm.includes('setup + preparacao');
 
             if (isPrep) return { status: 'Preparacao', reason, durationMs: dur };
             
