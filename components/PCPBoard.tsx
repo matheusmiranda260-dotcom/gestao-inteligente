@@ -3836,8 +3836,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 }
                 .pcp-op-bar {
                     position: absolute;
-                    border-radius: 12px;
-                    padding: 6px 10px;
+                    border-radius: 10px;
+                    padding: 4px 6px;
                     box-shadow: 0 4px 14px 0 rgba(11, 43, 104, 0.08);
                     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
                     z-index: 10;
@@ -3868,11 +3868,11 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
             {/* COLUNA PRINCIPAL: TIMELINE PCP SEMANAL */}
             <div className={`flex-1 pcp-glass rounded-2xl border border-blue-200/80 shadow-xl flex flex-col overflow-hidden relative ${
-                isPcpFullscreen ? 'h-full flex-1' : 'h-[calc(100vh-90px)]'
+                isPcpFullscreen ? 'h-full flex-1' : 'h-[calc(100vh-80px)]'
             }`}>
                 
                 {/* Cabeçalho de Controle e Ações (Identidade Ita Aços: Azul Royal + Faixa Laranja + Branco) */}
-                <div className="p-3.5 border-b border-blue-900/40 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0 bg-gradient-to-r from-[#0C2B68] via-[#103E8C] to-[#0A2454] relative text-white shadow-md">
+                <div className="py-2 px-3 sm:px-3.5 border-b border-blue-900/40 flex flex-col sm:flex-row items-center justify-between gap-2.5 shrink-0 bg-gradient-to-r from-[#0C2B68] via-[#103E8C] to-[#0A2454] relative text-white shadow-md">
                     {/* Faixa decorativa superior Laranja Ita Aços */}
                     <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-500 via-amber-400 to-orange-600" />
                     
@@ -4033,7 +4033,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                         
                         {/* Cabeçalho dos Dias (Segunda a Sexta) com Destaque Corporativo Ita Aços */}
                         <div className="pcp-timeline-grid pcp-header-cell border-b-2 border-orange-500 sticky top-0 z-30 shrink-0 shadow-sm">
-                            <div className="p-3.5 flex items-center justify-between font-black text-xs text-white tracking-wider uppercase select-none bg-[#092354]">
+                            <div className="p-2 sm:p-2.5 flex items-center justify-between font-black text-xs text-white tracking-wider uppercase select-none bg-[#092354]">
                                 <span>MÁQUINA</span>
                                 <span className="text-[10px] text-orange-300 font-mono font-bold bg-orange-500/20 px-2 py-0.5 rounded border border-orange-400/40">SEMANAL</span>
                             </div>
@@ -4047,7 +4047,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                 return (
                                     <div 
                                         key={index} 
-                                        className={`p-2 sm:p-2.5 text-center flex flex-col justify-center border-l relative ${
+                                        className={`p-1.5 sm:p-2 text-center flex flex-col justify-center border-l relative ${
                                             isToday 
                                                 ? 'bg-[#133E82] border-l-blue-700/60 shadow-inner' 
                                                 : isHoliday 
@@ -4109,8 +4109,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                                 const maxTracks = Math.max(1, ...machOps.map(op => getOpTrack(op) + 1));
                                 const rowMinHeight = maxTracks > 1 
-                                    ? (16 + maxTracks * 225) 
-                                    : (isPcpFullscreen ? 210 : 230);
+                                    ? (10 + maxTracks * 145) 
+                                    : (isPcpFullscreen ? 140 : 155);
 
                                 return (
                                     <div 
@@ -4120,7 +4120,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                     >
                                         
                                         {/* Coluna da Máquina (Fundo Branco Limpo com Indicador Ita Aços) */}
-                                        <div className={`p-3.5 flex flex-col justify-between border-r border-slate-200 border-l-4 ${mach.color} sticky left-0 z-20 shrink-0 shadow-sm bg-white`}>
+                                        <div className={`p-2 sm:p-2.5 flex flex-col justify-between border-r border-slate-200 border-l-4 ${mach.color} sticky left-0 z-20 shrink-0 shadow-sm bg-white`}>
                                             {/* Topo: Nome da Máquina (clicável para abrir turnos e paradas) + Botão Nova OP */}
                                             <div className="flex items-center justify-between gap-2 pb-1">
                                                 <button
@@ -4399,8 +4399,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             const leftStyle = `calc(210px + (100% - 210px) * ${colStart / 5} + 4px)`;
                                             const widthStyle = `calc((100% - 210px) * ${spanColumns / 5} - 8px)`;
                                             const cardVerticalStyle = maxTracks > 1
-                                                ? { top: `${6 + track * 225}px`, height: '215px' }
-                                                : { top: '6px', bottom: '6px' };
+                                                ? { top: `${3 + track * 145}px`, height: '139px' }
+                                                : { top: '3px', bottom: '3px' };
 
                                             const isTrelica = typeof op.machine === 'string' && op.machine.startsWith('Treliça') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Treliça'));
                                             const isMalha = typeof op.machine === 'string' && op.machine.startsWith('Malha') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Malha'));
@@ -4786,7 +4786,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                                                         {/* Faixa de Segmentação Diária da OP (Produção por dia alinhada às colunas) */}
                                                         <div 
-                                                            className="grid gap-2 p-1.5 bg-slate-100/90 rounded-xl border border-slate-200 flex-1 min-h-[92px]"
+                                                            className="grid gap-1.5 p-1 bg-slate-100/90 rounded-xl border border-slate-200 flex-1 min-h-0"
                                                             style={{ gridTemplateColumns: `repeat(${spanColumns}, minmax(0, 1fr))` }}
                                                             onClick={(e) => e.stopPropagation()}
                                                         >
@@ -4812,7 +4812,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                 unit: dayStats.unit 
                                                                             });
                                                                         }}
-                                                                        className={`flex flex-col justify-between p-2 sm:p-2.5 rounded-xl border text-left transition-all cursor-pointer hover:shadow-lg select-none min-h-[90px] sm:min-h-[96px] ${
+                                                                        className={`flex flex-col justify-between p-1.5 sm:p-2 rounded-xl border text-left transition-all cursor-pointer hover:shadow-lg select-none h-full min-h-0 ${
                                                                             dayStats.isToday 
                                                                                 ? (prog.isLive && (prog.isStopped || prog.isPrep))
                                                                                     ? (isDowntimeOverLimit
@@ -4829,7 +4829,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                         }`}
                                                                         title={`Clique para ver paradas e relatório de ${dayColName} ${formatFriendlyDate(currentDay)}`}
                                                                     >
-                                                                        <div className="flex items-center justify-between gap-1 text-[10.5px] sm:text-[11.5px] font-black uppercase tracking-wider mb-0.5 min-w-0">
+                                                                        <div className="flex items-center justify-between gap-1 text-[10px] sm:text-[11px] font-black uppercase tracking-wider mb-0.5 min-w-0">
                                                                             <span className={`truncate shrink-0 ${
                                                                                 dayStats.isToday 
                                                                                     ? (prog.isLive && (prog.isStopped || prog.isPrep))
@@ -4849,49 +4849,49 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                 {dayStats.isToday && (
                                                                                     prog.isLive && (prog.isStopped || prog.isPrep) ? (
                                                                                         isDowntimeOverLimit ? (
-                                                                                            <span className="flex items-center gap-1 text-[8.5px] sm:text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-rose-600 text-white tracking-wider shadow-sm animate-pulse shrink-0">
-                                                                                                <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                                                                                            <span className="flex items-center gap-1 text-[8px] sm:text-[8.5px] font-black uppercase px-1.5 py-0.5 rounded bg-rose-600 text-white tracking-wider shadow-sm animate-pulse shrink-0">
+                                                                                                <span className="w-1 h-1 rounded-full bg-white animate-ping" />
                                                                                                 ULTRAPASSADO
                                                                                             </span>
                                                                                         ) : (
-                                                                                            <span className="flex items-center gap-1 text-[8.5px] sm:text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-amber-500 text-white tracking-wider shadow-sm animate-pulse shrink-0">
-                                                                                                <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                                                                                            <span className="flex items-center gap-1 text-[8px] sm:text-[8.5px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-500 text-white tracking-wider shadow-sm animate-pulse shrink-0">
+                                                                                                <span className="w-1 h-1 rounded-full bg-white" />
                                                                                                 {prog.isPrep ? 'PREP' : 'ALERTA'}
                                                                                             </span>
                                                                                         )
                                                                                     ) : (
-                                                                                        <span className="flex items-center gap-1 text-[8.5px] sm:text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-blue-600 text-white tracking-wider shadow-sm shrink-0">
-                                                                                            <span className="w-1.5 h-1.5 rounded-full bg-white pulse-live" />
+                                                                                        <span className="flex items-center gap-1 text-[8px] sm:text-[8.5px] font-black uppercase px-1.5 py-0.5 rounded bg-blue-600 text-white tracking-wider shadow-sm shrink-0">
+                                                                                            <span className="w-1 h-1 rounded-full bg-white pulse-live" />
                                                                                             EM PRODUÇÃO
                                                                                         </span>
                                                                                     )
                                                                                 )}
                                                                                 {dayStats.isHoliday && !dayStats.isToday && (
-                                                                                    <span className="text-[8.5px] sm:text-[9px] font-black px-2 py-0.5 rounded-md bg-rose-100 text-rose-700 border border-rose-200 shrink-0" title={`Feriado: ${dayStats.holidayName}`}>
+                                                                                    <span className="text-[8px] sm:text-[8.5px] font-black px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200 shrink-0" title={`Feriado: ${dayStats.holidayName}`}>
                                                                                         🌴 Feriado
                                                                                     </span>
                                                                                 )}
                                                                                 {hasRealPastProd && (
-                                                                                    <span className="text-[8.5px] sm:text-[9px] font-black px-2 py-0.5 rounded-md bg-emerald-600 text-white shadow-sm tracking-wider shrink-0">
+                                                                                    <span className="text-[8px] sm:text-[8.5px] font-black px-1.5 py-0.5 rounded bg-emerald-600 text-white shadow-sm tracking-wider shrink-0">
                                                                                         ✓ Concluído
                                                                                     </span>
                                                                                 )}
                                                                                 {isIdlePast && !dayStats.isHoliday && (
-                                                                                    <span className="text-[8.5px] sm:text-[9px] font-medium px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200 shrink-0">
+                                                                                    <span className="text-[8px] sm:text-[8.5px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200 shrink-0">
                                                                                         Sem prod.
                                                                                     </span>
                                                                                 )}
                                                                                 {dayStats.isFuture && !dayStats.isHoliday && (
-                                                                                    <span className="text-[8.5px] sm:text-[9px] font-black px-2 py-0.5 rounded-md bg-slate-200/90 text-slate-700 border border-slate-300 tracking-wider shrink-0">
+                                                                                    <span className="text-[8px] sm:text-[8.5px] font-black px-1.5 py-0.5 rounded bg-slate-200/90 text-slate-700 border border-slate-300 tracking-wider shrink-0">
                                                                                         🎯 Meta
                                                                                     </span>
                                                                                 )}
                                                                             </div>
                                                                         </div>
 
-                                                                        <div className="flex items-center justify-between gap-2 my-1 min-w-0">
+                                                                        <div className="flex items-center justify-between gap-1.5 my-0.5 min-w-0">
                                                                             {dayStats.isHoliday && dayStats.produced === 0 ? (
-                                                                                <span className="text-sm font-black text-rose-600 font-mono tracking-tight">
+                                                                                <span className="text-xs font-black text-rose-600 font-mono tracking-tight">
                                                                                     Folga / Feriado
                                                                                 </span>
                                                                             ) : (
@@ -4901,7 +4901,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                         <button
                                                                                             type="button"
                                                                                             onClick={(e) => handleQuickAdjustShift(e, op, dayStats, currentDay, isTrefila ? -50 : -1)}
-                                                                                            className="w-5 h-5 rounded-md bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-700 border border-slate-200 hover:border-rose-300 text-xs font-black flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 active:scale-90 cursor-pointer select-none shrink-0"
+                                                                                            className="w-4.5 h-4.5 rounded bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-700 border border-slate-200 hover:border-rose-300 text-xs font-black flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 active:scale-90 cursor-pointer select-none shrink-0"
                                                                                             title={`Subtrair 1 ${dayStats.unit} deste turno`}
                                                                                         >
                                                                                             -
@@ -4923,7 +4923,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                         className="flex items-baseline gap-0.5 cursor-pointer group/qty hover:bg-white px-1 py-0.5 rounded-md transition-all select-none min-w-0"
                                                                                         title="Clique para abrir ajuste de contagem (Gestor)"
                                                                                     >
-                                                                                        <span className={`text-2xl sm:text-3xl md:text-[32px] font-black font-mono tracking-tight truncate group-hover/qty:text-orange-600 transition-colors leading-none ${
+                                                                                        <span className={`text-xl sm:text-2xl md:text-[26px] font-black font-mono tracking-tight truncate group-hover/qty:text-orange-600 transition-colors leading-none ${
                                                                                             dayStats.isToday 
                                                                                                 ? (prog.isLive && (prog.isStopped || prog.isPrep))
                                                                                                     ? (isDowntimeOverLimit ? 'text-rose-950 font-black' : 'text-amber-950 font-black')
@@ -4938,7 +4938,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                         }`}>
                                                                                             {dayStats.isFuture ? `~${dayStats.produced.toLocaleString('pt-BR')}` : dayStats.produced.toLocaleString('pt-BR')}
                                                                                         </span>
-                                                                                        <span className="text-xs sm:text-sm font-extrabold text-slate-600 font-mono group-hover/qty:text-orange-600 transition-colors shrink-0 ml-1">{dayStats.unit}</span>
+                                                                                        <span className="text-[11px] sm:text-xs font-extrabold text-slate-600 font-mono group-hover/qty:text-orange-600 transition-colors shrink-0 ml-0.5">{dayStats.unit}</span>
                                                                                         <span className="opacity-0 group-hover/qty:opacity-100 text-[10px] text-orange-500 transition-opacity shrink-0 ml-0.5" title="Ajustar Quantidade">✏️</span>
                                                                                     </div>
 
@@ -4947,7 +4947,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                         <button
                                                                                             type="button"
                                                                                             onClick={(e) => handleQuickAdjustShift(e, op, dayStats, currentDay, isTrefila ? 50 : 1)}
-                                                                                            className="w-5 h-5 rounded-md bg-slate-100 hover:bg-emerald-100 text-slate-500 hover:text-emerald-700 border border-slate-200 hover:border-emerald-300 text-xs font-black flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 active:scale-90 cursor-pointer select-none shrink-0"
+                                                                                            className="w-4.5 h-4.5 rounded bg-slate-100 hover:bg-emerald-100 text-slate-500 hover:text-emerald-700 border border-slate-200 hover:border-emerald-300 text-xs font-black flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 active:scale-90 cursor-pointer select-none shrink-0"
                                                                                             title={`Adicionar 1 ${dayStats.unit} a este turno`}
                                                                                         >
                                                                                             +
@@ -4959,7 +4959,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                             {/* Estatística de Tempo (Efetivo e Parado) - Cronômetro em Tempo Real e Ritmo por Hora */}
                                                                             {dayStats.hasTimeStats && (
                                                                                 <div 
-                                                                                    className={`flex flex-col justify-center px-2.5 py-1 rounded-lg border shadow-xs text-right shrink-0 select-none pointer-events-none gap-0.5 transition-all min-w-[96px] ${
+                                                                                    className={`flex flex-col justify-center px-1.5 sm:px-2 py-0.5 rounded-lg border shadow-xs text-right shrink-0 select-none pointer-events-none gap-0.5 transition-all min-w-[80px] sm:min-w-[86px] ${
                                                                                         dayStats.isMachineStoppedNow
                                                                                             ? 'bg-amber-50/95 border-amber-300 ring-1 ring-amber-400/30'
                                                                                             : dayStats.isProducingNow
@@ -4969,34 +4969,34 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                     title={`Cronômetro do Turno (Tempo Real):\n⚡ Efetivo: ${dayStats.effectiveFormatted} ${dayStats.isProducingNow ? '(Correndo)' : '(Pausado)'}\n⏱️ Parado: ${dayStats.downtimeFormatted} ${dayStats.isMachineStoppedNow ? '(Correndo)' : '(Pausado)'}${dayStats.ratePerHour > 0 ? `\n🚀 Ritmo: ${dayStats.rateFormatted} (Produção / Tempo Efetivo)` : ''}`}
                                                                                 >
                                                                                     <div className="flex items-center justify-between gap-1 leading-none">
-                                                                                        <span className={`text-[10px] sm:text-[10.5px] uppercase font-black tracking-tight flex items-center gap-0.5 ${
+                                                                                        <span className={`text-[9px] uppercase font-black tracking-tight flex items-center gap-0.5 ${
                                                                                             dayStats.isProducingNow ? 'text-emerald-800' : 'text-slate-500'
                                                                                         }`}>
                                                                                             {dayStats.isProducingNow ? (
-                                                                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                                                                                                <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse inline-block" />
                                                                                             ) : (
-                                                                                                <span className="text-[9px]">⚡</span>
+                                                                                                <span className="text-[7.5px]">⚡</span>
                                                                                             )}
                                                                                             EF:
                                                                                         </span>
-                                                                                        <span className={`text-[14px] sm:text-[15.5px] font-black font-mono tracking-tight leading-none ${
+                                                                                        <span className={`text-[12px] sm:text-[13px] font-black font-mono tracking-tight leading-none ${
                                                                                             dayStats.isProducingNow ? 'text-emerald-700' : 'text-slate-700'
                                                                                         }`}>
                                                                                             {dayStats.effectiveFormatted}
                                                                                         </span>
                                                                                     </div>
                                                                                     <div className="flex items-center justify-between gap-1 leading-none">
-                                                                                        <span className={`text-[10px] sm:text-[10.5px] uppercase font-black tracking-tight flex items-center gap-0.5 ${
+                                                                                        <span className={`text-[9px] uppercase font-black tracking-tight flex items-center gap-0.5 ${
                                                                                             dayStats.isMachineStoppedNow ? 'text-amber-800' : 'text-slate-400'
                                                                                         }`}>
                                                                                             {dayStats.isMachineStoppedNow ? (
-                                                                                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping inline-block" />
+                                                                                                <span className="w-1 h-1 rounded-full bg-amber-500 animate-ping inline-block" />
                                                                                             ) : (
-                                                                                                <span className="text-[9px]">⏱️</span>
+                                                                                                <span className="text-[7.5px]">⏱️</span>
                                                                                             )}
                                                                                             PAR:
                                                                                         </span>
-                                                                                        <span className={`text-[14px] sm:text-[15.5px] font-black font-mono tracking-tight leading-none ${
+                                                                                        <span className={`text-[12px] sm:text-[13px] font-black font-mono tracking-tight leading-none ${
                                                                                             dayStats.isMachineStoppedNow 
                                                                                                 ? 'text-amber-700 font-extrabold' 
                                                                                                 : dayStats.downtimeMs > 0 
@@ -5008,16 +5008,16 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                     </div>
                                                                                     {dayStats.ratePerHour > 0 && (
                                                                                         <div className="flex items-center justify-between gap-1 leading-none pt-0.5 border-t border-slate-200/80 mt-0.5">
-                                                                                            <span className={`text-[9.5px] sm:text-[10px] font-black tracking-tight flex items-center gap-0.5 ${
+                                                                                            <span className={`text-[8.5px] font-black tracking-tight flex items-center gap-0.5 ${
                                                                                                 dayStats.isProducingNow ? 'text-emerald-800' : 'text-slate-500'
                                                                                             }`}>
-                                                                                                <span className="text-[8px]">🚀</span>
+                                                                                                <span className="text-[7px]">🚀</span>
                                                                                                 H:
                                                                                             </span>
-                                                                                            <span className={`text-[12px] sm:text-[13px] font-black font-mono tracking-tight leading-none ${
+                                                                                            <span className={`text-[11px] sm:text-[12px] font-black font-mono tracking-tight leading-none ${
                                                                                                 dayStats.isProducingNow ? 'text-emerald-900 font-extrabold' : 'text-slate-800'
                                                                                             }`}>
-                                                                                                {dayStats.ratePerHour.toLocaleString('pt-BR')}<span className="text-[8px] font-bold text-slate-500 ml-0.5">{dayStats.rateUnit}</span>
+                                                                                                {dayStats.ratePerHour.toLocaleString('pt-BR')}<span className="text-[7px] font-bold text-slate-500 ml-0.5">{dayStats.rateUnit}</span>
                                                                                             </span>
                                                                                         </div>
                                                                                     )}
@@ -5025,7 +5025,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                             )}
                                                                         </div>
 
-                                                                        <div className="flex items-center justify-between text-[10.5px] sm:text-[11.5px] truncate pt-1 mt-0.5 border-t border-slate-200/80">
+                                                                        <div className="flex items-center justify-between text-[10px] sm:text-[11px] truncate pt-0.5 mt-0.5 border-t border-slate-200/80">
                                                                             <span className="truncate flex items-center gap-1 font-semibold min-w-0">
                                                                                 {dayStats.isHoliday ? (
                                                                                     <span className="text-rose-600 truncate font-bold">
@@ -5065,10 +5065,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                             {/* Última hora de atualização (apenas no dia atual / em produção) */}
                                                                             {dayStats.isToday && dayStats.lastUpdateFormatted && (
                                                                                 <span 
-                                                                                    className="text-[8.5px] sm:text-[9px] font-mono font-bold text-slate-600 bg-white/90 px-1.5 py-0.5 rounded border border-slate-200/90 shrink-0 ml-1.5 flex items-center gap-0.5 shadow-xs"
+                                                                                    className="text-[8px] sm:text-[8.5px] font-mono font-bold text-slate-600 bg-white/90 px-1 py-0.2 rounded border border-slate-200/90 shrink-0 ml-1 flex items-center gap-0.5 shadow-xs"
                                                                                     title={`Última atualização registrada hoje: ${dayStats.lastUpdateFormatted}`}
                                                                                 >
-                                                                                    <span className="text-[8px] opacity-80">🕒</span>
+                                                                                    <span className="text-[7.5px] opacity-80">🕒</span>
                                                                                     <span>{dayStats.lastUpdateFormatted}</span>
                                                                                 </span>
                                                                             )}
@@ -5079,7 +5079,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                         </div>
 
                                                         {/* Rodapé Integrado: Duração/Extensão Discreta + Barra de Progresso Real à Direita */}
-                                                        <div className="flex items-center justify-end gap-2.5 mt-1 select-none shrink-0 px-1" onClick={(e) => e.stopPropagation()}>
+                                                        <div className="flex items-center justify-end gap-2 mt-0.5 select-none shrink-0 px-1" onClick={(e) => e.stopPropagation()}>
                                                             {/* Controles Rápidos: MOVER ou ESTENDER + DURAÇÃO Compactos */}
                                                             <div className="flex items-center gap-1.5 shrink-0">
                                                                 {!hasProductionStarted(op) && (
