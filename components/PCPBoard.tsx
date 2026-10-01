@@ -3627,6 +3627,75 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         const rateUnit = isTrefila ? 'kg/h' : 'pçs/h';
         const rateFormatted = ratePerHour > 0 ? `${ratePerHour.toLocaleString('pt-BR')} ${rateUnit}` : `0 ${rateUnit}`;
 
+        // Timestamp da última atualização registrada para o dia
+        let maxTimestampMs = 0;
+        if (isToday) {
+            (op.processedLots || []).forEach((l: any) => {
+                const rawTime = l.endTime || l.weighedAt || l.timestamp || l.startTime;
+                if (!rawTime) return;
+                if (getIsoDateStr(rawTime) === dateStr) {
+                    const ms = new Date(rawTime).getTime();
+                    if (!isNaN(ms) && ms > maxTimestampMs) maxTimestampMs = ms;
+                }
+            });
+
+            (op.weighedPackages || []).forEach((p: any) => {
+                const rawTime = p.timestamp || p.weighedAt || p.createdAt;
+                if (!rawTime) return;
+                if (getIsoDateStr(rawTime) === dateStr) {
+                    const ms = new Date(rawTime).getTime();
+                    if (!isNaN(ms) && ms > maxTimestampMs) maxTimestampMs = ms;
+                }
+            });
+
+            (op.operatorLogs || []).forEach((l: any) => {
+                const rawTime = l.endTime || l.updatedAt || l.startTime;
+                if (!rawTime) return;
+                if (getIsoDateStr(rawTime) === dateStr) {
+                    const ms = new Date(rawTime).getTime();
+                    if (!isNaN(ms) && ms > maxTimestampMs) maxTimestampMs = ms;
+                }
+            });
+
+            (op.downtimeEvents || []).forEach((e: any) => {
+                const rawTime = e.resumeTime || e.stopTime;
+                if (!rawTime) return;
+                if (getIsoDateStr(rawTime) === dateStr) {
+                    const ms = new Date(rawTime).getTime();
+                    if (!isNaN(ms) && ms > maxTimestampMs) maxTimestampMs = ms;
+                }
+            });
+
+            matchingReports.forEach((r: any) => {
+                const rawTime = r.updatedAt || r.shiftEndTime || r.createdAt || r.shiftStartTime;
+                if (!rawTime) return;
+                if (getIsoDateStr(rawTime) === dateStr) {
+                    const ms = new Date(rawTime).getTime();
+                    if (!isNaN(ms) && ms > maxTimestampMs) maxTimestampMs = ms;
+                }
+            });
+
+            if (op.updatedAt && getIsoDateStr(op.updatedAt) === dateStr) {
+                const ms = new Date(op.updatedAt).getTime();
+                if (!isNaN(ms) && ms > maxTimestampMs) maxTimestampMs = ms;
+            }
+        }
+
+        let lastUpdateFormatted = '';
+        if (isToday) {
+            if (maxTimestampMs > 0) {
+                const d = new Date(maxTimestampMs);
+                const hh = String(d.getHours()).padStart(2, '0');
+                const mm = String(d.getMinutes()).padStart(2, '0');
+                lastUpdateFormatted = `${hh}:${mm}`;
+            } else if (isProducingNow || isMachineStoppedNow || status === 'live') {
+                const d = liveNow;
+                const hh = String(d.getHours()).padStart(2, '0');
+                const mm = String(d.getMinutes()).padStart(2, '0');
+                lastUpdateFormatted = `${hh}:${mm}`;
+            }
+        }
+
         const hasTimeStats = !isHoliday && (
             (isToday && (status === 'live' || status === 'closed' || dayElapsedShiftMs > 0 || produced > 0)) ||
             (isPast && (produced > 0 || matchingReports.length > 0 || dayDowntimeMs > 0))
@@ -3654,7 +3723,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             rateFormatted,
             hasTimeStats,
             isProducingNow,
-            isMachineStoppedNow
+            isMachineStoppedNow,
+            lastUpdateFormatted
         };
     };
 
@@ -4956,7 +5026,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                         </div>
 
                                                                         <div className="flex items-center justify-between text-[9.5px] sm:text-[10.5px] truncate pt-1 mt-0.5 border-t border-slate-200/80">
-                                                                            <span className="truncate flex items-center gap-1 font-semibold">
+                                                                            <span className="truncate flex items-center gap-1 font-semibold min-w-0">
                                                                                 {dayStats.isHoliday ? (
                                                                                     <span className="text-rose-600 truncate font-bold">
                                                                                         🌴 {dayStats.holidayName || 'Sem expediente'}
@@ -4991,6 +5061,17 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                     <span className="text-slate-500 font-medium italic">Planejado</span>
                                                                                 )}
                                                                             </span>
+
+                                                                            {/* Última hora de atualização (apenas no dia atual / em produção) */}
+                                                                            {dayStats.isToday && dayStats.lastUpdateFormatted && (
+                                                                                <span 
+                                                                                    className="text-[8px] sm:text-[8.5px] font-mono font-bold text-slate-500 shrink-0 ml-1.5 pl-1.5 border-l border-slate-300/80 flex items-center gap-0.5"
+                                                                                    title={`Última atualização registrada hoje: ${dayStats.lastUpdateFormatted}`}
+                                                                                >
+                                                                                    <span className="text-[7.5px] opacity-75">🕒</span>
+                                                                                    <span>{dayStats.lastUpdateFormatted}</span>
+                                                                                </span>
+                                                                            )}
                                                                         </div>
                                                                     </div>
                                                                 );
