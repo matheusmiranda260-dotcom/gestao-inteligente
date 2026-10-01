@@ -4907,7 +4907,12 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                         : 'bg-amber-50 border-2 border-amber-500 text-amber-950 shadow-md ring-2 ring-amber-400 animate-pulse')
                                                                                     : 'bg-blue-50/95 border-2 border-blue-500 text-blue-950 shadow-sm ring-1 ring-blue-300'
                                                                                 : hasRealPastProd
-                                                                                                                                      : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
+                                                                                    ? 'bg-emerald-50 border-2 border-emerald-400 text-emerald-950 shadow-sm hover:border-emerald-500' 
+                                                                                    : dayStats.isFuture
+                                                                                        ? 'bg-slate-100/90 border-2 border-dashed border-slate-300 text-slate-700 hover:border-blue-400 hover:bg-slate-100'
+                                                                                        : isIdlePast
+                                                                                            ? 'bg-slate-50/70 border border-slate-200 text-slate-400 hover:border-slate-300'
+                                                                                            : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
                                                                         }`}
                                                                         title={`Clique para ver paradas e relatório de ${dayColName} ${formatFriendlyDate(currentDay)}`}
                                                                     >
