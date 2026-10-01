@@ -1309,8 +1309,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 'Falta de Matéria-Prima', 'Falta de Energia', 'Refeição / Intervalo'
             ],
             'Malha': [
-                'Troca de Rolo', 'Falha de Solda', 'Ajuste de Espaçamento', 
-                'Manutenção Mecânica', 'Manutenção Elétrica', 'Falta de Fio', 'Falta de Energia'
+                'Troca de Rolo', 'Falha de Solda', 
+                'Manutenção Mecânica', 'Manutenção Elétrica', 'Falta de Energia'
             ],
             'Desbobinadeira': [
                 'Troca de Rolo', 'Enrosco de Fio', 'Corte / Descarte', 'Manutenção Mecânica', 'Manutenção Elétrica'

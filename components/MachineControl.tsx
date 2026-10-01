@@ -129,17 +129,20 @@ const DowntimeModal: React.FC<{
             'Falta de Matéria-Prima', 'Falta de Energia', 'Refeição / Intervalo'
         ];
         const defaultMalha = [
-            'Troca de Rolo', 'Falha de Solda', 'Ajuste de Espaçamento', 
-            'Manutenção Mecânica', 'Manutenção Elétrica', 'Falta de Fio', 'Falta de Energia', 'Refeição / Intervalo'
+            'Troca de Rolo', 'Falha de Solda', 
+            'Manutenção Mecânica', 'Manutenção Elétrica', 'Falta de Energia'
         ];
         const defaultDesbobinadeira = [
             'Troca de Rolo', 'Enrosco de Fio', 'Corte / Descarte', 'Manutenção Mecânica', 'Manutenção Elétrica', 'Refeição / Intervalo'
         ];
 
         const mTypeNorm = (machineType || '').toLowerCase();
+        const isMalhaMachine = mTypeNorm.includes('malha');
+        const excludedMalhaReasons = ['falta de fio', 'refeicao / intervalo', 'refeicao/intervalo', 'refeicao', 'intervalo', 'ajuste de espacamento', 'ajuste de espaçamento'];
+
         let fallbackList = defaultTrefila;
         if (mTypeNorm.includes('treli')) fallbackList = defaultTrelica;
-        else if (mTypeNorm.includes('malha')) fallbackList = defaultMalha;
+        else if (isMalhaMachine) fallbackList = defaultMalha;
         else if (mTypeNorm.includes('desbobinad')) fallbackList = defaultDesbobinadeira;
 
         // Motivos cadastrados no banco de dados para esta máquina ou gerais
@@ -148,6 +151,9 @@ const DowntimeModal: React.FC<{
                 if (!c.isActive) return false;
                 const reasonLower = (c.reason || '').toLowerCase().trim();
                 if (reasonLower === 'outros' || reasonLower === 'outro') return false;
+                if (isMalhaMachine && excludedMalhaReasons.some(ex => reasonLower.normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(ex.normalize("NFD").replace(/[\u0300-\u036f]/g, "")))) {
+                    return false;
+                }
                 if (!c.machineType || c.machineType === 'Geral') return true;
                 const cNorm = c.machineType.toLowerCase();
                 return mTypeNorm.includes(cNorm) || cNorm.includes(mTypeNorm.split(' ')[0]);
@@ -159,13 +165,18 @@ const DowntimeModal: React.FC<{
         fallbackList.forEach(item => {
             const itemLower = item.toLowerCase().trim();
             if (itemLower === 'outros' || itemLower === 'outro') return;
+            if (isMalhaMachine && excludedMalhaReasons.some(ex => itemLower.normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(ex.normalize("NFD").replace(/[\u0300-\u036f]/g, "")))) {
+                return;
+            }
             const exists = combined.some(r => r.toLowerCase().trim() === itemLower);
             if (!exists) combined.push(item);
         });
 
         return combined.filter(r => {
             const low = r.toLowerCase().trim();
-            return low !== 'outros' && low !== 'outro';
+            if (low === 'outros' || low === 'outro') return false;
+            if (isMalhaMachine && excludedMalhaReasons.some(ex => low.normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(ex.normalize("NFD").replace(/[\u0300-\u036f]/g, "")))) return false;
+            return true;
         });
     }, [downtimeConfigs, machineType]);
 
