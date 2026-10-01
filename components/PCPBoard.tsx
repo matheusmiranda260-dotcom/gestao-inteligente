@@ -5154,6 +5154,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                             style={{ width: `${prog.pct}%` }}
                                                                         />
                                                                     </div>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
