@@ -4997,60 +4997,56 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                             })}
                                                         </div>
 
-                                                        {/* Rodapé Integrado: Controles de Dias + Barra de Progresso Real (1 linha) */}
-                                                        <div className="flex items-center justify-between gap-2 bg-slate-100/95 px-2 py-1 rounded-lg border border-slate-200 select-none shrink-0" onClick={(e) => e.stopPropagation()}>
-                                                            {/* Controles Rápidos: MOVER ou ESTENDER + DURAÇÃO */}
+                                                        {/* Rodapé Integrado: Duração/Extensão Discreta + Barra de Progresso Real à Direita */}
+                                                        <div className="flex items-center justify-end gap-2 mt-1 select-none shrink-0 px-1" onClick={(e) => e.stopPropagation()}>
+                                                            {/* Controles Rápidos: MOVER ou ESTENDER + DURAÇÃO Compactos */}
                                                             <div className="flex items-center gap-1.5 shrink-0">
-                                                                {hasProductionStarted(op) ? (
-                                                                    <div className="flex items-center gap-1 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-200" title={`OP com produção iniciada em ${formatFriendlyDate(op.plannedStartDate)}. Início fixado para preservar histórico. Use + para ESTENDER o término.`}>
-                                                                        <span className="text-[9px] uppercase font-black text-orange-700 tracking-wider flex items-center gap-1">
-                                                                            <span>⏱️</span>
-                                                                            <span>ESTENDER</span>
-                                                                        </span>
-                                                                        <button 
-                                                                            onClick={() => handleAdjustDuration(op, 1)}
-                                                                            className="text-white hover:text-white font-black text-[10px] transition-colors active:scale-90 px-1 py-0.2 bg-emerald-600 hover:bg-emerald-700 rounded border border-emerald-600 ml-0.5 shadow-sm"
-                                                                            title="Estender produção em +1 dia útil"
-                                                                        >
-                                                                            +1d
-                                                                        </button>
-                                                                    </div>
-                                                                ) : (
-                                                                    <div className="flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-200 shadow-sm">
+                                                                {!hasProductionStarted(op) && (
+                                                                    <div className="flex items-center gap-1 bg-white/95 px-1.5 py-0.5 rounded-md border border-slate-200/90 shadow-xs">
                                                                         <button 
                                                                             onClick={() => handleShiftOP(op, -1)}
-                                                                            className="text-slate-600 hover:text-orange-600 font-black text-xs transition-colors active:scale-90 p-0.5" 
-                                                                            title="Mover 1 dia antes"
+                                                                            className="text-slate-500 hover:text-orange-600 font-black text-xs transition-colors active:scale-90 px-0.5" 
+                                                                            title="Mover OP 1 dia antes"
                                                                         >
                                                                             ◀
                                                                         </button>
-                                                                        <span className="text-[9px] uppercase font-black text-slate-700 tracking-wider">MOVER</span>
+                                                                        <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Mover</span>
                                                                         <button 
                                                                             onClick={() => handleShiftOP(op, 1)}
-                                                                            className="text-slate-600 hover:text-orange-600 font-black text-xs transition-colors active:scale-90 p-0.5"
-                                                                            title="Mover 1 dia depois"
+                                                                            className="text-slate-500 hover:text-orange-600 font-black text-xs transition-colors active:scale-90 px-0.5"
+                                                                            title="Mover OP 1 dia depois"
                                                                         >
                                                                             ▶
                                                                         </button>
                                                                     </div>
                                                                 )}
 
-                                                                <div className="flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-200 shadow-sm" title="Duração estimada em dias úteis">
-                                                                    <button 
-                                                                        onClick={() => handleAdjustDuration(op, -1)}
-                                                                        className="text-slate-600 hover:text-rose-600 font-black text-xs transition-colors active:scale-90 px-0.5"
-                                                                        title={hasProductionStarted(op) ? "Reduzir extensão (não reduz abaixo dos dias já decorridos)" : "Diminuir duração"}
-                                                                    >
-                                                                        -
-                                                                    </button>
-                                                                    <span className="font-black text-xs text-slate-900 tracking-wide">{op.estimatedDurationDays || 1}d</span>
-                                                                    <button 
-                                                                        onClick={() => handleAdjustDuration(op, 1)}
-                                                                        className="text-slate-600 hover:text-emerald-600 font-black text-xs transition-colors active:scale-90 px-0.5"
-                                                                        title="Aumentar duração / Estender OP"
-                                                                    >
-                                                                        +
-                                                                    </button>
+                                                                {/* Pill de Duração / Extensão */}
+                                                                <div 
+                                                                    className="flex items-center gap-1 bg-white/95 px-2 py-0.5 rounded-md border border-slate-200/90 shadow-xs text-slate-700"
+                                                                    title={hasProductionStarted(op) ? `OP iniciada em ${formatFriendlyDate(op.plannedStartDate)}. Use [+] para estender a duração em dias.` : "Duração estimada em dias úteis"}
+                                                                >
+                                                                    <span className="text-[10px] text-slate-500 font-bold flex items-center gap-0.5">
+                                                                        <span>⏱️</span>
+                                                                        <span>{hasProductionStarted(op) ? 'Estender:' : 'Duração:'}</span>
+                                                                    </span>
+                                                                    <div className="flex items-center gap-0.5 ml-0.5">
+                                                                        <button 
+                                                                            onClick={() => handleAdjustDuration(op, -1)}
+                                                                            className="w-4 h-4 rounded bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-700 font-black text-xs flex items-center justify-center transition-colors active:scale-90"
+                                                                            title={hasProductionStarted(op) ? "Reduzir extensão (não reduz abaixo dos dias já decorridos)" : "Diminuir duração em 1 dia"}
+                                                                        >
+                                                                            -
+                                                                        </button>
+                                                                        <span className="font-black text-xs text-slate-800 px-1 font-mono">{op.estimatedDurationDays || 1}d</span>
+                                                                        <button 
+                                                                            onClick={() => handleAdjustDuration(op, 1)}
+                                                                            className="w-4 h-4 rounded bg-slate-100 hover:bg-emerald-100 text-slate-600 hover:text-emerald-700 font-black text-xs flex items-center justify-center transition-colors active:scale-90"
+                                                                            title="Aumentar duração / Estender OP em +1 dia útil"
+                                                                        >
+                                                                            +
+                                                                        </button>
+                                                                    </div>
                                                                 </div>
                                                             </div>
 
@@ -5060,7 +5056,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                     e.stopPropagation();
                                                                     handleOpenAdjustQuantity(op, { mode: 'total' });
                                                                 }}
-                                                                className="flex items-center gap-2 flex-1 max-w-[280px] min-w-0 cursor-pointer group/footprog hover:bg-white px-2 py-0.5 rounded-lg transition-all select-none border border-transparent hover:border-slate-200"
+                                                                className="flex items-center gap-2 max-w-[260px] w-full min-w-[170px] cursor-pointer group/footprog bg-white/95 hover:bg-white px-2.5 py-1 rounded-md transition-all border border-slate-200/90 hover:border-slate-300 shadow-xs"
                                                                 title="Clique para ajustar quantidade total produzida da OP (Gestor)"
                                                             >
                                                                 <div className="flex-1 min-w-0">
