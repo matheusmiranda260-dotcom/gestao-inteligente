@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { ProductionOrderData, ShiftReport, StockItem, StockGauge } from '../types';
+import { DefaultMalhaGauges } from '../types';
 import { supabase } from '../supabaseClient';
 import html2canvas from 'html2canvas';
 import { resolveMachineShiftConfig } from '../services/shiftConfigService';
@@ -134,6 +135,13 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         const opM = (op?.machine as string || '').toLowerCase();
         const opSched = (op?.scheduledMachine as string || '').toLowerCase();
         return m.includes('trefila') || opM.includes('trefila') || opSched.includes('trefila');
+    }, [machine, op]);
+
+    const isMalha = useMemo(() => {
+        const m = (machine || '').toLowerCase();
+        const opM = (op?.machine as string || '').toLowerCase();
+        const opSched = (op?.scheduledMachine as string || '').toLowerCase();
+        return m.includes('malha') || opM.includes('malha') || opSched.includes('malha');
     }, [machine, op]);
 
     // Resolução da configuração de turnos da máquina (1 ou 2 turnos)
@@ -573,6 +581,26 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
     // Helper para obter o peso teórico por peça (em kg) a partir do catálogo oficial
     const getTheoreticalWeightPerPiece = (modelStr: string, sizeMts: number): number => {
         const cleanModel = (modelStr || '').toUpperCase().trim();
+
+        // 1. Se for Malha, buscar no catálogo de malhas ou gauges
+        const currentGauges = gauges && gauges.length > 0 ? gauges : cachedGauges;
+        const matchedMalha = (currentGauges || []).find((g: any) => {
+            const isM = (g.materialType || g.material_type || '').toLowerCase().includes('malha');
+            if (!isM) return false;
+            const desc = (g.description || '').toUpperCase();
+            const code = (g.productCode || g.product_code || '').toUpperCase();
+            return (code && cleanModel.includes(code)) || (desc && cleanModel.includes(desc)) || (desc && desc.includes(cleanModel));
+        }) || DefaultMalhaGauges.find(m => {
+            const desc = m.description.toUpperCase();
+            const code = (m.productCode || '').toUpperCase();
+            return (code && cleanModel.includes(code)) || cleanModel.includes(desc) || desc.includes(cleanModel);
+        });
+
+        if (matchedMalha) {
+            const raw = parseFloat(((matchedMalha as any).peso_peca || matchedMalha.peso_final || '0').replace(',', '.'));
+            if (raw > 0) return raw;
+        }
+
         const match = DEFAULT_TRELICA_MODELS.find(m => {
             const mModel = m.modelo.toUpperCase().trim();
             const mTam = parseInt(m.tamanho, 10);
@@ -1198,9 +1226,15 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         const inBitola = op.inputBitola || '8.00';
         const outBitola = op.targetBitola || '6.00';
         const resolvedTrefila = isTrefila ? resolveTrefilaProductDescriptions(op) : null;
-        const prodDesc = isTrefila 
-            ? resolvedTrefila!.descOut 
-            : (op.trelicaModel || op.product || 'TRELIÇA H-12 LEVE 6 MTS').toUpperCase();
+        let prodDesc = '';
+        if (isTrefila) {
+            prodDesc = resolvedTrefila!.descOut;
+        } else if (isMalha) {
+            const rawMalha = op.malhaModel || (op as any).malha_model || op.productDescription || (op as any).product_description || (op as any).product || '';
+            prodDesc = (rawMalha || 'MALHA SOLDADA/IND. PAINEL Q138-6,00X2,45 10X10 4,20MM- SOB MEDIDA').toUpperCase();
+        } else {
+            prodDesc = (op.trelicaModel || op.product || 'TRELIÇA H-12 LEVE 6 MTS').toUpperCase();
+        }
         const prodDescIn = resolvedTrefila ? resolvedTrefila.descIn : '';
         const prodDescOut = resolvedTrefila ? resolvedTrefila.descOut : '';
         const targetQ = op.quantityToProduce || op.targetQuantity || (isTrefila ? 10000 : 4500);
@@ -1611,6 +1645,13 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     setProductDescriptionIn(finalIn);
                     setProductDescriptionOut(finalOut);
                     setProductDescription(finalOut);
+                } else if (isMalha) {
+                    const savedDesc = dbReport.product_description;
+                    if (!savedDesc || savedDesc.toUpperCase().includes('TRELI')) {
+                        setProductDescription(auto.productDescription);
+                    } else {
+                        setProductDescription(savedDesc);
+                    }
                 } else {
                     setProductDescription(dbReport.product_description || op.trelicaModel || 'TRELIÇA H-12 LEVE 6 MTS');
                 }
