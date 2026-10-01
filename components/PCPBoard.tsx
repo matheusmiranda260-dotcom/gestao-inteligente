@@ -4948,7 +4948,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                 ) : (
                                                                                     <span className="flex items-center gap-0.5 text-[7.5px] sm:text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-blue-600 text-white tracking-wider shadow-sm shrink-0">
                                                                                         <span className="w-1.5 h-1.5 rounded-full bg-white pulse-live" />
-                                                                                        AO VIVO
+                                                                                        EM PRODUÇÃO
                                                                                     </span>
                                                                                 )
                                                                             )}
