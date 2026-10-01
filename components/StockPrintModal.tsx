@@ -257,15 +257,25 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                 );
             }
 
+            const itemQty = getLotWeight(item);
+
             if (!matchedOption && item.bitola) {
                 const cleanBitola = item.bitola.replace(',', '.').replace(' mm', '').trim();
-                matchedOption = Array.from(optionsMap.values()).find(o => {
+                const sameGaugeOptions = Array.from(optionsMap.values()).filter(o => {
                     const cleanGauge = o.gauge.replace(',', '.').replace(' mm', '').trim();
-                    return cleanGauge === cleanBitola && !o.description?.includes('ROLO');
+                    return cleanGauge === cleanBitola;
                 });
-            }
 
-            const itemQty = getLotWeight(item);
+                if (sameGaugeOptions.length === 1) {
+                    matchedOption = sameGaugeOptions[0];
+                } else if (sameGaugeOptions.length > 1) {
+                    if (itemQty >= 500) {
+                        matchedOption = sameGaugeOptions.find(o => o.productCode === '8135' || o.description?.toUpperCase().includes('2 TON') || o.description?.toUpperCase().includes('2TON') || o.description?.toUpperCase().includes('2000')) || sameGaugeOptions[0];
+                    } else {
+                        matchedOption = sameGaugeOptions.find(o => o.productCode === '8719' || o.description?.toUpperCase().includes('200KG') || o.description?.toUpperCase().includes('200 KG') || o.description?.toUpperCase().includes('200')) || sameGaugeOptions[0];
+                    }
+                }
+            }
 
             if (matchedOption) {
                 matchedOption.count += 1;
@@ -388,13 +398,6 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
             return lot.productCode.trim() === opt.productCode.trim();
         }
 
-        if (opt.productCode && !lot.productCode) {
-            if (lot.description && opt.description) {
-                return lot.description.trim().toLowerCase() === opt.description.trim().toLowerCase();
-            }
-            if (opt.description?.includes('ROLO') || opt.label.includes('ROLO')) return false;
-        }
-
         if (lot.description && opt.description && lot.description.trim().toLowerCase() === opt.description.trim().toLowerCase()) {
             return true;
         }
@@ -402,7 +405,17 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
         const cleanBitola = lot.bitola.replace(',', '.').replace(' mm', '').trim();
         const cleanGauge = opt.gauge.replace(',', '.').replace(' mm', '').trim();
         if (cleanBitola === cleanGauge) {
-            if (opt.description?.includes('ROLO') && !lot.description?.includes('ROLO')) return false;
+            const sameGaugeOptions = availableProductOptions.filter(o => o.gauge.replace(',', '.').replace(' mm', '').trim() === cleanBitola);
+            if (sameGaugeOptions.length > 1) {
+                const w = getLotWeight(lot);
+                if (w >= 500) {
+                    const isBigOpt = opt.productCode === '8135' || opt.description?.toUpperCase().includes('2 TON') || opt.description?.toUpperCase().includes('2TON') || opt.description?.toUpperCase().includes('2000');
+                    return Boolean(isBigOpt);
+                } else {
+                    const isSmallOpt = opt.productCode === '8719' || opt.description?.toUpperCase().includes('200KG') || opt.description?.toUpperCase().includes('200 KG') || opt.description?.toUpperCase().includes('200');
+                    return Boolean(isSmallOpt);
+                }
+            }
             return true;
         }
 
