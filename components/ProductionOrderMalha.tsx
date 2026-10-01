@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Page, StockItem, ProductionOrderData, Bitola, StockGauge, User, MachineType, Employee } from '../types';
 import { fetchByColumn } from '../services/supabaseService';
-import { TrefilaBitolaOptions, FioMaquinaBitolaOptions } from '../types';
+import { TrefilaBitolaOptions, FioMaquinaBitolaOptions, DefaultMalhaGauges } from '../types';
 import { ArrowLeftIcon, WarningIcon, ClipboardListIcon, PencilIcon, TrashIcon, AdjustmentsIcon } from './icons';
 import ProductionOrderHistoryModal from './ProductionOrderHistoryModal';
 import ProductionOrderReport from './ProductionOrderReport';
@@ -21,12 +21,94 @@ interface ProductionOrderMalhaProps {
 const ProductionOrderMalha: React.FC<ProductionOrderMalhaProps> = ({ setPage, stock, productionOrders, addProductionOrder, showNotification, updateProductionOrder, deleteProductionOrder, gauges, currentUser }) => {
     const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor';
     const [orderNumber, setOrderNumber] = useState('');
-    const [malhaModel, setMalhaModel] = useState('');
     const [malhaPieces, setMalhaPieces] = useState('');
     const [selectedMachine, setSelectedMachine] = useState<MachineType>('Malha 1');
     const [showHistoryModal, setShowHistoryModal] = useState(false);
     const [productionReportData, setProductionReportData] = useState<ProductionOrderData | null>(null);
     const [assignedMachine, setAssignedMachine] = useState<MachineType | null>(null);
+
+    // Lista de Modelos de Malha disponíveis (Catálogo + Cadastrados no Estoque/Gestão de Lotes)
+    const availableMalhaModels = useMemo(() => {
+        const deletedDefaults: string[] = JSON.parse(localStorage.getItem('deleted_default_gauges') || '[]');
+        const overriddenDefaults: string[] = JSON.parse(localStorage.getItem('overridden_default_gauges') || '[]');
+
+        const result: Array<{
+            id?: string;
+            productCode?: string;
+            description: string;
+            gauge?: string;
+            meshSpacing?: string;
+            panelDimensions?: string;
+            peso_peca?: string;
+            peso_final?: string;
+            longitudinal?: string;
+            transversal?: string;
+        }> = [];
+
+        // 1. Modelos de Malha customizados cadastrados em gauges
+        (gauges || []).filter(g => g.materialType === 'Malha').forEach(g => {
+            result.push({
+                id: g.id,
+                productCode: g.productCode,
+                description: g.description || `Malha ${g.gauge || ''}`,
+                gauge: g.gauge,
+                meshSpacing: (g as any).meshSpacing,
+                panelDimensions: (g as any).panelDimensions || (g as any).tamanho,
+                peso_peca: (g as any).peso_peca || g.peso_final,
+                peso_final: g.peso_final,
+                longitudinal: (g as any).longitudinal,
+                transversal: (g as any).transversal
+            });
+        });
+
+        // 2. Modelos padrão de DefaultMalhaGauges se não estiverem deletados ou substituídos
+        DefaultMalhaGauges.forEach(d => {
+            const defId = d.id || `default_ml_${d.productCode}`;
+            if (deletedDefaults.includes(defId) || overriddenDefaults.includes(defId)) return;
+            const exists = result.some(g => 
+                (d.productCode && g.productCode === d.productCode) || 
+                (g.description === d.description && g.gauge === d.gauge) ||
+                g.id === defId
+            );
+            if (!exists) {
+                result.push({
+                    id: defId,
+                    productCode: d.productCode,
+                    description: d.description,
+                    gauge: d.gauge,
+                    meshSpacing: d.meshSpacing,
+                    panelDimensions: d.panelDimensions,
+                    peso_peca: d.peso_peca || d.peso_final,
+                    peso_final: d.peso_final,
+                    longitudinal: d.longitudinal,
+                    transversal: d.transversal
+                });
+            }
+        });
+
+        return result;
+    }, [gauges]);
+
+    const [malhaModel, setMalhaModel] = useState('');
+
+    useEffect(() => {
+        if (!malhaModel && availableMalhaModels.length > 0) {
+            const first = availableMalhaModels[0];
+            setMalhaModel(first.description);
+            if (first.gauge) {
+                const rawG = first.gauge.replace('mm', '').replace(',', '.').trim();
+                setTargetBitola(rawG as Bitola);
+            }
+        }
+    }, [availableMalhaModels, malhaModel]);
+
+    const selectedMalhaModelObj = useMemo(() => {
+        return availableMalhaModels.find(m => 
+            m.description === malhaModel || 
+            m.productCode === malhaModel || 
+            m.id === malhaModel
+        ) || null;
+    }, [availableMalhaModels, malhaModel]);
 
     useEffect(() => {
         if (!isGestor && currentUser?.employeeId) {
@@ -70,20 +152,25 @@ const ProductionOrderMalha: React.FC<ProductionOrderMalhaProps> = ({ setPage, st
             return;
         }
 
+        const pieces = parseInt(malhaPieces);
+        const rawPeso = selectedMalhaModelObj?.peso_peca || selectedMalhaModelObj?.peso_final;
+        const pieceWeight = rawPeso ? parseFloat(rawPeso.replace(',', '.')) : 5;
+
         addProductionOrder({
             orderNumber,
             machine: selectedMachine,
             targetBitola,
-            quantityToProduce: parseInt(malhaPieces),
-            malhaModel: malhaModel,
-            malhaPieces: parseInt(malhaPieces)
+            quantityToProduce: pieces,
+            malhaModel: selectedMalhaModelObj?.description || malhaModel,
+            productCode: selectedMalhaModelObj?.productCode || '',
+            productDescription: selectedMalhaModelObj?.description || malhaModel,
+            totalWeight: pieces * (pieceWeight > 0 ? pieceWeight : 5),
+            malhaPieces: pieces
         });
 
         // Reset form
         setOrderNumber('');
-        setMalhaModel('');
         setMalhaPieces('');
-        setTargetBitola(TrefilaBitolaOptions[0]);
     };
 
     return (
@@ -171,15 +258,65 @@ const ProductionOrderMalha: React.FC<ProductionOrderMalhaProps> = ({ setPage, st
                                     />
                                 </div>
                                 <div>
-                                    <label htmlFor="malhaModel" className="block text-sm font-medium text-slate-700">Modelo da Malha</label>
-                                    <input
-                                        type="text"
+                                    <label htmlFor="malhaModel" className="block text-sm font-medium text-slate-700 flex items-center justify-between">
+                                        <span>Modelo da Malha (Gestão de Lotes)</span>
+                                        {selectedMalhaModelObj?.productCode && (
+                                            <span className="text-xs bg-indigo-50 text-indigo-700 font-bold px-2 py-0.5 rounded border border-indigo-200">
+                                                Cód. {selectedMalhaModelObj.productCode}
+                                            </span>
+                                        )}
+                                    </label>
+                                    <select
                                         id="malhaModel"
                                         value={malhaModel}
-                                        onChange={(e) => setMalhaModel(e.target.value)}
-                                        className="mt-1 p-2 w-full border border-slate-300 rounded-md"
-                                        placeholder="Ex: Q61"
-                                    />
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setMalhaModel(val);
+                                            const found = availableMalhaModels.find(m => m.description === val || m.productCode === val || m.id === val);
+                                            if (found && found.gauge) {
+                                                const rawG = found.gauge.replace('mm', '').replace(',', '.').trim();
+                                                setTargetBitola(rawG as Bitola);
+                                            }
+                                        }}
+                                        className="mt-1 p-2 w-full border border-slate-300 rounded-md bg-white font-medium text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                    >
+                                        <option value="">Selecione um modelo de malha cadastrado...</option>
+                                        {availableMalhaModels.map(m => {
+                                            const parts = [];
+                                            if (m.productCode) parts.push(`[Cód. ${m.productCode}]`);
+                                            parts.push(m.description);
+                                            if (m.gauge) parts.push(`(${m.gauge})`);
+                                            if (m.meshSpacing) parts.push(`[${m.meshSpacing}]`);
+                                            if (m.panelDimensions) parts.push(`• ${m.panelDimensions}m`);
+                                            if (m.peso_peca) parts.push(`• ${m.peso_peca} kg/pç`);
+                                            return (
+                                                <option key={m.id || m.productCode || m.description} value={m.description}>
+                                                    {parts.join(' ')}
+                                                </option>
+                                            );
+                                        })}
+                                    </select>
+
+                                    {selectedMalhaModelObj && (
+                                        <div className="mt-2 bg-indigo-50/60 border border-indigo-100 rounded-lg p-2.5 text-xs text-slate-700 flex flex-col gap-1">
+                                            <div className="flex items-center justify-between font-bold text-indigo-950">
+                                                <span>{selectedMalhaModelObj.description}</span>
+                                                {selectedMalhaModelObj.peso_peca && (
+                                                    <span className="bg-white px-2 py-0.5 rounded border border-indigo-200 text-indigo-700 font-mono">
+                                                        {selectedMalhaModelObj.peso_peca} kg/peça
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1 text-[11px] text-slate-600">
+                                                {selectedMalhaModelObj.gauge && <div>Bitola: <strong className="text-slate-900">{selectedMalhaModelObj.gauge}</strong></div>}
+                                                {selectedMalhaModelObj.meshSpacing && <div>Espaçamento: <strong className="text-slate-900">{selectedMalhaModelObj.meshSpacing}</strong></div>}
+                                                {selectedMalhaModelObj.panelDimensions && <div>Painel: <strong className="text-slate-900">{selectedMalhaModelObj.panelDimensions}m</strong></div>}
+                                                {selectedMalhaModelObj.peso_peca && malhaPieces && parseInt(malhaPieces) > 0 && (
+                                                    <div>Peso Estimado: <strong className="text-indigo-700 font-mono">{(parseInt(malhaPieces) * parseFloat(selectedMalhaModelObj.peso_peca.replace(',', '.'))).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kg</strong></div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                                 <div>
                                     <label htmlFor="malhaPieces" className="block text-sm font-medium text-slate-700">Quantidade de Peças</label>
