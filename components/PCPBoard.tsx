@@ -10102,19 +10102,23 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
             produced += Number(r.totalProducedWeight || r.totalProducedQuantity || 0);
         });
 
-        // 2. Lotes processados se for Trefila
+        // 2. Lotes processados se for Trefila (somente lotes pesados/finalizados)
         const isTrefilaMach = (activeOp.scheduledMachine || activeOp.machine || '').toLowerCase().includes('trefila');
         if (isTrefilaMach) {
             const pLots = activeOp.processedLots || (activeOp as any).processed_lots || [];
             let lotWeight = 0;
             pLots.forEach((l: any) => {
+                const fw = l.finalWeight !== null && l.finalWeight !== undefined 
+                    ? Number(l.finalWeight) 
+                    : (l.final_weight !== null && l.final_weight !== undefined ? Number(l.final_weight) : 0);
+                if (fw <= 0) return;
                 const lIso = l.endTime || l.end_time || l.startTime || l.start_time;
                 if (lIso && parseDateOnly(lIso) === targetReportDateStr) {
-                    lotWeight += Number(l.finalWeight || l.final_weight || l.producedWeight || l.produced_weight || 0);
+                    lotWeight += fw;
                 }
             });
             if (lotWeight > 0) {
-                produced = Math.max(produced, lotWeight);
+                produced = lotWeight;
             }
         }
 
@@ -10136,14 +10140,6 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
         // 4. Se a data bater com data.dateStr e produced ainda for 0, usar data.produced
         if (targetReportDateStr === data.dateStr && (produced === 0 || !produced)) {
             produced = data.produced || 0;
-        }
-
-        // 5. Se ainda for 0 e a OP tem peso/quantidade produzida
-        if (produced === 0) {
-            const totalOpProduced = Number(activeOp.actualProducedWeight || activeOp.actualProducedQuantity || 0);
-            if (totalOpProduced > 0) {
-                produced = totalOpProduced;
-            }
         }
 
         // 6. Operador fallback das paradas ou da OP

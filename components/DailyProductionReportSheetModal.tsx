@@ -479,12 +479,12 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         if (!val) return '';
         if (typeof val === 'string') {
             const raw = val.trim();
-            // Se já for formato YYYY-MM-DD
-            if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
-                return raw.split('T')[0];
+            // Se já for formato YYYY-MM-DD puro (sem hora)
+            if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+                return raw;
             }
             // Se for formato DD/MM/YYYY
-            if (/^\d{2}\/\d{2}\/\d{4}/.test(raw)) {
+            if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) {
                 const parts = raw.split('/');
                 return `${parts[2]}-${parts[1]}-${parts[0]}`;
             }
@@ -503,17 +503,39 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
 
     const matchesDate = (val: any, target: string): boolean => {
         if (!val || !target) return false;
-        const targetClean = target.trim();
-        const s = String(val).trim();
-        if (s.startsWith(targetClean)) return true;
-        if (s.split('T')[0] === targetClean) return true;
-        const local = getLocalDateString(val);
-        if (local === targetClean) return true;
-        if (targetClean.includes('/')) {
-            const parts = targetClean.split('/');
-            const targetIso = `${parts[2]}-${parts[1]}-${parts[0]}`;
-            if (s.startsWith(targetIso) || local === targetIso) return true;
+        const targetClean = String(target).trim();
+        const sVal = String(val).trim();
+
+        // 1. Extrair YYYY-MM-DD de target e val
+        const targetLocal = getLocalDateString(targetClean);
+        const valLocal = getLocalDateString(sVal);
+
+        if (targetLocal && valLocal && targetLocal === valLocal) return true;
+
+        // 2. Extração de Dia e Mês (DD e MM) para ambos (suporta '30/09' vs '2026-09-30' ou '30/09/2026')
+        const extractDayMonth = (str: string, localIso: string) => {
+            if (/^\d{2}\/\d{2}$/.test(str)) {
+                const [d, m] = str.split('/');
+                return { d, m };
+            }
+            if (/^\d{2}\/\d{2}\/\d{4}/.test(str)) {
+                const [d, m] = str.split('/');
+                return { d, m };
+            }
+            if (localIso && /^\d{4}-\d{2}-\d{2}/.test(localIso)) {
+                const parts = localIso.split('-');
+                return { d: parts[2], m: parts[1] };
+            }
+            return null;
+        };
+
+        const targetDM = extractDayMonth(targetClean, targetLocal);
+        const valDM = extractDayMonth(sVal, valLocal);
+
+        if (targetDM && valDM) {
+            return targetDM.d === valDM.d && targetDM.m === valDM.m;
         }
+
         return false;
     };
 
@@ -697,7 +719,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 ? Number(lot.finalWeight) 
                 : (lot.final_weight !== null && lot.final_weight !== undefined 
                     ? Number(lot.final_weight) 
-                    : Number(lot.producedWeight || lot.produced_weight || 0));
+                    : 0);
 
             // Na ficha oficial de pesagens, só incluímos lotes concluídos/pesados
             if (outputWeight <= 0) return;
@@ -1061,7 +1083,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         if (isTrefila) {
             const allUpdates = generateTrefilaProductionUpdates(targetOp, effectiveStock, effectiveDate);
             const filteredUpdates = allUpdates.filter(u => 
-                !u.isSeparator && 
+                !(u as any).isSeparator && 
                 (matchesDate(u.data, effectiveDate) || (effectiveDate && formatDateBr(effectiveDate).startsWith(u.data)) || !u.data)
             );
             dayLotsList = filteredUpdates.map(u => ({ lotNum: String(u.lote) }));
@@ -1249,9 +1271,13 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             let trefilaDayWeight = 0;
             const pLots = op.processedLots || (op as any).processed_lots || [];
             pLots.forEach((l: any) => {
+                const fw = l.finalWeight !== null && l.finalWeight !== undefined 
+                    ? Number(l.finalWeight) 
+                    : (l.final_weight !== null && l.final_weight !== undefined ? Number(l.final_weight) : 0);
+                if (fw <= 0) return;
                 const lIso = l.endTime || l.end_time || l.startTime || l.start_time;
-                if (!lIso || matchesDate(lIso, selectedDate)) {
-                    trefilaDayWeight += (Number(l.finalWeight || l.final_weight || l.producedWeight || l.produced_weight) || 0);
+                if (lIso && matchesDate(lIso, selectedDate)) {
+                    trefilaDayWeight += fw;
                 }
             });
             if (trefilaDayWeight === 0 && dayShiftReports.length > 0) {
@@ -1259,15 +1285,12 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     trefilaDayWeight += Number(r.totalProducedWeight || r.totalProducedQuantity || 0);
                 });
             }
-            if (trefilaDayWeight === 0 && initialProduced && initialProduced > 0) {
+            if (initialProduced !== undefined && initialProduced > 0) {
                 trefilaDayWeight = initialProduced;
-            }
-            if (trefilaDayWeight === 0 && (op.actualProducedWeight || (op as any).actual_produced_weight)) {
+            } else if (trefilaDayWeight === 0 && (op.actualProducedWeight || (op as any).actual_produced_weight)) {
                 trefilaDayWeight = Number(op.actualProducedWeight || (op as any).actual_produced_weight);
             }
-            if (piecesA === 0 && trefilaDayWeight > 0) {
-                piecesA = trefilaDayWeight;
-            }
+            piecesA = trefilaDayWeight;
         }
 
         // Coletar paradas do dia
@@ -1675,12 +1698,9 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     : defaultSchedA;
 
                 // Sincronização inteligente com a produção real do chão de fábrica:
-                let piecesAFromDb = Number(rawStatsA.pecasProduzidas || 0);
-                if (piecesAFromDb === 0) {
-                    piecesAFromDb = initialProduced || auto.statsShiftA.pecasProduzidas || 0;
-                } else if (initialProduced !== undefined && initialProduced > 0 && piecesAFromDb < initialProduced) {
-                    piecesAFromDb = initialProduced;
-                }
+                let piecesAFromDb = (initialProduced !== undefined && initialProduced > 0)
+                    ? initialProduced
+                    : (Number(rawStatsA.pecasProduzidas || 0) || auto.statsShiftA.pecasProduzidas || 0);
 
                 const expectedPieceSize = resolvePieceSize(op, dbReport.product_description);
 
@@ -1730,79 +1750,10 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     });
                 }
 
-                if (isTrefila && autoHistory.length > 0) {
-                    // Reconciliação inteligente com autoHistory:
-                    // 1. Corrigir números de lote que eram índices (ex: "7", "8", "11", "14") ou que tinham entrada zerada
-                    let repairedUpdates = (finalUpdates || []).map((u: any, uIdx: number) => {
-                        // Tentar achar correspondente no autoHistory:
-                        // Prioridade 1: lote exato
-                        let matchingAuto = autoHistory.find((a: any) => a.lote && a.lote === u.lote);
-                        // Prioridade 2: lote era índice ("7", "8") correspondente à posição no processedLots
-                        if (!matchingAuto && /^\d+$/.test(String(u.lote).trim())) {
-                            const num = parseInt(String(u.lote).trim(), 10);
-                            if (num >= 1 && num <= autoHistory.length) {
-                                matchingAuto = autoHistory[num - 1];
-                            }
-                        }
-                        // Prioridade 3: correspondência por peso de saída e data
-                        if (!matchingAuto && Number(u.saida || u.peso) > 0) {
-                            const uSaida = Number(u.saida || u.peso);
-                            matchingAuto = autoHistory.find((a: any) => 
-                                Math.abs((Number(a.saida || a.peso) || 0) - uSaida) <= 1 && 
-                                (!u.data || u.data === a.data)
-                            );
-                        }
-
-                        if (matchingAuto) {
-                            const p = Number(u.peso) || Number(matchingAuto.peso) || 0;
-                            const s = Number(u.saida) || Number(matchingAuto.saida) || p;
-                            const kg = (Number(u.kgEntrada) > 0) ? Number(u.kgEntrada) : Number(matchingAuto.kgEntrada);
-                            
-                            // Se o lote salvo era apenas um número de índice ou estava genérico, substituir pelo número real da bobina/fio
-                            const resolvedLote = (!u.lote || /^\d{1,2}$/.test(String(u.lote).trim())) 
-                                ? matchingAuto.lote 
-                                : u.lote;
-
-                            return {
-                                ...u,
-                                lote: resolvedLote,
-                                kgEntrada: kg,
-                                saida: s,
-                                peso: p,
-                                data: u.data || matchingAuto.data,
-                                bitola: u.bitola || matchingAuto.bitola
-                            };
-                        }
-                        return u;
-                    });
-
-                    // 2. Remover duplicatas (ex: se existia o lote "7" que virou "9857" e também já tinha outro "9857")
-                    const seenLots = new Set<string>();
-                    repairedUpdates = repairedUpdates.filter((u: any) => {
-                        const sVal = Number(u.saida || u.peso || 0);
-                        const kVal = Number(u.kgEntrada || 0);
-                        // Ignorar linhas puramente vazias / futuras de peso zero
-                        if (sVal === 0 && kVal === 0) return false;
-
-                        const lotKey = (u.lote || '').trim();
-                        if (lotKey && seenLots.has(lotKey)) {
-                            return false; // Descartar duplicata
-                        }
-                        if (lotKey) seenLots.add(lotKey);
-                        return true;
-                    });
-
-                    // 3. Adicionar lotes do autoHistory que ainda não estejam na lista
-                    autoHistory.forEach((a: any) => {
-                        if (!repairedUpdates.some((u: any) => u.lote === a.lote)) {
-                            repairedUpdates.push({ ...a });
-                        }
-                    });
-
-                    // 4. Ordenar rigorosamente por data para nunca dividir o mesmo dia em múltiplos blocos
-                    repairedUpdates.sort((a: any, b: any) => parseDateSortKey(a.data) - parseDateSortKey(b.data));
-
-                    finalUpdates = repairedUpdates;
+                if (isTrefila) {
+                    if (autoHistory.length > 0) {
+                        finalUpdates = autoHistory;
+                    }
                 }
 
                 setProductionUpdates(finalUpdates);
@@ -1813,11 +1764,16 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                         matchesDate(u.data, targetDate) || (targetDate && formatDateBr(targetDate).startsWith(u.data))
                     );
                     const sumDayOut = dayUpdates.reduce((acc: number, u: any) => acc + (Number(u.saida ?? u.peso) || 0), 0);
-                    if ((piecesAFromDb === 0 || !piecesAFromDb) && sumDayOut > 0) {
+                    if (initialProduced !== undefined && initialProduced > 0) {
+                        piecesAFromDb = initialProduced;
+                    } else if (sumDayOut > 0) {
                         piecesAFromDb = sumDayOut;
-                    }
-                    if (piecesAFromDb === 0 && auto.statsShiftA.pecasProduzidas > 0) {
+                    } else if (auto.statsShiftA.pecasProduzidas > 0) {
                         piecesAFromDb = auto.statsShiftA.pecasProduzidas;
+                    }
+                } else {
+                    if (initialProduced !== undefined && initialProduced > 0) {
+                        piecesAFromDb = initialProduced;
                     }
                 }
 

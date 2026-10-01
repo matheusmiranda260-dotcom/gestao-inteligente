@@ -467,6 +467,14 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
 
     const getLocalDateString = (val: any): string => {
         if (!val) return '';
+        if (typeof val === 'string') {
+            const raw = val.trim();
+            if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+            if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) {
+                const parts = raw.split('/');
+                return `${parts[2]}-${parts[1]}-${parts[0]}`;
+            }
+        }
         try {
             const dt = new Date(val);
             if (isNaN(dt.getTime())) return String(val).split('T')[0] || '';
@@ -477,6 +485,42 @@ const ReportsTrefila: React.FC<ReportsTrefilaProps> = ({
         } catch {
             return String(val).split('T')[0] || '';
         }
+    };
+
+    const matchesDate = (val: any, target: string): boolean => {
+        if (!val || !target) return false;
+        const targetClean = String(target).trim();
+        const sVal = String(val).trim();
+
+        const targetLocal = getLocalDateString(targetClean);
+        const valLocal = getLocalDateString(sVal);
+
+        if (targetLocal && valLocal && targetLocal === valLocal) return true;
+
+        const extractDayMonth = (str: string, localIso: string) => {
+            if (/^\d{2}\/\d{2}$/.test(str)) {
+                const [d, m] = str.split('/');
+                return { d, m };
+            }
+            if (/^\d{2}\/\d{2}\/\d{4}/.test(str)) {
+                const [d, m] = str.split('/');
+                return { d, m };
+            }
+            if (localIso && /^\d{4}-\d{2}-\d{2}/.test(localIso)) {
+                const parts = localIso.split('-');
+                return { d: parts[2], m: parts[1] };
+            }
+            return null;
+        };
+
+        const targetDM = extractDayMonth(targetClean, targetLocal);
+        const valDM = extractDayMonth(sVal, valLocal);
+
+        if (targetDM && valDM) {
+            return targetDM.d === valDM.d && targetDM.m === valDM.m;
+        }
+
+        return false;
     };
 
     // Função que sincroniza a evolução do dia com a ficha de papel
