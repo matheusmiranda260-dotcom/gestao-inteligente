@@ -5154,26 +5154,6 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                             style={{ width: `${prog.pct}%` }}
                                                                         />
                                                                     </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                                title="Clique para ajustar quantidade total produzida da OP (Gestor)"
-                                                            >
-                                                                <div className="flex-1 min-w-0">
-                                                                    <div className="flex items-center justify-between text-[10.5px] font-mono font-bold text-slate-700 leading-none">
-                                                                        <span className="truncate group-hover/footprog:text-orange-600 transition-colors">
-                                                                            {prog.produced.toLocaleString('pt-BR')} / {prog.target.toLocaleString('pt-BR')} {prog.unit}
-                                                                            <span className="opacity-0 group-hover/footprog:opacity-100 text-[10px] text-orange-600 ml-1 transition-opacity">✏️</span>
-                                                                        </span>
-                                                                        <span className="font-black text-slate-900 ml-1">{prog.pct}%</span>
-                                                                    </div>
-                                                                    <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden border border-slate-300 mt-1">
-                                                                        <div 
-                                                                            className={`h-full ${barProgressColor} rounded-full transition-all duration-500`}
-                                                                            style={{ width: `${prog.pct}%` }}
-                                                                        />
-                                                                    </div>
-                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
