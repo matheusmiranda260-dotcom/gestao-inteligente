@@ -105,47 +105,106 @@ interface GaugeOption {
 }
 
 const getGaugeOptionsForMaterial = (material: string, gauges: StockGauge[]): GaugeOption[] => {
-    let customGauges = gauges.filter(g => g.materialType === material);
-    
-    if (material === 'Eletrodos Treliças' && customGauges.length === 0) {
-        customGauges = DefaultElectrodeGauges.map(e => ({
-            id: `default_el_${e.productCode}`,
-            materialType: e.materialType,
-            gauge: e.gauge,
-            productCode: e.productCode,
-            description: e.description
-        })) as StockGauge[];
-    } else if (material === 'Treliça' && customGauges.length === 0) {
-        customGauges = DefaultTrelicaGauges.map(t => ({
-            id: `default_tr_${t.productCode}`,
-            materialType: 'Treliça',
-            gauge: t.gauge,
-            productCode: t.productCode,
-            description: t.description,
-            tamanho: t.tamanho,
-            superior: t.superior,
-            inferior: t.inferior,
-            senozoide: t.senozoide,
-            peso_final: t.peso_final,
-            peso_superior: t.peso_superior,
-            peso_inferior: t.peso_inferior,
-            peso_senozoide: t.peso_senozoide
-        })) as StockGauge[];
-    } else if (material === 'Malha' && customGauges.length === 0) {
-        customGauges = DefaultMalhaGauges.map(m => ({
-            id: `default_ml_${m.productCode}`,
-            materialType: 'Malha',
-            gauge: m.gauge,
-            productCode: m.productCode,
-            description: m.description,
-            longitudinal: m.longitudinal,
-            transversal: m.transversal,
-            linearMeters: m.linearMeters,
-            meshSpacing: m.meshSpacing,
-            panelDimensions: m.panelDimensions,
-            peso_peca: m.peso_peca,
-            peso_final: m.peso_peca
-        })) as StockGauge[];
+    let customGauges = [...gauges.filter(g => g.materialType === material)];
+
+    let deletedDefaults: string[] = [];
+    let overriddenDefaults: string[] = [];
+    try {
+        deletedDefaults = JSON.parse(localStorage.getItem('deleted_default_gauges') || '[]');
+        overriddenDefaults = JSON.parse(localStorage.getItem('overridden_default_gauges') || '[]');
+    } catch (e) {
+        // ignore
+    }
+
+    if (material === 'Eletrodos Treliças') {
+        DefaultElectrodeGauges.forEach(e => {
+            const defId = `default_el_${e.productCode}`;
+            if (deletedDefaults.includes(defId) || overriddenDefaults.includes(defId)) return;
+            const exists = customGauges.some(g => (e.productCode && g.productCode === e.productCode) || g.id === defId);
+            if (!exists) {
+                customGauges.push({
+                    id: defId,
+                    materialType: e.materialType,
+                    gauge: e.gauge,
+                    productCode: e.productCode,
+                    description: e.description
+                } as StockGauge);
+            }
+        });
+    } else if (material === 'Treliça') {
+        DefaultTrelicaGauges.forEach(t => {
+            const defId = t.id || `default_tr_${t.productCode}`;
+            if (deletedDefaults.includes(defId) || overriddenDefaults.includes(defId)) return;
+            const exists = customGauges.some(g => (t.productCode && g.productCode === t.productCode) || g.id === defId);
+            if (!exists) {
+                customGauges.push({
+                    id: defId,
+                    materialType: 'Treliça',
+                    gauge: t.gauge,
+                    productCode: t.productCode,
+                    description: t.description,
+                    tamanho: t.tamanho,
+                    superior: t.superior,
+                    inferior: t.inferior,
+                    senozoide: t.senozoide,
+                    peso_final: t.peso_final,
+                    peso_superior: t.peso_superior,
+                    peso_inferior: t.peso_inferior,
+                    peso_senozoide: t.peso_senozoide
+                } as StockGauge);
+            }
+        });
+    } else if (material === 'Sabão') {
+        DefaultSabaoGauges.forEach(s => {
+            const defId = `default_sb_${s.productCode}`;
+            if (deletedDefaults.includes(defId) || overriddenDefaults.includes(defId)) return;
+            const exists = customGauges.some(g => (s.productCode && g.productCode === s.productCode) || g.id === defId);
+            if (!exists) {
+                customGauges.push({
+                    id: defId,
+                    materialType: s.materialType,
+                    gauge: s.gauge,
+                    productCode: s.productCode,
+                    description: s.description
+                } as StockGauge);
+            }
+        });
+    } else if (material === 'Malha') {
+        DefaultMalhaGauges.forEach(m => {
+            const defId = m.id || `default_ml_${m.productCode}`;
+            if (deletedDefaults.includes(defId) || overriddenDefaults.includes(defId)) return;
+            const exists = customGauges.some(g => (m.productCode && g.productCode === m.productCode) || g.id === defId);
+            if (!exists) {
+                customGauges.push({
+                    id: defId,
+                    materialType: 'Malha',
+                    gauge: m.gauge,
+                    productCode: m.productCode,
+                    description: m.description,
+                    longitudinal: m.longitudinal,
+                    transversal: m.transversal,
+                    linearMeters: m.linearMeters,
+                    meshSpacing: m.meshSpacing,
+                    panelDimensions: m.panelDimensions,
+                    peso_peca: m.peso_peca,
+                    peso_final: m.peso_peca
+                } as StockGauge);
+            }
+        });
+    } else {
+        const baseGauges = material === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions;
+        baseGauges.forEach(bg => {
+            const exists = customGauges.some(g => g.gauge === bg);
+            if (!exists) {
+                const defDesc = `${material} ${bg.replace('.', ',')} mm`;
+                customGauges.push({
+                    id: `default_base_${bg}`,
+                    materialType: material as MaterialType,
+                    gauge: bg,
+                    description: defDesc
+                } as StockGauge);
+            }
+        });
     }
 
     const options: GaugeOption[] = [];
@@ -2490,104 +2549,118 @@ const StockControl: React.FC<{
             }
         });
 
-        // 2. Default base gauges ONLY if a material has ZERO registered gauges in DB
+        // 2. Default catalog gauges merged (if not already present in DB gauges by productCode/key)
+        let deletedDefaults: string[] = [];
+        let overriddenDefaults: string[] = [];
+        try {
+            deletedDefaults = JSON.parse(localStorage.getItem('deleted_default_gauges') || '[]');
+            overriddenDefaults = JSON.parse(localStorage.getItem('overridden_default_gauges') || '[]');
+        } catch (e) {
+            // ignore
+        }
+
         const materialsToInclude = materialFilter ? [materialFilter] : ['Fio Máquina', 'CA-60', 'Eletrodos Treliças', 'Sabão', 'Treliça', 'Malha'];
         materialsToInclude.forEach(mat => {
-            const registeredCount = gauges.filter(g => g.materialType === mat).length;
-            if (registeredCount === 0) {
-                if (mat === 'Eletrodos Treliças') {
-                    DefaultElectrodeGauges.forEach(eg => {
-                        const key = `Eletrodos Treliças::${eg.gauge}::${eg.productCode}::${eg.description}`;
-                        const matPrefix = !materialFilter ? `[Eletrodos Treliças] ` : '';
-                        if (!options.some(o => o.key === key)) {
-                            options.push({
-                                key,
-                                gauge: eg.gauge,
-                                materialType: 'Eletrodos Treliças',
-                                productCode: eg.productCode,
-                                description: eg.description,
-                                label: `${matPrefix}${eg.description} (Cód. ${eg.productCode})`
-                            });
-                        }
-                    });
-                } else if (mat === 'Sabão') {
-                    DefaultSabaoGauges.forEach(sg => {
-                        const key = `Sabão::${sg.gauge}::${sg.productCode}::${sg.description}`;
-                        const matPrefix = !materialFilter ? `[Sabão] ` : '';
-                        if (!options.some(o => o.key === key)) {
-                            options.push({
-                                key,
-                                gauge: sg.gauge,
-                                materialType: 'Sabão',
-                                productCode: sg.productCode,
-                                description: sg.description,
-                                label: `${matPrefix}🧼 ${sg.gauge} - ${sg.description} (Cód. ${sg.productCode})`
-                            });
-                        }
-                    });
-                } else if (mat === 'Treliça') {
-                    DefaultTrelicaGauges.forEach(tg => {
-                        const key = `Treliça::${tg.gauge}::${tg.productCode}::${tg.description}`;
-                        const matPrefix = !materialFilter ? `[Treliça] ` : '';
-                        const tam = tg.tamanho ? ` ${tg.tamanho}m` : '';
-                        const code = tg.productCode ? ` (${tg.productCode})` : '';
-                        if (!options.some(o => o.key === key)) {
-                            options.push({
-                                key,
-                                gauge: tg.gauge,
-                                materialType: 'Treliça',
-                                productCode: tg.productCode,
-                                description: tg.description,
-                                tamanho: tg.tamanho,
-                                superior: tg.superior,
-                                inferior: tg.inferior,
-                                senozoide: tg.senozoide,
-                                peso_final: tg.peso_final,
-                                label: `${matPrefix}📐 ${tg.description}${tam}${code}`
-                            });
-                        }
-                    });
-                } else if (mat === 'Malha') {
-                    DefaultMalhaGauges.forEach(mg => {
-                        const key = `Malha::${mg.gauge}::${mg.productCode}::${mg.description}`;
-                        const matPrefix = !materialFilter ? `[Malha] ` : '';
-                        const code = mg.productCode ? ` (${mg.productCode})` : '';
-                        const weightText = mg.peso_peca ? ` [${mg.peso_peca} kg/pc]` : '';
-                        if (!options.some(o => o.key === key)) {
-                            options.push({
-                                key,
-                                gauge: mg.gauge,
-                                materialType: 'Malha',
-                                productCode: mg.productCode,
-                                description: mg.description,
-                                peso_peca: mg.peso_peca,
-                                longitudinal: mg.longitudinal,
-                                transversal: mg.transversal,
-                                linearMeters: mg.linearMeters,
-                                meshSpacing: mg.meshSpacing,
-                                panelDimensions: mg.panelDimensions,
-                                label: `${matPrefix}🕸️ ${mg.description}${code}${weightText}`
-                            });
-                        }
-                    });
-                } else {
-                    const baseGauges = mat === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions;
-                    baseGauges.forEach(bg => {
-                        const desc = `${mat} ${bg.replace('.', ',')} mm`;
-                        const key = `${mat}::${bg}::::${desc}`;
-                        const matPrefix = !materialFilter ? `[${mat}] ` : '';
-                        if (!options.some(o => o.key === key)) {
-                            options.push({
-                                key,
-                                gauge: bg,
-                                materialType: mat,
-                                productCode: '',
-                                description: desc,
-                                label: `${matPrefix}${bg.replace('.', ',')} mm - ${desc}`
-                            });
-                        }
-                    });
-                }
+            if (mat === 'Eletrodos Treliças') {
+                DefaultElectrodeGauges.forEach(eg => {
+                    const defId = `default_el_${eg.productCode}`;
+                    if (deletedDefaults.includes(defId) || overriddenDefaults.includes(defId)) return;
+                    const key = `Eletrodos Treliças::${eg.gauge}::${eg.productCode}::${eg.description}`;
+                    const matPrefix = !materialFilter ? `[Eletrodos Treliças] ` : '';
+                    if (!options.some(o => (eg.productCode && o.productCode === eg.productCode) || o.key === key)) {
+                        options.push({
+                            key,
+                            gauge: eg.gauge,
+                            materialType: 'Eletrodos Treliças',
+                            productCode: eg.productCode,
+                            description: eg.description,
+                            label: `${matPrefix}${eg.description} (Cód. ${eg.productCode})`
+                        });
+                    }
+                });
+            } else if (mat === 'Sabão') {
+                DefaultSabaoGauges.forEach(sg => {
+                    const defId = `default_sb_${sg.productCode}`;
+                    if (deletedDefaults.includes(defId) || overriddenDefaults.includes(defId)) return;
+                    const key = `Sabão::${sg.gauge}::${sg.productCode}::${sg.description}`;
+                    const matPrefix = !materialFilter ? `[Sabão] ` : '';
+                    if (!options.some(o => (sg.productCode && o.productCode === sg.productCode) || o.key === key)) {
+                        options.push({
+                            key,
+                            gauge: sg.gauge,
+                            materialType: 'Sabão',
+                            productCode: sg.productCode,
+                            description: sg.description,
+                            label: `${matPrefix}🧼 ${sg.gauge} - ${sg.description} (Cód. ${sg.productCode})`
+                        });
+                    }
+                });
+            } else if (mat === 'Treliça') {
+                DefaultTrelicaGauges.forEach(tg => {
+                    const defId = tg.id || `default_tr_${tg.productCode}`;
+                    if (deletedDefaults.includes(defId) || overriddenDefaults.includes(defId)) return;
+                    const key = `Treliça::${tg.gauge}::${tg.productCode}::${tg.description}`;
+                    const matPrefix = !materialFilter ? `[Treliça] ` : '';
+                    const tam = tg.tamanho ? ` ${tg.tamanho}m` : '';
+                    const code = tg.productCode ? ` (${tg.productCode})` : '';
+                    if (!options.some(o => (tg.productCode && o.productCode === tg.productCode) || o.key === key)) {
+                        options.push({
+                            key,
+                            gauge: tg.gauge,
+                            materialType: 'Treliça',
+                            productCode: tg.productCode,
+                            description: tg.description,
+                            tamanho: tg.tamanho,
+                            superior: tg.superior,
+                            inferior: tg.inferior,
+                            senozoide: tg.senozoide,
+                            peso_final: tg.peso_final,
+                            label: `${matPrefix}📐 ${tg.description}${tam}${code}`
+                        });
+                    }
+                });
+            } else if (mat === 'Malha') {
+                DefaultMalhaGauges.forEach(mg => {
+                    const defId = mg.id || `default_ml_${mg.productCode}`;
+                    if (deletedDefaults.includes(defId) || overriddenDefaults.includes(defId)) return;
+                    const key = `Malha::${mg.gauge}::${mg.productCode}::${mg.description}`;
+                    const matPrefix = !materialFilter ? `[Malha] ` : '';
+                    const code = mg.productCode ? ` (${mg.productCode})` : '';
+                    const weightText = mg.peso_peca ? ` [${mg.peso_peca} kg/pc]` : '';
+                    if (!options.some(o => (mg.productCode && o.productCode === mg.productCode) || o.key === key)) {
+                        options.push({
+                            key,
+                            gauge: mg.gauge,
+                            materialType: 'Malha',
+                            productCode: mg.productCode,
+                            description: mg.description,
+                            peso_peca: mg.peso_peca,
+                            longitudinal: mg.longitudinal,
+                            transversal: mg.transversal,
+                            linearMeters: mg.linearMeters,
+                            meshSpacing: mg.meshSpacing,
+                            panelDimensions: mg.panelDimensions,
+                            label: `${matPrefix}🕸️ ${mg.description}${code}${weightText}`
+                        });
+                    }
+                });
+            } else {
+                const baseGauges = mat === 'Fio Máquina' ? FioMaquinaBitolaOptions : CA60BitolaOptions;
+                baseGauges.forEach(bg => {
+                    const desc = `${mat} ${bg.replace('.', ',')} mm`;
+                    const key = `${mat}::${bg}::::${desc}`;
+                    const matPrefix = !materialFilter ? `[${mat}] ` : '';
+                    if (!options.some(o => o.gauge === bg && o.materialType === mat)) {
+                        options.push({
+                            key,
+                            gauge: bg,
+                            materialType: mat,
+                            productCode: '',
+                            description: desc,
+                            label: `${matPrefix}${bg.replace('.', ',')} mm - ${desc}`
+                        });
+                    }
+                });
             }
         });
 

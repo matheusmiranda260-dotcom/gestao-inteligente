@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { Page, User, Employee, StockItem, ConferenceData, ProductionOrderData, TransferRecord, Bitola, MaterialType, MachineType, PartsRequest, ShiftReport, ProductionRecord, TransferredLotInfo, ProcessedLot, DowntimeEvent, OperatorLog, TrelicaSelectedLots, WeighedPackage, FinishedProductItem, Ponta, PontaItem, FinishedGoodsTransferRecord, TransferredFinishedGoodInfo, KaizenProblem, Meeting, MeetingItem, MeetingCategory, StockMovement, DowntimeConfig, UserAccessLog, ProductionSchedule, PcpShiftConfig } from './types';
-import { FioMaquinaBitolaOptions, TrefilaBitolaOptions, CA60BitolaOptions, DefaultElectrodeGauges, DefaultSabaoGauges, DefaultTrelicaGauges } from './types';
+import { FioMaquinaBitolaOptions, TrefilaBitolaOptions, CA60BitolaOptions, DefaultElectrodeGauges, DefaultSabaoGauges, DefaultTrelicaGauges, DefaultMalhaGauges } from './types';
 import Login from './components/Login';
 import MainMenu from './components/MainMenu';
 import StockControl from './components/StockControl';
@@ -609,10 +609,11 @@ const App: React.FC = () => {
                 const existing = gauges.find(g => g.id === id) ||
                     DefaultTrelicaGauges.find(t => (t.id || `default_tr_${t.productCode}`) === id) ||
                     DefaultElectrodeGauges.find(e => `default_el_${e.productCode}` === id) ||
-                    DefaultSabaoGauges.find(s => `default_sb_${s.productCode}` === id);
+                    DefaultSabaoGauges.find(s => `default_sb_${s.productCode}` === id) ||
+                    DefaultMalhaGauges.find(m => (m.id || `default_ml_${m.productCode}`) === id);
 
                 const itemToInsert: Omit<StockGauge, 'id'> = {
-                    materialType: data.materialType || existing?.materialType || 'Treliça',
+                    materialType: data.materialType || existing?.materialType || 'Malha',
                     gauge: data.gauge || existing?.gauge || '',
                     description: data.description !== undefined ? data.description : existing?.description,
                     productCode: data.productCode !== undefined ? data.productCode : existing?.productCode,
@@ -623,7 +624,13 @@ const App: React.FC = () => {
                     peso_final: data.peso_final || existing?.peso_final,
                     peso_superior: data.peso_superior || existing?.peso_superior,
                     peso_inferior: data.peso_inferior || existing?.peso_inferior,
-                    peso_senozoide: data.peso_senozoide || existing?.peso_senozoide
+                    peso_senozoide: data.peso_senozoide || existing?.peso_senozoide,
+                    longitudinal: data.longitudinal || (existing as any)?.longitudinal,
+                    transversal: data.transversal || (existing as any)?.transversal,
+                    linearMeters: data.linearMeters || (existing as any)?.linearMeters,
+                    meshSpacing: data.meshSpacing || (existing as any)?.meshSpacing,
+                    panelDimensions: data.panelDimensions || (existing as any)?.panelDimensions,
+                    peso_peca: data.peso_peca || (existing as any)?.peso_peca
                 };
 
                 savedOrUpdated = await insertItem<StockGauge>('stock_gauges', itemToInsert as StockGauge);
@@ -781,6 +788,19 @@ const App: React.FC = () => {
                     peso_superior: t.peso_superior,
                     peso_inferior: t.peso_inferior,
                     peso_senozoide: t.peso_senozoide
+                })),
+                ...DefaultMalhaGauges.map(m => ({
+                    materialType: 'Malha' as MaterialType,
+                    gauge: m.gauge,
+                    productCode: m.productCode,
+                    description: m.description,
+                    longitudinal: m.longitudinal,
+                    transversal: m.transversal,
+                    linearMeters: m.linearMeters,
+                    meshSpacing: m.meshSpacing,
+                    panelDimensions: m.panelDimensions,
+                    peso_peca: m.peso_peca,
+                    peso_final: m.peso_peca
                 }))
             ];
 
