@@ -3806,16 +3806,34 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     {/* Faixa decorativa superior Laranja Ita Aços */}
                     <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-500 via-amber-400 to-orange-600" />
                     
-                    {/* Título e Badge */}
-                    <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-orange-500/20 border border-orange-400/40 flex items-center justify-center text-orange-400 shadow-sm">
-                            <CalendarIcon className="w-5 h-5" />
+                    {/* Título com Logo Ita Aços + Setor Trefila + Power by MSM */}
+                    <div className="flex items-center gap-3.5">
+                        {/* Logo Ita Aços em card com acabamento clean */}
+                        <div className="bg-white/95 px-3 py-1.5 rounded-xl border border-white/40 shadow-md backdrop-blur-sm flex items-center justify-center shrink-0 hover:bg-white transition-all">
+                            <img 
+                                src="/ita-acos-logo.png" 
+                                alt="Logo Grupo Ita Aços" 
+                                className="h-7 sm:h-8 w-auto object-contain" 
+                            />
                         </div>
-                        <div>
-                            <h1 className="text-sm font-black tracking-widest uppercase text-white flex items-center gap-2">
-                                Quadro PCP <span className="text-[10px] text-orange-300 font-bold tracking-normal bg-orange-500/20 px-2.5 py-0.5 rounded-full border border-orange-400/40">Torre de Controle</span>
-                            </h1>
-                            <p className="text-[10px] text-blue-200/80">Planejamento, agendamento e evolução de produção em tempo real</p>
+
+                        <div className="flex flex-col justify-center">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <h1 className="text-sm sm:text-base font-black tracking-wider uppercase text-white drop-shadow-sm flex items-center gap-1.5">
+                                    Planejamento Semanal
+                                </h1>
+                                <span className="text-[9.5px] font-black uppercase text-white bg-gradient-to-r from-orange-500 via-orange-600 to-amber-500 px-2.5 py-0.5 rounded-full shadow-sm tracking-widest border border-orange-300/40">
+                                    Setor Trefila
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                <p className="text-[10px] text-blue-200/90 font-medium tracking-wide flex items-center gap-1.5">
+                                    <span>Painel de Produção</span>
+                                    <span className="text-blue-400/80">•</span>
+                                    <span className="text-orange-300 font-extrabold tracking-wider">Power by MSM</span>
+                                </p>
+                            </div>
                         </div>
                     </div>
 
