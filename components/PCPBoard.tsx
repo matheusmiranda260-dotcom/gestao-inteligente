@@ -5105,21 +5105,26 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                                                                             {/* Estatística de Tempo (Efetivo e Parado) - Cronômetro em Tempo Real e Ritmo por Hora */}
                                                                             {dayStats.hasTimeStats && (
-                                                                                <div className="flex flex-col items-end shrink-0">
-                                                                                    <span className="text-[7.5px] sm:text-[8px] font-bold uppercase tracking-wider text-slate-400 mb-0.5 pr-0.5 leading-none select-none">
+                                                                                <div 
+                                                                                    className={`flex flex-col justify-center px-1.5 sm:px-2 py-0.5 rounded-lg border shadow-xs text-right shrink-0 select-none pointer-events-none gap-0.5 transition-all min-w-[88px] sm:min-w-[96px] ${
+                                                                                        dayStats.isMachineStoppedNow
+                                                                                            ? 'bg-amber-50/95 border-amber-300 ring-1 ring-amber-400/30'
+                                                                                            : dayStats.isProducingNow
+                                                                                                ? 'bg-emerald-50/95 border-emerald-300 ring-1 ring-emerald-400/30'
+                                                                                                : 'bg-white/95 border-slate-200/90 shadow-[0_1px_2px_rgba(0,0,0,0.03)]'
+                                                                                    }`}
+                                                                                    title={`Cronômetro do Turno (Tempo Real):\n⚡ Efetivo: ${dayStats.effectiveFormatted} ${dayStats.isProducingNow ? '(Correndo)' : '(Pausado)'}\n⏱️ Parado: ${dayStats.downtimeFormatted} ${dayStats.isMachineStoppedNow ? '(Correndo)' : '(Pausado)'}${dayStats.ratePerHour > 0 ? `\n🚀 Ritmo: ${dayStats.rateFormatted}` : ''}${dayStats.speedValue > 0 ? `\n⚡ Velocidade: ${dayStats.speedFormatted} ${dayStats.speedUnit}` : ''}`}
+                                                                                >
+                                                                                    <div className={`text-[7.5px] sm:text-[8px] font-black uppercase tracking-widest text-center pb-0.5 border-b mb-0.5 select-none leading-none ${
+                                                                                        dayStats.isMachineStoppedNow 
+                                                                                            ? 'text-amber-800 border-amber-200/80' 
+                                                                                            : dayStats.isProducingNow 
+                                                                                                ? 'text-emerald-800 border-emerald-200/80' 
+                                                                                                : 'text-slate-400 border-slate-200/80'
+                                                                                    }`}>
                                                                                         Estatísticas
-                                                                                    </span>
-                                                                                    <div 
-                                                                                        className={`flex flex-col justify-center px-1.5 sm:px-2 py-0.5 rounded-lg border shadow-xs text-right shrink-0 select-none pointer-events-none gap-0.5 transition-all min-w-[88px] sm:min-w-[96px] ${
-                                                                                            dayStats.isMachineStoppedNow
-                                                                                                ? 'bg-amber-50/95 border-amber-300 ring-1 ring-amber-400/30'
-                                                                                                : dayStats.isProducingNow
-                                                                                                    ? 'bg-emerald-50/95 border-emerald-300 ring-1 ring-emerald-400/30'
-                                                                                                    : 'bg-white/95 border-slate-200/90 shadow-[0_1px_2px_rgba(0,0,0,0.03)]'
-                                                                                        }`}
-                                                                                        title={`Cronômetro do Turno (Tempo Real):\n⚡ Efetivo: ${dayStats.effectiveFormatted} ${dayStats.isProducingNow ? '(Correndo)' : '(Pausado)'}\n⏱️ Parado: ${dayStats.downtimeFormatted} ${dayStats.isMachineStoppedNow ? '(Correndo)' : '(Pausado)'}${dayStats.ratePerHour > 0 ? `\n🚀 Ritmo: ${dayStats.rateFormatted}` : ''}${dayStats.speedValue > 0 ? `\n⚡ Velocidade: ${dayStats.speedFormatted} ${dayStats.speedUnit}` : ''}`}
-                                                                                    >
-                                                                                        <div className="flex items-center justify-between gap-1 leading-none">
+                                                                                    </div>
+                                                                                    <div className="flex items-center justify-between gap-1 leading-none">
                                                                                             <span className={`text-[9.5px] uppercase font-black tracking-tight flex items-center gap-0.5 ${
                                                                                                 dayStats.isProducingNow ? 'text-emerald-800' : 'text-slate-500'
                                                                                             }`}>
@@ -5188,9 +5193,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                             </div>
                                                                                         )}
                                                                                     </div>
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
+                                                                                )}
+                                                                            </div>
 
                                                                         <div className="flex items-center justify-between text-[10px] sm:text-[11px] truncate pt-0.5 mt-0.5 border-t border-slate-200/80">
                                                                             <span className="truncate flex items-center gap-1 font-semibold min-w-0">
