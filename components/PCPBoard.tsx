@@ -4976,22 +4976,23 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                         title={`Clique para ver paradas e relatório de ${dayColName} ${formatFriendlyDate(currentDay)}`}
                                                                     >
                                                                         <div className="flex items-center justify-between gap-1 text-[10px] sm:text-[11px] font-black uppercase tracking-wider mb-0.5 min-w-0">
-                                                                            <span className={`truncate shrink-0 ${
-                                                                                dayStats.isToday 
-                                                                                    ? (prog.isLive && (prog.isStopped || prog.isPrep))
-                                                                                        ? (isDowntimeOverLimit ? 'text-rose-700 font-extrabold' : 'text-amber-800 font-extrabold')
-                                                                                        : 'text-blue-800 font-extrabold'
-                                                                                    : dayStats.isHoliday 
-                                                                                        ? 'text-rose-600' 
-                                                                                        : hasRealPastProd 
-                                                                                            ? 'text-emerald-800 font-extrabold' 
-                                                                                            : dayStats.isFuture
-                                                                                                ? 'text-slate-600 font-bold'
-                                                                                                : 'text-slate-500'
-                                                                            }`}>
-                                                                                {dayColName} {formatFriendlyDate(currentDay)}
-                                                                            </span>
-                                                                            <div className="flex-1 flex justify-center items-center">
+                                                                            <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                                                                                <span className={`truncate shrink-0 ${
+                                                                                    dayStats.isToday 
+                                                                                        ? (prog.isLive && (prog.isStopped || prog.isPrep))
+                                                                                            ? (isDowntimeOverLimit ? 'text-rose-700 font-extrabold' : 'text-amber-800 font-extrabold')
+                                                                                            : 'text-blue-800 font-extrabold'
+                                                                                        : dayStats.isHoliday 
+                                                                                            ? 'text-rose-600' 
+                                                                                            : hasRealPastProd 
+                                                                                                ? 'text-emerald-800 font-extrabold' 
+                                                                                                : dayStats.isFuture
+                                                                                                    ? 'text-slate-600 font-bold'
+                                                                                                    : 'text-slate-500'
+                                                                                }`}>
+                                                                                    {dayColName} {formatFriendlyDate(currentDay)}
+                                                                                </span>
+
                                                                                 {dayStats.isToday && (
                                                                                     prog.isLive && (prog.isStopped || prog.isPrep) ? (
                                                                                         isDowntimeOverLimit ? (
@@ -5105,7 +5106,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                             {/* Estatística de Tempo (Efetivo e Parado) - Cronômetro em Tempo Real e Ritmo por Hora */}
                                                                             {dayStats.hasTimeStats && (
                                                                                 <div 
-                                                                                    className={`flex flex-col justify-center px-2 py-0.5 rounded-lg border shadow-xs text-right shrink-0 select-none pointer-events-none gap-0.5 transition-all min-w-[84px] sm:min-w-[92px] ${
+                                                                                    className={`flex flex-col justify-center px-2 py-1 rounded-lg border shadow-xs text-right shrink-0 select-none pointer-events-none gap-0.5 transition-all min-w-[96px] sm:min-w-[106px] ${
                                                                                         dayStats.isMachineStoppedNow
                                                                                             ? 'bg-amber-50/95 border-amber-300 ring-1 ring-amber-400/30'
                                                                                             : dayStats.isProducingNow
