@@ -4617,8 +4617,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                 >
                                                     <div className="flex flex-col h-full justify-between gap-1">
                                                         <div className="flex items-center justify-between gap-2 shrink-0 pb-1 border-b border-slate-200/80 flex-wrap sm:flex-nowrap">
-                                                            {/* Lado Esquerdo: #OP# + Descrição + Status Badges */}
-                                                            <div className="flex items-center gap-1.5 min-w-0 flex-1 truncate">
+                                                            {/* Lado Esquerdo: #OP# + Descrição Completa + Status Badges */}
+                                                            <div className="flex items-center gap-2 min-w-0 flex-1 flex-wrap">
                                                                 <span 
                                                                     className="text-sm sm:text-base font-black text-blue-900 tracking-wide hover:text-orange-600 cursor-pointer transition-colors flex items-center flex-wrap gap-1 shrink-0"
                                                                     onClick={(e) => {
@@ -4628,8 +4628,15 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                     title="Clique para editar OP em produção (Nome, Meta, Turnos Finalizados)"
                                                                 >
                                                                     <span>#{title}#</span>
-                                                                    {subtitle && <span className="text-[11px] sm:text-xs text-slate-700 font-bold ml-1 tracking-normal truncate max-w-[260px] hidden md:inline">{subtitle}</span>}
                                                                 </span>
+                                                                {subtitle && (
+                                                                    <span 
+                                                                        className="text-xs sm:text-sm text-slate-800 font-bold tracking-normal"
+                                                                        title={subtitle}
+                                                                    >
+                                                                        {subtitle}
+                                                                    </span>
+                                                                )}
                                                                 
                                                                 {prog.isPending && (
                                                                     <span className="flex items-center gap-1 text-[9.5px] font-black uppercase bg-amber-100 text-amber-900 px-2 py-0.5 rounded-md border border-amber-300 shadow-sm shrink-0">
@@ -4638,7 +4645,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                     </span>
                                                                 )}
                                                                 {prog.isLive && prog.isStopped && (
-                                                                    <span className={`flex items-center gap-1 text-[9.5px] font-black uppercase text-white px-2 py-0.5 rounded-md shadow-sm shrink-0 truncate max-w-[260px] ${
+                                                                    <span className={`flex items-center gap-1 text-[9.5px] font-black uppercase text-white px-2.5 py-0.5 rounded-md shadow-sm shrink-0 ${
                                                                         isDowntimeOverLimit ? 'bg-rose-600 animate-pulse' : 'bg-amber-500 animate-pulse'
                                                                     }`}>
                                                                         <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping shrink-0" />
@@ -4646,7 +4653,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                     </span>
                                                                 )}
                                                                 {prog.isLive && prog.isPrep && (
-                                                                    <span className={`flex items-center gap-1 text-[9.5px] font-black uppercase text-white px-2 py-0.5 rounded-md shadow-sm shrink-0 truncate max-w-[260px] ${
+                                                                    <span className={`flex items-center gap-1 text-[9.5px] font-black uppercase text-white px-2.5 py-0.5 rounded-md shadow-sm shrink-0 ${
                                                                         isDowntimeOverLimit ? 'bg-rose-600 animate-pulse' : 'bg-amber-500 animate-pulse'
                                                                     }`}>
                                                                         <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
