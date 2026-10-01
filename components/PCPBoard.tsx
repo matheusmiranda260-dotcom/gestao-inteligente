@@ -5070,7 +5070,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                         className="flex items-baseline gap-0.5 cursor-pointer group/qty hover:bg-white px-1 py-0.5 rounded-md transition-all select-none min-w-0"
                                                                                         title="Clique para abrir ajuste de contagem (Gestor)"
                                                                                     >
-                                                                                        <span className={`text-2xl sm:text-3xl md:text-[28px] font-black font-mono tracking-tight truncate group-hover/qty:text-orange-600 transition-colors leading-none ${
+                                                                                        <span className={`text-xl sm:text-2xl md:text-[26px] font-black font-mono tracking-tight whitespace-nowrap group-hover/qty:text-orange-600 transition-colors leading-none ${
                                                                                             dayStats.isToday 
                                                                                                 ? (prog.isLive && (prog.isStopped || prog.isPrep))
                                                                                                     ? (isDowntimeOverLimit ? 'text-rose-950 font-black' : 'text-amber-950 font-black')
@@ -5105,84 +5105,89 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                                                                             {/* Estatística de Tempo (Efetivo e Parado) - Cronômetro em Tempo Real e Ritmo por Hora */}
                                                                             {dayStats.hasTimeStats && (
-                                                                                <div 
-                                                                                    className={`flex flex-col justify-center px-2 py-1 rounded-lg border shadow-xs text-right shrink-0 select-none pointer-events-none gap-0.5 transition-all min-w-[96px] sm:min-w-[106px] ${
-                                                                                        dayStats.isMachineStoppedNow
-                                                                                            ? 'bg-amber-50/95 border-amber-300 ring-1 ring-amber-400/30'
-                                                                                            : dayStats.isProducingNow
-                                                                                                ? 'bg-emerald-50/95 border-emerald-300 ring-1 ring-emerald-400/30'
-                                                                                                : 'bg-white/95 border-slate-200/90 shadow-[0_1px_2px_rgba(0,0,0,0.03)]'
-                                                                                    }`}
-                                                                                    title={`Cronômetro do Turno (Tempo Real):\n⚡ Efetivo: ${dayStats.effectiveFormatted} ${dayStats.isProducingNow ? '(Correndo)' : '(Pausado)'}\n⏱️ Parado: ${dayStats.downtimeFormatted} ${dayStats.isMachineStoppedNow ? '(Correndo)' : '(Pausado)'}${dayStats.ratePerHour > 0 ? `\n🚀 Ritmo: ${dayStats.rateFormatted}` : ''}${dayStats.speedValue > 0 ? `\n⚡ Velocidade: ${dayStats.speedFormatted} ${dayStats.speedUnit}` : ''}`}
-                                                                                >
-                                                                                    <div className="flex items-center justify-between gap-1 leading-none">
-                                                                                        <span className={`text-[9.5px] uppercase font-black tracking-tight flex items-center gap-0.5 ${
-                                                                                            dayStats.isProducingNow ? 'text-emerald-800' : 'text-slate-500'
-                                                                                        }`}>
-                                                                                            {dayStats.isProducingNow ? (
-                                                                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
-                                                                                            ) : (
-                                                                                                <span className="text-[8px]">⚡</span>
-                                                                                            )}
-                                                                                            EF:
-                                                                                        </span>
-                                                                                        <span className={`text-[12.5px] sm:text-[14px] font-black font-mono tracking-tight leading-none ${
-                                                                                            dayStats.isProducingNow ? 'text-emerald-700' : 'text-slate-700'
-                                                                                        }`}>
-                                                                                            {dayStats.effectiveFormatted}
-                                                                                        </span>
-                                                                                    </div>
-                                                                                    <div className="flex items-center justify-between gap-1 leading-none">
-                                                                                        <span className={`text-[9.5px] uppercase font-black tracking-tight flex items-center gap-0.5 ${
-                                                                                            dayStats.isMachineStoppedNow ? 'text-amber-800' : 'text-slate-400'
-                                                                                        }`}>
-                                                                                            {dayStats.isMachineStoppedNow ? (
-                                                                                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping inline-block" />
-                                                                                            ) : (
-                                                                                                <span className="text-[8px]">⏱️</span>
-                                                                                            )}
-                                                                                            PAR:
-                                                                                        </span>
-                                                                                        <span className={`text-[12.5px] sm:text-[14px] font-black font-mono tracking-tight leading-none ${
-                                                                                            dayStats.isMachineStoppedNow 
-                                                                                                ? 'text-amber-700 font-extrabold' 
-                                                                                                : dayStats.downtimeMs > 0 
-                                                                                                    ? 'text-amber-600' 
-                                                                                                    : 'text-slate-400'
-                                                                                        }`}>
-                                                                                            {dayStats.downtimeFormatted}
-                                                                                        </span>
-                                                                                    </div>
-                                                                                    {dayStats.ratePerHour > 0 && (
-                                                                                        <div className="flex items-center justify-between gap-1 leading-none pt-0.5 border-t border-slate-200/80 mt-0.5">
-                                                                                            <span className={`text-[8.5px] font-black tracking-tight flex items-center gap-0.5 ${
+                                                                                <div className="flex flex-col items-end shrink-0">
+                                                                                    <span className="text-[7.5px] sm:text-[8px] font-bold uppercase tracking-wider text-slate-400 mb-0.5 pr-0.5 leading-none select-none">
+                                                                                        Estatísticas
+                                                                                    </span>
+                                                                                    <div 
+                                                                                        className={`flex flex-col justify-center px-1.5 sm:px-2 py-0.5 rounded-lg border shadow-xs text-right shrink-0 select-none pointer-events-none gap-0.5 transition-all min-w-[88px] sm:min-w-[96px] ${
+                                                                                            dayStats.isMachineStoppedNow
+                                                                                                ? 'bg-amber-50/95 border-amber-300 ring-1 ring-amber-400/30'
+                                                                                                : dayStats.isProducingNow
+                                                                                                    ? 'bg-emerald-50/95 border-emerald-300 ring-1 ring-emerald-400/30'
+                                                                                                    : 'bg-white/95 border-slate-200/90 shadow-[0_1px_2px_rgba(0,0,0,0.03)]'
+                                                                                        }`}
+                                                                                        title={`Cronômetro do Turno (Tempo Real):\n⚡ Efetivo: ${dayStats.effectiveFormatted} ${dayStats.isProducingNow ? '(Correndo)' : '(Pausado)'}\n⏱️ Parado: ${dayStats.downtimeFormatted} ${dayStats.isMachineStoppedNow ? '(Correndo)' : '(Pausado)'}${dayStats.ratePerHour > 0 ? `\n🚀 Ritmo: ${dayStats.rateFormatted}` : ''}${dayStats.speedValue > 0 ? `\n⚡ Velocidade: ${dayStats.speedFormatted} ${dayStats.speedUnit}` : ''}`}
+                                                                                    >
+                                                                                        <div className="flex items-center justify-between gap-1 leading-none">
+                                                                                            <span className={`text-[9.5px] uppercase font-black tracking-tight flex items-center gap-0.5 ${
                                                                                                 dayStats.isProducingNow ? 'text-emerald-800' : 'text-slate-500'
                                                                                             }`}>
-                                                                                                <span className="text-[7.5px]">🚀</span>
-                                                                                                H:
+                                                                                                {dayStats.isProducingNow ? (
+                                                                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                                                                                                ) : (
+                                                                                                    <span className="text-[8px]">⚡</span>
+                                                                                                )}
+                                                                                                EF:
                                                                                             </span>
-                                                                                            <span className={`text-[11.5px] sm:text-[12.5px] font-black font-mono tracking-tight leading-none ${
-                                                                                                dayStats.isProducingNow ? 'text-emerald-900 font-extrabold' : 'text-slate-800'
+                                                                                            <span className={`text-[12px] sm:text-[13.5px] font-black font-mono tracking-tight leading-none ${
+                                                                                                dayStats.isProducingNow ? 'text-emerald-700' : 'text-slate-700'
                                                                                             }`}>
-                                                                                                {dayStats.ratePerHour.toLocaleString('pt-BR')}<span className="text-[7.5px] font-bold text-slate-500 ml-0.5">{dayStats.rateUnit}</span>
+                                                                                                {dayStats.effectiveFormatted}
                                                                                             </span>
                                                                                         </div>
-                                                                                    )}
-                                                                                    {dayStats.speedValue > 0 && (
-                                                                                        <div className="flex items-center justify-between gap-1 leading-none pt-0.5 border-t border-slate-200/80 mt-0.5">
-                                                                                            <span className={`text-[8.5px] font-black tracking-tight flex items-center gap-0.5 ${
-                                                                                                dayStats.isProducingNow ? 'text-emerald-800' : 'text-slate-500'
+                                                                                        <div className="flex items-center justify-between gap-1 leading-none">
+                                                                                            <span className={`text-[9.5px] uppercase font-black tracking-tight flex items-center gap-0.5 ${
+                                                                                                dayStats.isMachineStoppedNow ? 'text-amber-800' : 'text-slate-400'
                                                                                             }`}>
-                                                                                                <span className="text-[7.5px]">⚡</span>
-                                                                                                VEL:
+                                                                                                {dayStats.isMachineStoppedNow ? (
+                                                                                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping inline-block" />
+                                                                                                ) : (
+                                                                                                    <span className="text-[8px]">⏱️</span>
+                                                                                                )}
+                                                                                                PAR:
                                                                                             </span>
-                                                                                            <span className={`text-[11.5px] sm:text-[12.5px] font-black font-mono tracking-tight leading-none ${
-                                                                                                dayStats.isProducingNow ? 'text-emerald-900 font-extrabold' : 'text-slate-800'
+                                                                                            <span className={`text-[12px] sm:text-[13.5px] font-black font-mono tracking-tight leading-none ${
+                                                                                                dayStats.isMachineStoppedNow 
+                                                                                                    ? 'text-amber-700 font-extrabold' 
+                                                                                                    : dayStats.downtimeMs > 0 
+                                                                                                        ? 'text-amber-600' 
+                                                                                                        : 'text-slate-400'
                                                                                             }`}>
-                                                                                                {dayStats.speedFormatted}<span className="text-[7.5px] font-bold text-slate-500 ml-0.5">{dayStats.speedUnit}</span>
+                                                                                                {dayStats.downtimeFormatted}
                                                                                             </span>
                                                                                         </div>
-                                                                                    )}
+                                                                                        {dayStats.ratePerHour > 0 && (
+                                                                                            <div className="flex items-center justify-between gap-1 leading-none pt-0.5 border-t border-slate-200/80 mt-0.5">
+                                                                                                <span className={`text-[8.5px] font-black tracking-tight flex items-center gap-0.5 ${
+                                                                                                    dayStats.isProducingNow ? 'text-emerald-800' : 'text-slate-500'
+                                                                                                }`}>
+                                                                                                    <span className="text-[7.5px]">🚀</span>
+                                                                                                    H:
+                                                                                                </span>
+                                                                                                <span className={`text-[11px] sm:text-[12px] font-black font-mono tracking-tight leading-none ${
+                                                                                                    dayStats.isProducingNow ? 'text-emerald-900 font-extrabold' : 'text-slate-800'
+                                                                                                }`}>
+                                                                                                    {dayStats.ratePerHour.toLocaleString('pt-BR')}<span className="text-[7.5px] font-bold text-slate-500 ml-0.5">{dayStats.rateUnit}</span>
+                                                                                                </span>
+                                                                                            </div>
+                                                                                        )}
+                                                                                        {dayStats.speedValue > 0 && (
+                                                                                            <div className="flex items-center justify-between gap-1 leading-none pt-0.5 border-t border-slate-200/80 mt-0.5">
+                                                                                                <span className={`text-[8.5px] font-black tracking-tight flex items-center gap-0.5 ${
+                                                                                                    dayStats.isProducingNow ? 'text-emerald-800' : 'text-slate-500'
+                                                                                                }`}>
+                                                                                                    <span className="text-[7.5px]">⚡</span>
+                                                                                                    VEL:
+                                                                                                </span>
+                                                                                                <span className={`text-[11px] sm:text-[12px] font-black font-mono tracking-tight leading-none ${
+                                                                                                    dayStats.isProducingNow ? 'text-emerald-900 font-extrabold' : 'text-slate-800'
+                                                                                                }`}>
+                                                                                                    {dayStats.speedFormatted}<span className="text-[7.5px] font-bold text-slate-500 ml-0.5">{dayStats.speedUnit}</span>
+                                                                                                </span>
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </div>
                                                                                 </div>
                                                                             )}
                                                                         </div>
