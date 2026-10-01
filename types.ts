@@ -811,7 +811,7 @@ export const DefaultMalhaGauges: Array<Omit<StockGauge, 'id'> & { id?: string }>
     {
         materialType: 'Malha',
         productCode: '6626',
-        description: 'MALHA SOLDADA/IND. PAINEL 6,00X2,45 10X10 4,20MM- SOB MEDIDA',
+        description: 'MALHA SOLDADA/IND. PAINEL Q138-6,00X2,45 10X10 4,20MM- SOB MEDIDA',
         gauge: '4,20mm',
         longitudinal: '25 peças c/ 6mts',
         transversal: '60 peças c/ 2,45mts',
