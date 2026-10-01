@@ -3616,11 +3616,15 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         const effectiveFormatted = formatShiftTimeDisplay(effectiveMs, showSecondsLive);
         const downtimeFormatted = formatShiftTimeDisplay(dayDowntimeMs, showSecondsLive);
 
-        // Cálculo de Produtividade / Ritmo por Hora Efetiva (kg/h para Trefila, pçs/h para Treliça e Malha)
-        const effectiveHours = effectiveMs > 0 ? (effectiveMs / 3600000) : 0;
-        const ratePerHour = effectiveHours > 0 && produced > 0 ? Math.round(produced / effectiveHours) : 0;
+        // Cálculo de Produtividade Real / Ritmo por Hora do Turno (considerando Tempo Efetivo + Tempo Parado)
+        // Quantidade Produzida / Tempo Total Decorrido do Turno (em horas)
+        const totalShiftTimeMs = effectiveMs + dayDowntimeMs;
+        const totalShiftHours = totalShiftTimeMs > 0 ? (totalShiftTimeMs / 3600000) : 0;
+        
+        // Se a máquina tiver menos de 10 minutos de turno (0.16h) ou 0 produzido, não projeta número irreal (deixa 0)
+        const ratePerHour = (totalShiftHours >= 0.16 && produced > 0) ? Math.round(produced / totalShiftHours) : 0;
         const rateUnit = isTrefila ? 'kg/h' : 'pçs/h';
-        const rateFormatted = ratePerHour > 0 ? `${ratePerHour.toLocaleString('pt-BR')} ${rateUnit}` : '';
+        const rateFormatted = ratePerHour > 0 ? `${ratePerHour.toLocaleString('pt-BR')} ${rateUnit}` : `0 ${rateUnit}`;
 
         const hasTimeStats = !isHoliday && (
             (isToday && (status === 'live' || status === 'closed' || dayElapsedShiftMs > 0 || produced > 0)) ||
@@ -4719,7 +4723,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                 unit: dayStats.unit 
                                                                             });
                                                                         }}
-                                                                        className={`flex flex-col justify-between p-1.5 rounded-lg border text-left transition-all cursor-pointer hover:shadow-md select-none ${
+                                                                        className={`flex flex-col justify-between p-1.5 rounded-lg border text-left transition-all cursor-pointer hover:shadow-md select-none min-h-[76px] ${
                                                                             dayStats.isToday 
                                                                                 ? (prog.isLive && (prog.isStopped || prog.isPrep))
                                                                                     ? (isDowntimeOverLimit
@@ -4932,7 +4936,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                             )}
                                                                         </div>
 
-                                                                        <div className="flex items-center justify-between text-[9.5px] sm:text-[10.5px] truncate pt-0.5 border-t border-slate-200/80">
+                                                                        <div className="flex items-center justify-between text-[9.5px] sm:text-[10.5px] truncate pt-1 mt-0.5 border-t border-slate-200/80">
                                                                             <span className="truncate flex items-center gap-1 font-semibold">
                                                                                 {dayStats.isHoliday ? (
                                                                                     <span className="text-rose-600 truncate font-bold">
