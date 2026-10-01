@@ -3627,6 +3627,67 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         const rateUnit = isTrefila ? 'kg/h' : 'pçs/h';
         const rateFormatted = ratePerHour > 0 ? `${ratePerHour.toLocaleString('pt-BR')} ${rateUnit}` : `0 ${rateUnit}`;
 
+        // Cálculo de Velocidade Real de Produção:
+        // - Trefila: metros lineares por segundo (m/s) durante o tempo efetivo
+        // - Treliça: metros lineares por minuto (m/min) durante o tempo efetivo
+        // - Malha: Não exibe velocidade conforme solicitado
+        let speedValue = 0;
+        let speedUnit = '';
+        let speedFormatted = '';
+
+        if (isTrefila && effectiveMs >= 30000 && produced > 0) {
+            let bitolaMm = 0;
+            const rawGauge = (op as any).targetGauge || (op as any).gauge || (op as any).bitola || (op as any).targetBitola;
+            if (rawGauge) {
+                const parsed = parseFloat(String(rawGauge).replace(',', '.'));
+                if (!isNaN(parsed) && parsed > 0) bitolaMm = parsed;
+            }
+            if (!bitolaMm) {
+                const text = `${op.productDescription || ''} ${(op as any).product || ''} ${op.orderNumber || ''}`;
+                const match = text.match(/(\d+[.,]\d+)\s*(?:mm|m\.m\.|m\/m)?/i);
+                if (match) {
+                    const parsed = parseFloat(match[1].replace(',', '.'));
+                    if (!isNaN(parsed) && parsed > 0) bitolaMm = parsed;
+                }
+            }
+            if (!bitolaMm) bitolaMm = 3.40;
+
+            const linearMass = bitolaMm * bitolaMm * 0.006162; // kg/m
+            if (linearMass > 0) {
+                const totalMeters = produced / linearMass;
+                const effectiveSeconds = effectiveMs / 1000;
+                if (effectiveSeconds > 0) {
+                    speedValue = totalMeters / effectiveSeconds;
+                    speedUnit = 'm/s';
+                    speedFormatted = speedValue.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+                }
+            }
+        } else if (isTrelica && effectiveMs >= 30000 && produced > 0) {
+            let pieceLengthMeters = 0;
+            const rawLen = (op as any).targetLength || (op as any).length || (op as any).barLength;
+            if (rawLen) {
+                const parsed = parseFloat(String(rawLen).replace(',', '.'));
+                if (!isNaN(parsed) && parsed > 0) pieceLengthMeters = parsed;
+            }
+            if (!pieceLengthMeters) {
+                const text = `${op.productDescription || ''} ${(op as any).product || ''} ${(op as any).trelicaModel || ''}`;
+                const match = text.match(/(\d+(?:[.,]\d+)?)\s*(?:m|mts|metros|metro)\b/i);
+                if (match) {
+                    const parsed = parseFloat(match[1].replace(',', '.'));
+                    if (!isNaN(parsed) && parsed > 0) pieceLengthMeters = parsed;
+                }
+            }
+            if (!pieceLengthMeters) pieceLengthMeters = 6;
+
+            const totalMeters = produced * pieceLengthMeters;
+            const effectiveMinutes = effectiveMs / 60000;
+            if (effectiveMinutes > 0) {
+                speedValue = totalMeters / effectiveMinutes;
+                speedUnit = 'm/min';
+                speedFormatted = speedValue.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+            }
+        }
+
         // Timestamp da última atualização registrada para o dia
         let maxTimestampMs = 0;
         if (isToday) {
@@ -3721,6 +3782,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             ratePerHour,
             rateUnit,
             rateFormatted,
+            speedValue,
+            speedUnit,
+            speedFormatted,
             hasTimeStats,
             isProducingNow,
             isMachineStoppedNow,
@@ -5048,7 +5112,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                                 ? 'bg-emerald-50/95 border-emerald-300 ring-1 ring-emerald-400/30'
                                                                                                 : 'bg-white/95 border-slate-200/90 shadow-[0_1px_2px_rgba(0,0,0,0.03)]'
                                                                                     }`}
-                                                                                    title={`Cronômetro do Turno (Tempo Real):\n⚡ Efetivo: ${dayStats.effectiveFormatted} ${dayStats.isProducingNow ? '(Correndo)' : '(Pausado)'}\n⏱️ Parado: ${dayStats.downtimeFormatted} ${dayStats.isMachineStoppedNow ? '(Correndo)' : '(Pausado)'}${dayStats.ratePerHour > 0 ? `\n🚀 Ritmo: ${dayStats.rateFormatted} (Produção / Tempo Efetivo)` : ''}`}
+                                                                                    title={`Cronômetro do Turno (Tempo Real):\n⚡ Efetivo: ${dayStats.effectiveFormatted} ${dayStats.isProducingNow ? '(Correndo)' : '(Pausado)'}\n⏱️ Parado: ${dayStats.downtimeFormatted} ${dayStats.isMachineStoppedNow ? '(Correndo)' : '(Pausado)'}${dayStats.ratePerHour > 0 ? `\n🚀 Ritmo: ${dayStats.rateFormatted}` : ''}${dayStats.speedValue > 0 ? `\n⚡ Velocidade: ${dayStats.speedFormatted} ${dayStats.speedUnit}` : ''}`}
                                                                                 >
                                                                                     <div className="flex items-center justify-between gap-1 leading-none">
                                                                                         <span className={`text-[9.5px] uppercase font-black tracking-tight flex items-center gap-0.5 ${
@@ -5100,6 +5164,21 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                                 dayStats.isProducingNow ? 'text-emerald-900 font-extrabold' : 'text-slate-800'
                                                                                             }`}>
                                                                                                 {dayStats.ratePerHour.toLocaleString('pt-BR')}<span className="text-[7.5px] font-bold text-slate-500 ml-0.5">{dayStats.rateUnit}</span>
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    )}
+                                                                                    {dayStats.speedValue > 0 && (
+                                                                                        <div className="flex items-center justify-between gap-1 leading-none pt-0.5 border-t border-slate-200/80 mt-0.5">
+                                                                                            <span className={`text-[8.5px] font-black tracking-tight flex items-center gap-0.5 ${
+                                                                                                dayStats.isProducingNow ? 'text-emerald-800' : 'text-slate-500'
+                                                                                            }`}>
+                                                                                                <span className="text-[7.5px]">⚡</span>
+                                                                                                VEL:
+                                                                                            </span>
+                                                                                            <span className={`text-[11.5px] sm:text-[12.5px] font-black font-mono tracking-tight leading-none ${
+                                                                                                dayStats.isProducingNow ? 'text-emerald-900 font-extrabold' : 'text-slate-800'
+                                                                                            }`}>
+                                                                                                {dayStats.speedFormatted}<span className="text-[7.5px] font-bold text-slate-500 ml-0.5">{dayStats.speedUnit}</span>
                                                                                             </span>
                                                                                         </div>
                                                                                     )}
