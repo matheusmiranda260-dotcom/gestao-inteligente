@@ -4907,16 +4907,11 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                         : 'bg-amber-50 border-2 border-amber-500 text-amber-950 shadow-md ring-2 ring-amber-400 animate-pulse')
                                                                                     : 'bg-blue-50/95 border-2 border-blue-500 text-blue-950 shadow-sm ring-1 ring-blue-300'
                                                                                 : hasRealPastProd
-                                                                                    ? 'bg-emerald-50 border-2 border-emerald-400 text-emerald-950 shadow-sm hover:border-emerald-500' 
-                                                                                    : dayStats.isFuture
-                                                                                        ? 'bg-slate-100/90 border-2 border-dashed border-slate-300 text-slate-700 hover:border-blue-400 hover:bg-slate-100'
-                                                                                        : isIdlePast
-                                                                                            ? 'bg-slate-50/70 border border-slate-200 text-slate-400 hover:border-slate-300'
-                                                                                            : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
+                                                                                                                                      : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
                                                                         }`}
                                                                         title={`Clique para ver paradas e relatório de ${dayColName} ${formatFriendlyDate(currentDay)}`}
                                                                     >
-                                                                        <div className="flex items-center justify-between gap-1 text-[9px] sm:text-[9.5px] font-black uppercase tracking-wider mb-0.5 min-w-0">
+                                                                        <div className="flex items-center justify-between gap-1 text-[9.5px] sm:text-[10px] font-black uppercase tracking-wider mb-0.5 min-w-0">
                                                                             <span className={`truncate shrink-0 ${
                                                                                 dayStats.isToday 
                                                                                     ? (prog.isLive && (prog.isStopped || prog.isPrep))
@@ -4932,46 +4927,48 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                             }`}>
                                                                                 {dayColName} {formatFriendlyDate(currentDay)}
                                                                             </span>
-                                                                            {dayStats.isToday && (
-                                                                                prog.isLive && (prog.isStopped || prog.isPrep) ? (
-                                                                                    isDowntimeOverLimit ? (
-                                                                                        <span className="flex items-center gap-1 text-[7.5px] sm:text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-rose-600 text-white tracking-wider shadow-sm animate-pulse shrink-0">
-                                                                                            <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-                                                                                            ULTRAPASSADO
-                                                                                        </span>
+                                                                            <div className="flex-1 flex justify-center items-center">
+                                                                                {dayStats.isToday && (
+                                                                                    prog.isLive && (prog.isStopped || prog.isPrep) ? (
+                                                                                        isDowntimeOverLimit ? (
+                                                                                            <span className="flex items-center gap-1 text-[7.5px] sm:text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-rose-600 text-white tracking-wider shadow-sm animate-pulse shrink-0">
+                                                                                                <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                                                                                                ULTRAPASSADO
+                                                                                            </span>
+                                                                                        ) : (
+                                                                                            <span className="flex items-center gap-1 text-[7.5px] sm:text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-500 text-white tracking-wider shadow-sm animate-pulse shrink-0">
+                                                                                                <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                                                                                                {prog.isPrep ? 'PREP' : 'ALERTA'}
+                                                                                            </span>
+                                                                                        )
                                                                                     ) : (
-                                                                                        <span className="flex items-center gap-1 text-[7.5px] sm:text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-500 text-white tracking-wider shadow-sm animate-pulse shrink-0">
-                                                                                            <span className="w-1.5 h-1.5 rounded-full bg-white" />
-                                                                                            {prog.isPrep ? 'PREP' : 'ALERTA'}
+                                                                                        <span className="flex items-center gap-0.5 text-[7.5px] sm:text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-blue-600 text-white tracking-wider shadow-sm shrink-0">
+                                                                                            <span className="w-1.5 h-1.5 rounded-full bg-white pulse-live" />
+                                                                                            EM PRODUÇÃO
                                                                                         </span>
                                                                                     )
-                                                                                ) : (
-                                                                                    <span className="flex items-center gap-0.5 text-[7.5px] sm:text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-blue-600 text-white tracking-wider shadow-sm shrink-0">
-                                                                                        <span className="w-1.5 h-1.5 rounded-full bg-white pulse-live" />
-                                                                                        EM PRODUÇÃO
+                                                                                )}
+                                                                                {dayStats.isHoliday && !dayStats.isToday && (
+                                                                                    <span className="text-[7.5px] sm:text-[8px] font-black px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200 shrink-0" title={`Feriado: ${dayStats.holidayName}`}>
+                                                                                        🌴 Feriado
                                                                                     </span>
-                                                                                )
-                                                                            )}
-                                                                            {dayStats.isHoliday && !dayStats.isToday && (
-                                                                                <span className="text-[7.5px] sm:text-[8px] font-black px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200 shrink-0" title={`Feriado: ${dayStats.holidayName}`}>
-                                                                                    🌴 Feriado
-                                                                                </span>
-                                                                            )}
-                                                                            {hasRealPastProd && (
-                                                                                <span className="text-[7.5px] sm:text-[8px] font-black px-1.5 py-0.5 rounded bg-emerald-600 text-white shadow-sm tracking-wider shrink-0">
-                                                                                    ✓ Concluído
-                                                                                </span>
-                                                                            )}
-                                                                            {isIdlePast && !dayStats.isHoliday && (
-                                                                                <span className="text-[7.5px] sm:text-[8px] font-medium px-1 py-0.5 rounded bg-slate-100 text-slate-400 border border-slate-200 shrink-0">
-                                                                                    Sem prod.
-                                                                                </span>
-                                                                            )}
-                                                                            {dayStats.isFuture && !dayStats.isHoliday && (
-                                                                                <span className="text-[7.5px] sm:text-[8px] font-black px-1.5 py-0.5 rounded bg-slate-200/90 text-slate-700 border border-slate-300 tracking-wider shrink-0">
-                                                                                    🎯 Meta
-                                                                                </span>
-                                                                            )}
+                                                                                )}
+                                                                                {hasRealPastProd && (
+                                                                                    <span className="text-[7.5px] sm:text-[8px] font-black px-1.5 py-0.5 rounded bg-emerald-600 text-white shadow-sm tracking-wider shrink-0">
+                                                                                        ✓ Concluído
+                                                                                    </span>
+                                                                                )}
+                                                                                {isIdlePast && !dayStats.isHoliday && (
+                                                                                    <span className="text-[7.5px] sm:text-[8px] font-medium px-1 py-0.5 rounded bg-slate-100 text-slate-400 border border-slate-200 shrink-0">
+                                                                                        Sem prod.
+                                                                                    </span>
+                                                                                )}
+                                                                                {dayStats.isFuture && !dayStats.isHoliday && (
+                                                                                    <span className="text-[7.5px] sm:text-[8px] font-black px-1.5 py-0.5 rounded bg-slate-200/90 text-slate-700 border border-slate-300 tracking-wider shrink-0">
+                                                                                        🎯 Meta
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
                                                                         </div>
 
                                                                         <div className="flex items-center justify-between gap-1.5 my-0.5 min-w-0">
@@ -5008,7 +5005,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                         className="flex items-baseline gap-0.5 cursor-pointer group/qty hover:bg-white px-0.5 py-0.5 rounded transition-all select-none min-w-0"
                                                                                         title="Clique para abrir ajuste de contagem (Gestor)"
                                                                                     >
-                                                                                        <span className={`text-base sm:text-lg md:text-xl font-black font-mono tracking-tighter truncate group-hover/qty:text-orange-600 transition-colors ${
+                                                                                        <span className={`text-lg sm:text-xl md:text-[22px] font-black font-mono tracking-tight truncate group-hover/qty:text-orange-600 transition-colors ${
                                                                                             dayStats.isToday 
                                                                                                 ? (prog.isLive && (prog.isStopped || prog.isPrep))
                                                                                                     ? (isDowntimeOverLimit ? 'text-rose-950 font-black' : 'text-amber-950 font-black')
@@ -5023,7 +5020,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                         }`}>
                                                                                             {dayStats.isFuture ? `~${dayStats.produced.toLocaleString('pt-BR')}` : dayStats.produced.toLocaleString('pt-BR')}
                                                                                         </span>
-                                                                                        <span className="text-[8.5px] sm:text-[9px] font-bold text-slate-500 font-mono group-hover/qty:text-orange-600 transition-colors shrink-0">{dayStats.unit}</span>
+                                                                                        <span className="text-[9.5px] sm:text-[10.5px] font-extrabold text-slate-600 font-mono group-hover/qty:text-orange-600 transition-colors shrink-0 ml-0.5">{dayStats.unit}</span>
                                                                                         <span className="opacity-0 group-hover/qty:opacity-100 text-[8px] text-orange-500 transition-opacity shrink-0" title="Ajustar Quantidade">✏️</span>
                                                                                     </div>
 
@@ -5044,7 +5041,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                             {/* Estatística de Tempo (Efetivo e Parado) - Cronômetro em Tempo Real e Ritmo por Hora */}
                                                                             {dayStats.hasTimeStats && (
                                                                                 <div 
-                                                                                    className={`flex flex-col justify-center px-1.5 py-0.5 rounded-lg border shadow-xs text-right shrink-0 select-none pointer-events-none gap-0.5 transition-all min-w-[74px] ${
+                                                                                    className={`flex flex-col justify-center px-2 py-0.5 rounded-lg border shadow-xs text-right shrink-0 select-none pointer-events-none gap-0.5 transition-all min-w-[82px] ${
                                                                                         dayStats.isMachineStoppedNow
                                                                                             ? 'bg-amber-50/95 border-amber-300 ring-1 ring-amber-400/30'
                                                                                             : dayStats.isProducingNow
@@ -5054,34 +5051,34 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                     title={`Cronômetro do Turno (Tempo Real):\n⚡ Efetivo: ${dayStats.effectiveFormatted} ${dayStats.isProducingNow ? '(Correndo)' : '(Pausado)'}\n⏱️ Parado: ${dayStats.downtimeFormatted} ${dayStats.isMachineStoppedNow ? '(Correndo)' : '(Pausado)'}${dayStats.ratePerHour > 0 ? `\n🚀 Ritmo: ${dayStats.rateFormatted} (Produção / Tempo Efetivo)` : ''}`}
                                                                                 >
                                                                                     <div className="flex items-center justify-between gap-1 leading-none">
-                                                                                        <span className={`text-[8.5px] sm:text-[9px] uppercase font-black tracking-tight flex items-center gap-0.5 ${
+                                                                                        <span className={`text-[9px] sm:text-[9.5px] uppercase font-black tracking-tight flex items-center gap-0.5 ${
                                                                                             dayStats.isProducingNow ? 'text-emerald-800' : 'text-slate-500'
                                                                                         }`}>
                                                                                             {dayStats.isProducingNow ? (
                                                                                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
                                                                                             ) : (
-                                                                                                <span className="text-[7.5px]">⚡</span>
+                                                                                                <span className="text-[8px]">⚡</span>
                                                                                             )}
                                                                                             EF:
                                                                                         </span>
-                                                                                        <span className={`text-xs sm:text-[12.5px] md:text-[13px] font-black font-mono tracking-tight leading-none ${
+                                                                                        <span className={`text-[13px] sm:text-[14px] md:text-[14.5px] font-black font-mono tracking-tight leading-none ${
                                                                                             dayStats.isProducingNow ? 'text-emerald-700' : 'text-slate-700'
                                                                                         }`}>
                                                                                             {dayStats.effectiveFormatted}
                                                                                         </span>
                                                                                     </div>
                                                                                     <div className="flex items-center justify-between gap-1 leading-none">
-                                                                                        <span className={`text-[8.5px] sm:text-[9px] uppercase font-black tracking-tight flex items-center gap-0.5 ${
+                                                                                        <span className={`text-[9px] sm:text-[9.5px] uppercase font-black tracking-tight flex items-center gap-0.5 ${
                                                                                             dayStats.isMachineStoppedNow ? 'text-amber-800' : 'text-slate-400'
                                                                                         }`}>
                                                                                             {dayStats.isMachineStoppedNow ? (
                                                                                                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping inline-block" />
                                                                                             ) : (
-                                                                                                <span className="text-[7.5px]">⏱️</span>
+                                                                                                <span className="text-[8px]">⏱️</span>
                                                                                             )}
                                                                                             PAR:
                                                                                         </span>
-                                                                                        <span className={`text-xs sm:text-[12.5px] md:text-[13px] font-black font-mono tracking-tight leading-none ${
+                                                                                        <span className={`text-[13px] sm:text-[14px] md:text-[14.5px] font-black font-mono tracking-tight leading-none ${
                                                                                             dayStats.isMachineStoppedNow 
                                                                                                 ? 'text-amber-700 font-extrabold' 
                                                                                                 : dayStats.downtimeMs > 0 
@@ -5093,16 +5090,16 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                     </div>
                                                                                     {dayStats.ratePerHour > 0 && (
                                                                                         <div className="flex items-center justify-between gap-1 leading-none pt-0.5 border-t border-slate-200/80 mt-0.5">
-                                                                                            <span className={`text-[8px] sm:text-[8.5px] font-black tracking-tight flex items-center gap-0.5 ${
+                                                                                            <span className={`text-[8.5px] sm:text-[9px] font-black tracking-tight flex items-center gap-0.5 ${
                                                                                                 dayStats.isProducingNow ? 'text-emerald-800' : 'text-slate-500'
                                                                                             }`}>
-                                                                                                <span className="text-[7px]">🚀</span>
+                                                                                                <span className="text-[7.5px]">🚀</span>
                                                                                                 H:
                                                                                             </span>
-                                                                                            <span className={`text-[10px] sm:text-[10.5px] font-black font-mono tracking-tight leading-none ${
+                                                                                            <span className={`text-[11px] sm:text-[12px] md:text-[12.5px] font-black font-mono tracking-tight leading-none ${
                                                                                                 dayStats.isProducingNow ? 'text-emerald-900 font-extrabold' : 'text-slate-800'
                                                                                             }`}>
-                                                                                                {dayStats.ratePerHour.toLocaleString('pt-BR')}<span className="text-[7px] font-bold text-slate-500 ml-0.5">{dayStats.rateUnit}</span>
+                                                                                                {dayStats.ratePerHour.toLocaleString('pt-BR')}<span className="text-[7.5px] font-bold text-slate-500 ml-0.5">{dayStats.rateUnit}</span>
                                                                                             </span>
                                                                                         </div>
                                                                                     )}
@@ -5110,7 +5107,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                             )}
                                                                         </div>
 
-                                                                        <div className="flex items-center justify-between text-[8.5px] sm:text-[9.5px] truncate pt-0.5 border-t border-slate-200/80">
+                                                                        <div className="flex items-center justify-between text-[9.5px] sm:text-[10.5px] truncate pt-0.5 border-t border-slate-200/80">
                                                                             <span className="truncate flex items-center gap-1 font-semibold">
                                                                                 {dayStats.isHoliday ? (
                                                                                     <span className="text-rose-600 truncate font-bold">
@@ -5132,7 +5129,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                     ) : (
                                                                                         <>
                                                                                             <span className="text-blue-600">⚡</span>
-                                                                                            <strong className="text-blue-950 truncate">{dayStats.operatorName || 'Turno Ativo'}</strong>
+                                                                                            <strong className="text-blue-950 truncate font-bold">{dayStats.operatorName || 'Turno Ativo'}</strong>
                                                                                         </>
                                                                                     )
                                                                                 ) : hasRealPastProd ? (
