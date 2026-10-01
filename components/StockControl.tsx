@@ -2828,136 +2828,14 @@ const StockControl: React.FC<{
         return { runNumber, nfe, confNum, supplier, quantity };
     };
 
-    const getLotReferenceWeight = (item: StockItem): number => {
-        if (typeof item.weight === 'number' && item.weight > 0) return item.weight;
-        if (typeof item.labelWeight === 'number' && item.labelWeight > 0) return item.labelWeight;
-        if (typeof item.initialQuantity === 'number' && item.initialQuantity > 0) return item.initialQuantity;
-        if (typeof item.quantity === 'number' && item.quantity > 0) return item.quantity;
-        if (typeof item.remainingQuantity === 'number' && item.remainingQuantity > 0) return item.remainingQuantity;
-
-        const confDetails = confByLotMap.get(item.internalLot);
-        if (confDetails && typeof confDetails.quantity === 'number' && confDetails.quantity > 0) {
-            return confDetails.quantity;
-        }
-
-        if (Array.isArray(item.history)) {
-            for (const h of item.history) {
-                const hWeight = h?.weight || h?.details?.weight || h?.details?.quantity || h?.quantity;
-                if (typeof hWeight === 'number' && hWeight > 0) return hWeight;
-            }
-        }
-        return 0;
-    };
-
-    const resolveMatchingGauge = (item: StockItem, refWeight?: number): StockGauge | undefined => {
-        const itemMat = (item.materialType || '').trim();
-        const itemGauge = (item.bitola || '').trim();
-        const itemCode = (item.productCode || '').trim();
-        const itemDesc = (item.description || '').trim();
-
-        // 1. Direct product code lookup
-        if (itemCode) {
-            const byCode = gaugeLookupMap.get(`${itemMat}::${itemGauge}::${itemCode}`) || gaugeLookupMap.get(`${itemMat}::${itemCode}`);
-            if (byCode) return byCode;
-            const direct = gauges.find(g => g.productCode === itemCode && (!itemMat || g.materialType.toLowerCase() === itemMat.toLowerCase()));
-            if (direct) return direct;
-        }
-
-        // 2. Direct description lookup
-        if (itemDesc) {
-            const byDesc = gaugeLookupMap.get(`${itemMat}::${itemGauge}::${itemDesc}`) || gaugeLookupMap.get(`${itemMat}::${itemDesc}`);
-            if (byDesc) return byDesc;
-            const directDesc = gauges.find(g => g.description === itemDesc && (!itemMat || g.materialType.toLowerCase() === itemMat.toLowerCase()));
-            if (directDesc) return directDesc;
-        }
-
-        // 3. Find candidates matching materialType and gauge
-        const normGauge = itemGauge.replace(',', '.').replace('mm', '').trim();
-        const candidates = gauges.filter(g => {
-            if (itemMat && g.materialType.toLowerCase() !== itemMat.toLowerCase()) return false;
-            const gNorm = (g.gauge || '').replace(',', '.').replace('mm', '').trim();
-            return gNorm === normGauge || g.gauge === itemGauge;
-        });
-
-        if (candidates.length === 1) {
-            return candidates[0];
-        }
-
-        if (candidates.length > 1) {
-            // A. Keywords in description or model
-            const combinedText = `${itemDesc} ${item.model || ''}`.toUpperCase();
-            for (const cand of candidates) {
-                const cDesc = (cand.description || '').toUpperCase();
-                if (cand.productCode && combinedText.includes(cand.productCode.toUpperCase())) return cand;
-                if (combinedText.includes('2 TON') || combinedText.includes('2TON') || combinedText.includes('2.000') || combinedText.includes('2000KG') || combinedText.includes('2000 KG')) {
-                    if (cDesc.includes('2 TON') || cDesc.includes('2TON') || cDesc.includes('2000') || cand.productCode === '8135') return cand;
-                }
-                if (combinedText.includes('200KG') || combinedText.includes('200 KG') || combinedText.includes('+/- 200')) {
-                    if (cDesc.includes('200KG') || cDesc.includes('200 KG') || cand.productCode === '8719') return cand;
-                }
-            }
-
-            // B. Weight-based disambiguation (e.g. ~2000 kg for 2 TON vs ~200 kg for +/-200kg)
-            const w = (typeof refWeight === 'number' && refWeight > 0) ? refWeight : getLotReferenceWeight(item);
-            if (w > 0) {
-                const getNominal = (g: StockGauge): number | null => {
-                    if (g.idealWeight && g.idealWeight > 0) return g.idealWeight;
-                    const text = `${g.description || ''} ${g.gauge || ''}`.toUpperCase();
-                    if (g.productCode === '8135' || text.includes('2 TON') || text.includes('2TON') || text.includes('2000KG') || text.includes('2000 KG')) {
-                        return 2000;
-                    }
-                    if (g.productCode === '8719' || text.includes('200KG') || text.includes('200 KG') || text.includes('200')) {
-                        return 200;
-                    }
-                    const tonMatch = text.match(/(\d+(?:[.,]\d+)?)\s*(?:TON|TONELADA|T(?!\w))/);
-                    if (tonMatch) {
-                        const val = parseFloat(tonMatch[1].replace(',', '.'));
-                        if (val > 0) return val * 1000;
-                    }
-                    const kgMatch = text.match(/(\d+(?:[.,]\d+)?)\s*(?:KG|KILOS)/);
-                    if (kgMatch) {
-                        const val = parseFloat(kgMatch[1].replace(',', '.'));
-                        if (val > 0) return val;
-                    }
-                    return null;
-                };
-
-                let best: StockGauge | null = null;
-                let minDiff = Infinity;
-                for (const cand of candidates) {
-                    const nom = getNominal(cand);
-                    if (nom !== null) {
-                        const diff = Math.abs(w - nom);
-                        if (diff < minDiff) {
-                            minDiff = diff;
-                            best = cand;
-                        }
-                    }
-                }
-                if (best) return best;
-
-                if (w >= 500) {
-                    const big = candidates.find(c => (c.description || '').toUpperCase().includes('2 TON') || c.productCode === '8135');
-                    if (big) return big;
-                } else {
-                    const small = candidates.find(c => (c.description || '').toUpperCase().includes('200') || c.productCode === '8719');
-                    if (small) return small;
-                }
-            }
-
-            return candidates[0];
-        }
-
-        return gaugeLookupMap.get(`${itemMat}::${itemGauge}`);
-    };
-
     useEffect(() => {
         setCurrentPage(1);
     }, [searchTerm, searchField, materialFilter, bitolaFilter, steelTypeFilter, statusFilter]);
 
     const filtered = useMemo(() => stock.filter(i => {
-        const refWeight = getLotReferenceWeight(i);
-        const matchingGauge = resolveMatchingGauge(i, refWeight);
+        const matchingGauge = (i.productCode && gaugeLookupMap.get(`${i.materialType}::${i.bitola}::${i.productCode}`)) ||
+                              (i.description && gaugeLookupMap.get(`${i.materialType}::${i.bitola}::${i.description}`)) ||
+                              gaugeLookupMap.get(`${i.materialType}::${i.bitola}`);
 
         const itemDescription = matchingGauge?.description || i.description || '';
         const itemProductCode = matchingGauge?.productCode || i.productCode || '';
@@ -3046,7 +2924,7 @@ const StockControl: React.FC<{
             if (lotA !== lotB) return lotB - lotA;
             return b.internalLot.localeCompare(a.internalLot);
         }
-    }), [stock, searchTerm, searchField, confByLotMap, materialFilter, bitolaFilter, steelTypeFilter, statusFilter, isPrinting, gaugeLookupMap, availableBitolaOptions, gauges]);
+    }), [stock, searchTerm, searchField, confByLotMap, materialFilter, bitolaFilter, steelTypeFilter, statusFilter, isPrinting, gaugeLookupMap, availableBitolaOptions]);
 
     const totalPages = pageSize === 0 ? 1 : Math.ceil(filtered.length / pageSize) || 1;
 
@@ -4037,8 +3915,9 @@ const StockControl: React.FC<{
                             )}
                             {paginatedItems.map(item => {
                                 const details = getLotDetails(item);
-                                const refWeight = getLotReferenceWeight(item);
-                                const matchingGauge = resolveMatchingGauge(item, refWeight);
+                                const matchingGauge = (item.productCode && gaugeLookupMap.get(`${item.materialType}::${item.bitola}::${item.productCode}`)) ||
+                                                      (item.description && gaugeLookupMap.get(`${item.materialType}::${item.bitola}::${item.description}`)) ||
+                                                      gaugeLookupMap.get(`${item.materialType}::${item.bitola}`);
                                 return (
                                 <tr key={item.id} className="hover:bg-slate-50">
                                     <td className="p-3 text-center text-slate-500 font-medium print:hidden">{new Date(item.entryDate).toLocaleDateString('pt-BR')}</td>
