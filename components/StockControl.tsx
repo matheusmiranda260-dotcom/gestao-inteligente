@@ -3006,22 +3006,14 @@ const StockControl: React.FC<{
             const selectedOpt = availableBitolaOptions.find(o => o.key === bitolaFilter);
             if (selectedOpt) {
                 const matchMat = itemMat.toLowerCase() === (selectedOpt.materialType || '').trim().toLowerCase();
-                const normItemGauge = itemGauge.replace(',', '.').replace('mm', '').trim();
-                const normOptGauge = (selectedOpt.gauge || '').replace(',', '.').replace('mm', '').trim();
-                const matchGauge = normItemGauge === normOptGauge || itemGauge === (selectedOpt.gauge || '').trim();
+                const matchGauge = itemGauge === (selectedOpt.gauge || '').trim();
                 
                 if (matchMat && matchGauge) {
                     if (selectedOpt.productCode) {
-                        const selCode = selectedOpt.productCode.trim();
-                        const iCode = (i.productCode || '').trim();
-                        const mCode = (matchingGauge?.productCode || '').trim();
-
-                        if (iCode && mCode) {
-                            passesBitola = iCode === selCode || mCode === selCode;
-                        } else if (iCode) {
-                            passesBitola = iCode === selCode;
-                        } else if (mCode) {
-                            passesBitola = mCode === selCode;
+                        if (i.productCode) {
+                            passesBitola = (i.productCode || '').trim() === selectedOpt.productCode.trim();
+                        } else if (matchingGauge?.productCode) {
+                            passesBitola = (matchingGauge.productCode || '').trim() === selectedOpt.productCode.trim();
                         } else {
                             passesBitola = !selectedOpt.description || (itemDescription || '').trim().toLowerCase() === (selectedOpt.description || '').trim().toLowerCase();
                         }
@@ -3034,9 +3026,7 @@ const StockControl: React.FC<{
                     passesBitola = false;
                 }
             } else {
-                const normItemGauge = itemGauge.replace(',', '.').replace('mm', '').trim();
-                const normFilter = bitolaFilter.replace(',', '.').replace('mm', '').trim();
-                passesBitola = normItemGauge === normFilter || itemGauge === bitolaFilter.trim();
+                passesBitola = itemGauge === bitolaFilter.trim();
             }
         }
 
