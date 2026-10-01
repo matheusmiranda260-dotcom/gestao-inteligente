@@ -3909,35 +3909,6 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                             })}
                         </div>
 
-                        {/* Botão Minimizar / Expandir Topo (KPIs e Status Máquinas) */}
-                        <button
-                            onClick={() => {
-                                setIsHeaderCollapsed(prev => {
-                                    const next = !prev;
-                                    localStorage.setItem('pcp_header_collapsed', String(next));
-                                    return next;
-                                });
-                            }}
-                            className={`font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all shadow-sm active:scale-95 whitespace-nowrap ${
-                                isHeaderCollapsed 
-                                    ? 'bg-orange-500 text-white hover:bg-orange-600 shadow-[0_0_12px_rgba(249,115,22,0.3)]' 
-                                    : 'bg-blue-900/60 hover:bg-blue-800/80 text-blue-100 border border-blue-400/30'
-                            }`}
-                            title={isHeaderCollapsed ? "Expandir indicadores e monitor de máquinas" : "Minimizar indicadores para ter mais espaço vertical no quadro"}
-                        >
-                            {isHeaderCollapsed ? (
-                                <>
-                                    <ChevronDownIcon className="w-4 h-4 text-white" />
-                                    <span>Expandir Topo</span>
-                                </>
-                            ) : (
-                                <>
-                                    <ChevronUpIcon className="w-4 h-4 text-blue-200" />
-                                    <span>Minimizar Topo</span>
-                                </>
-                            )}
-                        </button>
-
                         {/* Botão Tela Cheia / Foco Total */}
                         <button
                             onClick={handleToggleFullscreen}
@@ -3959,25 +3930,6 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                     <span>Tela Cheia</span>
                                 </>
                             )}
-                        </button>
-
-                        {/* Botão Metas de Paradas & Checklist */}
-                        <button
-                            onClick={() => setIsDowntimeLimitsModalOpen(true)}
-                            className="bg-blue-900/60 hover:bg-blue-800/80 border border-orange-400/50 hover:border-orange-400 text-orange-200 font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all shadow-sm active:scale-95 whitespace-nowrap"
-                            title="Definir metas de tempo de parada, setup, lubrificação e checklist da produção"
-                        >
-                            <AdjustmentsIcon className="w-4 h-4 text-orange-400" />
-                            <span>Metas de Paradas</span>
-                        </button>
-
-                        {/* Botão + Nova Ordem de Produção (Destaque Laranja Ita Aços) */}
-                        <button
-                            onClick={() => handleOpenCreateModal()}
-                            className="bg-gradient-to-r from-orange-500 via-orange-600 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-xs px-4 py-2 rounded-xl flex items-center gap-2 shadow-lg shadow-orange-500/25 active:scale-95 transition-all uppercase tracking-wider whitespace-nowrap"
-                        >
-                            <PlusIcon className="w-4 h-4 text-white stroke-[3]" />
-                            <span>Nova Ordem</span>
                         </button>
                     </div>
                 </div>
