@@ -3618,6 +3618,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
         // Cálculo de Produtividade Real / Ritmo por Hora do Turno (considerando Tempo Efetivo + Tempo Parado)
         // Quantidade Produzida / Tempo Total Decorrido do Turno (em horas)
+        const effectiveHours = effectiveMs > 0 ? (effectiveMs / 3600000) : 0;
         const totalShiftTimeMs = effectiveMs + dayDowntimeMs;
         const totalShiftHours = totalShiftTimeMs > 0 ? (totalShiftTimeMs / 3600000) : 0;
         
