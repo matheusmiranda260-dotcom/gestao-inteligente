@@ -4692,6 +4692,28 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             let displayProductCode = op.productCode || '';
                                             let displayProductDescription = op.productDescription || '';
 
+                                            // Sincronização inteligente com o cadastro oficial de produtos (gauges / stock_gauges):
+                                            // Garante que o código do produto exibido no card seja o código oficial cadastrado (ex: 8702 para Espaçador Treliçado ET10 Pesada)
+                                            if (gauges && gauges.length > 0) {
+                                                const descToMatch = (op.productDescription || op.trelicaModel || op.malhaModel || '').trim().toUpperCase();
+                                                if (descToMatch) {
+                                                    const matchedGauge = (gauges || []).find((g: any) => {
+                                                        const gDesc = String(g.description || g.gaugeDescription || g.gauge || '').trim().toUpperCase();
+                                                        if (!gDesc) return false;
+                                                        return gDesc === descToMatch || (descToMatch.length > 6 && gDesc.includes(descToMatch)) || (gDesc.length > 6 && descToMatch.includes(gDesc));
+                                                    });
+                                                    if (matchedGauge) {
+                                                        const officialCode = matchedGauge.productCode || matchedGauge.product_code || (matchedGauge as any).code;
+                                                        if (officialCode) {
+                                                            displayProductCode = officialCode;
+                                                        }
+                                                        if (!displayProductDescription && (matchedGauge.description || (matchedGauge as any).gaugeDescription)) {
+                                                            displayProductDescription = matchedGauge.description || (matchedGauge as any).gaugeDescription;
+                                                        }
+                                                    }
+                                                }
+                                            }
+
                                             // Fallback para Trefila buscando descrição e código exatos do cadastro no gauges
                                             if (isTrefila && (!displayProductDescription || !displayProductCode)) {
                                                 const cleanTarget = String(op.targetBitola || '').replace('mm', '').trim();
