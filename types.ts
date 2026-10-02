@@ -69,7 +69,7 @@ export interface User {
     id: string;
     username: string;
     password?: string;
-    role: 'admin' | 'user' | 'gestor';
+    role: 'admin' | 'user' | 'gestor' | 'viewer';
     permissions?: Partial<Record<Page, boolean>>;
     employeeId?: string;
     isOnline?: boolean;

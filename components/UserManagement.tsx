@@ -14,6 +14,14 @@ interface UserManagementProps {
 
 const permissionCategories = [
     {
+        title: '📊 Planejamento & PCP',
+        permissions: [
+            { page: 'pcpBoard', label: '📊 Quadro PCP (Dashboard Planejamento Semanal)' },
+            { page: 'productionDashboard', label: '📈 Dashboard Geral de Produção' },
+            { page: 'desbobinadeiraDashboard', label: '🌀 Dashboard Desbobinadeira' },
+        ]
+    },
+    {
         title: '📦 Estoque',
         permissions: [
             { page: 'stock', label: 'Gestão de Lotes (Relatórios e Filtros)' },
@@ -64,7 +72,6 @@ const permissionCategories = [
         title: '🧪 Qualidade e Suporte',
         permissions: [
             { page: 'laboratory', label: '🔬 Laboratório (Ensaios e Testes)' },
-            { page: 'productionDashboard', label: '📊 Dashboard Gerencial de Produção' },
             { page: 'reports', label: '📈 Relatórios e KPIs Estratégicos' },
             { page: 'continuousImprovement', label: '💡 Melhoria Contínua (Kaizen)' },
             { page: 'workInstructions', label: '📖 Instruções de Trabalho (POP)' },
@@ -99,6 +106,13 @@ const UserModal: React.FC<{
     const [employeeId, setEmployeeId] = useState(user?.employeeId || '');
     const isEditing = !!user;
 
+    const handleRoleChange = (newRole: string) => {
+        setRole(newRole as any);
+        if (newRole === 'viewer') {
+            setPermissions({ pcpBoard: true, productionDashboard: true });
+        }
+    };
+
     const handlePermissionChange = (page: Page, isChecked: boolean) => {
         setPermissions(prev => ({ ...prev, [page]: isChecked }));
     };
@@ -109,14 +123,15 @@ const UserModal: React.FC<{
             alert('Nome de usuário e senha são obrigatórios.');
             return;
         }
+        const effectivePerms = role === 'viewer' ? { pcpBoard: true, productionDashboard: true, ...permissions } : permissions;
         if (isEditing) {
-            const dataToSubmit: Partial<User> = { permissions, role, employeeId };
+            const dataToSubmit: Partial<User> = { permissions: effectivePerms, role, employeeId };
             if (password) {
                 dataToSubmit.password = password;
             }
             onSubmit(dataToSubmit);
         } else {
-            onSubmit({ username, password, permissions, role, employeeId });
+            onSubmit({ username, password, permissions: effectivePerms, role, employeeId });
         }
         onClose();
     };
@@ -128,12 +143,13 @@ const UserModal: React.FC<{
                 <div className="space-y-4 flex-grow overflow-y-auto pr-2">
                     {!isEditing && (
                         <div className="mb-4">
-                            <label className="block text-sm font-medium text-slate-700">Nome de Usuário</label>
+                            <label className="block text-sm font-medium text-slate-700">Nome de Usuário (Login)</label>
                             <input
                                 type="text"
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
-                                className="mt-1 p-2 w-full border border-slate-300 rounded-md"
+                                className="mt-1 p-2 w-full border border-slate-300 rounded-md font-semibold"
+                                placeholder="Ex: pcp.leitura ou diretoria"
                                 required
                             />
                         </div>
@@ -154,17 +170,24 @@ const UserModal: React.FC<{
                     </div>
 
                     <div className="mb-4">
-                        <label className="block text-sm font-medium text-slate-700">Função (Role)</label>
+                        <label className="block text-sm font-medium text-slate-700">Função / Perfil (Role)</label>
                         <select
                             value={role}
-                            onChange={(e) => setRole(e.target.value)}
-                            className="mt-1 p-2 w-full border border-slate-300 rounded-md"
+                            onChange={(e) => handleRoleChange(e.target.value)}
+                            className="mt-1 p-2 w-full border border-slate-300 rounded-md font-bold text-slate-800"
                         >
-                            <option value="user">Usuário Comum</option>
-                            <option value="gestor">Gestor / Supervisor</option>
-                            <option value="admin">Administrador Total</option>
+                            <option value="user">👷 Operador / Usuário (Permissões Personalizadas)</option>
+                            <option value="viewer">👁️ Visualizador (Somente Leitura - Quadro PCP & Dashboard)</option>
+                            <option value="gestor">👔 Gestor / Supervisor (Acesso e Edição Total)</option>
+                            <option value="admin">👑 Administrador Total</option>
                         </select>
-                        <p className="text-[10px] text-slate-500 mt-1">Gestores e Admins possuem acesso total automático.</p>
+                        <p className="text-[11px] text-slate-500 mt-1">
+                            {role === 'viewer'
+                                ? '👁️ Perfil exclusivo para visualização na TV/Diretoria. Não permite editar, criar ou alterar dados.'
+                                : role === 'gestor' || role === 'admin'
+                                ? '👑 Acesso total liberado para todas as telas e configurações.'
+                                : '👷 Permite marcar manualmente quais telas o operador pode acessar.'}
+                        </p>
                     </div>
 
                     <div className="mb-6">
@@ -181,14 +204,30 @@ const UserModal: React.FC<{
                     <div className="mt-6 border-t pt-4">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-lg font-extrabold text-[#0F3F5C] px-1">Permissões de Acesso</h3>
-                            {role === 'user' ? (
+                            {role === 'viewer' ? (
+                                <span className="text-[10px] bg-sky-100 text-sky-800 font-black px-2 py-1 rounded-full uppercase tracking-tighter">👁️ Somente Leitura PCP</span>
+                            ) : role === 'user' ? (
                                 <span className="text-[10px] bg-indigo-100 text-indigo-700 font-bold px-2 py-1 rounded-full uppercase tracking-tighter">Personalizado</span>
                             ) : (
                                 <span className="text-[10px] bg-emerald-100 text-emerald-700 font-bold px-2 py-1 rounded-full uppercase tracking-tighter">Acesso Total</span>
                             )}
                         </div>
 
-                        {role !== 'user' ? (
+                        {role === 'viewer' ? (
+                            <div className="bg-sky-50 border border-sky-200 p-5 rounded-2xl text-center shadow-sm animate-fadeIn">
+                                <div className="w-12 h-12 bg-sky-600 text-white rounded-full flex items-center justify-center mx-auto mb-2 text-xl shadow-md shadow-sky-200">
+                                    👁️
+                                </div>
+                                <p className="text-sm font-black text-sky-950">Acesso Restrito: Somente Visualização do PCP</p>
+                                <p className="text-xs text-sky-800 mt-1.5 px-3 leading-relaxed font-medium">
+                                    Este usuário terá permissão para <strong>consultar em tempo real o Quadro PCP e Dashboards</strong> (ideal para telas de TV e diretoria). 
+                                    <br />
+                                    <span className="inline-block mt-1 text-rose-700 font-bold bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                                        🚫 Todas as ações de criação (+), arrastar OP, estender lotes e edições estarão bloqueadas.
+                                    </span>
+                                </p>
+                            </div>
+                        ) : role !== 'user' ? (
                             <div className="bg-emerald-50 border border-emerald-100 p-6 rounded-2xl text-center">
                                 <div className="w-12 h-12 bg-emerald-500 text-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg shadow-emerald-200">
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
@@ -408,7 +447,17 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
                                 return (
                                     <tr key={user.id} className="bg-white border-b hover:bg-slate-50">
                                         <td className="px-6 py-4 font-medium text-slate-900">{user.username}</td>
-                                        <td className="px-6 py-4 capitalize">{user.role}</td>
+                                        <td className="px-6 py-4">
+                                            {user.role === 'admin' ? (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">👑 Administrador</span>
+                                            ) : user.role === 'gestor' ? (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">👔 Gestor</span>
+                                            ) : user.role === 'viewer' ? (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-sky-100 text-sky-800 border border-sky-200">👁️ Somente PCP</span>
+                                            ) : (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">👷 Operador</span>
+                                            )}
+                                        </td>
                                         <td className="px-6 py-4">
                                             {user.isOnline ? (
                                                 <span className="flex items-center gap-1.5 text-emerald-600 font-bold">

@@ -326,7 +326,7 @@ const App: React.FC = () => {
                 if (user.sessionVersion === SESSION_VERSION) {
                     setCurrentUser(user);
                     if (page === 'login' || page === 'productionDashboard') {
-                        setPage(user.role === 'gestor' || user.role === 'admin' ? 'pcpBoard' : 'menu');
+                        setPage(user.role === 'gestor' || user.role === 'admin' || user.role === 'viewer' || user.permissions?.pcpBoard ? 'pcpBoard' : 'menu');
                     }
                 } else {
                     localStorage.removeItem('msm_user');
@@ -471,7 +471,7 @@ const App: React.FC = () => {
 
                 setCurrentUser(appUser);
                 localStorage.setItem('msm_user', JSON.stringify(appUser));
-                setPage(appUser.role === 'gestor' || appUser.role === 'admin' ? 'pcpBoard' : 'menu');
+                setPage(appUser.role === 'gestor' || appUser.role === 'admin' || appUser.role === 'viewer' || appUser.permissions?.pcpBoard ? 'pcpBoard' : 'menu');
                 showNotification(`Bem-vindo, ${appUser.username}!`, 'success');
                 return;
             }

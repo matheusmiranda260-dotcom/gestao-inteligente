@@ -77,6 +77,7 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
 
         // Specific permissions check
         if (targetPage === 'pcpBoard') {
+            if (currentUser.role === 'viewer') return true;
             return !!(
                 currentUser.permissions?.pcpBoard || 
                 currentUser.permissions?.productionScheduling || 
