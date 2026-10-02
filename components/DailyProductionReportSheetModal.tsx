@@ -1046,9 +1046,94 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         return { descIn, descOut };
     };
 
+    // Helper para normalizar horário para HH:MM
+    const normalizeTimeString = (timeStr?: string): string => {
+        if (!timeStr) return '';
+        const parts = timeStr.trim().split(':');
+        const hrs = String(parseInt(parts[0], 10) || 0).padStart(2, '0');
+        const mins = String(parseInt(parts[1], 10) || 0).padStart(2, '0');
+        return `${hrs}:${mins}`;
+    };
+
+    // Helper rigoroso para sanitizar e deduplicar paradas (evita duplicações e sobreposições)
+    const sanitizeAndDeduplicateStops = (list: StopRow[]): StopRow[] => {
+        if (!list || list.length === 0) return [];
+
+        // 1. Filtrar paradas inválidas ou de interjornada noturna/desligamento de fábrica
+        const validList = list.filter(s => {
+            if (!s || !s.inicio) return false;
+            const dur = calculateStopDurationSeconds(s.inicio, s.fim);
+            // Remover paradas com duração absurda (> 12h)
+            if (dur > 12 * 3600) return false;
+            // Remover paradas de 00:00:00 sem justificativa/motivo específico
+            if (s.inicio === s.fim && dur === 0 && (!s.motivo || s.motivo.includes('TROCA DE ROLO'))) return false;
+
+            const motUpper = (s.motivo || '').toUpperCase();
+            const isTurnoEndReason = motUpper.includes('FINAL DE TURNO') || 
+                                     motUpper.includes('FIM DE TURNO') || 
+                                     motUpper.includes('DESLIGADA: TURNO') || 
+                                     motUpper.includes('ENCERRAMENTO');
+            const startH = parseInt(s.inicio.split(':')[0], 10) || 0;
+            if (isTurnoEndReason && (dur > 180 * 60 || dur === 0 || startH >= 17 || startH < 6)) return false;
+            if (dur > 480 * 60 && (startH >= 17 || startH < 6)) return false;
+
+            return true;
+        });
+
+        // 2. Deduplicar por horário de início e intervalo sobreposto
+        const deduped: StopRow[] = [];
+        const sorted = [...validList].sort((a, b) => timeToSeconds(a.inicio) - timeToSeconds(b.inicio));
+
+        for (const stop of sorted) {
+            const currentInicio = normalizeTimeString(stop.inicio);
+            const currentFim = normalizeTimeString(stop.fim);
+            const currentDur = calculateStopDurationSeconds(stop.inicio, stop.fim);
+            const currentMotivo = (stop.motivo || '').trim();
+
+            const existingIdx = deduped.findIndex(d => {
+                const dInicio = normalizeTimeString(d.inicio);
+                const dFim = normalizeTimeString(d.fim);
+                const dDur = calculateStopDurationSeconds(d.inicio, d.fim);
+
+                // Mesma hora de início exata
+                if (dInicio === currentInicio) return true;
+
+                // Sobreposição de horários (início dentro de 2 min e mesmo fim ou mesma duração)
+                const startDiff = Math.abs(timeToSeconds(d.inicio) - timeToSeconds(stop.inicio));
+                if (startDiff <= 120 && (dFim === currentFim || Math.abs(dDur - currentDur) <= 120)) {
+                    return true;
+                }
+
+                return false;
+            });
+
+            if (existingIdx === -1) {
+                deduped.push({
+                    ...stop,
+                    inicio: currentInicio,
+                    fim: currentFim
+                });
+            } else {
+                // Já existe uma parada no mesmo horário: manter a que tiver maior detalhe/justificativa
+                const existing = deduped[existingIdx];
+                const existingMotivo = (existing.motivo || '').trim();
+                if (currentMotivo.length > existingMotivo.length || (currentMotivo.includes('-') && !existingMotivo.includes('-'))) {
+                    deduped[existingIdx] = {
+                        ...stop,
+                        inicio: currentInicio,
+                        fim: currentFim
+                    };
+                }
+            }
+        }
+
+        return deduped;
+    };
+
     // Helper para mesclar paradas adjacentes/duplicadas (ex: micro-cliques no mesmo minuto ou logo após o término da parada)
     const mergeAdjacentDuplicateStops = (stops: StopRow[]): StopRow[] => {
-        const sorted = [...(stops || [])].filter(s => Boolean(s && s.inicio)).sort((a, b) => timeToSeconds(a.inicio) - timeToSeconds(b.inicio));
+        const sanitized = sanitizeAndDeduplicateStops(stops);
+        const sorted = [...sanitized].sort((a, b) => timeToSeconds(a.inicio) - timeToSeconds(b.inicio));
         const merged: StopRow[] = [];
 
         for (let i = 0; i < sorted.length; i++) {
@@ -1218,6 +1303,35 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
 
             return s;
         });
+    };
+
+    // Helper para cálculo da união de intervalos reais (evita contagem duplicada de paradas sobrepostas)
+    const computeIntervalSeconds = (stops: StopRow[]): number => {
+        const intervals: [number, number][] = [];
+        (stops || []).forEach(s => {
+            if (!s || !s.inicio || !s.fim) return;
+            const startSec = timeToSeconds(s.inicio);
+            const endSec = timeToSeconds(s.fim);
+            if (endSec > startSec) {
+                intervals.push([startSec, endSec]);
+            }
+        });
+        if (intervals.length === 0) return 0;
+        intervals.sort((a, b) => a[0] - b[0]);
+        let mergedTotal = 0;
+        let [curStart, curEnd] = intervals[0];
+        for (let i = 1; i < intervals.length; i++) {
+            const [nextStart, nextEnd] = intervals[i];
+            if (nextStart <= curEnd) {
+                curEnd = Math.max(curEnd, nextEnd);
+            } else {
+                mergedTotal += (curEnd - curStart);
+                curStart = nextStart;
+                curEnd = nextEnd;
+            }
+        }
+        mergedTotal += (curEnd - curStart);
+        return mergedTotal;
     };
 
     // Auto-preenchimento automático inteligente dos dados com base no chão de fábrica
@@ -1539,8 +1653,8 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         const resolvedOpA = opA ? (getEmployeeForOperator(opA).name || opA) : '';
         const resolvedOpB = opB ? (getEmployeeForOperator(opB).name || opB) : '';
 
-        const formattedStopsA = formatStopsRollChanges(stopsListA, op, stock, selectedDate);
-        const formattedStopsB = formatStopsRollChanges(stopsListB, op, stock, selectedDate);
+        const formattedStopsA = sanitizeAndDeduplicateStops(formatStopsRollChanges(stopsListA, op, stock, selectedDate));
+        const formattedStopsB = sanitizeAndDeduplicateStops(formatStopsRollChanges(stopsListB, op, stock, selectedDate));
 
         return {
             productionOrder: prodOrder,
@@ -1658,24 +1772,8 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 setPiecesToProduce(Number(dbReport.pieces_to_produce ?? (op.quantityToProduce || (isTrefila ? 10000 : 4500))));
                 // Sincronização inteligente de paradas:
                 // Se a máquina/OP teve novas paradas registradas após o salvamento inicial do relatório (ex: durante o expediente),
-                // mescla automaticamente as paradas reais geradas do chão de fábrica preservando edições manuais
-                const sanitizeLoadedStops = (list: StopRow[]) => {
-                    const seen = new Set<string>();
-                    return (list || []).filter(s => {
-                        if (!s || !s.inicio) return false;
-                        const dur = calculateStopDurationSeconds(s.inicio, s.fim);
-                        // Remover paradas com duração absurda (> 12h, ex: 19h09m por timestamp invertido)
-                        if (dur > 12 * 3600) return false;
-                        // Remover paradas de 00:00:00 sem justificativa/motivo específico
-                        if (s.inicio === s.fim && dur === 0 && (!s.motivo || s.motivo.includes('TROCA DE ROLO'))) return false;
-                        // Deduplicar mesmo horário de início
-                        if (seen.has(s.inicio)) return false;
-                        seen.add(s.inicio);
-                        return true;
-                    });
-                };
-
-                const existingStopsA: StopRow[] = sanitizeLoadedStops(dbReport.stops_shift_a || []);
+                // mescla automaticamente as paradas reais geradas do chão de fábrica preservando edições manuais e eliminando duplicatas
+                const existingStopsA: StopRow[] = sanitizeAndDeduplicateStops(dbReport.stops_shift_a || []);
                 let mergedStopsA: StopRow[] = [...existingStopsA];
 
                 if (mergedStopsA.length === 0 && auto.stopsShiftA && auto.stopsShiftA.length > 0) {
@@ -1699,12 +1797,12 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                         }
                     });
                 }
-                mergedStopsA = sanitizeLoadedStops(mergedStopsA);
+                mergedStopsA = sanitizeAndDeduplicateStops(mergedStopsA);
                 mergedStopsA = formatStopsRollChanges(mergedStopsA, op, stock, targetDate);
                 mergedStopsA.sort((a, b) => timeToSeconds(a.inicio) - timeToSeconds(b.inicio));
                 setStopsShiftA(mergedStopsA);
 
-                const existingStopsB: StopRow[] = sanitizeLoadedStops(dbReport.stops_shift_b || []);
+                const existingStopsB: StopRow[] = sanitizeAndDeduplicateStops(dbReport.stops_shift_b || []);
                 let mergedStopsB: StopRow[] = [...existingStopsB];
                 if (mergedStopsB.length === 0 && auto.stopsShiftB && auto.stopsShiftB.length > 0) {
                     mergedStopsB = [...auto.stopsShiftB];
@@ -1719,7 +1817,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                         }
                     });
                 }
-                mergedStopsB = sanitizeLoadedStops(mergedStopsB);
+                mergedStopsB = sanitizeAndDeduplicateStops(mergedStopsB);
                 mergedStopsB = formatStopsRollChanges(mergedStopsB, op, stock, targetDate);
                 mergedStopsB.sort((a, b) => timeToSeconds(a.inicio) - timeToSeconds(b.inicio));
                 setStopsShiftB(mergedStopsB);
@@ -2113,16 +2211,18 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
 
     // Cálculos em Tempo Real
     const calculatedData = useMemo(() => {
-        const secondsParadoA = stopsShiftA.reduce((sum, stop) => sum + calculateStopDurationSeconds(stop.inicio, stop.fim), 0);
-        const secondsParadoB = stopsShiftB.reduce((sum, stop) => sum + calculateStopDurationSeconds(stop.inicio, stop.fim), 0);
+        const rawSecondsParadoA = computeIntervalSeconds(stopsShiftA);
+        const rawSecondsParadoB = computeIntervalSeconds(stopsShiftB);
 
         const totalWorkedA = timeToSeconds(statsShiftA.horasTrabalhadas) || 9 * 3600;
         const totalWorkedB = timeToSeconds(statsShiftB.horasTrabalhadas) || 9 * 3600;
 
+        const secondsParadoA = Math.min(rawSecondsParadoA, totalWorkedA);
         const percentParadoA = totalWorkedA > 0 ? (secondsParadoA / totalWorkedA) * 100 : 0;
         const secondsEfetivoA = Math.max(0, totalWorkedA - secondsParadoA);
         const percentEfetivoA = totalWorkedA > 0 ? (secondsEfetivoA / totalWorkedA) * 100 : 0;
 
+        const secondsParadoB = Math.min(rawSecondsParadoB, totalWorkedB);
         const percentParadoB = totalWorkedB > 0 ? (secondsParadoB / totalWorkedB) * 100 : 0;
         const secondsEfetivoB = Math.max(0, totalWorkedB - secondsParadoB);
         const percentEfetivoB = totalWorkedB > 0 ? (secondsEfetivoB / totalWorkedB) * 100 : 0;
@@ -2190,44 +2290,74 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
 
     // AÇÃO 2: COPIAR IMAGEM HD PARA WHATSAPP
     const handleCopyToWhatsApp = async () => {
-        try {
-            const element = document.getElementById('pcp-daily-report-sheet');
-            if (!element) return;
+        const element = document.getElementById('pcp-daily-report-sheet');
+        if (!element) return;
 
+        try {
             showToast('Gerando imagem de alta resolução para WhatsApp...', 'info');
 
-            // Sincronizar os valores dos inputs para atributos do DOM
-            const inputsToSync = element.querySelectorAll('input.modern-editable-input');
-            inputsToSync.forEach((input: any) => {
-                input.setAttribute('value', input.value);
+            // Sincronizar todos os campos de formulário para os atributos do DOM
+            const formElements = element.querySelectorAll('input, textarea, select');
+            formElements.forEach((input: any) => {
+                input.setAttribute('value', input.value || '');
             });
 
             element.classList.add('is-capturing');
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise(resolve => setTimeout(resolve, 120));
 
             const canvas = await html2canvas(element, {
-                scale: 2,
+                scale: 2.5,
                 useCORS: true,
                 allowTaint: true,
                 logging: false,
                 backgroundColor: '#ffffff',
+                windowWidth: 1280, // Força resolução e layout desktop (colunas alinhadas perfeitamente)
                 onclone: (clonedDoc) => {
                     const clonedElement = clonedDoc.getElementById('pcp-daily-report-sheet');
                     if (!clonedElement) return;
 
-                    const clonedInputs = clonedElement.querySelectorAll('input.modern-editable-input');
-                    clonedInputs.forEach((input: any) => {
-                        const div = clonedDoc.createElement('div');
-                        div.className = input.className;
-                        div.textContent = input.getAttribute('value') || input.value || '';
-                        div.style.display = 'inline-block';
-                        div.style.minHeight = '1.5em';
-                        div.style.lineHeight = '1.4';
-                        div.style.paddingTop = '2px';
-                        div.style.paddingBottom = '4px';
-                        div.style.whiteSpace = 'nowrap';
-                        div.style.overflow = 'visible';
-                        input.parentNode?.replaceChild(div, input);
+                    clonedElement.style.width = '1024px';
+                    clonedElement.style.maxWidth = '1024px';
+                    clonedElement.style.margin = '0 auto';
+                    clonedElement.style.borderRadius = '12px';
+                    clonedElement.style.overflow = 'hidden';
+                    clonedElement.style.boxShadow = 'none';
+                    clonedElement.style.border = '2px solid #002060';
+
+                    // Ocultar botões e controles interativos (+ Linha, + Registrar Peso, botões de exclusão/data)
+                    const interactiveEls = clonedElement.querySelectorAll('.no-print, button, .cursor-pointer:not(.allow-capture)');
+                    interactiveEls.forEach((el: any) => {
+                        if (el.tagName === 'BUTTON' || el.classList.contains('no-print')) {
+                            el.style.display = 'none';
+                        }
+                    });
+
+                    // Substituir todos os inputs e textareas por elementos tipográficos perfeitos
+                    const clonedFormEls = clonedElement.querySelectorAll('input, textarea, select');
+                    clonedFormEls.forEach((input: any) => {
+                        const val = input.value !== undefined ? input.value : (input.getAttribute('value') || '');
+                        const computed = window.getComputedStyle(input);
+                        
+                        const replacement = clonedDoc.createElement('div');
+                        replacement.className = input.className;
+                        replacement.textContent = val;
+                        replacement.style.border = 'none';
+                        replacement.style.background = 'transparent';
+                        replacement.style.boxShadow = 'none';
+                        replacement.style.outline = 'none';
+                        replacement.style.padding = '0';
+                        replacement.style.margin = '0';
+                        replacement.style.display = 'block';
+                        replacement.style.width = '100%';
+                        replacement.style.color = computed.color || '#002060';
+                        replacement.style.fontWeight = computed.fontWeight || '800';
+                        replacement.style.fontSize = computed.fontSize || '12px';
+                        replacement.style.textAlign = computed.textAlign || 'center';
+                        replacement.style.lineHeight = '1.3';
+                        replacement.style.whiteSpace = input.tagName === 'TEXTAREA' ? 'pre-wrap' : 'nowrap';
+                        replacement.style.overflow = 'visible';
+                        
+                        input.parentNode?.replaceChild(replacement, input);
                     });
                 }
             });
@@ -2264,7 +2394,6 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             }
         } catch (e) {
             console.error('Erro ao gerar captura:', e);
-            const element = document.getElementById('pcp-daily-report-sheet');
             if (element) element.classList.remove('is-capturing');
             showToast('Erro ao gerar imagem para o WhatsApp.', 'error');
         }
@@ -2366,6 +2495,9 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     margin: 0 auto !important;
                     box-shadow: none !important;
                     border: 2px solid #002060 !important;
+                    border-radius: 12px !important;
+                    overflow: hidden !important;
+                    background: #ffffff !important;
                     width: 1024px !important;
                     max-width: 1024px !important;
                 }
@@ -2373,9 +2505,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     border-bottom: none !important;
                     background: transparent !important;
                     pointer-events: none !important;
-                    padding-top: 2px !important;
-                    padding-bottom: 4px !important;
-                    line-height: 1.4 !important;
+                    line-height: 1.3 !important;
                 }
             `}} />
 

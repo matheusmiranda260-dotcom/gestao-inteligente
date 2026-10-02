@@ -10115,17 +10115,38 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
             const justStr = e.justification ? ` - ${e.justification.trim()}` : '';
             const fullReason = `${rawReason}${justStr}`;
             const reasonNorm = rawReason.toLowerCase().trim();
-            // Desconsiderar paradas fantasmas de 'Final de Turno' com 0 minutos ou stopTime igual a resumeTime
-            if ((reasonNorm.includes('final de turno') || reasonNorm.includes('fim de turno') || reasonNorm.includes('aguardando início')) && dur === 0) {
+            const sHour = isValidStop ? sDate.getHours() : 12;
+            const isTurnoEndReason = reasonNorm.includes('final de turno') || 
+                                     reasonNorm.includes('fim de turno') || 
+                                     reasonNorm.includes('aguardando início') ||
+                                     reasonNorm.includes('encerramento');
+            // Desconsiderar paradas fantasmas de 'Final de Turno' com 0 minutos ou interjornadas noturnas
+            if (isTurnoEndReason && (dur > 180 || dur === 0)) {
+                return;
+            }
+            if (dur > 480 && (sHour >= 17 || sHour < 6)) {
                 return;
             }
 
             const dStr = parseDateOnly(stopTime) || data.dateStr;
 
-            // Desduplicar 'Final de Turno' ocorridos no mesmo horário
-            if (reasonNorm.includes('final de turno')) {
-                const isDupeFT = stopsList.some(s => s.dateStr === dStr && (s.reason || '').toLowerCase().includes('final de turno') && Math.abs(new Date(s.stopTime).getTime() - sDate.getTime()) < 180000);
-                if (isDupeFT) return;
+            // Desduplicar 'Final de Turno' ou paradas com horários e motivos idênticos/sobrepostos
+            const existingIdx = stopsList.findIndex(s => {
+                if (s.dateStr !== dStr) return false;
+                const prevTime = new Date(s.stopTime).getTime();
+                const curTime = sDate.getTime();
+                const sameTime = Math.abs(prevTime - curTime) < 90000;
+                const sReason = s.reason.toLowerCase();
+                return sameTime && (sReason.includes(reasonNorm.substring(0, 8)) || reasonNorm.includes(sReason.substring(0, 8)));
+            });
+            if (existingIdx !== -1) {
+                if (fullReason.length > stopsList[existingIdx].reason.length) {
+                    stopsList[existingIdx].reason = fullReason;
+                }
+                if (dur > stopsList[existingIdx].durationMin) {
+                    stopsList[existingIdx].durationMin = dur;
+                }
+                return;
             }
 
             const timeFormatted = isValidStop
@@ -10166,7 +10187,15 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                 }
 
                 const rNorm = (e.reason || '').toLowerCase().trim();
-                if ((rNorm.includes('final de turno') || rNorm.includes('fim de turno') || rNorm.includes('aguardando início')) && dur === 0) {
+                const sHour = isValidStop ? sDate.getHours() : 12;
+                const isTurnoEndReason = rNorm.includes('final de turno') || 
+                                         rNorm.includes('fim de turno') || 
+                                         rNorm.includes('aguardando início') ||
+                                         rNorm.includes('encerramento');
+                if (isTurnoEndReason && (dur > 180 || dur === 0)) {
+                    return;
+                }
+                if (dur > 480 && (sHour >= 17 || sHour < 6)) {
                     return;
                 }
 
@@ -10175,7 +10204,15 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                     ? `${sDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${rDate && !isNaN(rDate.getTime()) ? ` às ${rDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ''}`
                     : 'Horário do turno';
 
-                const isDupe = stopsList.some(s => s.stopTime === String(stopTime) && s.reason === (e.reason || ''));
+                const isDupe = stopsList.some(s => {
+                    if (s.dateStr !== dStr) return false;
+                    const prevTime = new Date(s.stopTime).getTime();
+                    const curTime = sDate.getTime();
+                    const sameTime = Math.abs(prevTime - curTime) < 90000;
+                    const sReason = s.reason.toLowerCase();
+                    const matchReason = sReason.includes(rNorm.substring(0, 8)) || rNorm.includes(sReason.substring(0, 8));
+                    return sameTime && (matchReason || s.durationMin === dur);
+                });
                 if (!isDupe) {
                     stopsList.push({
                         id: `rep-event-${rIdx}-${eIdx}`,
@@ -10257,7 +10294,33 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
         return allStops.filter(s => s.dateStr === selectedDateStr);
     }, [allStops, selectedDateStr]);
 
-    const totalMinutes = filteredStops.reduce((acc, s) => acc + (s.durationMin || 0), 0);
+    const totalMinutes = useMemo(() => {
+        // Calcular minutos de parada evitando contagem duplicada de intervalos sobrepostos
+        const intervals: [number, number][] = [];
+        filteredStops.forEach(s => {
+            const sDate = new Date(s.stopTime);
+            if (isNaN(sDate.getTime()) || s.durationMin <= 0) return;
+            const startMin = sDate.getHours() * 60 + sDate.getMinutes();
+            const endMin = startMin + s.durationMin;
+            intervals.push([startMin, endMin]);
+        });
+        if (intervals.length === 0) return filteredStops.reduce((acc, s) => acc + (s.durationMin || 0), 0);
+        intervals.sort((a, b) => a[0] - b[0]);
+        let mergedTotal = 0;
+        let [curStart, curEnd] = intervals[0];
+        for (let i = 1; i < intervals.length; i++) {
+            const [nextStart, nextEnd] = intervals[i];
+            if (nextStart <= curEnd) {
+                curEnd = Math.max(curEnd, nextEnd);
+            } else {
+                mergedTotal += (curEnd - curStart);
+                curStart = nextStart;
+                curEnd = nextEnd;
+            }
+        }
+        mergedTotal += (curEnd - curStart);
+        return mergedTotal;
+    }, [filteredStops]);
     const hours = Math.floor(totalMinutes / 60);
     const mins = totalMinutes % 60;
     const formattedDuration = hours > 0 ? `${hours}h ${mins}min` : `${mins}min`;
