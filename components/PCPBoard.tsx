@@ -59,6 +59,7 @@ interface PCPBoardProps {
     shiftConfig?: PcpShiftConfig;
     onUpdateShiftConfig?: (config: PcpShiftConfig) => void;
     recordLotWeight?: (orderId: string, lotId: string, finalWeight?: number | null, measuredGauge?: number) => Promise<void> | void;
+    onLogout?: () => void;
 }
 
 // Configurações de capacidade produtiva padrão por máquina para sugerir duração
@@ -159,7 +160,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     updateProducedQuantity,
     shiftConfig: incomingShiftConfig,
     onUpdateShiftConfig,
-    recordLotWeight
+    recordLotWeight,
+    onLogout
 }) => {
     // Modo Visualizador (Somente Leitura - Não pode editar, criar ou excluir)
     const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor' || currentUser?.username?.toLowerCase() === 'admin' || currentUser?.username?.toLowerCase() === 'gestor' || currentUser?.username?.toLowerCase().includes('matheusmiranda');
@@ -4226,6 +4228,21 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                 </>
                             )}
                         </button>
+
+                        {/* Botão Sair do Sistema (Para modo Visualizador ou Foco Total) */}
+                        {onLogout && (
+                            <button
+                                type="button"
+                                onClick={onLogout}
+                                className="font-black text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all shadow-sm active:scale-95 whitespace-nowrap bg-rose-600/80 hover:bg-rose-600 text-white border border-rose-400/40 hover:shadow-[0_0_12px_rgba(225,29,72,0.3)] cursor-pointer"
+                                title="Sair do Sistema / Desconectar"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                                </svg>
+                                <span>Sair</span>
+                            </button>
+                        )}
                     </div>
                 </div>
 

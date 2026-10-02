@@ -117,6 +117,13 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
         );
     };
 
+    const hasVisaoGeral = hasPermission('pcpBoard') || hasPermission('productionDashboard');
+    const hasProducao = hasPermission('trefilaInProgress') || hasPermission('trefilaWeighing') || hasPermission('trefilaPending') || hasPermission('trefilaCompleted') || hasPermission('trefilaReports') || hasPermission('trefilaRings') || hasPermission('trefilaBitolaCheck') || hasPermission('trelicaInProgress') || hasPermission('trelicaPending') || hasPermission('trelicaCompleted') || hasPermission('trelicaReports') || hasPermission('malhaInProgress') || hasPermission('malhaPending') || hasPermission('malhaCompleted') || hasPermission('malhaReports') || hasPermission('productsManagement');
+    const hasEstoque = hasPermission('stock') || hasPermission('stockAdd') || hasPermission('stockTransfer') || hasPermission('finishedGoods') || hasPermission('trelicaStock');
+    const hasPessoas = hasPermission('peopleManagement') || hasPermission('continuousImprovement');
+    const hasGestao = hasPermission('reports') || hasPermission('laboratory') || hasPermission('documents') || hasPermission('workInstructions') || hasPermission('partsManager') || hasPermission('electrodesStock');
+    const hasSistema = hasPermission('userManagement') || hasPermission('gaugesManager') || hasPermission('downtimeConfigs') || hasPermission('desbobinadeiraDashboard') || hasPermission('desbobinadeiraInProgress') || hasPermission('desbobinadeiraPending') || hasPermission('desbobinadeiraCompleted') || hasPermission('desbobinadeiraReports') || hasPermission('productionOrderDesbobinadeira');
+
     return (
         <aside className={`sidebar no-print ${isCollapsed ? 'collapsed' : ''} ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
             <div className="sidebar-header">
@@ -137,299 +144,308 @@ const Sidebar: React.FC<SidebarProps> = ({ page, setPage, currentUser, notificat
 
             <div className="sidebar-content">
                 {/* VISÃO GERAL */}
-                <div className="sidebar-category">
-                    <div className="sidebar-category-title">{isCollapsed ? '📊' : '📊 Visão Geral'}</div>
-                    <MenuItem target="pcpBoard" label="Quadro PCP" icon={ClipboardListIcon} highlight />
-                </div>
+                {hasVisaoGeral && (
+                    <div className="sidebar-category">
+                        <div className="sidebar-category-title">{isCollapsed ? '📊' : '📊 Visão Geral'}</div>
+                        <MenuItem target="pcpBoard" label="Quadro PCP" icon={ClipboardListIcon} highlight />
+                    </div>
+                )}
 
                 {/* PRODUÇÃO */}
-                <div className="sidebar-category">
-                    <div className="sidebar-category-title">{isCollapsed ? '🏭' : '🏭 Produção'}</div>
+                {hasProducao && (
+                    <div className="sidebar-category">
+                        <div className="sidebar-category-title">{isCollapsed ? '🏭' : '🏭 Produção'}</div>
 
-                    {/* Trefila Collapsible */}
-                    {(hasPermission('trefilaInProgress') || hasPermission('trefilaWeighing') || hasPermission('trefilaPending') || hasPermission('trefilaCompleted') || hasPermission('trefilaReports') || hasPermission('trefilaRings') || hasPermission('trefilaBitolaCheck')) && (
-                        <>
-                            <button
-                                onClick={() => toggleMenu('trefila')}
-                                className={`sidebar-item ${['trefilaInProgress', 'trefilaPending', 'trefilaCompleted', 'trefilaReports', 'trefilaWeighing', 'trefilaRings', 'trefilaBitolaCheck'].includes(page) ? 'active' : ''} justify-between group`}
-                                title={isCollapsed ? 'Produção – Trefila' : ''}
-                            >
-                                <div className="flex items-center gap-3 overflow-hidden">
-                                    <div className="sidebar-item-icon shrink-0">
-                                        <CogIcon className="w-full h-full" />
+                        {/* Trefila Collapsible */}
+                        {(hasPermission('trefilaInProgress') || hasPermission('trefilaWeighing') || hasPermission('trefilaPending') || hasPermission('trefilaCompleted') || hasPermission('trefilaReports') || hasPermission('trefilaRings') || hasPermission('trefilaBitolaCheck')) && (
+                            <>
+                                <button
+                                    onClick={() => toggleMenu('trefila')}
+                                    className={`sidebar-item ${['trefilaInProgress', 'trefilaPending', 'trefilaCompleted', 'trefilaReports', 'trefilaWeighing', 'trefilaRings', 'trefilaBitolaCheck'].includes(page) ? 'active' : ''} justify-between group`}
+                                    title={isCollapsed ? 'Produção – Trefila' : ''}
+                                >
+                                    <div className="flex items-center gap-3 overflow-hidden">
+                                        <div className="sidebar-item-icon shrink-0">
+                                            <CogIcon className="w-full h-full" />
+                                        </div>
+                                        {!isCollapsed && <span className="sidebar-item-label whitespace-nowrap">Produção – Trefila</span>}
                                     </div>
-                                    {!isCollapsed && <span className="sidebar-item-label whitespace-nowrap">Produção – Trefila</span>}
-                                </div>
-                                {!isCollapsed && (
-                                    <ChevronRightIcon className={`w-3 h-3 text-slate-500 transition-transform duration-200 ${expandedMenus.includes('trefila') ? 'rotate-90' : ''}`} />
-                                )}
-                            </button>
+                                    {!isCollapsed && (
+                                        <ChevronRightIcon className={`w-3 h-3 text-slate-500 transition-transform duration-200 ${expandedMenus.includes('trefila') ? 'rotate-90' : ''}`} />
+                                    )}
+                                </button>
 
-                            {!isCollapsed && expandedMenus.includes('trefila') && (
-                                <div className="ml-4 pl-4 border-l border-slate-700/50 flex flex-col gap-0.5 mt-1 mb-2 animate-in slide-in-from-left-2 duration-200">
-                                    {hasPermission('trefilaInProgress') && (
-                                        <>
-                                            <button onClick={() => setPage('trefilaInProgress')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaInProgress' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                                ⚙️ Em Produção (Geral)
+                                {!isCollapsed && expandedMenus.includes('trefila') && (
+                                    <div className="ml-4 pl-4 border-l border-slate-700/50 flex flex-col gap-0.5 mt-1 mb-2 animate-in slide-in-from-left-2 duration-200">
+                                        {hasPermission('trefilaInProgress') && (
+                                            <>
+                                                <button onClick={() => setPage('trefilaInProgress')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaInProgress' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                                    ⚙️ Em Produção (Geral)
+                                                </button>
+                                                <div className="flex gap-1 px-3 mb-2">
+                                                    {(!assignedMachine || assignedMachine === 'Trefila 1') && (
+                                                        <button onClick={() => { localStorage.setItem('msm_active_machine', 'Trefila 1'); setPage('trefilaInProgress'); }} className="text-[9px] font-black bg-white/5 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 px-2 py-1 rounded border border-white/5 uppercase transition-all flex-1">Máquina 1</button>
+                                                    )}
+                                                    {(!assignedMachine || assignedMachine === 'Trefila 2') && (
+                                                        <button onClick={() => { localStorage.setItem('msm_active_machine', 'Trefila 2'); setPage('trefilaInProgress'); }} className="text-[9px] font-black bg-white/5 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 px-2 py-1 rounded border border-white/5 uppercase transition-all flex-1">Máquina 2</button>
+                                                    )}
+                                                </div>
+                                            </>
+                                        )}
+                                        {hasPermission('trefilaWeighing') && (
+                                            <button onClick={() => setPage('trefilaWeighing')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaWeighing' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                                ⚖️ Pesagem de Rolos
                                             </button>
-                                            <div className="flex gap-1 px-3 mb-2">
-                                                {(!assignedMachine || assignedMachine === 'Trefila 1') && (
-                                                    <button onClick={() => { localStorage.setItem('msm_active_machine', 'Trefila 1'); setPage('trefilaInProgress'); }} className="text-[9px] font-black bg-white/5 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 px-2 py-1 rounded border border-white/5 uppercase transition-all flex-1">Máquina 1</button>
-                                                )}
-                                                {(!assignedMachine || assignedMachine === 'Trefila 2') && (
-                                                    <button onClick={() => { localStorage.setItem('msm_active_machine', 'Trefila 2'); setPage('trefilaInProgress'); }} className="text-[9px] font-black bg-white/5 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 px-2 py-1 rounded border border-white/5 uppercase transition-all flex-1">Máquina 2</button>
-                                                )}
-                                            </div>
-                                        </>
-                                    )}
-                                    {hasPermission('trefilaWeighing') && (
-                                        <button onClick={() => setPage('trefilaWeighing')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaWeighing' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                            ⚖️ Pesagem de Rolos
-                                        </button>
-                                    )}
-                                    {hasPermission('trefilaPending') && (
-                                        <button onClick={() => setPage('trefilaPending')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaPending' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                            📋 Próximas Produções
-                                        </button>
-                                    )}
-                                    {hasPermission('trefilaCompleted') && (
-                                        <button onClick={() => setPage('trefilaCompleted')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaCompleted' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                            📦 Produções Finalizadas
-                                        </button>
-                                    )}
-                                    {hasPermission('trefilaReports') && (
-                                        <button onClick={() => setPage('trefilaReports')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaReports' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                            📑 Relatórios de Turno
-                                        </button>
-                                    )}
-                                    {hasPermission('trefilaRings') && (
-                                        <button onClick={() => setPage('trefilaRings')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaRings' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                            💍 Simulação & Anéis
-                                        </button>
-                                    )}
-                                    {hasPermission('trefilaBitolaCheck') && (
-                                        <button onClick={() => setPage('trefilaBitolaCheck')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaBitolaCheck' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                            ⚖️ Aferir Bitola
-                                        </button>
-                                    )}
-                                </div>
-                            )}
-                        </>
-                    )}
-
-                    {/* Treliça Collapsible */}
-                    {(hasPermission('trelicaInProgress') || hasPermission('trelicaPending') || hasPermission('trelicaCompleted') || hasPermission('trelicaReports')) && (
-                        <>
-                            <button
-                                onClick={() => toggleMenu('trelica')}
-                                className={`sidebar-item ${['trelicaInProgress', 'trelicaPending', 'trelicaCompleted', 'trelicaReports'].includes(page) ? 'active' : ''} justify-between group`}
-                                title={isCollapsed ? 'Produção – Treliça' : ''}
-                            >
-                                <div className="flex items-center gap-3 overflow-hidden">
-                                    <div className="sidebar-item-icon shrink-0">
-                                        <CogIcon className="w-full h-full" />
+                                        )}
+                                        {hasPermission('trefilaPending') && (
+                                            <button onClick={() => setPage('trefilaPending')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaPending' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                                📋 Próximas Produções
+                                            </button>
+                                        )}
+                                        {hasPermission('trefilaCompleted') && (
+                                            <button onClick={() => setPage('trefilaCompleted')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaCompleted' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                                📦 Produções Finalizadas
+                                            </button>
+                                        )}
+                                        {hasPermission('trefilaReports') && (
+                                            <button onClick={() => setPage('trefilaReports')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaReports' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                                📑 Relatórios de Turno
+                                            </button>
+                                        )}
+                                        {hasPermission('trefilaRings') && (
+                                            <button onClick={() => setPage('trefilaRings')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaRings' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                                💍 Simulação & Anéis
+                                            </button>
+                                        )}
+                                        {hasPermission('trefilaBitolaCheck') && (
+                                            <button onClick={() => setPage('trefilaBitolaCheck')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trefilaBitolaCheck' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                                ⚖️ Aferir Bitola
+                                            </button>
+                                        )}
                                     </div>
-                                    {!isCollapsed && <span className="sidebar-item-label whitespace-nowrap">Produção – Treliça</span>}
-                                </div>
-                                {!isCollapsed && (
-                                    <ChevronRightIcon className={`w-3 h-3 text-slate-500 transition-transform duration-200 ${expandedMenus.includes('trelica') ? 'rotate-90' : ''}`} />
                                 )}
-                            </button>
+                            </>
+                        )}
 
-                            {!isCollapsed && expandedMenus.includes('trelica') && (
-                                <div className="ml-4 pl-4 border-l border-slate-700/50 flex flex-col gap-0.5 mt-1 mb-2 animate-in slide-in-from-left-2 duration-200">
-                                    {hasPermission('trelicaInProgress') && (
-                                        <>
-                                            <button onClick={() => setPage('trelicaInProgress')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelicaInProgress' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                                ⚙️ Em Produção (Geral)
-                                            </button>
-                                            <div className="flex gap-1 px-3 mb-2">
-                                                {(!assignedMachine || assignedMachine === 'Treliça 1') && (
-                                                    <button onClick={() => { localStorage.setItem('msm_active_machine', 'Treliça 1'); setPage('trelicaInProgress'); }} className="text-[9px] font-black bg-white/5 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 px-2 py-1 rounded border border-white/5 uppercase transition-all flex-1">Máquina 1</button>
-                                                )}
-                                                {(!assignedMachine || assignedMachine === 'Treliça 2') && (
-                                                    <button onClick={() => { localStorage.setItem('msm_active_machine', 'Treliça 2'); setPage('trelicaInProgress'); }} className="text-[9px] font-black bg-white/5 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 px-2 py-1 rounded border border-white/5 uppercase transition-all flex-1">Máquina 2</button>
-                                                )}
-                                            </div>
-                                        </>
-                                    )}
-                                    {hasPermission('trelicaPending') && (
-                                        <button onClick={() => setPage('trelicaPending')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelicaPending' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                            📋 Próximas Produções
-                                        </button>
-                                    )}
-                                    {hasPermission('trelicaCompleted') && (
-                                        <button onClick={() => setPage('trelicaCompleted')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelicaCompleted' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                            📦 Produções Finalizadas
-                                        </button>
-                                    )}
-                                    {hasPermission('trelicaReports') && (
-                                        <button onClick={() => setPage('trelicaReports')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelicaReports' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                            📑 Relatórios de Turno
-                                        </button>
-                                    )}
-                                </div>
-                            )}
-                        </>
-                    )}
-
-                    {/* Malha Collapsible */}
-                    {(hasPermission('malhaInProgress') || hasPermission('malhaPending') || hasPermission('malhaCompleted') || hasPermission('malhaReports')) && (
-                        <>
-                            <button
-                                onClick={() => toggleMenu('malha')}
-                                className={`sidebar-item ${['malhaInProgress', 'malhaPending', 'malhaCompleted', 'malhaReports'].includes(page) ? 'active' : ''} justify-between group`}
-                                title={isCollapsed ? 'Produção – Malha' : ''}
-                            >
-                                <div className="flex items-center gap-3 overflow-hidden">
-                                    <div className="sidebar-item-icon shrink-0">
-                                        <CogIcon className="w-full h-full" />
+                        {/* Treliça Collapsible */}
+                        {(hasPermission('trelicaInProgress') || hasPermission('trelicaPending') || hasPermission('trelicaCompleted') || hasPermission('trelicaReports')) && (
+                            <>
+                                <button
+                                    onClick={() => toggleMenu('trelica')}
+                                    className={`sidebar-item ${['trelicaInProgress', 'trelicaPending', 'trelicaCompleted', 'trelicaReports'].includes(page) ? 'active' : ''} justify-between group`}
+                                    title={isCollapsed ? 'Produção – Treliça' : ''}
+                                >
+                                    <div className="flex items-center gap-3 overflow-hidden">
+                                        <div className="sidebar-item-icon shrink-0">
+                                            <CogIcon className="w-full h-full" />
+                                        </div>
+                                        {!isCollapsed && <span className="sidebar-item-label whitespace-nowrap">Produção – Treliça</span>}
                                     </div>
-                                    {!isCollapsed && <span className="sidebar-item-label whitespace-nowrap">Produção – Malha</span>}
-                                </div>
-                                {!isCollapsed && (
-                                    <ChevronRightIcon className={`w-3 h-3 text-slate-500 transition-transform duration-200 ${expandedMenus.includes('malha') ? 'rotate-90' : ''}`} />
-                                )}
-                            </button>
+                                    {!isCollapsed && (
+                                        <ChevronRightIcon className={`w-3 h-3 text-slate-500 transition-transform duration-200 ${expandedMenus.includes('trelica') ? 'rotate-90' : ''}`} />
+                                    )}
+                                </button>
 
-                            {!isCollapsed && expandedMenus.includes('malha') && (
-                                <div className="ml-4 pl-4 border-l border-slate-700/50 flex flex-col gap-0.5 mt-1 mb-2 animate-in slide-in-from-left-2 duration-200">
-                                    {hasPermission('malhaInProgress') && (
-                                        <>
-                                            <button onClick={() => setPage('malhaInProgress')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'malhaInProgress' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                                ⚙️ Em Produção (Geral)
+                                {!isCollapsed && expandedMenus.includes('trelica') && (
+                                    <div className="ml-4 pl-4 border-l border-slate-700/50 flex flex-col gap-0.5 mt-1 mb-2 animate-in slide-in-from-left-2 duration-200">
+                                        {hasPermission('trelicaInProgress') && (
+                                            <>
+                                                <button onClick={() => setPage('trelicaInProgress')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelicaInProgress' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                                    ⚙️ Em Produção (Geral)
+                                                </button>
+                                                <div className="flex gap-1 px-3 mb-2">
+                                                    {(!assignedMachine || assignedMachine === 'Treliça 1') && (
+                                                        <button onClick={() => { localStorage.setItem('msm_active_machine', 'Treliça 1'); setPage('trelicaInProgress'); }} className="text-[9px] font-black bg-white/5 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 px-2 py-1 rounded border border-white/5 uppercase transition-all flex-1">Máquina 1</button>
+                                                    )}
+                                                    {(!assignedMachine || assignedMachine === 'Treliça 2') && (
+                                                        <button onClick={() => { localStorage.setItem('msm_active_machine', 'Treliça 2'); setPage('trelicaInProgress'); }} className="text-[9px] font-black bg-white/5 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 px-2 py-1 rounded border border-white/5 uppercase transition-all flex-1">Máquina 2</button>
+                                                    )}
+                                                </div>
+                                            </>
+                                        )}
+                                        {hasPermission('trelicaPending') && (
+                                            <button onClick={() => setPage('trelicaPending')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelicaPending' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                                📋 Próximas Produções
                                             </button>
-                                            <div className="flex gap-1 px-3 mb-2">
-                                                {(!assignedMachine || assignedMachine === 'Malha 1') && (
-                                                    <button onClick={() => { localStorage.setItem('msm_active_machine', 'Malha 1'); setPage('malhaInProgress'); }} className="text-[9px] font-black bg-white/5 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 px-2 py-1 rounded border border-white/5 uppercase transition-all flex-1">Máquina 1</button>
-                                                )}
-                                                {(!assignedMachine || assignedMachine === 'Malha 2') && (
-                                                    <button onClick={() => { localStorage.setItem('msm_active_machine', 'Malha 2'); setPage('malhaInProgress'); }} className="text-[9px] font-black bg-white/5 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 px-2 py-1 rounded border border-white/5 uppercase transition-all flex-1">Máquina 2</button>
-                                                )}
-                                            </div>
-                                        </>
-                                    )}
-                                    {hasPermission('malhaPending') && (
-                                        <button onClick={() => setPage('malhaPending')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'malhaPending' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                            📋 Próximas Produções
-                                        </button>
-                                    )}
-                                    {hasPermission('malhaCompleted') && (
-                                        <button onClick={() => setPage('malhaCompleted')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'malhaCompleted' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                            📦 Produções Finalizadas
-                                        </button>
-                                    )}
-                                    {hasPermission('malhaReports') && (
-                                        <button onClick={() => setPage('malhaReports')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'malhaReports' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                            📑 Relatórios de Turno
-                                        </button>
-                                    )}
-                                </div>
-                            )}
-                        </>
-                    )}
+                                        )}
+                                        {hasPermission('trelicaCompleted') && (
+                                            <button onClick={() => setPage('trelicaCompleted')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelicaCompleted' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                                📦 Produções Finalizadas
+                                            </button>
+                                        )}
+                                        {hasPermission('trelicaReports') && (
+                                            <button onClick={() => setPage('trelicaReports')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'trelicaReports' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                                📑 Relatórios de Turno
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                            </>
+                        )}
 
-                    <MenuItem target="productsManagement" label="Fichas Técnicas" icon={AdjustmentsIcon} />
-                </div>
+                        {/* Malha Collapsible */}
+                        {(hasPermission('malhaInProgress') || hasPermission('malhaPending') || hasPermission('malhaCompleted') || hasPermission('malhaReports')) && (
+                            <>
+                                <button
+                                    onClick={() => toggleMenu('malha')}
+                                    className={`sidebar-item ${['malhaInProgress', 'malhaPending', 'malhaCompleted', 'malhaReports'].includes(page) ? 'active' : ''} justify-between group`}
+                                    title={isCollapsed ? 'Produção – Malha' : ''}
+                                >
+                                    <div className="flex items-center gap-3 overflow-hidden">
+                                        <div className="sidebar-item-icon shrink-0">
+                                            <CogIcon className="w-full h-full" />
+                                        </div>
+                                        {!isCollapsed && <span className="sidebar-item-label whitespace-nowrap">Produção – Malha</span>}
+                                    </div>
+                                    {!isCollapsed && (
+                                        <ChevronRightIcon className={`w-3 h-3 text-slate-500 transition-transform duration-200 ${expandedMenus.includes('malha') ? 'rotate-90' : ''}`} />
+                                    )}
+                                </button>
+
+                                {!isCollapsed && expandedMenus.includes('malha') && (
+                                    <div className="ml-4 pl-4 border-l border-slate-700/50 flex flex-col gap-0.5 mt-1 mb-2 animate-in slide-in-from-left-2 duration-200">
+                                        {hasPermission('malhaInProgress') && (
+                                            <>
+                                                <button onClick={() => setPage('malhaInProgress')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'malhaInProgress' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                                    ⚙️ Em Produção (Geral)
+                                                </button>
+                                                <div className="flex gap-1 px-3 mb-2">
+                                                    {(!assignedMachine || assignedMachine === 'Malha 1') && (
+                                                        <button onClick={() => { localStorage.setItem('msm_active_machine', 'Malha 1'); setPage('malhaInProgress'); }} className="text-[9px] font-black bg-white/5 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 px-2 py-1 rounded border border-white/5 uppercase transition-all flex-1">Máquina 1</button>
+                                                    )}
+                                                    {(!assignedMachine || assignedMachine === 'Malha 2') && (
+                                                        <button onClick={() => { localStorage.setItem('msm_active_machine', 'Malha 2'); setPage('malhaInProgress'); }} className="text-[9px] font-black bg-white/5 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 px-2 py-1 rounded border border-white/5 uppercase transition-all flex-1">Máquina 2</button>
+                                                    )}
+                                                </div>
+                                            </>
+                                        )}
+                                        {hasPermission('malhaPending') && (
+                                            <button onClick={() => setPage('malhaPending')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'malhaPending' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                                📋 Próximas Produções
+                                            </button>
+                                        )}
+                                        {hasPermission('malhaCompleted') && (
+                                            <button onClick={() => setPage('malhaCompleted')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'malhaCompleted' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                                📦 Produções Finalizadas
+                                            </button>
+                                        )}
+                                        {hasPermission('malhaReports') && (
+                                            <button onClick={() => setPage('malhaReports')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'malhaReports' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                                📑 Relatórios de Turno
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                            </>
+                        )}
+
+                        <MenuItem target="productsManagement" label="Fichas Técnicas" icon={AdjustmentsIcon} />
+                    </div>
+                )}
 
                 {/* ESTOQUE */}
-                <div className="sidebar-category">
-                    <div className="sidebar-category-title">{isCollapsed ? '📦' : '📦 Estoque'}</div>
+                {hasEstoque && (
+                    <div className="sidebar-category">
+                        <div className="sidebar-category-title">{isCollapsed ? '📦' : '📦 Estoque'}</div>
 
-                    {hasPermission('stock') && (
-                        <>
-                            {/* Collapsible Matéria-prima */}
-                            <button
-                                onClick={() => toggleMenu('stock')}
-                                className={`sidebar-item ${['stock', 'stockAdd', 'stockTransfer'].includes(page) ? 'active' : ''} justify-between group`}
-                                title={isCollapsed ? 'Matéria-prima' : ''}
-                            >
-                                <div className="flex items-center gap-3 overflow-hidden">
-                                    <div className="sidebar-item-icon shrink-0">
-                                        <ArchiveIcon className="w-full h-full" />
+                        {hasPermission('stock') && (
+                            <>
+                                {/* Collapsible Matéria-prima */}
+                                <button
+                                    onClick={() => toggleMenu('stock')}
+                                    className={`sidebar-item ${['stock', 'stockAdd', 'stockTransfer'].includes(page) ? 'active' : ''} justify-between group`}
+                                    title={isCollapsed ? 'Matéria-prima' : ''}
+                                >
+                                    <div className="flex items-center gap-3 overflow-hidden">
+                                        <div className="sidebar-item-icon shrink-0">
+                                            <ArchiveIcon className="w-full h-full" />
+                                        </div>
+                                        {!isCollapsed && <span className="sidebar-item-label whitespace-nowrap">Matéria-prima</span>}
                                     </div>
-                                    {!isCollapsed && <span className="sidebar-item-label whitespace-nowrap">Matéria-prima</span>}
-                                </div>
-                                {!isCollapsed && (
-                                    <ChevronRightIcon className={`w-3 h-3 text-slate-500 transition-transform duration-200 ${expandedMenus.includes('stock') ? 'rotate-90' : ''}`} />
+                                    {!isCollapsed && (
+                                        <ChevronRightIcon className={`w-3 h-3 text-slate-500 transition-transform duration-200 ${expandedMenus.includes('stock') ? 'rotate-90' : ''}`} />
+                                    )}
+                                </button>
+
+                                {/* Submenu */}
+                                {!isCollapsed && expandedMenus.includes('stock') && (
+                                    <div className="ml-4 pl-4 border-l border-slate-700/50 flex flex-col gap-0.5 mt-1 mb-2 animate-in slide-in-from-left-2 duration-200">
+                                        {hasPermission('stockAdd') && (
+                                            <button onClick={() => setPage('stockAdd')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stockAdd' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                                + Conferência
+                                            </button>
+                                        )}
+                                        {hasPermission('stockTransfer') && (
+                                            <button onClick={() => setPage('stockTransfer')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stockTransfer' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                                ➡️ Transferência
+                                            </button>
+                                        )}
+
+                                        {hasPermission('stock') && (
+                                            <button onClick={() => setPage('stock')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stock' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                                ⚙️ Gestão de Lotes
+                                            </button>
+                                        )}
+                                    </div>
                                 )}
-                            </button>
+                            </>
+                        )}
 
-                            {/* Submenu */}
-                            {!isCollapsed && expandedMenus.includes('stock') && (
-                                <div className="ml-4 pl-4 border-l border-slate-700/50 flex flex-col gap-0.5 mt-1 mb-2 animate-in slide-in-from-left-2 duration-200">
-                                    {hasPermission('stockAdd') && (
-                                        <button onClick={() => setPage('stockAdd')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stockAdd' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                            + Conferência
-                                        </button>
-                                    )}
-                                    {hasPermission('stockTransfer') && (
-                                        <button onClick={() => setPage('stockTransfer')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stockTransfer' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                            ➡️ Transferência
-                                        </button>
-                                    )}
-
-                                    {hasPermission('stock') && (
-                                        <button onClick={() => setPage('stock')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'stock' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                            ⚙️ Gestão de Lotes
-                                        </button>
-                                    )}
-                                </div>
-                            )}
-                        </>
-                    )}
-
-                    <MenuItem target="finishedGoods" label="Produto Acabado" icon={ArchiveIcon} />
-                    <MenuItem target="trelicaStock" label="Estoque de Treliça" icon={ArchiveIcon} />
-                </div>
-
+                        <MenuItem target="finishedGoods" label="Produto Acabado" icon={ArchiveIcon} />
+                        <MenuItem target="trelicaStock" label="Estoque de Treliça" icon={ArchiveIcon} />
+                    </div>
+                )}
 
                 {/* PESSOAS */}
-                <div className="sidebar-category">
-                    <div className="sidebar-category-title">{isCollapsed ? '👥' : '👥 Pessoas'}</div>
+                {hasPessoas && (
+                    <div className="sidebar-category">
+                        <div className="sidebar-category-title">{isCollapsed ? '👥' : '👥 Pessoas'}</div>
 
-                    <button
-                        onClick={() => toggleMenu('people')}
-                        className={`sidebar-item ${['peopleManagement', 'continuousImprovement'].includes(page) ? 'active' : ''} justify-between group`}
-                        title={isCollapsed ? 'Pessoas' : ''}
-                    >
-                        <div className="flex items-center gap-3 overflow-hidden">
-                            <div className="sidebar-item-icon shrink-0">
-                                <UserGroupIcon className="w-full h-full" />
+                        <button
+                            onClick={() => toggleMenu('people')}
+                            className={`sidebar-item ${['peopleManagement', 'continuousImprovement'].includes(page) ? 'active' : ''} justify-between group`}
+                            title={isCollapsed ? 'Pessoas' : ''}
+                        >
+                            <div className="flex items-center gap-3 overflow-hidden">
+                                <div className="sidebar-item-icon shrink-0">
+                                    <UserGroupIcon className="w-full h-full" />
+                                </div>
+                                {!isCollapsed && <span className="sidebar-item-label whitespace-nowrap">Gestão</span>}
                             </div>
-                            {!isCollapsed && <span className="sidebar-item-label whitespace-nowrap">Gestão</span>}
-                        </div>
-                        {!isCollapsed && (
-                            <ChevronRightIcon className={`w-3 h-3 text-slate-500 transition-transform duration-200 ${expandedMenus.includes('people') ? 'rotate-90' : ''}`} />
-                        )}
-                    </button>
+                            {!isCollapsed && (
+                                <ChevronRightIcon className={`w-3 h-3 text-slate-500 transition-transform duration-200 ${expandedMenus.includes('people') ? 'rotate-90' : ''}`} />
+                            )}
+                        </button>
 
-                    {!isCollapsed && expandedMenus.includes('people') && (
-                        <div className="ml-4 pl-4 border-l border-slate-700/50 flex flex-col gap-0.5 mt-1 mb-2 animate-in slide-in-from-left-2 duration-200">
-                            {hasPermission('peopleManagement') && (
-                                <button onClick={() => setPage('peopleManagement')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'peopleManagement' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                    👥 Gestão de Pessoas
-                                </button>
-                            )}
-                            {hasPermission('continuousImprovement') && (
-                                <button onClick={() => setPage('continuousImprovement')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'continuousImprovement' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
-                                    ✨ Melhoria Contínua
-                                </button>
-                            )}
-                        </div>
-                    )}
-                </div>
+                        {!isCollapsed && expandedMenus.includes('people') && (
+                            <div className="ml-4 pl-4 border-l border-slate-700/50 flex flex-col gap-0.5 mt-1 mb-2 animate-in slide-in-from-left-2 duration-200">
+                                {hasPermission('peopleManagement') && (
+                                    <button onClick={() => setPage('peopleManagement')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'peopleManagement' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                        👥 Gestão de Pessoas
+                                    </button>
+                                )}
+                                {hasPermission('continuousImprovement') && (
+                                    <button onClick={() => setPage('continuousImprovement')} className={`text-left text-[12px] font-medium py-1.5 px-3 rounded-md transition-all ${page === 'continuousImprovement' ? 'text-[#00E5FF] bg-white/5' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                                        ✨ Melhoria Contínua
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* GESTÃO */}
-                <div className="sidebar-category">
-                    <div className="sidebar-category-title">{isCollapsed ? '🧰' : '🧰 Gestão'}</div>
-                    <MenuItem target="reports" label="Relatórios" icon={ChartBarIcon} />
-                    <MenuItem target="laboratory" label="Laboratório" icon={DocumentReportIcon} />
-                    <MenuItem target="documents" label="Documentos" icon={DocumentTextIcon} />
-                    <MenuItem target="workInstructions" label="Instruções" icon={DocumentTextIcon} />
-                    <MenuItem target="partsManager" label="Peças" icon={WrenchScrewdriverIcon} />
-                    <MenuItem target="electrodesStock" label="Eletrodos" icon={AdjustmentsIcon} />
-                </div>
+                {hasGestao && (
+                    <div className="sidebar-category">
+                        <div className="sidebar-category-title">{isCollapsed ? '🧰' : '🧰 Gestão'}</div>
+                        <MenuItem target="reports" label="Relatórios" icon={ChartBarIcon} />
+                        <MenuItem target="laboratory" label="Laboratório" icon={DocumentReportIcon} />
+                        <MenuItem target="documents" label="Documentos" icon={DocumentTextIcon} />
+                        <MenuItem target="workInstructions" label="Instruções" icon={DocumentTextIcon} />
+                        <MenuItem target="partsManager" label="Peças" icon={WrenchScrewdriverIcon} />
+                        <MenuItem target="electrodesStock" label="Eletrodos" icon={AdjustmentsIcon} />
+                    </div>
+                )}
 
 
                 {/* SISTEMA */}

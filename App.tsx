@@ -3182,11 +3182,14 @@ const App: React.FC = () => {
                 shiftConfig={pcpShiftConfig}
                 onUpdateShiftConfig={setPcpShiftConfig}
                 recordLotWeight={recordLotWeight}
+                onLogout={handleLogout}
             />;
         }
     };
 
-    const isPcpFocus = page === 'pcpBoard' && isPcpFullscreen;
+    const isGestorUser = currentUser?.role === 'admin' || currentUser?.role === 'gestor' || currentUser?.username?.toLowerCase() === 'admin' || currentUser?.username?.toLowerCase() === 'gestor' || currentUser?.username?.toLowerCase().includes('matheusmiranda');
+    const isViewerUser = currentUser?.role === 'viewer' || (!isGestorUser && !!currentUser?.permissions?.pcpBoard && !currentUser?.permissions?.trelica && !currentUser?.permissions?.trefila && !currentUser?.permissions?.malha && !currentUser?.permissions?.stock);
+    const isPcpFocus = (page === 'pcpBoard' && (isPcpFullscreen || isViewerUser));
 
     return (
         <div className={`app-container ${isPcpFocus ? 'pcp-fullscreen-active' : ''}`}>
