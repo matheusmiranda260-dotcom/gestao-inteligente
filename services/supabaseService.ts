@@ -303,6 +303,15 @@ export const insertItem = async <T extends { id?: string }>(
         }
     }
 
+    // Resilience fallback: if DB table has CHECK constraint on role without 'viewer', fallback to 'user'
+    if (error && (error.code === '23514' || error.message?.includes('role_check') || error.message?.includes('violates check constraint')) && fallbackPayload.role === 'viewer') {
+        console.warn(`PostgreSQL check constraint on role in ${table}, retrying insert with role='user'...`);
+        fallbackPayload.role = 'user';
+        const retry = await supabase.from(table).insert(fallbackPayload).select().single();
+        data = retry.data;
+        error = retry.error;
+    }
+
     if (error) {
         console.error(`Error inserting into ${table}:`, error);
         console.error('Error details:', {
@@ -366,6 +375,15 @@ export const updateItem = async <T>(table: string, id: string, updates: Partial<
             }
             break;
         }
+    }
+
+    // Resilience fallback: if DB table has CHECK constraint on role without 'viewer', fallback to 'user'
+    if (error && (error.code === '23514' || error.message?.includes('role_check') || error.message?.includes('violates check constraint')) && fallbackPayload.role === 'viewer') {
+        console.warn(`PostgreSQL check constraint on role in ${table}, retrying update with role='user'...`);
+        fallbackPayload.role = 'user';
+        const retry = await supabase.from(table).update(fallbackPayload).eq('id', id).select().single();
+        data = retry.data;
+        error = retry.error;
     }
 
     if (error) {

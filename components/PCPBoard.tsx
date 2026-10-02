@@ -162,8 +162,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     recordLotWeight
 }) => {
     // Modo Visualizador (Somente Leitura - Não pode editar, criar ou excluir)
-    const isViewer = currentUser?.role === 'viewer';
-    const isGestor = !isViewer && (currentUser?.role === 'admin' || currentUser?.role === 'gestor' || currentUser?.username?.toLowerCase() === 'admin' || currentUser?.username?.toLowerCase() === 'gestor' || currentUser?.username?.toLowerCase().includes('matheusmiranda'));
+    const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor' || currentUser?.username?.toLowerCase() === 'admin' || currentUser?.username?.toLowerCase() === 'gestor' || currentUser?.username?.toLowerCase().includes('matheusmiranda');
+    const isViewer = currentUser?.role === 'viewer' || (!isGestor && !!currentUser?.permissions?.pcpBoard && !currentUser?.permissions?.trelica && !currentUser?.permissions?.trefila && !currentUser?.permissions?.malha && !currentUser?.permissions?.stock);
 
     // Estado de cabeçalho minimizado/expandido (persistido)
     const [isHeaderCollapsed, setIsHeaderCollapsed] = useState<boolean>(() => {
